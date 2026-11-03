@@ -96,6 +96,15 @@ describe('inboxLayout', () => {
     expect(rowStatus(t('a'), undefined)).toBeNull();
   });
 
+  it('keeps a thread whose own turn ended in Working while a thread it delegated works, on desktop and the phone', () => {
+    const l = inboxLayout({ threads: [t('job', { status: 'done', delegating: true }), t('idle')], needs: [], delegated: none, open: null });
+    expect(ids(l.working)).toEqual(['job']);
+    expect(ids(l.inbox)).toEqual(['idle']);
+    expect(rowStatus(t('job', { status: 'done', delegating: true }), undefined)).toEqual({ glyph: 'running', label: 'Working' });
+    // Once nothing it delegated works, it is back to its own status.
+    expect(rowStatus(t('job', { status: 'done', delegating: false }), undefined)).toBeNull();
+  });
+
   it('sorts done threads by when they were marked done, newest first', () => {
     const l = inboxLayout({
       threads: [t('x', { done_at: '2026-10-01' }), t('y', { done_at: '2026-10-04' })],

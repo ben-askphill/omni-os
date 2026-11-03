@@ -1,4 +1,5 @@
 import type { ChannelWithRunning, Folder, FolderWithThreads, ThreadStub } from './api.ts';
+import { isWorking } from '@omni/shared/delegate-count.ts';
 
 export const FOLDER_NAME_MAX = 60;
 export const DEFAULT_FOLDER_NAME = 'New folder';
@@ -30,7 +31,7 @@ export function freeName(list: Pick<Folder, 'id' | 'name'>[], base: string, exce
 /** One line, trimmed. */
 export const cleanName = (s: string) => s.replace(/\s+/g, ' ').trim();
 
-const busy = (t: Pick<ThreadStub, 'status'>) => t.status === 'running' || t.status === 'queued';
+const busy = isWorking;
 
 export const withFolders = (c: ChannelWithRunning, fn: (list: FolderWithThreads[]) => FolderWithThreads[]) => ({ ...c, folders: sortFolders(fn(c.folders ?? [])) });
 export const patchFolder = (id: string, patch: Partial<FolderWithThreads>) => (c: ChannelWithRunning) =>

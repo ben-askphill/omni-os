@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { Thread, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
+import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '@omni/server/harness/types.ts';
 import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
@@ -13,7 +13,7 @@ import type { ContinueLink } from '@omni/shared/continue.ts';
 import type { Clipped, HistoryHead } from '@omni/shared/history.ts';
 import { outputQuery, type OutputChunk } from '@omni/shared/tool-output.ts';
 
-export type { Thread, EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
+export type { EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
 export type HarnessWithRunning = HarnessInfo & { running: number; /** How to install it, when it is not available and has a local CLI. */ install?: string };
@@ -26,9 +26,15 @@ export type CommandList = HarnessCommands & { recent?: string[] };
 /** A channel as the API sends it: the design system's file stays on the server, only its name and size come. */
 export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: number };
 
+/**
+ * A thread as the API sends it. `delegating`: a thread it delegated, at any depth, still runs or queues
+ * (apps/server/delegating.ts). Read running state through @omni/shared/delegate-count.ts, not `status` alone.
+ */
+export type Thread = ThreadRow & { delegating?: boolean };
+
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> &
-  Partial<Pick<Thread, 'parent_id' | 'source'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
+  Partial<Pick<Thread, 'parent_id' | 'source' | 'delegating'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
 /** A Conductor job and its cross-channel delegated threads, as the channel API sends them. */
 export interface ConductorHandoffGroup {
   parent: ThreadStub;

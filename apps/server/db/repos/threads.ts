@@ -231,6 +231,21 @@ export const threads = {
       )
       .all() as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
+  /**
+   * The threads with a delegated thread running or queued below them, at any depth (apps/server/delegating.ts). An
+   * archived thread pins nothing. UNION drops an id met again, so a parent_id cycle ends.
+   */
+  delegating: () =>
+    (
+      db
+        .prepare(
+          `WITH RECURSIVE up(id) AS (
+             SELECT parent_id FROM threads WHERE status IN ('running','queued') AND archived = 0 AND parent_id IS NOT NULL
+             UNION SELECT t.parent_id FROM threads t JOIN up ON t.id = up.id WHERE t.parent_id IS NOT NULL)
+           SELECT id FROM up`,
+        )
+        .all() as { id: string }[]
+    ).map((r) => r.id),
   /** The machine that wrote the thread's running or queued status (sync), or null. For the status merge; ownership reads the assignment. */
   runMachine: (id: string) =>
     (db.prepare('SELECT run_machine FROM threads WHERE id = ?').get(id) as { run_machine: string | null } | undefined)?.run_machine ?? null,

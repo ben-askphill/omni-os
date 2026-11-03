@@ -16,6 +16,10 @@ export const STATUS_LABEL: Record<string, string> = {
   idle: 'Idle',
 };
 
+/** A thread's status in words. A thread whose own turn is over while the threads it delegated work reads as such. */
+export const threadStatusText = (t: { status: string; delegating?: boolean }) =>
+  t.delegating && t.status !== 'running' && t.status !== 'queued' ? 'Delegated threads running' : (STATUS_LABEL[t.status] ?? t.status);
+
 export type Glyph = 'running' | 'needs' | 'done' | 'settled' | 'idle' | 'queued';
 
 /** Thread status to the glyph it draws: a failure needs you, a stop just settles. */

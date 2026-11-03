@@ -1,6 +1,7 @@
 // A thread as the phone lists it: in a channel and in search. Pure.
 import { relTime } from '@omni/shared/format.ts';
 import type { Thread, ThreadStub } from '../api.ts';
+import { isWorking, shownStatus } from '@omni/shared/delegate-count.ts';
 
 export interface RowItem {
   id: string;
@@ -40,9 +41,9 @@ export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: nu
     channelId: t.channel_id,
     channelIcon: channel?.icon ?? null,
     role: t.role ?? null,
-    status: t.status,
-    settled: t.status !== 'running' && t.status !== 'queued',
+    status: shownStatus(t),
+    settled: !isWorking(t),
     time: shortTime(t.updated_at ?? t.created_at, now),
-    meta: META[t.status] ?? null,
+    meta: META[shownStatus(t)] ?? null,
   };
 }

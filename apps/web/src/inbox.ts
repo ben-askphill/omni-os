@@ -2,6 +2,7 @@
 // shelves by what it waits on. Pure, so the rules are tested on their own (apps/web/tests/inbox.test.ts).
 import type { NeedsYouBlocker, NeedsYouItem, ThreadStub } from './api.ts';
 import type { Glyph } from './components/ui.tsx';
+import { isWorking, showsRunning } from '@omni/shared/delegate-count.ts';
 
 export type InboxThread = ThreadStub & { pinned_at?: string | null; source?: string; archived?: number | boolean };
 
@@ -59,7 +60,7 @@ export function rowStatus(t: ThreadStub, need: NeedsYouItem | undefined, agents 
   const b = need?.blockers[0];
   if (b) return { glyph: 'needs', label: BLOCKER_LABEL[b.kind] };
   if (t.status === 'queued') return { glyph: 'queued', label: 'Queued' };
-  if (t.status === 'running' || agents > 0) return { glyph: 'running', label: 'Working' };
+  if (showsRunning(t) || agents > 0) return { glyph: 'running', label: 'Working' };
   switch (need?.result?.status) {
     case 'failed':
       return { glyph: 'needs', label: 'Failed' };
@@ -73,7 +74,7 @@ export function rowStatus(t: ThreadStub, need: NeedsYouItem | undefined, agents 
 
 const at = (t: InboxThread) => t.updated_at ?? t.created_at;
 const newest = (key: (t: InboxThread) => string) => (a: InboxThread, b: InboxThread) => key(b).localeCompare(key(a)) || a.id.localeCompare(b.id);
-const isBusy = (t: InboxThread) => t.status === 'running' || t.status === 'queued';
+const isBusy = isWorking;
 
 export function inboxLayout({
   threads,

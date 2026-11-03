@@ -32,6 +32,7 @@ import { useShell, useThread } from './shell.tsx';
 import { threadView } from '@omni/shared/thread-view.ts';
 import { holds } from '../thread-history.ts';
 import { hasLiveOutput, outputTarget } from '../tool-output.ts';
+import { isWorking } from '@omni/shared/delegate-count.ts';
 
 // xterm loads only when the terminal opens, as on desktop (pages/Thread.tsx).
 const TerminalView = lazy(() => import('../components/TerminalView.tsx').then((m) => ({ default: m.TerminalView })));
@@ -416,8 +417,6 @@ function AgentGlyph({ harness, status }: { harness: string; status: string }) {
   );
 }
 
-const ACTIVE_STATUS = new Set(['running', 'queued']);
-
 /**
  * Where the thread sits among its agents, the phone's copy of the desktop agents card: where it came from, what it
  * handed on to, what runs now and the delegations that finished, folded.
@@ -427,8 +426,8 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
   const { tasks } = useApp();
   const [showPrev, setShowPrev] = useState(false);
   const agents = useMemo(() => (thread ? runningSubagents(tasks, thread.id) : []), [tasks, thread]);
-  const running = children.filter((c) => ACTIVE_STATUS.has(c.status));
-  const previous = children.filter((c) => !ACTIVE_STATUS.has(c.status));
+  const running = children.filter(isWorking);
+  const previous = children.filter((c) => !isWorking(c));
   type R = { key: string; icon: ReactNode; label: ReactNode; sub?: ReactNode; right?: ReactNode; go?: () => void };
   const rows: R[] = [];
   if (parent) rows.push({ key: `p${parent.id}`, icon: 'arrowUpRight', label: parent.title || 'Untitled', sub: `Delegated it · ${STATUS_LABEL[parent.status] ?? parent.status}`, go: () => open(parent.id) });

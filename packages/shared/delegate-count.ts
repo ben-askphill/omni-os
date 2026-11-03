@@ -19,6 +19,7 @@ export interface DelegateChild {
   id: string;
   status: string;
   done_at?: string | null;
+  delegating?: boolean;
 }
 
 /**
@@ -30,7 +31,28 @@ export interface DelegateNeeds {
   failed: boolean;
 }
 
-const working = (c: DelegateChild) => c.status === 'running' || c.status === 'queued';
+/**
+ * The parts of a thread its running state reads. `delegating`: a thread it delegated, at any depth, runs or queues.
+ * The server derives it from the statuses (apps/server/delegating.ts) and sends it with every thread.
+ */
+export interface WorkState {
+  status: string;
+  delegating?: boolean;
+}
+
+/**
+ * The thread shows running: its own turn runs, or a thread it delegated still works, so a Conductor job whose turn
+ * ended keeps running until its crew reports back. Queued alone waits for a slot and shows as queued.
+ */
+export const showsRunning = (t: WorkState) => t.status === 'running' || !!t.delegating;
+
+/** The thread is at work, for the Running lists and counts: running, queued, or waiting on a thread it delegated. */
+export const isWorking = (t: WorkState) => t.status === 'running' || t.status === 'queued' || !!t.delegating;
+
+/** The status a thread's dot, pill or label shows: running while what it delegated works, its own otherwise. */
+export const shownStatus = (t: WorkState) => (t.delegating && t.status !== 'queued' ? 'running' : t.status);
+
+const working = (c: DelegateChild) => isWorking(c);
 
 /**
  * The count for one Conductor thread's delegated threads, or null when it delegated none. The state goes by priority:

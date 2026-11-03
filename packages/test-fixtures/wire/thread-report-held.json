@@ -1,6 +1,6 @@
 {
   "thread": {
-    "id": "00000000-0000-4000-8000-000000000012",
+    "id": "00000000-0000-4000-8000-000000000024",
     "channel_id": "acme",
     "title": "Plan the launch",
     "status": "stopped",
@@ -12,7 +12,7 @@
     "queued_harness": null,
     "queued_model": null,
     "queued_effort": null,
-    "session_id": "00000000-0000-4000-8000-000000000012",
+    "session_id": "00000000-0000-4000-8000-000000000024",
     "has_run": 1,
     "cwd": "/tmp/omni-fixtures/acme",
     "branch": null,
@@ -36,7 +36,8 @@
     "limit_elsewhere": 0,
     "continued_from": null,
     "created_at": "2026-01-05T09:00:00.000Z",
-    "updated_at": "2026-01-05T09:00:00.000Z"
+    "updated_at": "2026-01-05T09:00:00.000Z",
+    "delegating": false
   },
   "channel": {
     "id": "acme",
@@ -61,43 +62,43 @@
   },
   "events": [
     {
-      "id": 64,
-      "thread_id": "00000000-0000-4000-8000-000000000012",
+      "id": 80,
+      "thread_id": "00000000-0000-4000-8000-000000000024",
       "kind": "init",
-      "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[\"omni-ask:connected\"]}",
+      "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures/acme\",\"tools\":10,\"mcp\":[\"omni-ask:connected\",\"omni-render:connected\",\"omni-threads:connected\"]}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 67,
-      "thread_id": "00000000-0000-4000-8000-000000000012",
+      "id": 81,
+      "thread_id": "00000000-0000-4000-8000-000000000024",
       "kind": "user",
       "payload": "{\"text\":\"TOOL:30000 plan the launch\",\"source\":\"manual\"}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 68,
-      "thread_id": "00000000-0000-4000-8000-000000000012",
+      "id": 82,
+      "thread_id": "00000000-0000-4000-8000-000000000024",
       "kind": "tool_use",
       "payload": "{\"id\":\"toolu_fake_1\",\"name\":\"Bash\",\"input\":{\"command\":\"sleep 30\",\"description\":\"Fake tool\"},\"parent\":null}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 69,
-      "thread_id": "00000000-0000-4000-8000-000000000012",
+      "id": 83,
+      "thread_id": "00000000-0000-4000-8000-000000000024",
       "kind": "task",
       "payload": "{\"task_id\":\"toolu_fake_1\",\"event\":\"started\"}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 70,
-      "thread_id": "00000000-0000-4000-8000-000000000012",
+      "id": 84,
+      "thread_id": "00000000-0000-4000-8000-000000000024",
       "kind": "tool_result",
       "payload": "{\"tool_use_id\":\"toolu_fake_1\",\"text\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\",\"is_error\":true,\"truncated\":false}",
       "created_at": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": 71,
-      "thread_id": "00000000-0000-4000-8000-000000000012",
+      "id": 85,
+      "thread_id": "00000000-0000-4000-8000-000000000024",
       "kind": "result",
       "payload": "{\"ok\":false,\"subtype\":\"error_during_execution\",\"duration_ms\":1000,\"turns\":1,\"cost_usd\":0.001,\"stopped\":true}",
       "created_at": "2026-01-05T09:00:00.000Z"
@@ -106,7 +107,7 @@
   "artifacts": [],
   "children": [
     {
-      "id": "00000000-0000-4000-8000-000000000013",
+      "id": "00000000-0000-4000-8000-000000000025",
       "channel_id": "acme",
       "title": "Check the stock",
       "status": "done",
@@ -118,12 +119,12 @@
       "queued_harness": null,
       "queued_model": null,
       "queued_effort": null,
-      "session_id": "00000000-0000-4000-8000-000000000013",
+      "session_id": "00000000-0000-4000-8000-000000000025",
       "has_run": 1,
       "cwd": "/tmp/omni-fixtures/acme",
       "branch": null,
-      "parent_id": "00000000-0000-4000-8000-000000000012",
-      "task_id": "T-0437",
+      "parent_id": "00000000-0000-4000-8000-000000000024",
+      "task_id": "T-74D7",
       "source": "manual",
       "automation": null,
       "last_text": "ack: TOOL:300 check the stock",
@@ -142,22 +143,23 @@
       "limit_elsewhere": 0,
       "continued_from": null,
       "created_at": "2026-01-05T09:00:00.000Z",
-      "updated_at": "2026-01-05T09:00:00.000Z"
+      "updated_at": "2026-01-05T09:00:00.000Z",
+      "delegating": false
     }
   ],
   "team": [],
   "parent": null,
   "pending": [
     {
-      "uuid": "00000000-0000-4000-8000-000000000014",
+      "uuid": "00000000-0000-4000-8000-000000000026",
       "kind": "crew_report",
       "text": "ack: TOOL:300 check the stock",
       "source": "crew",
       "mode": "steer",
       "state": "held",
-      "task_id": "T-0437",
-      "thread_id": "00000000-0000-4000-8000-000000000013",
-      "request_id": "crew-report:00000000-0000-4000-8000-000000000013:79",
+      "task_id": "T-74D7",
+      "thread_id": "00000000-0000-4000-8000-000000000025",
+      "request_id": "crew-report:00000000-0000-4000-8000-000000000025:93",
       "delivery": "recovered"
     }
   ],

@@ -19,6 +19,7 @@ import { MoBubble } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import type { useShell, useThread } from './shell.tsx';
 import type { ThreadView as ThreadOf } from '@omni/shared/thread-view.ts';
+import { showsRunning } from '@omni/shared/delegate-count.ts';
 
 /** A worktree thread's changes since its base, again whenever a turn starts or ends. */
 export function useBranchChanges(thread: Thread | null, busy: boolean) {
@@ -78,7 +79,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
       <>
         {quiet && (t.prose || delegated) ? (
           <div className="flex items-center gap-2 text-[12.5px] leading-none text-fg-3">
-            <OmniMark size={20} state={crew.some((c) => c.status === 'running') ? 'delegating' : 'idle'} />
+            <OmniMark size={20} state={crew.some(showsRunning) ? 'delegating' : 'idle'} />
             Conductor
           </div>
         ) : (

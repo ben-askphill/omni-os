@@ -6,6 +6,7 @@ import { href } from '../../../router.ts';
 import { harnessLabel, HarnessLogo } from '../../brand.tsx';
 import { Icon, STATUS_LABEL, StatusDot, type IconName } from '../../ui.tsx';
 import { SubagentRow } from './RunningSubagents.tsx';
+import { isWorking } from '@omni/shared/delegate-count.ts';
 
 /** A thread's harness logo with its status dot on the corner, the way the panel marks every agent. */
 function AgentMark({ harness, status, icon }: { harness?: string; status: string; icon?: IconName }) {
@@ -31,7 +32,6 @@ function AgentLink({ to, title, mark, side, sub }: { to: string; title: string; 
   );
 }
 
-const ACTIVE = new Set(['running', 'queued']);
 
 /** The card's element id: a delegate count in the sidebar opens Details scrolled to it. */
 export const AGENTS_CARD_ID = 'thread-agents';
@@ -44,8 +44,8 @@ const statusText = (s: string) => STATUS_LABEL[s] ?? s;
  */
 export function AgentsSection({ parent, links, children, agents, onJump, now = Date.now() }: { parent: Thread | null; links: ThreadLinks; children: Thread[]; agents: BackgroundTask[]; onJump: (eventId: number) => void; now?: number }) {
   const [showPrev, setShowPrev] = useState(true);
-  const running = children.filter((c) => ACTIVE.has(c.status));
-  const previous = children.filter((c) => !ACTIVE.has(c.status));
+  const running = children.filter(isWorking);
+  const previous = children.filter((c) => !isWorking(c));
   const lineage = !!parent || !!links.from || links.into.length > 0;
   if (!lineage && !agents.length && !children.length) return null;
   return (

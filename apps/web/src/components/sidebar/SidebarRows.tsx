@@ -6,9 +6,9 @@ import { duration, plural } from '../../format.ts';
 import { href, navigate } from '../../router.ts';
 import { readPref, useApp, useNow, writePref } from '../../store.tsx';
 import { HarnessLogo, Loader } from '../brand.tsx';
-import { DoneMark, Icon, STATUS_LABEL, StatusDot, type IconName } from '../ui.tsx';
+import { DoneMark, Icon, StatusDot, threadStatusText, type IconName } from '../ui.tsx';
 import { DelegateCount, DelegateCountSpace, delegatesHref, useDelegateSummary } from '../DelegateCount.tsx';
-import type { DelegateSummary } from '@omni/shared/delegate-count.ts';
+import { showsRunning, type DelegateSummary } from '@omni/shared/delegate-count.ts';
 
 export function NavLink({ to, icon, lead, active, children, right, onNavigate, channelId, expanded }: { channelId?: string; to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: (e: MouseEvent) => void; expanded?: boolean }) {
   return (
@@ -83,8 +83,8 @@ function WithDelegates({ delegates, children }: { delegates: RowDelegates | unde
 export function ThreadLink({ t, active, tasks, onNavigate, indent = true, delegates }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void; indent?: boolean | 'flush'; delegates?: RowDelegates }) {
   const title = t.title || 'Untitled';
   const agents = tasks.length;
-  // A thread whose turn ended still works while its sub-agents run.
-  const busy = t.status === 'running' || agents > 0;
+  // A thread whose turn ended still works while its sub-agents or the threads it delegated run.
+  const busy = showsRunning(t) || agents > 0;
   return (
     <>
       <WithDelegates delegates={delegates}>
@@ -98,7 +98,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, delega
           e.dataTransfer.setData('text/plain', title);
         }}
         onDragEnd={drag.end}
-        title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : t.done_at ? 'Marked done' : (STATUS_LABEL[t.status] ?? t.status)}`}
+        title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : t.done_at ? 'Marked done' : threadStatusText(t)}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
         className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
@@ -183,7 +183,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, de
   const { setPinned } = useApp();
   const title = t.title || 'Untitled';
   const agents = tasks.length;
-  const busy = t.status === 'running' || agents > 0;
+  const busy = showsRunning(t) || agents > 0;
   return (
     <>
     <WithDelegates delegates={delegates}>
@@ -191,7 +191,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, de
       <a
         href={href.thread(t.id)}
         onClick={onNavigate}
-        title={`${title} · ${channel} · ${agents ? plural(agents, 'agent') + ' running' : (STATUS_LABEL[t.status] ?? t.status)}`}
+        title={`${title} · ${channel} · ${agents ? plural(agents, 'agent') + ' running' : threadStatusText(t)}`}
         aria-current={active && home ? 'page' : undefined}
         data-active={(active && home) || undefined}
         className={`hov z-[1] flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 text-[13.5px] transition-colors md:h-8 md:text-[13px] ${

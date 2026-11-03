@@ -58,7 +58,8 @@
         "pinned_at": null,
         "done_at": null,
         "parent_id": null,
-        "source": "manual"
+        "source": "manual",
+        "delegating": false
       }
     ],
     "recent": [
@@ -74,7 +75,8 @@
         "pinned_at": null,
         "done_at": null,
         "parent_id": null,
-        "source": "manual"
+        "source": "manual",
+        "delegating": false
       }
     ],
     "folders": []

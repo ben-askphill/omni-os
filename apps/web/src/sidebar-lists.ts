@@ -1,6 +1,7 @@
 // The sidebar's Running section and the phone's Recent threads, read off the channel list. Pure, so the rules are tested on their
 // own (apps/web/tests/sidebar-lists.test.ts).
 import type { ChannelWithRunning, ConductorHandoffGroup, ThreadStub } from './api.ts';
+import { isWorking } from '@omni/shared/delegate-count.ts';
 
 /** How many threads Recent threads lists. The server sends each channel's 5 latest, so the 5 latest overall are among them. */
 export const RECENT_THREADS = 5;
@@ -40,7 +41,7 @@ export function recentThreads(channels: Listing[], open: ThreadStub | null = nul
   return withOpen(unique(channels.map((c) => c.recent ?? [])).sort(byActivity).slice(0, limit), open);
 }
 
-const isBusy = (t: ThreadStub) => t.status === 'running' || t.status === 'queued';
+const isBusy = isWorking;
 const allHandoffs = (channels: Listing[]): ConductorHandoffGroup[] => channels.find((c) => c.id === 'conductor')?.handoffs ?? [];
 
 /** Nest Conductor's delegated threads under their job in a global sidebar section. */

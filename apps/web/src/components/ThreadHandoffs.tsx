@@ -4,6 +4,7 @@ import { href } from '../router.ts';
 import { readPref, useApp, writePref } from '../store.tsx';
 import { DoneMark, Icon, StatusDot } from './ui.tsx';
 import { Loader } from './brand.tsx';
+import { isWorking } from '@omni/shared/delegate-count.ts';
 
 /** A Conductor job row with its delegated threads, using the sidebar's existing tree-row style. */
 export function ThreadHandoffs({ parent, children, renderParent, channelIndent = false, idPrefix = 'sidebar', onNavigate }: {
@@ -47,7 +48,7 @@ function HandoffLink({ child, last, onNavigate }: { child: ThreadStub; last: boo
   const { channels } = useApp();
   const channel = channels.find((c) => c.id === child.channel_id)?.name ?? child.channel_id;
   const title = child.title || 'Untitled';
-  const busy = child.status === 'running' || child.status === 'queued';
+  const busy = isWorking(child);
 
   return (
     <a

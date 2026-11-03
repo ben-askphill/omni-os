@@ -13,6 +13,7 @@ import { MoDelegatedRow } from './DelegatedRow.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
 import { rowOf, type RowItem } from './rows.ts';
 import { useShell } from './shell.tsx';
+import { isWorking } from '@omni/shared/delegate-count.ts';
 
 const GROUPS: { label: string; kinds: string[] }[] = [
   { label: 'Clients', kinds: ['client'] },
@@ -100,7 +101,7 @@ export function ChannelsScreen() {
   );
 }
 
-const busy = (t: Thread) => t.status === 'running' || t.status === 'queued';
+const busy = isWorking;
 
 function MoFolderHeader({ folder, onToggle }: { folder: FolderRows; onToggle: () => void }) {
   return (
@@ -172,7 +173,7 @@ export function ChannelScreen({ id }: { id: string }) {
 
     if (id === 'conductor') {
       for (const group of ch?.handoffs ?? []) {
-        if (!group.children.some((child) => child.status === 'running' || child.status === 'queued')) continue;
+        if (!group.children.some(isWorking)) continue;
         const inActive = activeRows.some((row) => row.id === group.parent.id);
         if (inActive) continue;
         const parent = rowOf(group.parent, info, now);

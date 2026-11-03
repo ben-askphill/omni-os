@@ -9,6 +9,7 @@ import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
 import { Avatar, Button, Chip, DoneMark, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
+import { isWorking, showsRunning, shownStatus } from '@omni/shared/delegate-count.ts';
 
 /** Loads a thread list and keeps it current from /feed. With `archived`, the list holds archived threads only. */
 export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500, archived = false) {
@@ -64,19 +65,19 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
   const source = SOURCE_LABEL[t.source];
   // A mod's pinned status, compact beside the running indicator. The newest one when several mods set one.
   const mod = mods.findLast((m) => m.thread_id === t.id);
-  const preview = t.last_text ? t.last_text.replace(/\s+/g, ' ').slice(0, 240) : t.status === 'running' ? 'Working' : t.status === 'queued' ? 'Waiting for a slot' : '';
+  const preview = t.last_text ? t.last_text.replace(/\s+/g, ' ').slice(0, 240) : showsRunning(t) ? 'Working' : t.status === 'queued' ? 'Waiting for a slot' : '';
   return (
     <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-3 [--hov:var(--surface)] md:px-3.5">
       {showChannel ? (
         <span className="relative mt-0.5 shrink-0">
           <Avatar name={t.channel_id} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} size={32} />
           <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-            {t.done_at ? <DoneMark size={8} /> : <StatusDot status={t.status} size={8} />}
+            {t.done_at ? <DoneMark size={8} /> : <StatusDot status={shownStatus(t)} size={8} />}
           </span>
         </span>
       ) : (
         <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          {t.done_at ? <DoneMark /> : <StatusDot status={t.status} />}
+          {t.done_at ? <DoneMark /> : <StatusDot status={shownStatus(t)} />}
         </span>
       )}
       <div className="min-w-0 flex-1">
@@ -91,7 +92,7 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}
           {t.branch && <span className="hidden shrink-0 rounded-full bg-surface-2 px-1.5 font-mono text-[10.5px] leading-[18px] text-fg-3 sm:inline">{t.branch}</span>}
-          {!t.last_text && t.status === 'running' && <Loader size={11} className="shrink-0" />}
+          {!t.last_text && showsRunning(t) && <Loader size={11} className="shrink-0" />}
           {mod && (
             <span className="max-w-[45%] shrink-0 truncate rounded-full bg-surface-2 px-1.5 text-[11px] leading-[18px] text-fg-3" title={`${mod.plugin}: ${mod.text}`}>
               {mod.text}
@@ -193,7 +194,7 @@ function FolderGroups({ threads, channel, prs, handoffs = [] }: { threads: Threa
     <div className="space-y-4">
       {groups.map((g) => (
         <section key={g.folder.id}>
-          <FolderHeader channel={channel} folder={g.folder} count={g.threads.length} running={g.threads.some((t) => t.status === 'running' || t.status === 'queued')} />
+          <FolderHeader channel={channel} folder={g.folder} count={g.threads.length} running={g.threads.some(isWorking)} />
           {!g.folder.collapsed &&
             (g.threads.length ? (
               <Rows threads={g.threads} prs={prs} draggable handoffs={handoffs} />

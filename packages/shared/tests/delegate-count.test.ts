@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { delegateLabel, delegateSummary, delegatedIds, type DelegateNeeds } from '../delegate-count.ts';
+import { delegateLabel, delegateSummary, delegatedIds, isWorking, shownStatus, showsRunning, type DelegateNeeds } from '../delegate-count.ts';
 
 const kid = (id: string, status: string, done_at: string | null = null) => ({
   id,
@@ -64,5 +64,34 @@ describe('delegatedIds', () => {
   it('collects every child across groups', () => {
     expect([...delegatedIds([{ children: [{ id: 'a' }] }, { children: [{ id: 'b' }, { id: 'c' }] }])]).toEqual(['a', 'b', 'c']);
     expect(delegatedIds(undefined).size).toBe(0);
+  });
+});
+
+describe('a thread at work through what it delegated', () => {
+  it('shows running while a delegated thread works, though its own turn ended', () => {
+    const idle = { status: 'done', delegating: true };
+    expect(showsRunning(idle)).toBe(true);
+    expect(isWorking(idle)).toBe(true);
+    expect(shownStatus(idle)).toBe('running');
+  });
+
+  it('goes back to its own status once nothing it delegated works', () => {
+    for (const status of ['done', 'failed', 'stopped']) {
+      const t = { status, delegating: false };
+      expect([showsRunning(t), isWorking(t), shownStatus(t)]).toEqual([false, false, status]);
+    }
+    expect(shownStatus({ status: 'done' })).toBe('done');
+  });
+
+  it('keeps queued as queued: it waits for a slot', () => {
+    const t = { status: 'queued', delegating: true };
+    expect(showsRunning(t)).toBe(true);
+    expect(shownStatus(t)).toBe('queued');
+    expect(showsRunning({ status: 'queued' })).toBe(false);
+    expect(isWorking({ status: 'queued' })).toBe(true);
+  });
+
+  it('counts a delegated thread whose own delegates work as working', () => {
+    expect(delegateSummary([{ id: 'a', status: 'done', delegating: true }])!.state).toBe('working');
   });
 });

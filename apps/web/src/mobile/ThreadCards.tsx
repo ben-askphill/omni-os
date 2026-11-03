@@ -16,6 +16,7 @@ import { NeedsActions } from './NeedsCard.tsx';
 import { MoAvatar, MoDiff, MoStripes } from './parts.tsx';
 import { useShell } from './shell.tsx';
 import type { NowDoing, PlanView, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
+import { shownStatus } from '@omni/shared/delegate-count.ts';
 
 /** The phone's turn, carrying the web's own artifact and thread rows. */
 export type TurnView = TurnOf<Artifact, Thread>;
@@ -169,7 +170,7 @@ export function Delegation({ kids }: { kids: Thread[] }) {
                 <span className="truncate text-[14px] leading-[1.3]">{k.title || 'Untitled'}</span>
                 <span className="truncate text-[12px] leading-[1.3] text-fg-3">{[k.role, k.task_id, `#${channel(k.channel_id)?.name ?? k.channel_id}`].filter(Boolean).join(' · ')}</span>
               </span>
-              <StatusPill status={card?.glyph === 'needs' ? 'needs' : k.status} />
+              <StatusPill status={card?.glyph === 'needs' ? 'needs' : shownStatus(k)} />
             </button>
             {card && (
               <div className="px-3 pb-3 pl-[54px]">

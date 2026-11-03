@@ -5,6 +5,7 @@ import { about } from './about.ts';
 import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { config } from './config.ts';
 import { needsYou, resultReads, search, threads, type Thread } from './db.ts';
+import { allWithDelegating, withDelegating } from './delegating.ts';
 import { handoffView } from './handoff/records.ts';
 import { grokBotConfigured } from './grokbot.ts';
 import { fromThisMac } from './request-guard.ts';
@@ -16,9 +17,11 @@ export const feedApi = new Hono();
 
 feedApi.get('/feed', (c) =>
   sessionSSE(c, async (stream) => {
-    // A thread carries its handoff on every update, as its own stream and GET do.
+    // A thread carries its handoff and `delegating` on every update, as its own stream and GET do.
     const onFeed = (e: FeedEvent) =>
-      void stream.writeSSE({ data: JSON.stringify(e.type === 'thread' ? { ...e, handoff: handoffView(e.thread as Thread) } : e) });
+      void stream.writeSSE({
+        data: JSON.stringify(e.type === 'thread' ? { ...e, thread: withDelegating(e.thread as Thread), handoff: handoffView(e.thread as Thread) } : e),
+      });
     bus.on('feed', onFeed);
     stream.onAbort(() => {
       bus.off('feed', onFeed);
@@ -55,9 +58,9 @@ feedApi.get('/tasks', (c) => c.json(activeTasks()));
 /** Mod status lines pinned now, across every thread. Cleared when a thread's process ends. */
 feedApi.get('/mods', (c) => c.json(activeMods()));
 
-feedApi.get('/recent', (c) => c.json(threads.recent(Number(c.req.query('limit') ?? 60))));
+feedApi.get('/recent', (c) => c.json(allWithDelegating(threads.recent(Number(c.req.query('limit') ?? 60)))));
 /** The sidebar's Pinned section: pinned threads in every channel, the latest pin first. Archived ones drop out. */
-feedApi.get('/pinned', (c) => c.json(threads.pinned()));
+feedApi.get('/pinned', (c) => c.json(allWithDelegating(threads.pinned())));
 feedApi.get('/search', (c) => c.json(search(c.req.query('q') ?? '')));
 
 /**

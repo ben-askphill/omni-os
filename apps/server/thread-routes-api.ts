@@ -18,6 +18,7 @@ import { remoteHolder } from './ownership.ts';
 import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
+import { allWithDelegating, delegatingIds, withDelegating } from './delegating.ts';
 import {
   acceptedAgain,
   activeMods,
@@ -83,11 +84,13 @@ const createSchema = z.object({
 
 threadRoutesApi.get('/', (c) =>
   c.json(
-    threads.list({
-      channel: c.req.query('channel'),
-      status: c.req.query('status'),
-      limit: Number(c.req.query('limit') ?? 50),
-    }),
+    allWithDelegating(
+      threads.list({
+        channel: c.req.query('channel'),
+        status: c.req.query('status'),
+        limit: Number(c.req.query('limit') ?? 50),
+      }),
+    ),
   ),
 );
 
@@ -169,16 +172,20 @@ function openingOf(id: string, pending: PendingMsg[]): Opening | null {
 /** The detail with `page`'s events: every event, the head and its `history`, or none (the stream's sync). */
 function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const pending = pendingFor(t.id);
+  const ids = delegatingIds();
+  const shown = <T extends { id: string }>(list: T[]) => list.map((x) => withDelegating(x, ids));
+  const children = threads.children(t.id);
+  const parent = t.parent_id ? threads.get(t.parent_id) : null;
   const detail = {
-    thread: t,
+    thread: withDelegating(t, ids),
     channel: (ch => ch && publicChannel(ch))(channels.get(t.channel_id)),
     events: page.events,
     ...(page.history && { history: page.history }),
     artifacts: artifacts.byThread(t.id),
-    children: threads.children(t.id),
+    children: shown(children),
     // Members of the teams this thread started, so its delegation cards can show their state.
-    team: threads.children(t.id).flatMap((ch) => threads.team(ch.id)),
-    parent: t.parent_id ? threads.get(t.parent_id) : null,
+    team: shown(children.flatMap((ch) => threads.team(ch.id))),
+    parent: parent ? withDelegating(parent, ids) : null,
     pending,
     opening: openingOf(t.id, pending),
     live: isLive(t.id),
@@ -202,6 +209,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
   if (!t) return c.json({ error: 'not found' }, 404);
   return c.json({
     id: t.id, title: t.title, status: t.status, channel: t.channel_id, role: t.role, task_id: t.task_id,
+    // A thread it delegated, at any depth, still runs or queues: it reports back here.
+    delegating: delegatingIds().has(t.id),
     updated_at: t.updated_at, last_reply: events.lastRunText(t.id) || events.lastAssistantText(t.id),
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
     // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
@@ -534,7 +543,7 @@ threadActionsApi.get('/:id/stream', (c) => {
       const pending = pendingFor(id);
       onEvent({
         kind: 'thread',
-        thread: e.thread,
+        thread: withDelegating(e.thread as Thread),
         pending,
         opening: openingOf(id, pending),
         live: isLive(id),

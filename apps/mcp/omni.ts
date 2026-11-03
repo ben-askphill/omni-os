@@ -434,7 +434,7 @@ server.registerTool(
     if (status) q.set('status', status);
     q.set('limit', String(limit ?? 20));
     const list = await call(`/threads?${q}`);
-    return text(list.map((t: any) => ({ id: t.id, title: t.title, channel: t.channel_id, role: t.role, status: t.status, task_id: t.task_id, updated_at: t.updated_at })));
+    return text(list.map((t: any) => ({ id: t.id, title: t.title, channel: t.channel_id, role: t.role, status: t.status, delegating: t.delegating, task_id: t.task_id, updated_at: t.updated_at })));
   },
 );
 

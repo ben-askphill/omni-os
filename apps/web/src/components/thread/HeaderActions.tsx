@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Thread } from '../../api.ts';
+import { shownStatus } from '@omni/shared/delegate-count.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { openMenu } from '../ContextMenu.tsx';
 import { Button, IconButton, StatusPill } from '../ui.tsx';
@@ -57,7 +58,7 @@ export function HeaderActions({
           Restore
         </Button>
       )}
-      <StatusPill status={asking ? 'needs' : thread.status} label={asking ? ASKING_LABEL : undefined} />
+      <StatusPill status={asking ? 'needs' : shownStatus(thread)} label={asking ? ASKING_LABEL : undefined} />
       <IconButton
         icon="more"
         label="Thread actions"
