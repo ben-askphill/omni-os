@@ -1,11 +1,10 @@
-// The phone's Activity tab: what needs Ben as cards he answers in place, then what runs, what he pinned, the latest
-// threads and what finished today.
-// Pure: the recent list and Needs you in, the screen's sections out.
-import type { NeedsYou, NeedsYouItem, Thread } from '../api.ts';
+// A Needs you item as the phone's card shows it, on a thread's screen and under a Conductor thread's delegated tasks:
+// why the thread waits on Ben and the buttons that answer it in place. Pure.
+import type { NeedsYouItem, Thread } from '../api.ts';
 import type { Glyph } from '../components/ui.tsx';
 import { LIMIT_ACTION, limitView, type LimitAction } from '../limits.ts';
 import { canMarkDone, reasonOf } from '../needs-you.ts';
-import { rowOf, shortTime, type ChannelInfo, type ListedThread, type RowItem } from './rows.ts';
+import { shortTime, type ChannelInfo } from './rows.ts';
 
 /** What a card's button does. Each is a route the server already has; nothing here is invented for the phone. */
 export type NeedsAction =
@@ -37,15 +36,6 @@ export interface NeedsCard {
   time: string;
   /** The first is the main one: vermilion when the card's glyph says it needs Ben, ink otherwise. At most two. */
   actions: NeedsAction[];
-}
-
-export interface Activity {
-  needs: NeedsCard[];
-  running: RowItem[];
-  doneToday: RowItem[];
-  pinned: RowItem[];
-  /** The sidebar's Recent threads: the latest by activity in any channel (apps/web/src/sidebar-lists.ts). */
-  latest: RowItem[];
 }
 
 const OPEN: NeedsAction = { kind: 'open', label: 'Open' };
@@ -96,47 +86,5 @@ export function needsCard(item: NeedsYouItem, channel: ChannelInfo | undefined, 
     channelIcon: channel?.icon ?? null,
     time: shortTime(item.at, now),
     actions: actionsOf(item, harness, now),
-  };
-}
-
-const startOfDay = (now: number) => {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-};
-
-/**
- * Needs you is the server's inbox as it stands. Running and Done today come from the recent list, without the
- * threads Needs you already shows, team members (listed under their lead) and archived threads.
- */
-export function activityOf({
-  recent,
-  needsYou,
-  pinned,
-  latest = [],
-  channel,
-  harness,
-  now,
-}: {
-  recent: Thread[] | undefined;
-  needsYou: NeedsYou | null;
-  pinned: ListedThread[];
-  latest?: ListedThread[];
-  channel: (id: string) => ChannelInfo | undefined;
-  harness: (id: string) => string;
-  now: number;
-}): Activity {
-  // What waits on a decision comes before results to read; each keeps the inbox's order.
-  const needs = (needsYou?.items ?? []).map((i) => needsCard(i, channel(i.thread.channel_id), harness, now)).sort((a, b) => Number(b.glyph === 'needs') - Number(a.glyph === 'needs'));
-  const inNeeds = new Set(needs.map((n) => n.id));
-  const listed = (recent ?? []).filter((t) => !inNeeds.has(t.id) && t.source !== 'team' && !t.archived);
-  const today = startOfDay(now);
-  const row = (t: ListedThread) => rowOf(t, channel(t.channel_id), now);
-  return {
-    needs,
-    running: listed.filter((t) => t.status === 'running' || t.status === 'queued').map(row),
-    doneToday: listed.filter((t) => (t.status === 'done' || t.status === 'failed' || t.status === 'stopped') && new Date(t.updated_at).getTime() >= today).map(row),
-    pinned: pinned.map(row),
-    latest: latest.map(row),
   };
 }

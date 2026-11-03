@@ -159,7 +159,7 @@ export function ThreadScreen() {
               }}
             />
             {/* A question's card above is where Ben answers it, and the setup card is where he retries setup. */}
-            {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} inThread onRecovered={(r) => {
+            {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} onRecovered={(r) => {
                   applyThread(r.thread, true);
                   setQueued(r.pending);
                 }} />}

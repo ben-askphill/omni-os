@@ -5,7 +5,6 @@ import { LIMIT_ACTION } from '../limits.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import type { NeedsAction, NeedsCard } from './activity.ts';
-import { MoAvatar } from './parts.tsx';
 import { useShell } from './shell.tsx';
 
 /** What the recovery routes answer with: the thread and its pending list as they are now. */
@@ -78,33 +77,14 @@ export function NeedsActions({ card, size = 'lg', onRecovered }: { card: NeedsCa
 }
 
 /**
- * The decision card (MoDecision): why a thread waits on Ben and the buttons that answer it, the same in Activity and
- * in the thread. In the thread it drops the header, which would only repeat the thread's own.
+ * The decision card (MoDecision) in a thread: why it waits on Ben and the buttons that answer it. It has no header,
+ * which would only repeat the thread's own.
  */
-export function NeedsCardView({ card, inThread, onRecovered }: { card: NeedsCard; inThread?: boolean; onRecovered?: (r: Recovered) => void }) {
-  const shell = useShell();
-  const t = card.thread;
+export function NeedsCardView({ card, onRecovered }: { card: NeedsCard; onRecovered?: (r: Recovered) => void }) {
   return (
     <div className="flex flex-col gap-3 rounded-[20px] bg-surface p-3.5">
-      {inThread ? (
-        <span className="text-[16px] leading-[1.3] font-medium text-pretty">{card.label}</span>
-      ) : (
-        <button type="button" onClick={() => shell.open(href.thread(t.id))} className="flex items-start gap-3 text-left">
-          <MoAvatar role={t.role} channel={t.channel_id} channelIcon={card.channelIcon} state={card.glyph} />
-          <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-            <span className="truncate text-[12px] leading-[1.3] text-fg-3">{card.meta}</span>
-            <span className="text-[16px] leading-[1.3] font-medium text-pretty">{t.title || 'Untitled'}</span>
-          </span>
-          <span className="shrink-0 text-[12px] leading-[1.3] text-fg-3 tabular-nums">{card.time}</span>
-        </button>
-      )}
-      {(inThread ? card.detail : true) && (
-        <p className="m-0 line-clamp-4 text-[14px] leading-[1.5] text-pretty text-fg-2">
-          {!inThread && <span className="text-fg">{card.label}</span>}
-          {!inThread && card.detail && ' · '}
-          {card.detail}
-        </p>
-      )}
+      <span className="text-[16px] leading-[1.3] font-medium text-pretty">{card.label}</span>
+      {card.detail && <p className="m-0 line-clamp-4 text-[14px] leading-[1.5] text-pretty text-fg-2">{card.detail}</p>}
       <NeedsActions card={card} onRecovered={onRecovered} />
     </div>
   );

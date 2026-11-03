@@ -131,7 +131,7 @@ export function MoDiff({ add, del }: { add: number; del: number }) {
   );
 }
 
-/** One thread in a list: Activity, a channel, search. */
+/** One thread in a list: a channel, search. */
 /** `trailing`: room at the end of the second line, for a control laid over the row (MoDelegatedRow's count). */
 export function MoRow({ it, onOpen, last, trailing }: { it: RowItem; onOpen: () => void; last?: boolean; trailing?: ReactNode }) {
   return (
