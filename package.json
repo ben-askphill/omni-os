@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=@omni/server --filter=@omni/web",
     "build": "turbo run build",
     "start": "npm run start --workspace @omni/server",
     "test": "turbo boundaries && turbo run test --concurrency=2",
