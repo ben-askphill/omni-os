@@ -2,7 +2,8 @@ import type { PickedLines } from '@omni/shared/diff-pick.ts';
 import { diffSelection, selectRows } from '@omni/shared/message-context-diff.ts';
 import { NOTE_MAX, newContext } from '@omni/shared/message-context.ts';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { addDraftContext } from '../context/draft';

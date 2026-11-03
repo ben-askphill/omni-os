@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
-import { fontSize, minTarget, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, space, useOmniTheme, weight } from '../theme';
 
 export interface FolderHeaderProps {
   name: string;
@@ -51,7 +52,7 @@ const styles = StyleSheet.create({
   name: {
     flex: 1,
     fontSize: fontSize.body + 1,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   counts: {
     flexDirection: 'row',

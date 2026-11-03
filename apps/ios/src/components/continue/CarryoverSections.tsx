@@ -1,9 +1,10 @@
 import { previewSections, type PreviewRow, type PreviewSection } from '@omni/shared/continue-flow.ts';
 import type { Carryover } from '@omni/shared/continue.ts';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
-import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme } from '../../theme';
+import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
 import { OptionGroup } from '../../ui/OptionRow';
 import { Tag } from './Tag';
 
@@ -126,7 +127,7 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   box: {
     maxHeight: 360,

@@ -38,14 +38,14 @@ const STYLE = `
   --fg3: #9a9a9a; --line: rgba(255,255,255,.12); --well: #161616; --primary: #ededed; --on-primary: #141414; } }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
-body { font: 13.5px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
+body { font: 500 13.5px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
   display: flex; align-items: center; justify-content: center; padding: 20px; -webkit-user-select: text; }
 main { width: 100%; max-width: 600px; max-height: 100%; overflow-y: auto; background: var(--card); border: 1px solid var(--line);
   border-radius: 20px; padding: 24px 28px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 main > * { flex-shrink: 0; }
 .glyph { width: 44px; height: 44px; border-radius: 50%; background: var(--well); display: grid; place-items: center;
-  color: #d97706; font-weight: 700; font-size: 18px; }
-h1 { margin: 0; font-size: 21px; font-weight: 500; letter-spacing: -0.01em; }
+  color: #d97706; font-weight: 800; font-size: 18px; }
+h1 { margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; color: var(--fg2); text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* The log gives up height first, down to the caption and 48px of lines. Below that the card scrolls. */
 .log { width: 100%; min-height: 72px; flex: 0 1 auto; display: flex; flex-direction: column; }
@@ -56,7 +56,7 @@ pre { margin: 0; min-height: 48px; max-height: 220px; flex: 0 1 auto; overflow: 
   color: var(--fg2); white-space: pre-wrap; overflow-wrap: anywhere; }
 nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 a { display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 17px; text-decoration: none;
-  border: 1px solid var(--line); color: var(--fg); font-weight: 500; }
+  border: 1px solid var(--line); color: var(--fg); font-weight: 600; }
 a.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; }
 a:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
 .spinner { width: 22px; height: 22px; border: 2px solid var(--line); border-top-color: var(--fg3); border-radius: 50%;

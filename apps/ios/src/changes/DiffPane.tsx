@@ -1,9 +1,10 @@
 import type { ChangeGroupView } from '@omni/shared/changes-view.ts';
 import { heldPick, holdPress, noPick, pickedLines, type HeldPick } from '@omni/shared/diff-pick.ts';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, RefreshControl, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
-import { fontSize, lineHeight, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, space, useOmniTheme, weight } from '../theme';
 import { FileHeader, GroupHeader, LineRow, MoreRow, NoteRow } from './DiffRows';
 import { changeRows, FRESH_ROWS, pickedRange, showAll, toggleFile, type ChangeRow } from './rows';
 import { SelectionDock, type PickSource } from './SelectionDock';
@@ -134,7 +135,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   emptyBody: {
     fontSize: fontSize.body,

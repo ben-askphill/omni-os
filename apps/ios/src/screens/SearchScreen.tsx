@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../ui/Text';
 
 import { ListHeading } from '../components/ListHeading';
 import { SearchHitRow } from '../components/SearchHitRow';

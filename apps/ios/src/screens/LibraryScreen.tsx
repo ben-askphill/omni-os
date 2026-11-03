@@ -1,7 +1,8 @@
 import type { ArtifactWithThread } from '@omni/client-core';
 import { ARTIFACT_FILTERS, matchesArtifactFilter, type ArtifactFilter } from '@omni/shared/artifacts.ts';
 import { useMemo, useState } from 'react';
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { useArtifactFile } from '../artifacts/use-artifact-file';
 import { extensionOf, hasThumbnail } from '../artifacts/viewer-kind';

@@ -1,8 +1,9 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import type { ThreadRow } from '../live/channel-model';
-import { fontSize, space, useOmniTheme } from '../theme';
+import { fontSize, space, useOmniTheme, weight } from '../theme';
 import type { ThreadAction } from '../thread/actions';
 import { useThreadActions } from '../thread/hooks';
 import { canMarkDone } from '../thread/target';
@@ -75,6 +76,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

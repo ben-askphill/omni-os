@@ -1,11 +1,12 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import type { RootScreenProps } from '../navigation/types';
 import { describePairingError } from '../pairing/messages';
 import { usePairing } from '../pairing/PairingProvider';
 import type { PairedServer } from '../pairing/servers';
 import { STATUS_LABEL } from '../pairing/status';
-import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { Button } from '../ui/Button';
 
 export function ServersScreen({ navigation }: RootScreenProps<'Servers'>) {
@@ -107,11 +108,11 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   activeMarker: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.pill,
     paddingHorizontal: space.s4,
@@ -130,6 +131,6 @@ const styles = StyleSheet.create({
   },
   removeLabel: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

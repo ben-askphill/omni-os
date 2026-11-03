@@ -1,12 +1,13 @@
 import type { OmniApi } from '@omni/client-core';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { useLiveHub } from '../live/react';
 import { useRemote } from '../live/use-remote';
 import { RemoteList } from '../settings/RemoteList';
 import { deviceRows, revokeConfirmation, withoutDevice, type DeviceRow } from '../settings/devices-model';
-import { fontSize, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { GroupedList, ListRow } from '../ui/GroupedList';
 
 const loadDevices = (api: OmniApi) => api.signedInDevices();
@@ -79,7 +80,7 @@ const styles = StyleSheet.create({
   },
   marker: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.pill,
     paddingHorizontal: space.s4,
@@ -94,6 +95,6 @@ const styles = StyleSheet.create({
   },
   revokeLabel: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

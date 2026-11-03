@@ -1,13 +1,14 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useState } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import { describePairingError } from '../../pairing/messages';
 import { parsePairingQr } from '../../pairing/pairingInput';
 import { Button } from '../../ui/Button';
 import { Callout } from '../../ui/Callout';
 import { Field } from '../../ui/Field';
-import { fontSize, lineHeight, radius, space, useOmniTheme } from '../../theme';
+import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 
 type Scan =
   | { kind: 'idle' }
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
   confirmTitle: {
     fontSize: fontSize.heading,
     lineHeight: Math.round(fontSize.heading * lineHeight.heading),
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   body: {
     fontSize: fontSize.body,

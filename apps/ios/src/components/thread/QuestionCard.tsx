@@ -9,7 +9,8 @@ import {
   type ThreadQuestion,
 } from '@omni/shared/question.ts';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../../ui/Text';
 
 import {
   advance,
@@ -24,7 +25,7 @@ import {
   type Phase,
   type Settled,
 } from '../../questions/card-state';
-import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme } from '../../theme';
+import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
 
 export type SendAnswers = (questionId: string, answers: Answer[]) => Promise<{ state: ThreadQuestion['state'] }>;
@@ -281,7 +282,7 @@ const styles = StyleSheet.create({
   },
   pillText: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   step: {
     fontSize: fontSize.meta,
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
   },
   question: {
     fontSize: fontSize.input,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     lineHeight: Math.round(fontSize.input * lineHeight.body),
   },
   options: {
@@ -325,7 +326,7 @@ const styles = StyleSheet.create({
   },
   tick: {
     fontSize: fontSize.meta,
-    fontWeight: '700',
+    fontWeight: weight.bold,
   },
   optionText: {
     flex: 1,
@@ -333,7 +334,7 @@ const styles = StyleSheet.create({
   },
   optionLabel: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   optionDescription: {
     fontSize: fontSize.meta,
@@ -349,7 +350,7 @@ const styles = StyleSheet.create({
   },
   error: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   actions: {
     flexDirection: 'row',

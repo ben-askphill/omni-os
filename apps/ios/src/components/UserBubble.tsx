@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { fontSize, lineHeight, radius, space, useOmniTheme } from '../theme';
 

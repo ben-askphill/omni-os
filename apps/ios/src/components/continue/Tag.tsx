@@ -1,13 +1,14 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
-import { fontSize, radius, space, useOmniTheme } from '../../theme';
+import { fontSize, radius, space, useOmniTheme, weight } from '../../theme';
 
 /** A word beside a row: a file's change, a check's result, "Shortened", "Too big". */
 export function Tag({ label, tone }: { label: string; tone?: 'pass' | 'fail' }) {
   const { colors } = useOmniTheme();
   return (
     <View style={[styles.tag, { backgroundColor: colors.surface2 }]}>
-      <Text style={[styles.label, { color: tone ? colors.fg : colors.fg3, fontWeight: tone ? '700' : '500' }]}>{label}</Text>
+      <Text style={[styles.label, { color: tone ? colors.fg : colors.fg3, fontWeight: tone ? weight.bold : weight.medium }]}>{label}</Text>
     </View>
   );
 }

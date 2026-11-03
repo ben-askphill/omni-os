@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import type { HarnessInfo, ThreadStatus } from '@omni/client-core';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
 
 import type { ThreadView } from '../../live/hub';
-import { fontSize, lineHeight, radius, space, useOmniTheme } from '../../theme';
+import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { StatusLine } from '../StatusLine';
 import { RunChip } from './RunChips';
 
@@ -115,7 +116,7 @@ const styles = StyleSheet.create({
   },
   linkLabel: {
     fontSize: fontSize.body,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   linkCaret: {
     fontSize: fontSize.body,

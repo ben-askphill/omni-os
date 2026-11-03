@@ -71,6 +71,14 @@ export const fontSize = {
   titleLg: 30,
 } as const;
 
+/** Weight scale, one step above the platform defaults so text reads less thin (web: --fw-* in apps/web/src/index.css). */
+export const weight = {
+  regular: '500',
+  medium: '600',
+  semibold: '700',
+  bold: '800',
+} as const;
+
 export const lineHeight = {
   tight: 1.1,
   heading: 1.25,

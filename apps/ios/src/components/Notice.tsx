@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
-import { fontSize, minTarget, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, space, useOmniTheme, weight } from '../theme';
 
 /** A full-screen message with an optional action, for a screen that has nothing else to show yet. */
 export function Notice({ title, body, action }: { title: string; body?: string; action?: { label: string; onPress: () => void } }) {
@@ -27,7 +28,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   body: {
     fontSize: fontSize.body,
@@ -39,6 +40,6 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

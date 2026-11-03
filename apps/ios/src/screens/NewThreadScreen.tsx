@@ -1,7 +1,8 @@
 import type { DraftRun } from '@omni/shared/draft-run.ts';
 import { offersRunOn } from '@omni/shared/thread-machine.ts';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../ui/Text';
 
 import { AttachControl, AttachNotice } from '../attachments/AttachControl';
 import { AttachmentChips } from '../attachments/AttachmentChips';
@@ -25,7 +26,7 @@ import {
   type DraftPick,
 } from '../newthread/draft';
 import { useCrew, useStartThread } from '../newthread/hooks';
-import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { useHarnessCatalog } from '../thread/hooks';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
@@ -287,7 +288,7 @@ const styles = StyleSheet.create({
   },
   pillLabel: {
     fontSize: fontSize.body,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   input: {
     minHeight: 160,
@@ -316,7 +317,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.body,
   },
   uploadCancel: {
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   chip: {
     height: 36,
@@ -332,7 +333,7 @@ const styles = StyleSheet.create({
   chipLabel: {
     flexShrink: 1,
     fontSize: fontSize.body,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   caret: {
     fontSize: fontSize.meta,

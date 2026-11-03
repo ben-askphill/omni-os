@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import type { ThreadRow } from '../live/channel-model';
-import { fontSize, lineHeight, minTarget, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 import { type DotTone, StatusDot } from './StatusDot';
 
 /**
@@ -55,7 +56,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: fontSize.body + 1,
     lineHeight: Math.round((fontSize.body + 1) * lineHeight.body),
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   meta: {
     fontSize: fontSize.meta,

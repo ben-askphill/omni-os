@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
-import { fontSize, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 
 interface SegmentedControlProps<T extends string> {
   options: readonly { value: T; label: string; count?: number }[];
@@ -54,7 +55,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   count: {
     fontSize: fontSize.meta,

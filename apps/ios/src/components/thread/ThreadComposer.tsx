@@ -1,5 +1,6 @@
 import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../../ui/Text';
 
 import type { HarnessInfo, Thread } from '@omni/client-core';
 
@@ -10,7 +11,7 @@ import { removeDraftContext, useDraftContext } from '../../context/draft';
 import type { ThreadLive } from '../../live/hub';
 import { useStore } from '../../live/react';
 import { canStop, composerPlaceholder, sendLabel } from '../../send/rules';
-import { fontSize, lineHeight, radius, space, useOmniTheme } from '../../theme';
+import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { restoreDraft, setDraft, useDraft, useFocusRequests } from './drafts';
 import { NextTurnChip } from './RunChips';
 
@@ -180,7 +181,7 @@ const styles = StyleSheet.create({
   contextLabel: {
     flexShrink: 1,
     fontSize: fontSize.meta + 1,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   contextRemove: {
     fontSize: fontSize.meta + 1,
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
   },
   sendGlyph: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: weight.bold,
     lineHeight: 24,
   },
   stopGlyph: {

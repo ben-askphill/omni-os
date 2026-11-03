@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import type { RootScreenProps } from '../navigation/types';
 import { KIND_COPY, PUSH_KINDS } from '../notifications/preferences';
 import { useNotifications } from '../notifications/NotificationsProvider';
-import { fontSize, lineHeight, radius, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../theme';
 import { Button } from '../ui/Button';
 
 export function NotificationsIntroScreen({ navigation }: RootScreenProps<'NotificationsIntro'>) {
@@ -67,7 +68,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: fontSize.titleLg,
     lineHeight: Math.round(fontSize.titleLg * lineHeight.tight),
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   body: {
     fontSize: fontSize.input,
@@ -84,7 +85,7 @@ const styles = StyleSheet.create({
   },
   kindTitle: {
     fontSize: fontSize.input,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   kindDetail: {
     fontSize: fontSize.body,

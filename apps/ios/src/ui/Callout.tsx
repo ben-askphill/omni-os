@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { fontSize, lineHeight, radius, space, useOmniTheme } from '../theme';
 

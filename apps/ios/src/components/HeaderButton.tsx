@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import { Text } from '../ui/Text';
 
-import { fontSize, minTarget, useOmniTheme } from '../theme';
+import { fontSize, minTarget, useOmniTheme, weight } from '../theme';
 
 export function HeaderButton({
   label,
@@ -36,6 +37,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: fontSize.input,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
 });

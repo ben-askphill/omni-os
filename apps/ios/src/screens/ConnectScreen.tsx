@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
+import { Text } from '../ui/Text';
 
 import type { RootScreenProps } from '../navigation/types';
 import { describePairingError } from '../pairing/messages';

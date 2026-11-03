@@ -1,6 +1,7 @@
 import { attachmentRows, attachmentsSummary } from '@omni/shared/continue-flow.ts';
 import type { Carryover } from '@omni/shared/continue.ts';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import { fontSize, lineHeight, space, useOmniTheme } from '../../theme';
 import { OptionGroup } from '../../ui/OptionRow';

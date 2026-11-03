@@ -11,7 +11,8 @@ import {
   type ContinueSource,
 } from '@omni/shared/continue-flow.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../ui/Text';
 
 import { HeaderButton } from '../components/HeaderButton';
 import { Notice } from '../components/Notice';
@@ -23,7 +24,7 @@ import { pickerModel, runFor, runLabel } from '../continue/flow';
 import { useContinue, useContinueSource } from '../continue/hooks';
 import { useLiveHub } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
-import { fontSize, lineHeight, radius, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../theme';
 import { useHarnessCatalog } from '../thread/hooks';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
@@ -247,7 +248,7 @@ const styles = StyleSheet.create({
   },
   headingTitle: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   status: {
     flexDirection: 'row',

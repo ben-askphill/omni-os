@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import type { ChannelWithRunning } from '@omni/client-core';
 
@@ -12,7 +13,7 @@ import type { RootScreenProps } from '../navigation/types';
 import { usePairing } from '../pairing/PairingProvider';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
-import { fontSize, minTarget, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, space, useOmniTheme, weight } from '../theme';
 
 interface ChannelSection {
   title: string | null;
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: fontSize.input,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   sub: {
     fontSize: fontSize.meta,
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   emptyBody: {
     fontSize: fontSize.body,
@@ -217,6 +218,6 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: fontSize.input,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

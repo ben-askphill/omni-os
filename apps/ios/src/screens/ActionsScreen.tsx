@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 import { anyRunning, liveRun, SETUP_MODE_LABEL, type ActionRun, type ChannelAction } from '@omni/shared/channel-actions.ts';
 
 import { StatusDot } from '../components/StatusDot';
@@ -8,7 +9,7 @@ import { actionDetail, outputCut, RUN_STATE_LABEL, runTone, runWhen } from '../l
 import { useActionsLive, useActionsView } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { Button } from '../ui/Button';
-import { fontSize, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 
 const MONO = 'Menlo';
 
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     textTransform: 'uppercase',
     paddingTop: space.s9,
   },
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     fontSize: fontSize.body + 1,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   command: {
     fontFamily: MONO,
@@ -282,7 +283,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   emptyBody: {
     fontSize: fontSize.body,

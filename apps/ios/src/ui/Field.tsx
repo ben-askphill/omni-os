@@ -1,6 +1,7 @@
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { StyleSheet, View, type TextInputProps } from 'react-native';
+import { Text, TextInput } from './Text';
 
-import { fontSize, radius, space, useOmniTheme } from '../theme';
+import { fontSize, radius, space, useOmniTheme, weight } from '../theme';
 
 interface FieldProps extends Pick<
   TextInputProps,
@@ -35,7 +36,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: fontSize.meta,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   input: {
     fontSize: fontSize.input,

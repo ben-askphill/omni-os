@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, PanResponder, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
-import { fontSize, radius, useOmniTheme } from '../theme';
+import { fontSize, radius, useOmniTheme, weight } from '../theme';
 import { clampSlide, slideReached } from './slide';
 
 const THUMB = 44;
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
   label: {
     textAlign: 'center',
     fontSize: fontSize.body,
-    fontWeight: '500',
+    fontWeight: weight.medium,
     paddingHorizontal: THUMB + PAD * 3,
   },
   thumb: {
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
   },
   arrow: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: weight.bold,
     lineHeight: 24,
   },
 });

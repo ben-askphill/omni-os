@@ -1,6 +1,7 @@
 import type { File } from 'expo-file-system';
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
-import { Linking, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Share, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { shareableFile } from '../artifacts/files';
 import { agoPhrase, formatBytes } from '../artifacts/viewer-kind';

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { useLiveHub } from '../live/react';
-import { fontSize, space, useOmniTheme } from '../theme';
+import { fontSize, space, useOmniTheme, weight } from '../theme';
 import { OptionGroup, OptionRow } from '../ui/OptionRow';
 import { Sheet } from '../ui/Sheet';
 import { DEFAULT_MAX_MB, MAX_ATTACHMENTS, describeProblems } from './model';
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
   glyph: {
     fontSize: 24,
     lineHeight: 28,
-    fontWeight: '400',
+    fontWeight: weight.regular,
   },
   body: {
     gap: space.s6,
@@ -158,6 +159,6 @@ const styles = StyleSheet.create({
   },
   noticeAction: {
     fontSize: fontSize.meta + 1,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

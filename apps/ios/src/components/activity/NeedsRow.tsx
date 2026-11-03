@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import type { NeedsButton, NeedsGlyph, NeedsRow as NeedsRowModel } from '../../live/activity-model';
-import { fontSize, lineHeight, minTarget, space, useOmniTheme } from '../../theme';
+import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
 import { type DotTone, StatusDot } from '../StatusDot';
 
@@ -113,7 +114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: fontSize.input,
     lineHeight: Math.round(fontSize.input * lineHeight.heading),
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   ago: {
     fontSize: fontSize.meta,

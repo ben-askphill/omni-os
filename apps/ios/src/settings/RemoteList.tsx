@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { Notice } from '../components/Notice';
 import { usePullRefresh } from '../live/react';
 import type { Remote } from '../live/use-remote';
-import { fontSize, lineHeight, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, space, useOmniTheme, weight } from '../theme';
 import { refreshNote, remoteView } from './remote-state';
 
 export function RemoteList({
@@ -66,7 +67,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   hint: {
     fontSize: fontSize.body,

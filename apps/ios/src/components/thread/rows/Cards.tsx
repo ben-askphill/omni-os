@@ -1,13 +1,14 @@
 import { cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../../ui/Text';
 
 import { AttachmentRow } from '../../../attachments/AttachmentRow';
 import { showsBubble } from '../../../context/labels';
 import { duration, plural } from '../../../thread/format';
 import { outcomeText, type ThreadRow } from '../../../thread/rows';
-import { fontSize, minTarget, radius, space, useOmniTheme } from '../../../theme';
+import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
 import { ContextChips } from '../../ContextChips';
 import { type DotTone, StatusDot } from '../../StatusDot';
 import { Markdown } from '../Markdown';
@@ -295,13 +296,13 @@ const styles = StyleSheet.create({
   small: { fontSize: 12.5, lineHeight: 18 },
   meta: { fontSize: 12.5 },
   card: { borderRadius: radius.xl, paddingHorizontal: space.s6, paddingVertical: space.s6, gap: space.s4 },
-  cardTitle: { fontSize: 13, fontWeight: '600' },
+  cardTitle: { fontSize: 13, fontWeight: weight.semibold },
   line: { flexDirection: 'row', alignItems: 'center', gap: space.s4 },
   grow: { flex: 1 },
   loadWhole: { minHeight: 32, justifyContent: 'center' },
   mono: { fontFamily: MONO, fontSize: 12.5, lineHeight: 19 },
   links: { flexDirection: 'row', gap: space.s8 },
-  link: { fontSize: 13, fontWeight: '600' },
+  link: { fontSize: 13, fontWeight: weight.semibold },
   kid: {
     flexDirection: 'row',
     alignItems: 'center',

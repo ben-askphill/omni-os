@@ -1,5 +1,6 @@
 import type { RunOnRow } from '@omni/shared/thread-machine.ts';
-import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import { fontSize, space, useOmniTheme } from '../../theme';
 import { Callout } from '../../ui/Callout';

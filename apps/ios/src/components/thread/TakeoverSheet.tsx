@@ -1,7 +1,8 @@
 import { takeoverConfirm, type Takeover } from '@omni/shared/handoff.ts';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
-import { fontSize, lineHeight, space, useOmniTheme } from '../../theme';
+import { fontSize, lineHeight, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
 import { Callout } from '../../ui/Callout';
 import { Sheet } from '../../ui/Sheet';
@@ -57,7 +58,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     lineHeight: Math.round(fontSize.heading * lineHeight.heading),
   },
   body: {

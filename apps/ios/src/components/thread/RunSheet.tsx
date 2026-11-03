@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import { fontSize, space, useOmniTheme } from '../../theme';
 import { useRunSwitch, type HarnessCatalog } from '../../thread/hooks';

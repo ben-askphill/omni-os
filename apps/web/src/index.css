@@ -67,7 +67,12 @@
   --ease-fluid: cubic-bezier(0.37, 0, 0.63, 1);
   --dur-pulse: 1400ms;
   --dur-ping: 1600ms;
-  --type-caption: 500 12px/1.2 var(--font-sans);
+  /* Weight scale, one step above the platform defaults so text reads less thin: regular body is 500. */
+  --fw-regular: 500;
+  --fw-medium: 600;
+  --fw-semibold: 700;
+  --fw-bold: 800;
+  --type-caption: var(--fw-medium) 12px/1.2 var(--font-sans);
   /* Type sizes, line heights, spacing and radii from the Claude Design system (tokens/type.css, tokens/space.css).
      Use them as values (`text-[length:var(--fs-meta)]`): Tailwind's own radius and text names mean other sizes. */
   --fs-label: 10.5px;
@@ -159,6 +164,11 @@
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   /* Numbers are sans with tabular figures; mono is only for code (ids, branches, commits, paths). */
   --font-num: var(--font-sans);
+  /* Tailwind's font-normal … font-bold read the weight scale. */
+  --font-weight-normal: var(--fw-regular);
+  --font-weight-medium: var(--fw-medium);
+  --font-weight-semibold: var(--fw-semibold);
+  --font-weight-bold: var(--fw-bold);
 }
 
 @layer base {
@@ -177,6 +187,7 @@
     color: var(--fg);
     font-family: var(--font-sans);
     font-size: 14px;
+    font-weight: var(--fw-regular);
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -253,7 +264,7 @@
   .font-display {
     font-family: var(--font-head);
     letter-spacing: -0.01em;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
   }
   /* Section labels: sentence case sans caption. No mono caps. */
   .caption {
@@ -346,7 +357,7 @@
     padding: 0 10px 0 8px;
     border-radius: 999px;
     background: var(--surface-2);
-    font: 500 12px/1 var(--font-sans);
+    font: var(--fw-medium) 12px/1 var(--font-sans);
     color: var(--fg-2);
     white-space: nowrap;
   }
@@ -519,7 +530,7 @@
     height: 100%;
     padding: 0 14px;
     font-size: 12.5px;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--fg);
     white-space: nowrap;
     transition:
@@ -557,7 +568,7 @@
     height: 100%;
     padding: 0 14px;
     font-size: 12.5px;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--fg);
     background: var(--wash);
   }
@@ -599,7 +610,7 @@
     display: grid;
     place-items: center;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: color-mix(in srgb, var(--fg) 45%, transparent);
     pointer-events: none;
     white-space: nowrap;
@@ -641,7 +652,7 @@
     justify-content: center;
     gap: 8px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     animation: omni-in 0.3s var(--ease-out);
   }
 
@@ -828,7 +839,7 @@
 .md h3,
 .md h4 {
   font-family: var(--font-head);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   letter-spacing: -0.01em;
   line-height: 1.25;
   color: var(--fg);
@@ -844,7 +855,7 @@
 .md h4 {
   font-family: var(--font-sans);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--fg-3);
@@ -919,7 +930,7 @@
   font-variant-numeric: tabular-nums;
 }
 .md strong {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--fg);
 }
 /* An opening bold line is the reply's verdict. */
@@ -975,7 +986,7 @@
   vertical-align: top;
 }
 .md th {
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   color: var(--fg-3);
 }
 .md input[type="checkbox"] {

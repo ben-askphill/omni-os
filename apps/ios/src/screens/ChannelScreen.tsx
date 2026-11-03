@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { channelThreads, threadSections, type ThreadRow } from '../live/channel-model';
 import { useChannels, useHandoffOpen, useLiveHub, usePullRefresh } from '../live/react';
@@ -10,7 +11,7 @@ import { StatusLine } from '../components/StatusLine';
 import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { ThreadSwipeRow } from '../components/ThreadSwipeRow';
 import type { RootScreenProps } from '../navigation/types';
-import { fontSize, space, useOmniTheme } from '../theme';
+import { fontSize, space, useOmniTheme, weight } from '../theme';
 
 export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>) {
   const { id } = route.params;
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   emptyBody: {
     fontSize: fontSize.body,

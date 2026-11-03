@@ -1,7 +1,8 @@
 import { takeoverNote } from '@omni/shared/handoff.ts';
 import { handoffBanner, mayTakeOver, takeoverShown } from '@omni/shared/thread-machine.ts';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import type { ThreadView } from '../../live/hub';
 import type { ThreadMachineControl } from '../../machine/hooks';

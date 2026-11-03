@@ -2,7 +2,8 @@ import type { Thread, TurnView } from '@omni/client-core';
 import { baseLabel, headMove, shortSha, TURN_NOTE, turnStateNote, turnTitle } from '@omni/shared/changes-view.ts';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { Notice } from '../components/Notice';
 import { DiffPane } from '../changes/DiffPane';
@@ -10,7 +11,7 @@ import { useBranchChanges, useTurnChanges } from '../changes/hooks';
 import { useThreadLive, useThreadView } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { DiffCount, Loading } from '../review/parts';
-import { fontSize, lineHeight, mono, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, mono, space, useOmniTheme, weight } from '../theme';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
 type Mode = 'base' | 'turn';
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
   },
   messageTitle: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   messageBody: {
     fontSize: fontSize.body,

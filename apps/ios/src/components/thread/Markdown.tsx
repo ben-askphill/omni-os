@@ -3,14 +3,14 @@ import { Linking } from 'react-native';
 import { EnrichedMarkdownText, type MarkdownStyle } from 'react-native-enriched-markdown';
 
 import { linkTarget, linkThreads } from '../../thread/links';
-import { type ColorTokens, fontSize, lineHeight, radius, useOmniTheme } from '../../theme';
+import { type ColorTokens, fontSize, lineHeight, radius, useOmniTheme, weight } from '../../theme';
 
 const MONO = 'Menlo';
 const BODY = 15;
 
 function styleFor(c: ColorTokens): MarkdownStyle {
   const block = { color: c.fg, fontSize: BODY, lineHeight: Math.round(BODY * 1.6) };
-  const heading = (size: number) => ({ color: c.fg, fontSize: size, fontWeight: '600', lineHeight: Math.round(size * 1.3), marginTop: 12, marginBottom: 6 });
+  const heading = (size: number) => ({ color: c.fg, fontSize: size, fontWeight: weight.semibold, lineHeight: Math.round(size * 1.3), marginTop: 12, marginBottom: 6 });
   return {
     paragraph: { ...block, marginTop: 0, marginBottom: 8 },
     h1: heading(22),

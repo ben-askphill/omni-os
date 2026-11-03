@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import type { HandoffChild, ThreadRow } from '../live/channel-model';
 import { fontSize, minTarget, space, useOmniTheme } from '../theme';

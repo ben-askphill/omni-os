@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import { AttachmentChips } from '../../attachments/AttachmentChips';
 import { restoreStaged } from '../../attachments/staged';
 import type { ThreadLive } from '../../live/hub';
 import { useStore } from '../../live/react';
-import { fontSize, space, useOmniTheme } from '../../theme';
+import { fontSize, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
 import { UserBubble } from '../UserBubble';
 import { editInComposer } from './drafts';
@@ -106,6 +107,6 @@ const styles = StyleSheet.create({
   },
   cancel: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

@@ -1,14 +1,15 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import type { ThreadLive, ThreadView } from '../../live/hub';
 import { useMarkResultRead } from '../../live/react';
 import { openArtifact } from '../../navigation/open-artifact';
 import type { RootStackParamList } from '../../navigation/types';
 import { CLOSED, type Disclosure, threadRows, type ThreadRow } from '../../thread/rows';
-import { fontSize, minTarget, space, useOmniTheme } from '../../theme';
+import { fontSize, minTarget, space, useOmniTheme, weight } from '../../theme';
 import { NeedsCards } from './NeedsCards';
 import { PendingRows } from './PendingRows';
 import type { SendAnswers } from './QuestionCard';
@@ -153,6 +154,6 @@ const styles = StyleSheet.create({
   },
   olderLabel: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

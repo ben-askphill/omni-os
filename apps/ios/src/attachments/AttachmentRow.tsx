@@ -1,11 +1,12 @@
 import type { Attachment } from '@omni/client-core';
 import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import type { FileSource, LiveHub } from '../live/hub';
 import { useLiveHub } from '../live/react';
-import { fontSize, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { formatBytes } from './model';
 
 const THUMB = 132;
@@ -222,7 +223,7 @@ const styles = StyleSheet.create({
   },
   fileName: {
     fontSize: fontSize.body,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   fileSize: {
     fontSize: fontSize.meta,
@@ -256,12 +257,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#ffffff',
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   viewerAction: {
     color: '#ffffff',
     fontSize: fontSize.input,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   viewerImage: {
     flex: 1,

@@ -1,7 +1,8 @@
 import type { Folder } from '@omni/client-core';
 import type { ThreadActionIcon, ThreadActionId } from '@omni/shared/thread-actions.ts';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import type { ThreadMachineControl } from '../../machine/hooks';
 import { machineNote } from '../../machine/state';

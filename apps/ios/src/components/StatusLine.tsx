@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { linkLabel } from '../live/connection';
 import { useLink } from '../live/react';
-import { fontSize, space, useOmniTheme } from '../theme';
+import { fontSize, space, useOmniTheme, weight } from '../theme';
 import { StatusDot } from './StatusDot';
 
 /** The connection state as one quiet line. It carries no banner and no colour beyond the dot. */
@@ -26,6 +27,6 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: fontSize.meta,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
 });

@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
-import { fontSize, minTarget, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, space, useOmniTheme, weight } from '../theme';
 
 interface SheetProps {
   visible: boolean;
@@ -55,10 +56,10 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   doneLabel: {
     fontSize: fontSize.input,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

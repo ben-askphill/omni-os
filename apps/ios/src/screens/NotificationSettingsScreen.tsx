@@ -1,6 +1,7 @@
 import type { AppPushKind } from '@omni/shared/app-pairing.ts';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { useNotifications } from '../notifications/NotificationsProvider';
 import type { PermissionState } from '../notifications/permission';
@@ -8,7 +9,7 @@ import { KIND_COPY, PUSH_KINDS } from '../notifications/preferences';
 import { usePushPreferences } from '../notifications/usePushPreferences';
 import { usePairing } from '../pairing/PairingProvider';
 import type { PairedServer } from '../pairing/servers';
-import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { Button } from '../ui/Button';
 
 type PermissionKey = PermissionState | 'checking';
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   meta: {
     fontSize: fontSize.body,
@@ -221,7 +222,7 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     fontSize: fontSize.input,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   rowDetail: {
     fontSize: fontSize.body,

@@ -1,10 +1,11 @@
 import { STATUS_LETTER } from '@omni/shared/changes-view.ts';
 import type { DiffLine } from '@omni/shared/diff.ts';
 import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { DiffCount } from '../review/parts';
-import { fontSize, minTarget, mono, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, mono, space, useOmniTheme, weight } from '../theme';
 import { pickable, type ChangeRow } from './rows';
 
 const DIGIT = 7.4;
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
   },
   groupTitle: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     textTransform: 'uppercase',
   },
   note: {
@@ -172,6 +173,6 @@ const styles = StyleSheet.create({
   },
   moreLabel: {
     fontSize: fontSize.body,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

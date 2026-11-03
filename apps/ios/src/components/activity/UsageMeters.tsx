@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import type { UsageMeter } from '../../live/activity-model';
 import { fontSize, radius, space, useOmniTheme } from '../../theme';

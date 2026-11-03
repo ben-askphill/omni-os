@@ -1,10 +1,11 @@
 import { toolLabel, toolSummary, type ToolCall } from '@omni/shared/transcript-fold.ts';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../../ui/Text';
 
 import { callDetail } from '../../../thread/call-detail';
 import type { ThreadRow } from '../../../thread/rows';
-import { fontSize, minTarget, radius, space, useOmniTheme } from '../../../theme';
+import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
 import { type DotTone, StatusDot } from '../../StatusDot';
 import { Markdown } from '../Markdown';
 import { useRowActions } from './actions';
@@ -165,7 +166,7 @@ const styles = StyleSheet.create({
   head: { minHeight: minTarget - 8, flexDirection: 'row', alignItems: 'flex-start', gap: space.s6, paddingVertical: space.s2, borderRadius: radius.md - 4 },
   dot: { paddingTop: 6 },
   grow: { flex: 1, gap: 2 },
-  name: { fontSize: fontSize.body - 0.5, fontWeight: '500' },
+  name: { fontSize: fontSize.body - 0.5, fontWeight: weight.medium },
   summary: { fontSize: 12.5, lineHeight: 17, fontFamily: MONO },
   preview: { marginLeft: space.s8, borderRadius: 8, paddingHorizontal: space.s4, paddingVertical: space.s2, fontFamily: MONO, fontSize: 11.5, lineHeight: 16, overflow: 'hidden' },
   detail: { marginLeft: space.s8, borderRadius: radius.md - 4, borderWidth: StyleSheet.hairlineWidth, padding: space.s4, gap: space.s2 },

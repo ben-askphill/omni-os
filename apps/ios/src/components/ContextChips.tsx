@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { contextLabels } from '../context/labels';
-import { fontSize, radius, space, useOmniTheme } from '../theme';
+import { fontSize, radius, space, useOmniTheme, weight } from '../theme';
 
 /** The context a sent message carries, as chips above its bubble. A message that is only context has no bubble. */
 export function ContextChips({ records }: { records: unknown }) {
@@ -37,6 +38,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: fontSize.meta + 1,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

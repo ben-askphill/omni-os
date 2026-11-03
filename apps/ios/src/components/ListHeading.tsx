@@ -1,6 +1,7 @@
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Text } from '../ui/Text';
 
-import { fontSize, space, useOmniTheme } from '../theme';
+import { fontSize, space, useOmniTheme, weight } from '../theme';
 
 /** A section label in a list, such as "Active" or a folder name, with how many rows it holds when given. */
 export function ListHeading({ children, count }: { children: string; count?: number }) {
@@ -20,7 +21,7 @@ export function ListHeading({ children, count }: { children: string; count?: num
 const styles = StyleSheet.create({
   heading: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     textTransform: 'uppercase',
     paddingHorizontal: space.s9,
     paddingTop: space.s9,

@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
-import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 
 export function GroupedList({ children }: { children: ReactNode }) {
   const { colors } = useOmniTheme();
@@ -76,7 +77,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.input,
   },
   destructive: {
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   detail: {
     fontSize: fontSize.body,

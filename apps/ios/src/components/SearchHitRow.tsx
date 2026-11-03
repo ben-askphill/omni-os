@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import type { HitRow } from '../search/search-model';
-import { fontSize, lineHeight, minTarget, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 
 export function SearchHitRow({ row, onPress }: { row: HitRow; onPress: () => void }) {
   const { colors } = useOmniTheme();
@@ -22,7 +23,7 @@ export function SearchHitRow({ row, onPress }: { row: HitRow; onPress: () => voi
         {row.snippet.length ? (
           <Text numberOfLines={3} style={[styles.snippet, { color: colors.fg3 }]}>
             {row.snippet.map((p, i) => (
-              <Text key={i} style={p.match ? { color: colors.fg, fontWeight: '600' } : undefined}>
+              <Text key={i} style={p.match ? { color: colors.fg, fontWeight: weight.semibold } : undefined}>
                 {p.text}
               </Text>
             ))}
@@ -44,7 +45,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: fontSize.input,
-    fontWeight: '500',
+    fontWeight: weight.medium,
     lineHeight: Math.round(fontSize.input * lineHeight.heading),
   },
   meta: {

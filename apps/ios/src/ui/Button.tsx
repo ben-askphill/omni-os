@@ -1,6 +1,7 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { Text } from './Text';
 
-import { fontSize, minTarget, radius, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 
 interface ButtonProps {
   label: string;
@@ -58,6 +59,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: fontSize.input,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
 });

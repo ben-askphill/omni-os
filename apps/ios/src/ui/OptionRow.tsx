@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
-import { fontSize, lineHeight, minTarget, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 
 interface OptionRowProps {
   label: string;
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   },
   groupTitle: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     textTransform: 'uppercase',
   },
   card: {

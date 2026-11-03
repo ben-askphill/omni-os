@@ -2,13 +2,14 @@ import type { Artifact } from '@omni/client-core';
 import { parseCsv } from '@omni/shared/artifacts.ts';
 import type { File } from 'expo-file-system';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import { markdownDocument } from '../../artifacts/markdown';
 import { sandboxHtml, svgDocument, type DocumentColors } from '../../artifacts/sandbox';
 import { useArtifactFile } from '../../artifacts/use-artifact-file';
 import { textPreview, viewerFor } from '../../artifacts/viewer-kind';
-import { fontSize, space, useOmniTheme, type ColorTokens } from '../../theme';
+import { type ColorTokens, fontSize, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
 import { SandboxWebView } from './SandboxWebView';
 
@@ -207,7 +208,7 @@ const styles = StyleSheet.create({
   headCell: {
     fontFamily: 'Menlo',
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   text: {
     padding: space.s6,

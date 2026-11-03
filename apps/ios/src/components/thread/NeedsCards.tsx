@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 
 import type { PendingMsg, Thread } from '@omni/client-core';
 
 import type { NeedsAction } from '../../needs/actions';
 import { threadCards, type CardButton, type ThreadCard } from '../../needs/thread-cards';
-import { fontSize, lineHeight, radius, space, useOmniTheme } from '../../theme';
+import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
 import { ErrorNote } from './QuestionCard';
 
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: fontSize.input,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   body: {
     fontSize: fontSize.body,

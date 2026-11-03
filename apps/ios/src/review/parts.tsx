@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
-import { fontSize, radius, space, useOmniTheme } from '../theme';
+import { fontSize, radius, space, useOmniTheme, weight } from '../theme';
 
 export function DiffCount({ add, del }: { add: number; del: number }) {
   const { colors } = useOmniTheme();
@@ -69,14 +70,14 @@ const styles = StyleSheet.create({
   },
   chipLabel: {
     fontSize: fontSize.meta + 1,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   section: {
     gap: space.s2,
   },
   sectionTitle: {
     fontSize: fontSize.meta,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
     textTransform: 'uppercase',
     paddingHorizontal: space.s2,
   },

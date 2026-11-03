@@ -1,6 +1,7 @@
 import type { OmniApi } from '@omni/client-core';
 import Constants from 'expo-constants';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { ListHeading } from '../components/ListHeading';
 import { useRemote } from '../live/use-remote';

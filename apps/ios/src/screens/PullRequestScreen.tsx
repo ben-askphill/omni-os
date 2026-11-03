@@ -1,7 +1,8 @@
 import { FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT } from '@omni/shared/thread-glance.ts';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeaderButton } from '../components/HeaderButton';
@@ -13,7 +14,7 @@ import { useMerge, usePRWatch, useThreadPR } from '../pr/hooks';
 import type { MergeOutcome } from '../pr/actions';
 import { CheckDot } from '../pr/CheckDot';
 import { Chip, DiffCount, Loading, Section } from '../review/parts';
-import { fontSize, lineHeight, minTarget, mono, space, useOmniTheme } from '../theme';
+import { fontSize, lineHeight, minTarget, mono, space, useOmniTheme, weight } from '../theme';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
 import { SlideToConfirm } from '../ui/SlideToConfirm';
@@ -147,7 +148,7 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
               ))}
               {c.review.latest.map((l, i) => (
                 <Text key={`${l.login}:${i}`} style={[styles.excerpt, { color: colors.fg2, borderColor: colors.lineStrong }]}>
-                  <Text style={{ color: colors.fg, fontWeight: '600' }}>{l.login}</Text> {l.excerpt}
+                  <Text style={{ color: colors.fg, fontWeight: weight.semibold }}>{l.login}</Text> {l.excerpt}
                 </Text>
               ))}
             </View>
@@ -222,7 +223,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     lineHeight: Math.round(22 * lineHeight.heading),
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   row: {
     flexDirection: 'row',
@@ -240,7 +241,7 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: fontSize.body,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   inline: {
     alignSelf: 'flex-start',
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontSize: fontSize.body,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   reviews: {
     padding: space.s8,
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: fontSize.heading,
-    fontWeight: '600',
+    fontWeight: weight.semibold,
   },
   emptyBody: {
     fontSize: fontSize.body,

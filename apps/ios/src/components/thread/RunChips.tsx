@@ -1,7 +1,8 @@
 import type { HarnessInfo } from '@omni/client-core';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import { Text } from '../../ui/Text';
 
-import { fontSize, radius, space, useOmniTheme } from '../../theme';
+import { fontSize, radius, space, useOmniTheme, weight } from '../../theme';
 import { nextTurnLabel, runChipLabel, type RunThread } from '../../thread/run-model';
 
 interface RunChipProps {
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
   label: {
     flexShrink: 1,
     fontSize: fontSize.body,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   caret: {
     fontSize: fontSize.meta,

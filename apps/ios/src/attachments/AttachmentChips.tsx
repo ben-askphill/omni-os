@@ -1,6 +1,7 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
-import { fontSize, radius, space, useOmniTheme } from '../theme';
+import { fontSize, radius, space, useOmniTheme, weight } from '../theme';
 import { formatBytes, type Staged } from './model';
 
 const THUMB = 56;
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
   },
   fileName: {
     fontSize: fontSize.body - 1,
-    fontWeight: '500',
+    fontWeight: weight.medium,
   },
   fileSize: {
     fontSize: fontSize.meta,
@@ -115,6 +116,6 @@ const styles = StyleSheet.create({
   removeGlyph: {
     fontSize: 14,
     lineHeight: 16,
-    fontWeight: '700',
+    fontWeight: weight.bold,
   },
 });

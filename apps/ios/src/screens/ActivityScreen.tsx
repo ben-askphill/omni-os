@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { NeedsRow } from '../components/activity/NeedsRow';
 import { ThreadGroupView } from '../components/activity/ThreadGroupView';
