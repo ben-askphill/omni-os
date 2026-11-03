@@ -3,7 +3,6 @@ import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
 import { deliveryStages, isDeliveryAhead, isPendingDelivery, TRIGGER_DELIVERY_STATES, type TriggerDeliveryState } from '../automation-triggers.ts';
 
-// The same cases run in apps/mac/OmniKit/Tests/OmniKitTests/DeliveryStagesTests.swift.
 const cases = JSON.parse(readFileSync(fixture('delivery-stages.json'), 'utf8')) as { case: string; input: Parameters<typeof deliveryStages>[0]; expected: unknown }[];
 
 describe('deliveryStages', () => {

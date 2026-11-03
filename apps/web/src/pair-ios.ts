@@ -2,7 +2,7 @@ import type { AppPairingCode, AppPairingQr } from '@omni/shared/app-pairing.ts';
 import { ApiError, errorText } from './api.ts';
 
 // Settings, Sharing & access, Omni for iOS: which address the phone is told to use, what the QR holds, and what to say
-// when a code cannot be made. The Mac app mirrors it in OmniKit's IosPairing.swift.
+// when a code cannot be made.
 //
 // The QR holds {"version":1,"serverUrl":"https://<origin>","code":"<code>"} and nothing else: the code comes from
 // POST /api/auth/app-pairings and is short-lived. The install token and the session cookie never reach the page's
@@ -125,7 +125,7 @@ export function parsePairingCode(raw: unknown): AppPairingCode | null {
  * revoke. A browser that signed in with Google is told where to go: there is no button, and nothing in the page asks
  * for the token.
  */
-const INSTALL_TOKEN_ONLY = 'Pairing the iOS app takes the install token. Use the Omni Mac app, or a browser paired with the install token.';
+const INSTALL_TOKEN_ONLY = 'Pairing the iOS app takes the install token. Use the Omni desktop app, or a browser paired with the install token.';
 export const NEEDS_INSTALL_TOKEN = `This browser signed in with Google. ${INSTALL_TOKEN_ONLY}`;
 
 export const NO_CODE = 'The server did not send a pairing code. If you updated Omni, restart its server and try again.';

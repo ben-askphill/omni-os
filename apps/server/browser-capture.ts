@@ -108,7 +108,7 @@ export async function captureAnnotation(src: CaptureSource, threadId: string, no
   return fail(413, `This page is too large to attach as an image (over ${(MAX_INLINE_IMAGE / 1_000_000).toFixed(1)} MB even as a JPEG). Make the browser window smaller and try again.`, false);
 }
 
-/** What a client that shows the page itself (the Mac app's own web view) says about it with the screenshot it took. */
+/** What a client that shows the page itself (the desktop app's Web tab) says about it with the screenshot it took. */
 export interface NativePage {
   url: string;
   title: string;
@@ -234,7 +234,7 @@ export function captureApi(browserFor: (c: Context) => CaptureSource, hooks: { c
     return c.json({ capture: r.capture });
   });
 
-  // A screenshot the client took of its own web view (the Mac app's native browser): the image as bytes, the page's numbers in the query.
+  // A screenshot the client took of its own web view (the desktop app's Web tab): the image as bytes, the page's numbers in the query.
   api.post('/:id/browser/capture/native', async (c) => {
     const q = z
       .object({

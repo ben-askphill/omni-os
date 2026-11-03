@@ -1,6 +1,5 @@
 // Where a server keeps secret values, as GET /api/status reports it in `server.secretStore`. The server picks the store
-// (apps/server/secret-store.ts); clients name it in their Secrets, Sync and Automations copy. The Mac app mirrors
-// this in OmniKit SecretStore.swift.
+// (apps/server/secret-store.ts); clients name it in their Secrets, Sync and Automations copy.
 
 export const SECRET_STORES = ['keychain', 'libsecret', 'file'] as const;
 export type SecretStoreKind = (typeof SECRET_STORES)[number];

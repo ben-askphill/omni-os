@@ -68,9 +68,8 @@
   --dur-pulse: 1400ms;
   --dur-ping: 1600ms;
   --type-caption: 500 12px/1.2 var(--font-sans);
-  /* Type sizes, line heights, spacing and radii from the Claude Design system (tokens/type.css, tokens/space.css),
-     the same steps as Theme.swift's TypeSize, Space and Radius. Use them as values (`text-[length:var(--fs-meta)]`):
-     Tailwind's own radius and text names mean other sizes. */
+  /* Type sizes, line heights, spacing and radii from the Claude Design system (tokens/type.css, tokens/space.css).
+     Use them as values (`text-[length:var(--fs-meta)]`): Tailwind's own radius and text names mean other sizes. */
   --fs-label: 10.5px;
   --fs-meta: 11px;
   --fs-code: 11.5px;
@@ -981,7 +980,7 @@
   vertical-align: -1px;
   accent-color: var(--fg);
 }
-/* Each image on its own line under its caption, as the Mac app lays them out. */
+/* Each image on its own line under its caption. */
 .md img {
   display: block;
   max-width: 100%;

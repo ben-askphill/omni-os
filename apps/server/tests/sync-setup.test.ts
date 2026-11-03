@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { ClerkClient, DevicePoll } from '../clerk.ts';
 import { MemoryTransport, RelayRefusedError, type RelayAuth } from '../sync/transport.ts';
 
@@ -266,11 +267,10 @@ describe('path map', () => {
   });
 });
 
-describe('Mac app', () => {
+describe('wire fixture', () => {
   it('gets the status keys and types its hand-made fixture has', async () => {
-    // The Mac app's SyncStatus decodes this fixture; the server must still send the same shape. Null reads
-    // as a string, the type of every nullable field.
-    const path = join(import.meta.dirname, '..', '..', 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures', 'sync-status.json');
+    // The server must still send the shape of this fixture. Null reads as a string, the type of every nullable field.
+    const path = join(WIRE_FIXTURES, 'sync-status.json');
     const shape = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === null ? 'string' : typeof v]));
     const live = await (await app.request('/status')).json();
     expect(shape(live)).toEqual(shape(JSON.parse(readFileSync(path, 'utf8'))));

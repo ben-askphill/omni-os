@@ -23,7 +23,7 @@ delete process.env.ELECTRON_RUN_AS_NODE;
 // Minimal .env loader so a server an app starts from a checkout and `npm run dev` read the same config. The desktop
 // app's bundle sits in the app's read-only resources and gets only a fixed environment (apps/desktop/src/backend/launch.ts),
 // so it reads the .env in its data dir instead. When that data dir is a checkout's data/, which the desktop app adopts
-// from the SwiftUI app or the Linux launcher (apps/desktop/src/backend/data-dir.ts), the checkout's .env still counts,
+// from an earlier install (apps/desktop/src/backend/data-dir.ts), the checkout's .env still counts,
 // below the data dir's: it may hold OMNI_SECRET_STORE, without which the secrets the old server kept are not found.
 const checkout = omniCheckout();
 const envFiles = BUNDLED

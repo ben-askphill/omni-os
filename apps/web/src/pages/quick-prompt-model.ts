@@ -1,4 +1,4 @@
-// The Quick Prompt's rules (OmniKit's QuickPromptModel): what is sent where, which keys send, and when Wispr Flow's
+// The Quick Prompt's rules: what is sent where, which keys send, and when Wispr Flow's
 // words have landed. Pure, so tests pin each one. The panel's page is QuickPrompt.tsx.
 
 export const CONDUCTOR = 'conductor';

@@ -1,7 +1,6 @@
 // What the composers do with a `/`, as pure functions: the Omni commands every thread's menu offers,
 // what Send does with a message that starts with one, and the quiet hints for commands that stay
 // plain text. The new-thread composer offers no Omni commands. The grammar itself is in slash.ts.
-// Shared by the Web UI and the Mac app's slash engine, so it imports nothing from apps/web/ or apps/mac/.
 import { OMNI_COMMANDS, TITLE_MAX, mentionHits, midMessageCommands, resolveSlash, visibleCommands, type CommandList, type SlashCommand } from './slash.ts';
 
 const HARNESS_NAME: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor Agent', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud' };

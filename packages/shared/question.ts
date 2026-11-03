@@ -1,6 +1,5 @@
 // Questions an agent asks the user with Omni's ask_user_question tool (apps/mcp/ask.ts), the same shape as Claude
 // Code's AskUserQuestion. Pure: the server parses a call and an answer with these, and formats what the agent gets back.
-// apps/mac/OmniKit/Sources/OmniKit/Question.swift ports the client half (the draft and the answers it sends).
 
 export interface QuestionOption {
   /** 1 to 5 words, shown bold. */

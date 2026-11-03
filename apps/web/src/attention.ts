@@ -1,5 +1,4 @@
-// Browser notifications for results that need Ben, the Web UI's copy of the Mac app's (OmniKit/Attention.swift). They
-// come from the same state as Needs you: a result alerts when it first shows there, under its own uid, so one result
+// Browser notifications for results that need Ben. They come from the same state as Needs you: a result alerts when it first shows there, under its own uid, so one result
 // alerts once however often the inbox loads. Choices stay in this browser and start off.
 import { useEffect, useState } from 'react';
 import type { NeedsYou, NeedsYouItem } from './api.ts';
@@ -42,7 +41,7 @@ export interface Changes {
 }
 
 /**
- * Which results alert, from each Needs you list in turn. The same rules as the Mac's AttentionTracker:
+ * Which results alert, from each Needs you list in turn:
  * - the first list only records what is there: results from before the page loaded are history, not news;
  * - a result alerts once, the first time a list has it;
  * - a result older than FRESHNESS_MS when it first shows never alerts;

@@ -3,7 +3,6 @@ import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
 import { commentsPrompt, isArtifactUrl, publishedFrom } from '../published.ts';
 
-// The same cases run in apps/mac/OmniKit/Tests/OmniKitTests/PublishedTests.swift.
 const cases = JSON.parse(readFileSync(fixture('published.json'), 'utf8')) as {
   case: string;
   name: string;

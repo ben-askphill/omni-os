@@ -53,8 +53,7 @@ export function guestPreferences(given: WebPreferences, pickPreload: string): We
 
 /**
  * The permissions a page in the Web tab gets: copying to the clipboard, and full screen for a video. Everything else
- * (camera, microphone, location, notifications, reading the clipboard, MIDI, devices) is refused without asking, as
- * the Mac app's web view did.
+ * (camera, microphone, location, notifications, reading the clipboard, MIDI, devices) is refused without asking.
  */
 const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'fullscreen']);
 
@@ -80,7 +79,7 @@ export function guestNavigation(url: string): GuestNavigation {
 
 /**
  * What a guest's popup becomes. `window.open` with a size (a sign-in popup, which posts back to its opener and closes
- * itself) opens a small window of the Web tab's own, signed in as the tab is, as the Mac app made it a tab of its own.
+ * itself) opens a small window of the Web tab's own, signed in as the tab is.
  * A link with target=_blank opens in the default browser and a mail link in its app. Nothing opens without a click.
  */
 export type PopupAction = { kind: 'window' } | { kind: 'external'; url: string } | { kind: 'deny' };
@@ -98,7 +97,7 @@ export function popupAction(details: { url: string; disposition: string }, gestu
 
 /**
  * What a guest does with a navigation of its top frame that it did not load itself: carry on, hand a mail link to its
- * app (only right after a click, as on the Mac), or stop it.
+ * app (only right after a click), or stop it.
  */
 export function navigationAction(url: string, mainFrame: boolean, gesture: boolean): 'allow' | 'external' | 'block' {
   const nav = guestNavigation(url);

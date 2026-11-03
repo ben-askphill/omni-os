@@ -1,8 +1,7 @@
 // Pages an agent shows inline in its thread with Omni's html_render tool (apps/mcp/render.ts): a chart, diagram,
 // table or mockup that sits in the transcript above the reply. The server saves each one as an artifact under
 // artifacts/renders/, so it syncs and stays in the Library like any file, and serves it with `?frame=1` to the frame.
-// apps/mac/OmniKit/Sources/OmniKit/HtmlRender.swift ports the call parsing; packages/test-fixtures/html-render.json
-// keeps them in step.
+// packages/test-fixtures/html-render.json holds the call parsing's cases.
 
 export const RENDER_SERVER = 'omni-render';
 export const RENDER_TOOL = 'html_render';
@@ -38,7 +37,7 @@ export function renderedFrom(name: string, input: unknown, result: { text: strin
 
 /**
  * The variables a rendered page reads, each set from an Omni token: shadcn's names, which agents already know.
- * The web reads each token's resolved value from its own CSS; the Mac from Theme.swift.
+ * The web reads each token's resolved value from its own CSS.
  */
 export const RENDER_COLORS = {
   '--background': '--bg',

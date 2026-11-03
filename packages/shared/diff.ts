@@ -1,6 +1,5 @@
 // The diff model every diff view shares: a unified diff cut into files and numbered lines. The PR page's diff and a
-// thread's Changes panel both draw it with DiffFile (components/DiffViewer.tsx). apps/mac/OmniKit's DiffParser.swift is the
-// same model; keep the two in step.
+// thread's Changes panel both draw it with DiffFile (components/DiffViewer.tsx).
 
 export type DiffLineKind = 'hunk' | 'add' | 'del' | 'context' | 'note';
 

@@ -7,8 +7,7 @@ import { Button, Chip, ErrorNote, Loading, StatusDot } from '../components/ui.ts
 import { Card, InfoRow, SwitchRow } from './settings-parts.tsx';
 
 // Settings, Sharing & access, Omni Connect (docs/user/omni-connect.md): turn this machine's Cloudflare tunnel on and off, see
-// its address and tunnel, and open your other machines. The Mac app's Machines tab
-// (apps/mac/Omni/ConnectSettingsView.swift) shows the same.
+// its address and tunnel, and open your other machines.
 
 const TUNNEL: Record<ConnectStatus['tunnel']['state'], { dot: string; label: string }> = {
   off: { dot: 'idle', label: 'Off' },
@@ -90,7 +89,7 @@ function MachineList({ connectPage, tunnelState }: { connectPage: string | null;
   const { reload } = res;
 
   // The relay asks every machine over its tunnel, so check again when this machine's tunnel changes (it is offline
-  // to the relay until the tunnel is up), and every 30 seconds for the others, as the Mac app does.
+  // to the relay until the tunnel is up), and every 30 seconds for the others.
   const lastTunnel = useRef(tunnelState);
   useEffect(() => {
     if (lastTunnel.current === tunnelState) return;

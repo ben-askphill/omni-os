@@ -1,5 +1,5 @@
 // Needs you (apps/server/db/repos/needs-you.ts) from the Web UI's side: why each thread is there, and which result an
-// open thread has shown. NeedsYou.swift is the Mac app's copy.
+// open thread has shown.
 import type { NeedsYou, NeedsYouItem } from './api.ts';
 import type { Glyph } from './components/ui.tsx';
 import { resetLabel } from './limits.ts';

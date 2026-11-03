@@ -8,7 +8,7 @@ import { buildItems, type Item, type TranscriptEvent } from '@omni/shared/transc
 import { historyServer, longRows } from './history-sim.ts';
 import { projectFold } from '@omni/shared/tests/transcript-snapshot.ts';
 
-// The fold over held spans (#223): the same rules as Transcript.swift, checked on the shared corpus and on real pages
+// The fold over held spans (#223), checked on the shared corpus and on real pages
 // of the long fixture against the fold of the whole thread.
 
 type Case = { name: string; events: TranscriptEvent[]; spans?: Span[]; items: unknown; plan: unknown };

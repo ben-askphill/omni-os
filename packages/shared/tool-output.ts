@@ -1,7 +1,6 @@
 // Tool output on the wire (#225): a tool_result row travels as a short preview and its size, the saved output is read
 // in bounded chunks when a row opens, and a running command's output is followed through a bounded tail.
-// Pure. The server builds these in apps/server/tool-output.ts and tool-tail.ts; apps/mac/OmniKit/Sources/OmniKit/
-// ToolOutput.swift ports the client half. Why and how: docs/internals/thread-history.md.
+// Pure. The server builds these in apps/server/tool-output.ts and tool-tail.ts. Why and how: docs/internals/thread-history.md.
 
 /** Every limit on tool output in transport. Offsets and sizes are in code points unless a name says otherwise. */
 export const TOOL_OUTPUT = {

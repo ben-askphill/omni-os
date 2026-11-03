@@ -1,6 +1,6 @@
 // Watch PR: the server polls a thread's pull request and wakes the thread when something new needs it
-// (apps/server/pr-watch/). Server and web share these shapes; the Mac app mirrors them (OmniKit PRWatch.swift) and
-// the fixtures in apps/server/tests/mac-fixtures.test.ts hold both to the same JSON.
+// (apps/server/pr-watch/). Server and web share these shapes, and the
+// fixtures in apps/server/tests/wire-fixtures.test.ts record their JSON.
 
 /**
  * Why a watch stopped polling. `stopped`: Ben or the Conductor stopped it. `archived`: its thread was archived.

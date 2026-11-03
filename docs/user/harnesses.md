@@ -106,7 +106,7 @@ It needs two things, and the model picker says which is missing:
 | Models | Cursor default (the one set on cursor.com) or a model from Cursor's list. No effort levels |
 | Usage | Billed to your Cursor plan. Omni shows no meter for it |
 
-Not supported, since the agent runs on Linux: building or running the Mac app, Swift and Xcode tests, and screenshots of the Mac app or a browser. Its prompt tells it to say what it could not check. Pull the branch and do those on the Mac.
+Not supported, since the agent runs on a Cursor machine: a Mac build of the desktop app, running the desktop app, and screenshots of it or a browser. Its prompt tells it to say what it could not check. Pull the branch and do those on your own machine.
 
 Omni drives the [Cloud Agents API v1](https://cursor.com/docs/cloud-agent/api/endpoints), which Cursor marks as a public beta.
 

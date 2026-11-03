@@ -1,4 +1,4 @@
-// Quitting, as the SwiftUI app did it (OmniKit/Quit.swift): a server this app started stops with it, unless turns
+// Quitting: a server this app started stops with it, unless turns
 // still run on it. Then the app asks whether to keep the server running for them. A server someone else started keeps
 // running, and the app quits at once. The activity monitor this app started stops either way. Restart Server asks
 // the same question before it stops a server with turns on it. Relaunch to Update asks it without Keep Server
@@ -52,7 +52,7 @@ export function updateAction(choice: UpdateChoice): QuitAction {
   }
 }
 
-/** The dialog's text, worded as the SwiftUI app's QuitDialog. Buttons follow QUIT_CHOICES. */
+/** The dialog's text. Buttons follow QUIT_CHOICES. */
 export function quitDialog(runningTurns: number | null): { message: string; detail: string; buttons: string[] } {
   const buttons = ['Keep Server Running', 'Stop Them and Quit', 'Cancel'];
   if (runningTurns === null) {
@@ -116,8 +116,8 @@ const IDLE_POLL_MS = 2000;
 let restartPending = false;
 
 /**
- * Server > Restart Server on a ready server this app started. With turns running it asks first: wait for them (as the
- * SwiftUI app's ServerRestart did), stop them, or leave the server alone.
+ * Server > Restart Server on a ready server this app started. With turns running it asks first: wait for them, stop
+ * them, or leave the server alone.
  */
 export async function restartServer(ctx: AppContext): Promise<void> {
   if (restartPending) return;

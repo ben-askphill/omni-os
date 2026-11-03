@@ -67,7 +67,7 @@ describe('parseHash', () => {
     expect(parseHash('#/secrets')).toEqual({ name: 'settings', section: 'secrets' });
     expect(parseHash('#/sync')).toEqual({ name: 'settings', section: 'sync' });
     expect(parseHash('#/storage')).toEqual({ name: 'settings', section: 'worktrees' });
-    // The Mac's tab names before the grouped layout open the section that holds them now.
+    // The old tab names from before the grouped layout open the section that holds them now.
     expect(parseHash('#/settings/storage')).toEqual({ name: 'settings', section: 'worktrees' });
     expect(parseHash('#/settings/profile')).toEqual({ name: 'settings', section: 'general' });
     // A search result carries the setting to scroll to.

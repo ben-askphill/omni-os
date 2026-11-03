@@ -131,7 +131,7 @@ prints the config for each client below, filled in for this checkout, port and d
 
 Claude Desktop, Cursor, Claude Code and Codex start `apps/mcp/external/stdio.ts` with Node. It reads `data/api-token` itself, so no token goes into their config files. Paste the `mcpServers` block into `claude_desktop_config.json` or `~/.cursor/mcp.json`, or run the `claude mcp add` or `codex mcp add` line. Restart the client.
 
-The server has to be running (`npm start`, `npm run dev` or the Mac app). The stdio server only relays to it.
+The server has to be running (`npm start`, `npm run dev` or the desktop app). The stdio server only relays to it.
 
 ### From anywhere else (HTTP)
 

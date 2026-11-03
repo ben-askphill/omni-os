@@ -1,5 +1,4 @@
-// Durable sends (apps/server/db/repos/requests.ts): one request id per message, kept across its retries. RequestIds.swift
-// is the Mac app's copy.
+// Durable sends (apps/server/db/repos/requests.ts): one request id per message, kept across its retries.
 
 export interface PendingRequest {
   key: string;

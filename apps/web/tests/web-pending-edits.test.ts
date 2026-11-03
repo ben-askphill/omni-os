@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { PendingMsg, ThreadDetail } from '../src/api.ts';
 import { canMove, canSteerNow, changed, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE } from '../src/pending-edits.ts';
 
 // The Web UI's model for editing, removing and reordering unsent messages (apps/web/src/pending-edits.ts), against the
-// recorded server answers the Mac app's Swift tests decode too (apps/server/tests/mac-fixtures.test.ts records them).
+// recorded server answers (apps/server/tests/wire-fixtures.test.ts records them).
 
-const FIXTURES = join(resolve(import.meta.dirname, '../..'), 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures');
-const fixture = <T>(name: string) => JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as T;
+const fixture = <T>(name: string) => JSON.parse(readFileSync(join(WIRE_FIXTURES, name), 'utf8')) as T;
 
 const msg = (uuid: string, state: PendingMsg['state'], extra: Partial<PendingMsg> = {}): PendingMsg => ({
   uuid, kind: 'user', text: uuid, mode: 'queue', state, request_id: `r-${uuid}`, delivery: state, ...extra,

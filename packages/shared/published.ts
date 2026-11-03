@@ -2,7 +2,7 @@
 // There is no public Artifacts API; the CLI's own tool call and result are all Omni gets. The result text
 // ("Published <path> at https://claude.ai/code/artifact/<uuid>") is not a documented format, so this reads
 // only the URL out of it and returns null for anything it does not recognise.
-// apps/mac/OmniKit/Sources/OmniKit/PublishedPage.swift ports it; packages/test-fixtures/published.json keeps them in step.
+// packages/test-fixtures/published.json holds the cases.
 
 export interface Published {
   url: string;

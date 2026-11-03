@@ -24,7 +24,6 @@ import { Advanced, Card, InfoRow } from './settings-parts.tsx';
 // code from POST /api/auth/app-pairings. The code lives in this component only: it is not stored, logged or sent
 // anywhere else, and it is dropped when it expires or the card closes. The server mints a code only for a client holding
 // the install token, so a browser that signed in with Google is told where to go instead of being offered the button.
-// The Mac app's card is IosPairingSettingsView.swift.
 
 interface Issued {
   code: string;

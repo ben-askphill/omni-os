@@ -70,7 +70,7 @@ export interface Profile {
   pronouns?: string;
   email?: string;
   timezone?: string;
-  /** False until onboarding finished (web, Mac or `npm run setup`). Older servers leave it out. */
+  /** False until onboarding finished (the Web UI or `npm run setup`). Older servers leave it out. */
   onboarded?: boolean;
 }
 
@@ -374,7 +374,7 @@ export type FeedEvent =
   | { type: 'usage'; harness?: HarnessId; usage: Usage | null }
   | { type: 'artifact'; artifact: Artifact }
   | { type: 'channel'; id: string }
-  /** Ben read a thread's result, here or in the Mac app: Needs you changed, nothing else did. */
+  /** Ben read a thread's result, here or on another client: Needs you changed, nothing else did. */
   | { type: 'needs_you'; thread_id: string }
   /** A delivery to this automation was saved or changed state. */
   | { type: 'automation_delivery'; automation: string }

@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { NeedsYou, NeedsYouItem } from '../src/api.ts';
 import { FRESHNESS_MS, alertFor, createTracker } from '../src/attention.ts';
 
-// Which Needs you results become browser notifications (apps/web/src/attention.ts): the rules the Mac's AttentionTracker
-// follows, against the same recorded server answer.
+// Which Needs you results become browser notifications (apps/web/src/attention.ts), against the recorded server answer
+// (apps/server/tests/wire-fixtures.test.ts records it).
 
-const FIXTURES = join(resolve(import.meta.dirname, '../..'), 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures');
-const base = (JSON.parse(readFileSync(join(FIXTURES, 'needs-you.json'), 'utf8')) as NeedsYou).items;
+const base = (JSON.parse(readFileSync(join(WIRE_FIXTURES, 'needs-you.json'), 'utf8')) as NeedsYou).items;
 const AT = Date.parse('2026-01-05T09:00:00.000Z');
 const byTitle = (title: string) => base.find((i) => i.thread.title === title)!;
 const list = (items: NeedsYouItem[]): NeedsYou => ({ items, unread: items.filter((i) => i.result).length, blocked: 0 });

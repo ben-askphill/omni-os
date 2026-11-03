@@ -1,6 +1,6 @@
 # Architecture overview
 
-One Node server (`apps/server/`, Hono on `node:sqlite`) owns every thread, harness process, secret and automation. The Web UI and the Mac app are two clients of its `/api`. Words like channel, thread, turn and request are defined in [CONTEXT.md](../../CONTEXT.md). Decisions and their reasons are in the [ADRs](../adr/).
+One Node server (`apps/server/`, Hono on `node:sqlite`) owns every thread, harness process, secret and automation. The Web UI, the desktop app that shows it, and the iOS app are clients of its `/api`. Words like channel, thread, turn and request are defined in [CONTEXT.md](../../CONTEXT.md). Decisions and their reasons are in the [ADRs](../adr/).
 
 Tool-failure diagnostics reuse the runner's normalized `tool_result` records and SQLite connection. Only `is_error` results enter the local failure ledger. The ledger stores allowlisted error categories and summaries, never arguments or raw error bodies. Existing transcripts retain their existing payload behavior. A shell failure that starts with `Exit code N` is classified from that code (124 timeout, 126 permission, 127 not found, else `command_exit`, or `not_found` when the next lines say the command was missing), not from keywords in the command's own output. A Cursor call rejected before it starts arrives as a completion only; the adapter still records the tool name from that event so the failure is not stored as `unknown`. Claude Code Read's missing file, wiki and browser "not found" replies, and similar misses go to `not_found`; directory and size-limit refusals go to `invalid_input`. DesignSync's headless login failure is `authentication`, and a missing-parameter reply is `invalid_input`. A thread, harness, session and call reference deduplicate repeated reports; missing call references fall back to event IDs. Groups combine harness, tool and category, so unrelated causes can share a group. Triage status and human-written guidance do not disable tools. A new occurrence reopens a fixed group while keeping its guidance. Retry links and recovery observations are explicit through `PATCH /api/tool-failures/occurrences/:id`; successful calls do not imply recovery. This diagnostic state deliberately stays out of sync, so one machine's tool installation and failures do not become another machine's guidance.
 
@@ -37,22 +37,19 @@ A running channel action also keeps its worktree from cleanup. Starting an actio
 
 The channel browser (`apps/server/browser.ts`) is one Chrome per channel that Omni launches on first use (a thread's MCP or the Browser panel) and closes after 5 idle minutes. The panel streams it with a CDP screencast and sends mouse, wheel and keys back (`/api/channels/:id/browser/*`). While someone watches, the page lays out at the viewer's size (`Emulation.setDeviceMetricsOverride`, sharp at the display's scale), so it reads like a real browser window in the panel; the last viewer to report a size wins, and with none watching the agent gets the 1280-wide desktop page back. Input goes in batches: a client queues while a batch is on its way and merges moves and scrolls. The frame is Chrome-like: tabs with favicons, the address bar, a loading bar, and Chrome's Cmd shortcuts (L, T, W, R, [, ], C, X, V; A and Z go to the page).
 
-The Mac app also has a Web tab: Ben's own browser, a `WKWebView` per tab in the app (`NativeBrowserModel.swift`), drawn by the Mac rather than streamed. It shares the frame (`BrowserChrome.swift`) but nothing else with the channel browser: the agent can't see it, and its cookies live in the app's default website data store, never on the server. Live Annotate works on it as on the channel browser: the hover and the pick run the shared page scripts in the web view and read their answers with the shared readers through JavaScriptCore (`packages/shared/browser-pick-*.ts`), and the capture is the web view's own screenshot (`POST /api/channels/:id/browser/capture/native`).
+The desktop app also has a Web tab: Ben's own browser, a `<webview>` in the app (`apps/web/src/components/NativeBrowser.tsx`, `apps/desktop/src/native-browser.ts`), drawn by the app rather than streamed. It shares nothing with the channel browser: the agent can't see it, and its cookies live in the app's persistent Web tab session, never on the server. Live Annotate works on it as on the channel browser: the hover and the pick run the shared page scripts in the web view through `apps/desktop/src/pick-preload.ts` and read their answers with the shared readers (`packages/shared/browser-pick-*.ts`), and the capture is the web view's own screenshot (`POST /api/channels/:id/browser/capture/native`).
 
-## Web UI and Mac app
+## Clients
 
-The two clients are kept apart so a change to one cannot break the other:
+The clients are kept apart so a change to one cannot break another:
 
-- `apps/web/` imports only `apps/web/`, `packages/shared/` and server types. It never imports `apps/mac/`.
+- `apps/web/` imports only `apps/web/`, `packages/shared/` and server types. It never imports `apps/desktop/`.
 - Below 768px, `apps/web/src/mobile/MobileShell.tsx` replaces the desktop shell. Phone screens and their parents come from the hash route (`mobile/screens.ts`), and the thread screens share their loaded thread and stream. Check this layout separately from desktop.
-- `apps/mac/` imports only `apps/mac/` and `packages/shared/`. Its Swift code talks to the server over HTTP and SSE, never to `apps/web/`.
-- `packages/shared/` holds the pure TypeScript the web, Mac and iOS clients need (slash grammar, `/` menu ranking, command pills, and shared view models) and imports only itself. It also holds wire contracts the server and the web both import, such as the Changes panel's types (`changes.ts`) and the user config's fields (`settings.ts`). The Mac's Swift copies of those are checked against them by `apps/server/tests/mac-fixtures.test.ts`. The Mac app runs it through JavaScriptCore from checked-in bundles: run `npm run build:slash` after changing a slash module, `npm run build:pick` after changing `browser-pick-script.ts` or `browser-pick-read.ts`.
-- `apps/ios/` is a separate Expo client. It talks to the server through `packages/client-core` and `packages/shared`, and imports nothing from `apps/web`, `apps/mac` or `apps/server`. Pairing, push and the app's screens are in [apps/ios/README.md](../../apps/ios/README.md) and [Native app pairing](app-pairing.md).
+- `apps/desktop/` is an Electron window on the Web UI that runs the bundled server ([ADR 0010](../adr/0010-desktop-app-is-electron.md)). It imports only itself and `packages/shared/`. Desktop-only UI goes through `window.omniDesktop` (`packages/shared/desktop-bridge.ts`), which the Web UI reads only through `apps/web/src/desktop.ts`, so a browser and a phone never see it. Details: [apps/desktop/README.md](../../apps/desktop/README.md).
+- `packages/shared/` holds the pure TypeScript the web, desktop and iOS clients need (slash grammar, `/` menu ranking, command pills, and shared view models) and imports only itself. It also holds wire contracts the server and the web both import, such as the Changes panel's types (`changes.ts`) and the user config's fields (`settings.ts`).
+- `apps/ios/` is a separate Expo client. It talks to the server through `packages/client-core` and `packages/shared`, and imports nothing from `apps/web`, `apps/desktop` or `apps/server`. Pairing, push and the app's screens are in [apps/ios/README.md](../../apps/ios/README.md) and [Native app pairing](app-pairing.md).
 - `turbo boundaries` (part of `npm test`) fails on any import that crosses these lines: a file outside its package, a package that is not a declared dependency, or a dependency the tags in `turbo.json` deny.
-- `apps/server/tests/mac-fixtures.test.ts` pins the JSON the Mac app reads from the server, so a server change that would break the app fails `npm test`.
-- Some screens copy a Web UI rule (transcript grouping, status line, format helpers). Those are ported to Swift with their own tests, not imported. A Web UI change to one of them should say whether the Mac app needs it too ([ADR 0002](../adr/0002-mac-app-is-a-client.md)).
-- Mac-only details (project layout, the OmniKit files, the QA harness): `apps/mac/NOTES.md`.
-- The Linux app (`apps/linux`) is a launcher around this Web UI, not a third screen to port. It starts the server and opens an app window. See [ADR 0006](../adr/0006-linux-app-is-a-window.md).
+- `apps/server/tests/wire-fixtures.test.ts` records the JSON and SSE the clients read from the server into `packages/test-fixtures/wire/`, and a normal run checks the server still sends that shape. The web and shared tests read the same fixtures, so a server change that would break a client fails `npm test`.
 
 ## Layout
 
@@ -65,19 +62,18 @@ apps/server/                @omni/server: Hono API (*-api.ts), runner/, harness/
                             GitHub, scheduler; scripts/ for history import and sync backfill
 apps/mcp/                   @omni/mcp: omni.ts, the conductor tools; ask.ts, ask_user_question for every thread; threads.ts, read_referenced_thread for every thread but the conductor's
 apps/web/                   @omni/web: Web UI (React, Vite)
-apps/mac/                   @omni/mac: SwiftUI app (Omni/), OmniKit package, slash engine entry and bundler
+apps/desktop/               @omni/desktop: Electron app for macOS and Linux. Shows the Web UI and runs the bundled server
 apps/ios/                   @omni/ios: Expo React Native app (pairing, live threads, Activity, Library)
-apps/linux/                 @omni/linux: desktop launcher for Linux. Starts the server and opens the Web UI in an app window
-packages/shared/            @omni/shared: pure TypeScript the web, Mac and iOS clients use (slash grammar, menu, pills)
+packages/shared/            @omni/shared: pure TypeScript the web, desktop and iOS clients use (slash grammar, menu, pills)
 packages/client-core/       @omni/client-core: typed HTTP and thread stream for the iOS app
-packages/test-fixtures/     @omni/test-fixtures: fake CLIs and corpora the TS and Swift tests share
+packages/test-fixtures/     @omni/test-fixtures: fake CLIs, corpora and wire fixtures the tests share
 packages/typescript-config/ @omni/typescript-config: the tsconfig bases every package extends
 crew/                       shared role charters (yours override them from data/crew/)
 automations/                shared automation YAML, cron or events (yours go in data/automations/)
 prototypes/                 standalone experiments (not npm workspaces; see prototypes/README.md)
 omni.config.example.json    every field of data/omni.config.json
 mods/                       Claude Code mods loaded with OMNI_MODS=1 (omni-progress)
-scripts/                    shell shim, Mac build, Linux launcher, QA stack, PR screenshots, sync-main (Update), docs-daily
+scripts/                    shell shim, desktop build, QA stack, PR screenshots, sync-main (Update), docs-daily
 docs/                       user guides (user/), architecture (internals/), ADRs (adr/), PR screenshot guide
 CONTEXT.md                  domain glossary (channel, thread, harness, crew...)
 CONTRIBUTING.md             dev setup, checks and what a PR needs

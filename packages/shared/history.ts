@@ -1,7 +1,6 @@
 // Bounded thread history (#223): a thread opens with its newest page of events and loads older pages on demand.
 // Pure. The server cuts pages with `cut` and `spanOf`; clients hold a `History` and join every page into it.
-// apps/mac/OmniKit/Sources/OmniKit/History.swift ports the client half; packages/test-fixtures/history/spans.json
-// keeps the two in step. Budgets and the reasons for them: docs/internals/thread-history.md.
+// packages/test-fixtures/history/spans.json holds the client half's cases. Budgets and the reasons for them: docs/internals/thread-history.md.
 
 /** What one page may carry. The server enforces it; the budget tests and the recorded baseline read it. */
 export const HISTORY_BUDGET = {
@@ -434,7 +433,7 @@ export type HistoryEdge = { type: 'earlier' } | { type: 'gap'; after: number };
 
 /**
  * Where each control goes, by the key of the shown row it sits above. `keys`: the shown rows' keys, ascending (item
- * keys on the desktop and the Mac, turn keys on the phone). A control with no shown row under it is keyed -1, at the
+ * keys on the desktop, turn keys on the phone). A control with no shown row under it is keyed -1, at the
  * end; the earlier control wins that key.
  */
 export function historyEdges(h: Pick<History, 'spans'>, keys: readonly number[]): Map<number, HistoryEdge> {

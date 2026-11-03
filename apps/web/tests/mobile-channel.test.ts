@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { NeedsYou, Thread } from '../src/api.ts';
@@ -33,8 +34,7 @@ vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: vi.fn(), ba
 
 import { ChannelScreen } from '../src/mobile/ChannelsScreen.tsx';
 
-const fixtures = resolve(import.meta.dirname, '../../mac/OmniKit/Tests/OmniKitTests/Fixtures');
-const base = (JSON.parse(readFileSync(resolve(fixtures, 'recent.json'), 'utf8')) as Thread[])[0];
+const base = (JSON.parse(readFileSync(resolve(WIRE_FIXTURES, 'recent.json'), 'utf8')) as Thread[])[0];
 const thread = (id: string, status: Thread['status'], folder_id: string | null = 'folder'): Thread => ({
   ...base, id, title: `Thread ${id}`, channel_id: 'acme', status, folder_id,
 });
@@ -82,7 +82,7 @@ describe('phone channel folders', () => {
   });
 
   it('keeps finished threads that need Ben under Active, inside and outside folders', () => {
-    const inbox = JSON.parse(readFileSync(resolve(fixtures, 'needs-you.json'), 'utf8')) as NeedsYou;
+    const inbox = JSON.parse(readFileSync(resolve(WIRE_FIXTURES, 'needs-you.json'), 'utf8')) as NeedsYou;
     const result = inbox.items.find((item) => item.thread.status === 'done' && item.result)!;
     expect(result).toBeDefined();
     const filed = thread('unread-filed', 'done');

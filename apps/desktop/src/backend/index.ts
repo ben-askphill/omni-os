@@ -1,7 +1,7 @@
 // The Omni server behind the window: attach to this install's server when one already holds the port, else start
 // one on this app's own binary and stop it on quit. After the Web UI's Update it exits with RESTART_EXIT_CODE and
-// starts again here, the job the Mac app's ServerSupervisor and the Linux launcher did. A server an earlier launch
-// started and left running (Keep Server Running) is still this app's own: a note of its pid says so.
+// starts again here. A server an earlier launch started and left running (Keep Server Running) is still this app's
+// own: a note of its pid says so.
 import { readFileSync, rmSync } from 'node:fs';
 import type { DesktopServerInfo } from '@omni/shared/desktop-bridge.ts';
 import {

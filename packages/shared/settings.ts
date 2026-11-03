@@ -1,11 +1,9 @@
 // The user config's one contract (data/omni.config.json, GET and PUT /api/setup): every field the person sets, with
 // its label, hint, default and checks, and the types the server and the web import. The server builds its schema from
 // SETTING_FIELDS (apps/server/user-config.ts) and checks a save with `settingProblem`; the web's Settings page draws its
-// General and Workspace forms from them (apps/web/src/pages/Settings.tsx). The Mac app's Setup.swift and
-// ProfileSettingsView.swift mirror them; apps/server/tests/mac-fixtures.test.ts holds both to this file.
+// General and Workspace forms from them (apps/web/src/pages/Settings.tsx).
 //
-// A new text setting is one entry here, its property in Setup.swift, its row in ProfileSettingsView.swift and its
-// line in omni.config.example.json.
+// A new text setting is one entry here and its line in omni.config.example.json.
 
 export const NAME_MAX = 60;
 
@@ -208,7 +206,7 @@ export interface AutomationOverride {
 
 export interface UserConfig {
   version: 1;
-  /** Set when onboarding (web, Mac or `npm run setup`) finished. Missing means both clients show the wizard. */
+  /** Set when onboarding (the Web UI or `npm run setup`) finished. Missing means the Web UI shows the wizard. */
   onboardedAt?: string;
   user: SectionValues<'user'>;
   workspace: SectionValues<'workspace'>;

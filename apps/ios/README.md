@@ -67,7 +67,7 @@ Search lists the latest threads until you type. After 200 ms of quiet it asks th
 
 Settings is a grouped list. Servers is the pairing screen. Notifications opens the per-server alert choices (`NotificationSettings`). Devices lists who is signed in to the active server and revokes one. The server decides who may revoke a device, and its refusal is shown as it is. Automations lists the server's automations and pauses or resumes one, as phone web does. Sign out of a server is the same as removing it: the phone tells the server, then forgets the token. The footer shows the app version.
 
-These screens call the server through `hub.call` (`src/live/hub.ts`), which retries once after a 401 like the live lists, and `useRemote` (`src/live/use-remote.ts`) for lists the live feed does not carry. Appearance follows the system theme. Workspace, Machines, Sync, Integrations, Harness config, Secrets and About stay in the Web UI and the Mac app.
+These screens call the server through `hub.call` (`src/live/hub.ts`), which retries once after a 401 like the live lists, and `useRemote` (`src/live/use-remote.ts`) for lists the live feed does not carry. Appearance follows the system theme. Workspace, Machines, Sync, Integrations, Harness config, Secrets and About stay in the Web UI and the desktop app.
 
 ## Library and artifacts
 

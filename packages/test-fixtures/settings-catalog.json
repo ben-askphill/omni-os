@@ -120,6 +120,14 @@
       "scoped": true
     },
     {
+      "id": "desktop",
+      "group": "app",
+      "title": "Desktop app",
+      "icon": "monitor",
+      "blurb": "Quick Prompt, zoom, updates and how this app starts.",
+      "desktopApp": true
+    },
+    {
       "id": "about",
       "group": "app",
       "title": "About",
@@ -151,21 +159,6 @@
         "wizard",
         "harness check",
         "first run"
-      ]
-    },
-    {
-      "id": "quick-prompt",
-      "section": "general",
-      "title": "Quick Prompt",
-      "keywords": [
-        "hotkey",
-        "shortcut",
-        "keyboard",
-        "global",
-        "launcher"
-      ],
-      "surfaces": [
-        "mac"
       ]
     },
     {
@@ -567,6 +560,69 @@
       ]
     },
     {
+      "id": "desktop-quick-prompt",
+      "section": "desktop",
+      "title": "Quick Prompt",
+      "keywords": [
+        "hotkey",
+        "shortcut",
+        "keyboard",
+        "global",
+        "launcher",
+        "wispr flow",
+        "dictate"
+      ],
+      "surfaces": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "desktop-login",
+      "section": "desktop",
+      "title": "Open Omni at login",
+      "keywords": [
+        "startup",
+        "launch",
+        "login items",
+        "autostart"
+      ],
+      "surfaces": [
+        "desktop"
+      ],
+      "needs": "loginItem"
+    },
+    {
+      "id": "desktop-zoom",
+      "section": "desktop",
+      "title": "Zoom",
+      "keywords": [
+        "text size",
+        "scale",
+        "bigger",
+        "smaller",
+        "font size"
+      ],
+      "surfaces": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "desktop-app",
+      "section": "desktop",
+      "title": "App version, server and updates",
+      "keywords": [
+        "version",
+        "update",
+        "log",
+        "data folder",
+        "server",
+        "relaunch"
+      ],
+      "surfaces": [
+        "desktop"
+      ]
+    },
+    {
       "id": "version",
       "section": "about",
       "title": "Version and build",
@@ -608,7 +664,7 @@
     },
     {
       "query": "dark",
-      "surface": "mac",
+      "surface": "desktop",
       "expected": [
         "theme"
       ]
@@ -638,9 +694,9 @@
     },
     {
       "query": "hotkey",
-      "surface": "mac",
+      "surface": "desktop",
       "expected": [
-        "quick-prompt"
+        "desktop-quick-prompt"
       ]
     },
     {
@@ -659,7 +715,7 @@
     },
     {
       "query": "port",
-      "surface": "mac",
+      "surface": "desktop",
       "expected": [
         "server",
         "channel-actions",

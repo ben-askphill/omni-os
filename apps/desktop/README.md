@@ -1,6 +1,6 @@
 # Omni desktop app
 
-An Electron window on the Web UI that runs the Omni server itself ([ADR 0010](../../docs/adr/0010-desktop-app-is-electron.md)). It loads `apps/web` as it is, starts the bundled server on Electron's own Node, and adds what a browser cannot do: menus, notifications, the Quick Prompt shortcut, launch at login, zoom, thread windows and the native Web tab. One codebase builds the Mac app (arm64, x64, universal) and the Linux AppImage. It replaces `apps/mac` and `apps/linux`.
+An Electron window on the Web UI that runs the Omni server itself ([ADR 0010](../../docs/adr/0010-desktop-app-is-electron.md)). It loads `apps/web` as it is, starts the bundled server on Electron's own Node, and adds what a browser cannot do: menus, notifications, the Quick Prompt shortcut, launch at login, zoom, thread windows and the native Web tab. One codebase builds the Mac app (arm64, x64, universal) and the Linux AppImage. It replaced the SwiftUI Mac app and the Linux launcher.
 
 ## Layout
 
@@ -20,7 +20,7 @@ An Electron window on the Web UI that runs the Omni server itself ([ADR 0010](..
 
 `packages/shared/desktop-bridge.ts` is the contract: the `DesktopBridge` type the page sees as `window.omniDesktop`, the events the main process sends (`DesktopEvent`, including menu commands as `DesktopCommand`), and the pure rules both sides share (settings parsing, zoom steps, Quick Prompt shortcuts). The Web UI reads the bridge only through `apps/web/src/desktop.ts`, which is `null` in a browser or on a phone. Gate every desktop-only piece of UI on it, so the other two surfaces stay as they were.
 
-To add a call, add the channel to `src/ipc.ts`, the method to `src/preload.ts` and the type to `desktop-bridge.ts`, then answer it in the main process with `handle` or `on` from `src/handle.ts`. Those check that the sender is an Omni page, so a site in the Web tab cannot reach the bridge. `apps/desktop` imports `@omni/shared` only, never `apps/server`, `apps/web` or `apps/mac` source.
+To add a call, add the channel to `src/ipc.ts`, the method to `src/preload.ts` and the type to `desktop-bridge.ts`, then answer it in the main process with `handle` or `on` from `src/handle.ts`. Those check that the sender is an Omni page, so a site in the Web tab cannot reach the bridge. `apps/desktop` imports `@omni/shared` only, never `apps/server` or `apps/web` source.
 
 ## Develop
 
@@ -54,7 +54,7 @@ Tests and types: `npx vitest run && npx tsc --noEmit` in this folder, or `npx tu
 
 ## QA harness
 
-`scripts/qa.ts` drives the app with Playwright's Electron driver and replaces the SwiftUI app's QA runner. It runs a JSON script against a QA stack's server and writes one PNG per screenshot step, plus `qa.json`, `main.log` (the main process's output) and the run's own Electron user-data folder to `--out`.
+`scripts/qa.ts` drives the app with Playwright's Electron driver. It runs a JSON script against a QA stack's server and writes one PNG per screenshot step, plus `qa.json`, `main.log` (the main process's output) and the run's own Electron user-data folder to `--out`.
 
 ```sh
 cd apps/desktop
@@ -66,7 +66,7 @@ npx tsx scripts/qa.ts --script run.json --out ~/.cache/omni-qa/run --app release
 - Without `--app` it builds `dist/` and launches this checkout's dev build. `--app` takes a packaged app: `Omni.app`, its binary, or an AppImage.
 - It only attaches. It exits 2 before launching anything when the port is 4747, when the data dir is this checkout's or the main checkout's `data/`, or when no server on the port holds the data dir's token. Start the stack first.
 - Each run gets its own `--user-data-dir` in the out folder. Its settings, Web tab logins and single-instance lock never touch the real app's, and a real app that is open does not swallow the launch.
-- It exits 0 when every step passed and 1 when one failed or the first window never loaded. A failed step does not stop the run, as in the Mac harness. Each step has a ceiling of twice its own timeout (or its wait) plus 30 seconds, so a call that never answers fails its step instead of holding the run. `qa.json` is rewritten after every step: `{ok, error, app, port, dataDir, steps: [{step, action, ok, ms, error, files}], facts: {route, windows: [{url, title, bounds, zoom}]}, pageErrors}`.
+- It exits 0 when every step passed and 1 when one failed or the first window never loaded. A failed step does not stop the run. Each step has a ceiling of twice its own timeout (or its wait) plus 30 seconds, so a call that never answers fails its step instead of holding the run. `qa.json` is rewritten after every step: `{ok, error, app, port, dataDir, steps: [{step, action, ok, ms, error, files}], facts: {route, windows: [{url, title, bounds, zoom}]}, pageErrors}`.
 - `--script` takes a path or the JSON itself. `--port`, `--data-dir`, `--app-url`, `--appearance`, `--zoom` and `--size 1320x860` override the script's fields.
 
 A script is a list of steps, or an object with the run's settings and `steps`:
@@ -96,8 +96,8 @@ A script is a list of steps, or an object with the run's settings and `steps`:
 | `{"click": "<selector>"}` | Clicks the first match. Selectors are Playwright's: CSS, `text=...`, `role=button[name="Save"]` |
 | `{"fill": {"selector": "textarea", "text": "hi"}}` | Fills a field |
 | `{"type": "text"}`, `{"press": "Control+K"}` | Types into, or presses a key in, whatever has focus |
-| `{"wait": 500}`, `{"wait": "<selector>"}`, `{"wait": {"for": "<selector>", "timeout": 30}}` | Waits for milliseconds, or until the selector is visible (10 seconds by default, `timeout` in seconds). The Mac harness's conditions are refused when the script is read, with the selector to use instead: `sidebarLoaded` is `[data-channel-id]`, `channel:<id>` is `[data-channel-id="<id>"]`, `thread:<id>` is `openThread` or a `route` and then a transcript selector, and `serverState:` and `connection:` always hold, since the harness only attaches to a running server |
-| `{"sleep": 1.5}` | Seconds, as in the Mac harness |
+| `{"wait": 500}`, `{"wait": "<selector>"}`, `{"wait": {"for": "<selector>", "timeout": 30}}` | Waits for milliseconds, or until the selector is visible (10 seconds by default, `timeout` in seconds). The old SwiftUI harness's conditions are refused when the script is read, with the selector to use instead: `sidebarLoaded` is `[data-channel-id]`, `channel:<id>` is `[data-channel-id="<id>"]`, `thread:<id>` is `openThread` or a `route` and then a transcript selector, and `serverState:` and `connection:` always hold, since the harness only attaches to a running server |
+| `{"sleep": 1.5}` | Seconds |
 | `{"expect": "<selector>"}`, `{"expect": {"selector": "h1", "text": "General", "timeout": 5}}` | Fails unless the selector is visible and, when given, its text contains `text` |
 | `{"command": "settings"}` | Sends a `DesktopCommand` to the current window on the event channel, as a menu item does: `new-thread`, `go-to`, `search`, `home`, `settings` |
 | `{"menu": "View > Zoom In"}` | Clicks that item of the application menu for the current window. Labels match without `&`, a trailing ellipsis, or case |
@@ -113,7 +113,7 @@ Notes:
 
 - A fresh QA stack opens on the onboarding dialog. Start with `{"click": "text=Skip setup"}`, which then leaves the window on the Conductor's welcome thread, or write `$QA_DIR/data/omni.config.json` with an `onboardedAt` first (see the verify skill).
 - Screenshots come from `webContents.capturePage()`, so they need no screen-recording permission, and a zoomed window comes out whole. Playwright's own page screenshot crops a zoomed page.
-- Steps the SwiftUI harness had for its own controls (`scroll`, `expand`, `folder`, `annotate`, `quickPrompt` and the rest) have no counterpart here. Drive the same UI with `click`, `fill` and `press` on the Web UI's own elements.
+- Steps the old SwiftUI harness had for its own controls (`scroll`, `expand`, `folder`, `annotate`, `quickPrompt` and the rest) have no counterpart here. Drive the same UI with `click`, `fill` and `press` on the Web UI's own elements.
 
 ## Stage and package
 
@@ -126,7 +126,7 @@ npx tsx scripts/dist.ts --platform linux --arch x64      # the AppImage
 
 A Linux build ships `node-pty`'s compiled addon, which must load on glibc 2.28. When the checkout's own build needs a newer glibc (most current distros), `stage.ts` compiles it again in docker's `node:24-bullseye` image, so it needs a working docker, and stops with an error without one. `--host-glibc` skips that and ships this machine's build, which only runs on a glibc as new as this one: fine for a local test, not for a release.
 
-On a Mac, `npm run build:desktop` (`scripts/build-desktop.sh`) builds the unpacked app for this Mac's arch, installs it to `~/Applications/Omni.app` and opens it. In the main checkout it first syncs to `main`. It signs with a Developer ID or Apple Development identity from the keychain, else ad hoc, and never notarizes. `scripts/build-mac.sh` installs the SwiftUI app to the same path, and each script refuses to replace an app with the other's bundle id, so until the cutover only one of the two can live there: move the other away first. `build-desktop.sh` never replaces the app while it, or a server it started, still runs from the bundle.
+On a Mac, `npm run build:desktop` (`scripts/build-desktop.sh`) builds the unpacked app for this Mac's arch, installs it to `~/Applications/Omni.app` and opens it. In the main checkout it first syncs to `main`. It signs with a Developer ID or Apple Development identity from the keychain, else ad hoc, and never notarizes. It refuses to replace an app with another bundle id, such as the old SwiftUI app: move that one away first. `build-desktop.sh` never replaces the app while it, or a server it started, still runs from the bundle.
 
 ## Updates
 
@@ -146,4 +146,4 @@ npx tsx scripts/update-check.ts
 | Server log | `~/Library/Logs/Omni/server.log` | `$XDG_STATE_HOME/omni-os/server.log` (`~/.local/state/omni-os/server.log`) |
 | App settings (`settings.json`), the data-dir choice (`data-dir.json`) | `~/Library/Application Support/Omni` | `~/.config/Omni` |
 
-On first launch, when the SwiftUI app (its `repoPath`, or `~/omni-os`) or the Linux launcher left an `omni.db` in a checkout's `data/`, the app asks once whether to use that folder in place or start fresh. It only reads the old folder to decide, and never copies or moves it. `--data-dir` and `--dev` skip the question. In development the default is the checkout's own `data/`. Server, Show Server Log opens the log.
+On first launch, when the SwiftUI app (its `repoPath`, or `~/omni-os`) or the Linux launcher (the checkout in its `omni-os.desktop` entry) left an `omni.db` in a checkout's `data/`, the app asks once whether to use that folder in place or start fresh. It only reads the old folder to decide, and never copies or moves it. `--data-dir` and `--dev` skip the question. In development the default is the checkout's own `data/`. Server, Show Server Log opens the log.

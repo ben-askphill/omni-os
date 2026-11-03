@@ -3,7 +3,7 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MemoryTransport } from '../sync/transport.ts';
-import { macFixture } from './fixture-shape.ts';
+import { wireFixture } from './fixture-shape.ts';
 import { tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
 
@@ -146,9 +146,9 @@ describe('replies forwarded to the machine running a thread (#398)', () => {
     expect(a.byKind(idle, 'error').map((e) => e.p.text)).toContain('Stop was not delivered to Box B: No turn was running on Box B.');
   });
 
-  it('sends the Mac app the shapes its fixtures hold', () => {
+  it('sends the shapes its wire fixtures hold', () => {
     const places = [a.tmp, b.tmp, shared].flatMap((p) => [realpathSync(p), p]);
     expect([...fixtures.keys()]).toEqual(['thread-undelivered.json']);
-    for (const [name, value] of fixtures) macFixture(name, value, places);
+    for (const [name, value] of fixtures) wireFixture(name, value, places);
   });
 });

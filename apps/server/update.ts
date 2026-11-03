@@ -11,9 +11,8 @@ import { runningCount } from './runner.ts';
 //
 // The check fetches origin's main every 15 minutes and compares it with the commit this server booted from. Update
 // waits until no turn runs, runs scripts/sync-main.sh (the main checkout fast-forwards; a worktree stays), rebuilds
-// the Web UI and exits with RESTART_EXIT_CODE. Only a supervisor starts it again: the desktop app run with --dev, the
-// SwiftUI Mac app, the Linux launcher, or a service manager such as systemd with OMNI_SUPERVISOR set by hand
-// (docs/user/install.md). Without one, Update is not offered. The packaged desktop app runs the server as a bundle
+// the Web UI and exits with RESTART_EXIT_CODE. Only a supervisor starts it again: the desktop app run with --dev, or a
+// service manager such as systemd with OMNI_SUPERVISOR set by hand (docs/user/install.md). Without one, Update is not offered. The packaged desktop app runs the server as a bundle
 // with no checkout and updates itself (apps/desktop/src/updates.ts), so there Update is neither checked nor offered.
 
 const run = promisify(execFile);

@@ -1,6 +1,5 @@
-// The PRs page's search, sort, filters and groups: what GET /api/prs lists, narrowed to what the toolbar asks for. The
-// Mac app mirrors these rules in OmniKit's PullRequestQuery.swift. packages/test-fixtures/pr-query.json holds the cases
-// both run, so the two cannot drift.
+// The PRs page's search, sort, filters and groups: what GET /api/prs lists, narrowed to what the toolbar asks for.
+// packages/test-fixtures/pr-query.json holds the cases.
 import { prBadge } from './thread-glance.ts';
 
 /** The parts of a GET /api/prs row these rules read. */

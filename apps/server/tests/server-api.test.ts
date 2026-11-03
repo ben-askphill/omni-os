@@ -158,7 +158,7 @@ describe('/api/auth', () => {
     expect(after.status).toBe(200);
   });
 
-  it('pairs the Linux app window from this machine, with the token only in the cookie', async () => {
+  it('pairs the desktop app window from this machine, with the token only in the cookie', async () => {
     const res = await app.request('/api/auth/desktop-pair', { headers: { authorization: '' } });
     expect(res.status).toBe(302);
     expect(new URL(res.headers.get('location') ?? '', 'http://127.0.0.1').pathname).toBe('/');

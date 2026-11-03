@@ -3,7 +3,6 @@ import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
 import { INLINE_MAX_HEIGHT, isRenderPath, readFrameHeight, renderedFrom, renderedText, withFrameScript } from '../html-render.ts';
 
-// The same cases run in apps/mac/OmniKit/Tests/OmniKitTests/HtmlRenderTests.swift.
 const cases = JSON.parse(readFileSync(fixture('html-render.json'), 'utf8')) as {
   case: string;
   name: string;

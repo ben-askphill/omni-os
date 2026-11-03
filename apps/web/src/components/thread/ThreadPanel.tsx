@@ -50,8 +50,8 @@ export function ThreadPanel({
   prs: Omit<PRs, 'thread'>;
 }) {
   const { agents } = details;
-  // The channel whose Web tab was opened. It stays mounted while another tab shows, as the Mac app kept its page: the
-  // page, a form half filled in and a sign-in midway live only in it.
+  // The channel whose Web tab was opened. It stays mounted while another tab shows: the page, a form half filled in
+  // and a sign-in midway live only in it.
   const [webFor, setWebFor] = useState<string | null>(null);
   if (tab === 'web' && webFor !== thread.channel_id) setWebFor(thread.channel_id);
   const pr = prs.data?.pr;

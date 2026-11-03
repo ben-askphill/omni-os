@@ -10,8 +10,8 @@ import { Picker, type PickerOption } from '../ui.tsx';
 
 // The Machine chip: one control for where a thread runs, next to the model pill on both composers. On a new thread it
 // picks where the thread starts (Run on); on an open thread it names the machine that holds it and hands the thread
-// off or takes it over. Hidden while there is one machine. RunOnPicker.swift is the Mac's; the phone opens its
-// RunOnSheet from a chip.
+// off or takes it over. Hidden while there is one machine. The phone opens its RunOnSheet
+// from a chip.
 
 export const machineOptions = (rows: RunOnRow[]): PickerOption<string>[] =>
   rows.map((r) => ({ value: r.value, label: r.label, sub: r.sub, icon: 'monitor', avatar: false, disabled: r.disabled }));

@@ -1,6 +1,6 @@
 // Continuing an idle thread on another local harness: a new, linked thread with its own Session and worktree, whose
-// first Session reads a Carryover ahead of Ben's first message. Server and web share these shapes; the Mac app mirrors
-// them (OmniKit Continue.swift) and the fixtures in apps/server/tests/mac-fixtures.test.ts hold both to the same JSON.
+// first Session reads a Carryover ahead of Ben's first message. Server and web share these shapes, and the fixtures in
+// apps/server/tests/wire-fixtures.test.ts record their JSON.
 // "Carryover" is the word #187 uses for the same packet when an imported transcript is continued.
 import type { RunName } from './run-switch.ts';
 

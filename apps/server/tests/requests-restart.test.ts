@@ -116,7 +116,7 @@ function client(port: number) {
   return { call, ok, detail, users };
 }
 
-/** A queued message with a file, as the Mac app and the Web UI send one: the JSON in `payload`, then the files. */
+/** A queued message with a file, as the Web UI sends one: the JSON in `payload`, then the files. */
 function withFile(body: Record<string, unknown>, name: string, text: string) {
   const form = new FormData();
   form.append('payload', JSON.stringify(body));

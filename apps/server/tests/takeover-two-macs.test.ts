@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MemoryTransport } from '../sync/transport.ts';
-import { macFixture } from './fixture-shape.ts';
+import { wireFixture } from './fixture-shape.ts';
 import { tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
 
@@ -36,7 +36,7 @@ const T = { timeout: 30_000 };
 let a: Mac;
 let b: Mac;
 let id: string;
-/** What the Mac app decodes from a Take over, kept as the tests get it. */
+/** The wire fixtures of a Take over, kept as the tests get them. */
 const fixtures = new Map<string, unknown>();
 
 const sessionFile = (m: Mac, t: { cwd: string; session_id: string }) =>
@@ -202,10 +202,10 @@ describe('taking over a running thread', () => {
     expect(own.body.error).toBe('This thread is on this machine already.');
   });
 
-  it('sends the Mac app the shapes its fixtures hold', () => {
+  it('sends the shapes its wire fixtures hold', () => {
     const places = [a.tmp, b.tmp, shared].flatMap((p) => [realpathSync(p), p]);
     expect([...fixtures.keys()].sort()).toEqual(['thread-takeover-requested.json', 'thread-takeover.json']);
-    for (const [name, value] of fixtures) macFixture(name, value, places);
+    for (const [name, value] of fixtures) wireFixture(name, value, places);
   });
 });
 

@@ -4,9 +4,6 @@ data/
 apps/web/dist/
 .env
 .DS_Store
-apps/mac/.xcode*/
-apps/mac/OmniKit/.build/
-apps/mac/OmniKit/.swiftpm/
 xcuserdata/
 .playwright-mcp/
 .wrangler/

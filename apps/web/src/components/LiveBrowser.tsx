@@ -501,7 +501,7 @@ function Viewport({ b, address, box, overlay }: { b: Browser; address: RefObject
 
 /**
  * The channel browser to watch, on a phone: the frames and nothing else. It sends no input and no size, so the page
- * keeps the size its viewer on the Mac gave it.
+ * keeps the size its viewer on the desktop gave it.
  */
 export function BrowserWatch({ b, box: given, children }: { b: Browser; box?: RefObject<HTMLDivElement | null>; children?: ReactNode }) {
   const own = useRef<HTMLDivElement>(null);

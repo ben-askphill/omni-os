@@ -7,8 +7,8 @@ import { cookieName, loadToken, proofFor } from '../api-token.ts';
 import { hostAllowed, requestGuard, viaTailnet } from '../request-guard.ts';
 
 // requestGuard in front of /api: a request without this install's token is refused, and so is what a
-// cross-site page or a DNS-rebinding domain sends. What the Web UI (same origin, or through vite), the Mac
-// app, the MCP and curl send with the token gets through. tests/setup.ts adds the token to every app.request
+// cross-site page or a DNS-rebinding domain sends. What the Web UI (same origin, or through vite), the
+// MCP and curl send with the token gets through. tests/setup.ts adds the token to every app.request
 // unless the test passes `authorization: ''`, which `get` does.
 
 const app = new Hono();
@@ -104,7 +104,7 @@ describe('requestGuard: through tailscale serve', () => {
     expect((await get('/api/threads', { ...ts, host: '100.101.102.103:4747' })).status).toBe(403);
     // The login is on top of the token, not instead of it.
     expect((await get('/api/threads', { host: ts.host, 'tailscale-user-login': 'ben@example.com' })).status).toBe(401);
-    // Loopback clients (the Mac app, scripts) send no login.
+    // Loopback clients (the desktop app, scripts) send no login.
     expect((await get('/api/threads', AUTH)).status).toBe(200);
   });
 
@@ -165,7 +165,7 @@ describe('loadToken', () => {
 });
 
 describe('requestGuard', () => {
-  it('lets the Mac app, the MCP and curl through: JSON, no Origin', async () => {
+  it('lets the MCP, scripts and curl through: JSON, no Origin', async () => {
     expect((await send({ 'content-type': 'application/json' })).status).toBe(200);
     expect((await send({}, { method: 'GET', body: undefined })).status).toBe(200);
   });

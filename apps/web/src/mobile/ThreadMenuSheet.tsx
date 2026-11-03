@@ -198,7 +198,7 @@ export function MenuSheet({ thread, pr, changes, onClose }: { thread: Thread; pr
       </MoSheet>
     );
   }
-  // The thread's actions, from the list the desktop menu and the Mac app render too.
+  // The thread's actions, from the list the desktop menu renders too.
   const menu = threadMenu({
     row: true,
     archived: !!thread.archived,

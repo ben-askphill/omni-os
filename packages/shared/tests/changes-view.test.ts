@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { BranchChanges, TurnChanges, TurnView } from '../changes.ts';
 import { baseLabel, changesView, headMove, shortSha, turnChangesView, turnStateNote, turnTitle } from '../changes-view.ts';
 import { parseDiff, startsOpen } from '../diff.ts';
 
-// The Changes view model both phone clients share (packages/shared/changes-view.ts, diff.ts) on the recorded server answers the Mac app's
-// Swift tests decode too (apps/server/tests/mac-fixtures.test.ts records them).
+// The Changes view model both phone clients share (packages/shared/changes-view.ts, diff.ts) on the recorded server answers
+// (apps/server/tests/wire-fixtures.test.ts records them).
 
-const FIXTURES = join(resolve(import.meta.dirname, '../../../apps'), 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures');
-const fixture = <T>(name: string) => JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as T;
+const fixture = <T>(name: string) => JSON.parse(readFileSync(join(WIRE_FIXTURES, name), 'utf8')) as T;
 
 describe('changes panel', () => {
   it('groups the recorded changes with counts, labels and notices', () => {

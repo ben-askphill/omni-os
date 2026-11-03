@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { annotate, browserAnnotation, type BrowserAnnotation, type BrowserCapture } from '@omni/shared/message-context-browser.ts';
 import { newContext } from '@omni/shared/message-context.ts';
 import { startRunner } from './runner-boot.ts';
-import { macFixture } from './fixture-shape.ts';
+import { wireFixture } from './fixture-shape.ts';
 import type { PageObservation } from '../browser.ts';
 import type { CaptureSource, StaleReason } from '../browser-capture.ts';
 
@@ -340,8 +340,8 @@ describe('the capture routes', () => {
     const res = await post(mount(fakeBrowser()), 'shots', { thread: t.id });
     expect(res.status).toBe(200);
     const body = await res.json();
-    // The Mac app decodes this (OmniKit's BrowserCapture): the same keys and types as its recorded fixture.
-    macFixture('browser-capture.json', body);
+    // The same keys and types as its recorded fixture.
+    wireFixture('browser-capture.json', body);
     const { capture } = body as { capture: BrowserCapture };
     expect(capture).toMatchObject({ thread: t.id, url: PAGE.url, viewport: { scale: 2 } });
     expect(saved(t.id)).toEqual([capture.image.name]);
@@ -353,7 +353,7 @@ describe('the capture routes', () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body).toMatchObject({ stale: 'navigated', retryable: true, error: expect.stringMatching(/navigated/) });
-    macFixture('browser-capture-stale.json', body);
+    wireFixture('browser-capture-stale.json', body);
   });
 
   it('refuses a thread that is not in the channel, and an unknown one', T, async () => {
@@ -371,8 +371,7 @@ describe('the capture routes', () => {
     const res = await app.request(url, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(2560, 1426, 700) });
     expect(res.status).toBe(200);
     const body = await res.json();
-    // The Mac app decodes this (OmniKit's MarkedReply).
-    macFixture('browser-capture-marked.json', body);
+    wireFixture('browser-capture-marked.json', body);
     expect(body).toEqual({ marked: { name: capture.image.name.replace('.png', '-marked.png'), mime: 'image/png', width: 2560, height: 1426, bytes: 700 } });
     const wrong = await app.request(url, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png(10, 10) });
     expect(wrong.status).toBe(422);

@@ -10,7 +10,7 @@ import { Button, ErrorNote } from './ui.tsx';
 export { PronounsInput, TimezoneInput } from './onboarding-parts.tsx';
 
 // Onboarding: five short screens on first run (no data/omni.config.json yet), or again from Settings. It writes the
-// user config through /api/setup; the Mac app (OnboardingSheet.swift) and `npm run setup` ask the same questions.
+// user config through /api/setup; `npm run setup` asks the same questions.
 
 export { NAME_MAX };
 

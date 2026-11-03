@@ -8,7 +8,7 @@ import { plural } from '../format.ts';
 import { useHereName, useSecretStoreLabel } from '../store.tsx';
 
 // Settings, Sync: sign in to the Cloudflare relay with Google (through Clerk), see what is waiting, sync now, pause and sign out. The
-// path map sits under Machines' Advanced. The Mac app's Machines tab (apps/mac/Omni/SyncSettingsView.swift) shows the same.
+// path map sits under Machines' Advanced.
 
 type Status = SyncStatus;
 

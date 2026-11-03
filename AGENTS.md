@@ -2,24 +2,23 @@
 
 Project context and conventions live in `CLAUDE.md`. Read it first.
 
-- Desktop app: `apps/desktop/` (Electron). It loads the Web UI and runs the bundled server on Electron's own Node, and will replace `apps/mac` and `apps/linux` (ADR 0010). Desktop-only UI goes through `window.omniDesktop` (`packages/shared/desktop-bridge.ts`, read via `apps/web/src/desktop.ts`), always gated on it being there. It imports `@omni/shared` only. QA harness: `apps/desktop/scripts/qa.ts`. See `apps/desktop/README.md`.
+- Desktop app: `apps/desktop/` (Electron). It loads the Web UI and runs the bundled server on Electron's own Node. It replaced the SwiftUI Mac app and the Linux launcher (ADR 0010). Desktop-only UI goes through `window.omniDesktop` (`packages/shared/desktop-bridge.ts`, read via `apps/web/src/desktop.ts`), always gated on it being there. It imports `@omni/shared` only. QA harness: `apps/desktop/scripts/qa.ts`. See `apps/desktop/README.md`.
 
 ## Standing rules
 
 ### Every surface, every time
 
 - A feature or fix takes effect on all three surfaces unless the task says otherwise: the Web UI on desktop, the Web UI's phone layout (`apps/web/src/mobile/`) and the desktop app (`apps/desktop/`, ADR 0010). The desktop app shows the Web UI, so a Web UI change reaches it as is. Desktop-only behavior goes through `window.omniDesktop`.
-- Until the cutover deletes `apps/mac` (ADR 0010), the SwiftUI Mac app still gets every change that shows there, in the same PR.
-- Ship all of them in the same PR. None of them is a follow-up. If one surface does not need the change, say why in the PR.
-- Check each surface before calling the work done: desktop browser, 390px phone width and the desktop app's QA harness (`apps/desktop/scripts/qa.ts`), plus the Mac app's QA harness when the change touches `apps/mac`. A UI change carries screenshots of each ([docs/pr-screenshots.md](docs/pr-screenshots.md)).
-- Why: folders once shipped web-only (#177) and never reached the Mac app, and later the phone Channels screen ignored folder data.
+- Ship all three in the same PR. None of them is a follow-up. If one surface does not need the change, say why in the PR.
+- Check each surface before calling the work done: desktop browser, 390px phone width and the desktop app's QA harness (`apps/desktop/scripts/qa.ts`). A UI change carries screenshots of all three ([docs/pr-screenshots.md](docs/pr-screenshots.md)).
+- Why: folders once shipped web-only (#177) and never reached the old SwiftUI Mac app, and later the phone Channels screen ignored folder data.
 
 ### New UI components go into the design system
 
 - The Omni OS design system lives in Claude Design: https://claude.ai/design/p/a7120f6b-8577-40e3-9087-e512ce20d673. Reuse its components and tokens first.
 - If a feature needs a component that design system does not have, add it there in the same task, not only in code.
 - How: the Claude Design MCP (`mcp__claude_design__get_project`, `list_files`, `read_file`, `write_files`) reads and writes the project. Read its `readme.md` and `SKILL.md` first. Components live in `components/<group>/` (a `.jsx`, `.d.ts` and `.prompt.md` each, plus a `*.card.html` preview), their styles in `components/omni.css`, tokens in `tokens/`. Writing needs a plan first: call `finalize_plan` with the exact paths, then pass the plan token it returns to `write_files` (an `if_match` etag alone is refused). `project not found` from `get_project` means the login lacks Claude Design access: ask Ben to run `/design-login`.
-- The repo has no `DESIGN.md`. The code copies of the tokens are `apps/web/src/index.css` and `apps/mac/Omni/Theme.swift`: a token change goes into the design system and both files.
+- The repo has no `DESIGN.md`. The code copies of the tokens are `apps/web/src/index.css`, `apps/ios/src/theme.ts` and the window background in `apps/desktop/src/windows.ts` (`--chrome`): a token change goes into the design system and all three files.
 
 ## Unslop every message (always on)
 

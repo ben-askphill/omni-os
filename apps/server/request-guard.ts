@@ -76,11 +76,11 @@ const hostnameOf = (host: string) => {
 const refuse = (reason: string, status = 403) =>
   new Response(JSON.stringify({ error: status === 403 ? `Forbidden: ${reason}` : reason }), { status, headers: { 'content-type': 'application/json' } });
 
-/** The Mac app asks this to prove the process on the port is this install, before it sends the token. */
+/** The desktop app asks this to prove the process on the port is this install, before it sends the token. */
 export const PROOF_PATH = '/api/auth/proof';
 
 /**
- * The Linux app opens this once, in its own window, and the response sets the pairing cookie.
+ * The desktop app opens this once, in its own window, and the response sets the pairing cookie.
  * No token in the URL. Only a request from this machine that did not come through a proxy (so Tailscale
  * and a forwarded client still have to pair with the token).
  */
@@ -214,7 +214,7 @@ const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
  *   from this machine, the Google sign-in routes, redeeming an app pairing code, and Omni Connect's signed routes (CONNECT_OPEN_ROUTES);
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set.
- * The Mac app, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
+ * The desktop app's main process, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
  */
 export const requestGuard: MiddlewareHandler = async (c, next) => {
   const host = requestHost(c);

@@ -10,8 +10,7 @@ import { Card, Origin, ServerOptions, useScopedChannel } from './settings-parts.
 
 // Settings, Harnesses & models: each harness with whether it can run, how to fix it, its models and its cap; the
 // model a new thread starts on (a channel default, else Auto); and the .env options behind them. A thread or crew
-// role that picks its own model wins over the channel (apps/server/harness/resolve.ts). The Mac app's section
-// (apps/mac/Omni/SettingsSections.swift) shows the same.
+// role that picks its own model wins over the channel (apps/server/harness/resolve.ts).
 
 export function ModelsSection() {
   const { channel } = useScopedChannel();

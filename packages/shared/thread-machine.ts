@@ -81,7 +81,7 @@ export function deviceRow(d: Device, now = Date.now()): DeviceRow {
 
 /**
  * Online Macs first, then the ones Tailscale cannot vouch for, then the asleep ones; by name within each, numbers in
- * order ("Mac 2" before "Mac 10"), as the Mac app's `localizedStandardCompare` sorts them.
+ * order ("Mac 2" before "Mac 10").
  */
 export function deviceRows(devices: Device[], now = Date.now()): DeviceRow[] {
   const rank = { online: 0, unknown: 1, offline: 2 } as const;
@@ -132,7 +132,7 @@ export const mayTakeOver = (t: Takeover | null | undefined, h: HandoffView | nul
 
 /**
  * The "can't take a turn" note over the composer, or null when something already says why: the handoff card while a
- * handoff or a Take over is under way (as the Mac app does), or the Take over note for a thread running on another Mac.
+ * handoff or a Take over is under way, or the Take over note for a thread running on another Mac.
  */
 export function blockedNote(
   blocked: string | null | undefined,

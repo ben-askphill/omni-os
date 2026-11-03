@@ -94,7 +94,7 @@ export const HARNESS_META: Record<HarnessId, { name: string; plan: string }> = {
 };
 
 /**
- * How to install each local CLI, for onboarding (web, Mac, `npm run setup`). `fix` on HarnessInfo says how to sign
+ * How to install each local CLI, for onboarding (the Web UI and `npm run setup`). `fix` on HarnessInfo says how to sign
  * in once it is installed. Hermes and Cursor Cloud run off this Mac, so they have none.
  */
 export const HARNESS_INSTALL: Partial<Record<HarnessId, string>> = {

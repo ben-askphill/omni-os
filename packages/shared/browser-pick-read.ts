@@ -1,7 +1,7 @@
 // What the page scripts (browser-pick-script.ts) answered, as the panels show it and the record holds it. The answer is
 // the page's own data, so every string is cleaned and cut and every box clipped, then the element is parsed as the
 // message route will parse it. Both browsers read their page's answers here: the server for the channel's Chrome
-// (apps/server/browser-pick.ts), the Mac app for its Web tab through JavaScriptCore (apps/mac/browser-pick/entry.ts),
+// (apps/server/browser-pick.ts), the desktop app for its Web tab (apps/web/src/components/NativeBrowser.tsx),
 // so the same answer gives the same element, styles and words on either.
 import type { RawInspect, RawPick } from './browser-pick-script.ts';
 import {

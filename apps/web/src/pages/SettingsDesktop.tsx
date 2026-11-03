@@ -20,9 +20,8 @@ import { appUpdateWords } from '../app-update-notice.ts';
 import { Button, ErrorNote, Loader, Picker } from '../components/ui.tsx';
 import { Card, InfoRow, Origin, Row, SwitchRow } from './settings-parts.tsx';
 
-// Settings > Desktop app: what only the desktop app (apps/desktop) has. The Quick Prompt and opening at login port
-// apps/mac/Omni/QuickPromptSettingsView.swift, the zoom AppearanceSettingsView.swift, the server lines SettingsView's
-// status card. Shown only with the bridge (@omni/shared/settings-catalog.ts `desktopApp`).
+// Settings > Desktop app: what only the desktop app (apps/desktop) has: the Quick Prompt, opening at login, the zoom
+// and the app's server and updates. Shown only with the bridge (@omni/shared/settings-catalog.ts `desktopApp`).
 
 const ZOOM_LEVELS = Array.from({ length: Math.round((ZOOM_MAX - ZOOM_MIN) / ZOOM_STEP) + 1 }, (_, i) => Math.round((ZOOM_MIN + i * ZOOM_STEP) * 100) / 100);
 export const zoomLabel = (factor: number) => `${Math.round(factor * 100)}%`;

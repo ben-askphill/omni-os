@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { CrewPR } from '../crew-prs.ts';
 import { startRunner } from './runner-boot.ts';
 
@@ -138,14 +139,14 @@ describe('crew PRs', () => {
     expect((await prsOf(conductor.id)).crew.map((p) => [p.number, p.thread_id, p.task_id])).toEqual(want);
   });
 
-  it("sends the keys the Mac app's crew-prs.json fixture decodes", T, async () => {
+  it('sends the keys the crew-prs.json wire fixture has', T, async () => {
     const conductor = await H.start('be the conductor');
     await H.untilResults(conductor.id, 1);
-    await delegate(conductor.id, 'shop', 'omni/mac-shape');
-    github({ 'acme/shop': [{ number: 51, branch: 'omni/mac-shape' }] });
+    await delegate(conductor.id, 'shop', 'omni/wire-shape');
+    github({ 'acme/shop': [{ number: 51, branch: 'omni/wire-shape' }] });
     later();
     const sent = await prsOf(conductor.id);
-    const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../mac/OmniKit/Tests/OmniKitTests/Fixtures/crew-prs.json'), 'utf8'));
+    const fixture = JSON.parse(readFileSync(join(WIRE_FIXTURES, 'crew-prs.json'), 'utf8'));
     const keys = (o: object) => Object.keys(o).sort();
     expect(keys(sent)).toEqual(keys(fixture));
     expect(keys(sent.crew[0])).toEqual(keys(fixture.crew[0]));
@@ -157,8 +158,8 @@ describe('crew PRs', () => {
     await H.untilResults(conductor.id, 1);
     const child = await delegate(conductor.id, 'shop', 'omni/linked');
     expect(prThread('acme/shop', 'omni/linked')).toEqual({ id: child.id, title: child.title, channel_id: 'shop', parent: { id: conductor.id, title: H.thread(conductor.id).title } });
-    // The Mac app decodes this as pr.json's `thread`.
-    const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../mac/OmniKit/Tests/OmniKitTests/Fixtures/pr.json'), 'utf8')).thread;
+    // A PR page's `thread`, as the pr.json wire fixture has it.
+    const fixture = JSON.parse(readFileSync(join(WIRE_FIXTURES, 'pr.json'), 'utf8')).thread;
     const keys = (o: object) => Object.keys(o).sort();
     expect(keys(prThread('acme/shop', 'omni/linked')!)).toEqual(keys(fixture));
     expect(keys(prThread('acme/shop', 'omni/linked')!.parent!)).toEqual(keys(fixture.parent));

@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero/hero-dark.png">
-    <img src="docs/assets/hero/hero-light.png" alt="The Omni OS Mac app: a channel sidebar with folders, a Conductor thread that delegated three tasks and got a researcher's report back, and an artifact open in the side panel" width="100%">
+    <img src="docs/assets/hero/hero-light.png" alt="Omni OS: a channel sidebar with folders, a Conductor thread that delegated three tasks and got a researcher's report back, and an artifact open in the side panel" width="100%">
   </picture>
 </p>
 
@@ -13,9 +13,7 @@ One Node server runs everything (threads, harnesses, database, secrets, automati
 
 | Client | What | Where |
 | --- | --- | --- |
-| Desktop app | Electron app for macOS and Linux: the Web UI in its own window, with the server inside. No checkout or Node needed. Replacing the Mac and Linux apps ([ADR 0010](docs/adr/0010-desktop-app-is-electron.md)) | `apps/desktop/` |
-| Mac app | Native SwiftUI app for the desk. Starts and stops the server itself | `apps/mac/` |
-| Linux app | Desktop launcher for Omarchy and other Linux desktops. Starts the server and opens the Web UI as an app window | `apps/linux/` |
+| Desktop app | Electron app for macOS and Linux: the Web UI in its own window, with the server inside, plus menus, notifications and the Quick Prompt. No checkout or Node needed ([ADR 0010](docs/adr/0010-desktop-app-is-electron.md)) | `apps/desktop/` |
 | Web UI | React app, in any browser and on your phone over Tailscale | `apps/web/` |
 
 ## What does it cost?
@@ -30,22 +28,21 @@ Nothing extra. Omni runs each thread through the official CLI of the harness you
 > - Claude Code (Claude plan): `npm install -g @anthropic-ai/claude-code`, then run `claude` and `/login`
 > - Codex (ChatGPT plan): `npm install -g @openai/codex && codex login`
 > - Cursor Agent (Cursor plan): `curl https://cursor.com/install -fsS | bash && cursor-agent login`
-> - Hermes (Anthropic API, on your own Linux server): no CLI on the Mac. See [Harnesses](docs/user/harnesses.md#hermes-remote)
+> - Hermes (Anthropic API, on your own Linux server): no CLI on this machine. See [Harnesses](docs/user/harnesses.md#hermes-remote)
 > - Cursor Cloud (Cursor plan, a Cursor cloud agent on Cursor's machines): the secret `CURSOR_API_KEY`. See [Harnesses](docs/user/harnesses.md#cursor-cloud)
 
 `npm run setup` and the first-run screens check which ones are installed and signed in, and print the fix for each one that is not.
 
 ## Quick start
 
-Needs Node 24+ and `gh` signed in. The Mac app also needs macOS and Xcode. On Linux, `scripts/install-linux.sh` installs a desktop launcher. Secrets go to the Keychain on a Mac and a 0600 file on Linux.
+The desktop app needs no checkout: install the DMG or AppImage ([Install](docs/user/install.md#the-desktop-app)). Running from a checkout or building the app needs Node 24+. Either way, sign in to `gh`. Secrets go to the Keychain on a Mac and a 0600 file on Linux.
 
 **Let an agent do it.** Open Claude Code, Codex or Cursor in an empty terminal and paste this. Swap `<you>` for your GitHub owner, or point it at an existing clone.
 
 ```text
-Clone github.com/<you>/omni-os to ~/omni-os (skip if it is already there), then install and run its
-Mac app. Follow the "Agent instructions" in docs/user/install.md step by step, run every check it
-lists, and stop and tell me if a check fails. Ask me before running `npm run setup` without --yes,
-since it asks who I am.
+Clone github.com/<you>/omni-os to ~/omni-os (skip if it is already there), then build and open its
+desktop app. Follow the "Agent instructions" in docs/user/install.md step by step, run every check
+it lists, and stop and tell me if a check fails.
 ```
 
 **Or by hand:**
@@ -54,14 +51,13 @@ since it asks who I am.
 git clone https://github.com/<you>/omni-os.git ~/omni-os
 cd ~/omni-os
 npm install --include=dev
-npm run setup          # who you are and where your work lives; Enter takes each default
 npm run build:desktop     # Desktop app on a Mac: builds, installs to ~/Applications/Omni.app and opens it
-scripts/build-mac.sh      # Mac app: builds, installs to ~/Applications/Omni.app and opens it
-scripts/install-linux.sh  # Linux: builds the Web UI and installs the Omni launcher
-npm run dev               # or the Web UI: server on :4747, UI on http://localhost:4748
+# or the Web UI in a browser:
+npm run setup             # who you are and where your work lives; Enter takes each default
+npm run dev               # server on :4747, UI on http://localhost:4748
 ```
 
-`build:desktop` and `build-mac.sh` install to the same path, so only one of the two apps lives there at a time. The desktop app's Linux AppImage and other builds: [apps/desktop/README.md](apps/desktop/README.md).
+The desktop app's Linux AppImage and other builds: [apps/desktop/README.md](apps/desktop/README.md). Coming from the old SwiftUI app or Linux launcher: [Install](docs/user/install.md#coming-from-the-swiftui-app-or-the-linux-launcher).
 
 Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal lives in `data/`, so upstream updates merge cleanly.
 
@@ -69,7 +65,7 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 > Omni is early and built for one person's daily use on their own Mac. Expect rough edges.
 >
 > - Threads run with `bypassPermissions`, since nobody can answer a prompt headless. Isolation is a git worktree plus a browser profile, not a VM.
-> - Every API request needs the install's token from `data/api-token`. A browser pairs once to get it. Keep the server on loopback and reach it remotely only over your tailnet. See [Remote access and security](docs/user/remote-access.md).
+> - Every API request needs the install's token from `api-token` in the data dir (a checkout's `data/`, or the desktop app's data folder in [Install](docs/user/install.md)). A browser pairs once to get it. Keep the server on loopback and reach it remotely only over your tailnet. See [Remote access and security](docs/user/remote-access.md).
 
 ## What you get
 
@@ -83,7 +79,7 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 - **Automations**: YAML on a cron schedule, GitHub PR event, published page or signed GitHub webhook; every run is its own thread
 - **Sync** between two Macs through a relay on your own Cloudflare account (optional), with handoff of a running thread to the other Mac
 - **Omni Connect**: open any synced machine from a phone through that relay, without Tailscale
-- **Update**: one button in the Mac app, the desktop sidebar and phone Activity when origin's `main` is ahead; syncs, rebuilds and restarts
+- **Update**: one button in the desktop sidebar and phone Activity when origin's `main` is ahead of a checkout; syncs, rebuilds and restarts. The packaged desktop app updates itself from its GitHub Releases
 - **Phone layout** with Activity, Channels, Library and PRs tabs, a new-thread sheet and full-screen thread panels. Save it to the iPhone home screen over Tailscale
 - **Native iOS app** that pairs with a server over HTTPS: Activity, Channels, Library, send, attachments, handoff and changes review. See [Remote access](docs/user/remote-access.md#pair-the-native-ios-app) and [apps/ios/README.md](apps/ios/README.md)
 

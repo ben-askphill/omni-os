@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { NeedsYou, Thread } from '../src/api.ts';
 import { activityOf } from '../src/mobile/activity.ts';
 
-// The phone's Activity tab, against the recorded server answers the Mac app's tests decode too
-// (apps/server/tests/mac-fixtures.test.ts records them).
-const FIXTURES = join(resolve(import.meta.dirname, '../..'), 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures');
-const fixture = <T>(name: string) => JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as T;
+// The phone's Activity tab, against the recorded server answers
+// (apps/server/tests/wire-fixtures.test.ts records them).
+const fixture = <T>(name: string) => JSON.parse(readFileSync(join(WIRE_FIXTURES, name), 'utf8')) as T;
 const inbox = () => fixture<NeedsYou>('needs-you.json');
 const base = fixture<Thread[]>('recent.json')[0];
 

@@ -1,9 +1,8 @@
 // Typed context Ben attaches to a message: a record per thing he points at (diff lines now; terminal output, a
 // screenshot, a page element and a thread later), each with his note. Pure, and it names no kind: a kind is a file
 // of its own (message-context-diff.ts) listed in message-context-kinds.ts. The server parses records strictly at
-// its route and projects them to harness text (apps/server/message-context/); both clients read them leniently, so
-// a record from a newer Omni shows as a fallback chip instead of breaking the message.
-// apps/mac/OmniKit/Sources/OmniKit/MessageContext.swift ports the client half.
+// its route and projects them to harness text (apps/server/message-context/); clients read them leniently, so a
+// record from a newer Omni shows as a fallback chip instead of breaking the message.
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -138,7 +137,6 @@ export function cutLabel(label: string): string {
 }
 
 /**
- * Whether `s` is longer than `max` characters. Every limit counts code points, as the Swift port's unicodeScalars do,
- * so a cut never splits a surrogate pair. A code point is 1 or 2 UTF-16 units, which settles most strings without the spread.
+ * Whether `s` is longer than `max` characters. Every limit counts code points, so a cut never splits a surrogate pair. A code point is 1 or 2 UTF-16 units, which settles most strings without the spread.
  */
 export const overLimit = (s: string, max: number) => s.length > max && (s.length > 2 * max || [...s].length > max);

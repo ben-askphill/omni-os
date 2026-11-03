@@ -2,7 +2,6 @@
 // plain text, taken when he added it, with which shell it came from and when. The shell goes on and the scrollback
 // scrolls away; the record does not change. Nothing in it is ever run: the text has no control characters, so no
 // escape sequence survives into the record or the harness's message.
-// apps/mac/OmniKit/Sources/OmniKit/TerminalExcerptContext.swift ports it.
 import { ID_MAX, cutLabel, overLimit, type MessageContextKind, type Parsed } from './message-context.ts';
 
 export interface TerminalExcerpt {

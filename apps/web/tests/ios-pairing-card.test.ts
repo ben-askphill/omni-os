@@ -172,13 +172,13 @@ it('drops a shown code when the address is switched', async () => {
   expect(qr()).toBeNull();
 });
 
-it('sends a browser that signed in with Google to the Mac app, with no way to ask for a code', async () => {
+it('sends a browser that signed in with Google to the desktop app, with no way to ask for a code', async () => {
   via = 'session';
   await mount();
   expect(button('Show pairing code')).toBeUndefined();
   expect(host.querySelector('#ios-address')).toBeNull();
   expect(host.textContent).toContain('signed in with Google');
-  expect(host.textContent).toContain('Mac app');
+  expect(host.textContent).toContain('desktop app');
   expect(host.textContent).toContain('install token');
   expect(posts).toEqual([]);
 });
@@ -192,5 +192,5 @@ it('tells a refused browser the same when the server says no', async () => {
   await flush();
   const text = host.querySelector('[role="alert"]')?.textContent ?? '';
   expect(text).toContain('Forbidden: only the install token can pair an app.');
-  expect(text).toContain('Mac app');
+  expect(text).toContain('desktop app');
 });

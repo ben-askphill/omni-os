@@ -1,6 +1,6 @@
 // The desktop app's QA harness: runs a JSON script of steps against the app with Playwright's Electron driver and
 // writes a PNG per screenshot step and qa.json to --out. It replaces the SwiftUI app's QARunner and keeps its step
-// names where they carry over (apps/mac/NOTES.md, "QA harness").
+// names where they carry over (ADR 0010). README.md, "QA harness", lists the steps.
 //
 //   npx tsx scripts/qa.ts --script run.json --out <dir> [--app <packaged app>] [--port N] [--data-dir <dir>]
 //                         [--appearance light|dark] [--zoom 1.2] [--size 1320x860] [--app-url http://127.0.0.1:<vite port>]
@@ -104,7 +104,7 @@ export function parseSize(v: unknown): Size | null {
   return ok(w) && ok(h) ? { width: w, height: h } : null;
 }
 
-/** Mac scripts give timeouts in seconds. */
+/** Timeouts are in seconds, as in the SwiftUI app's harness. */
 function timeoutOf(raw: Record<string, unknown>, fallback = DEFAULT_TIMEOUT_MS): Result<number> {
   if (raw.timeout === undefined) return fallback;
   return typeof raw.timeout === 'number' && raw.timeout > 0 && raw.timeout <= 600 ? raw.timeout * 1000 : { error: 'timeout is seconds, from 0 to 600' };
@@ -115,10 +115,10 @@ function hashRoute(v: unknown): string | null {
 }
 
 /**
- * A Mac harness wait condition (QACondition in apps/mac/OmniKit/Sources/OmniKit/QAScript.swift), or null. Here a wait
- * takes a selector, and a Mac condition would parse as one and only fail at its timeout, so it is refused up front.
+ * What to use instead of a wait condition from the SwiftUI app's harness, or null. Here a wait takes a selector, and
+ * an old condition would parse as one and only fail at its timeout, so it is refused up front.
  */
-export function macCondition(value: string): string | null {
+export function swiftUICondition(value: string): string | null {
   const [name, arg] = value.includes(':') ? [value.slice(0, value.indexOf(':')), value.slice(value.indexOf(':') + 1)] : [value, null];
   const instead =
     name === 'sidebarLoaded' && arg === null ? 'a sidebar row: {"wait": "[data-channel-id]"}'
@@ -127,7 +127,7 @@ export function macCondition(value: string): string | null {
     : (name === 'serverState' || name === 'connection') && arg ? 'nothing: the harness attaches only to a running server, so drop the step'
     : name === 'browserFrame' && arg === null ? 'a selector in the Browser tab'
     : null;
-  return instead ? `"${value}" is a Mac harness condition; a wait here takes a Playwright selector. Use ${instead}` : null;
+  return instead ? `"${value}" is a SwiftUI harness condition; a wait here takes a Playwright selector. Use ${instead}` : null;
 }
 
 const STEP_KEYS = [
@@ -135,7 +135,7 @@ const STEP_KEYS = [
   'openThread', 'appearance', 'zoom', 'size', 'screenshot', 'snapshot', 'quit',
 ] as const;
 
-/** One step of a script. Each step is an object with one action key, as in the Mac harness. */
+/** One step of a script. Each step is an object with one action key, as in the SwiftUI app's harness. */
 export function parseStep(raw: unknown): Result<QAStep> {
   const step = obj(raw);
   if (!step) return { error: 'a step is an object such as {"route": "#/settings"}' };
@@ -172,8 +172,8 @@ export function parseStep(raw: unknown): Result<QAStep> {
       if (typeof value === 'number') return value >= 0 && value <= 600_000 ? { kind: 'wait', ms: value } : { error: 'wait takes 0 to 600000 ms' };
       const selector = typeof value === 'string' ? text(value) : text(inner?.for);
       if (!selector) return { error: 'wait needs ms, a selector, or {"for": "<selector>", "timeout": <seconds>}' };
-      const mac = macCondition(selector);
-      if (mac) return { error: mac };
+      const old = swiftUICondition(selector);
+      if (old) return { error: old };
       const timeoutMs = inner ? timeoutOf(inner) : DEFAULT_TIMEOUT_MS;
       if (isError(timeoutMs)) return timeoutMs;
       return { kind: 'waitFor', selector, timeoutMs };

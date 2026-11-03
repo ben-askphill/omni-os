@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { FAKE_CLIENT_ID, FAKE_PUBLISHABLE_KEY } from './fake-clerk.ts';
-import { macFixture } from './fixture-shape.ts';
+import { wireFixture } from './fixture-shape.ts';
 import { startRunner } from './runner-boot.ts';
 import type { ConnectRelay } from '../connect/service.ts';
 import type { EcJwk } from '../connect/jwt.ts';
@@ -156,11 +156,11 @@ describe('turning Omni Connect on and off', () => {
     ]);
   });
 
-  it('sends the Mac app the status and machines shapes it records', async () => {
-    // The Mac app decodes these (OmniKit's ConnectStatus and ConnectMachines), recorded with Connect on.
+  it('sends the status and machines shapes of their wire fixtures', async () => {
+    // Recorded with Connect on.
     await enable();
-    macFixture('connect-status.json', await (await req('GET', '/connect')).json());
-    macFixture('connect-machines.json', await (await req('GET', '/connect/machines')).json());
+    wireFixture('connect-status.json', await (await req('GET', '/connect')).json());
+    wireFixture('connect-machines.json', await (await req('GET', '/connect/machines')).json());
   });
 
   it('signing out of sync stops Connect here too', async () => {

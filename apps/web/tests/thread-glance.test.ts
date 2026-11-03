@@ -7,7 +7,7 @@ import { DetailsTab } from '../src/components/thread/panel/DetailsTab.tsx';
 import { FIX_CHECKS_PROMPT, FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, prLine, prNext } from '@omni/shared/thread-glance.ts';
 
 // The thread panel's Details tab: the branch card on top (thread-glance.ts, GlanceCard.tsx), the agents card and the
-// session rows with MCP folded to one line. The Mac app mirrors prNext in OmniKit's ThreadGlance.swift.
+// session rows with MCP folded to one line.
 
 const pr = (over: Partial<PRSummary> = {}): PRSummary => ({
   number: 481,
@@ -65,7 +65,7 @@ describe('the agents card', () => {
       createElement(AgentsSection, {
         parent: thread({ id: 'p1', title: 'Bundled Server', status: 'done' }),
         links: { from: null, into: [] },
-        children: [thread({ id: 'c1', title: 'Web UI Update banner', status: 'done' }), thread({ id: 'c2', title: 'Mac app button', status: 'running' })],
+        children: [thread({ id: 'c1', title: 'Web UI Update banner', status: 'done' }), thread({ id: 'c2', title: 'Desktop app button', status: 'running' })],
         agents: [],
         onJump: () => {},
       }),
@@ -73,7 +73,7 @@ describe('the agents card', () => {
     expect(html).toContain('Lineage');
     expect(html).toContain('Bundled Server');
     // The running delegation sits under Running, before the fold.
-    expect(html.indexOf('Mac app button')).toBeLessThan(html.indexOf('Previous agents'));
+    expect(html.indexOf('Desktop app button')).toBeLessThan(html.indexOf('Previous agents'));
     expect(html.indexOf('Web UI Update banner')).toBeGreaterThan(html.indexOf('Previous agents'));
     expect(html).toContain('aria-expanded="true"');
   });

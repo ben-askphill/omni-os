@@ -5,7 +5,7 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/apps/mac/OmniKit/Tests/OmniKitTests/Fixtures/**",
+        "$TURBO_ROOT$/packages/test-fixtures/wire/**",
         "$TURBO_ROOT$/crew/**",
         "$TURBO_ROOT$/automations/**",
         "$TURBO_ROOT$/mods/**"

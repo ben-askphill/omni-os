@@ -1,7 +1,7 @@
 // The scripts that read the page for Annotate: one element for a pick, and the element under the pointer for the hover
 // inspector. Both browsers run these very scripts, so they report the same fields: the server in the channel's Chrome
-// through Runtime.evaluate (apps/server/browser.ts), the Mac app in the Web tab's own web view, in an isolated content
-// world (apps/mac/browser-pick/entry.ts bundles this file). Each finds what is at a point and returns a bounded
+// through Runtime.evaluate (apps/server/browser.ts), the desktop app in the Web tab's own <webview>, in an isolated
+// world (apps/desktop/src/pick-preload.ts). Each finds what is at a point and returns a bounded
 // description of it, never the DOM, and changes nothing on the page. Everything it returns is the page's own data and is
 // cleaned and checked again (browser-pick-read.ts), so a page that tampers with the results gets a refused pick, not a
 // larger record.

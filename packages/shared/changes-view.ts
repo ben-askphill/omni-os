@@ -1,6 +1,6 @@
 // What a thread's Changes panel shows (apps/web/src/components/thread/panel/ChangesTab.tsx, apps/ios/src/changes), from GET /api/threads/:id/changes
-// (Since base) and GET /api/threads/:id/turns (This turn). Pure, so tests run it on the recorded answers the Mac app
-// decodes too (apps/mac/OmniKit's Changes.swift is the same).
+// (Since base) and GET /api/threads/:id/turns (This turn). Pure, so tests run it on the recorded answers in
+// packages/test-fixtures/wire.
 import type { BranchChanges, ChangeBase, ChangeGroup, ChangeKind, ChangedFile, DiffOmitted, TurnChanges, TurnView } from './changes.ts';
 import { parseDiff, type FileDiff } from './diff.ts';
 

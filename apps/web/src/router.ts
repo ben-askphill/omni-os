@@ -4,7 +4,7 @@ import type { NewThreadPreset } from './new-thread-preset.ts';
 
 export type ChannelTab = 'threads' | 'prs' | 'settings';
 
-/** The Settings sections, the same on desktop, phone and Mac (@omni/shared/settings-catalog.ts). Automations stays a page of its own. */
+/** The Settings sections, the same on desktop and phone (@omni/shared/settings-catalog.ts). Automations stays a page of its own. */
 export const SETTINGS_SECTIONS = SETTINGS_SECTION_IDS;
 export type SettingsSection = SettingsSectionId;
 /** The pages Settings replaced (#404). Their hashes still work and land on the section that holds them now. */
@@ -78,7 +78,7 @@ export function parseHash(hash: string): Route {
   if (Object.hasOwn(LEGACY_SETTINGS, a) && !b) return { name: 'settings', section: LEGACY_SETTINGS[a] };
   if (a === 'settings' && !b) return { name: 'settings' };
   if (a === 'settings' && b && !c) {
-    // An old section name (the Mac's tab names before this layout) opens the section that holds it now.
+    // An old section name (from before this layout) opens the section that holds it now.
     const section = settingsSectionNamed(b);
     if (section) return { name: 'settings', section, focus: q.get('focus') || undefined };
   }

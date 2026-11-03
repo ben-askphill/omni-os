@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { realpathSync } from 'node:fs';
 import { TOOL_OUTPUT, type TailMessage } from '@omni/shared/tool-output.ts';
-import { macFixture } from './fixture-shape.ts';
+import { wireFixture } from './fixture-shape.ts';
 import { startRunner } from './runner-boot.ts';
 
-// The shapes the Mac app reads for compact tool output (#225): a thread whose head holds a compact result beside a
+// The shapes the clients read for compact tool output (#225): a thread whose head holds a compact result beside a
 // whole one, two chunks of the compact one's saved output, and a tail's messages. The server makes them here, in
-// process, since the fixtures server runs the fake claude, which prints a tool's output only when it ends. The Swift
-// tests decode the recorded files (apps/mac/OmniKit/Tests/OmniKitTests/ToolOutputTests.swift). To record them again:
-//   OMNI_RECORD_MAC_FIXTURES=1 npx vitest run --config apps/server/vitest.config.ts apps/server/tests/tool-output-fixtures.test.ts
+// process, since the fixtures server runs the fake claude, which prints a tool's output only when it ends. To record
+// them again:
+//   OMNI_RECORD_WIRE_FIXTURES=1 npx vitest run --config apps/server/vitest.config.ts apps/server/tests/tool-output-fixtures.test.ts
 
 const r = await startRunner();
 const { app } = await import('../app.ts');
@@ -76,22 +76,22 @@ async function tailFrames(call: string, drive: (wait: (n: number) => Promise<voi
   return frames;
 }
 
-describe('the Mac fixtures for tool output', () => {
+describe('the wire fixtures for tool output', () => {
   it('hold the shapes the server sends now', async () => {
     const places = [r.tmp, realpathSync(r.tmp)];
     const open = (await get(`/threads/${ID}?history=recent`)) as { events: { id: number; kind: string; payload: string }[] };
     const result = open.events.find((e) => e.id === compact)!;
     expect(JSON.parse(result.payload)).toMatchObject({ is_error: true, truncated: true, output: { exit_code: 1 } });
     expect(JSON.parse(open.events.find((e) => e.kind === 'tool_result')!.payload).output, 'a short result travels whole').toBeUndefined();
-    macFixture('tool-output-open.json', open, places);
+    wireFixture('tool-output-open.json', open, places);
 
     const first = (await get(`/threads/${ID}/events/${compact}/output?offset=0&limit=400`)) as { next: number | null; total: number };
     expect(first.next).toBe(400);
-    macFixture('tool-output-chunk.json', first, places);
+    wireFixture('tool-output-chunk.json', first, places);
     const last = (await get(`/threads/${ID}/events/${compact}/output?offset=${first.total - 100}&limit=400`)) as { next: number | null; text: string };
     expect(last).toMatchObject({ next: null });
     expect(last.text).toHaveLength(100);
-    macFixture('tool-output-chunk-end.json', last, places);
+    wireFixture('tool-output-chunk-end.json', last, places);
 
     // The call is running with some output before the client joins, so its first message is the tail so far.
     toolTails.begin(ID, 'call-live');
@@ -109,6 +109,6 @@ describe('the Mac fixtures for tool output', () => {
     expect(frames[0]).toMatchObject({ reset: true, text: 'Compiling 1/3\n', skipped: 0 });
     expect(frames[2]).toMatchObject({ kind: 'tail', skipped: 50 });
     // The big message is a run of one letter: its text is not the fixture.
-    macFixture('tool-tail.json', frames.map((f) => (f.kind === 'tail' && f.text.length > 100 ? { ...f, text: `${f.text.slice(0, 8)}…` } : f)), places);
+    wireFixture('tool-tail.json', frames.map((f) => (f.kind === 'tail' && f.text.length > 100 ? { ...f, text: `${f.text.slice(0, 8)}…` } : f)), places);
   });
 });

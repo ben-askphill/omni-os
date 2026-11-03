@@ -5,7 +5,7 @@ import { RETENTION_DAYS } from '@omni/shared/worktree-cleanup.ts';
 import { cancelWorktreeScan, currentWorktreeScan, startWorktreeScan } from './worktree-inventory.ts';
 import { cleanupRunning, cleanupState, setRetentionPolicy, startCleanup } from './worktree-cleanup.ts';
 
-// Settings > Worktrees in both clients: the worktree inventory, and the cleanup that removes what it lists as eligible.
+// Settings > Worktrees in the Web UI: the worktree inventory, and the cleanup that removes what it lists as eligible.
 // The scan and a cleanup run in the background; clients poll GET /scan while either runs.
 
 export const worktreesApi = new Hono();

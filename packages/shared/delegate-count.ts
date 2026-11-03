@@ -1,6 +1,5 @@
 // The delegate count on a Conductor thread's sidebar row: how many threads it delegated, and the one state the count
-// wears. Delegated threads get no sidebar row of their own, so this count is where a stuck one shows. The Mac app
-// mirrors these rules in OmniKit's DelegateCount.swift.
+// wears. Delegated threads get no sidebar row of their own, so this count is where a stuck one shows.
 
 /** needs: a delegated thread waits on Ben. failed: one failed and Ben has not seen it. working: one runs or queues. settled: none of those. */
 export type DelegateState = 'needs' | 'failed' | 'working' | 'settled';

@@ -6,7 +6,7 @@ import type { HandoverP, RunName, SwitchP } from '../run-switch.ts';
 import { buildItems, buildTasks, type SwitchItem, type TranscriptEvent } from '../transcript-fold.ts';
 import { projectFold } from './transcript-snapshot.ts';
 
-// One corpus for the Web UI fold and the Mac transcript. Swift reads the same file from the repo.
+// One corpus for the transcript fold, which the web and iOS tests read too.
 
 const corpus = JSON.parse(readFileSync(fixture('transcript', 'corpus.json'), 'utf8')) as {
   cases: { name: string; events: TranscriptEvent[]; spans?: Span[]; items: unknown; plan: unknown }[];

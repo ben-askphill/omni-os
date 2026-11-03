@@ -1,6 +1,5 @@
 // Named commands a channel's threads can run in their checkout: Theme preview, Theme check, Tests. Server and web
-// share these shapes; the Mac app mirrors them (OmniKit ChannelActions.swift) and the fixtures in
-// apps/server/tests/mac-fixtures.test.ts hold both to the same JSON.
+// share these shapes, and the fixtures in apps/server/tests/wire-fixtures.test.ts record their JSON.
 
 /**
  * One action in a channel's settings. Only the command and the names of the secrets it needs are stored, never a

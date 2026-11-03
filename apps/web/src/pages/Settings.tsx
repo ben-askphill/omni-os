@@ -26,11 +26,11 @@ import { PathMapEditor, SyncSection } from './Sync.tsx';
 import { Advanced, Card, InfoRow, Origin, Row, ScopeBar, ServerOptions, settingAnchor, SwitchRow, useScopedChannel } from './settings-parts.tsx';
 
 // Settings: a searchable nav of grouped sections beside one section at a time (@omni/shared/settings-catalog.ts),
-// the same sections in the same order as the phone's Settings screen and the Mac app's Settings window. A scoped
+// the same sections in the same order as the phone's Settings screen. A scoped
 // section shows the channel picker: Every channel is this machine's values, a channel shows what it sets and what it
 // inherits. Each value says where it comes from (built-in default, .env, this machine, the channel, this device),
 // with Reset beside one Omni saved. Config fields come from the shared contract (@omni/shared/settings.ts) and save
-// to data/omni.config.json through PUT /api/setup, as the Mac app's ProfileSettingsView.swift does.
+// to data/omni.config.json through PUT /api/setup.
 
 export function SettingsPage({ section, focus }: { section?: SettingsSection; focus?: string }) {
   // The desktop app's own section is no page in a browser or on a phone.
@@ -409,7 +409,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // The Mac app, a reset or `npm run setup` can change the file while this page is open. A field still as it was
+  // Another window, a reset or `npm run setup` can change the file while this page is open. A field still as it was
   // saved follows the file; one being edited keeps its draft.
   const base = useRef(values);
   useEffect(() => {
@@ -605,7 +605,7 @@ function AppearanceCard() {
           {null}
         </Card>
       ) : (
-        <Card entry="zoom" title="Text size" subtitle="For bigger or smaller text, use the browser's zoom (Cmd + and Cmd -). The Mac app has its own." origin={<Origin of="device" label="This browser only" />}>
+        <Card entry="zoom" title="Text size" subtitle="For bigger or smaller text, use the browser's zoom (Cmd + and Cmd -). The desktop app has its own." origin={<Origin of="device" label="This browser only" />}>
           {null}
         </Card>
       )}
@@ -648,7 +648,7 @@ function NotificationsCard({ scoped }: { scoped?: string }) {
       >
         <SwitchRow
           title="Notify in this browser"
-          detail="New finished and failed results, the ones Needs you lists. Turning this on asks the browser the first time. With the Mac app's notifications on too, you get both."
+          detail="New finished and failed results, the ones Needs you lists. Turning this on asks the browser the first time."
           checked={prefs.enabled}
           onChange={toggle}
           disabled={permission === 'unsupported'}

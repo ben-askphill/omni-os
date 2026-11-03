@@ -1,7 +1,6 @@
 // Every kind of message context this build knows: one line per kind. The server's projectors
 // (apps/server/message-context/kinds.ts) and the Web UI's views (apps/web/src/message-context/kinds.ts) are typed
-// over this table, so a kind listed here without them fails typecheck. The Mac app lists its views in
-// apps/mac/Omni/ContextViews.swift.
+// over this table, so a kind listed here without them fails typecheck.
 import { parseContextsWith, readContextsWith, type FallbackWhy, type MessageContext, type MessageContextKind, type Parsed } from './message-context.ts';
 import { browserAnnotation } from './message-context-browser.ts';
 import { diffSelection } from './message-context-diff.ts';

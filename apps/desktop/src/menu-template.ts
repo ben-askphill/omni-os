@@ -1,6 +1,6 @@
 // The application menu and the text-field context menu as data, from the app's state. Pure, so tests pin each
 // label, shortcut and platform difference; menu.ts and windows.ts turn them into native menus.
-// The menu is OmniCommands in apps/mac/Omni/OmniApp.swift, with Ctrl in place of Cmd off the Mac.
+// Off the Mac, Ctrl takes Cmd's place.
 import type { MenuItemConstructorOptions } from 'electron';
 import { serverOriginLabel, ZOOM_MAX, ZOOM_MIN, type DesktopCommand, type DesktopPlatform } from '@omni/shared/desktop-bridge.ts';
 

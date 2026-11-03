@@ -3,7 +3,7 @@
 // said in it. The agent reads that on demand, a bounded page at a time, through an Omni tool (apps/server/thread-history.ts),
 // so attaching a reference never copies a history into the message and never touches the referenced thread.
 // The server stamps title, channel and time at send (apps/server/message-context/thread-reference.ts): a rename or an
-// archive after that does not rewrite a sent message. apps/mac/OmniKit/Sources/OmniKit/ThreadReferenceContext.swift ports it.
+// archive after that does not rewrite a sent message.
 import { ID_MAX, cutLabel, type MessageContextKind, type Parsed } from './message-context.ts';
 import { FORBIDDEN_CLASS, plain } from './message-context-terminal.ts';
 

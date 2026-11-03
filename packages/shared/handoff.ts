@@ -1,6 +1,5 @@
 // Handing a thread to another synced Mac, running or idle, and taking one over from another Mac. Server and web share
-// these shapes; the Mac app mirrors them (OmniKit Handoff.swift) and the fixtures in apps/server/tests/mac-fixtures.test.ts
-// hold both to the same JSON.
+// these shapes, and apps/server/tests/handoff-two-macs.test.ts and takeover-two-macs.test.ts record their JSON.
 //
 // Everything travels as synced kv, one key per writer, so the two Macs never write the same key:
 //   devices.<machine id>     written by that Mac only: its name and its Tailscale node.

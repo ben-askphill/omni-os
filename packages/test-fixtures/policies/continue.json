@@ -1,5 +1,5 @@
 {
-  "about": "Continue eligibility and the sheet's lines. packages/shared/continue.ts and packages/shared/continue-flow.ts run it in apps/web/tests/client-policies.test.ts; apps/mac/OmniKit/Sources/OmniKit/Continue.swift runs it in ClientPolicyTests.swift. A model of \"\" means the harness's default.",
+  "about": "Continue eligibility and the sheet's lines. packages/shared/continue.ts and packages/shared/continue-flow.ts run it in apps/web/tests/client-policies.test.ts. A model of \"\" means the harness's default.",
   "refusals": [
     { "harness": "claude-code", "target": null, "source": null },
     { "harness": "codex", "target": null, "source": null },

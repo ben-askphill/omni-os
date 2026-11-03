@@ -1,6 +1,6 @@
 // The diff_selection kind of message context: lines Ben picked in a thread's Changes panel. The rows are kept as he
 // saw them, with where they came from (the group, the commits compared and the file's blob ids), so the record still
-// says what he meant after the file moves on. apps/mac/OmniKit/Sources/OmniKit/DiffSelectionContext.swift ports it.
+// says what he meant after the file moves on.
 import { cutLabel, overLimit, type MessageContextKind, type Parsed } from './message-context.ts';
 
 export interface DiffRow {
@@ -67,7 +67,7 @@ const GROUPS = ['committed', 'staged', 'unstaged', 'untracked', 'turn'] as const
 const isGroup = (v: unknown): v is DiffSource['group'] => GROUPS.some((g) => g === v);
 /** A commit, turn or blob id. */
 const isRef = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && !overLimit(v, 64);
-// These return undefined for a bad value; a missing one is null, since Swift's Codable leaves nil keys out.
+// These return undefined for a bad value; a missing one is null, since a client may leave null keys out.
 const lineOrNull = (v: unknown) => (v === undefined || v === null ? null : typeof v === 'number' && Number.isInteger(v) && v >= 1 ? v : undefined);
 const refOrNull = (v: unknown) => (v === undefined || v === null ? null : isRef(v) ? v : undefined);
 

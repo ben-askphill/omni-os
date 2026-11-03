@@ -1,5 +1,5 @@
-// The commit a new worktree thread's branch is cut from. Server and web share these shapes; the Mac app mirrors them
-// (OmniKit WorktreeBase.swift) and the fixtures in apps/server/tests/mac-fixtures.test.ts hold both to the same JSON.
+// The commit a new worktree thread's branch is cut from. Server and web share these shapes, and the fixtures in
+// apps/server/tests/wire-fixtures.test.ts record their JSON.
 
 /**
  * What Ben chose as the base, kept with the thread until it is resolved to a commit.

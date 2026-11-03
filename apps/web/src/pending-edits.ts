@@ -1,7 +1,7 @@
 // Editing, removing, reordering and steering messages that are accepted but not sent (apps/server/runner/pending.ts), from the
 // Web UI's side. An edit lives here, apart from the composer's draft. The server checks each change against where
 // the message is when it arrives; when the message was sent first, the edit turns stale and keeps Ben's text so he
-// can copy it or send it as a new message. PendingEdits.swift is the Mac app's copy.
+// can copy it or send it as a new message.
 import type { PendingMsg } from './api.ts';
 import { isOmnis, isParked } from './requests.ts';
 

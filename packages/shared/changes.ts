@@ -1,7 +1,7 @@
 // The wire types of a thread's Changes panel, the one copy the server (apps/server/changes.ts, turns.ts) and the clients
 // (changes-view.ts, which both phone UIs draw) import: GET /api/threads/:id/changes (`BranchChanges`) and GET /api/threads/:id/turns
-// (`TurnChanges`). The Mac app's Changes.swift mirrors them; apps/server/tests/mac-fixtures.test.ts checks its recorded
-// answers with `changesProblems` and `turnChangesProblems`, and Changes.swift's value lists against the ones here.
+// (`TurnChanges`). apps/server/tests/wire-fixtures.test.ts checks the recorded answers with `changesProblems` and
+// `turnChangesProblems`.
 
 /** `turn`: what one turn changed, between its before and after snapshots (apps/server/turns.ts). */
 export const CHANGE_KINDS = ['committed', 'staged', 'unstaged', 'untracked', 'turn'] as const;
@@ -168,20 +168,6 @@ const turnChangesShape = {
 };
 
 const branchChanges: Check = (v, at, out) => object(isObj(v) && v.available === false ? unavailableShape : availableShape)(v, at, out);
-
-/**
- * Each wire type's JSON keys, for checking a client's own copy (the Mac's Changes.swift). `BranchChanges` is both of
- * its forms together, as a client that decodes one struct reads it.
- */
-export const CHANGES_WIRE_KEYS: Record<string, string[]> = {
-  BranchChanges: [...new Set([...Object.keys(unavailableShape), ...Object.keys(availableShape)])],
-  ChangeBase: Object.keys(changeBaseShape),
-  ChangeGroup: Object.keys(changeGroupShape),
-  ChangedFile: Object.keys(changedFileShape),
-  TurnSide: Object.keys(turnSideShape),
-  TurnView: Object.keys(turnViewShape),
-  TurnChanges: Object.keys(turnChangesShape),
-};
 
 const problems = (check: Check) => (v: unknown) => {
   const out: string[] = [];

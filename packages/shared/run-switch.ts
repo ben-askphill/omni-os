@@ -1,6 +1,5 @@
 // Switching a thread's harness, model or effort between turns: the transcript events the server writes and both
-// clients draw. Pure, so the server, the Web UI and their tests share one copy. The Mac app ports the text helpers in
-// apps/mac/OmniKit/Sources/OmniKit/RunSwitch.swift.
+// clients draw. Pure, so the server, the Web UI and their tests share one copy.
 
 /** What a thread runs on. An empty model is the harness default; an empty effort is the model's default. */
 export interface Run {

@@ -1,7 +1,7 @@
 // DelegateCount: on a Conductor thread's row, the delegate icon and how many threads it delegated. Delegated threads
 // have no row of their own, so the count carries their state: the needs-you diamond while one waits on Ben or failed,
 // the live tint while one works, grey once all are done and seen. Clicking it opens the parent on its Details tab.
-// The rules are @omni/shared/delegate-count.ts; the Mac app's copy is DelegateCount in SidebarRows.swift.
+// The rules are @omni/shared/delegate-count.ts.
 import { useMemo } from 'react';
 import { delegateLabel, delegateSummary, type DelegateChild, type DelegateNeeds, type DelegateSummary } from '@omni/shared/delegate-count.ts';
 import type { NeedsYou } from '../api.ts';

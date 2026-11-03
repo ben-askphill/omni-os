@@ -1,7 +1,7 @@
-// /api/auth: pairing a browser, Google sign-in for new devices, and the Mac app's check that the server on the port
+// /api/auth: pairing a browser, Google sign-in for new devices, and the desktop app's check that the server on the port
 // is this install's Omni. requestGuard has checked the token or a device session before any of these run, except
 // GET /auth/proof, GET /auth/desktop-pair, the sign-in routes (SIGN_IN_ROUTES) and POST /auth/app-pairings/redeem.
-// desktop-pair is the Linux app's window: a loopback GET with no proxy, and the token never appears in the URL.
+// desktop-pair is the desktop app's window: a loopback GET with no proxy, and the token never appears in the URL.
 // App pairing (app-pairing.ts) gives a native app its own revocable session; push-tokens.ts keeps its push token.
 import { Hono, type Context } from 'hono';
 import { deleteCookie, setCookie } from 'hono/cookie';
@@ -54,7 +54,7 @@ authApi.post('/pair', (c) => {
   return c.json({ ok: true });
 });
 
-/** The Linux app's first navigation. Sets the same cookie as /pair, then sends the window to the Web UI. */
+/** The desktop app's first navigation. Sets the same cookie as /pair, then sends the window to the Web UI. */
 authApi.get('/desktop-pair', (c) => {
   if (!desktopPairAllowed(c)) return c.json({ error: 'Forbidden: desktop pairing is only from this machine' }, 403);
   pairCookie(c);

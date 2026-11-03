@@ -1,10 +1,12 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { expect } from 'vitest';
 
-// The shape of the JSON the Mac app reads (apps/mac/OmniKit decodes the fixtures): the keys and value types, compared
-// between a recorded fixture and what the server sends now. apps/server/tests/mac-fixtures.test.ts records most of
-// them from one server; a test that makes a response one server cannot (two Macs) checks its own with macFixture.
+// The shape of the JSON the clients read: the keys and value types, compared between a recorded fixture in
+// packages/test-fixtures/wire and what the server sends now. The web and shared tests read the same fixtures.
+// apps/server/tests/wire-fixtures.test.ts records most of them from one server; a test that makes a response one
+// server cannot (two machines) checks its own with wireFixture.
 
 export type Kind = 'null' | 'boolean' | 'number' | 'string' | 'array' | 'object';
 
@@ -86,8 +88,6 @@ export function diff(want: Shape, have: Shape, path: string, out: string[]) {
   }
 }
 
-export const MAC_FIXTURES = resolve(import.meta.dirname, '../../mac/OmniKit/Tests/OmniKitTests/Fixtures');
-
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 const TIME = /\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z/g;
 
@@ -110,12 +110,12 @@ function normalized(value: unknown, places: string[]): string {
     .replace(/omni\/[0-9a-f]{8}\b/g, 'omni/00000000');
 }
 
-/** Check a response against its recorded fixture, or record it with OMNI_RECORD_MAC_FIXTURES=1. */
-export function macFixture(name: string, value: unknown, places: string[] = []) {
-  const file = join(MAC_FIXTURES, name);
-  if (process.env.OMNI_RECORD_MAC_FIXTURES === '1') return writeFileSync(file, normalized(value, places));
-  expect(existsSync(file), `${file} is missing. Record it with OMNI_RECORD_MAC_FIXTURES=1`).toBe(true);
+/** Check a response against its recorded fixture, or record it with OMNI_RECORD_WIRE_FIXTURES=1. */
+export function wireFixture(name: string, value: unknown, places: string[] = []) {
+  const file = join(WIRE_FIXTURES, name);
+  if (process.env.OMNI_RECORD_WIRE_FIXTURES === '1') return writeFileSync(file, normalized(value, places));
+  expect(existsSync(file), `${file} is missing. Record it with OMNI_RECORD_WIRE_FIXTURES=1`).toBe(true);
   const out: string[] = [];
   diff(shapeOf([JSON.parse(readFileSync(file, 'utf8'))]), shapeOf([value]), name, out);
-  expect(out, `The server JSON the Mac app reads changed shape. If that is on purpose, record ${name} again with OMNI_RECORD_MAC_FIXTURES=1, then run npm run test:mac`).toEqual([]);
+  expect(out, `The server JSON the clients read changed shape. If that is on purpose, record ${name} again with OMNI_RECORD_WIRE_FIXTURES=1, then run npm test`).toEqual([]);
 }

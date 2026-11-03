@@ -36,8 +36,8 @@ Four, under `/api/threads/:id/transitions`, the same for every kind:
 | read | `GET .../transitions/:tid` | the transition as it stands now |
 | cancel | `POST .../transitions/:tid/cancel` | a queued reconfigure dropped, a relocate under way cancelled; a 409 for one that is over, or for a fork |
 
-The six routes from before answer through the same service, in the shapes they always had, so the Web UI, the Mac
-app, the Conductor and a machine on an older build keep working without a change:
+The six routes from before answer through the same service, in the shapes they always had, so the Web UI (in a browser
+or the desktop app), the Conductor and a machine on an older build keep working without a change:
 
 | Older route | Is |
 | --- | --- |

@@ -89,7 +89,7 @@ server.registerTool(
         .optional()
         .describe(
           'Override the role default harness: claude-code, codex, cursor, hermes or cursor-cloud. cursor runs the cursor-agent CLI on this machine; ' +
-            'cursor-cloud launches a Cursor cloud agent on Cursor\'s Linux machines that pushes a branch and opens a PR (no Mac build, Swift tests or screenshots). Use list_harnesses.',
+            'cursor-cloud launches a Cursor cloud agent on Cursor\'s Linux machines that pushes a branch and opens a PR (no Mac build or screenshots). Use list_harnesses.',
         ),
       model: z
         .string()
@@ -680,7 +680,7 @@ server.registerTool('note_tool_failure_recovery', {
 }, async ({ id, ...body }) => text(await call(`/tool-failures/occurrences/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) })));
 
 server.registerTool('omni_update', {
-  description: `Omni's own update. check: fetch origin's main and say how many commits this server is behind, with their subjects. apply: the Update button. It waits until no turn runs (this one included, so it starts after your turn ends), updates the main checkout to main, rebuilds the Web UI and restarts the server. Only works when an app started the server from a checkout: the SwiftUI Mac app, the Linux launcher, or the desktop app run with --dev. The packaged desktop app updates itself and offers to relaunch, so there check finds nothing and apply is refused. Apply only when ${USER} asks.`,
+  description: `Omni's own update. check: fetch origin's main and say how many commits this server is behind, with their subjects. apply: the Update button. It waits until no turn runs (this one included, so it starts after your turn ends), updates the main checkout to main, rebuilds the Web UI and restarts the server. Only works when a supervisor started the server from a checkout: the desktop app run with --dev, or a service manager with OMNI_SUPERVISOR set. The packaged desktop app updates itself and offers to relaunch, so there check finds nothing and apply is refused. Apply only when ${USER} asks.`,
   inputSchema: { action: z.enum(['check', 'apply']) },
 }, async ({ action }) => text(await call(action === 'check' ? '/update/check' : '/update', { method: 'POST' })));
 

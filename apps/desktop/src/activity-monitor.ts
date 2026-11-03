@@ -1,6 +1,6 @@
 // The activity monitor (prototypes/activity-monitor): a sampler on :4791 and its dashboard in a window. The app
 // starts the sampler on its own binary as Node unless a monitor already answers there, and stops only the one it
-// started (OmniKit/ActivityMonitor.swift). Its window has a session of its own: whatever answers on the port gets
+// started. Its window has a session of its own: whatever answers on the port gets
 // none of the app's cookies, which sign in to the Omni API.
 import { BrowserWindow, dialog } from 'electron';
 import { existsSync } from 'node:fs';

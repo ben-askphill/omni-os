@@ -1,6 +1,6 @@
 // What the top of the thread panel's Details tab reads: the branch's PR state and the one next step it calls for.
 // Ben's history says the panel is mostly used to steer a branch to a merged PR: open the PR, fix conflicts, fix
-// checks, then merge. The Mac app mirrors these rules in OmniKit's ThreadGlance.swift.
+// checks, then merge.
 
 /** The parts of a PR summary (GET /api/threads/:id/pr) these rules read. */
 export interface PRSummary {

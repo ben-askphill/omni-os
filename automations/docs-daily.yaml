@@ -26,7 +26,7 @@ prompt: |
      Work only inside `"$scratch"` for the rest of the run. Remove the worktree when you are done.
   3. Read `git log <base_sha>..<head_sha>` and each merged PR in that range (`gh pr list --repo {{omniRepo}} --state merged
      --json number,title,mergeCommit,url` filtered to SHAs in the range). Update docs to match behaviour changes:
-     README.md, docs/**, CLAUDE.md, AGENTS.md, crew/*.md, apps/mac/NOTES.md, CONTRIBUTING.md, CONTEXT.md, FORKING.md as needed.
+     README.md, docs/**, CLAUDE.md, AGENTS.md, crew/*.md, CONTRIBUTING.md, CONTEXT.md, FORKING.md as needed.
      Do not edit apps/, packages/, automations/*.yaml, or other source. AGENTS.md is maintained separately from CLAUDE.md in
      this repo (no sync script): update each file when its scope changes.
   4. Before commit: `OMNI_ROOT={{omniRoot}} DOCS_DAILY_REPO="$scratch" {{omniRoot}}/scripts/docs-daily.sh assert-docs-only`.

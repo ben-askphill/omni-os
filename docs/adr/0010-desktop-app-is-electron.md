@@ -1,5 +1,7 @@
 # The desktop app is an Electron window on the Web UI, with the server inside it
 
+> Done: the cutover deleted `apps/mac` and `apps/linux`, with their scripts. The desktop app is the third surface.
+
 Omni has two desktop apps. On a Mac it is a native SwiftUI client of `/api` ([ADR 0002](0002-mac-app-is-a-client.md)): about 78,000 lines of Swift, with presentation rules ported from TypeScript and pinned by mirror tests. On Linux it is a launcher that opens the Web UI in Chromium's app mode ([ADR 0006](0006-linux-app-is-a-window.md)). Every feature is written twice, once in React and once in Swift, and the Swift half is the one that slips (folders in #177 never reached the Mac app). Both apps also need a repo checkout and Node 24 on the machine, so neither can be handed to someone as a download.
 
 T3 Code (pingdotgg/t3code, `apps/desktop`) ships one Electron 44 shell for macOS, Linux and Windows. The shell loads the React web app and runs a bundled server on Electron's own Node (`ELECTRON_RUN_AS_NODE=1`). It builds Mac apps for arm64, x64 and universal.

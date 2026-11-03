@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { firstBelow } from '../src/pages/useScrollAnchor.ts';
 import { BOTTOM_SLACK, followAfterScroll, onContent } from '../src/pages/useTranscriptScroll.ts';
 
-// The transcript's auto scroll, as ScrollPin.swift on the Mac: a scroll up leaves the bottom, however small.
+// The transcript's auto scroll: a scroll up leaves the bottom, however small.
 
 describe('followAfterScroll', () => {
   it('stops following on a scroll up of a few pixels', () => {

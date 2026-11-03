@@ -1,17 +1,16 @@
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
 import { tailId } from '@omni/shared/history.ts';
 import { classifyStream } from '../src/api.ts';
 
-// The thread stream as the server records it for the Mac app (apps/server/tests/mac-fixtures.test.ts), read the way
+// The thread stream as the server records it (apps/server/tests/wire-fixtures.test.ts), read the way
 // useThreadStream reads it. Each connect ends its catch-up with one sync (#224).
-
-const FIXTURES = join(resolve(import.meta.dirname, '../..'), 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures');
 
 /** The data frames of an SSE file, with their ids. */
 function frames(name: string): { id?: string; data: unknown }[] {
-  return readFileSync(join(FIXTURES, name), 'utf8')
+  return readFileSync(join(WIRE_FIXTURES, name), 'utf8')
     .split('\n\n')
     .map((block) => {
       const lines = block.split('\n');

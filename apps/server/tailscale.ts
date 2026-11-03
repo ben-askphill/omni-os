@@ -19,7 +19,7 @@ export interface Tailnet {
   peers: Map<string, TailnetPeer>;
 }
 
-/** Where the Mac app keeps its CLI when `tailscale` is not on PATH. */
+/** Where Tailscale's Mac app keeps its CLI when `tailscale` is not on PATH. */
 const APP_BIN = '/Applications/Tailscale.app/Contents/MacOS/Tailscale';
 const CACHE_MS = 5_000;
 const TIMEOUT_MS = 3_000;

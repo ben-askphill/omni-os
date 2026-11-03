@@ -13,7 +13,7 @@ npm install
 npm run setup
 ```
 
-Or skip `npm run setup` and answer the same questions in the Web UI or the Mac app on first open. See
+Or skip `npm run setup` and answer the same questions in the Web UI or the desktop app on first open. See
 [Install](docs/user/install.md) for prerequisites and [Configuration](docs/user/configuration.md) for every file.
 
 ## What is yours and what is shared
@@ -52,10 +52,10 @@ PR upstream instead of carrying the change.
 git fetch upstream
 git merge upstream/main          # or: git rebase upstream/main
 npm install --include=dev
-scripts/build-mac.sh             # if you use the Mac app
+npm run build:desktop            # if you build the desktop app from this checkout, on a Mac
 ```
 
-Restart the server if you run it yourself; the Mac app restarts its own. Since none of your settings live in tracked files, this merges cleanly unless
+Restart the server if you run it yourself. `npm run build:desktop` needs the app quit first, and opens the new build. Since none of your settings live in tracked files, this merges cleanly unless
 you changed shared code yourself. `git status` should be clean before you pull; if it shows `crew/` or
 `automations/` changes, move them into `data/crew/` or `data/automations/` and run `git checkout -- crew automations`.
 

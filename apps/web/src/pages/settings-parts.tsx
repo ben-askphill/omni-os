@@ -15,7 +15,7 @@ export const settingAnchor = (entry: string) => `setting-${entry}`;
 /**
  * Advanced: the developer and rarely changed items of a form, folded shut so the everyday ones stand alone (#405).
  * `open` forces it open, for a value Omni could not work out and needs typed. `title` names a fold that is not
- * Advanced (a long list). The Mac app's `AdvancedFold` matches.
+ * Advanced (a long list).
  */
 export function Advanced({ title = 'Advanced', summary, open: forced = false, children }: { title?: string; summary?: string; open?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(forced);

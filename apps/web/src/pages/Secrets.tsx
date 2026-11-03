@@ -23,8 +23,7 @@ function scopeLabel(scope: string, name: (id: string) => string | undefined) {
 
 // Settings, Secrets: the names by scope, a form that adds or replaces one, and the known global ones. With a channel
 // in Settings' scope (`scoped`), the list is what that channel's threads get: its own secrets, each marked where it
-// overrides a global one, then the global ones it inherits; the form saves to that channel. The Mac app's Secrets
-// section (apps/mac/Omni/SecretsSettingsView.swift) shows the same.
+// overrides a global one, then the global ones it inherits; the form saves to that channel.
 export function SecretsSection({ scoped }: { scoped?: string }) {
   const { channels, channel, status, reloadStatus } = useApp();
   const res = useApi<SecretRow[]>('/secrets');

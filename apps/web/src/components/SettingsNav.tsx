@@ -5,7 +5,7 @@ import { href, navigate } from '../router.ts';
 import { Icon, type IconName } from './ui.tsx';
 
 // Settings' nav on a desktop: a search box over the groups of sections (@omni/shared/settings-catalog.ts), the same
-// groups and order as the phone's Settings screen and the Mac app's Settings sidebar. Typing lists the settings that
+// groups and order as the phone's Settings screen. Typing lists the settings that
 // match instead; picking one opens its section and scrolls to it. Links, so a section has a hash of its own.
 
 export function SettingsNav({ section }: { section: SettingsSectionId }) {

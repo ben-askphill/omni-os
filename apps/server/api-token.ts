@@ -1,7 +1,7 @@
 // The per-install secret every /api request carries (apps/server/request-guard.ts). It lives in the data dir as
-// `api-token`, mode 0600, so only Ben's macOS account can read it: the Mac app, scripts/omni.sh and apps/mcp/omni.ts
+// `api-token`, mode 0600, so only Ben's account can read it: the desktop app, scripts/omni.sh and apps/mcp/omni.ts
 // read the file, threads get it as OMNI_TOKEN, and a browser pairs once and then holds it in an HttpOnly cookie.
-// A file rather than the Keychain: shell scripts and the Swift app read it without a Keychain prompt, and the
+// A file rather than the Keychain: shell scripts and the desktop app read it without a Keychain prompt, and the
 // Keychain would guard it from the same account the file's mode already admits, and from no one else.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { chmodSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -59,7 +59,7 @@ export const cookieName = () => `omni_token_${config.port}`;
 export const sessionCookieName = () => `omni_session_${config.port}`;
 
 /**
- * What the server answers to `nonce`, so the Mac app can tell it is this install's Omni without sending the token.
+ * What the server answers to `nonce`, so the desktop app can tell it is this install's Omni without sending the token.
  * Bound to the port the server listens on: a program squatting on the app's port that relays the nonce to an Omni
  * on another port (a QA stack, a moved server) gets a proof for that port, which the app refuses.
  */

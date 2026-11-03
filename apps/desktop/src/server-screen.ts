@@ -1,6 +1,6 @@
 // What the app shows when the server cannot start or stops on its own: a small window with what went wrong and the
-// last lines of the log, worded as the SwiftUI app's ServerView. The main window stays open behind it, and the Web
-// UI reconnects by itself once Try Again brings the server back.
+// last lines of the log. The main window stays open behind it, and the Web UI reconnects by itself once Try Again
+// brings the server back.
 import { app, BrowserWindow, nativeTheme, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import type { AppContext } from './context.ts';
@@ -80,7 +80,7 @@ export function screenHtml(view: ScreenView): string {
     const buttons = [button('try-again', 'Try Again', true), view.logExists ? button('open-log', 'Open Log') : '', button('quit', 'Quit')];
     body = `<main><div class="glyph">!</div><h1>Server problem</h1><p>${escapeHtml(view.message)}</p>${log}<nav>${buttons.join('')}</nav></main>`;
   }
-  // The log scrolls from the bottom, as the SwiftUI app's did. The CSP allows only this one inline script.
+  // The log scrolls from the bottom. The CSP allows only this one inline script.
   const script = `<script>const t=document.getElementById('tail');if(t)t.scrollTop=t.scrollHeight;</script>`;
   return (
     `<!doctype html><html><head><meta charset="utf-8">` +

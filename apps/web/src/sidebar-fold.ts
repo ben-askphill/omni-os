@@ -1,5 +1,4 @@
-// The sidebar's channel folding. Pure, so the rules are tested on their own; SidebarSections in OmniKit keeps the Mac
-// app's the same.
+// The sidebar's channel folding. Pure, so the rules are tested on their own.
 import type { ChannelWithRunning } from './api.ts';
 
 type Folding = Pick<ChannelWithRunning, 'id' | 'folders'>;

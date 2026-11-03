@@ -6,7 +6,7 @@ import { SETTING_FIELDS } from '../settings.ts';
 import { catalogFixture } from './settings-catalog-cases.ts';
 
 describe('settings catalog', () => {
-  it('matches the fixture the Swift port reads (run scripts/settings-catalog-fixture.ts after a change)', () => {
+  it('matches settings-catalog.json (run scripts/settings-catalog-fixture.ts after a change)', () => {
     expect(JSON.parse(readFileSync(fixture('settings-catalog.json'), 'utf8'))).toEqual(JSON.parse(JSON.stringify(catalogFixture())));
   });
 
@@ -39,7 +39,7 @@ describe('settings catalog', () => {
     expect(searchSettings('worktree zebra', 'web')).toEqual([]);
   });
 
-  it('lists the desktop app\'s section only in the desktop app, and leaves it out of the Mac app\'s fixture', () => {
+  it('lists the desktop app\'s section only in the desktop app', () => {
     const ids = (desktopApp: boolean) => sectionsIn('app', { desktopApp }).map((s) => s.id);
     expect(ids(false)).toEqual(['about']);
     expect(ids(true)).toEqual(['desktop', 'about']);
@@ -47,9 +47,6 @@ describe('settings catalog', () => {
     expect(sectionShows('desktop', true)).toBe(true);
     expect(sectionShows('general', false)).toBe(true);
     expect(settingsSectionNamed('desktop')).toBe('desktop');
-    const fixture = catalogFixture();
-    expect(fixture.sections.map((s) => s.id)).not.toContain('desktop');
-    expect(fixture.entries.filter((e) => e.section === 'desktop')).toEqual([]);
   });
 
   it('finds the desktop app\'s settings only in the desktop app, which finds every web setting too', () => {
@@ -63,8 +60,8 @@ describe('settings catalog', () => {
     expect(searchSettings('theme', 'desktop').map((e) => e.id)).toEqual(searchSettings('theme', 'web').map((e) => e.id));
   });
 
-  it('keeps a Mac-only setting out of the web search', () => {
+  it('finds Quick Prompt only in the desktop app', () => {
     expect(searchSettings('quick prompt', 'web')).toEqual([]);
-    expect(searchSettings('quick prompt', 'mac').map((e) => e.id)).toEqual(['quick-prompt']);
+    expect(searchSettings('quick prompt', 'desktop').map((e) => e.id)).toEqual(['desktop-quick-prompt']);
   });
 });

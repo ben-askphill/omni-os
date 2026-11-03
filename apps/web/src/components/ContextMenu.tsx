@@ -101,7 +101,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     onClose();
   };
 
-  // The thread's actions, from the list the phone and the Mac app render too. `off`: why one cannot run here, shown under it.
+  // The thread's actions, from the list the phone renders too. `off`: why one cannot run here, shown under it.
   const runs: Record<ThreadActionId, () => void> = {
     pin: () => void togglePin(),
     done: () => void toggleDone(),
@@ -112,7 +112,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     reference: () => setReferencing(true),
     grok: () => void sendGrok(),
   };
-  // The desktop app opens a thread in a window of its own, as the Mac app's menu did.
+  // The desktop app opens a thread in a window of its own.
   const ownWindow: { items: MenuItem[] }[] =
     desktop && target.kind === 'thread'
       ? [{ items: [{ label: 'Open in New Window', icon: 'external', run: () => (desktop?.openWindow(href.thread(target.id)), onClose()) }] }]

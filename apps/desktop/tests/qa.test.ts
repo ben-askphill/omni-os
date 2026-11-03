@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { appExecutable, attachRefusal, liveDataDirs, macCondition, type MenuNode, parseArgs, parseScript, parseSize, parseStep, readScriptSource, refusal, resolveMenuPath, stepCeilingMs, withDeadline } from '../scripts/qa.ts';
+import { appExecutable, attachRefusal, liveDataDirs, swiftUICondition, type MenuNode, parseArgs, parseScript, parseSize, parseStep, readScriptSource, refusal, resolveMenuPath, stepCeilingMs, withDeadline } from '../scripts/qa.ts';
 
 const BASE = { port: 4766, dataDir: '/qa/data' };
 
 describe('parseStep', () => {
-  it('reads the Mac harness steps that carry over', () => {
+  it('reads the SwiftUI harness steps that carry over', () => {
     expect(parseStep({ route: '#/settings' })).toEqual({ kind: 'route', route: '#/settings' });
     expect(parseStep({ snapshot: 'home' })).toEqual({ kind: 'screenshot', name: 'home' });
     expect(parseStep({ sleep: 1.5 })).toEqual({ kind: 'wait', ms: 1500 });
@@ -20,14 +20,14 @@ describe('parseStep', () => {
     expect(parseStep({ wait: 'button:has-text("Send")' })).toEqual({ kind: 'waitFor', selector: 'button:has-text("Send")', timeoutMs: 10_000 });
   });
 
-  it('refuses the Mac harness conditions and names a selector to use', () => {
+  it('refuses the SwiftUI harness conditions and names a selector to use', () => {
     expect(parseStep({ wait: 'sidebarLoaded' })).toEqual({ error: expect.stringContaining('[data-channel-id]') });
-    expect(parseStep({ wait: { for: 'serverState:running', timeout: 30 } })).toEqual({ error: expect.stringContaining('Mac harness condition') });
+    expect(parseStep({ wait: { for: 'serverState:running', timeout: 30 } })).toEqual({ error: expect.stringContaining('SwiftUI harness condition') });
     expect(parseStep({ wait: 'connection:open' })).toEqual({ error: expect.stringContaining('drop the step') });
     expect(parseStep({ wait: 'channel:inbox' })).toEqual({ error: expect.stringContaining('[data-channel-id=\\"inbox\\"]') });
     expect(parseStep({ wait: 'thread:abc' })).toEqual({ error: expect.stringContaining('{"openThread": "abc"}') });
-    expect(parseStep({ wait: 'browserFrame' })).toEqual({ error: expect.stringContaining('Mac harness condition') });
-    expect(macCondition('thread')).toBeNull();
+    expect(parseStep({ wait: 'browserFrame' })).toEqual({ error: expect.stringContaining('SwiftUI harness condition') });
+    expect(swiftUICondition('thread')).toBeNull();
   });
 
   it('reads the page steps', () => {

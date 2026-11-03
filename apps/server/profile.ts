@@ -13,7 +13,7 @@ export interface Profile {
   email: string;
   /** The saved zone, or the resolved one (OMNI_TZ, else the system's) when none is saved. */
   timezone: string;
-  /** False until onboarding finished: both clients then show the wizard. */
+  /** False until onboarding finished: the Web UI then shows the wizard. */
   onboarded: boolean;
 }
 

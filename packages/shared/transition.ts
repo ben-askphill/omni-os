@@ -1,6 +1,6 @@
 // A transition: one of the three ways a thread changes how or where it runs, as the server's transition service
 // (apps/server/transition.ts) and its four routes (apps/server/transitions-api.ts) describe it. Pure types, shared by the
-// server and the Web UI; the Mac app mirrors what it reads. The older routes (Continue preview and start, run switch,
+// server and the Web UI. The older routes (Continue preview and start, run switch,
 // handoff, takeover, handoff cancel) answer with the same shapes they always did, built from these.
 import type { ContinueBlock, ContinuePreview } from './continue.ts';
 import type { HandoffPhase, HandoffView } from './handoff.ts';

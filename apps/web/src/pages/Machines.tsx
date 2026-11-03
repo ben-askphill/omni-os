@@ -10,8 +10,7 @@ import { Card, InfoRow, Origin, ServerOptions } from './settings-parts.tsx';
 
 // Settings, Machines: this machine (its name, sync state, the address this browser uses, the feed and the thread
 // counts) and the server options from .env (port and host). Where new threads run is under Threads (RunOnCard);
-// Sync, Sharing & access and Worktrees are sections of their own. The Mac app's Machines section shows the same,
-// with its server's port, repo, Node and log.
+// Sync, Sharing & access and Worktrees are sections of their own.
 
 function syncLine(s: SyncStatus | undefined, now: number): { dot: string; text: string } {
   if (!s) return { dot: 'settled', text: 'Reading sync' };

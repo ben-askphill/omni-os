@@ -20,7 +20,7 @@ function syncSub(s: SyncStatus | undefined, now: number) {
 
 /**
  * Settings, pushed from the avatar on Channels: a search over every setting, then the same groups of sections as the
- * desktop nav and the Mac's sidebar (@omni/shared/settings-catalog.ts), each opening its own page under a back bar,
+ * desktop nav (@omni/shared/settings-catalog.ts), each opening its own page under a back bar,
  * then Automations. A search result opens its section scrolled to it. Plan usage sits on the Activity screen.
  */
 export function SettingsScreen() {

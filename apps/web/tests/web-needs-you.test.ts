@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { NeedsYou, NeedsYouItem } from '../src/api.ts';
 import { canMarkDone, coalesced, inChannel, reasonOf, shownResult, withoutResult, withoutThread } from '../src/needs-you.ts';
 
-// The Web UI's side of Needs you (apps/web/src/needs-you.ts), against the same recorded server answers the Mac app's Swift
-// tests decode (apps/server/tests/mac-fixtures.test.ts records them): every kind of result and blocker, then a read.
+// The Web UI's side of Needs you (apps/web/src/needs-you.ts), against the recorded server answers
+// (apps/server/tests/wire-fixtures.test.ts records them): every kind of result and blocker, then a read.
 
-const FIXTURES = join(resolve(import.meta.dirname, '../..'), 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures');
-const fixture = <T>(name: string) => JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as T;
+const fixture = <T>(name: string) => JSON.parse(readFileSync(join(WIRE_FIXTURES, name), 'utf8')) as T;
 const inbox = () => fixture<NeedsYou>('needs-you.json');
 const byTitle = (n: NeedsYou, title: string) => n.items.find((i) => i.thread.title === title)!;
 

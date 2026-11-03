@@ -17,7 +17,7 @@ if (holder) {
 }
 process.on('exit', () => releaseLock(paths.lock));
 
-// Made before the port opens, so the Mac app and scripts find it as soon as the server answers.
+// Made before the port opens, so the desktop app and scripts find it as soon as the server answers.
 const { apiToken, tokenPath } = await import('./api-token.ts');
 apiToken();
 

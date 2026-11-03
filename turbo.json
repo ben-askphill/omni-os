@@ -17,9 +17,6 @@
     "test": {
       "dependsOn": ["transit"]
     },
-    "test:mac": {
-      "dependsOn": ["transit"]
-    },
     "dev": {
       "cache": false,
       "persistent": true
@@ -30,23 +27,17 @@
       "lib": {
         "dependencies": { "deny": ["app"] }
       },
-      "mac": {
-        "dependencies": { "deny": ["@omni/web"] }
-      },
       "web": {
-        "dependencies": { "deny": ["@omni/mac"] }
-      },
-      "linux": {
-        "dependencies": { "deny": ["@omni/web", "@omni/mac", "@omni/server"] }
+        "dependencies": { "deny": ["@omni/desktop"] }
       },
       "relay": {
-        "dependencies": { "deny": ["@omni/web", "@omni/mac", "@omni/server", "@omni/shared", "@omni/mcp"] }
+        "dependencies": { "deny": ["@omni/web", "@omni/server", "@omni/shared", "@omni/mcp", "@omni/desktop"] }
       },
       "ios": {
-        "dependencies": { "deny": ["@omni/web", "@omni/mac", "@omni/server"] }
+        "dependencies": { "deny": ["@omni/web", "@omni/server", "@omni/desktop"] }
       },
       "desktop": {
-        "dependencies": { "deny": ["@omni/web", "@omni/mac", "@omni/server", "@omni/linux", "@omni/mcp", "@omni/client-core"] }
+        "dependencies": { "deny": ["@omni/web", "@omni/server", "@omni/mcp", "@omni/ios", "@omni/client-core"] }
       }
     }
   }

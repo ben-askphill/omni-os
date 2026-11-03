@@ -24,7 +24,6 @@ import {
 } from '../message-context-marks.ts';
 import { browserAnnotation, annotate, type BrowserCapture } from '../message-context-browser.ts';
 
-// The same corpus runs in apps/mac/OmniKit/Tests/OmniKitTests/BrowserMarksTests.swift, so the Swift geometry cannot drift from this.
 type Case = { name: string; op: string; expect: unknown } & Record<string, unknown>;
 const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')) as { marks: Case[] };
 const vp = { width: 1280, height: 713 };

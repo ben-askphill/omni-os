@@ -22,7 +22,7 @@
 <body>
   <div class="tiles">
     <div class="tile"><div class="label">Commits, last <span id="days">60</span> days</div><div class="big" id="total">442</div></div>
-    <div class="tile"><div class="label">Busiest package</div><div class="big" id="top">apps/mac</div></div>
+    <div class="tile"><div class="label">Busiest package</div><div class="big" id="top">apps/desktop</div></div>
   </div>
   <div class="panel">
     <h2>Commits touching each package</h2>
@@ -30,8 +30,8 @@
     <div class="controls"><button id="d60" aria-pressed="true">60 days</button><button id="d30" aria-pressed="false">30 days</button></div>
   </div>
 <script>
-  var data = { 60: [['apps/mac', 146], ['apps/server', 138], ['apps/web', 117], ['apps/mcp', 45], ['packages/shared', 35]],
-               30: [['apps/server', 81], ['apps/web', 64], ['apps/mac', 52], ['packages/shared', 20], ['apps/mcp', 12]] };
+  var data = { 60: [['apps/desktop', 146], ['apps/server', 138], ['apps/web', 117], ['apps/mcp', 45], ['packages/shared', 35]],
+               30: [['apps/server', 81], ['apps/web', 64], ['apps/desktop', 52], ['packages/shared', 20], ['apps/mcp', 12]] };
   function draw(d) {
     var rows = data[d], max = rows[0][1], total = 0;
     document.getElementById('rows').innerHTML = rows.map(function (r) { total += r[1]; return '<div class="row"><span class="name">' + r[0] + '</span><div class="bar" style="width:' + (100 * r[1] / max) + '%"></div><span class="n">' + r[1] + '</span></div>'; }).join('');

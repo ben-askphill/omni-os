@@ -135,7 +135,7 @@ export interface ChromeLookup {
   list(dir: string): string[];
 }
 
-/** Chromium-family browsers a Linux machine may have on PATH, Google Chrome first. Same family as the Linux app's list. */
+/** Chromium-family browsers a Linux machine may have on PATH, Google Chrome first. */
 const LINUX_BROWSERS = ['google-chrome-stable', 'google-chrome', 'chromium', 'chromium-browser', 'brave-browser', 'brave'];
 
 /**

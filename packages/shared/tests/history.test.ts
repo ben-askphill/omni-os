@@ -31,8 +31,8 @@ import {
   type Retain,
 } from '../history.ts';
 
-// The client half is ported to Swift (OmniKit/History.swift). Its tests replay packages/test-fixtures/history/spans.json,
-// which this file writes with OMNI_RECORD_HISTORY_CORPUS=1 and checks otherwise.
+// packages/test-fixtures/history/spans.json records what the client half does in each case. This file writes it with
+// OMNI_RECORD_HISTORY_CORPUS=1 and checks it otherwise.
 
 const row = (id: number, kind = 'assistant_text', clipped = false): HistoryRow => ({
   id,
@@ -319,11 +319,11 @@ describe('history joins', () => {
   });
 });
 
-describe('history corpus (TS and Swift)', () => {
+describe('history corpus', () => {
   const path = fixture('history', 'spans.json');
   const corpus = { cases: CASES.map((k) => ({ name: k.name, steps: k.steps, reveal: k.reveal, keys: k.keys, expect: observe(run(k.steps), k) })) };
 
-  it('matches what Swift replays', () => {
+  it('matches the recorded corpus', () => {
     if (process.env.OMNI_RECORD_HISTORY_CORPUS) {
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, `${JSON.stringify(corpus, null, 2)}\n`);

@@ -22,7 +22,7 @@ import { compactRow, compactStored } from './tool-output.ts';
 export type PageRow = EventRow & { clipped?: Clipped };
 
 /**
- * `rows:bytes:rowBytes`, for the Mac fixture recording only (apps/server/tests/mac-fixtures.test.ts), where a short
+ * `rows:bytes:rowBytes`, for the wire fixture recording only (apps/server/tests/wire-fixtures.test.ts), where a short
  * thread has to show a head, an older page, a reveal and a clipped row. Anchors keep their budget.
  */
 export function budgetFromEnv(raw: string | undefined): HistoryBudget | null {

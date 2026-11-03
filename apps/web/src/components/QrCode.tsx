@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import qrcode from 'qrcode-generator';
 
 // A QR code as an SVG. Black on white in both themes, with the four-module quiet zone scanners need: a themed code
-// would not scan in dark mode. The Mac app draws the same code in IosPairingSettingsView.swift.
+// would not scan in dark mode.
 
 export function QrCode({ text, label, className = '' }: { text: string; label: string; className?: string }) {
   const { size, path } = useMemo(() => {

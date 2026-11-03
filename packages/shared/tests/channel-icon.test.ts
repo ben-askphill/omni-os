@@ -49,10 +49,4 @@ describe('channel icons', () => {
     const ui = readFileSync(resolve(root, 'apps/web/src/components/ui/icons.tsx'), 'utf8');
     for (const name of CHANNEL_GLYPHS) expect(ui, name).toMatch(new RegExp(`^  ${name}: '`, 'm'));
   });
-
-  it('matches the list in the Mac app', () => {
-    const swift = readFileSync(resolve(root, 'apps/mac/OmniKit/Sources/OmniKit/ChannelIcon.swift'), 'utf8');
-    const list = swift.match(/glyphs: \[String\] = \[([^\]]*)\]/)![1];
-    expect([...list.matchAll(/"([a-zA-Z]+)"/g)].map((m) => m[1])).toEqual([...CHANNEL_GLYPHS]);
-  });
 });

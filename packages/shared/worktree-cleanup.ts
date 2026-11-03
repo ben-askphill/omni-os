@@ -1,4 +1,4 @@
-// Worktree cleanup, as both clients show it under Settings > Worktrees: what a cleanup Ben starts or this Mac's
+// Worktree cleanup, as the Web UI shows it under Settings > Worktrees: what a cleanup Ben starts or this Mac's
 // retention policy would remove, and what a run removed, kept or failed to remove (apps/server/worktree-cleanup.ts).
 // Pure: types, the shared labels and the filter that picks what a cleanup may remove from a scan.
 import type { KeepReason, WorktreeItem } from './worktree-inventory.ts';

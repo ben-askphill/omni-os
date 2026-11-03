@@ -1,5 +1,5 @@
 // Which data dir the server uses when no --data-dir names one: the default for this OS, unless the user picked
-// another once (such as the checkout's data/ the SwiftUI app or the Linux launcher used).
+// another once (such as the checkout's data/ that the old SwiftUI app or Linux launcher used).
 // Looking for the old data only reads: it never copies, moves or writes into the old folder.
 import { dialog } from 'electron';
 import { execFile } from 'node:child_process';
@@ -8,7 +8,7 @@ import { isAbsolute, join } from 'node:path';
 import type { PlatformDirs } from '../paths.ts';
 import { writeJsonAtomic } from '../settings.ts';
 
-/** The SwiftUI app's UserDefaults domain and key for its checkout (OmniKit/ServerSettings.swift). */
+/** The SwiftUI app's UserDefaults domain and key for its checkout. */
 export const MAC_DEFAULTS_DOMAIN = 'com.omni-os.mac';
 export const MAC_REPO_KEY = 'repoPath';
 /** The SwiftUI app's checkout when its repoPath is blank. */

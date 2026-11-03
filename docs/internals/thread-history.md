@@ -1,8 +1,8 @@
 # Thread history
 
-A thread opens with its newest page of events. Older pages load as Ben scrolls up, and a search hit loads the page that holds it. The server side is `apps/server/history.ts` and `apps/server/db/repos/history.ts`. The shared rules (budgets, cursors, spans, the client's join) are in `packages/shared/history.ts`, and the Mac app ports the client half to `OmniKit/History.swift`.
+A thread opens with its newest page of events. Older pages load as Ben scrolls up, and a search hit loads the page that holds it. The server side is `apps/server/history.ts` and `apps/server/db/repos/history.ts`. The shared rules (budgets, cursors, spans, the client's join) are in `packages/shared/history.ts`.
 
-`GET /api/threads/:id` without `?history=recent` still sends every event. The Conductor, tests and older clients read it that way, and the Mac app's "Copy Thread as Markdown" needs the whole thread.
+`GET /api/threads/:id` without `?history=recent` still sends every event. The Conductor, tests and older clients read it that way.
 
 ## The routes
 
@@ -37,7 +37,7 @@ The stream subscribes to the bus before it reads the catch-up, so a row written 
 
 The long fixture (`packages/test-fixtures/long-thread.ts`) records what this buys in `packages/test-fixtures/history/baseline.json`. The full open is 3,472 rows and 8.1 MiB. The head is 262 rows and 154 KiB, plus one 173-byte anchor. Thirteen pages reach the start, one of them cut mid-turn by the row cap, and the largest is 174 KiB. `apps/server/tests/history-budget.test.ts` checks the exact numbers. Record them again with `OMNI_RECORD_HISTORY_BASELINE=1` after a deliberate change.
 
-`OMNI_HISTORY_BUDGET=rows:bytes:rowBytes` overrides the first three, read once at boot. It exists only for recording the Mac fixtures, where a short thread has to show a head, an older page, a reveal and a clipped row. Do not set it on a real install.
+`OMNI_HISTORY_BUDGET=rows:bytes:rowBytes` overrides the first three, read once at boot. It exists only for recording the wire fixtures (`apps/server/tests/wire-fixtures.test.ts`), where a short thread has to show a head, an older page, a reveal and a clipped row. Do not set it on a real install.
 
 ## Spans and cursors
 
@@ -79,21 +79,20 @@ Every statement is a keyset read on an index. `history-budget.test.ts` runs `EXP
 
 ## Clients
 
-Both clients hold one `History` and fold it with its spans (`buildItems(events, spans)` on the web, `Transcript.update(_:spans:)` on the Mac). The traps that cost time:
+The Web UI holds one `History` and folds it with its spans (`buildItems(events, spans)`). The traps that cost time:
 
 - The stream's `after` moves only on the first load, on streamed rows and on a snapshot sync. An older page never moves it, or the replay would skip rows.
 - "New activity" and follow-the-bottom key on `tailId`, not on the row count, so an earlier page never looks like new output.
 - Web: the transcript sets `overflow-anchor: none` and `useScrollAnchor` restores the first visible `[data-key]` row itself, because phone Safari has no scroll anchoring. Without `none`, Chrome corrects a second time.
-- Mac: `.scrollTargetLayout()` alone did not hold the row. At the top edge the lazy stack keeps its offset and the page pushes the row down, so `holdsTopRow` (`TranscriptAnchor.swift`) scrolls it back after the layout.
-- A reveal (`?at=` on the web, `ThreadStoreRegistry.reveal` on the Mac) reads from the start of the hit's turn, so the hit's group folds as it would in the full thread.
+- A reveal (`?at=`) reads from the start of the hit's turn, so the hit's group folds as it would in the full thread.
 
 ## A thread held open
 
-Live rows only add, so a thread left open while its agent works would hold every row it streamed (#411). After each live batch, `boundHistory` (`History.bound` on the Mac) checks `RETAIN`: once the client holds more than `rows + slack` (2,000) rows while Ben follows the newest, or `hard` (6,000) while he reads older ones, it drops the oldest down to 1,500. The cut goes at a turn start and keeps the anchors a head page would carry (parent calls, the newest `init` and `result`). The head span starts at the cut, `below` counts the dropped results, and "Earlier messages" loads them back. The slack makes it a step every 500 rows, not one per frame, which matters on the Mac: a span change lays the transcript out again.
+Live rows only add, so a thread left open while its agent works would hold every row it streamed (#411). After each live batch, `boundHistory` checks `RETAIN`: once the client holds more than `rows + slack` (2,000) rows while Ben follows the newest, or `hard` (6,000) while he reads older ones, it drops the oldest down to 1,500. The cut goes at a turn start and keeps the anchors a head page would carry (parent calls, the newest `init` and `result`). The head span starts at the cut, `below` counts the dropped results, and "Earlier messages" loads them back. The slack makes it a step every 500 rows, not one per frame.
 
-The view says whether it follows: `useTranscriptScroll`'s `following` on the desktop, the newest turn being on screen on the phone, `ScrollPin.isPinned` on the Mac. Each sets `follows` on the history (`useThreadHistory`, `ThreadStore`).
+The view says whether it follows: `useTranscriptScroll`'s `following` on the desktop, the newest turn being on screen on the phone. Each sets `follows` on the history (`useThreadHistory`).
 
-The web fold still runs over every held row each frame, but no longer redoes the work for rows that did not change. `buildItems` parses each row's payload once (a `WeakMap` by row), and the transcript passes each fold through `keepSame`, which keeps an item the previous fold made when it is equal, so its memoized `ItemRow` skips rendering. The Mac's `Transcript.update` already lays out only the new tail.
+The web fold still runs over every held row each frame, but no longer redoes the work for rows that did not change. `buildItems` parses each row's payload once (a `WeakMap` by row), and the transcript passes each fold through `keepSame`, which keeps an item the previous fold made when it is equal, so its memoized `ItemRow` skips rendering.
 
 `apps/web/tests/live-history.test.ts` streams 320 turns into an open thread and checks the bound, the turn count, the fold against the whole thread's, and loading the dropped rows back. `apps/web/tests/live-history-measure.test.ts` times each frame (`OMNI_MEASURE=1`, see its header). With the same 320 turns (13,764 rows), the last frames went from 0.8 ms to append, 10 ms to fold and 34 to 48 ms to render the desktop transcript, with 14,026 rows held and the heap growing from 54 to 264 MiB, to 0.02 ms, 0.2 ms and 1 ms, with 1,507 rows held and the heap ending at 85 MiB.
 

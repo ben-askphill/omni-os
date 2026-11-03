@@ -1,4 +1,4 @@
-// `npm run setup`: the onboarding wizard in a terminal. Asks what the web and Mac wizards ask and writes the same
+// `npm run setup`: the onboarding wizard in a terminal. Asks what the Web UI's wizard asks and writes the same
 // file (data/omni.config.json, apps/server/user-config.ts). Safe to run again: every answer defaults to what is
 // saved, so Enter through it changes nothing.
 //
@@ -141,7 +141,7 @@ async function main() {
     ensureWorkspace();
   }
   say(`5. Done. Saved ${tildify(configPath())}.`);
-  say(server ? `   Open ${server} (or the Mac app).` : '   Start Omni with `npm run dev` (web on http://localhost:4748) or open the Mac app.');
+  say(server ? `   Open ${server} (or the desktop app).` : '   Start Omni with `npm run dev` (web on http://localhost:4748) or open the desktop app.');
   say('   Change any of this later in Settings, or run `npm run setup` again.');
 }
 

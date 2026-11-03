@@ -52,7 +52,6 @@ is_doc_path() {
     README.md|CLAUDE.md|AGENTS.md|CONTEXT.md|FORKING.md|CONTRIBUTING.md) return 0 ;;
     docs/*) return 0 ;;
     crew/*.md) return 0 ;;
-    apps/mac/NOTES.md) return 0 ;;
     *) return 1 ;;
   esac
 }

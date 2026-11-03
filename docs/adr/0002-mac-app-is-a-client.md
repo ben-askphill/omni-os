@@ -1,6 +1,6 @@
 # The Mac app is a SwiftUI client of the Node server, not a rewrite
 
-> Superseded by [ADR 0010](0010-desktop-app-is-electron.md): one Electron app on the Web UI, with the server bundled inside it, replaces the SwiftUI app. This record stays as the history of why the SwiftUI app was built.
+> Superseded by [ADR 0010](0010-desktop-app-is-electron.md) and deleted: one Electron app on the Web UI, with the server bundled inside it, replaced the SwiftUI app, and the cutover deleted `apps/mac`. This record stays as the history of why the SwiftUI app was built.
 
 The Mac app is a native SwiftUI app that talks to the same Omni server and `/api` as the Web UI, over HTTP and SSE on localhost. It does not replace the server. The runner, harness adapters, stream parser, database, secret store, worktrees, automations and conductor MCP stay in Node. Ben's reason for a Mac app is the native feel at his desk. A Swift rewrite of the backend would bring no visible gain and would cost weeks of re-proving the harness contracts that the vitest suite already covers. It would also leave the phone, the conductor MCP, omni.sh and claude-bar without a server. A web view wrapper around the React UI was considered and rejected: it would not feel native, which was the whole point.
 

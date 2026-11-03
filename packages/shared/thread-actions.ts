@@ -1,7 +1,5 @@
 // The thread action menu: one list of ids, groups, labels and conditions that the Web UI's right-click menu, the phone's
-// thread sheet and the Mac app's right-click all render. The Mac runs it from the slash engine bundle
-// (apps/mac/slash-engine/entry.ts, `npm run build:slash`), and apps/server/tests/mac-fixtures.test.ts records its
-// JSON as thread-menu.json for the Swift types.
+// thread sheet and the iOS app's thread menu all render.
 import { continueSourceRefusal } from './continue.ts';
 
 export type ThreadActionId = 'pin' | 'done' | 'rename' | 'move' | 'archive' | 'fork' | 'reference' | 'grok';
@@ -96,7 +94,7 @@ export function threadMenu(f: ThreadMenuFacts): ThreadMenuGroup[] {
   })).filter((g) => g.items.length > 0);
 }
 
-/** A thread every action applies to: the Mac fixture, and the base the tests vary. */
+/** A thread every action applies to: the base the tests vary. */
 export const EVERY_ACTION_FACTS: ThreadMenuFacts = {
   row: true,
   archived: false,

@@ -15,9 +15,7 @@ import { deviceRows, handoffBanner, HERE, runOnDefault, runOnPick, runOnRequest,
 import { continueTargets, defaultRun, slashHint } from '@omni/shared/continue-flow.ts';
 import type { HarnessWithRunning } from '../src/api.ts';
 
-// The client policies the Web UI and the Mac app both implement, held to one corpus each in
-// packages/test-fixtures/policies/. apps/mac/OmniKit/Tests/OmniKitTests/ClientPolicyTests.swift reads the same files,
-// so the two ports cannot drift. A case that fails here and not there (or the reverse) is a real difference.
+// The client policies in @omni/shared, held to one corpus each in packages/test-fixtures/policies/.
 
 const corpus = (name: string) => JSON.parse(readFileSync(fixture('policies', `${name}.json`), 'utf8'));
 

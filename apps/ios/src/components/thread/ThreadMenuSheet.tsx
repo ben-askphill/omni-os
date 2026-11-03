@@ -151,7 +151,7 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
               ))}
             </OptionGroup>
             {folders.length === 0 ? (
-              <Text style={[styles.note, { color: colors.fg3 }]}>This channel has no folders yet. Make one on the Web UI or the Mac app, then move threads into it here.</Text>
+              <Text style={[styles.note, { color: colors.fg3 }]}>This channel has no folders yet. Make one on the Web UI or the desktop app, then move threads into it here.</Text>
             ) : null}
           </>
         ) : null}

@@ -1,7 +1,7 @@
 // Settings' map: the sections, the groups the nav lists them in, and every setting a search can find. Desktop web,
-// the phone's Settings screen and the Mac app's Settings window all draw their nav from this, so the three keep the
-// same sections in the same order. The Mac app mirrors it in OmniKit's SettingsCatalog.swift; both are held to
-// packages/test-fixtures/settings-catalog.json (write it again with `npx tsx packages/shared/scripts/settings-catalog-fixture.ts`).
+// the phone's Settings screen and the desktop app all draw their nav from this, so they keep the same sections in the
+// same order. packages/test-fixtures/settings-catalog.json records it (write it again with
+// `npx tsx packages/shared/scripts/settings-catalog-fixture.ts`).
 //
 // Scope: a section marked `scoped` shows the channel picker. "Every channel" shows this machine's values; a channel
 // shows what that channel sets and what it inherits. The picked channel stays picked from section to section.
@@ -19,16 +19,13 @@ export interface SettingsSectionDef {
   id: string;
   group: SettingsGroupId;
   title: string;
-  /** An icon name both icon sets have (apps/web/src/components/ui/icons.tsx, OmniKit BrandPaths.swift). */
+  /** An icon name in apps/web/src/components/ui/icons.tsx. */
   icon: string;
   /** One line under the title: what the section changes. */
   blurb: string;
   /** Shows the channel scope picker. */
   scoped?: boolean;
-  /**
-   * Only in the desktop app (apps/desktop), where the Web UI has its bridge. A browser, the phone layout and the Mac
-   * app never list it, and the Mac app's fixture leaves it out.
-   */
+  /** Only in the desktop app (apps/desktop), where the Web UI has its bridge. A browser and the phone layout never list it. */
   desktopApp?: boolean;
 }
 
@@ -62,8 +59,8 @@ export const sectionsIn = (group: SettingsGroupId, opts: { desktopApp: boolean }
 export const sectionShows = (id: SettingsSectionId, desktopApp: boolean): boolean => desktopApp || !sectionDef(id).desktopApp;
 
 /**
- * Old names that still open a section: the pages Settings replaced (#/sync, #/storage, #/secrets) and the Mac's tab
- * names before this layout. A section keeps its own name.
+ * Old names that still open a section: the pages Settings replaced (#/sync, #/storage, #/secrets) and section
+ * names from before this layout. A section keeps its own name.
  */
 export const LEGACY_SETTINGS_SECTIONS: Record<string, SettingsSectionId> = {
   profile: 'general',
@@ -78,7 +75,7 @@ export const settingsSectionNamed = (name: string | undefined | null): SettingsS
   isSettingsSectionId(name) ? name : name && Object.hasOwn(LEGACY_SETTINGS_SECTIONS, name) ? LEGACY_SETTINGS_SECTIONS[name] : null;
 
 /** `desktop`: the Web UI in the desktop app (apps/desktop). It finds everything `web` does, and its own section. */
-export type SettingsSurface = 'web' | 'mac' | 'desktop';
+export type SettingsSurface = 'web' | 'desktop';
 
 /** One thing a search finds. `id` is also the anchor a client scrolls to: `setting-<id>` on the web. */
 export interface SettingsEntry {
@@ -100,7 +97,6 @@ export interface SettingsCapabilities {
 export const SETTINGS_ENTRIES = [
   { id: 'you', section: 'general', title: 'Name, pronouns, timezone and email', keywords: ['name', 'pronouns', 'timezone', 'time zone', 'email', 'greeting', 'profile'] },
   { id: 'setup', section: 'general', title: 'Run setup again', keywords: ['onboarding', 'wizard', 'harness check', 'first run'] },
-  { id: 'quick-prompt', section: 'general', title: 'Quick Prompt', keywords: ['hotkey', 'shortcut', 'keyboard', 'global', 'launcher'], surfaces: ['mac'] },
   { id: 'theme', section: 'appearance', title: 'Theme', keywords: ['dark', 'light', 'system', 'mode', 'colors'] },
   { id: 'zoom', section: 'appearance', title: 'Text size', keywords: ['zoom', 'scale', 'font size', 'bigger', 'smaller'] },
   { id: 'notify', section: 'notifications', title: 'Notify on this device', keywords: ['alerts', 'finished', 'failed', 'desktop', 'permission', 'needs you'] },
@@ -179,7 +175,7 @@ export function searchSettings(query: string, surface: SettingsSurface, can: Set
  * Where a shown value comes from, the label beside it. `default`: Omni's built-in value. `env`: an environment
  * variable or `.env` line, which wins over the config file. `machine`: this machine's data/omni.config.json.
  * `channel`: set on the channel in scope. `inherited`: the channel has none of its own, so this machine's applies.
- * `device`: kept by this browser or this Mac only. `mixed`: channels differ (shown at Every channel).
+ * `device`: kept by this browser or this app only. `mixed`: channels differ (shown at Every channel).
  */
 export type Provenance = 'default' | 'env' | 'machine' | 'channel' | 'inherited' | 'device' | 'mixed';
 

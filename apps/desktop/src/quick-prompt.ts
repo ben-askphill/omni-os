@@ -1,4 +1,4 @@
-// The Quick Prompt: a shortcut from any app opens a small panel that starts a thread (apps/mac/Omni/QuickPrompt.swift).
+// The Quick Prompt: a shortcut from any app opens a small panel that starts a thread.
 // The panel is one reused window on the Web UI's #/quick-prompt page. The page keeps the prompt and Wispr Flow's
 // listening state; this side registers the shortcut, places, shows and hides the panel, and opens Wispr Flow's links.
 import { app, BrowserWindow, globalShortcut, screen, shell, type Rectangle } from 'electron';
@@ -265,7 +265,7 @@ function reveal(panel: BrowserWindow): void {
   panel.setBounds({ x, y, width: PANEL_WIDTH, height: panel.getBounds().height });
   state.movedAt = Date.now();
   // show() activates the app on macOS, which brings every Omni window forward. A 'panel' window becomes key through
-  // focus() without activating, as the Swift NSPanel did. Wayland has no showInactive.
+  // focus() without activating. Wayland has no showInactive.
   if (MAC) panel.showInactive();
   else panel.show();
   panel.focus();

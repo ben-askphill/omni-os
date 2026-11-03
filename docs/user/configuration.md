@@ -12,14 +12,14 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file. In a checkout it sits at the repo root; the packaged desktop app reads it from its data dir instead ([Server options](#server-options)) |
 | Secret store | Secret values: the Keychain on a Mac, `data/secrets.json` on Linux. The database keeps their names only |
 
-`npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in Settings, which has the same sections on desktop web, phone web and the Mac app (`packages/shared/settings-catalog.ts`). The desktop app (`apps/desktop`) adds one more, Desktop app:
+`npm run setup` or the first-run screens write `data/omni.config.json` ([Install](install.md#set-up-by-hand)). Change it later in Settings, which has the same sections on desktop web, phone web and the desktop app (`packages/shared/settings-catalog.ts`). The desktop app (`apps/desktop`) adds one more, Desktop app:
 
 | Group | Sections |
 | --- | --- |
-| | General (you, run setup again; Quick Prompt on the Mac), Appearance, Notifications |
+| | General (you, run setup again), Appearance, Notifications |
 | Agents | Harnesses & models (each harness, the default model per channel, the model options from `.env`), Threads (run new threads on, sessions and usage limits from `.env`, a link to Automations) |
 | Code | Channels (each channel's settings and actions), Workspace (your folders, GitHub owner), Worktrees (storage and cleanup) |
-| Connections | Machines (this machine; the Mac app adds its server port, repo, Node and log), Sync, Sharing & access (Google account, signed-in devices, Omni Connect, Tailscale logins, public MCP URL), Integrations (Hermes, central brain), Secrets |
+| Connections | Machines (this machine and its server), Sync, Sharing & access (Google account, signed-in devices, Omni Connect, Tailscale logins, public MCP URL), Integrations (Hermes, central brain), Secrets |
 | | Desktop app, only in the desktop app (Quick Prompt and its shortcut, Wispr Flow on a Mac, open at login, zoom, the app's version, server, log and updates), About (version, build, where the files live) |
 
 - Search at the top of the nav finds a single setting and scrolls to it.
@@ -43,8 +43,8 @@ Optional. Copy `.env.example` to `.env` (gitignored) and uncomment what you need
 
 Where `.env` goes depends on what runs the server:
 
-- From a checkout (`npm run dev`, the SwiftUI app, the Linux launcher, or the desktop app with `--dev`): the repo root.
-- The packaged desktop app: its data dir, like `~/Library/Application Support/Omni/data/.env` ([where the data dir is](install.md#the-desktop-app)). If you moved over from a checkout and kept using its `data/`, the server also reads the checkout's `.env`; a line in `data/.env` wins over the same one there.
+- From a checkout (`npm run dev`, `npm start`, or the desktop app with `--dev`): the repo root.
+- The packaged desktop app: its data dir, like `~/Library/Application Support/Omni/data/.env` ([where the data dir is](install.md#the-desktop-app)). If you moved over from the old SwiftUI app or Linux launcher and kept using the checkout's `data/`, the server also reads the checkout's `.env`; a line in `data/.env` wins over the same one there.
 
 The desktop app, packaged or `--dev`, starts the server with a fixed environment, so a variable exported in your shell never reaches it: put it in `.env`. It also sets the port and data dir itself (`--port`, `--data-dir`), so `OMNI_PORT` and `OMNI_DATA_DIR` in `.env` have no effect there.
 
@@ -82,13 +82,13 @@ Settings > Worktrees inventories worktrees and explains why each is kept or elig
 
 Send to Grok Bot posts a thread's title and messages to a webhook. The context is the channel id and the thread id. That only goes one way. For Grok Bot to read threads and start work in Omni, connect it to Omni's MCP server: see [Connect Grok Bot](external-mcp.md#connect-grok-bot).
 
-The action is in the thread's menu on the Web UI and the Mac app: the ⋯ in the thread header, or a right-click on the thread. On a phone it is in Thread options. The Conductor calls `send_to_grok_bot`.
+The action is in the thread's menu on desktop web and in the desktop app: the ⋯ in the thread header, or a right-click on the thread. On a phone it is in Thread options. The Conductor calls `send_to_grok_bot`.
 
 The menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a global secret or in `.env`. `GET /api/status` reports this as `grokBot`. Without it nothing of Grok Bot shows.
 
 The URL and the Authorization value come from the Omni OS requests routine, on Grok Bot's Routines tab. Paste each one in either place.
 
-1. Settings, Secrets, scope Global. Type `GROKBOT_WEBHOOK_URL` as the name and paste the URL, then do the same for `GROKBOT_WEBHOOK_AUTH`. Once the URL is saved, Known global secrets on the Web UI (the phone opens the same section) lists both names, and the Mac app's Settings > Secrets offers Use GROKBOT_WEBHOOK_URL and Use GROKBOT_WEBHOOK_AUTH while the name field is empty.
+1. Settings, Secrets, scope Global. Type `GROKBOT_WEBHOOK_URL` as the name and paste the URL, then do the same for `GROKBOT_WEBHOOK_AUTH`. Once the URL is saved, Known global secrets (the phone opens the same section) lists both names.
 2. `.env`, as a fallback when the secret store has no value for that name. Copy the empty lines from `.env.example` and fill them in. An empty value leaves Grok Bot off. `.env` stays untracked.
 
 When both are set, Omni uses the secret store's value. `GROKBOT_WEBHOOK_URL` is the routine's URL. `GROKBOT_WEBHOOK_AUTH` can be the bare key or a value that already starts with `Bearer `. Either form works. Omni leaves both values out of the log. A thread's harness and its terminal run without them.

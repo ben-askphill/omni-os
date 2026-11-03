@@ -21,8 +21,8 @@ export function defaultDataDir(dirs: PlatformDirs, input: { dev: boolean; repo: 
 
 /**
  * The logs folder: macOS's ~/Library/Logs/Omni, the XDG state folder elsewhere, or one inside a `--user-data-dir`
- * given on the command line. The default one is the installed app's, and the SwiftUI app and the Linux launcher wrote
- * their server logs there too, so a dev or QA run keeps its own.
+ * given on the command line. The default one is the installed app's, and older Omni apps wrote their server logs
+ * there too, so a dev or QA run keeps its own.
  */
 export function logsDir(input: {
   platform: NodeJS.Platform;

@@ -73,7 +73,7 @@ describe('DesktopHooks', () => {
     expect(location.hash).toBe('#/settings');
   });
 
-  it('nudges sync when the Mac wakes', async () => {
+  it('nudges sync when the machine wakes', async () => {
     vi.useFakeTimers();
     try {
       await render(createElement(DesktopHooks));

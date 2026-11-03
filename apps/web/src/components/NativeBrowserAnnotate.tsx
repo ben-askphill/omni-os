@@ -1,5 +1,5 @@
 // Live Annotate on the desktop app's Web tab (NativeBrowser.tsx), as on the agent's Browser tab
-// (BrowserAnnotationOverlay.tsx) and as the Mac app's Web tab did it: the page stays live under a transparent layer,
+// (BrowserAnnotationOverlay.tsx): the page stays live under a transparent layer,
 // the hover and the pick are read from the page itself by the pick preload, the screenshot is the app's own of its
 // <webview>, saved by the server as the thread's capture (POST .../browser/capture/native). The record is the same
 // browser_annotation, and the card that sends it or adds it to the next message is the Browser tab's.

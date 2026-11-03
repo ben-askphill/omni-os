@@ -1,4 +1,4 @@
-// /api/setup: the user config behind onboarding and Settings, on web and Mac. `npm run setup`
+// /api/setup: the user config behind onboarding and Settings in the Web UI. `npm run setup`
 // (apps/server/scripts/setup.ts) writes the same file from a terminal.
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';

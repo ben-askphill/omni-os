@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Puts the main checkout on main, level with origin, before Rebuild and Relaunch or Restart Server.
+# Puts the main checkout on main, level with origin, before the server's Update or scripts/build-desktop.sh.
 #
 #   scripts/sync-main.sh
 #
@@ -8,7 +8,7 @@
 # Untracked files stay. A branch it leaves stays as it is, its commits included.
 # When origin can't be reached it says so and goes on with the local main.
 # When package-lock.json changed it runs npm install --include=dev.
-# Lines start with "sync-main:". The Mac app shows the last one when it fails.
+# Lines start with "sync-main:". Update shows the last one when it fails.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

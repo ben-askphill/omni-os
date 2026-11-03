@@ -5,9 +5,8 @@ import { elementFrom, inspectReply, inspectedFrom, pickReply } from '../browser-
 import { inspectScript, pickScript, type RawInspect, type RawPick } from '../browser-pick-script.ts';
 import { ELEMENT_STYLE_KEYS, annotate, type BrowserCapture } from '../message-context-browser.ts';
 
-// What is made of the page scripts' answers, which both browsers read here: the server for the channel's Chrome, the Mac
-// app for its Web tab (through JavaScriptCore). packages/test-fixtures/browser-pick.json holds answers and the replies
-// they must give; apps/mac/OmniKit's BrowserPickEngineTests read the same file, so the two browsers cannot drift.
+// What is made of the page scripts' answers. packages/test-fixtures/browser-pick.json holds answers and the replies
+// they must give.
 
 interface Corpus {
   point: { x: number; y: number };

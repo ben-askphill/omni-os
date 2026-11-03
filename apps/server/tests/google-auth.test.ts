@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { startRunner } from './runner-boot.ts';
 import { FAKE_CLIENT_ID, FAKE_PUBLISHABLE_KEY, fakeClerk } from './fake-clerk.ts';
 
@@ -194,19 +195,19 @@ describe('Google sign-in: what a session may and may not do', () => {
   });
 });
 
-describe('Mac app', () => {
-  // OmniKit's AuthAccount and SignedInDevice decode these hand-made fixtures; the server must still send their shape.
-  const fixture = (name: string) => JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures', name), 'utf8'));
+describe('wire fixtures', () => {
+  // The server must still send the shape of these hand-made account and device fixtures.
+  const fixture = (name: string) => JSON.parse(readFileSync(join(WIRE_FIXTURES, name), 'utf8'));
   const shape = (v: unknown): unknown =>
     v === null ? 'null' : Array.isArray(v) ? v.slice(0, 1).map(shape) : typeof v === 'object' ? Object.fromEntries(Object.entries(v as object).map(([k, x]) => [k, shape(x)])) : typeof v;
 
-  it('sends the account and device list shapes the app decodes', async () => {
+  it('sends the account and device list shapes the fixtures have', async () => {
     await link({ sub: 'user_ada', email: 'ada@example.com' });
     const s = (await (await req('POST', '/auth/google/start', { client: 'browser' }, NO_TOKEN)).json()) as { flow: string; secret: string; userCode: string };
     clerk.approve(s.userCode, { sub: 'user_ada' });
     await pollUntilDone(s.flow, s.secret);
     const account = (await (await req('GET', '/auth/account')).json()) as Record<string, unknown>;
-    // Ada's name is null here and a string in the fixture: both decode as String?.
+    // Ada's name is null here and a string in the fixture: both are an optional string.
     expect(shape({ ...account, owner: { ...(account.owner as object), name: 'Ada' } })).toEqual(shape(fixture('auth-account.json')));
     expect(shape(await (await req('GET', '/auth/devices')).json())).toEqual(shape(fixture('auth-devices.json')));
   });

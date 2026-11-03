@@ -1,7 +1,7 @@
 // A channel's icon: one emoji, one of the design system's icons stored as `icon:<name>`, or an uploaded SVG stored
-// as `svg:<markup>`. The server checks it with parseChannelIcon; the Web UI and the Mac app draw it. OmniKit's
-// ChannelIcon keeps the same list. An SVG is only ever drawn as an image (an <img> data URL, an NSImage), never
-// put into the page as markup, so scripts in it could not run anyway; readSvgIcon refuses them all the same.
+// as `svg:<markup>`. The server checks it with parseChannelIcon; the Web UI draws it. An SVG is only ever drawn as an
+// image (an <img> data URL), never put into the page as markup, so scripts in it could not run anyway; readSvgIcon
+// refuses them all the same.
 
 /** The design system icons a channel can wear, in picker order. Names are keys of PATHS in apps/web/src/components/ui.tsx. */
 export const CHANNEL_GLYPHS = [

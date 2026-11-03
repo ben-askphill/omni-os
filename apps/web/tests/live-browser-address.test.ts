@@ -4,8 +4,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 // The address bar of the thread panel's live browser: it takes the keys while it has focus, Return goes to the address
-// and Escape gives up the edit, and either way the keys go back to the page, as in Chrome. The page's frames and the
-// Mac app's field are checked in a real browser and the Mac QA harness ({"browserAddress": ...}).
+// and Escape gives up the edit, and either way the keys go back to the page, as in Chrome. The page's frames are checked
+// in a real browser.
 
 const posts: { path: string; body: any }[] = [];
 let push: (d: unknown) => void = () => {};

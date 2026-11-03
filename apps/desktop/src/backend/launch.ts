@@ -1,5 +1,5 @@
-// How the desktop app decides to start or attach, and the environment of the server it starts. The same rules as
-// the Linux launcher's (ADR 0010): a proof that the process on the port holds this install's token, or a free port.
+// How the desktop app decides to start or attach, and the environment of the server it starts (ADR 0010): a proof
+// that the process on the port holds this install's token, or a free port.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { join } from 'node:path';
 

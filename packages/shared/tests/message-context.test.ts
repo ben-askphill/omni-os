@@ -23,7 +23,7 @@ import { LINES_MAX, TEXT_MAX, plainText, selectExcerpt, terminalExcerpt, type Te
 import { CHANNEL_NAME_MAX, TITLE_MAX, cleanLine, referenceBody, shortId, threadReference, type ThreadIdentity, type ThreadReference } from '../message-context-thread.ts';
 import { CONTEXT_JSON_MAX, LABEL_MAX, contextDigest, contextKey, cutLabel, newContext, readContextsWith, type MessageContext } from '../message-context.ts';
 
-// The same corpus runs in the web tests and apps/mac/OmniKit/Tests/OmniKitTests/MessageContextTests.swift.
+// The same corpus runs in the web tests.
 const corpus = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')) as {
   kinds: string[];
   records: { name: string; raw: unknown; expect: { as: 'known' | 'fallback'; why?: string; id: string; label: string; note: string } }[];

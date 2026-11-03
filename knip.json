@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreBinaries": [
-    "swift",
     "flock",
     "scutil",
     "ioreg",
@@ -9,13 +8,18 @@
   ],
   "ignore": [
     ".claude/**",
+    ".codex/**",
     "docs/**",
     "prototypes/**",
     "mods/**",
-    "**/fixtures/**",
-    "apps/mac/OmniKit/Sources/OmniKit/Resources/*.js"
+    "**/fixtures/**"
   ],
   "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.{mjs,ts}"
+      ]
+    },
     "apps/server": {
       "entry": [
         "scripts/*.ts",
@@ -39,6 +43,7 @@
         "omni.ts",
         "ask.ts",
         "threads.ts",
+        "render.ts",
         "external/stdio.ts"
       ]
     },
@@ -47,8 +52,6 @@
         "@effect/atom-react",
         "effect",
         "expo-status-bar",
-        "react-native-reanimated",
-        "react-native-worklets",
         "babel-plugin-react-compiler",
         "expo-updates",
         "expo-system-ui"
@@ -67,24 +70,6 @@
         "scripts/*.{ts,mjs}",
         "electron-builder.config.cjs",
         "tests/**/*.test.ts"
-      ]
-    },
-    "apps/linux": {
-      "entry": [
-        "src/main.ts",
-        "tests/**/*.test.ts"
-      ]
-    },
-    "apps/mac": {
-      "entry": [
-        "scripts/*.ts",
-        "slash-engine/entry.ts",
-        "browser-pick/entry.ts",
-        "tests/**/*.test.ts"
-      ],
-      "ignoreDependencies": [
-        "mermaid",
-        "@omni/test-fixtures"
       ]
     },
     "packages/shared": {

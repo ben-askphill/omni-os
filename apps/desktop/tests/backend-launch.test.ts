@@ -1,4 +1,4 @@
-// Ported from apps/linux/tests/linux.test.ts, for the code that moved into src/backend/launch.ts and process.ts.
+// Tests for src/backend/launch.ts and process.ts, the code that came from the Linux launcher (ADR 0006).
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { type AddressInfo } from 'node:net';

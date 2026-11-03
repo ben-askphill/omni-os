@@ -1,5 +1,4 @@
-// The desktop app's Web tab: Ben's own browser for the channel, a real <webview> in the app, as the Mac app's Web tab
-// was a WKWebView. Its session is the app's persistent Web tab partition, so logins stay on this computer and last
+// The desktop app's Web tab: Ben's own browser for the channel, a real <webview> in the app. Its session is the app's persistent Web tab partition, so logins stay on this computer and last
 // across launches; the agent drives the channel's server-side Chrome in the Browser tab and cannot see this one. The
 // desktop app forces the partition, the pick preload, no Node and a sandbox on every <webview> (apps/desktop/src/
 // native-browser.ts). Only rendered when the desktop bridge is there (ThreadPanel.tsx).

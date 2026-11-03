@@ -141,12 +141,12 @@ _Avoid_: Tag, reference
 
 ### Clients
 
-**Mac app**:
-The native macOS client for the desk.
-_Avoid_: Desktop app, native UI, "the app"
+**Desktop app**:
+The Electron app for macOS and Linux (`apps/desktop`): the **Web UI** in a window of its own, with the Omni server inside, plus menus, notifications and the Quick Prompt.
+_Avoid_: Mac app (the old SwiftUI client it replaced), Linux launcher, native UI, "the app"
 
 **Web UI**:
-The browser client, used from the phone over Tailscale or [Omni Connect](docs/user/omni-connect.md), and as a fallback on the Mac.
+The browser client, used from the phone over Tailscale or [Omni Connect](docs/user/omni-connect.md), and inside the **Desktop app**.
 _Avoid_: Frontend, dashboard
 
 **Omni Connect**:
@@ -155,7 +155,7 @@ _Avoid_: Funnel, public tunnel (alone), Tailscale Serve
 
 ## Relationships
 
-- The **Mac app** and the **Web UI** are two clients of the same Omni server; neither holds thread state of its own
+- The **Desktop app** shows the **Web UI**; both are clients of the same Omni server, and neither holds thread state of its own
 - A **Channel** has many **Threads**
 - A **Thread** runs on one **Harness** and one **Model** at a time, and has one current **Session**; it keeps the **Session** it had on each harness it left
 - A **Harness** offers many **Models**; the same model family can appear in several harnesses (Claude Opus runs in Claude Code and in Cursor Agent)

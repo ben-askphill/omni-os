@@ -255,7 +255,7 @@ const isCheckout = (dir: string) => existsSync(join(dir, 'apps', 'server', 'inde
 /**
  * The Omni git checkout that automations about Omni itself work in ({{omniRoot}}, {{omniRepo}}). A server run from a
  * checkout is in one. The desktop app's bundle is not: it uses OMNI_CHECKOUT, else the checkout whose data/ it adopted
- * from the SwiftUI app or the Linux launcher (apps/desktop/src/backend/data-dir.ts), else none.
+ * from an earlier install (apps/desktop/src/backend/data-dir.ts), else none.
  */
 export function omniCheckout(): string | null {
   if (!import.meta.url.endsWith('.mjs')) return ROOT;

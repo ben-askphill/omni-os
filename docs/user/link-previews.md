@@ -1,6 +1,6 @@
 # Link previews
 
-A link in a reply shows as its tool's mark, its id and the title the tool gives it (`#7723 Fix the cart`, `29549 Localization setup`), on the web and the Mac app. A link with its own words keeps them and gains the mark; hovering shows the source, state and URL.
+A link in a reply shows as its tool's mark, its id and the title the tool gives it (`#7723 Fix the cart`, `29549 Localization setup`), on the web and in the desktop app. A link with its own words keeps them and gains the mark; hovering shows the source, state and URL.
 
 - `packages/shared/link-sources.ts` reads what a URL points at, `apps/server/links.ts` asks the source for the live title and state (`POST /api/links/resolve`, cached 10 minutes), and the marks come from `packages/shared/link-icons.ts` (regenerate with `npx tsx packages/shared/scripts/build-link-icons.ts`).
 - Sources with an API lookup, and the secret each needs (global, or the channel's own, which wins):

@@ -8,7 +8,7 @@ import type { OutputMeta } from './tool-output.ts';
 
 // The transcript fold. Pure: events in, rows out. The Web UI's Transcript.tsx and the phone's thread-view.ts render
 // the rows, and the iOS app folds with it too, so it imports no DOM, no React and no Node API.
-// Swift cannot import this; packages/test-fixtures/transcript is the shared artifact.
+// packages/test-fixtures/transcript holds its cases.
 
 export interface TranscriptEvent {
   id: number;

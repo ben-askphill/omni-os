@@ -1,8 +1,7 @@
 // The marks Ben draws on a browser_annotation's screenshot (message-context-browser.ts): freehand strokes, rectangles,
 // ellipses, arrows, lines and text, in the page's own CSS pixels like the rectangle, so they mean the same thing on any
-// client and at any display scale. Pure geometry and checking: every client draws them itself (canvas on the web,
-// CoreGraphics and SwiftUI on the Mac) and the server describes them to the agent in words (apps/server/message-context/).
-// apps/mac/OmniKit/Sources/OmniKit/BrowserMarks.swift ports it.
+// client and at any display scale. Pure geometry and checking: every client draws them itself (canvas on the web)
+// and the server describes them to the agent in words (apps/server/message-context/).
 import type { Parsed } from './message-context.ts';
 import { plain } from './message-context-terminal.ts';
 

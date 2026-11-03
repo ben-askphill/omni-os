@@ -2,7 +2,7 @@
 
 ## Using Omni
 
-- [Install and first run](user/install.md): the desktop app, and the step-by-step agent instructions for a checkout
+- [Install and first run](user/install.md): the desktop app, running from a checkout, and the step-by-step agent instructions
 - [Configuration](user/configuration.md): your config, `.env`, placeholders and secrets
 - [Threads](user/threads.md): Needs you and Mark done, the composer, context chips, history, channel actions, Watch PR and Send to Grok Bot
 - [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud
@@ -22,7 +22,7 @@
 
 Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](../CLAUDE.md).
 
-- [Architecture overview](internals/overview.md): how a thread runs, the Web UI and Mac app split, repo layout
+- [Architecture overview](internals/overview.md): how a thread runs, how the clients are kept apart, repo layout
 - [Execution and ownership state](internals/execution-state.md): a thread's process, its messages and its owner machine as state diagrams, who owns each, and how the runner reaches the rest of Omni. Read before touching `apps/server/runner/`
 - [Auto routing](internals/auto-routing.md): how Auto picks a model, and the benchmarks that check it
 - [Thread history](internals/thread-history.md): how a long thread opens on its newest page, the budgets, and what clients hold
@@ -33,15 +33,14 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Native app pairing contract](internals/app-pairing.md): session pairing, capabilities, and push token registration
 - [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md)
 - [Desktop app](../apps/desktop/README.md): develop against a QA stack, the QA harness (`scripts/qa.ts`), packaging, where data and logs live, and the bridge contract
-- [Mac app notes](../apps/mac/NOTES.md), until the desktop app replaces it
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)
 - Reviews: [2026-10-31 consolidation release, the KPIs re-measured](reviews/2026-10-31-consolidation-review.md) · [2026-10-22 bloat and dead code](reviews/2026-10-22-thermo-bloat-review.html) · [2026-10-16 thermo](reviews/2026-10-16-thermo-review.html)
-- Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) (superseded) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md) · [0005 One execution owner](adr/0005-one-execution-owner.md) · [0006 Linux app is a window](adr/0006-linux-app-is-a-window.md) (superseded) · [0007 Google sign-in through Clerk](adr/0007-google-sign-in-through-clerk.md) · [0008 Cloudflare relay](adr/0008-cloudflare-relay.md) · [0009 Omni Connect](adr/0009-omni-connect.md) · [0010 Desktop app is Electron](adr/0010-desktop-app-is-electron.md)
+- Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) (superseded by 0010; the app is deleted) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md) · [0005 One execution owner](adr/0005-one-execution-owner.md) · [0006 Linux app is a window](adr/0006-linux-app-is-a-window.md) (superseded by 0010; the app is deleted) · [0007 Google sign-in through Clerk](adr/0007-google-sign-in-through-clerk.md) · [0008 Cloudflare relay](adr/0008-cloudflare-relay.md) · [0009 Omni Connect](adr/0009-omni-connect.md) · [0010 Desktop app is Electron](adr/0010-desktop-app-is-electron.md)
 
 ## Where a new doc goes
 
 - `docs/user/`: how to use a feature. What it does, how to start, anything unintuitive, and where its setting lives. Not a tour of every button.
-- `docs/internals/`: decisions, constraints that span the server and both clients, and traps you cannot see from the code. If reading the code answers it, leave it out.
+- `docs/internals/`: decisions, constraints that span the server and the clients, and traps you cannot see from the code. If reading the code answers it, leave it out.
 - `docs/adr/`: one decision with its context and the options turned down.
 - When behaviour changes, rewrite the affected text instead of appending a second account.

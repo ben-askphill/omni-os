@@ -56,7 +56,7 @@ export function ChannelsScreen() {
         right={<HeaderActions searchLabel="Search channels" />}
       />
       <MoScroll tabBar>
-        {/* The machine's name lives in Settings, Machines (#405), as on the desktop and the Mac. */}
+        {/* The machine's name lives in Settings, Machines (#405), as on the desktop. */}
         <MoTitle
           title="Channels"
           sub={`${listed.length} channels · ${running} ${running === 1 ? 'thread' : 'threads'} running`}

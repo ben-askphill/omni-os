@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { requestIdFor } from '@omni/shared/request-id.ts';
 import type { PendingMsg, ThreadDetail } from '../src/api.ts';
 import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf, reportNotes, sendKey } from '../src/requests.ts';
 import { isEditable, movedOrder } from '../src/pending-edits.ts';
 
-// The Web UI's side of durable sends (apps/web/src/requests.ts), against the same recorded server answers the Mac app's
-// Swift tests decode (apps/server/tests/mac-fixtures.test.ts records them).
+// The Web UI's side of durable sends (apps/web/src/requests.ts), against the recorded server answers
+// (apps/server/tests/wire-fixtures.test.ts records them).
 
-const FIXTURES = join(resolve(import.meta.dirname, '../..'), 'mac', 'OmniKit', 'Tests', 'OmniKitTests', 'Fixtures');
-const fixture = <T>(name: string) => JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as T;
+const fixture = <T>(name: string) => JSON.parse(readFileSync(join(WIRE_FIXTURES, name), 'utf8')) as T;
 
 describe('request ids', () => {
   it('keeps one id across retries of the same message, and makes a new one for anything else', () => {
@@ -30,7 +30,7 @@ describe('request ids', () => {
     expect(requestIdFor(null, 'k').id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('is what the Mac app sends: the recorded queued message carries its request id', () => {
+  it('is what a client sends: the recorded queued message carries its request id', () => {
     expect(fixture<Record<string, string>>('message-queued-request.json')).toEqual({ prompt: 'then write it up', mode: 'queue', request_id: 'req-1' });
   });
 });

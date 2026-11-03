@@ -5,7 +5,6 @@
 // any display scale. The server takes the screenshot and everything but the marking (`BrowserCapture`), so the marks are
 // drawn on the very image they describe and cannot disagree with it; the client adds the marking and the note. With marks
 // the client also renders them onto the screenshot and the server keeps that as `marked`, the image the agent gets.
-// apps/mac/OmniKit/Sources/OmniKit/BrowserAnnotationContext.swift ports it.
 import { ID_MAX, cutLabel, overLimit, type MessageContextKind, type Parsed } from './message-context.ts';
 import { marksLabel, marksOf, type Mark } from './message-context-marks.ts';
 import { FORBIDDEN_CLASS, plain } from './message-context-terminal.ts';

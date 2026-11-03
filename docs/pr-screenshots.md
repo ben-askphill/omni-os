@@ -1,21 +1,20 @@
 # Screenshots on PRs
 
-Every PR for a feature or fix that changes what the Web UI, the desktop app or the Mac app looks like carries screenshots in its description. A change that only moves pixels by accident (a refactor, a dependency bump) needs them too once you notice it. Backend, test and tooling PRs with no visible change don't.
+Every PR for a feature or fix that changes what the Web UI or the desktop app looks like carries screenshots in its description. A change that only moves pixels by accident (a refactor, a dependency bump) needs them too once you notice it. Backend, test and tooling PRs with no visible change don't.
 
 ## What to capture
 
 - The screen or component that changed, cropped to it or shown in context, whichever reads better.
 - Before and after for a fix or a restyle. Take "before" from `main` (or before your first commit), not from memory.
 - Light and dark when the change touches colour, tokens or theming.
-- Every surface: desktop web, phone web (390px) and the desktop app (`apps/desktop`). Skip one only when the PR says why it does not change there. Until the cutover deletes `apps/mac` (ADR 0010), a change that also touches `apps/mac` carries Mac app screenshots too.
+- Every surface: desktop web, phone web (390px) and the desktop app (`apps/desktop`). Skip one only when the PR says why it does not change there.
 - States that matter: empty, loading, error, long content, hover or open menus.
 
 ## How to capture
 
 - Never screenshot against the live server on :4747 or its `data/`. Start a throwaway server on a spare port with its own data dir and the fake CLIs (`QA_SERVER_PORT=<port> scripts/qa-stack.sh up`, which seeds sample threads), and point the client at it.
-- Web: run vite against it (`OMNI_PORT=4757 npx vite --config apps/web/vite.config.ts --port 4768`, any free port) and use the thread's browser (`omni-browser` MCP) or Playwright: `browser_resize` for phone width, `browser_emulate_media` for dark mode.
-- Desktop app: `apps/desktop/scripts/qa.ts` with `snapshot` steps and `"appearance": "light"` or `"dark"`, described under "QA harness" in `apps/desktop/README.md`. It launches the app with Playwright against the stack's server and captures windows without screen recording permission. Pass `--app-url` with a Vite in front of the stack so the app shows your Web UI change, not the server's last build of `apps/web/dist`.
-- Mac app, until the cutover: the Debug app's QA harness (`-OmniQAScript` with `snapshot` steps, `-appearance light` or `dark`), described in `apps/mac/NOTES.md`.
+- Web: open the stack's vite (the `web` URL `qa-stack.sh up` prints, `QA_WEB_PORT`, default 4768) in the thread's browser (`omni-browser` MCP) or Playwright: `browser_resize` for phone width, `browser_emulate_media` for dark mode.
+- Desktop app: `apps/desktop/scripts/qa.ts` with `snapshot` steps and `"appearance": "light"` or `"dark"`, described under "QA harness" in [apps/desktop/README.md](../apps/desktop/README.md#qa-harness). It launches the app with Playwright against the stack's server and captures windows without screen recording permission. Pass `--app-url` with a Vite in front of the stack so the app shows your Web UI change, not the server's last build of `apps/web/dist`. That Vite has to listen on 127.0.0.1, where the pairing cookie is set, so start one on a free port: `OMNI_PORT=<server port> npx vite --config apps/web/vite.config.ts --host 127.0.0.1 --port <free port> --strictPort`, then `--app-url http://127.0.0.1:<that port>`.
 - Name files after what they show, like `composer-after-dark.png`. The name becomes the alt text.
 
 ## How to attach

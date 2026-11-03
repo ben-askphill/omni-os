@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MemoryTransport } from '../sync/transport.ts';
-import { macFixture } from './fixture-shape.ts';
+import { wireFixture } from './fixture-shape.ts';
 import { tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
 
@@ -25,7 +25,7 @@ let a: Mac;
 let b: Mac;
 let id: string;
 let offerId: string;
-/** What the Mac app decodes from a handoff, kept as the tests get it. */
+/** The wire fixtures of a handoff, kept as the tests get them. */
 const fixtures = new Map<string, unknown>();
 
 const sessionFile = (m: Mac, t: { cwd: string; session_id: string }) =>
@@ -184,10 +184,10 @@ describe('handing a running thread to the other Mac', () => {
     expect(a.db.messageRequests.forThread(id).map((r) => r.state)).toEqual(['cancelled']);
   });
 
-  it('sends the Mac app the shapes its fixtures hold', () => {
+  it('sends the shapes its wire fixtures hold', () => {
     const places = [a.tmp, b.tmp, shared].flatMap((p) => [realpathSync(p), p]);
     expect([...fixtures.keys()].sort()).toEqual(['devices.json', 'thread-handoff.json']);
-    for (const [name, value] of fixtures) macFixture(name, value, places);
+    for (const [name, value] of fixtures) wireFixture(name, value, places);
   });
 });
 

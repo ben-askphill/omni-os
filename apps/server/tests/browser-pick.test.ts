@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { fixture } from '@omni/test-fixtures';
 import type { BrowserCapture, ElementPick, PickedElement } from '@omni/shared/message-context-browser.ts';
 import { startRunner } from './runner-boot.ts';
-import { macFixture } from './fixture-shape.ts';
+import { wireFixture } from './fixture-shape.ts';
 import type { PageObservation } from '../browser.ts';
 import type { RawInspect, RawPick } from '@omni/shared/browser-pick-script.ts';
 import type { InspectSource, PickSource } from '../browser-pick.ts';
@@ -51,7 +51,7 @@ const PAGE: PageObservation = {
   scroll: { x: 0, y: 240 },
 };
 
-/** What the page script answers for a button in the cart (the corpus the Mac's Web tab reads too). */
+/** What the page script answers for a button in the cart (the corpus the shared tests read too). */
 const BUTTON = CORPUS.picks[0].raw as RawPick;
 
 type Fake = PickSource & { page: PageObservation; answer: RawPick | null; asked: { x: number; y: number }[]; during?: (p: PageObservation) => void; fail?: boolean };
@@ -117,13 +117,13 @@ describe('the inspect route', () => {
   const post = (src: InspectSource, body: unknown) =>
     new Hono().route('/api/channels', pick.inspectApi(() => src)).request('/api/channels/picks/browser/inspect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-  it('answers 200 with the element or why there is none, for the Mac app to read', async () => {
+  it('answers 200 with the element or why there is none, in the shape of its wire fixtures', async () => {
     const res = await post(inspector(HOVER), POINT);
     expect(res.status).toBe(200);
-    macFixture('browser-inspect.json', await res.json());
+    wireFixture('browser-inspect.json', await res.json());
     const none = await post(inspector({ ok: false, reason: 'nothing' }), POINT);
     expect(none.status).toBe(200);
-    macFixture('browser-inspect-unavailable.json', await none.json());
+    wireFixture('browser-inspect-unavailable.json', await none.json());
   });
 
   it('refuses a point that is not whole pixels', async () => {
@@ -248,12 +248,12 @@ describe('the pick route', () => {
     const res = await post(app, 'picks', c.image.name, { thread: t.id, ...POINT });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { element: PickedElement };
-    // The Mac app decodes this (OmniKit's ElementPickReply): the same keys and types as its recorded fixture.
-    macFixture('browser-pick-element.json', body);
+    // The same keys and types as its recorded fixture.
+    wireFixture('browser-pick-element.json', body);
     expect(body.element).toMatchObject({ tag: 'button', point: POINT });
   });
 
-  it('answers 200 with why there is none, for the Mac app to read', T, async () => {
+  it('answers 200 with why there is none, in the shape of its wire fixture', T, async () => {
     const t = await newThread();
     const src = fakeBrowser();
     const app = mount(src);
@@ -263,7 +263,7 @@ describe('the pick route', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ unavailable: { reason: 'stale' } });
-    macFixture('browser-pick-unavailable.json', body);
+    wireFixture('browser-pick-unavailable.json', body);
   });
 
   it('refuses a thread of another channel, an unknown thread and a point that is not whole pixels', T, async () => {

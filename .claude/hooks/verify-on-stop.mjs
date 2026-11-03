@@ -5,8 +5,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-const CODE = /^(apps|packages)\/.*\.(ts|tsx|mjs|js|css|swift)$/;
-const CHECKS = /npm (run )?(test|typecheck)|turbo (run )?(test|typecheck)|vitest|qa-stack\.sh|swift test/;
+const CODE = /^(apps|packages)\/.*\.(ts|tsx|mjs|js|css)$/;
+const CHECKS = /npm (run )?(test|typecheck)|turbo (run )?(test|typecheck)|vitest|qa-stack\.sh/;
 
 let input = {};
 try {

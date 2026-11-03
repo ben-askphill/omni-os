@@ -18,8 +18,8 @@ import {
 } from './quick-prompt-model.ts';
 
 // The desktop app's Quick Prompt panel (#/quick-prompt), in a frameless, transparent window that floats over other
-// apps (apps/desktop/src/quick-prompt.ts). Ports apps/mac/Omni/QuickPrompt.swift: where the prompt goes, the field,
-// and a line that says what is happening. Return starts a thread without bringing Omni forward; Cmd-Return opens it.
+// apps (apps/desktop/src/quick-prompt.ts): where the prompt goes, the field, and a line that says what is happening.
+// Return starts a thread without bringing Omni forward; Cmd-Return opens it.
 
 const SENT_LINGER_MS = 1400;
 const MENU_SHADOW = 16;
@@ -162,7 +162,7 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  /** Waits for Wispr Flow's words to land (OmniKit's awaitDictation). Returns whether anything is left to send. */
+  /** Waits for Wispr Flow's words to land. Returns whether anything is left to send. */
   const awaitDictation = () =>
     new Promise<boolean>((resolve) => {
       setPhase({ kind: 'finishing' });

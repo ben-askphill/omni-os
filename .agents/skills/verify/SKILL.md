@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Use to check your own work in Omni OS whenever you change apps/server/, apps/web/, apps/desktop/, packages/shared/, apps/mac/ or apps/mcp/ code, before you say it is done or open a PR. Runs the checks, starts a throwaway stack, drives it and proves the change. Use it aggressively.
+description: Use to check your own work in Omni OS whenever you change apps/server/, apps/web/, apps/desktop/, packages/shared/ or apps/mcp/ code, before you say it is done or open a PR. Runs the checks, starts a throwaway stack, drives it and proves the change. Use it aggressively.
 ---
 
 # Verify your change in Omni OS
@@ -10,12 +10,10 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 ## 1. Static checks (every change)
 
 - `npm run typecheck`
-- `npm test` (turbo boundaries, then every package's vitest), or one package: `npx turbo run test --filter=@omni/<server|web|desktop|shared|mac>`, or one file while iterating: `cd apps/server && npx vitest run tests/<file>.test.ts` (each package has its own `vitest.config.ts`).
-- A failing test: rerun it on `main` (`git stash; git checkout main; npx vitest run ...`) before treating it as yours. The whole suite passes on macOS and Linux, so a failure that main does not show is yours.
+- `npm test` (turbo boundaries, then every package's vitest), or one package: `npx turbo run test --filter=@omni/<server|web|desktop|shared>`, or one file while iterating: `cd apps/server && npx vitest run tests/<file>.test.ts` (each package has its own `vitest.config.ts`).
+- A failing test: rerun it on `main` in a separate worktree (`git worktree add <scratch>/main main`, `npm install --include=dev` there, then `npx vitest run ...`) before treating it as yours. Never stash or check out in this one: the stash is shared with other worktrees. Apart from the known blockers below, the suite passes on macOS and Linux, so a failure that main does not show is yours.
 - `npm run build` for web changes. Run it alone, not chained after other commands.
-- Changed a slash module in `packages/shared/`: `npm run build:slash`. Changed `packages/shared/browser-pick-*.ts`: `npm run build:pick`.
 - Desktop app: `cd apps/desktop && npx vitest run && npx tsc --noEmit`.
-- Mac code, until the cutover deletes `apps/mac` (macOS only): `npm run test:mac`.
 
 ## 2. Run it
 
@@ -33,8 +31,7 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 - With `omni-browser`, take a `browser_snapshot` before clicking. Pass the exact snapshot reference as `target` to `browser_click`; `element` is only a description, and `ref` is not a supported argument. For a selector, pass a valid unique CSS selector as `target`.
 - Omit the `omni-browser` screenshot filename to save in the thread's browser folder. An explicit relative filename saves in the working directory instead. Do not pass an absolute path in `/tmp` or another directory outside the thread's browser folder and worktree. Read or copy the exact returned path, then put a copy in `shots/` for `scripts/pr-screenshots.sh`.
 - Server: curl the route and read the response. Then check the side effect: the row in the QA db, the feed event (`curl -N localhost:4757/api/feed`), the line in `scripts/qa-stack.sh logs`.
-- Desktop app: `cd apps/desktop && npx tsx scripts/qa.ts --script run.json --out <scratch>/qa` launches the Electron app with Playwright, attaches it to the stack (`"port"` and `"dataDir"` in the script, the stack's `$QA_DIR/data`), runs the steps and writes PNGs and `qa.json`. It exits non-zero on a failed step and refuses :4747 and a checkout's `data/`. The steps and flags are under "QA harness" in `apps/desktop/README.md`. Add `--app-url http://127.0.0.1:<vite port>` with a Vite on `127.0.0.1` in front of the stack to see a Web UI change; the server alone serves the last build of `apps/web/dist`. `--app <path>` runs a packaged build instead of the dev one.
-- Mac app, until the cutover: the Debug app's QA harness (`-OmniQAScript`, see "QA harness" in `apps/mac/NOTES.md`) points the app at :4757 and snapshots windows.
+- Desktop app: `cd apps/desktop && npx tsx scripts/qa.ts --script run.json --out <scratch>/qa` launches the Electron app with Playwright, attaches it to the stack (`"port"` and `"dataDir"` in the script, the stack's `$QA_DIR/data`), runs the steps and writes PNGs and `qa.json`. It exits non-zero on a failed step and refuses :4747 and a checkout's `data/`. The steps and flags are under "QA harness" in `apps/desktop/README.md`. Add `--app-url http://127.0.0.1:<vite port>` with a Vite on `127.0.0.1` in front of the stack to see a Web UI change (`OMNI_PORT=<server port> npx vite --config apps/web/vite.config.ts --host 127.0.0.1 --port <free port> --strictPort`; the stack's own vite may listen on `::1` only); the server alone serves the last build of `apps/web/dist`. `--app <path>` runs a packaged build instead of the dev one.
 
 ## 4. Prove it
 
@@ -56,19 +53,13 @@ Known blockers:
 - `up` can print "up" for both ports while another worktree's stack holds them, so the browser shows that worktree's code. After `up`, check `lsof -t -iTCP:<web port> -sTCP:LISTEN | xargs -I{} lsof -p {} | grep cwd` points at your worktree.
 - A thread's fake CLI stays alive after its turn (and after `/stop`), so the next message skips the spawn-time worktree check. To test that check, kill the thread's process first: `kill $(ps -eo pid,command | grep fake-claude | grep <thread-id> | grep -v grep | awk '{print $1}')`.
 - A fresh QA stack opens on the onboarding dialog, which swallows every click a browser script makes. Mark it onboarded first: `echo '{"onboardedAt":"2026-01-01T00:00:00.000Z"}' > "$QA_DIR/data/omni.config.json"`.
-- Playwright from `node_modules` can want a browser build that is not downloaded. Pass `executablePath` to a build already in `~/Library/Caches/ms-playwright/` rather than downloading one.
+- Playwright from `node_modules` can want a browser build that is not downloaded. Pass `executablePath` to a build already in `~/Library/Caches/ms-playwright/` (macOS) or `~/.cache/ms-playwright/` (Linux) rather than downloading one.
 - A fresh worktree has no `node_modules`, so `@omni/server` types resolve to the main checkout's copy and typecheck misses (or invents) errors in your change. Tests do the same: `@omni/test-fixtures` resolves to main's fake CLIs, so a new fixture directive silently does nothing. Run `npm ci --include=dev` in the worktree first (agent shells set `NODE_ENV=production`).
-- The Mac QA harness pointed at a `qa-stack.sh` server shows "Port answers, but not as this install's Omni": in QA mode the app reads the token from `<-OmniQAOut>/data/api-token`, not the stack's. Copy it there first (`mkdir -p "$OUT/data"; install -m 600 "$QA_DIR/data/api-token" "$OUT/data/api-token"`) and launch with `env -u OMNI_TOKEN`.
 - `qa-stack.sh`'s `security` wrapper passes every call but the Cursor key to the real login Keychain, so saving a secret on a QA stack (Secrets, or a webhook's Set secret) writes it to Ben's Keychain. After `up`, overwrite `$QA_DIR/bin/security` with a stub (`-i` reads stdin and exits 0; `find-generic-password` prints a fixed value for the names you test) before saving any.
 - The desktop QA harness only attaches. "no QA server on port N that owns <dir>" means the stack is not up or `dataDir` is not its `$QA_DIR/data`. It never starts a server itself, since one started from the checkout would run the real harness CLIs.
 - Desktop QA on a tiling window manager (Hyprland, Omarchy): the manager sizes the app's windows, so a `size` step or the script's `size` may not hold once a second window opens. `qa.json`'s `facts.windows[].bounds` shows what the window got.
 - In the desktop QA harness, a `{"click": "text=Skip setup"}` on a fresh stack's onboarding leaves the window on the Conductor's welcome thread. Route back with `{"route": "#/"}`.
-- Mac QA runs read and write the real app's drafts (`~/Library/Application Support/Omni/Drafts`), so text or context left unsent in one run is in the reply box on the next. Delete that thread's `reply%3A<id>.txt` and `context%3A<id>.txt` (the id percent-encoded) between runs and after the last one.
 - The thread's Browser panel says "The live browser is off" on a default QA stack. Start it with `QA_BROWSER=1 scripts/qa-stack.sh up` (it launches a real Chrome for the channel).
-- A web view in a Mac QA window stops painting a few seconds after it loads (the window is never on screen), so `cacheDisplay` drew the Web tab's page blank. `snapshot` now lays each shown web view's own `takeSnapshot` over it while it draws. For the same reason the page's `requestAnimationFrame` and scroll events wait for a frame that never comes; `{"annotate": {"pageScroll": n}}` forces one.
-- The Mac QA step `{"annotate": {"hover": [x, y]}}` can fail with "nothing was inspected under the pointer" on a build that works: it sends one move and waits 5s. Run it again, and run the untouched build the same way, before treating it as yours.
-- Synthesized clicks in the Mac QA harness never focus a text field: the app is not active, so its window is not key, and a field ignores the first click in a non-key window. A step that tests focus must call `NSApp.activate()` first (see `browserAddress` in `QARunner.swift`).
-- Mac snapshots, and `screencapture` without screen recording permission (it fails), draw a Core Animation layer at its model value, so they can't show it moves. Prove a layer animation runs by building the view's file with a small `swiftc` harness that puts it in a window and prints `layer.presentation()` values a few times over a second.
 - The worktree branch can start on top of commits that are not on `main` (another local branch's work). Check `git log --oneline main..HEAD` before you start; if it lists commits you did not make, they end up in your PR. With your edits still uncommitted and not in those commits' files, `git reset --keep main` drops them from your branch only (the other branch keeps them).
 - On Linux with Node 26, `apps/web/tests/live-history-measure.test.ts` fails to load ("No such built-in module: node:") on `main` too, and turbo then stops the other packages' tests. Run `npx turbo run test --concurrency=2 --continue` to get every package's result.
 - After `down` and `up`, the browser still holds the old stack's pairing cookie and can show the pairing screen even on the `?pair=` link. Paste the new token from `status` into the field.

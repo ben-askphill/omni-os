@@ -3,7 +3,6 @@ import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
 import { facetOptions, filterCount, inScope, isNarrowed, parseSearch, pickedFilters, queryPRs, toggleFilter, DEFAULT_PR_QUERY, type ListedPR, type PRFacet, type PRQuery, type PRSearch } from '../pr-query.ts';
 
-// The same cases run in apps/mac/OmniKit/Tests/OmniKitTests/PullRequestQueryTests.swift.
 const corpus = JSON.parse(readFileSync(fixture('pr-query.json'), 'utf8')) as {
   prs: ListedPR[];
   queries: { case: string; viewer: string | null; query: PRQuery; expected: { group: string; numbers: number[] }[] }[];
