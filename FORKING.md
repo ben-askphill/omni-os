@@ -31,6 +31,14 @@ Or skip `npm run setup` and answer the same questions in the Web UI or the deskt
 Your channels (clients, projects, repos, stores) are rows in `data/omni.db`, made in the app or by `npm run setup`.
 Omni seeds only `#conductor` and `#inbox`.
 
+## Design system
+
+`design-system/` is a copy of the Omni OS design system: tokens (`tokens.json`, `tokens.css`, `tokens/`), the
+component sources and previews (`components/`), logo and icon assets, the brand book (`README.md`,
+`guidelines/brand-book.html`) and the desktop and phone UI kits. Open `design-system/README.md` first. Its source
+of truth is a Claude Design System artifact, so edits made here do not flow back; change it there and re-export.
+The code copies of the tokens live in `apps/web/src/index.css`, `apps/ios/src/theme.ts` and `apps/desktop/src/windows.ts`.
+
 ## Customising without touching tracked files
 
 - **A charter**: copy `crew/inbox.md` to `data/crew/inbox.md` and edit the copy. Your copy replaces the shared one.

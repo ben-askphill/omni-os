@@ -1,0 +1,1 @@
+The web app's icon set on a 24-unit grid: 1.75 stroke, round caps and joins, stroked in `currentColor`, so in an `<img>` they draw black; the `Icon` component draws them in the surrounding text colour. Includes the Omni additions on the same grid (delegate, split, sidebar, browser, gauge, pause, diff, more).

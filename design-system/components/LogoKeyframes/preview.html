@@ -1,0 +1,11 @@
+<!-- @dsCard group="01 Logo" viewport="700x330" name="Mark — keyframes" subtitle="Delegating (3 crew threads) and report received, frozen at t" width=700 height=330 -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css"><script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script><style>body{padding:16px 24px}.r{display:grid;grid-template-columns:90px repeat(6,1fr);align-items:center;border-bottom:1px solid var(--line)}.r code,.t{font:var(--type-meta);color:var(--text-3)}.k{display:grid;justify-items:center;gap:4px;padding:10px 0}</style></head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ OmniMark }) => {
+  const rows=[['delegating',[0.3,0.9,1.5,2.6,3.9,5.6]],['report',[0.2,0.8,1.3,1.6,2.2,3.3]],['hover',[0,0,0,0,0,0]]];
+  const leans=[0,.25,.5,.75,1,.4];
+  function App(){return <div>{rows.map(([s,ts])=><div className="r" key={s}><code>{s}</code>{ts.map((t,i)=><div className="k" key={i}><OmniMark size={80} state={s} time={t} lean={s==='hover'?leans[i]:undefined} leanAngle={-2.4+i*0.5}/><span className="t">{s==='hover'?'k '+leans[i]:'t '+t.toFixed(1)+'s'}</span></div>)}</div>)}</div>}
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script></body></html>

@@ -1,0 +1,16 @@
+<!-- @dsCard group="09 Forms" viewport="480x130" name="Ticks" subtitle="Segmented meter; default and needs tone" width=480 height=130 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Ticks }) => {
+
+function App(){return <div className="stack" style={{width:260}}><div className="cell"><span className="om-caption">46%</span><Ticks value={.46}/></div><div className="cell"><span className="om-caption">93% needs</span><Ticks value={.93} tone="needs"/></div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

@@ -1,0 +1,21 @@
+/* Handoff: the card in the transcript column, its settled line, and the picker of Macs. */
+.om-handoff{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:20px;padding:12px 16px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.om-handoff--phone{margin-top:0;border:0;border-radius:20px}
+.om-handoff__mark{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:999px;background:var(--surface-2);color:var(--fg-3)}
+.om-handoff__mark--alert{background:color-mix(in srgb,var(--needs) 12%,transparent);color:var(--needs)}
+.om-handoff__body{flex:1 1 224px;min-width:0}
+.om-handoff__say{margin:0;font:400 13.5px/1.45 var(--font-sans);color:var(--fg)}
+.om-handoff--phone .om-handoff__say{font-size:14px}
+.om-handoff__note{margin:2px 0 0;font:400 12.5px/1.5 var(--font-sans);color:var(--fg-3)}
+.om-handoff__cancel{margin-left:auto}
+.om-handoff-line{display:flex;align-items:center;gap:8px;margin-top:20px;font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3)}
+.om-handoff-line .om-icon{color:var(--fg-4)}
+.om-devices{display:grid;width:240px;padding:6px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--bg);box-shadow:0 8px 24px rgb(0 0 0/.08)}
+.om-devices__title{padding:6px 10px 4px;font:500 var(--fs-12)/1.4 var(--font-sans);color:var(--fg-4)}
+.om-devices__row{display:flex;align-items:center;gap:10px;padding:6px 10px;border:0;border-radius:var(--r-md);background:none;text-align:left;cursor:pointer;font:inherit}
+.om-devices__row:hover:not(:disabled){background:var(--surface-2)}
+.om-devices__row:disabled{opacity:.45;cursor:default}
+.om-devices__text{display:grid;min-width:0}
+.om-devices__name{font:400 13px/1.35 var(--font-sans);color:var(--fg)}
+.om-devices__label{font:400 11px/1.35 var(--font-sans);color:var(--fg-4)}
+.om-devices__error{margin:6px 10px 4px;font:400 12px/1.45 var(--font-sans);color:var(--fg-3)}

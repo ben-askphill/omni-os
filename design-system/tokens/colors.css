@@ -1,0 +1,38 @@
+/* Omni OS color. Neutrals from apps/web/src/index.css (Bencho warm neutrals); the three status pops are ours. */
+/* Values that tokens.json declares come from tokens.css (imported first by styles.css); this sheet keeps what tokens.json cannot hold. */
+:root{
+color-scheme:light;
+/* diffs: the one place a line gets a wash */
+--diff-add:color-mix(in srgb,var(--done) 22%,transparent);
+--diff-del:color-mix(in srgb,var(--needs) 12%,transparent);
+}
+[data-theme="dark"],.scheme-dark{color-scheme:dark}
+/* .scheme-dark: the sidebar always draws with the dark tokens */
+.scheme-dark{
+--canvas:#0c0d0f;
+--bg:#121316;
+--surface:#191b1e;
+--surface-2:#222428;
+--surface-3:#2a2c31;
+--elev:#212429;
+--fg:#eceae5;
+--fg-2:#b8b7b1;
+--fg-3:#908f89;
+--fg-4:#6f6e69;
+--on-ink:#101114;
+--line:rgb(236 235 231 / 0.08);
+--line-strong:rgb(236 235 231 / 0.16);
+--thumb:rgb(255 255 255 / 0.14);
+--wash:rgb(236 234 229 / 0.06);
+--pane:rgb(33 36 41 / 0.72);
+--pane-edge:rgb(255 255 255 / 0.09);
+--mark-hl:rgb(245 181 68 / 0.28);
+--warn:#f5b544;
+--inverse-bg-hover:#d6d4cf;
+--inverse-muted:#6f6e69;
+--live:var(--ultramarine-lift);
+--live-text:var(--ultramarine-lift);
+--on-live:#101114;
+--done-edge:transparent;
+--scrim:rgb(0 0 0 / 0.5);
+}

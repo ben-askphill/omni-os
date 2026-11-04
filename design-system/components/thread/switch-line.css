@@ -1,0 +1,8 @@
+/* SwitchLine: a run switch between turns. The result line's rule and caption type. */
+.om-switch{display:grid;gap:4px;padding:4px 0;text-align:center;font:500 var(--fs-12)/1.4 var(--font-sans);color:var(--fg-4)}
+.om-switch__line{display:flex;align-items:center;gap:12px}
+.om-switch__line::before,.om-switch__line::after{content:"";flex:1;min-width:16px;height:1px;background:var(--line)}
+.om-switch__say{min-width:0;max-width:80%;overflow-wrap:anywhere;color:var(--fg-3)}
+.om-switch__wait,.om-switch__wait *{display:inline-block}
+.om-switch__wait{margin-left:6px;vertical-align:-2px}
+.om-switch__note{padding:0 24px;font-weight:400}

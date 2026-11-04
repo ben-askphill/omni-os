@@ -1,0 +1,25 @@
+<!-- @dsCard group="12 Thread" viewport="760x640" name="CloudAgentCard" subtitle="Cursor cloud agent run: starting, working with its branch, finished with a PR, stopped, error; phone width" width=760 height=640 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.col{max-width:620px}.phone{width:390px;margin-top:8px;padding:12px 16px;box-sizing:border-box;border-radius:var(--r-xl);background:var(--bg);border:1px solid var(--line)}.lab{margin:16px 0 2px}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ CloudAgentCard }) => {
+const base = { name: 'Move the toolbar buttons to the right', repo: 'acme/widgets', startingRef: 'main', url: 'https://cursor.com/agents/bc-6f1c2d3e' };
+const branch = 'cursor/move-the-toolbar-buttons-6f1c';
+function App(){return <div className="col">
+  <CloudAgentCard {...base} status="CREATING" />
+  <CloudAgentCard {...base} status="RUNNING" branch={branch} />
+  <CloudAgentCard {...base} status="FINISHED" branch={branch} prUrl="https://github.com/acme/widgets/pull/42" />
+  <CloudAgentCard {...base} name="Also add a test" status="CANCELLED" branch={branch} prUrl="https://github.com/acme/widgets/pull/42" />
+  <CloudAgentCard {...base} name="Bump the Swift toolchain" status="ERROR" />
+  <div className="om-caption lab">Phone, 390pt</div>
+  <div className="phone"><CloudAgentCard {...base} mobile status="FINISHED" branch={branch} prUrl="https://github.com/acme/widgets/pull/42" /></div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

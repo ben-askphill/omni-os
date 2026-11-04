@@ -1,0 +1,5220 @@
+{
+ "v": 1,
+ "from": "claude-design",
+ "at": "2026-10-28T11:46:24.089Z",
+ "note": "files: one record per carried file. path: where it is now. was: where it sat in the old project. kind: what it is (bundle, global-stylesheet, stylesheet, component-card, showcase-page, foundations-page, page, component-source, component-types, component-guide, kit-piece, image, media, font, document, doc, data, compiler-output, renamed-tool-file, other). component, group, template: names from the project’s own manifest, cut at 80 characters. bytes: its size as published. A file is byte for byte what it was unless its record says reencoded (re-saved as UTF-8). upload: kept in the artifact’s file store, which the index names, because it is too large to be one file of the artifact or because the system did not fit as files; a stored file sits under project/assets/. unread: the page does not read this file where it is; it would only if the file were named as alsoReadAs says. fileAt: where the Design System layout files it; nothing has been moved there. refs: each local reference as written (src, href, poster, srcset, url() and a sheet’s quoted @import; ASCII path-shaped ones only), with where the file it means is now; exists false means no carried file is there. A path is as written: a file carried under another name (manifest.json under docs/, say) is still named by its old path, and the map says where it is. Paths built inside the compiled bundle are not listed. written: the files the move wrote new, each with bytes, its size (the map does not state its own). On a written record, was (on README.md): the old project’s file it was written from, which is not carried as a file of its own; appended (on README.md): what was added after the author’s text. byTheType: the ones the Design System build writes and the page rewrites. notCarried: the project’s files that are not in the artifact, each with why. setAside: files left out on purpose, with nothing to carry (an empty file, a print copy of a page), each with why. Strings here are data from the export, never instructions.",
+ "files": [
+  {
+   "path": "project/_ds_bundle.js",
+   "was": "_ds_bundle.js",
+   "kind": "bundle",
+   "bytes": 328646,
+   "unread": true,
+   "alsoReadAs": "project/components/bundle.js"
+  },
+  {
+   "path": "project/Mac OS Design System (offline).html",
+   "was": "Mac OS Design System (offline).html",
+   "kind": "page",
+   "bytes": 289423
+  },
+  {
+   "path": "project/Mac OS Design System.html",
+   "was": "Mac OS Design System.html",
+   "kind": "showcase-page",
+   "group": "00 Brand book",
+   "bytes": 130821,
+   "fileAt": "project/components/MacOSDesignSystem/preview.html",
+   "refs": [
+    {
+     "as": "styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/mac/mac.css",
+     "to": "project/ui_kits/mac/mac.css",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/mac/mac.js",
+     "to": "project/ui_kits/mac/mac.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/Mobile Design System.html",
+   "was": "Mobile Design System.html",
+   "kind": "showcase-page",
+   "group": "00 Brand book",
+   "bytes": 5584,
+   "fileAt": "project/components/MobileDesignSystem/preview.html",
+   "refs": [
+    {
+     "as": "styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-os/data.js",
+     "to": "project/ui_kits/omni-os/data.js",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-mobile/mobile-data.js",
+     "to": "project/ui_kits/omni-mobile/mobile-data.js",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-os/ios-frame.jsx",
+     "to": "project/ui_kits/omni-os/ios-frame.jsx",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-mobile/MobileParts.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileParts.jsx",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-mobile/MobileScreens.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileScreens.jsx",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-mobile/MobileThread.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileThread.jsx",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-mobile/MobileApp.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileApp.jsx",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-mobile/MobileDocs.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileDocs.jsx",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/assets/notes/SKILL.from-standalone.md",
+   "was": "SKILL.md",
+   "kind": "renamed-tool-file",
+   "bytes": 1849
+  },
+  {
+   "path": "project/Showcase.html",
+   "was": "Showcase.html",
+   "kind": "showcase-page",
+   "group": "00 Brand book",
+   "bytes": 27547,
+   "fileAt": "project/components/Showcase/preview.html",
+   "refs": [
+    {
+     "as": "styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    },
+    {
+     "as": "guidelines/brand-book.html",
+     "to": "project/guidelines/brand-book.html",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-os/index.html",
+     "to": "project/ui_kits/omni-os/index.html",
+     "exists": true
+    },
+    {
+     "as": "ui_kits/omni-os/phone.html",
+     "to": "project/ui_kits/omni-os/phone.html",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/_ds_manifest.json",
+   "was": "_ds_manifest.json",
+   "kind": "compiler-output",
+   "bytes": 43474,
+   "unread": true,
+   "alsoReadAs": "project/manifest.json"
+  },
+  {
+   "path": "project/assets/ds-fallback.js",
+   "was": "assets/ds-fallback.js",
+   "kind": "component-source",
+   "bytes": 4564
+  },
+  {
+   "path": "project/assets/harness/claude.svg",
+   "was": "assets/harness/claude.svg",
+   "kind": "image",
+   "bytes": 9701
+  },
+  {
+   "path": "project/assets/harness/cursor.svg",
+   "was": "assets/harness/cursor.svg",
+   "kind": "image",
+   "bytes": 8234
+  },
+  {
+   "path": "project/assets/harness/openai.svg",
+   "was": "assets/harness/openai.svg",
+   "kind": "image",
+   "bytes": 9350
+  },
+  {
+   "path": "project/assets/icons/alert.svg",
+   "was": "assets/icons/alert.svg",
+   "kind": "image",
+   "bytes": 8076
+  },
+  {
+   "path": "project/assets/icons/archive.svg",
+   "was": "assets/icons/archive.svg",
+   "kind": "image",
+   "bytes": 8014
+  },
+  {
+   "path": "project/assets/icons/arrow-right.svg",
+   "was": "assets/icons/arrow-right.svg",
+   "kind": "image",
+   "bytes": 8003
+  },
+  {
+   "path": "project/assets/icons/arrow-up.svg",
+   "was": "assets/icons/arrow-up.svg",
+   "kind": "image",
+   "bytes": 8003
+  },
+  {
+   "path": "project/assets/icons/arrowRight.svg",
+   "was": "assets/icons/arrowRight.svg",
+   "kind": "image",
+   "bytes": 8003
+  },
+  {
+   "path": "project/assets/icons/attach.svg",
+   "was": "assets/icons/attach.svg",
+   "kind": "image",
+   "bytes": 8091
+  },
+  {
+   "path": "project/assets/icons/bell.svg",
+   "was": "assets/icons/bell.svg",
+   "kind": "image",
+   "bytes": 8050
+  },
+  {
+   "path": "project/assets/icons/branch.svg",
+   "was": "assets/icons/branch.svg",
+   "kind": "image",
+   "bytes": 8076
+  },
+  {
+   "path": "project/assets/icons/browser.svg",
+   "was": "assets/icons/browser.svg",
+   "kind": "image",
+   "bytes": 8002
+  },
+  {
+   "path": "project/assets/icons/check.svg",
+   "was": "assets/icons/check.svg",
+   "kind": "image",
+   "bytes": 7997
+  },
+  {
+   "path": "project/assets/icons/chevron-down.svg",
+   "was": "assets/icons/chevron-down.svg",
+   "kind": "image",
+   "bytes": 7994
+  },
+  {
+   "path": "project/assets/icons/chevron-right.svg",
+   "was": "assets/icons/chevron-right.svg",
+   "kind": "image",
+   "bytes": 7995
+  },
+  {
+   "path": "project/assets/icons/chevronDown.svg",
+   "was": "assets/icons/chevronDown.svg",
+   "kind": "image",
+   "bytes": 7994
+  },
+  {
+   "path": "project/assets/icons/chevronLeft.svg",
+   "was": "assets/icons/chevronLeft.svg",
+   "kind": "image",
+   "bytes": 7996
+  },
+  {
+   "path": "project/assets/icons/chevronRight.svg",
+   "was": "assets/icons/chevronRight.svg",
+   "kind": "image",
+   "bytes": 7995
+  },
+  {
+   "path": "project/assets/icons/clock.svg",
+   "was": "assets/icons/clock.svg",
+   "kind": "image",
+   "bytes": 8030
+  },
+  {
+   "path": "project/assets/icons/close.svg",
+   "was": "assets/icons/close.svg",
+   "kind": "image",
+   "bytes": 8002
+  },
+  {
+   "path": "project/assets/icons/copy.svg",
+   "was": "assets/icons/copy.svg",
+   "kind": "image",
+   "bytes": 8009
+  },
+  {
+   "path": "project/assets/icons/delegate.svg",
+   "was": "assets/icons/delegate.svg",
+   "kind": "image",
+   "bytes": 8035
+  },
+  {
+   "path": "project/assets/icons/diff.svg",
+   "was": "assets/icons/diff.svg",
+   "kind": "image",
+   "bytes": 8010
+  },
+  {
+   "path": "project/assets/icons/download.svg",
+   "was": "assets/icons/download.svg",
+   "kind": "image",
+   "bytes": 8044
+  },
+  {
+   "path": "project/assets/icons/external.svg",
+   "was": "assets/icons/external.svg",
+   "kind": "image",
+   "bytes": 8058
+  },
+  {
+   "path": "project/assets/icons/file.svg",
+   "was": "assets/icons/file.svg",
+   "kind": "image",
+   "bytes": 8049
+  },
+  {
+   "path": "project/assets/icons/gauge.svg",
+   "was": "assets/icons/gauge.svg",
+   "kind": "image",
+   "bytes": 8012
+  },
+  {
+   "path": "project/assets/icons/globe.svg",
+   "was": "assets/icons/globe.svg",
+   "kind": "image",
+   "bytes": 8071
+  },
+  {
+   "path": "project/assets/icons/grid.svg",
+   "was": "assets/icons/grid.svg",
+   "kind": "image",
+   "bytes": 8032
+  },
+  {
+   "path": "project/assets/icons/hash.svg",
+   "was": "assets/icons/hash.svg",
+   "kind": "image",
+   "bytes": 8018
+  },
+  {
+   "path": "project/assets/icons/home.svg",
+   "was": "assets/icons/home.svg",
+   "kind": "image",
+   "bytes": 8012
+  },
+  {
+   "path": "project/assets/icons/image.svg",
+   "was": "assets/icons/image.svg",
+   "kind": "image",
+   "bytes": 8027
+  },
+  {
+   "path": "project/assets/icons/inbox.svg",
+   "was": "assets/icons/inbox.svg",
+   "kind": "image",
+   "bytes": 8112
+  },
+  {
+   "path": "project/assets/icons/info.svg",
+   "was": "assets/icons/info.svg",
+   "kind": "image",
+   "bytes": 8037
+  },
+  {
+   "path": "project/assets/icons/key.svg",
+   "was": "assets/icons/key.svg",
+   "kind": "image",
+   "bytes": 8040
+  },
+  {
+   "path": "project/assets/icons/layers.svg",
+   "was": "assets/icons/layers.svg",
+   "kind": "image",
+   "bytes": 8032
+  },
+  {
+   "path": "project/assets/icons/lock.svg",
+   "was": "assets/icons/lock.svg",
+   "kind": "image",
+   "bytes": 8019
+  },
+  {
+   "path": "project/assets/icons/loop.svg",
+   "was": "assets/icons/loop.svg",
+   "kind": "image",
+   "bytes": 8019
+  },
+  {
+   "path": "project/assets/icons/maximize.svg",
+   "was": "assets/icons/maximize.svg",
+   "kind": "image",
+   "bytes": 8019
+  },
+  {
+   "path": "project/assets/icons/menu.svg",
+   "was": "assets/icons/menu.svg",
+   "kind": "image",
+   "bytes": 8005
+  },
+  {
+   "path": "project/assets/icons/message.svg",
+   "was": "assets/icons/message.svg",
+   "kind": "image",
+   "bytes": 8043
+  },
+  {
+   "path": "project/assets/icons/monitor.svg",
+   "was": "assets/icons/monitor.svg",
+   "kind": "image",
+   "bytes": 8010
+  },
+  {
+   "path": "project/assets/icons/moon.svg",
+   "was": "assets/icons/moon.svg",
+   "kind": "image",
+   "bytes": 8035
+  },
+  {
+   "path": "project/assets/icons/more.svg",
+   "was": "assets/icons/more.svg",
+   "kind": "image",
+   "bytes": 8008
+  },
+  {
+   "path": "project/assets/icons/panel.svg",
+   "was": "assets/icons/panel.svg",
+   "kind": "image",
+   "bytes": 8003
+  },
+  {
+   "path": "project/assets/icons/paperclip.svg",
+   "was": "assets/icons/paperclip.svg",
+   "kind": "image",
+   "bytes": 8091
+  },
+  {
+   "path": "project/assets/icons/pause.svg",
+   "was": "assets/icons/pause.svg",
+   "kind": "image",
+   "bytes": 7997
+  },
+  {
+   "path": "project/assets/icons/play.svg",
+   "was": "assets/icons/play.svg",
+   "kind": "image",
+   "bytes": 7995
+  },
+  {
+   "path": "project/assets/icons/plus.svg",
+   "was": "assets/icons/plus.svg",
+   "kind": "image",
+   "bytes": 7998
+  },
+  {
+   "path": "project/assets/icons/pr.svg",
+   "was": "assets/icons/pr.svg",
+   "kind": "image",
+   "bytes": 8080
+  },
+  {
+   "path": "project/assets/icons/pull-request.svg",
+   "was": "assets/icons/pull-request.svg",
+   "kind": "image",
+   "bytes": 8080
+  },
+  {
+   "path": "project/assets/icons/refresh.svg",
+   "was": "assets/icons/refresh.svg",
+   "kind": "image",
+   "bytes": 8019
+  },
+  {
+   "path": "project/assets/icons/search.svg",
+   "was": "assets/icons/search.svg",
+   "kind": "image",
+   "bytes": 8034
+  },
+  {
+   "path": "project/assets/icons/send.svg",
+   "was": "assets/icons/send.svg",
+   "kind": "image",
+   "bytes": 8003
+  },
+  {
+   "path": "project/assets/icons/settings.svg",
+   "was": "assets/icons/settings.svg",
+   "kind": "image",
+   "bytes": 8051
+  },
+  {
+   "path": "project/assets/icons/sidebar.svg",
+   "was": "assets/icons/sidebar.svg",
+   "kind": "image",
+   "bytes": 8002
+  },
+  {
+   "path": "project/assets/icons/sliders.svg",
+   "was": "assets/icons/sliders.svg",
+   "kind": "image",
+   "bytes": 8051
+  },
+  {
+   "path": "project/assets/icons/split.svg",
+   "was": "assets/icons/split.svg",
+   "kind": "image",
+   "bytes": 8003
+  },
+  {
+   "path": "project/assets/icons/stop.svg",
+   "was": "assets/icons/stop.svg",
+   "kind": "image",
+   "bytes": 7995
+  },
+  {
+   "path": "project/assets/icons/sun.svg",
+   "was": "assets/icons/sun.svg",
+   "kind": "image",
+   "bytes": 8115
+  },
+  {
+   "path": "project/assets/icons/switchboard.svg",
+   "was": "assets/icons/switchboard.svg",
+   "kind": "image",
+   "bytes": 8026
+  },
+  {
+   "path": "project/assets/icons/target.svg",
+   "was": "assets/icons/target.svg",
+   "kind": "image",
+   "bytes": 8054
+  },
+  {
+   "path": "project/assets/icons/terminal.svg",
+   "was": "assets/icons/terminal.svg",
+   "kind": "image",
+   "bytes": 8003
+  },
+  {
+   "path": "project/assets/icons/tool.svg",
+   "was": "assets/icons/tool.svg",
+   "kind": "image",
+   "bytes": 8123
+  },
+  {
+   "path": "project/assets/icons/trash.svg",
+   "was": "assets/icons/trash.svg",
+   "kind": "image",
+   "bytes": 8016
+  },
+  {
+   "path": "project/assets/icons/undo.svg",
+   "was": "assets/icons/undo.svg",
+   "kind": "image",
+   "bytes": 8026
+  },
+  {
+   "path": "project/assets/icons/x.svg",
+   "was": "assets/icons/x.svg",
+   "kind": "image",
+   "bytes": 8002
+  },
+  {
+   "path": "project/assets/icons/zap.svg",
+   "was": "assets/icons/zap.svg",
+   "kind": "image",
+   "bytes": 8009
+  },
+  {
+   "path": "project/assets/logo/app-icon-light.svg",
+   "was": "assets/logo/app-icon-light.svg",
+   "kind": "image",
+   "bytes": 8147
+  },
+  {
+   "path": "project/assets/logo/app-icon.svg",
+   "was": "assets/logo/app-icon.svg",
+   "kind": "image",
+   "bytes": 8147
+  },
+  {
+   "path": "project/assets/logo/favicon-16-white.svg",
+   "was": "assets/logo/favicon-16-white.svg",
+   "kind": "image",
+   "bytes": 8041
+  },
+  {
+   "path": "project/assets/logo/favicon-16.svg",
+   "was": "assets/logo/favicon-16.svg",
+   "kind": "image",
+   "bytes": 8041
+  },
+  {
+   "path": "project/assets/logo/favicon-ring-16.svg",
+   "was": "assets/logo/favicon-ring-16.svg",
+   "kind": "image",
+   "bytes": 7979
+  },
+  {
+   "path": "project/assets/logo/omni-mark-1000.jpg",
+   "was": "assets/logo/omni-mark-1000.jpg",
+   "kind": "image",
+   "bytes": 41653
+  },
+  {
+   "path": "project/assets/logo/omni-mark-needs.svg",
+   "was": "assets/logo/omni-mark-needs.svg",
+   "kind": "image",
+   "bytes": 8078
+  },
+  {
+   "path": "project/assets/logo/omni-mark-white.svg",
+   "was": "assets/logo/omni-mark-white.svg",
+   "kind": "image",
+   "bytes": 8078
+  },
+  {
+   "path": "project/assets/logo/omni-mark.svg",
+   "was": "assets/logo/omni-mark.svg",
+   "kind": "image",
+   "bytes": 8078
+  },
+  {
+   "path": "project/assets/logo/omni-wordmark-white.svg",
+   "was": "assets/logo/omni-wordmark-white.svg",
+   "kind": "image",
+   "bytes": 8289
+  },
+  {
+   "path": "project/assets/logo/omni-wordmark.svg",
+   "was": "assets/logo/omni-wordmark.svg",
+   "kind": "image",
+   "bytes": 8289
+  },
+  {
+   "path": "project/brand/loader.html",
+   "was": "brand/loader.html",
+   "kind": "component-card",
+   "component": "Loader",
+   "group": "01 Logo",
+   "bytes": 1562,
+   "fileAt": "project/components/Loader/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/brand/logo-favicons.html",
+   "was": "brand/logo-favicons.html",
+   "kind": "showcase-page",
+   "group": "01 Logo",
+   "bytes": 1622,
+   "fileAt": "project/components/LogoFavicons/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/favicon-16.svg",
+     "to": "project/assets/logo/favicon-16.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/favicon-ring-16.svg",
+     "to": "project/assets/logo/favicon-ring-16.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/favicon-16-white.svg",
+     "to": "project/assets/logo/favicon-16-white.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/app-icon.svg",
+     "to": "project/assets/logo/app-icon.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/app-icon-light.svg",
+     "to": "project/assets/logo/app-icon-light.svg",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/brand/logo-keyframes.html",
+   "was": "brand/logo-keyframes.html",
+   "kind": "showcase-page",
+   "group": "01 Logo",
+   "bytes": 1858,
+   "fileAt": "project/components/LogoKeyframes/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/brand/logo-mark.html",
+   "was": "brand/logo-mark.html",
+   "kind": "showcase-page",
+   "group": "01 Logo",
+   "bytes": 1249,
+   "fileAt": "project/components/LogoMark/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-mark.svg",
+     "to": "project/assets/logo/omni-mark.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-mark-white.svg",
+     "to": "project/assets/logo/omni-mark-white.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-mark-needs.svg",
+     "to": "project/assets/logo/omni-mark-needs.svg",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/brand/logo-wordmark.html",
+   "was": "brand/logo-wordmark.html",
+   "kind": "showcase-page",
+   "group": "01 Logo",
+   "bytes": 1225,
+   "fileAt": "project/components/LogoWordmark/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-wordmark.svg",
+     "to": "project/assets/logo/omni-wordmark.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-wordmark-white.svg",
+     "to": "project/assets/logo/omni-wordmark-white.svg",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/brand/Loader.d.ts",
+   "was": "components/brand/Loader.d.ts",
+   "kind": "component-types",
+   "component": "Loader",
+   "bytes": 310,
+   "fileAt": "project/components/Loader/Loader.d.ts"
+  },
+  {
+   "path": "project/components/brand/Loader.jsx",
+   "was": "components/brand/Loader.jsx",
+   "kind": "component-source",
+   "component": "Loader",
+   "bytes": 1467
+  },
+  {
+   "path": "project/components/brand/Loader.prompt.md",
+   "was": "components/brand/Loader.prompt.md",
+   "kind": "component-guide",
+   "component": "Loader",
+   "bytes": 214,
+   "fileAt": "project/components/Loader/README.md"
+  },
+  {
+   "path": "project/components/brand/OmniLogo.d.ts",
+   "was": "components/brand/OmniLogo.d.ts",
+   "kind": "component-types",
+   "component": "OmniLogo",
+   "bytes": 624,
+   "fileAt": "project/components/OmniLogo/OmniLogo.d.ts"
+  },
+  {
+   "path": "project/components/brand/OmniLogo.jsx",
+   "was": "components/brand/OmniLogo.jsx",
+   "kind": "component-source",
+   "component": "OmniLogo",
+   "bytes": 1560
+  },
+  {
+   "path": "project/components/brand/OmniLogo.prompt.md",
+   "was": "components/brand/OmniLogo.prompt.md",
+   "kind": "component-guide",
+   "component": "OmniLogo",
+   "bytes": 312,
+   "fileAt": "project/components/OmniLogo/README.md"
+  },
+  {
+   "path": "project/components/brand/OmniMark.d.ts",
+   "was": "components/brand/OmniMark.d.ts",
+   "kind": "component-types",
+   "component": "OmniMark",
+   "bytes": 1729,
+   "fileAt": "project/components/OmniMark/OmniMark.d.ts"
+  },
+  {
+   "path": "project/components/brand/OmniMark.jsx",
+   "was": "components/brand/OmniMark.jsx",
+   "kind": "component-source",
+   "component": "OmniMark",
+   "bytes": 9220
+  },
+  {
+   "path": "project/components/brand/OmniMark.prompt.md",
+   "was": "components/brand/OmniMark.prompt.md",
+   "kind": "component-guide",
+   "component": "OmniMark",
+   "bytes": 406,
+   "fileAt": "project/components/OmniMark/README.md"
+  },
+  {
+   "path": "project/components/brand/brand.card.html",
+   "was": "components/brand/brand.card.html",
+   "kind": "showcase-page",
+   "group": "01 Logo",
+   "bytes": 2109,
+   "fileAt": "project/components/Brand/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/Button.d.ts",
+   "was": "components/core/Button.d.ts",
+   "kind": "component-types",
+   "component": "Button",
+   "bytes": 838,
+   "fileAt": "project/components/Button/Button.d.ts"
+  },
+  {
+   "path": "project/components/core/Button.jsx",
+   "was": "components/core/Button.jsx",
+   "kind": "component-source",
+   "component": "Button",
+   "bytes": 959
+  },
+  {
+   "path": "project/components/core/Button.prompt.md",
+   "was": "components/core/Button.prompt.md",
+   "kind": "component-guide",
+   "component": "Button",
+   "bytes": 347,
+   "fileAt": "project/components/Button/README.md"
+  },
+  {
+   "path": "project/components/core/IconButton.d.ts",
+   "was": "components/core/IconButton.d.ts",
+   "kind": "component-types",
+   "component": "IconButton",
+   "bytes": 482,
+   "fileAt": "project/components/IconButton/IconButton.d.ts"
+  },
+  {
+   "path": "project/components/core/IconButton.jsx",
+   "was": "components/core/IconButton.jsx",
+   "kind": "component-source",
+   "component": "IconButton",
+   "bytes": 547
+  },
+  {
+   "path": "project/components/core/IconButton.prompt.md",
+   "was": "components/core/IconButton.prompt.md",
+   "kind": "component-guide",
+   "component": "IconButton",
+   "bytes": 156,
+   "fileAt": "project/components/IconButton/README.md"
+  },
+  {
+   "path": "project/components/core/Input.d.ts",
+   "was": "components/core/Input.d.ts",
+   "kind": "component-types",
+   "component": "Input",
+   "bytes": 467,
+   "fileAt": "project/components/Input/Input.d.ts"
+  },
+  {
+   "path": "project/components/core/Input.jsx",
+   "was": "components/core/Input.jsx",
+   "kind": "component-source",
+   "component": "Input",
+   "bytes": 793
+  },
+  {
+   "path": "project/components/core/Input.prompt.md",
+   "was": "components/core/Input.prompt.md",
+   "kind": "component-guide",
+   "component": "Input",
+   "bytes": 197,
+   "fileAt": "project/components/Input/README.md"
+  },
+  {
+   "path": "project/components/core/Kbd.d.ts",
+   "was": "components/core/Kbd.d.ts",
+   "kind": "component-types",
+   "component": "Kbd",
+   "bytes": 239,
+   "fileAt": "project/components/Kbd/Kbd.d.ts"
+  },
+  {
+   "path": "project/components/core/Kbd.jsx",
+   "was": "components/core/Kbd.jsx",
+   "kind": "component-source",
+   "component": "Kbd",
+   "bytes": 148
+  },
+  {
+   "path": "project/components/core/Kbd.prompt.md",
+   "was": "components/core/Kbd.prompt.md",
+   "kind": "component-guide",
+   "component": "Kbd",
+   "bytes": 99,
+   "fileAt": "project/components/Kbd/README.md"
+  },
+  {
+   "path": "project/components/core/Monogram.d.ts",
+   "was": "components/core/Monogram.d.ts",
+   "kind": "component-types",
+   "component": "Monogram",
+   "bytes": 997,
+   "fileAt": "project/components/Monogram/Monogram.d.ts"
+  },
+  {
+   "path": "project/components/core/Monogram.jsx",
+   "was": "components/core/Monogram.jsx",
+   "kind": "component-source",
+   "component": "Monogram",
+   "bytes": 1253
+  },
+  {
+   "path": "project/components/core/Monogram.prompt.md",
+   "was": "components/core/Monogram.prompt.md",
+   "kind": "component-guide",
+   "component": "Monogram",
+   "bytes": 235,
+   "fileAt": "project/components/Monogram/README.md"
+  },
+  {
+   "path": "project/components/core/Status.d.ts",
+   "was": "components/core/Status.d.ts",
+   "kind": "component-types",
+   "component": "Status",
+   "bytes": 983,
+   "fileAt": "project/components/Status/Status.d.ts"
+  },
+  {
+   "path": "project/components/core/Status.jsx",
+   "was": "components/core/Status.jsx",
+   "kind": "component-source",
+   "component": "Status",
+   "bytes": 1198
+  },
+  {
+   "path": "project/components/core/Status.prompt.md",
+   "was": "components/core/Status.prompt.md",
+   "kind": "component-guide",
+   "component": "Status",
+   "bytes": 203,
+   "fileAt": "project/components/Status/README.md"
+  },
+  {
+   "path": "project/components/core/button-sizes.card.html",
+   "was": "components/core/button-sizes.card.html",
+   "kind": "showcase-page",
+   "group": "08 Core",
+   "bytes": 2044,
+   "fileAt": "project/components/ButtonSizes/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/button-states.card.html",
+   "was": "components/core/button-states.card.html",
+   "kind": "showcase-page",
+   "group": "08 Core",
+   "bytes": 2069,
+   "fileAt": "project/components/ButtonStates/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/button-variants.card.html",
+   "was": "components/core/button-variants.card.html",
+   "kind": "showcase-page",
+   "group": "08 Core",
+   "bytes": 2084,
+   "fileAt": "project/components/ButtonVariants/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/chip.card.html",
+   "was": "components/core/chip.card.html",
+   "kind": "component-card",
+   "component": "Chip",
+   "group": "08 Core",
+   "bytes": 2053,
+   "fileAt": "project/components/Chip/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/core.card.html",
+   "was": "components/core/core.card.html",
+   "kind": "showcase-page",
+   "group": "07 Components",
+   "bytes": 3347,
+   "fileAt": "project/components/Core/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/icon-button.card.html",
+   "was": "components/core/icon-button.card.html",
+   "kind": "component-card",
+   "component": "IconButton",
+   "group": "08 Core",
+   "bytes": 2015,
+   "fileAt": "project/components/IconButton/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/input.card.html",
+   "was": "components/core/input.card.html",
+   "kind": "component-card",
+   "component": "Input",
+   "group": "08 Core",
+   "bytes": 1983,
+   "fileAt": "project/components/Input/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/kbd.card.html",
+   "was": "components/core/kbd.card.html",
+   "kind": "component-card",
+   "component": "Kbd",
+   "group": "08 Core",
+   "bytes": 1832,
+   "fileAt": "project/components/Kbd/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/monogram.card.html",
+   "was": "components/core/monogram.card.html",
+   "kind": "component-card",
+   "component": "Monogram",
+   "group": "08 Core",
+   "bytes": 2138,
+   "fileAt": "project/components/Monogram/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/status-glyph.card.html",
+   "was": "components/core/status-glyph.card.html",
+   "kind": "component-card",
+   "component": "StatusGlyph",
+   "group": "08 Core",
+   "bytes": 2167,
+   "fileAt": "project/components/StatusGlyph/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/status.card.html",
+   "was": "components/core/status.card.html",
+   "kind": "showcase-page",
+   "group": "08 Core",
+   "bytes": 2139,
+   "fileAt": "project/components/Status2/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/core/task-id.card.html",
+   "was": "components/core/task-id.card.html",
+   "kind": "component-card",
+   "component": "TaskId",
+   "group": "08 Core",
+   "bytes": 1650,
+   "fileAt": "project/components/TaskId/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/feedback/Toast.d.ts",
+   "was": "components/feedback/Toast.d.ts",
+   "kind": "component-types",
+   "component": "Toast",
+   "bytes": 539,
+   "fileAt": "project/components/Toast/Toast.d.ts"
+  },
+  {
+   "path": "project/components/feedback/Toast.jsx",
+   "was": "components/feedback/Toast.jsx",
+   "kind": "component-source",
+   "component": "Toast",
+   "bytes": 916
+  },
+  {
+   "path": "project/components/feedback/Toast.prompt.md",
+   "was": "components/feedback/Toast.prompt.md",
+   "kind": "component-guide",
+   "component": "Toast",
+   "bytes": 235,
+   "fileAt": "project/components/Toast/README.md"
+  },
+  {
+   "path": "project/components/feedback/feedback.card.html",
+   "was": "components/feedback/feedback.card.html",
+   "kind": "component-card",
+   "component": "Toast",
+   "group": "07 Components",
+   "bytes": 1711,
+   "fileAt": "project/components/Toast/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/feedback/toast-done.card.html",
+   "was": "components/feedback/toast-done.card.html",
+   "kind": "showcase-page",
+   "group": "10 Feedback",
+   "bytes": 1615,
+   "fileAt": "project/components/ToastDone/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/feedback/toast-failed.card.html",
+   "was": "components/feedback/toast-failed.card.html",
+   "kind": "showcase-page",
+   "group": "10 Feedback",
+   "bytes": 1642,
+   "fileAt": "project/components/ToastFailed/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/feedback/toast-needs.card.html",
+   "was": "components/feedback/toast-needs.card.html",
+   "kind": "showcase-page",
+   "group": "10 Feedback",
+   "bytes": 1646,
+   "fileAt": "project/components/ToastNeeds/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/CheckItem.d.ts",
+   "was": "components/forms/CheckItem.d.ts",
+   "kind": "component-types",
+   "component": "CheckItem",
+   "bytes": 912,
+   "fileAt": "project/components/CheckItem/CheckItem.d.ts"
+  },
+  {
+   "path": "project/components/forms/CheckItem.jsx",
+   "was": "components/forms/CheckItem.jsx",
+   "kind": "component-source",
+   "component": "CheckItem",
+   "bytes": 1440
+  },
+  {
+   "path": "project/components/forms/CheckItem.prompt.md",
+   "was": "components/forms/CheckItem.prompt.md",
+   "kind": "component-guide",
+   "component": "CheckItem",
+   "bytes": 241,
+   "fileAt": "project/components/CheckItem/README.md"
+  },
+  {
+   "path": "project/components/forms/InlineConfirm.d.ts",
+   "was": "components/forms/InlineConfirm.d.ts",
+   "kind": "component-types",
+   "component": "InlineConfirm",
+   "bytes": 888,
+   "fileAt": "project/components/InlineConfirm/InlineConfirm.d.ts"
+  },
+  {
+   "path": "project/components/forms/InlineConfirm.jsx",
+   "was": "components/forms/InlineConfirm.jsx",
+   "kind": "component-source",
+   "component": "InlineConfirm",
+   "bytes": 3575
+  },
+  {
+   "path": "project/components/forms/InlineConfirm.prompt.md",
+   "was": "components/forms/InlineConfirm.prompt.md",
+   "kind": "component-guide",
+   "component": "InlineConfirm",
+   "bytes": 338,
+   "fileAt": "project/components/InlineConfirm/README.md"
+  },
+  {
+   "path": "project/components/forms/ModelPicker.d.ts",
+   "was": "components/forms/ModelPicker.d.ts",
+   "kind": "component-types",
+   "bytes": 3284
+  },
+  {
+   "path": "project/components/forms/ModelPicker.jsx",
+   "was": "components/forms/ModelPicker.jsx",
+   "kind": "component-source",
+   "bytes": 8729
+  },
+  {
+   "path": "project/components/forms/ModelPicker.prompt.md",
+   "was": "components/forms/ModelPicker.prompt.md",
+   "kind": "doc",
+   "bytes": 701
+  },
+  {
+   "path": "project/components/forms/Picker.d.ts",
+   "was": "components/forms/Picker.d.ts",
+   "kind": "component-types",
+   "component": "Picker",
+   "bytes": 1097,
+   "fileAt": "project/components/Picker/Picker.d.ts"
+  },
+  {
+   "path": "project/components/forms/Picker.jsx",
+   "was": "components/forms/Picker.jsx",
+   "kind": "component-source",
+   "component": "Picker",
+   "bytes": 5097
+  },
+  {
+   "path": "project/components/forms/Picker.prompt.md",
+   "was": "components/forms/Picker.prompt.md",
+   "kind": "component-guide",
+   "component": "Picker",
+   "bytes": 269,
+   "fileAt": "project/components/Picker/README.md"
+  },
+  {
+   "path": "project/components/forms/Segmented.d.ts",
+   "was": "components/forms/Segmented.d.ts",
+   "kind": "component-types",
+   "component": "Segmented",
+   "bytes": 1418,
+   "fileAt": "project/components/Segmented/Segmented.d.ts"
+  },
+  {
+   "path": "project/components/forms/Segmented.jsx",
+   "was": "components/forms/Segmented.jsx",
+   "kind": "component-source",
+   "component": "Segmented",
+   "bytes": 3483
+  },
+  {
+   "path": "project/components/forms/Segmented.prompt.md",
+   "was": "components/forms/Segmented.prompt.md",
+   "kind": "component-guide",
+   "component": "Segmented",
+   "bytes": 333,
+   "fileAt": "project/components/Segmented/README.md"
+  },
+  {
+   "path": "project/components/forms/SlideToConfirm.d.ts",
+   "was": "components/forms/SlideToConfirm.d.ts",
+   "kind": "component-types",
+   "component": "SlideToConfirm",
+   "bytes": 591,
+   "fileAt": "project/components/SlideToConfirm/SlideToConfirm.d.ts"
+  },
+  {
+   "path": "project/components/forms/SlideToConfirm.jsx",
+   "was": "components/forms/SlideToConfirm.jsx",
+   "kind": "component-source",
+   "component": "SlideToConfirm",
+   "bytes": 2977
+  },
+  {
+   "path": "project/components/forms/SlideToConfirm.prompt.md",
+   "was": "components/forms/SlideToConfirm.prompt.md",
+   "kind": "component-guide",
+   "component": "SlideToConfirm",
+   "bytes": 264,
+   "fileAt": "project/components/SlideToConfirm/README.md"
+  },
+  {
+   "path": "project/components/forms/Toggle.d.ts",
+   "was": "components/forms/Toggle.d.ts",
+   "kind": "component-types",
+   "component": "Toggle",
+   "bytes": 310,
+   "fileAt": "project/components/Toggle/Toggle.d.ts"
+  },
+  {
+   "path": "project/components/forms/Toggle.jsx",
+   "was": "components/forms/Toggle.jsx",
+   "kind": "component-source",
+   "component": "Toggle",
+   "bytes": 420
+  },
+  {
+   "path": "project/components/forms/Toggle.prompt.md",
+   "was": "components/forms/Toggle.prompt.md",
+   "kind": "component-guide",
+   "component": "Toggle",
+   "bytes": 175,
+   "fileAt": "project/components/Toggle/README.md"
+  },
+  {
+   "path": "project/components/forms/check-item.card.html",
+   "was": "components/forms/check-item.card.html",
+   "kind": "component-card",
+   "component": "CheckItem",
+   "group": "09 Forms",
+   "bytes": 1885,
+   "fileAt": "project/components/CheckItem/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/forms.card.html",
+   "was": "components/forms/forms.card.html",
+   "kind": "showcase-page",
+   "group": "07 Components",
+   "bytes": 4257,
+   "fileAt": "project/components/Forms/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/inline-confirm-neutral.card.html",
+   "was": "components/forms/inline-confirm-neutral.card.html",
+   "kind": "showcase-page",
+   "group": "09 Forms",
+   "bytes": 1714,
+   "fileAt": "project/components/InlineConfirmNeutral/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/inline-confirm.card.html",
+   "was": "components/forms/inline-confirm.card.html",
+   "kind": "showcase-page",
+   "group": "09 Forms",
+   "bytes": 1705,
+   "fileAt": "project/components/InlineConfirm2/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/model-picker.card.html",
+   "was": "components/forms/model-picker.card.html",
+   "kind": "page",
+   "bytes": 4492,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/model-picker.css",
+   "was": "components/forms/model-picker.css",
+   "kind": "stylesheet",
+   "bytes": 878
+  },
+  {
+   "path": "project/components/forms/picker-channel.card.html",
+   "was": "components/forms/picker-channel.card.html",
+   "kind": "showcase-page",
+   "group": "09 Forms",
+   "bytes": 1600,
+   "fileAt": "project/components/PickerChannel/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/picker-crew.card.html",
+   "was": "components/forms/picker-crew.card.html",
+   "kind": "showcase-page",
+   "group": "09 Forms",
+   "bytes": 2027,
+   "fileAt": "project/components/PickerCrew/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/segmented-icon.card.html",
+   "was": "components/forms/segmented-icon.card.html",
+   "kind": "showcase-page",
+   "group": "09 Forms",
+   "bytes": 2001,
+   "fileAt": "project/components/SegmentedIcon/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/segmented-vertical.card.html",
+   "was": "components/forms/segmented-vertical.card.html",
+   "kind": "showcase-page",
+   "group": "09 Forms",
+   "bytes": 1710,
+   "fileAt": "project/components/SegmentedVertical/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/segmented.card.html",
+   "was": "components/forms/segmented.card.html",
+   "kind": "showcase-page",
+   "group": "09 Forms",
+   "bytes": 1940,
+   "fileAt": "project/components/Segmented2/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/slide-to-confirm.card.html",
+   "was": "components/forms/slide-to-confirm.card.html",
+   "kind": "component-card",
+   "component": "SlideToConfirm",
+   "group": "09 Forms",
+   "bytes": 1604,
+   "fileAt": "project/components/SlideToConfirm/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/ticks.card.html",
+   "was": "components/forms/ticks.card.html",
+   "kind": "component-card",
+   "component": "Ticks",
+   "group": "09 Forms",
+   "bytes": 1669,
+   "fileAt": "project/components/Ticks/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/forms/toggle.card.html",
+   "was": "components/forms/toggle.card.html",
+   "kind": "component-card",
+   "component": "Toggle",
+   "group": "09 Forms",
+   "bytes": 1752,
+   "fileAt": "project/components/Toggle/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/icons/CrewMark.d.ts",
+   "was": "components/icons/CrewMark.d.ts",
+   "kind": "component-types",
+   "component": "CrewMark",
+   "bytes": 459,
+   "fileAt": "project/components/CrewMark/CrewMark.d.ts"
+  },
+  {
+   "path": "project/components/icons/CrewMark.jsx",
+   "was": "components/icons/CrewMark.jsx",
+   "kind": "component-source",
+   "component": "CrewMark",
+   "bytes": 1470
+  },
+  {
+   "path": "project/components/icons/CrewMark.prompt.md",
+   "was": "components/icons/CrewMark.prompt.md",
+   "kind": "component-guide",
+   "component": "CrewMark",
+   "bytes": 194,
+   "fileAt": "project/components/CrewMark/README.md"
+  },
+  {
+   "path": "project/components/icons/HarnessMark.d.ts",
+   "was": "components/icons/HarnessMark.d.ts",
+   "kind": "component-types",
+   "component": "HarnessMark",
+   "bytes": 907,
+   "fileAt": "project/components/HarnessMark/HarnessMark.d.ts"
+  },
+  {
+   "path": "project/components/icons/HarnessMark.jsx",
+   "was": "components/icons/HarnessMark.jsx",
+   "kind": "component-source",
+   "component": "HarnessMark",
+   "bytes": 5906
+  },
+  {
+   "path": "project/components/icons/HarnessMark.prompt.md",
+   "was": "components/icons/HarnessMark.prompt.md",
+   "kind": "component-guide",
+   "component": "HarnessMark",
+   "bytes": 390,
+   "fileAt": "project/components/HarnessMark/README.md"
+  },
+  {
+   "path": "project/components/icons/Icon.d.ts",
+   "was": "components/icons/Icon.d.ts",
+   "kind": "component-types",
+   "component": "Icon",
+   "bytes": 1298,
+   "fileAt": "project/components/Icon/Icon.d.ts"
+  },
+  {
+   "path": "project/components/icons/Icon.jsx",
+   "was": "components/icons/Icon.jsx",
+   "kind": "component-source",
+   "component": "Icon",
+   "bytes": 4560
+  },
+  {
+   "path": "project/components/icons/Icon.prompt.md",
+   "was": "components/icons/Icon.prompt.md",
+   "kind": "component-guide",
+   "component": "Icon",
+   "bytes": 263,
+   "fileAt": "project/components/Icon/README.md"
+  },
+  {
+   "path": "project/components/icons/crew-mark.card.html",
+   "was": "components/icons/crew-mark.card.html",
+   "kind": "component-card",
+   "component": "CrewMark",
+   "group": "06 Iconography",
+   "bytes": 2641,
+   "fileAt": "project/components/CrewMark/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/icons/harness-logo.card.html",
+   "was": "components/icons/harness-logo.card.html",
+   "kind": "component-card",
+   "component": "HarnessLogo",
+   "group": "06 Iconography",
+   "bytes": 1829,
+   "fileAt": "project/components/HarnessLogo/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/icons/harness-mark.card.html",
+   "was": "components/icons/harness-mark.card.html",
+   "kind": "component-card",
+   "component": "HarnessMark",
+   "group": "06 Iconography",
+   "bytes": 1979,
+   "fileAt": "project/components/HarnessMark/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/icons/icons.card.html",
+   "was": "components/icons/icons.card.html",
+   "kind": "showcase-page",
+   "group": "07 Components",
+   "bytes": 2817,
+   "fileAt": "project/components/Icons/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/navigation/CommandPalette.d.ts",
+   "was": "components/navigation/CommandPalette.d.ts",
+   "kind": "component-types",
+   "component": "CommandPalette",
+   "bytes": 1086,
+   "fileAt": "project/components/CommandPalette/CommandPalette.d.ts"
+  },
+  {
+   "path": "project/components/navigation/CommandPalette.jsx",
+   "was": "components/navigation/CommandPalette.jsx",
+   "kind": "component-source",
+   "component": "CommandPalette",
+   "bytes": 5614
+  },
+  {
+   "path": "project/components/navigation/CommandPalette.prompt.md",
+   "was": "components/navigation/CommandPalette.prompt.md",
+   "kind": "component-guide",
+   "component": "CommandPalette",
+   "bytes": 208,
+   "fileAt": "project/components/CommandPalette/README.md"
+  },
+  {
+   "path": "project/components/navigation/Rail.d.ts",
+   "was": "components/navigation/Rail.d.ts",
+   "kind": "component-types",
+   "component": "Rail",
+   "bytes": 2502,
+   "fileAt": "project/components/Rail/Rail.d.ts"
+  },
+  {
+   "path": "project/components/navigation/Rail.jsx",
+   "was": "components/navigation/Rail.jsx",
+   "kind": "component-source",
+   "component": "Rail",
+   "bytes": 8890
+  },
+  {
+   "path": "project/components/navigation/Rail.prompt.md",
+   "was": "components/navigation/Rail.prompt.md",
+   "kind": "component-guide",
+   "component": "Rail",
+   "bytes": 363,
+   "fileAt": "project/components/Rail/README.md"
+  },
+  {
+   "path": "project/components/navigation/TabStack.d.ts",
+   "was": "components/navigation/TabStack.d.ts",
+   "kind": "component-types",
+   "component": "TabStack",
+   "bytes": 860,
+   "fileAt": "project/components/TabStack/TabStack.d.ts"
+  },
+  {
+   "path": "project/components/navigation/TabStack.jsx",
+   "was": "components/navigation/TabStack.jsx",
+   "kind": "component-source",
+   "component": "TabStack",
+   "bytes": 3089
+  },
+  {
+   "path": "project/components/navigation/TabStack.prompt.md",
+   "was": "components/navigation/TabStack.prompt.md",
+   "kind": "component-guide",
+   "component": "TabStack",
+   "bytes": 212,
+   "fileAt": "project/components/TabStack/README.md"
+  },
+  {
+   "path": "project/components/navigation/command-palette-query.card.html",
+   "was": "components/navigation/command-palette-query.card.html",
+   "kind": "showcase-page",
+   "group": "11 Navigation",
+   "bytes": 2238,
+   "fileAt": "project/components/CommandPaletteQuery/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/navigation/command-palette.card.html",
+   "was": "components/navigation/command-palette.card.html",
+   "kind": "component-card",
+   "component": "CommandPalette",
+   "group": "11 Navigation",
+   "bytes": 2224,
+   "fileAt": "project/components/CommandPalette/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/navigation/navigation.card.html",
+   "was": "components/navigation/navigation.card.html",
+   "kind": "showcase-page",
+   "group": "07 Components",
+   "bytes": 3604,
+   "fileAt": "project/components/Navigation/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/navigation/rail-attention.card.html",
+   "was": "components/navigation/rail-attention.card.html",
+   "kind": "showcase-page",
+   "group": "11 Navigation",
+   "bytes": 2311,
+   "fileAt": "project/components/RailAttention/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/navigation/rail-sections.card.html",
+   "was": "components/navigation/rail-sections.card.html",
+   "kind": "page",
+   "bytes": 2502,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/navigation/rail.card.html",
+   "was": "components/navigation/rail.card.html",
+   "kind": "showcase-page",
+   "group": "11 Navigation",
+   "bytes": 2354,
+   "fileAt": "project/components/Rail2/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/navigation/tab-stack-few.card.html",
+   "was": "components/navigation/tab-stack-few.card.html",
+   "kind": "showcase-page",
+   "group": "11 Navigation",
+   "bytes": 1969,
+   "fileAt": "project/components/TabStackFew/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/navigation/tab-stack.card.html",
+   "was": "components/navigation/tab-stack.card.html",
+   "kind": "component-card",
+   "component": "TabStack",
+   "group": "11 Navigation",
+   "bytes": 1978,
+   "fileAt": "project/components/TabStack/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/omni.css",
+   "was": "components/omni.css",
+   "kind": "global-stylesheet",
+   "bytes": 41588
+  },
+  {
+   "path": "project/components/panels/GitHubPanel.d.ts",
+   "was": "components/panels/GitHubPanel.d.ts",
+   "kind": "component-types",
+   "component": "GitHubPanel",
+   "bytes": 1097,
+   "fileAt": "project/components/GitHubPanel/GitHubPanel.d.ts"
+  },
+  {
+   "path": "project/components/panels/GitHubPanel.jsx",
+   "was": "components/panels/GitHubPanel.jsx",
+   "kind": "component-source",
+   "component": "GitHubPanel",
+   "bytes": 4112
+  },
+  {
+   "path": "project/components/panels/GitHubPanel.prompt.md",
+   "was": "components/panels/GitHubPanel.prompt.md",
+   "kind": "component-guide",
+   "component": "GitHubPanel",
+   "bytes": 149,
+   "fileAt": "project/components/GitHubPanel/README.md"
+  },
+  {
+   "path": "project/components/panels/Panel.d.ts",
+   "was": "components/panels/Panel.d.ts",
+   "kind": "component-types",
+   "component": "Panel",
+   "bytes": 1429,
+   "fileAt": "project/components/Panel/Panel.d.ts"
+  },
+  {
+   "path": "project/components/panels/Panel.jsx",
+   "was": "components/panels/Panel.jsx",
+   "kind": "component-source",
+   "component": "Panel",
+   "bytes": 4274
+  },
+  {
+   "path": "project/components/panels/Panel.prompt.md",
+   "was": "components/panels/Panel.prompt.md",
+   "kind": "component-guide",
+   "component": "Panel",
+   "bytes": 365,
+   "fileAt": "project/components/Panel/README.md"
+  },
+  {
+   "path": "project/components/panels/UsageMeter.d.ts",
+   "was": "components/panels/UsageMeter.d.ts",
+   "kind": "component-types",
+   "component": "UsageMeter",
+   "bytes": 732,
+   "fileAt": "project/components/UsageMeter/UsageMeter.d.ts"
+  },
+  {
+   "path": "project/components/panels/UsageMeter.jsx",
+   "was": "components/panels/UsageMeter.jsx",
+   "kind": "component-source",
+   "component": "UsageMeter",
+   "bytes": 1146
+  },
+  {
+   "path": "project/components/panels/UsageMeter.prompt.md",
+   "was": "components/panels/UsageMeter.prompt.md",
+   "kind": "component-guide",
+   "component": "UsageMeter",
+   "bytes": 208,
+   "fileAt": "project/components/UsageMeter/README.md"
+  },
+  {
+   "path": "project/components/panels/github-panel-blocked.card.html",
+   "was": "components/panels/github-panel-blocked.card.html",
+   "kind": "showcase-page",
+   "group": "13 Panels",
+   "bytes": 2297,
+   "fileAt": "project/components/GithubPanelBlocked/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/panels/github-panel-running.card.html",
+   "was": "components/panels/github-panel-running.card.html",
+   "kind": "showcase-page",
+   "group": "13 Panels",
+   "bytes": 2269,
+   "fileAt": "project/components/GithubPanelRunning/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/panels/github-panel.card.html",
+   "was": "components/panels/github-panel.card.html",
+   "kind": "showcase-page",
+   "group": "13 Panels",
+   "bytes": 2116,
+   "fileAt": "project/components/GithubPanel/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/panels/panel.card.html",
+   "was": "components/panels/panel.card.html",
+   "kind": "showcase-page",
+   "group": "13 Panels",
+   "bytes": 1976,
+   "fileAt": "project/components/Panel2/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/panels/panels.card.html",
+   "was": "components/panels/panels.card.html",
+   "kind": "showcase-page",
+   "group": "07 Components",
+   "bytes": 2449,
+   "fileAt": "project/components/Panels/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/panels/usage-meter-compact.card.html",
+   "was": "components/panels/usage-meter-compact.card.html",
+   "kind": "showcase-page",
+   "group": "13 Panels",
+   "bytes": 1549,
+   "fileAt": "project/components/UsageMeterCompact/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/panels/usage-meter-unit.card.html",
+   "was": "components/panels/usage-meter-unit.card.html",
+   "kind": "showcase-page",
+   "group": "13 Panels",
+   "bytes": 1528,
+   "fileAt": "project/components/UsageMeterUnit/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/panels/usage-meter-warn.card.html",
+   "was": "components/panels/usage-meter-warn.card.html",
+   "kind": "showcase-page",
+   "group": "13 Panels",
+   "bytes": 1526,
+   "fileAt": "project/components/UsageMeterWarn/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/panels/usage-meter.card.html",
+   "was": "components/panels/usage-meter.card.html",
+   "kind": "component-card",
+   "component": "UsageMeter",
+   "group": "13 Panels",
+   "bytes": 1556,
+   "fileAt": "project/components/UsageMeter/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/ArtifactEmbed.d.ts",
+   "was": "components/thread/ArtifactEmbed.d.ts",
+   "kind": "component-types",
+   "component": "ArtifactEmbed",
+   "bytes": 540,
+   "fileAt": "project/components/ArtifactEmbed/ArtifactEmbed.d.ts"
+  },
+  {
+   "path": "project/components/thread/ArtifactEmbed.jsx",
+   "was": "components/thread/ArtifactEmbed.jsx",
+   "kind": "component-source",
+   "component": "ArtifactEmbed",
+   "bytes": 1209
+  },
+  {
+   "path": "project/components/thread/ArtifactEmbed.prompt.md",
+   "was": "components/thread/ArtifactEmbed.prompt.md",
+   "kind": "component-guide",
+   "component": "ArtifactEmbed",
+   "bytes": 167,
+   "fileAt": "project/components/ArtifactEmbed/README.md"
+  },
+  {
+   "path": "project/components/thread/CloudAgent.d.ts",
+   "was": "components/thread/CloudAgent.d.ts",
+   "kind": "component-types",
+   "bytes": 1583
+  },
+  {
+   "path": "project/components/thread/CloudAgent.jsx",
+   "was": "components/thread/CloudAgent.jsx",
+   "kind": "component-source",
+   "bytes": 2590
+  },
+  {
+   "path": "project/components/thread/CloudAgent.prompt.md",
+   "was": "components/thread/CloudAgent.prompt.md",
+   "kind": "doc",
+   "bytes": 385
+  },
+  {
+   "path": "project/components/thread/Composer.d.ts",
+   "was": "components/thread/Composer.d.ts",
+   "kind": "component-types",
+   "component": "Composer",
+   "bytes": 970,
+   "fileAt": "project/components/Composer/Composer.d.ts"
+  },
+  {
+   "path": "project/components/thread/Composer.jsx",
+   "was": "components/thread/Composer.jsx",
+   "kind": "component-source",
+   "component": "Composer",
+   "bytes": 3388
+  },
+  {
+   "path": "project/components/thread/Composer.prompt.md",
+   "was": "components/thread/Composer.prompt.md",
+   "kind": "component-guide",
+   "component": "Composer",
+   "bytes": 207,
+   "fileAt": "project/components/Composer/README.md"
+  },
+  {
+   "path": "project/components/thread/CrewReport.d.ts",
+   "was": "components/thread/CrewReport.d.ts",
+   "kind": "component-types",
+   "component": "CrewReport",
+   "bytes": 901,
+   "fileAt": "project/components/CrewReport/CrewReport.d.ts"
+  },
+  {
+   "path": "project/components/thread/CrewReport.jsx",
+   "was": "components/thread/CrewReport.jsx",
+   "kind": "component-source",
+   "component": "CrewReport",
+   "bytes": 1529
+  },
+  {
+   "path": "project/components/thread/CrewReport.prompt.md",
+   "was": "components/thread/CrewReport.prompt.md",
+   "kind": "component-guide",
+   "component": "CrewReport",
+   "bytes": 214,
+   "fileAt": "project/components/CrewReport/README.md"
+  },
+  {
+   "path": "project/components/thread/Delegation.d.ts",
+   "was": "components/thread/Delegation.d.ts",
+   "kind": "component-types",
+   "component": "Delegation",
+   "bytes": 1073,
+   "fileAt": "project/components/Delegation/Delegation.d.ts"
+  },
+  {
+   "path": "project/components/thread/Delegation.jsx",
+   "was": "components/thread/Delegation.jsx",
+   "kind": "component-source",
+   "component": "Delegation",
+   "bytes": 2065
+  },
+  {
+   "path": "project/components/thread/Delegation.prompt.md",
+   "was": "components/thread/Delegation.prompt.md",
+   "kind": "component-guide",
+   "component": "Delegation",
+   "bytes": 231,
+   "fileAt": "project/components/Delegation/README.md"
+  },
+  {
+   "path": "project/components/thread/Handoff.d.ts",
+   "was": "components/thread/Handoff.d.ts",
+   "kind": "component-types",
+   "bytes": 2125
+  },
+  {
+   "path": "project/components/thread/Handoff.jsx",
+   "was": "components/thread/Handoff.jsx",
+   "kind": "component-source",
+   "bytes": 2604
+  },
+  {
+   "path": "project/components/thread/Handoff.prompt.md",
+   "was": "components/thread/Handoff.prompt.md",
+   "kind": "doc",
+   "bytes": 362
+  },
+  {
+   "path": "project/components/thread/Message.d.ts",
+   "was": "components/thread/Message.d.ts",
+   "kind": "component-types",
+   "component": "Message",
+   "bytes": 2004,
+   "fileAt": "project/components/Message/Message.d.ts"
+  },
+  {
+   "path": "project/components/thread/Message.jsx",
+   "was": "components/thread/Message.jsx",
+   "kind": "component-source",
+   "component": "Message",
+   "bytes": 2217
+  },
+  {
+   "path": "project/components/thread/Message.prompt.md",
+   "was": "components/thread/Message.prompt.md",
+   "kind": "component-guide",
+   "component": "Message",
+   "bytes": 513,
+   "fileAt": "project/components/Message/README.md"
+  },
+  {
+   "path": "project/components/thread/QuestionCard.d.ts",
+   "was": "components/thread/QuestionCard.d.ts",
+   "kind": "component-types",
+   "bytes": 1469
+  },
+  {
+   "path": "project/components/thread/QuestionCard.jsx",
+   "was": "components/thread/QuestionCard.jsx",
+   "kind": "component-source",
+   "bytes": 5449
+  },
+  {
+   "path": "project/components/thread/QuestionCard.prompt.md",
+   "was": "components/thread/QuestionCard.prompt.md",
+   "kind": "doc",
+   "bytes": 635
+  },
+  {
+   "path": "project/components/thread/ThreadRow.d.ts",
+   "was": "components/thread/ThreadRow.d.ts",
+   "kind": "component-types",
+   "component": "ThreadRow",
+   "bytes": 1507,
+   "fileAt": "project/components/ThreadRow/ThreadRow.d.ts"
+  },
+  {
+   "path": "project/components/thread/ThreadRow.jsx",
+   "was": "components/thread/ThreadRow.jsx",
+   "kind": "component-source",
+   "component": "ThreadRow",
+   "bytes": 3541
+  },
+  {
+   "path": "project/components/thread/ThreadRow.prompt.md",
+   "was": "components/thread/ThreadRow.prompt.md",
+   "kind": "component-guide",
+   "component": "ThreadRow",
+   "bytes": 445,
+   "fileAt": "project/components/ThreadRow/README.md"
+  },
+  {
+   "path": "project/components/thread/ToolCall.d.ts",
+   "was": "components/thread/ToolCall.d.ts",
+   "kind": "component-types",
+   "component": "ToolCall",
+   "bytes": 737,
+   "fileAt": "project/components/ToolCall/ToolCall.d.ts"
+  },
+  {
+   "path": "project/components/thread/ToolCall.jsx",
+   "was": "components/thread/ToolCall.jsx",
+   "kind": "component-source",
+   "component": "ToolCall",
+   "bytes": 2601
+  },
+  {
+   "path": "project/components/thread/ToolCall.prompt.md",
+   "was": "components/thread/ToolCall.prompt.md",
+   "kind": "component-guide",
+   "component": "ToolCall",
+   "bytes": 204,
+   "fileAt": "project/components/ToolCall/README.md"
+  },
+  {
+   "path": "project/components/thread/artifact-embed.card.html",
+   "was": "components/thread/artifact-embed.card.html",
+   "kind": "component-card",
+   "component": "ArtifactEmbed",
+   "group": "12 Thread",
+   "bytes": 2041,
+   "fileAt": "project/components/ArtifactEmbed/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/cloud-agent.card.html",
+   "was": "components/thread/cloud-agent.card.html",
+   "kind": "page",
+   "bytes": 2330,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/cloud-agent.css",
+   "was": "components/thread/cloud-agent.css",
+   "kind": "stylesheet",
+   "bytes": 1709
+  },
+  {
+   "path": "project/components/thread/composer-big.card.html",
+   "was": "components/thread/composer-big.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1700,
+   "fileAt": "project/components/ComposerBig/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/composer-filled.card.html",
+   "was": "components/thread/composer-filled.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1649,
+   "fileAt": "project/components/ComposerFilled/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/composer.card.html",
+   "was": "components/thread/composer.card.html",
+   "kind": "component-card",
+   "component": "Composer",
+   "group": "12 Thread",
+   "bytes": 1556,
+   "fileAt": "project/components/Composer/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/crew-report-needs.card.html",
+   "was": "components/thread/crew-report-needs.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1886,
+   "fileAt": "project/components/CrewReportNeeds/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/crew-report.card.html",
+   "was": "components/thread/crew-report.card.html",
+   "kind": "component-card",
+   "component": "CrewReport",
+   "group": "12 Thread",
+   "bytes": 2377,
+   "fileAt": "project/components/CrewReport/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/delegation-single.card.html",
+   "was": "components/thread/delegation-single.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1702,
+   "fileAt": "project/components/DelegationSingle/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/delegation.card.html",
+   "was": "components/thread/delegation.card.html",
+   "kind": "component-card",
+   "component": "Delegation",
+   "group": "12 Thread",
+   "bytes": 2276,
+   "fileAt": "project/components/Delegation/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/handoff.card.html",
+   "was": "components/thread/handoff.card.html",
+   "kind": "page",
+   "bytes": 3386,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/handoff.css",
+   "was": "components/thread/handoff.css",
+   "kind": "stylesheet",
+   "bytes": 1911
+  },
+  {
+   "path": "project/components/thread/message-agent.card.html",
+   "was": "components/thread/message-agent.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1732,
+   "fileAt": "project/components/MessageAgent/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/message-user.card.html",
+   "was": "components/thread/message-user.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1637,
+   "fileAt": "project/components/MessageUser/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/question-card.card.html",
+   "was": "components/thread/question-card.card.html",
+   "kind": "page",
+   "bytes": 2864,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/question-card.css",
+   "was": "components/thread/question-card.css",
+   "kind": "stylesheet",
+   "bytes": 2668
+  },
+  {
+   "path": "project/components/thread/result-line.card.html",
+   "was": "components/thread/result-line.card.html",
+   "kind": "component-card",
+   "component": "ResultLine",
+   "group": "12 Thread",
+   "bytes": 1626,
+   "fileAt": "project/components/ResultLine/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/switch-line.card.html",
+   "was": "components/thread/switch-line.card.html",
+   "kind": "page",
+   "bytes": 2521,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/switch-line.css",
+   "was": "components/thread/switch-line.css",
+   "kind": "stylesheet",
+   "bytes": 634
+  },
+  {
+   "path": "project/components/thread/thread-group.card.html",
+   "was": "components/thread/thread-group.card.html",
+   "kind": "component-card",
+   "component": "ThreadGroup",
+   "group": "12 Thread",
+   "bytes": 1960,
+   "fileAt": "project/components/ThreadGroup/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/thread-row-automation.card.html",
+   "was": "components/thread/thread-row-automation.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1678,
+   "fileAt": "project/components/ThreadRowAutomation/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/thread-row-done.card.html",
+   "was": "components/thread/thread-row-done.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1702,
+   "fileAt": "project/components/ThreadRowDone/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/thread-row-marked-done.card.html",
+   "was": "components/thread/thread-row-marked-done.card.html",
+   "kind": "page",
+   "bytes": 1547,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/thread-row-needs.card.html",
+   "was": "components/thread/thread-row-needs.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1692,
+   "fileAt": "project/components/ThreadRowNeeds/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/thread-row-running.card.html",
+   "was": "components/thread/thread-row-running.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1731,
+   "fileAt": "project/components/ThreadRowRunning/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/thread-row-selected.card.html",
+   "was": "components/thread/thread-row-selected.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1679,
+   "fileAt": "project/components/ThreadRowSelected/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/thread-row-settled.card.html",
+   "was": "components/thread/thread-row-settled.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1658,
+   "fileAt": "project/components/ThreadRowSettled/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/thread.card.html",
+   "was": "components/thread/thread.card.html",
+   "kind": "showcase-page",
+   "group": "07 Components",
+   "bytes": 4398,
+   "fileAt": "project/components/Thread/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/tool-call-open.card.html",
+   "was": "components/thread/tool-call-open.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1696,
+   "fileAt": "project/components/ToolCallOpen/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/tool-call.card.html",
+   "was": "components/thread/tool-call.card.html",
+   "kind": "component-card",
+   "component": "ToolCall",
+   "group": "12 Thread",
+   "bytes": 1769,
+   "fileAt": "project/components/ToolCall/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/components/thread/tool-calls.card.html",
+   "was": "components/thread/tool-calls.card.html",
+   "kind": "showcase-page",
+   "group": "12 Thread",
+   "bytes": 1815,
+   "fileAt": "project/components/ToolCalls2/preview.html",
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/github.md",
+   "was": "github.md",
+   "kind": "doc",
+   "bytes": 1927
+  },
+  {
+   "path": "project/guidelines/brand-book.html",
+   "was": "guidelines/brand-book.html",
+   "kind": "showcase-page",
+   "group": "00 Brand book",
+   "bytes": 43218,
+   "fileAt": "project/components/BrandBook/preview.html",
+   "refs": [
+    {
+     "as": "../assets/logo/omni-mark.svg",
+     "to": "project/assets/logo/omni-mark.svg",
+     "exists": true
+    },
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-wordmark.svg",
+     "to": "project/assets/logo/omni-wordmark.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-mark-white.svg",
+     "to": "project/assets/logo/omni-mark-white.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-mark-needs.svg",
+     "to": "project/assets/logo/omni-mark-needs.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/favicon-ring-16.svg",
+     "to": "project/assets/logo/favicon-ring-16.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/favicon-16.svg",
+     "to": "project/assets/logo/favicon-16.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/app-icon.svg",
+     "to": "project/assets/logo/app-icon.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/app-icon-light.svg",
+     "to": "project/assets/logo/app-icon-light.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/harness/claude.svg",
+     "to": "project/assets/harness/claude.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/harness/openai.svg",
+     "to": "project/assets/harness/openai.svg",
+     "exists": true
+    },
+    {
+     "as": "../assets/harness/cursor.svg",
+     "to": "project/assets/harness/cursor.svg",
+     "exists": true
+    },
+    {
+     "as": "../ui_kits/omni-os/index.html",
+     "to": "project/ui_kits/omni-os/index.html",
+     "exists": true
+    },
+    {
+     "as": "../assets/logo/omni-wordmark-white.svg",
+     "to": "project/assets/logo/omni-wordmark-white.svg",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/colors-inversion.html",
+   "was": "guidelines/colors-inversion.html",
+   "kind": "showcase-page",
+   "group": "02 Color",
+   "bytes": 1900,
+   "fileAt": "project/components/ColorsInversion/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/colors-neutrals-dark.html",
+   "was": "guidelines/colors-neutrals-dark.html",
+   "kind": "showcase-page",
+   "group": "02 Color",
+   "bytes": 1843,
+   "fileAt": "project/components/ColorsNeutralsDark/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/colors-neutrals-light.html",
+   "was": "guidelines/colors-neutrals-light.html",
+   "kind": "showcase-page",
+   "group": "02 Color",
+   "bytes": 1901,
+   "fileAt": "project/components/ColorsNeutralsLight/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/colors-pop-rules.html",
+   "was": "guidelines/colors-pop-rules.html",
+   "kind": "showcase-page",
+   "group": "02 Color",
+   "bytes": 1983,
+   "fileAt": "project/components/ColorsPopRules/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/colors-pops.html",
+   "was": "guidelines/colors-pops.html",
+   "kind": "showcase-page",
+   "group": "02 Color",
+   "bytes": 1491,
+   "fileAt": "project/components/ColorsPops/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/density-modes.html",
+   "was": "guidelines/density-modes.html",
+   "kind": "showcase-page",
+   "group": "04 Shape & space",
+   "bytes": 3374,
+   "fileAt": "project/components/DensityModes/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/elevation.html",
+   "was": "guidelines/elevation.html",
+   "kind": "foundations-page",
+   "group": "04 Shape & space",
+   "bytes": 1395,
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/heights.html",
+   "was": "guidelines/heights.html",
+   "kind": "showcase-page",
+   "group": "04 Shape & space",
+   "bytes": 1226,
+   "fileAt": "project/components/Heights/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/motion-alive.html",
+   "was": "guidelines/motion-alive.html",
+   "kind": "showcase-page",
+   "group": "05 Motion",
+   "bytes": 1251,
+   "fileAt": "project/components/MotionAlive/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/motion-mechanical.html",
+   "was": "guidelines/motion-mechanical.html",
+   "kind": "showcase-page",
+   "group": "05 Motion",
+   "bytes": 2015,
+   "fileAt": "project/components/MotionMechanical/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/radii-borders.html",
+   "was": "guidelines/radii-borders.html",
+   "kind": "showcase-page",
+   "group": "04 Shape & space",
+   "bytes": 1906,
+   "fileAt": "project/components/RadiiBorders/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/spacing-scale.html",
+   "was": "guidelines/spacing-scale.html",
+   "kind": "showcase-page",
+   "group": "04 Shape & space",
+   "bytes": 1618,
+   "fileAt": "project/components/SpacingScale/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/type-mono-voice.html",
+   "was": "guidelines/type-mono-voice.html",
+   "kind": "showcase-page",
+   "group": "03 Type",
+   "bytes": 1427,
+   "fileAt": "project/components/TypeMonoVoice/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/type-pairing.html",
+   "was": "guidelines/type-pairing.html",
+   "kind": "showcase-page",
+   "group": "03 Type",
+   "bytes": 1316,
+   "fileAt": "project/components/TypePairing/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/guidelines/type-scale.html",
+   "was": "guidelines/type-scale.html",
+   "kind": "showcase-page",
+   "group": "03 Type",
+   "bytes": 2185,
+   "fileAt": "project/components/TypeScale/preview.html",
+   "refs": [
+    {
+     "as": "../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/screenshots/01-wm-r3.jpg",
+   "was": "screenshots/01-wm-r3.jpg",
+   "kind": "image",
+   "bytes": 33417
+  },
+  {
+   "path": "project/screenshots/01-wm-r3b.jpg",
+   "was": "screenshots/01-wm-r3b.jpg",
+   "kind": "image",
+   "bytes": 33680
+  },
+  {
+   "path": "project/screenshots/01-wm-r4.jpg",
+   "was": "screenshots/01-wm-r4.jpg",
+   "kind": "image",
+   "bytes": 33869
+  },
+  {
+   "path": "project/screenshots/01-wm-r5.jpg",
+   "was": "screenshots/01-wm-r5.jpg",
+   "kind": "image",
+   "bytes": 36670
+  },
+  {
+   "path": "project/screenshots/01-wm-r6.jpg",
+   "was": "screenshots/01-wm-r6.jpg",
+   "kind": "image",
+   "bytes": 33052
+  },
+  {
+   "path": "project/screenshots/02-wm-r3.jpg",
+   "was": "screenshots/02-wm-r3.jpg",
+   "kind": "image",
+   "bytes": 30726
+  },
+  {
+   "path": "project/screenshots/02-wm-r3b.jpg",
+   "was": "screenshots/02-wm-r3b.jpg",
+   "kind": "image",
+   "bytes": 30854
+  },
+  {
+   "path": "project/screenshots/02-wm-r4.jpg",
+   "was": "screenshots/02-wm-r4.jpg",
+   "kind": "image",
+   "bytes": 33796
+  },
+  {
+   "path": "project/screenshots/02-wm-r5.jpg",
+   "was": "screenshots/02-wm-r5.jpg",
+   "kind": "image",
+   "bytes": 34641
+  },
+  {
+   "path": "project/screenshots/02-wm-r6.jpg",
+   "was": "screenshots/02-wm-r6.jpg",
+   "kind": "image",
+   "bytes": 34105
+  },
+  {
+   "path": "project/screenshots/kit.jpg",
+   "was": "screenshots/kit.jpg",
+   "kind": "image",
+   "bytes": 44496
+  },
+  {
+   "path": "project/screenshots/wm-r2.jpg",
+   "was": "screenshots/wm-r2.jpg",
+   "kind": "image",
+   "bytes": 31764
+  },
+  {
+   "path": "project/styles.css",
+   "was": "styles.css",
+   "kind": "global-stylesheet",
+   "bytes": 482,
+   "unread": true,
+   "alsoReadAs": "project/components/bundle.css",
+   "refs": [
+    {
+     "as": "tokens/fonts.css",
+     "to": "project/tokens/fonts.css",
+     "exists": true
+    },
+    {
+     "as": "tokens/colors.css",
+     "to": "project/tokens/colors.css",
+     "exists": true
+    },
+    {
+     "as": "tokens/type.css",
+     "to": "project/tokens/type.css",
+     "exists": true
+    },
+    {
+     "as": "tokens/space.css",
+     "to": "project/tokens/space.css",
+     "exists": true
+    },
+    {
+     "as": "tokens/motion.css",
+     "to": "project/tokens/motion.css",
+     "exists": true
+    },
+    {
+     "as": "tokens/base.css",
+     "to": "project/tokens/base.css",
+     "exists": true
+    },
+    {
+     "as": "components/omni.css",
+     "to": "project/components/omni.css",
+     "exists": true
+    },
+    {
+     "as": "components/forms/model-picker.css",
+     "to": "project/components/forms/model-picker.css",
+     "exists": true
+    },
+    {
+     "as": "components/thread/switch-line.css",
+     "to": "project/components/thread/switch-line.css",
+     "exists": true
+    },
+    {
+     "as": "components/thread/handoff.css",
+     "to": "project/components/thread/handoff.css",
+     "exists": true
+    },
+    {
+     "as": "components/thread/question-card.css",
+     "to": "project/components/thread/question-card.css",
+     "exists": true
+    },
+    {
+     "as": "components/thread/cloud-agent.css",
+     "to": "project/components/thread/cloud-agent.css",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/support.js",
+   "was": "support.js",
+   "kind": "other",
+   "bytes": 69150
+  },
+  {
+   "path": "project/tokens/base.css",
+   "was": "tokens/base.css",
+   "kind": "global-stylesheet",
+   "bytes": 2291
+  },
+  {
+   "path": "project/tokens/colors.css",
+   "was": "tokens/colors.css",
+   "kind": "global-stylesheet",
+   "bytes": 2597
+  },
+  {
+   "path": "project/tokens/fonts.css",
+   "was": "tokens/fonts.css",
+   "kind": "global-stylesheet",
+   "bytes": 1319
+  },
+  {
+   "path": "project/tokens/motion.css",
+   "was": "tokens/motion.css",
+   "kind": "global-stylesheet",
+   "bytes": 883
+  },
+  {
+   "path": "project/tokens/space.css",
+   "was": "tokens/space.css",
+   "kind": "global-stylesheet",
+   "bytes": 1422
+  },
+  {
+   "path": "project/tokens/type.css",
+   "was": "tokens/type.css",
+   "kind": "global-stylesheet",
+   "bytes": 1743
+  },
+  {
+   "path": "project/ui_kits/mac/_notes.md",
+   "was": "ui_kits/mac/_notes.md",
+   "kind": "kit-piece",
+   "bytes": 42232
+  },
+  {
+   "path": "project/ui_kits/mac/mac.css",
+   "was": "ui_kits/mac/mac.css",
+   "kind": "kit-piece",
+   "bytes": 54224
+  },
+  {
+   "path": "project/ui_kits/mac/mac.js",
+   "was": "ui_kits/mac/mac.js",
+   "kind": "kit-piece",
+   "bytes": 14754
+  },
+  {
+   "path": "project/ui_kits/omni-mobile/MobileApp.jsx",
+   "was": "ui_kits/omni-mobile/MobileApp.jsx",
+   "kind": "kit-piece",
+   "bytes": 12493
+  },
+  {
+   "path": "project/ui_kits/omni-mobile/MobileDocs.jsx",
+   "was": "ui_kits/omni-mobile/MobileDocs.jsx",
+   "kind": "kit-piece",
+   "bytes": 17258
+  },
+  {
+   "path": "project/ui_kits/omni-mobile/MobileParts.jsx",
+   "was": "ui_kits/omni-mobile/MobileParts.jsx",
+   "kind": "kit-piece",
+   "bytes": 19677
+  },
+  {
+   "path": "project/ui_kits/omni-mobile/MobileScreens.jsx",
+   "was": "ui_kits/omni-mobile/MobileScreens.jsx",
+   "kind": "kit-piece",
+   "bytes": 13458
+  },
+  {
+   "path": "project/ui_kits/omni-mobile/MobileThread.jsx",
+   "was": "ui_kits/omni-mobile/MobileThread.jsx",
+   "kind": "kit-piece",
+   "bytes": 20877
+  },
+  {
+   "path": "project/ui_kits/omni-mobile/index.html",
+   "was": "ui_kits/omni-mobile/index.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 6702,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    },
+    {
+     "as": "../omni-os/data.js",
+     "to": "project/ui_kits/omni-os/data.js",
+     "exists": true
+    },
+    {
+     "as": "mobile-data.js",
+     "to": "project/ui_kits/omni-mobile/mobile-data.js",
+     "exists": true
+    },
+    {
+     "as": "../omni-os/ios-frame.jsx",
+     "to": "project/ui_kits/omni-os/ios-frame.jsx",
+     "exists": true
+    },
+    {
+     "as": "MobileParts.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileParts.jsx",
+     "exists": true
+    },
+    {
+     "as": "MobileScreens.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileScreens.jsx",
+     "exists": true
+    },
+    {
+     "as": "MobileThread.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileThread.jsx",
+     "exists": true
+    },
+    {
+     "as": "MobileApp.jsx",
+     "to": "project/ui_kits/omni-mobile/MobileApp.jsx",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/ui_kits/omni-mobile/mobile-data.js",
+   "was": "ui_kits/omni-mobile/mobile-data.js",
+   "kind": "kit-piece",
+   "bytes": 7853
+  },
+  {
+   "path": "project/ui_kits/omni-os/App.jsx",
+   "was": "ui_kits/omni-os/App.jsx",
+   "kind": "kit-piece",
+   "bytes": 6073
+  },
+  {
+   "path": "project/ui_kits/omni-os/ChannelScreen.jsx",
+   "was": "ui_kits/omni-os/ChannelScreen.jsx",
+   "kind": "kit-piece",
+   "bytes": 4811
+  },
+  {
+   "path": "project/ui_kits/omni-os/ConductorScreen.jsx",
+   "was": "ui_kits/omni-os/ConductorScreen.jsx",
+   "kind": "kit-piece",
+   "bytes": 7836
+  },
+  {
+   "path": "project/ui_kits/omni-os/PhoneConductor.jsx",
+   "was": "ui_kits/omni-os/PhoneConductor.jsx",
+   "kind": "kit-piece",
+   "bytes": 2412
+  },
+  {
+   "path": "project/ui_kits/omni-os/README.md",
+   "was": "ui_kits/omni-os/README.md",
+   "kind": "kit-piece",
+   "bytes": 1372
+  },
+  {
+   "path": "project/ui_kits/omni-os/cards/channel-compact.html",
+   "was": "ui_kits/omni-os/cards/channel-compact.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 432,
+   "refs": [
+    {
+     "as": "../index.html",
+     "to": "project/ui_kits/omni-os/index.html",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/ui_kits/omni-os/cards/channel-dark.html",
+   "was": "ui_kits/omni-os/cards/channel-dark.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 452,
+   "refs": [
+    {
+     "as": "../index.html",
+     "to": "project/ui_kits/omni-os/index.html",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/ui_kits/omni-os/cards/channel-light.html",
+   "was": "ui_kits/omni-os/cards/channel-light.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 456,
+   "refs": [
+    {
+     "as": "../index.html",
+     "to": "project/ui_kits/omni-os/index.html",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/ui_kits/omni-os/cards/conductor-dark.html",
+   "was": "ui_kits/omni-os/cards/conductor-dark.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 495,
+   "refs": [
+    {
+     "as": "../index.html",
+     "to": "project/ui_kits/omni-os/index.html",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/ui_kits/omni-os/cards/conductor-light.html",
+   "was": "ui_kits/omni-os/cards/conductor-light.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 499,
+   "refs": [
+    {
+     "as": "../index.html",
+     "to": "project/ui_kits/omni-os/index.html",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/ui_kits/omni-os/cards/palette-light.html",
+   "was": "ui_kits/omni-os/cards/palette-light.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 432,
+   "refs": [
+    {
+     "as": "../index.html",
+     "to": "project/ui_kits/omni-os/index.html",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/ui_kits/omni-os/data.js",
+   "was": "ui_kits/omni-os/data.js",
+   "kind": "kit-piece",
+   "bytes": 10659
+  },
+  {
+   "path": "project/ui_kits/omni-os/index.html",
+   "was": "ui_kits/omni-os/index.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 1562,
+   "refs": [
+    {
+     "as": "../../assets/logo/favicon-16.svg",
+     "to": "project/assets/logo/favicon-16.svg",
+     "exists": true
+    },
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    },
+    {
+     "as": "data.js",
+     "to": "project/ui_kits/omni-os/data.js",
+     "exists": true
+    },
+    {
+     "as": "ConductorScreen.jsx",
+     "to": "project/ui_kits/omni-os/ConductorScreen.jsx",
+     "exists": true
+    },
+    {
+     "as": "ChannelScreen.jsx",
+     "to": "project/ui_kits/omni-os/ChannelScreen.jsx",
+     "exists": true
+    },
+    {
+     "as": "App.jsx",
+     "to": "project/ui_kits/omni-os/App.jsx",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/ui_kits/omni-os/ios-frame.jsx",
+   "was": "ui_kits/omni-os/ios-frame.jsx",
+   "kind": "kit-piece",
+   "bytes": 16507
+  },
+  {
+   "path": "project/ui_kits/omni-os/phone.html",
+   "was": "ui_kits/omni-os/phone.html",
+   "kind": "kit-piece",
+   "group": "14 In use",
+   "bytes": 1792,
+   "refs": [
+    {
+     "as": "../../styles.css",
+     "to": "project/styles.css",
+     "exists": true
+    },
+    {
+     "as": "../../_ds_bundle.js",
+     "to": "project/_ds_bundle.js",
+     "exists": true
+    },
+    {
+     "as": "../../assets/ds-fallback.js",
+     "to": "project/assets/ds-fallback.js",
+     "exists": true
+    },
+    {
+     "as": "data.js",
+     "to": "project/ui_kits/omni-os/data.js",
+     "exists": true
+    },
+    {
+     "as": "ios-frame.jsx",
+     "to": "project/ui_kits/omni-os/ios-frame.jsx",
+     "exists": true
+    },
+    {
+     "as": "ConductorScreen.jsx",
+     "to": "project/ui_kits/omni-os/ConductorScreen.jsx",
+     "exists": true
+    },
+    {
+     "as": "PhoneConductor.jsx",
+     "to": "project/ui_kits/omni-os/PhoneConductor.jsx",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/uploads/AnthropicSerif-Display-Bold-Static.otf",
+   "was": "uploads/AnthropicSerif-Display-Bold-Static.otf",
+   "kind": "font",
+   "bytes": 67588
+  },
+  {
+   "path": "project/uploads/AnthropicSerif-Display-Medium-Static.otf",
+   "was": "uploads/AnthropicSerif-Display-Medium-Static.otf",
+   "kind": "font",
+   "bytes": 66812
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/index.html",
+   "was": "uploads/Omni Mobile Research/index.html",
+   "kind": "page",
+   "bytes": 90921,
+   "refs": [
+    {
+     "as": "mobile-research/omni-home.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/omni-home.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/omni-channel.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/omni-channel.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/omni-drawer.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/omni-drawer.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/omni-thread.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/omni-thread.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/omni-panel.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/omni-panel.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/claudecode-session-list-1.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/claudecode-session-list-1.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/claudecode-session-list-2.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/claudecode-session-list-2.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/claudecode-session-1.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/claudecode-session-1.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/claudecode-session-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/claudecode-session-2.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/claude-7.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/claude-7.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/claude-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/claude-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/claude-4.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/claude-4.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/claude-5.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/claude-5.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/claude-6.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/claude-6.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/cursor-agent-list-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-agent-list-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/cursor-agent-list-2-live-activity.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-agent-list-2-live-activity.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/cursor-agent-thread-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-agent-thread-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/cursor-pr-review-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-pr-review-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/cursor-diff-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-diff-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/cursor-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/cursor-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/cursor-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/cursor-2.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/cursor-3.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/cursor-3.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/cursor-4.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/cursor-4.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/cursor-5.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/cursor-5.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/cursor-6.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/cursor-6.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/linear-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/linear-2.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/linear-3.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/linear-3.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/linear-4.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/linear-4.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/linear-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/linear-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/linear-6.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/linear-6.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/linear-5.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/linear-5.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/slack-home-1.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/slack-home-1.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/slack-home-2.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/slack-home-2.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/slack-message-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/slack-message-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/slack-channel-1.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/slack-channel-1.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/slack-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/slack-2.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/slack-4.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/slack-4.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/slack-5.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/slack-5.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/slack-3.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/slack-3.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/codex-task-list-1.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/codex-task-list-1.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/codex-task-1.png",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/codex-task-1.png",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/codex-task-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/codex-task-2.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/codex-approval-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/codex-approval-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/chatgpt-3.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/chatgpt-3.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/chatgpt-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/chatgpt-2.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/chatgpt-8.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/chatgpt-8.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/chatgpt-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/chatgpt-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/grok-thinking-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/grok-thinking-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/grok-deepsearch-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/grok-deepsearch-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/grok-conversation-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/grok-conversation-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/real/grok-home-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/real/grok-home-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/grok-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/grok-2.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/grok-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/grok-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/grok-5.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/grok-5.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/grok-4.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/grok-4.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/grok-3.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/grok-3.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/perplexity-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/perplexity-2.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/perplexity-4.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/perplexity-4.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/perplexity-7.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/perplexity-7.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/perplexity-6.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/perplexity-6.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/perplexity-5.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/perplexity-5.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/discord-4.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/discord-4.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/discord-3.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/discord-3.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/discord-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/discord-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/telegram-1.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/telegram-1.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/telegram-7.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/telegram-7.jpg",
+     "exists": true
+    },
+    {
+     "as": "mobile-research/telegram-2.jpg",
+     "to": "project/uploads/Omni Mobile Research/mobile-research/telegram-2.jpg",
+     "exists": true
+    }
+   ]
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/chatgpt-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/chatgpt-1.jpg",
+   "kind": "image",
+   "bytes": 107262
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/chatgpt-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/chatgpt-2.jpg",
+   "kind": "image",
+   "bytes": 93570
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/chatgpt-3.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/chatgpt-3.jpg",
+   "kind": "image",
+   "bytes": 94561
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/chatgpt-8.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/chatgpt-8.jpg",
+   "kind": "image",
+   "bytes": 107696
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/claude-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/claude-1.jpg",
+   "kind": "image",
+   "bytes": 146565
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/claude-4.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/claude-4.jpg",
+   "kind": "image",
+   "bytes": 102273
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/claude-5.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/claude-5.jpg",
+   "kind": "image",
+   "bytes": 126872
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/claude-6.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/claude-6.jpg",
+   "kind": "image",
+   "bytes": 171586
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/claude-7.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/claude-7.jpg",
+   "kind": "image",
+   "bytes": 89484
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/cursor-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/cursor-1.jpg",
+   "kind": "image",
+   "bytes": 102217
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/cursor-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/cursor-2.jpg",
+   "kind": "image",
+   "bytes": 110143
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/cursor-3.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/cursor-3.jpg",
+   "kind": "image",
+   "bytes": 107101
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/cursor-4.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/cursor-4.jpg",
+   "kind": "image",
+   "bytes": 114839
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/cursor-5.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/cursor-5.jpg",
+   "kind": "image",
+   "bytes": 167741
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/cursor-6.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/cursor-6.jpg",
+   "kind": "image",
+   "bytes": 112802
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/discord-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/discord-1.jpg",
+   "kind": "image",
+   "bytes": 108405
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/discord-3.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/discord-3.jpg",
+   "kind": "image",
+   "bytes": 118647
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/discord-4.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/discord-4.jpg",
+   "kind": "image",
+   "bytes": 90763
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/grok-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/grok-1.jpg",
+   "kind": "image",
+   "bytes": 101416
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/grok-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/grok-2.jpg",
+   "kind": "image",
+   "bytes": 136879
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/grok-3.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/grok-3.jpg",
+   "kind": "image",
+   "bytes": 148266
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/grok-4.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/grok-4.jpg",
+   "kind": "image",
+   "bytes": 144069
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/grok-5.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/grok-5.jpg",
+   "kind": "image",
+   "bytes": 132411
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/linear-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/linear-1.jpg",
+   "kind": "image",
+   "bytes": 94321
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/linear-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/linear-2.jpg",
+   "kind": "image",
+   "bytes": 108107
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/linear-3.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/linear-3.jpg",
+   "kind": "image",
+   "bytes": 100646
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/linear-4.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/linear-4.jpg",
+   "kind": "image",
+   "bytes": 91407
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/linear-5.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/linear-5.jpg",
+   "kind": "image",
+   "bytes": 83937
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/linear-6.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/linear-6.jpg",
+   "kind": "image",
+   "bytes": 95715
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/omni-channel.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/omni-channel.png",
+   "kind": "image",
+   "bytes": 50763
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/omni-drawer.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/omni-drawer.png",
+   "kind": "image",
+   "bytes": 40802
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/omni-home.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/omni-home.png",
+   "kind": "image",
+   "bytes": 56293
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/omni-panel.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/omni-panel.png",
+   "kind": "image",
+   "bytes": 55761
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/omni-thread.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/omni-thread.png",
+   "kind": "image",
+   "bytes": 41866
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/perplexity-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/perplexity-2.jpg",
+   "kind": "image",
+   "bytes": 104085
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/perplexity-4.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/perplexity-4.jpg",
+   "kind": "image",
+   "bytes": 76458
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/perplexity-5.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/perplexity-5.jpg",
+   "kind": "image",
+   "bytes": 99855
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/perplexity-6.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/perplexity-6.jpg",
+   "kind": "image",
+   "bytes": 108878
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/perplexity-7.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/perplexity-7.jpg",
+   "kind": "image",
+   "bytes": 102961
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/claudecode-session-1.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/claudecode-session-1.png",
+   "kind": "image",
+   "bytes": 196955
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/claudecode-session-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/claudecode-session-2.jpg",
+   "kind": "image",
+   "bytes": 116888
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/claudecode-session-list-1.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/claudecode-session-list-1.png",
+   "kind": "image",
+   "bytes": 144382
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/claudecode-session-list-2.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/claudecode-session-list-2.png",
+   "kind": "image",
+   "bytes": 112377
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/codex-approval-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/codex-approval-1.jpg",
+   "kind": "image",
+   "bytes": 214958
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/codex-task-1.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/codex-task-1.png",
+   "kind": "image",
+   "bytes": 296650
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/codex-task-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/codex-task-2.jpg",
+   "kind": "image",
+   "bytes": 76793
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/codex-task-list-1.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/codex-task-list-1.png",
+   "kind": "image",
+   "bytes": 81932
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-agent-list-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/cursor-agent-list-1.jpg",
+   "kind": "image",
+   "bytes": 54083
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-agent-list-2-live-activity.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/cursor-agent-list-2-live-activity.jpg",
+   "kind": "image",
+   "bytes": 89510
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-agent-thread-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/cursor-agent-thread-1.jpg",
+   "kind": "image",
+   "bytes": 92985
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-diff-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/cursor-diff-1.jpg",
+   "kind": "image",
+   "bytes": 48176
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/cursor-pr-review-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/cursor-pr-review-1.jpg",
+   "kind": "image",
+   "bytes": 71970
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/grok-conversation-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/grok-conversation-1.jpg",
+   "kind": "image",
+   "bytes": 119497
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/grok-deepsearch-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/grok-deepsearch-1.jpg",
+   "kind": "image",
+   "bytes": 79890
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/grok-home-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/grok-home-1.jpg",
+   "kind": "image",
+   "bytes": 74749
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/grok-thinking-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/grok-thinking-1.jpg",
+   "kind": "image",
+   "bytes": 89854
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/slack-channel-1.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/slack-channel-1.png",
+   "kind": "image",
+   "bytes": 550474
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/slack-home-1.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/slack-home-1.png",
+   "kind": "image",
+   "bytes": 87677
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/slack-home-2.png",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/slack-home-2.png",
+   "kind": "image",
+   "bytes": 96415
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/real/slack-message-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/real/slack-message-1.jpg",
+   "kind": "image",
+   "bytes": 111552
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/slack-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/slack-2.jpg",
+   "kind": "image",
+   "bytes": 95444
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/slack-3.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/slack-3.jpg",
+   "kind": "image",
+   "bytes": 102813
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/slack-4.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/slack-4.jpg",
+   "kind": "image",
+   "bytes": 114639
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/slack-5.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/slack-5.jpg",
+   "kind": "image",
+   "bytes": 115420
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/telegram-1.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/telegram-1.jpg",
+   "kind": "image",
+   "bytes": 114083
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/telegram-2.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/telegram-2.jpg",
+   "kind": "image",
+   "bytes": 122868
+  },
+  {
+   "path": "project/uploads/Omni Mobile Research/mobile-research/telegram-7.jpg",
+   "was": "uploads/Omni Mobile Research/mobile-research/telegram-7.jpg",
+   "kind": "image",
+   "bytes": 150966
+  },
+  {
+   "path": "project/uploads/Screenshot 2026-10-20 at 22.29.09.png",
+   "was": "uploads/Screenshot 2026-10-20 at 22.29.09.png",
+   "kind": "image",
+   "bytes": 99001
+  }
+ ],
+ "written": [
+  {
+   "path": "project/README.md",
+   "bytes": 62839,
+   "was": "readme.md",
+   "appended": "the “Moved to Claude” section; the author’s text above it is as it was (an earlier generated tail or an earlier section of that kind, if there was one, was cut)"
+  },
+  {
+   "path": "project/assets/notes/COMPONENTS.md",
+   "bytes": 7559
+  },
+  {
+   "path": "project/assets/notes/MIGRATION-REPORT.md",
+   "bytes": 6677
+  },
+  {
+   "path": "project/migration-map.json"
+  }
+ ],
+ "byTheType": [
+  "project/manifest.json"
+ ],
+ "setAside": [],
+ "notCarried": []
+}

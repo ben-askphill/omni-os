@@ -1,0 +1,18 @@
+<!-- @dsCard group="07 Components" viewport="720x180" name="Toast" subtitle="Springs up from the corner when a thread finishes elsewhere" width=720 height=180 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}body{background:var(--canvas)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Toast }) => {
+function App(){const [k,setK]=React.useState(0);return <div className="stack" key={k}>
+<Toast status="done" title="Klaviyo abandoned-cart flow" body="Finished in #Volero" onAction={()=>setK(k+1)} onDismiss={()=>setK(k+1)}/>
+<Toast status="needs" title="Pause WEEKEND15?" body="Store ops is waiting on you · T-4F2C" action="Decide" onAction={()=>setK(k+1)} onDismiss={()=>setK(k+1)}/>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

@@ -1,0 +1,16 @@
+/* Omni OS space, radii, heights, shadows. Values from apps/web/src (Tailwind classes in ui.tsx, Sidebar, Transcript, index.css). */
+/* Spacing, radii, heights, layout and the shadows tokens.json can hold come from tokens.css; what references other tokens stays here. */
+:root{
+--r-composer:var(--r-sm);
+/* shadows (Bencho) */
+--shadow-card:0 0 0 0.5px var(--pane-edge),0 1px 2px rgb(23 24 26 / 0.05);
+--ring-focus:0 0 0 4px var(--wash);
+}
+[data-theme="dark"],.scheme-dark{
+--shadow-card:0 0 0 0.5px var(--pane-edge),0 1px 2px rgb(0 0 0 / 0.4);
+}
+/* .scheme-dark: the sidebar always draws with the dark tokens */
+.scheme-dark{
+--shadow-thumb:0 1px 2px rgb(0 0 0 / 0.3),0 0 0 0.5px rgb(255 255 255 / 0.06);
+--shadow-menu:0 0 0 0.5px rgb(255 255 255 / 0.08),0 2px 4px rgb(0 0 0 / 0.3),0 18px 44px -10px rgb(0 0 0 / 0.65);
+}

@@ -1,0 +1,16 @@
+<!-- @dsCard group="09 Forms" viewport="360x200" name="Segmented — vertical" subtitle="Thumb slides on the y axis" width=360 height=200 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Segmented }) => {
+
+function App(){const [v,setV]=React.useState('general');return <div style={{width:200}}><Segmented vertical value={v} onChange={setV} options={[{id:"general",label:"General",icon:"settings"},{id:"harness",label:"Harnesses",icon:"terminal"},{id:"notify",label:"Notifications",icon:"bell"}]}/></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

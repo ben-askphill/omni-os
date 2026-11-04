@@ -1,0 +1,19 @@
+<!-- @dsCard group="08 Core" viewport="720x110" name="Chip" subtitle="default, outline, ink, needs, done, live" -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Chip }) => {
+
+function App(){return <div className="cells"><div className="cell"><span className="om-caption">default</span><Chip>builder</Chip></div><div className="cell"><span className="om-caption">outline</span><Chip tone="outline">Automation</Chip></div><div className="cell"><span className="om-caption">ink</span><Chip tone="ink">Pinned</Chip></div><div className="cell"><span className="om-caption">needs</span><Chip tone="needs">Needs you</Chip></div><div className="cell"><span className="om-caption">done</span><Chip tone="done">New</Chip></div><div className="cell"><span className="om-caption">live</span><Chip tone="live">2 running</Chip></div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

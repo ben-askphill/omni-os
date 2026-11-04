@@ -1,0 +1,21 @@
+<!-- @dsCard group="07 Components" viewport="1000x620" name="Navigation" subtitle="Sidebar (sliding thumb), TabStack, CommandPalette" width=1000 height=620 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}body{padding:8px 8px 8px 0;background:var(--canvas)}.wrap{display:flex;height:604px}.main{position:relative;flex:1;display:flex;flex-direction:column;min-width:0;border-radius:22px;background:var(--bg);box-shadow:var(--shadow-card);overflow:hidden}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Rail, TabStack, CommandPalette }) => {
+const channels=[{id:'conductor',name:'Conductor',threads:[{id:'t0',title:'Volero checkout drop-off',state:'needs'}]},{id:'vo',name:'Volero',kind:'client',running:2,needs:1,threads:[{id:'t1',title:'Patch shipping-rate script',state:'running'},{id:'t2',title:'Size-guide metafields',state:'running'}]},{id:'pg',name:'Pink Gellac',kind:'client',running:1},{id:'as',name:'Acne Studios',kind:'client'},{id:'in',name:'omni-internal',kind:'internal'},{id:'me',name:'personal',kind:'personal'}];
+const items=[{id:'a',group:'Actions',kind:'command',icon:'plus',label:'New thread',sub:'Start a task'},{id:'c1',group:'Channels',kind:'channel',label:'#Volero',sub:'volero.nl',meta:'2 running',metaLive:true},{id:'c2',group:'Channels',kind:'channel',label:'#Pink Gellac',sub:'pinkgellac.com'},{id:'t1',group:'Recent threads',kind:'thread',label:'Patch shipping-rate script',sub:'#Volero',taskId:'T-4F2B',state:'running'},{id:'t2',group:'Recent threads',kind:'thread',label:'Pause WEEKEND15?',sub:'#Volero',taskId:'T-4F2C',state:'needs'},{id:'t3',group:'Recent threads',kind:'thread',label:'Checkout drop-off report',sub:'#Volero',taskId:'T-4F2A',state:'done'}];
+function App(){const [a,setA]=React.useState('vo');const [t,setT]=React.useState('a');const [th,setTh]=React.useState('light');return <div className="wrap">
+<Rail channels={channels} activeId={a} onSelect={setA} conductor={{state:'delegating',running:1}} usage={[{name:'Claude',five:.71,week:.48},{name:'Codex',five:.93,week:.62},{name:'Cursor',five:.22,week:null}]} theme={th} onTheme={setTh}/>
+<div className="main"><TabStack activeId={t} onSelect={setT} tabs={[{id:'a',title:'Volero checkout drop-off',state:'needs'},{id:'b',title:'Patch shipping-rate script',state:'running'},{id:'c',title:'funnel-before-after.html',kind:'artifact'},{id:'d',title:'WEEKEND15',state:'needs'},{id:'e',title:'Returns copy'},{id:'f',title:'PDP audit',state:'done'}]}/>
+<div style={{position:'relative',flex:1,padding:'24px 40px'}}><CommandPalette modal={false} items={items} onClose={()=>{}}/></div></div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

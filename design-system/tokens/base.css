@@ -1,0 +1,30 @@
+/* Omni OS base: element defaults and shared keyframes (mirrors web/src/index.css). */
+*,::before,::after{border-color:var(--line)}
+html{background:var(--canvas);color:var(--fg);font-family:var(--font-sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+body{margin:0;font:var(--type-body)}
+button{cursor:pointer;font:inherit;color:inherit}
+button:disabled{cursor:default}
+input,textarea,select{font:inherit;letter-spacing:inherit;color:inherit}
+a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px;transition:text-decoration-color .16s}
+a:hover{text-decoration-color:currentColor}
+code,samp,pre{font-family:var(--font-mono)}
+body{font-variant-numeric:tabular-nums}
+::selection{background:var(--mark-hl)}
+:focus-visible{outline:1.5px solid var(--fg);outline-offset:2px}
+*{scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+.om-tnum{font-variant-numeric:tabular-nums}
+@keyframes om-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+@keyframes om-ping{0%{transform:scale(1);opacity:.55}80%,100%{transform:scale(2.6);opacity:0}}
+@keyframes om-spin{to{transform:rotate(360deg)}}
+@keyframes om-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes om-pop{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes om-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes om-panel{from{transform:translateX(18px) scale(.985);opacity:0}}
+@keyframes om-scrim{from{opacity:0}}
+@keyframes om-pik{from{opacity:0;transform:translateY(-4px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes om-toast{from{opacity:0;transform:translateY(14px) scale(.92)}to{opacity:1;transform:none}}
+@keyframes om-burn{from{width:100%}to{width:0}}
+@keyframes om-rise-y{0%{transform:scaleY(.45)}50%{transform:scaleY(1)}100%{transform:scaleY(.45)}}
+@keyframes om-dash{to{background-position:12px 0}}
+@keyframes om-tick-row{from{transform:translateX(-56px)}to{transform:translateX(1400px)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important}}

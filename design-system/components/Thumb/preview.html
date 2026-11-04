@@ -1,0 +1,16 @@
+<!-- @dsCard group="09 Forms" name="Thumb" subtitle="The sliding thumb inside Segmented: default, wash and soft tones" width=700 height=140 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-end}.cell{display:grid;gap:8px;justify-items:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Segmented }) => {
+
+function App(){const [s,setS]=React.useState('threads');const o=[{id:'threads',label:'Threads'},{id:'prs',label:'PRs'},{id:'settings',label:'Settings'}];return <div className="cells"><div className="cell"><span className="om-caption">default</span><Segmented value={s} onChange={setS} options={o}/></div><div className="cell"><span className="om-caption">wash</span><Segmented tone="wash" value={s} onChange={setS} options={o}/></div><div className="cell"><span className="om-caption">soft</span><Segmented tone="soft" value={s} onChange={setS} options={o}/></div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

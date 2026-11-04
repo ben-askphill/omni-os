@@ -1,0 +1,257 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Other": {
+      "files": {},
+      "name": "Other",
+      "order": []
+    },
+    "harness": {
+      "files": {},
+      "name": "harness",
+      "order": []
+    },
+    "icons": {
+      "files": {},
+      "name": "icons",
+      "order": []
+    },
+    "logo": {
+      "files": {},
+      "name": "logo",
+      "order": []
+    },
+    "mac-app": {
+      "files": {
+        "01-tokens.webp": {
+          "blob": "aaf31b6c16fc629d87bdb4da44b26f84",
+          "name": "01-tokens.webp",
+          "size": 92830,
+          "type": "image/webp"
+        },
+        "02-brand-and-icons.webp": {
+          "blob": "c1d5c050c918906bdf8956642ad5ef0a",
+          "name": "02-brand-and-icons.webp",
+          "size": 67722,
+          "type": "image/webp"
+        },
+        "03-main-window.webp": {
+          "blob": "65c36b7445ca9a6b7a33ddc9fcc804a9",
+          "name": "03-main-window.webp",
+          "size": 102190,
+          "type": "image/webp"
+        },
+        "04-sidebar.webp": {
+          "blob": "21c1bb26fa2687823e9a0eff88a516fe",
+          "name": "04-sidebar.webp",
+          "size": 75578,
+          "type": "image/webp"
+        },
+        "05-command-menu.webp": {
+          "blob": "d771aa7dceca5ae71f02d462d30e0022",
+          "name": "05-command-menu.webp",
+          "size": 38108,
+          "type": "image/webp"
+        },
+        "06-buttons-and-pills.webp": {
+          "blob": "6ed2b6e3e2874fbac38291015630a3df",
+          "name": "06-buttons-and-pills.webp",
+          "size": 92398,
+          "type": "image/webp"
+        },
+        "07-fields.webp": {
+          "blob": "868685a56159d6dab5a32165cb59817a",
+          "name": "07-fields.webp",
+          "size": 48964,
+          "type": "image/webp"
+        },
+        "08-feedback.webp": {
+          "blob": "c6af7011cb9186a94d82ccc91023cde8",
+          "name": "08-feedback.webp",
+          "size": 70576,
+          "type": "image/webp"
+        },
+        "09-composer.webp": {
+          "blob": "3312aa221bb406f6c02307f052940ead",
+          "name": "09-composer.webp",
+          "size": 122654,
+          "type": "image/webp"
+        },
+        "10-transcript.webp": {
+          "blob": "d630f83cab50b87474e8a59c1e4205e3",
+          "name": "10-transcript.webp",
+          "size": 57204,
+          "type": "image/webp"
+        },
+        "11-shipping-rates.webp": {
+          "blob": "9b6e3ee7b370b1d4855f47bf9789692f",
+          "name": "11-shipping-rates.webp",
+          "size": 40626,
+          "type": "image/webp"
+        },
+        "12-tool-calls.webp": {
+          "blob": "d05e90e9641e324e962733c95d9df230",
+          "name": "12-tool-calls.webp",
+          "size": 78282,
+          "type": "image/webp"
+        },
+        "13-delegation-and-reports.webp": {
+          "blob": "696ee2b1f348c6713899385844fadfd9",
+          "name": "13-delegation-and-reports.webp",
+          "size": 66030,
+          "type": "image/webp"
+        },
+        "14-queued-messages.webp": {
+          "blob": "cbc1ec412f9ba307de54be46b991678d",
+          "name": "14-queued-messages.webp",
+          "size": 49666,
+          "type": "image/webp"
+        },
+        "15-thread-cards.webp": {
+          "blob": "3aee3a832c9b88ed2cf0072a30eb7073",
+          "name": "15-thread-cards.webp",
+          "size": 82590,
+          "type": "image/webp"
+        },
+        "16-header-and-context.webp": {
+          "blob": "781d6a74cceb1453a1f78484029ea4a3",
+          "name": "16-header-and-context.webp",
+          "size": 71948,
+          "type": "image/webp"
+        },
+        "17-inspector.webp": {
+          "blob": "ed2601e57945e7c6de4a16ed1342b732",
+          "name": "17-inspector.webp",
+          "size": 119982,
+          "type": "image/webp"
+        },
+        "18-home-channel-search.webp": {
+          "blob": "d5d2d16ea034100668768d39c3a2f6a1",
+          "name": "18-home-channel-search.webp",
+          "size": 100684,
+          "type": "image/webp"
+        },
+        "19-artifacts.webp": {
+          "blob": "71126161c61d5efbeba069260fc09323",
+          "name": "19-artifacts.webp",
+          "size": 24212,
+          "type": "image/webp"
+        },
+        "20-pull-requests.webp": {
+          "blob": "ebb46cd4903a174a44172526f233c691",
+          "name": "20-pull-requests.webp",
+          "size": 90470,
+          "type": "image/webp"
+        },
+        "21-automations.webp": {
+          "blob": "5960fd239ce511de11b5ac21297bac6e",
+          "name": "21-automations.webp",
+          "size": 32310,
+          "type": "image/webp"
+        },
+        "22-settings.webp": {
+          "blob": "a30fbc95e98773c4d7eef4a3e1a2d8b3",
+          "name": "22-settings.webp",
+          "size": 163206,
+          "type": "image/webp"
+        },
+        "23-server-and-updates.webp": {
+          "blob": "8fae65215a228a2e707e7e8c9660bffa",
+          "name": "23-server-and-updates.webp",
+          "size": 63760,
+          "type": "image/webp"
+        },
+        "24-menus-and-alerts.webp": {
+          "blob": "4cdd3d3f96a001d57200ab30a97be047",
+          "name": "24-menus-and-alerts.webp",
+          "size": 76644,
+          "type": "image/webp"
+        }
+      },
+      "name": "mac-app",
+      "order": [
+        "01-tokens.webp",
+        "02-brand-and-icons.webp",
+        "03-main-window.webp",
+        "04-sidebar.webp",
+        "05-command-menu.webp",
+        "06-buttons-and-pills.webp",
+        "07-fields.webp",
+        "08-feedback.webp",
+        "09-composer.webp",
+        "10-transcript.webp",
+        "11-shipping-rates.webp",
+        "12-tool-calls.webp",
+        "13-delegation-and-reports.webp",
+        "14-queued-messages.webp",
+        "15-thread-cards.webp",
+        "16-header-and-context.webp",
+        "17-inspector.webp",
+        "18-home-channel-search.webp",
+        "19-artifacts.webp",
+        "20-pull-requests.webp",
+        "21-automations.webp",
+        "22-settings.webp",
+        "23-server-and-updates.webp",
+        "24-menus-and-alerts.webp"
+      ],
+      "tile": "l"
+    },
+    "notes": {
+      "files": {},
+      "name": "notes",
+      "order": []
+    }
+  },
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-10-28T11:46:24.089Z",
+    "v": 1
+  },
+  "docs": {
+    "readme": "project/README.md",
+    "sections": [
+      "project/github.md",
+      "project/phone.md",
+      "project/ui_kits/mac/notes/2-window.md",
+      "project/ui_kits/mac/notes/3-controls.md",
+      "project/ui_kits/mac/notes/4-composer-transcript.md",
+      "project/ui_kits/mac/notes/5-delegation-threads.md",
+      "project/ui_kits/mac/notes/6-inspector.md",
+      "project/ui_kits/mac/notes/7-screens.md",
+      "project/ui_kits/mac/notes/8-settings.md",
+      "project/ui_kits/mac/notes/9-server-menus.md",
+      "project/ui_kits/omni-os/README.md"
+    ]
+  },
+  "groups": [
+    "Other",
+    "harness",
+    "icons",
+    "logo",
+    "notes",
+    "mac-app"
+  ],
+  "lastChange": {
+    "by": "Ben",
+    "at": "2026-11-03T11:09:38Z",
+    "via": "Cowork",
+    "note": "Mobile screens moved to their own Mobile web page (components/MobileWeb)"
+  },
+  "layout": "files",
+  "libraries": [
+    {
+      "global": "React",
+      "name": "react",
+      "version": "18"
+    },
+    {
+      "global": "ReactDOM",
+      "name": "react-dom",
+      "version": "18"
+    }
+  ],
+  "namespace": "OmniOSDesignSystem_a7120f",
+  "sections": {},
+  "title": "Omni OS Design System"
+}

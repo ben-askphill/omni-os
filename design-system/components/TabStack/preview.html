@@ -1,0 +1,16 @@
+<!-- @dsCard group="11 Navigation" viewport="760x120" name="TabStack" subtitle="Open threads and artifacts, overflow stacked" width=760 height=120 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}.main{border-radius:22px;background:var(--bg);box-shadow:var(--shadow-card);overflow:hidden}body{background:var(--canvas)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ TabStack }) => {
+const tabs=[{id:'a',title:'Volero checkout drop-off',state:'needs'},{id:'b',title:'Patch shipping-rate script',state:'running'},{id:'c',title:'funnel-before-after.html',kind:'artifact'},{id:'d',title:'WEEKEND15',state:'needs'},{id:'e',title:'Returns copy'},{id:'f',title:'PDP audit',state:'done'}];
+function App(){const [t,setT]=React.useState('a');return <div className="main"><TabStack activeId={t} onSelect={setT} tabs={tabs}/></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

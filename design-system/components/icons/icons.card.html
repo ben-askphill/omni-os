@@ -1,0 +1,23 @@
+<!-- @dsCard group="07 Components" viewport="720x360" name="Icons" subtitle="24-grid, 1.75 round stroke (web/src set + Omni additions), crew marks, harness logos" -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.ic{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}.ic div{display:grid;justify-items:center;gap:6px;padding:10px 0 8px;border-radius:14px;background:var(--surface);font:400 9px/1 var(--font-mono);color:var(--fg-4)}.ic svg{color:var(--fg)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Icon, CrewMark, HarnessMark, HarnessLogo, ICON_PATHS }) => {
+const names=Object.keys(window.OmniOS.Icon && ICON_PATHS ? ICON_PATHS : {}).slice(0,60);
+function App(){return <div className="stack">
+<div className="ic">{names.map(n=><div key={n}><Icon name={n} size={18}/><span>{n.length>9?n.slice(0,9):n}</span></div>)}</div>
+<div className="row"><span className="lab om-caption">crew</span>{['conductor','researcher','builder','store-ops','inbox'].map(r=><span key={r} style={{display:'inline-flex',alignItems:'center',gap:8,font:'400 13px var(--font-sans)',marginRight:10}}><span style={{display:'grid',placeItems:'center',width:28,height:28,borderRadius:'50%',background:'var(--surface-2)'}}><CrewMark role={r} size={15}/></span>{r}</span>)}</div>
+<div className="row"><span className="lab om-caption">harness</span><HarnessMark harness="claude-code" withLabel/><HarnessMark harness="codex" withLabel/><HarnessMark harness="cursor" withLabel/><span style={{width:12}}/><HarnessMark harness="claude-code" size="lg"/><HarnessMark harness="codex" size="lg"/><HarnessMark harness="cursor" size="lg"/><span style={{width:12}}/>{["claude-code","codex","cursor"].map(h=><span key={h} style={{color:"var(--fg-2)"}}><HarnessLogo harness={h} size={14}/></span>)}</div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

@@ -1,0 +1,387 @@
+/* Omni OS Design System — generated from tokens.json */
+:root, [data-theme="light"] {
+  --ink: #17181a; /* Raw pop ink: the text on the vermilion and volt fills (`on-needs`, `on-done`) and the done edge. */
+  --ultramarine: #2b3bff; /* Raw pop, full saturation, never tinted. Live (running) status only, via `live`. */
+  --ultramarine-lift: #7280ff; /* Ultramarine lifted for the dark scheme: `live` and `live-text` in dark. */
+  --vermilion: #ff4420; /* Raw pop, full saturation, never tinted. Needs-you status only, via `needs`. */
+  --volt: #c6f52b; /* Raw pop, full saturation, never tinted. Done status only, via `done`. */
+  --canvas: #ffffff; /* The base: page canvas. Pure white in light. */
+  --chrome: #0c0d0f; /* Chrome around the pane (sidebar, gutters): dark in both schemes. */
+  --bg-sidebar: var(--chrome); /* Sidebar (Rail) background; the sidebar draws dark in both schemes. */
+  --bg: #ffffff; /* Main pane background. */
+  --surface: #f7f7f6; /* Grey surface inside the white base: cards (filled, no border), code blocks, tool output. */
+  --surface-2: #f1f1f0; /* Second surface step: selection thumbs on white, secondary pills, chat bubbles, crew-mark discs. */
+  --surface-3: #ecebe7; /* Third surface step; pills darken one surface step on hover. */
+  --elev: #ffffff; /* Elevated sheets. */
+  --fg: #17181a; /* Primary text and the ink pill fill, on `canvas`, `bg`, `surface`, `surface-2`, `surface-3` (11.6:1 or more in both themes). */
+  --fg-2: #3c3b37; /* Secondary text (settled rows, body in lists) on `canvas`, `bg` and every surface step (6.9:1 or more). */
+  --fg-3: #6f6e68; /* Tertiary text (meta, captions, timestamps) on `canvas`, `bg`, `surface`, `surface-2` (4.5:1 or more in both themes; 4.3:1 on `surface-3`). */
+  --fg-4: #9d9c96; /* Quaternary text: placeholders and disabled labels. Kept from the source below 4.5:1 (2.75:1 on white, 3.8:1 on dark canvas): never for text that must be read. */
+  --on-ink: #ffffff; /* Text and icons on an `fg` (ink) fill, e.g. the primary pill. */
+  --line: rgb(23 24 26 / 0.08); /* Hairlines and the default border colour. */
+  --line-strong: rgb(23 24 26 / 0.16); /* Stronger hairlines, link underlines, scrollbar thumbs. */
+  --thumb: #ffffff; /* The sliding selection thumb on grey tracks. */
+  --wash: rgb(23 24 26 / 0.06); /* Bencho hover wash and the 4px field focus ring. */
+  --pane: rgb(255 255 255 / 0.72); /* Translucent pills (search, usage) over the canvas. */
+  --pane-edge: rgb(23 24 26 / 0.07); /* Hairline edge of the pane card (inside `shadow-card`). */
+  --code-bg: var(--surface); /* Inline code and code block background. */
+  --mark-hl: rgb(245 158 11 / 0.28); /* Text highlight and ::selection. */
+  --mark: var(--mark-hl); /* Alias of `mark-hl` for <mark>. */
+  --warn: #b45309; /* Amber for a meter filling up (context from 70%); text on `canvas`, `bg`, `surface` (4.7:1 or more). */
+  --bubble: var(--surface-2); /* User message bubble. */
+  --bg-raised: var(--surface); /* v1 alias of `surface`, kept so older markup resolves. */
+  --bg-sunken: var(--surface-2); /* v1 alias of `surface-2`. */
+  --text-1: var(--fg); /* v1 alias of `fg`. */
+  --text-2: var(--fg-2); /* v1 alias of `fg-2`. */
+  --text-3: var(--fg-3); /* v1 alias of `fg-3`. */
+  --text-4: var(--fg-4); /* v1 alias of `fg-4`. */
+  --text-disabled: var(--fg-4); /* Disabled text (v1 alias of `fg-4`; same contrast caveat). */
+  --inverse-bg: var(--fg); /* Inverted fill (ink in light, paper in dark): primary pills, toasts. */
+  --inverse-bg-hover: #2e2f32; /* Hover step of `inverse-bg`. */
+  --inverse-text: var(--on-ink); /* Text on `inverse-bg`. */
+  --inverse-muted: #9d9c96; /* Muted text on `inverse-bg` (6.5:1 in light; kept from the source at 4.2:1 in dark). */
+  --focus: var(--fg); /* Focus outline: 1.5px solid, 2px offset. */
+  --live: var(--ultramarine); /* Status: running. The pinging disc, live fills. */
+  --live-text: var(--ultramarine); /* Running-state text on `canvas`, `bg`, `surface`, `surface-2` (4.6:1 or more in both themes). */
+  --on-live: #ffffff; /* Text on a `live` fill (6.6:1 light, 5.6:1 dark). */
+  --needs: var(--vermilion); /* Status: needs you (the still diamond, attention). Never animates. */
+  --on-needs: var(--ink); /* Text on a `needs` fill (5.2:1). */
+  --done: var(--volt); /* Status: done (the edged volt disc). */
+  --on-done: var(--ink); /* Text on a `done` fill (14:1). */
+  --done-edge: var(--ink); /* Edge drawn around the volt disc in light (none in dark). */
+  --scrim: rgb(23 24 26 / 0.22); /* Modal / palette scrim: ink 22% (50% dark), no blur. */
+  --shadow-thumb: 0 1px 2px rgb(23 24 26 / 0.09),0 0 0 0.5px rgb(23 24 26 / 0.05); /* The sliding selection thumb on grey tracks. */
+  --shadow-menu: 0 0 0 0.5px rgb(23 24 26 / 0.08),0 2px 4px rgb(23 24 26 / 0.04),0 18px 44px -10px rgb(23 24 26 / 0.2); /* Palette, pickers, toasts. */
+}
+[data-theme="dark"] {
+  --canvas: #0c0d0f;
+  --bg-sidebar: var(--chrome);
+  --bg: #121316;
+  --surface: #191b1e;
+  --surface-2: #222428;
+  --surface-3: #2a2c31;
+  --elev: #212429;
+  --fg: #eceae5;
+  --fg-2: #b8b7b1;
+  --fg-3: #908f89;
+  --fg-4: #6f6e69;
+  --on-ink: #101114;
+  --line: rgb(236 235 231 / 0.08);
+  --line-strong: rgb(236 235 231 / 0.16);
+  --thumb: rgb(255 255 255 / 0.14);
+  --wash: rgb(236 234 229 / 0.06);
+  --pane: rgb(33 36 41 / 0.72);
+  --pane-edge: rgb(255 255 255 / 0.09);
+  --code-bg: var(--surface);
+  --mark-hl: rgb(245 181 68 / 0.28);
+  --mark: var(--mark-hl);
+  --warn: #f5b544;
+  --bubble: var(--surface-2);
+  --bg-raised: var(--surface);
+  --bg-sunken: var(--surface-2);
+  --text-1: var(--fg);
+  --text-2: var(--fg-2);
+  --text-3: var(--fg-3);
+  --text-4: var(--fg-4);
+  --text-disabled: var(--fg-4);
+  --inverse-bg: var(--fg);
+  --inverse-bg-hover: #d6d4cf;
+  --inverse-text: var(--on-ink);
+  --inverse-muted: #6f6e69;
+  --focus: var(--fg);
+  --live: var(--ultramarine-lift);
+  --live-text: var(--ultramarine-lift);
+  --on-live: #101114;
+  --needs: var(--vermilion);
+  --on-needs: var(--ink);
+  --done: var(--volt);
+  --on-done: var(--ink);
+  --done-edge: #00000000;
+  --scrim: rgb(0 0 0 / 0.5);
+  --shadow-thumb: 0 1px 2px rgb(0 0 0 / 0.3),0 0 0 0.5px rgb(255 255 255 / 0.06);
+  --shadow-menu: 0 0 0 0.5px rgb(255 255 255 / 0.08),0 2px 4px rgb(0 0 0 / 0.3),0 18px 44px -10px rgb(0 0 0 / 0.65);
+}
+:root {
+  --sp-1: 2px; /* Spacing step 1 (values from the web app's Tailwind classes). */
+  --sp-2: 4px; /* Spacing step 2. */
+  --sp-3: 6px; /* Spacing step 3. */
+  --sp-4: 8px; /* Spacing step 4; the main pane sits 8px inset. */
+  --sp-5: 10px; /* Spacing step 5. */
+  --sp-6: 12px; /* Spacing step 6. */
+  --sp-7: 14px; /* Spacing step 7. */
+  --sp-8: 16px; /* Spacing step 8. */
+  --sp-9: 20px; /* Spacing step 9. */
+  --sp-10: 24px; /* Spacing step 10. */
+  --sp-11: 32px; /* Spacing step 11; content side padding. */
+  --sp-12: 40px; /* Spacing step 12. */
+  --r-xs: 6px; /* Kbd, checkbox. */
+  --r-sm: 12px; /* Tool output, the composer. */
+  --r-md: 14px; /* Fields, code blocks. */
+  --r-lg: 18px; /* Thread rows. */
+  --r-xl: 20px; /* Tool groups, usage card, panel trays. */
+  --r-2xl: 22px; /* The pane, reports, menus. */
+  --r-3xl: 28px; /* Command palette, modal. */
+  --r-pill: 999px; /* Pills: buttons, nav, tabs, chips, pickers, search. */
+  --h-chip: 20px; /* Chips. */
+  --h-pill: 24px; /* Small pills. */
+  --h-seg-sm: 26px; /* Small segmented control. */
+  --h-btn-sm: 28px; /* Small button. */
+  --h-sub: 28px; /* Sub rows. */
+  --h-seg: 30px; /* Segmented control. */
+  --h-nav: 32px; /* Sidebar nav rows. */
+  --h-icon: 32px; /* Icon buttons. */
+  --h-tool: 32px; /* Tool call rows. */
+  --h-btn: 34px; /* Default button. */
+  --h-search: 40px; /* Search field. */
+  --h-palette-row: 48px; /* Command palette rows. */
+  --h-btn-lg: 44px; /* Large button. */
+  --h-slide: 56px; /* Slide to confirm. */
+  --sidebar-w: 252px; /* Sidebar width. */
+  --measure: 768px; /* Content column max width (max-w-3xl). */
+  --page-pad: 32px; /* Page side padding. */
+  --panel-w: 360px; /* Side panel default width (drag-resizable 280–720). */
+  --fs-label: 10.5px; /* Tiny labels. */
+  --fs-meta: 11px; /* Meta: timestamps, counts. */
+  --fs-code: 11.5px; /* Code. */
+  --fs-12: 12px; /* Captions (medium). */
+  --fs-small: 12.5px; /* Small text, labels. */
+  --fs-ui: 13px; /* UI text. */
+  --fs-nav: 13.5px; /* Sidebar nav. */
+  --fs-body: 14px; /* Body and lists. */
+  --fs-prose: 14.5px; /* Markdown prose. */
+  --fs-subhead: 15px; /* Subheads. */
+  --fs-input: 16px; /* Inputs. */
+  --fs-heading: 17px; /* Headings. */
+  --fs-title: 26px; /* Titles. */
+  --fs-title-lg: 30px; /* Display titles. */
+  --fs-display: 44px; /* Largest display size. */
+  --lh-tight: 1.1; /* Titles. */
+  --lh-heading: 1.25; /* Headings. */
+  --lh-ui: 1.4; /* Small text. */
+  --lh-body: 1.45; /* Body. */
+  --lh-prose: 1.62; /* Markdown prose. */
+  --tr-display: -0.01em; /* Titles 26–30. No letter-spacing on body. */
+  --w-regular: 400; /* Body, settled rows. */
+  --w-medium: 500; /* UI labels, titles. */
+  --w-semibold: 600; /* Rare emphasis. */
+  --mo-status-inset: 54px; /* Status bar inset above every header (the safe-area top on a device). */
+  --mo-home-inset: 34px; /* Home indicator clearance under the composer and sheets. */
+  --mo-gutter: 16px; /* Side gutter for lists and cards. */
+  --mo-header-h: 52px; /* Header bar under the status bar. */
+  --mo-round: 40px; /* Round buttons: back, search, more, mic, send, stop. */
+  --mo-tabbar-h: 60px; /* Tab bar pill and the new-delegation disc. */
+  --mo-tabbar-inset: 14px; /* Tab bar inset from the screen sides. */
+  --mo-row-min: 52px; /* Grouped-list row minimum height. */
+  --mo-avatar: 36px; /* Crew avatar in thread rows and decision cards. */
+  --mo-chip-h: 36px; /* Action chips above the composer. */
+  --mo-answer-h: 48px; /* Answer buttons in decision cards. */
+  --mo-composer-h: 52px; /* Composer box minimum height. */
+  --mo-card-r: 20px; /* Phone cards: decision, group, artifact, bubble. */
+  --mo-inner-r: 14px; /* White sheets inside phone cards; thread-row press wash. */
+  --mo-composer-r: 26px; /* Composer box. */
+  --mo-sheet-r: 28px; /* Bottom sheet top corners. */
+  --font-sans: "SF Pro","SF Pro Text",system-ui,-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+  --font-head: "SF Pro","SF Pro Display",system-ui,-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+  --font-rounded: "SF Pro Rounded",ui-rounded,system-ui,-apple-system,sans-serif;
+  --font-mono: "SF Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --text-type-display: 500 30px/1.1 var(--font-head); /* Display titles (`--type-display`). */
+  --text-type-title: 500 26px/1.1 var(--font-head); /* Page titles (`--type-title`). */
+  --text-type-heading: 500 17px/1.25 var(--font-head); /* Headings (`--type-heading`). */
+  --text-type-subhead: 500 15px/1.3 var(--font-head); /* Subheads (`--type-subhead`). */
+  --text-type-prose: 400 14.5px/1.62 var(--font-sans); /* Markdown prose in transcripts (`--type-prose`). */
+  --text-type-body: 400 14px/1.45 var(--font-sans); /* Body (`--type-body`). */
+  --text-type-list: 500 14px/1.3 var(--font-sans); /* List rows (`--type-list`). */
+  --text-type-ui: 500 13px/1.3 var(--font-sans); /* UI labels and pills (`--type-ui`). */
+  --text-type-small: 400 12.5px/1.4 var(--font-sans); /* Small text (`--type-small`). */
+  --text-type-label: 500 12.5px/1.3 var(--font-sans); /* Field labels (`--type-label`). */
+  --text-type-meta: 400 11px/1.2 var(--font-sans); /* Meta: times, counts (`--type-meta`). */
+  --text-type-caption: 500 12px/1.2 var(--font-sans); /* Section captions, sentence case (`--type-caption`). */
+  --text-type-code: 400 11.5px/1.6 var(--font-mono); /* Code only: ids, branches, paths, filenames (`--type-code`). */
+  --text-mo-large-title: 500 30px/1.1 var(--font-head); /* Tab-root titles (MoLargeTitle). */
+  --text-mo-sheet-title: 500 17px/1.25 var(--font-head); /* Sheet titles (MoSheet). */
+  --text-mo-card-title: 500 16px/1.3 var(--font-sans); /* Decision card question (MoDecisionCard). */
+  --text-mo-nav-title: 500 15px/1.25 var(--font-sans); /* Pushed header title (MoHeader). */
+  --text-mo-row: 400 15px/1.3 var(--font-sans); /* Thread and list rows; 500 when the thread needs you. */
+  --text-mo-bubble: 400 15px/1.45 var(--font-sans); /* Your messages (MoBubble). */
+  --text-mo-prose: 400 15px/1.6 var(--font-sans); /* Agent prose in a phone thread. */
+  --text-mo-body: 400 14px/1.5 var(--font-sans); /* Card bodies. */
+  --text-mo-chip: 500 13.5px/1 var(--font-sans); /* Action chips and toasts. */
+  --text-mo-sub: 400 12.5px/1.35 var(--font-sans); /* Second lines of rows. */
+  --text-mo-meta: 400 12px/1.3 var(--font-sans); /* Times and counts, tabular figures. */
+  --text-mo-tab: 500 11px/1 var(--font-sans); /* Tab bar labels (MoTabBar). */
+}
+.type-display {
+  font-family: var(--font-head);
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.type-title {
+  font-family: var(--font-head);
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.type-heading {
+  font-family: var(--font-head);
+  font-size: 17px;
+  line-height: 1.25;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.type-subhead {
+  font-family: var(--font-head);
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.type-prose {
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  line-height: 1.62;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.type-body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.type-list {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.type-ui {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.type-small {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.4;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.type-label {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.type-meta {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.type-caption {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.type-code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.mo-large-title {
+  font-family: var(--font-head);
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+}
+.mo-sheet-title {
+  font-family: var(--font-head);
+  font-size: 17px;
+  line-height: 1.25;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.mo-card-title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.mo-nav-title {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.mo-row {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.mo-bubble {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.mo-prose {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.mo-body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.mo-chip {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.mo-sub {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.35;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.mo-meta {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.mo-tab {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0;
+}

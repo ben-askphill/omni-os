@@ -1,0 +1,35 @@
+<!-- @dsCard group="07 Components" viewport="820x1000" name="Thread" subtitle="ThreadRow, Message, ToolCalls, Delegation, CrewReport, ArtifactEmbed, Composer" -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}body{padding:16px 28px 28px}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ ThreadRow, ThreadGroup, Message, ResultLine, ToolCall, ToolCalls, Delegation, CrewReport, ArtifactEmbed, Composer, InlineConfirm }) => {
+const doc='<body style="margin:0;font:13px/1.4 system-ui,-apple-system,sans-serif;padding:14px;background:#fff;color:#17181a"><b>Checkout funnel</b> · 7d before vs after<table style="width:100%;margin-top:8px;border-collapse:collapse"><tr><td>Cart → checkout</td><td align=right>61% → 60%</td></tr><tr><td>Shipping step</td><td align=right>78% → <b>52%</b></td></tr></table></body>';
+function App(){return <div className="om-thread"><div className="om-transcript">
+<ThreadGroup label="Today" count={3}>
+<ThreadRow title="Patch shipping-rate script in checkout" taskId="T-4F2B" state="running" role="builder" harness="claude-code" time="12m" branch="omni/t-4f2b" preview="Editing snippets/shipping-rates.liquid · step 5/9"/>
+<ThreadRow title="Pause WEEKEND15 until the patch ships?" taskId="T-4F2C" state="needs" role="store-ops" harness="claude-code" time="3m" preview="It stacks with free shipping."/>
+<ThreadRow title="Returns page copy review" taskId="T-4E11" state="settled" role="inbox" harness="cursor" time="Tue" preview="Tightened to 140 words."/>
+</ThreadGroup>
+<Message role="user" time="14:02">Volero’s checkout drop-off spiked after Friday’s theme deploy. Find out why and fix it.</Message>
+<Message><p>Three things in parallel: measure the drop, patch the likely cause, and check the weekend automation.</p></Message>
+<ToolCalls><ToolCall name="search_threads" args='channel:volero "shipping"' duration="0.4s" output="3 threads"/><ToolCall name="Read" args="snippets/shipping-rates.liquid" duration="0.2s"/><ToolCall name="Bash" args="git log main --since=2026-09-24" status="running"/></ToolCalls>
+<Delegation branches={[{taskId:'T-4F2A',role:'researcher',title:'Compare checkout funnel before/after the deploy',channel:{name:'Volero'},harness:'codex',state:'done',progress:'report in · 4m'},{taskId:'T-4F2B',role:'builder',title:'Patch shipping-rate script in checkout',channel:{name:'Volero'},harness:'claude-code',state:'running',progress:'step 5/9 · editing snippets/shipping-rates.liquid'},{taskId:'T-4F2C',role:'store-ops',title:'WEEKEND15 still firing on free-shipping carts',channel:{name:'Volero'},harness:'claude-code',state:'needs',note:'Pause it until the patch ships?',actions:<InlineConfirm label="Pause WEEKEND15" icon="pause" confirmLabel="Pause until #812" doneLabel="Paused" undoMs={4000} onConfirm={()=>{}}/>}]}/>
+<CrewReport role="researcher" taskId="T-4F2A" channel={{name:'Volero'}} time="14:09" title="The drop is at the shipping step, not payment" facts={['7d vs 7d','18,402 sessions','−26 pts at shipping']}>
+<p>Shipping-step completion fell from <strong>78% to 52%</strong> on 25 Sep at 16:40.</p>
+<ArtifactEmbed name="funnel-before-after.html" kind="html" size="48 KB" taskId="T-4F2A" height={110} srcDoc={doc} caption="rendered by researcher"/>
+</CrewReport>
+<ResultLine>done in 3m 41s · 12 turns</ResultLine>
+<Composer channel={{name:'Volero'}} model="opus-4.5"/>
+</div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

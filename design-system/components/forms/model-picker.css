@@ -1,0 +1,11 @@
+/* Picker pills that cannot be picked (web: disabled:opacity-45), e.g. while a switch is being sent. */
+.om-pik-btn:disabled { opacity: .45; cursor: default; }
+.om-pik-btn:disabled:hover { background: var(--surface-2); }
+
+/* A run queued for after this turn: the pills show it, ringed in live (web: ring-1 ring-live). */
+.om-queued .om-pik-btn { box-shadow: inset 0 0 0 1px var(--live); }
+
+/* The chip ahead of queued pills. Clicking it keeps the run the thread is on. */
+.om-next-turn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 10px; flex: none; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--live-text); font: 600 12px/1 var(--font-sans); cursor: pointer; transition: background-color .15s var(--ease-out); }
+.om-next-turn:hover { background: var(--surface-3); }
+.om-next-turn .x { color: var(--fg-4); }

@@ -1,0 +1,19 @@
+<!-- @dsCard group="09 Forms" viewport="480x170" name="CheckItem" subtitle="Plan steps: completed, in progress, pending" -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ CheckItem }) => {
+
+function App(){const [ck,setCk]=React.useState(['completed','in_progress','pending']);const next=(i)=>setCk(c=>c.map((v,j)=>j===i?(v==='completed'?'pending':v==='pending'?'in_progress':'completed'):v));return <div style={{width:300}}><CheckItem state={ck[0]} onClick={()=>next(0)}>Find where the drop is</CheckItem><CheckItem state={ck[1]} onClick={()=>next(1)}>Decide on WEEKEND15</CheckItem><CheckItem state={ck[2]} onClick={()=>next(2)}>Merge #812</CheckItem></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

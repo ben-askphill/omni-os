@@ -1,0 +1,16 @@
+<!-- @dsCard group="12 Thread" viewport="720x170" name="Delegation — single branch" subtitle="One crew thread queued" width=720 height=170 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Delegation }) => {
+
+function App(){return <div className="om-thread"><div className="om-transcript"><Delegation branches={[{taskId:'T-4F40',role:'inbox',title:'Draft reply to Volero about the weekend dip',channel:{name:'Volero'},harness:'cursor',state:'queued',progress:'waits for T-4F2A'}]}/></div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

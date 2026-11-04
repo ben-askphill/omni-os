@@ -1,0 +1,20 @@
+/* Omni OS motion. Touch = Bencho springs (from web/src/index.css). Agents = the liquid mark + alive states. */
+:root{
+--ease-spring:cubic-bezier(0.24,1.34,0.38,1); /* @kind other */
+--ease-settle:cubic-bezier(0.28,1.28,0.36,1); /* @kind other */
+--ease-stretch:cubic-bezier(0.32,0.72,0.24,1); /* @kind other */
+--ease-out:cubic-bezier(0.22,1,0.36,1); /* @kind other */
+--ease-linear:linear; /* @kind other */
+--ease-fluid:cubic-bezier(.37,0,.63,1); /* @kind other */
+--dur-hover:160ms; /* @kind other */
+--dur-stretch:190ms; /* @kind other */
+--dur-press:220ms; /* @kind other */
+--dur-enter:240ms; /* @kind other */
+--dur-wash:320ms; /* @kind other */
+--dur-settle:420ms; /* @kind other */
+--dur-panel:500ms; /* @kind other */
+--dur-breathe:4800ms; /* @kind other */
+--dur-pulse:1400ms; /* @kind other */
+--dur-ping:1600ms; /* @kind other */
+--dur-tick:2400ms; /* @kind other */
+}

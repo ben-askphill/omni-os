@@ -1,0 +1,51 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+html,body{margin:0;background:var(--canvas)}
+.cover{position:relative;width:960px;height:288px;background:var(--canvas);overflow:hidden}
+svg{position:absolute;left:0;top:0}
+.blk{rx:var(--r-2xl)}
+.pill{rx:var(--r-sm)}
+.track{rx:var(--r-xl)}
+.thumb{rx:var(--r-md)}
+.ink{fill:var(--fg)}
+.ultra{fill:var(--ultramarine)}
+.volt{fill:var(--volt)}
+.verm{fill:var(--vermilion)}
+.tint{fill:var(--surface-3)}
+.cut{fill:var(--canvas)}
+.on{fill:var(--ink)}
+.text{position:absolute;left:32px;bottom:32px;max-width:900px}
+.name{margin:0;font-family:var(--font-head);font-weight:500;font-size:64px;line-height:.95;letter-spacing:-0.01em;color:var(--fg);white-space:nowrap}
+.tag{margin:12px 0 0;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--fg-3)}
+</style></head><body>
+<div class="cover">
+<svg width="960" height="288" viewBox="0 0 960 288" aria-hidden="true">
+<!-- blocks: fg 368x112, ultramarine 256x112, volt 112x112, surface-3 112x48, vermilion 112x48; corners r-2xl (22px)
+     arrangement: top band (112 tall, sp-11 inset), one ink slab then the three status pops, weighted slab > live > done > needs
+     pattern: pills, from "Pills for buttons, nav, tabs, chips, pickers, search" and "radii: rounded, pill-first"; the sliding thumb on its track
+     scales: pill h-pill 24 / rx r-sm 12, track h-search 40 / rx r-xl 20, thumb h-btn-sm 28 / rx r-md 14, gaps sp-4 8 / sp-8 16 / sp-10 24 -->
+<rect class="blk ink" x="32" y="32" width="368" height="112"/>
+<rect class="blk ultra" x="416" y="32" width="256" height="112"/>
+<rect class="blk volt" x="688" y="32" width="112" height="112"/>
+<rect class="blk tint" x="816" y="32" width="112" height="48"/>
+<rect class="blk verm" x="816" y="96" width="112" height="48"/>
+<!-- nav pills cut from the slab -->
+<rect class="pill cut" x="56" y="48" width="176" height="24"/>
+<rect class="pill cut" x="56" y="80" width="120" height="24"/>
+<rect class="pill cut" x="56" y="112" width="152" height="24"/>
+<rect class="pill cut" x="248" y="48" width="128" height="24"/>
+<rect class="pill cut" x="248" y="80" width="80" height="24"/>
+<rect class="pill cut" x="248" y="112" width="104" height="24"/>
+<!-- sliding thumb on its track -->
+<rect class="track cut" x="440" y="68" width="208" height="40"/>
+<rect class="thumb ink" x="446" y="74" width="96" height="28"/>
+<!-- done chip, needs dot, tint pills -->
+<rect class="pill on" x="704" y="104" width="56" height="24"/>
+<rect class="pill cut" x="896" y="108" width="24" height="24"/>
+<rect class="pill ink" x="832" y="44" width="64" height="24"/>
+</svg>
+<div class="text"><p class="name">Omni OS — Design System</p><p class="tag">Fluid agents, a calm instrument.</p></div>
+</div>
+</body></html>

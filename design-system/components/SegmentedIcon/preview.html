@@ -1,0 +1,16 @@
+<!-- @dsCard group="09 Forms" viewport="720x120" name="Segmented — icon radio" subtitle="Theme switch; soft tone on white" width=720 height=120 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Segmented }) => {
+
+function App(){const [t,setT]=React.useState('light');return <div className="cells"><div className="cell"><span className="om-caption">icon radio</span><Segmented size="sm" radio value={t} onChange={setT} options={[{id:"light",icon:"sun",title:"Light"},{id:"system",icon:"monitor",title:"System"},{id:"dark",icon:"moon",title:"Dark"}]}/></div><div className="cell"><span className="om-caption">soft tone</span><Segmented size="sm" tone="soft" bare value={t} onChange={setT} options={[{id:"light",label:"Light"},{id:"system",label:"System"},{id:"dark",label:"Dark"}]}/></div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

@@ -1,0 +1,16 @@
+<!-- @dsCard group="12 Thread" viewport="720x180" name="ThreadRow — marked done" subtitle="Ben dismissed it from Needs you; still in its channel" width=720 height=180 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ ThreadRow }) => {
+
+function App(){return <div className="om-thread"><div className="om-transcript"><ThreadRow title="Sidebar: pin threads above channels" state="failed" markedDone branch="omni/e4dc7ed9" time="2m"/><ThreadRow title="Sidebar: pin threads above channels" state="failed" markedDone channel="omni-os" time="2m" preview="Worktree could not be prepared"/></div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

@@ -1,0 +1,14 @@
+/* Omni OS fonts: Apple system faces (developer.apple.com/fonts), same stacks as web/src/index.css.
+   Apple's license rules out serving them as web fonts, so these @font-face rules only point at the local install
+   (local()). Without it, the stacks fall back to system-ui / ui-* (SF on Apple devices). SF Pro handles optical size
+   and tracking itself, so body text sets no letter-spacing. */
+@font-face{font-family:"SF Pro";font-style:normal;font-weight:100 900;src:local("SF Pro"),local("SF Pro Text"),local("SF Pro Display"),local("SFProText-Regular"),local(".SFNS-Regular")}
+@font-face{font-family:"SF Pro Rounded";font-style:normal;font-weight:100 900;src:local("SF Pro Rounded"),local("SFProRounded-Regular")}
+@font-face{font-family:"SF Mono";font-style:normal;font-weight:100 900;src:local("SF Mono"),local("SFMono-Regular")}
+:root{
+--font-sans:"SF Pro","SF Pro Text",system-ui,-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+--font-head:"SF Pro","SF Pro Display",system-ui,-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+--font-rounded:"SF Pro Rounded",ui-rounded,system-ui,-apple-system,sans-serif;
+--font-mono:"SF Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+--font-num:var(--font-sans); /* numbers, times, counts: SF Pro with tabular figures. Mono is only for code. */
+}

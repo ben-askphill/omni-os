@@ -1,0 +1,55 @@
+/* Omni OS space, radii, heights, shadows. Values from apps/web/src (Tailwind classes in ui.tsx, Sidebar, Transcript, index.css). */
+:root{
+--sp-1:2px;
+--sp-2:4px;
+--sp-3:6px;
+--sp-4:8px;
+--sp-5:10px;
+--sp-6:12px;
+--sp-7:14px;
+--sp-8:16px;
+--sp-9:20px;
+--sp-10:24px;
+--sp-11:32px;
+--sp-12:40px;
+/* radii: rounded, pill-first */
+--r-xs:6px;
+--r-sm:12px;
+--r-md:14px;
+--r-lg:18px;
+--r-xl:20px;
+--r-2xl:22px;
+--r-composer:var(--r-sm);
+--r-3xl:28px;
+--r-pill:999px;
+/* control heights */
+--h-chip:20px;
+--h-pill:24px;
+--h-seg-sm:26px;
+--h-btn-sm:28px;
+--h-sub:28px;
+--h-seg:30px;
+--h-nav:32px;
+--h-icon:32px;
+--h-tool:32px;
+--h-btn:34px;
+--h-search:40px;
+--h-palette-row:48px;
+--h-btn-lg:44px;
+--h-slide:56px;
+/* shadows (Bencho) */
+--shadow-card:0 0 0 0.5px var(--pane-edge),0 1px 2px rgb(23 24 26 / 0.05);
+--shadow-thumb:0 1px 2px rgb(23 24 26 / 0.09),0 0 0 0.5px rgb(23 24 26 / 0.05);
+--shadow-menu:0 0 0 0.5px rgb(23 24 26 / 0.08),0 2px 4px rgb(23 24 26 / 0.04),0 18px 44px -10px rgb(23 24 26 / 0.2);
+--ring-focus:0 0 0 4px var(--wash);
+/* layout */
+--sidebar-w:252px;
+--measure:768px;
+--page-pad:32px;
+--panel-w:360px;
+}
+[data-theme="dark"],.scheme-dark{
+--shadow-card:0 0 0 0.5px var(--pane-edge),0 1px 2px rgb(0 0 0 / 0.4);
+--shadow-thumb:0 1px 2px rgb(0 0 0 / 0.3),0 0 0 0.5px rgb(255 255 255 / 0.06);
+--shadow-menu:0 0 0 0.5px rgb(255 255 255 / 0.08),0 2px 4px rgb(0 0 0 / 0.3),0 18px 44px -10px rgb(0 0 0 / 0.65);
+}

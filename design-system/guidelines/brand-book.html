@@ -1,0 +1,435 @@
+<!-- @dsCard group="00 Brand book" viewport="1280x9400" name="Omni OS — Brand book" subtitle="Edition 2. Idea, logo, color, type, shape, motion, icons, voice, in use." -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Omni OS — Brand book</title>
+<link rel="stylesheet" href="../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../_ds_bundle.js"></script>
+<script src="../assets/ds-fallback.js" data-root=".."></script>
+<style>
+body{margin:0;background:var(--canvas);color:var(--fg);font:var(--type-body);font-variant-numeric:tabular-nums}
+a{color:var(--fg);text-decoration:none}a:hover{color:var(--live)}
+code,.mono{font-family:var(--font-mono);font-size:.92em}
+.bk{max-width:1280px;margin:0 auto;padding:24px;box-sizing:border-box;display:grid;gap:120px}
+.cap{font:var(--type-caption);color:var(--fg-3)}
+.meta{font:var(--type-meta);color:var(--fg-3)}
+/* cover */
+.cover{position:relative;min-height:860px;border-radius:28px;background:var(--bg);box-shadow:var(--shadow-card);padding:36px 40px;box-sizing:border-box;display:grid;grid-template-rows:auto 1fr auto;gap:32px;overflow:hidden}
+.cover__top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.cover__mid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:40px}
+.cover__mark{display:grid;place-items:center;min-height:440px}
+.cover h1{margin:0;font:500 76px/0.98 var(--font-head);letter-spacing:-.03em;text-wrap:balance}
+.cover__lede{margin:28px 0 0;font:400 19px/1.5 var(--font-sans);color:var(--fg-2);max-width:40ch;text-wrap:pretty}
+.toc{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.toc a{display:flex;align-items:center;gap:10px;height:44px;padding:0 16px;border-radius:999px;background:var(--surface);font:500 13.5px/1 var(--font-sans);transition:background var(--dur-hover) var(--ease-out),transform var(--dur-press) var(--ease-settle)}
+.toc a:hover{background:var(--surface-3);color:var(--fg)}.toc a:active{transform:scale(.96)}
+.toc a span{color:var(--fg-3);font-weight:400}
+/* chapters */
+.ch{display:grid;gap:20px}
+.ch__h{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;padding:0 8px 28px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.ch__n{font:500 56px/1 var(--font-head);letter-spacing:-.02em;color:var(--fg-3)}
+.ch__h h2{margin:0;font:500 56px/1 var(--font-head);letter-spacing:-.025em}
+.ch__h p{margin:18px 0 0;font:400 19px/1.5 var(--font-sans);color:var(--fg-2);max-width:52ch;text-wrap:pretty}
+.sub{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;padding:36px 8px 4px}
+.sub h3{margin:0;font:500 17px/1.25 var(--font-head)}
+.sub p{margin:0;font:400 14.5px/1.55 var(--font-sans);color:var(--fg-2);max-width:62ch;text-wrap:pretty}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.g6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.plate{position:relative;border-radius:28px;background:var(--surface);padding:24px;box-sizing:border-box;overflow:hidden}
+.plate--white{background:var(--bg);box-shadow:var(--shadow-card)}
+.plate--ink{background:var(--ink);color:#fff}
+.plate__label{display:flex;justify-content:space-between;gap:12px;font:var(--type-caption);color:var(--fg-3)}
+.plate--ink .plate__label{color:#b8b7b1}
+.note{display:grid;gap:6px;padding:16px 8px 0}
+.note b{font:500 14px/1.3 var(--font-sans)}
+.note span{font:400 13.5px/1.5 var(--font-sans);color:var(--fg-2);text-wrap:pretty}
+.tenets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:8px}
+.tenet{padding:24px;border-radius:28px;background:var(--surface);display:grid;gap:10px;align-content:start}
+.tenet i{font:500 13px/1 var(--font-sans);font-style:normal;color:var(--fg-3)}
+.tenet b{font:500 24px/1.15 var(--font-head);letter-spacing:-.015em}
+.tenet span{font:400 14px/1.5 var(--font-sans);color:var(--fg-2);text-wrap:pretty}
+/* idea */
+.duo{min-height:460px;display:grid;grid-template-rows:auto 1fr auto}
+.duo__art{display:grid;place-items:center}
+.duo__txt{display:grid;gap:8px}
+.duo__txt b{font:500 28px/1.1 var(--font-head);letter-spacing:-.02em}
+.duo__txt span{font:400 14.5px/1.5 var(--font-sans);max-width:44ch;text-wrap:pretty}
+.plate--ink .duo__txt span{color:#b8b7b1}.plate .duo__txt span{color:var(--fg-2)}.plate--ink .duo__txt span{color:#b8b7b1}
+.inst{display:grid;gap:12px;justify-items:start;padding:20px;border-radius:22px;background:var(--bg);box-shadow:var(--shadow-card);width:min(340px,100%);box-sizing:border-box}
+.inst__row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+/* logo */
+.mark-hero{grid-column:span 2;min-height:560px;display:grid;grid-template-rows:auto 1fr auto}
+.mark-hero__art{display:grid;place-items:center}
+.specs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;border-top:1px solid var(--line);padding-top:16px}
+.specs div{display:grid;gap:4px}.specs b{font:500 13.5px/1.3 var(--font-sans)}.specs span{font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3)}
+.stack{display:grid;gap:12px;grid-template-rows:1fr 1fr}
+.stack .plate{display:grid;grid-template-rows:auto 1fr;min-height:0}
+.stack .art{display:grid;place-items:center}
+.wm{min-height:340px;display:grid;grid-template-rows:auto 1fr auto}
+.wm__art{display:grid;place-items:center}
+.sizes{display:flex;align-items:flex-end;gap:48px;flex-wrap:wrap;padding:12px 8px 4px}
+.sizes div{display:grid;gap:12px;justify-items:center}
+.misuse{display:grid;grid-template-rows:150px auto;padding:0;background:var(--surface)}
+.misuse__art{display:grid;place-items:center;position:relative;overflow:hidden}
+.misuse__txt{padding:14px 16px 18px;display:grid;gap:8px;align-content:start}
+.misuse__txt b{font:500 13.5px/1.3 var(--font-sans)}.misuse__txt span{font:400 12.5px/1.45 var(--font-sans);color:var(--fg-2)}
+.mmask{display:block;width:84px;height:84px;-webkit-mask:url(../assets/logo/omni-mark.svg) center/contain no-repeat;mask:url(../assets/logo/omni-mark.svg) center/contain no-repeat}
+.states{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding:0}
+.state{display:grid;justify-items:center;gap:16px;padding:36px 12px 28px;border-right:1px solid var(--line);text-align:center}
+.state:last-child{border-right:0}
+.state__m{height:120px;display:grid;place-items:center}
+.state b{font:500 14px/1.2 var(--font-sans)}.state span{font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3);max-width:20ch}
+/* color */
+.pop{min-height:400px;display:grid;grid-template-rows:auto 1fr auto;border-radius:28px;padding:24px;box-sizing:border-box}
+.pop__top{display:flex;justify-content:space-between;font:500 12px/1.2 var(--font-sans)}
+.pop__word{align-self:end;font:500 52px/1 var(--font-head);letter-spacing:-.03em}
+.pop__def{margin-top:14px;font:400 14px/1.45 var(--font-sans);max-width:30ch}
+.neut{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));border-radius:28px;overflow:hidden;box-shadow:var(--shadow-card)}
+.neut div{height:180px;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;font:500 12.5px/1.2 var(--font-sans)}
+.neut div span{font:400 11.5px/1.2 var(--font-sans);opacity:.75}
+.prop{display:flex;height:72px;border-radius:999px;overflow:hidden;box-shadow:var(--shadow-card)}
+.prop div{display:flex;align-items:center;padding:0 18px;font:500 12.5px/1 var(--font-sans);white-space:nowrap;overflow:hidden}
+.rules{margin:0;padding:0;list-style:none;display:grid;gap:0;counter-reset:r}
+.rules li{counter-increment:r;display:grid;grid-template-columns:36px minmax(0,1fr);padding:14px 0;border-top:1px solid var(--line);font:400 14px/1.5 var(--font-sans);color:var(--fg-2);text-wrap:pretty}
+.rules li:first-child{border-top:0}
+.rules li::before{content:counter(r,decimal-leading-zero);font:500 12px/1.9 var(--font-sans);color:var(--fg-3)}
+.rules li b{color:var(--fg);font-weight:500}
+.dark{background:#0c0d0f;color:#eceae5;display:grid;grid-template-rows:auto 1fr;gap:20px}
+.dark .plate__label{color:#908f89}
+.dark__pane{border-radius:22px;background:#121316;box-shadow:0 0 0 .5px rgb(255 255 255/.09);padding:18px;display:grid;gap:8px;align-content:start}
+.dark__row{display:flex;align-items:center;gap:12px;height:44px;padding:0 14px;border-radius:18px;background:#191b1e;font:500 13.5px/1 var(--font-sans)}
+.dark__row span{margin-left:auto;font:400 12px/1 var(--font-sans);color:#908f89}
+.dark__row i{width:9px;height:9px;border-radius:50%;flex:none}
+/* type */
+.aa{grid-column:span 2;min-height:520px;display:grid;grid-template-rows:auto 1fr auto}
+.aa__g{align-self:center;font:500 260px/.9 var(--font-head);letter-spacing:-.05em}
+.aa__foot{display:flex;justify-content:space-between;align-items:end;gap:24px;flex-wrap:wrap}
+.aa__foot b{font:500 28px/1 var(--font-head);letter-spacing:-.02em}
+.aa__foot span{font:400 14px/1.5 var(--font-sans);color:var(--fg-2);max-width:44ch}
+.face{display:grid;grid-template-rows:auto 1fr auto;gap:16px}
+.face__g{align-self:center}
+.face b{font:500 17px/1.2 var(--font-head)}.face span{display:block;margin-top:6px;font:400 13px/1.45 var(--font-sans);color:var(--fg-2)}
+.scale{display:grid;border-radius:28px;background:var(--bg);box-shadow:var(--shadow-card);padding:8px 28px}
+.scale__r{display:grid;grid-template-columns:150px minmax(0,1fr) 220px;gap:24px;align-items:baseline;padding:20px 0;border-top:1px solid var(--line)}
+.scale__r:first-child{border-top:0}
+.scale__r .x{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scale__r .u{font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3);text-align:right}
+/* shape */
+.radii{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:12px;align-items:end}
+.radii div{display:grid;gap:10px}
+.radii i{display:block;aspect-ratio:1;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line)}
+.radii b{font:500 12.5px/1 var(--font-sans)}.radii span{font:400 11.5px/1.35 var(--font-sans);color:var(--fg-3);margin-top:-4px}
+.heights{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:28px 24px 24px}
+.heights div{display:grid;gap:8px;justify-items:start}
+.heights i{display:block;width:84px;border-radius:999px;background:var(--surface-3)}
+.heights b{font:500 12.5px/1 var(--font-sans)}.heights span{font:400 11.5px/1.2 var(--font-sans);color:var(--fg-3)}
+.elev{min-height:260px;display:grid;grid-template-rows:1fr auto;gap:16px}
+.elev__art{display:grid;place-items:center}
+.elev__s{width:70%;height:110px;border-radius:22px}
+/* motion */
+.ease{display:grid;gap:0}
+.ease__r{display:grid;grid-template-columns:150px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:14px 0;border-top:1px solid var(--line)}
+.ease__r:first-child{border-top:0}
+.ease__r code{font-size:12px;color:var(--fg-2)}
+.ease__r span{font:400 13px/1.4 var(--font-sans);color:var(--fg-2)}
+.ease__r em{font:400 12.5px/1 var(--font-sans);font-style:normal;color:var(--fg-3);text-align:right}
+.track{position:relative;height:6px;border-radius:999px;background:var(--surface-3)}
+.track i{position:absolute;left:0;top:-5px;width:16px;height:16px;border-radius:50%;background:var(--fg);animation:bk-run 2.4s infinite}
+@keyframes bk-run{0%,12%{left:0}50%,62%{left:calc(100% - 16px)}100%{left:0}}
+.alive{display:grid;gap:0}
+.alive__r{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px 0;border-top:1px solid var(--line)}
+.alive__r:first-child{border-top:0}
+.alive__r b{font:500 14px/1.3 var(--font-sans)}.alive__r span{display:block;font:400 13px/1.4 var(--font-sans);color:var(--fg-3)}
+.alive__r em{font:400 12.5px/1 var(--font-sans);font-style:normal;color:var(--fg-3)}
+.try{display:flex;gap:8px;flex-wrap:wrap;padding-top:18px}
+/* icons */
+.icons{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+.icons div{aspect-ratio:1;display:grid;place-items:center;border-radius:18px;transition:background var(--dur-hover) var(--ease-out)}
+.icons div:hover{background:var(--surface-2)}
+.icons img{width:24px;height:24px}
+.harn{display:grid;gap:10px}
+.harn div{display:flex;align-items:center;gap:14px;height:56px;padding:0 16px;border-radius:20px;background:var(--bg);font:500 14px/1 var(--font-sans)}
+.harn div span{margin-left:auto;font:400 12.5px/1 var(--font-sans);color:var(--fg-3)}
+.harn i{width:32px;height:32px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center}
+.harn img{width:16px;height:16px}
+.crew{display:flex;gap:10px;flex-wrap:wrap}
+/* voice */
+.say{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border-radius:28px;background:var(--bg);box-shadow:var(--shadow-card);overflow:hidden}
+.say>div{padding:6px 24px 10px}
+.say>div:first-child{border-right:1px solid var(--line)}
+.say h4{margin:0;padding:18px 0 10px;display:flex;align-items:center;gap:8px;font:var(--type-caption);color:var(--fg-3)}
+.say p{margin:0;padding:12px 0;border-top:1px solid var(--line);font:500 15px/1.35 var(--font-sans)}
+.say>div:last-child p{font-weight:400;color:var(--fg-3);text-decoration:line-through;text-decoration-color:var(--vermilion);text-decoration-thickness:1.5px}
+.convo{display:grid;gap:18px;align-content:start}
+.convo .u{justify-self:end;max-width:80%;padding:10px 16px;border-radius:20px;background:var(--surface-2);font:400 14px/1.45 var(--font-sans)}
+.convo .a{font:400 14.5px/1.62 var(--font-sans);color:var(--fg);max-width:60ch}
+.convo .a code{font-size:12.5px;padding:1px 5px;border-radius:6px;background:var(--surface-2)}
+.convo .who{display:flex;align-items:center;gap:8px;font:500 12.5px/1 var(--font-sans);color:var(--fg-3);margin-bottom:8px}
+/* in use */
+.screen{position:relative;aspect-ratio:1440/900;border-radius:22px;overflow:hidden;box-shadow:var(--shadow-menu);background:var(--bg)}
+.screen iframe{position:absolute;left:0;top:0;width:1440px;height:900px;border:0;transform-origin:0 0}
+/* colophon */
+.colo{border-radius:28px;background:var(--ink);color:#eceae5;padding:40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:40px}
+.colo h5{margin:0 0 14px;font:500 12px/1 var(--font-sans);color:#908f89}
+.colo p{margin:0;font:400 13.5px/1.6 var(--font-sans);color:#d6d4cf}
+.colo a{color:#fff}.colo a:hover{color:var(--volt)}
+.colo code{color:#fff}
+@media (max-width:980px){.cover__mid,.g2,.g3,.tenets,.colo,.say{grid-template-columns:minmax(0,1fr)}.mark-hero,.aa{grid-column:auto}.g6,.states{grid-template-columns:repeat(3,minmax(0,1fr))}.toc{grid-template-columns:repeat(2,minmax(0,1fr))}.ch__h,.sub{grid-template-columns:minmax(0,1fr);gap:12px}.neut{grid-template-columns:repeat(4,minmax(0,1fr))}.radii{grid-template-columns:repeat(5,minmax(0,1fr))}.icons{grid-template-columns:repeat(6,minmax(0,1fr))}.cover h1{font-size:52px}.aa__g{font-size:180px}.scale__r{grid-template-columns:minmax(0,1fr)}.scale__r .u{text-align:left}.say>div:first-child{border-right:0}}
+@media (prefers-reduced-motion:reduce){.track i{animation:none}}
+</style></head>
+<body><div class="bk">
+
+<header class="cover" data-screen-label="Cover">
+<div class="cover__top"><img src="../assets/logo/omni-wordmark.svg" alt="omni" style="height:30px;width:auto;display:block"><div class="meta" style="display:flex;gap:18px"><span>Brand book</span><span>Edition 2</span><span>October 2026</span></div></div>
+<div class="cover__mid">
+<div class="cover__mark" id="m-cover"><img src="../assets/logo/omni-mark.svg" width="340" height="340" alt="Omni mark"></div>
+<div><h1>Fluid agents, a calm instrument.</h1><p class="cover__lede">Omni OS is one person’s workspace for a crew of AI agents, across every client project. This book holds the rules that keep it calm.</p></div>
+</div>
+<nav class="toc"><a href="#idea"><span>01</span>Idea</a><a href="#logo"><span>02</span>Logo</a><a href="#color"><span>03</span>Color</a><a href="#type"><span>04</span>Type</a><a href="#shape"><span>05</span>Shape &amp; space</a><a href="#motion"><span>06</span>Motion</a><a href="#icons"><span>07</span>Iconography</a><a href="#voice"><span>08</span>Voice</a><a href="#use"><span>09</span>In use</a><a href="#colophon"><span>10</span>Colophon</a></nav>
+</header>
+
+<section class="ch" id="idea" data-screen-label="01 Idea">
+<header class="ch__h"><div class="ch__n">01</div><div><h2>Idea</h2><p>The agents are the liquid; the workspace holds them. Everything that moves on its own is agent work. Everything you touch is a quiet, precise instrument.</p></div></header>
+<div class="g2">
+<div class="plate plate--ink duo"><div class="plate__label"><span>The liquid</span><span>Agents</span></div><div class="duo__art" id="m-liquid"><img src="../assets/logo/omni-mark-white.svg" width="220" height="220" alt=""></div><div class="duo__txt"><b>Alive, on its own.</b><span>The mark breathes, a droplet pinches off for every crew thread, a report falls back in and merges. Running work pings.</span></div></div>
+<div class="plate duo"><div class="plate__label"><span>The instrument</span><span>Workspace</span></div><div class="duo__art"><div class="inst">
+<div class="inst__row"><span class="om-chip om-chip--live">Running</span><span class="om-chip om-chip--needs">Needs you</span><span class="om-chip om-chip--done">Done</span></div>
+<div class="inst__row"><button class="om-btn om-btn--primary">Merge</button><button class="om-btn om-btn--secondary">Open thread</button></div>
+<div class="inst__row meta"><span class="om-kbd">⌘</span><span class="om-kbd">K</span><span>Search or jump to</span></div>
+</div></div><div class="duo__txt"><b>Still, until touched.</b><span>White, rounded, quiet. SF Pro, pill controls and Bencho springs that answer only when you press.</span></div></div>
+</div>
+<div class="tenets">
+<div class="tenet"><i>01</i><b>Color is status.</b><span>Three pops, each meaning one thing. Everything else is white, grey or ink.</span></div>
+<div class="tenet"><i>02</i><b>Quiet by default.</b><span>Settled work drops to regular weight. Only running, waiting and just-done things speak up.</span></div>
+<div class="tenet"><i>03</i><b>Only agents move.</b><span>Touch gets springs. Attention never blinks; it waits, still and vermilion, until you answer.</span></div>
+</div>
+</section>
+
+<section class="ch" id="logo" data-screen-label="02 Logo">
+<header class="ch__h"><div class="ch__n">02</div><div><h2>Logo</h2><p>A ring with a satellite droplet: the frozen moment of delegation. The name is always just <i>omni</i>, in lowercase, with no “OS”.</p></div></header>
+<div class="g3">
+<div class="plate plate--white mark-hero"><div class="plate__label"><span>Mark</span><span class="mono">omni-mark.svg</span></div><div class="mark-hero__art"><img src="../assets/logo/omni-mark.svg" width="320" height="320" alt="Omni mark"></div>
+<div class="specs"><div><b>Ring</b><span>r40, 20u stroke in a 128 box. The wordmark’s o.</span></div><div><b>Lean</b><span>10°, as if poured.</span></div><div><b>Droplet</b><span>One crew thread, just leaving.</span></div></div></div>
+<div class="stack">
+<div class="plate plate--ink"><div class="plate__label"><span>One colour, white</span></div><div class="art"><img src="../assets/logo/omni-mark-white.svg" width="120" height="120" alt=""></div></div>
+<div class="plate"><div class="plate__label"><span>Attention only</span><span>Vermilion</span></div><div class="art"><img src="../assets/logo/omni-mark-needs.svg" width="120" height="120" alt=""></div></div>
+</div>
+</div>
+<div class="plate plate--white wm"><div class="plate__label"><span>Wordmark</span><span class="mono">omni-wordmark.svg</span></div><div class="wm__art"><img src="../assets/logo/omni-wordmark.svg" alt="omni" style="height:150px;width:auto;max-width:100%"></div><div class="meta">One continuous 20u line. The o is the mark’s ring; the pen never lifts.</div></div>
+
+<div class="sub"><h3>Small sizes</h3><p>At 16px the mark switches to its own geometry: heavier ring, droplet pulled clear. Where even that is too busy, drop the droplet.</p></div>
+<div class="plate plate--white"><div class="sizes">
+<div><img src="../assets/logo/favicon-ring-16.svg" width="16" height="16" alt=""><span class="meta">16 · ring</span></div>
+<div><img src="../assets/logo/favicon-16.svg" width="16" height="16" alt=""><span class="meta">16</span></div>
+<div><img src="../assets/logo/omni-mark.svg" width="24" height="24" alt=""><span class="meta">24</span></div>
+<div><img src="../assets/logo/omni-mark.svg" width="32" height="32" alt=""><span class="meta">32</span></div>
+<div><img src="../assets/logo/omni-mark.svg" width="64" height="64" alt=""><span class="meta">64</span></div>
+<div><img src="../assets/logo/app-icon.svg" width="96" height="96" alt=""><span class="meta">App icon</span></div>
+<div><img src="../assets/logo/app-icon-light.svg" width="96" height="96" alt=""><span class="meta">App icon, light</span></div>
+</div></div>
+
+<div class="sub"><h3>Six states</h3><p>The mark in the sidebar is live. Each state means something; none is decoration. Hover a mark to see it lean; click the vermilion one to acknowledge it.</p></div>
+<div class="plate plate--white states" id="m-states">
+<div class="state"><div class="state__m"></div><b>Idle</b><span>Almost still. The droplet bobs.</span></div>
+<div class="state"><div class="state__m"></div><b>Hover</b><span>The surface leans to the pointer.</span></div>
+<div class="state"><div class="state__m"></div><b>Thinking</b><span>The surface ripples.</span></div>
+<div class="state"><div class="state__m"></div><b>Delegating</b><span>A droplet pinches off per crew thread.</span></div>
+<div class="state"><div class="state__m"></div><b>Report</b><span>A droplet falls back in and merges.</span></div>
+<div class="state"><div class="state__m"></div><b>Attention</b><span>Tense and vermilion until you answer.</span></div>
+</div>
+
+<div class="sub"><h3>Misuse</h3><p>The mark is the one fluid thing in a still room. Don’t make it louder.</p></div>
+<div class="g6">
+<div class="plate misuse"><div class="misuse__art"><img src="../assets/logo/omni-mark.svg" width="84" height="84" alt="" style="transform:scaleX(1.45)"></div><div class="misuse__txt"><span class="om-chip om-chip--needs" style="justify-self:start">Don’t</span><b>Stretch or squash</b><span>The ring is a circle.</span></div></div>
+<div class="plate misuse"><div class="misuse__art"><img src="../assets/logo/omni-mark.svg" width="84" height="84" alt="" style="transform:rotate(-34deg)"></div><div class="misuse__txt"><span class="om-chip om-chip--needs" style="justify-self:start">Don’t</span><b>Re-lean</b><span>10° is drawn in. Never rotate it further.</span></div></div>
+<div class="plate misuse"><div class="misuse__art"><i class="mmask" style="background:var(--ultramarine)"></i></div><div class="misuse__txt"><span class="om-chip om-chip--needs" style="justify-self:start">Don’t</span><b>Recolor</b><span>Ink or white. Vermilion only for attention.</span></div></div>
+<div class="plate misuse"><div class="misuse__art" style="gap:10px;display:flex;align-items:center;justify-content:center"><img src="../assets/logo/omni-wordmark.svg" alt="" style="height:34px;width:auto"><span style="font:600 30px/1 var(--font-head)">OS</span></div><div class="misuse__txt"><span class="om-chip om-chip--needs" style="justify-self:start">Don’t</span><b>Add “OS”</b><span>The wordmark is just omni.</span></div></div>
+<div class="plate misuse"><div class="misuse__art"><img src="../assets/logo/omni-mark.svg" width="84" height="84" alt="" style="filter:drop-shadow(0 0 10px #2B3BFF) drop-shadow(0 0 22px #2B3BFF)"></div><div class="misuse__txt"><span class="om-chip om-chip--needs" style="justify-self:start">Don’t</span><b>Add effects</b><span>No glow, shadow, outline or bevel.</span></div></div>
+<div class="plate misuse"><div class="misuse__art" style="background:linear-gradient(135deg,#7280FF,#FF4420 60%,#C6F52B)"><img src="../assets/logo/omni-mark-white.svg" width="84" height="84" alt=""></div><div class="misuse__txt"><span class="om-chip om-chip--needs" style="justify-self:start">Don’t</span><b>Use a busy ground</b><span>Solid white or ink only. Never a gradient.</span></div></div>
+</div>
+</section>
+
+<section class="ch" id="color" data-screen-label="03 Color">
+<header class="ch__h"><div class="ch__n">03</div><div><h2>Color</h2><p>White, grey and ink do all the work. Three saturated pops mark status, and each means exactly one thing.</p></div></header>
+<div class="g3">
+<div class="pop" style="background:var(--ultramarine);color:#fff"><div class="pop__top"><span>Ultramarine</span><span>#2B3BFF</span></div><div></div><div><div class="pop__word">Running</div><div class="pop__def">Happening now. A pinging disc, a live branch, a stroke.</div></div></div>
+<div class="pop" style="background:var(--vermilion);color:var(--ink)"><div class="pop__top"><span>Vermilion</span><span>#FF4420</span></div><div></div><div><div class="pop__word">Needs you</div><div class="pop__def">A decision or a block. A still diamond. It never blinks.</div></div></div>
+<div class="pop" style="background:var(--volt);color:var(--ink)"><div class="pop__top"><span>Volt</span><span>#C6F52B</span></div><div></div><div><div class="pop__word">Done</div><div class="pop__def">Just finished. An edged disc, then it settles to grey.</div></div></div>
+</div>
+<div class="sub"><h3>Neutrals</h3><p>A pure white base. The warm Bencho greys fill only the things that sit inside it.</p></div>
+<div class="neut">
+<div style="background:#fff;color:var(--ink)">Canvas<span>#FFFFFF</span></div>
+<div style="background:#f7f7f6;color:var(--ink)">Surface<span>#F7F7F6</span></div>
+<div style="background:#f1f1f0;color:var(--ink)">Surface 2<span>#F1F1F0</span></div>
+<div style="background:#ecebe7;color:var(--ink)">Surface 3<span>#ECEBE7</span></div>
+<div style="background:#9d9c96;color:var(--ink)">Fg 4<span>#9D9C96</span></div>
+<div style="background:#6f6e68;color:#fff">Fg 3<span>#6F6E68</span></div>
+<div style="background:#3c3b37;color:#fff">Fg 2<span>#3C3B37</span></div>
+<div style="background:#17181a;color:#fff">Ink<span>#17181A</span></div>
+</div>
+<div class="sub"><h3>Proportion</h3><p>Roughly how a working screen should feel. If a pop isn’t saying something, it shouldn’t be there.</p></div>
+<div class="prop"><div style="flex:76;background:#fff;color:var(--fg-3)">White</div><div style="flex:16;background:#f1f1f0;color:var(--fg-2)">Greys</div><div style="flex:6;background:var(--ink);color:#fff">Ink</div><div style="flex:.7;background:var(--ultramarine);padding:0"></div><div style="flex:.5;background:var(--vermilion);padding:0"></div><div style="flex:.5;background:var(--volt);padding:0"></div></div>
+<div class="g2" style="margin-top:32px">
+<div class="plate dark"><div class="plate__label"><span>Dark</span><span>Ultramarine lifts to #7280FF</span></div><div class="dark__pane">
+<div class="dark__row"><i style="background:#7280FF"></i>Funnel audit<span>running</span></div>
+<div class="dark__row"><i style="background:#FF4420;border-radius:2px;transform:rotate(45deg) scale(.85)"></i>Pause WEEKEND15?<span>needs you</span></div>
+<div class="dark__row"><i style="background:#C6F52B"></i>Shipping rates snippet<span>done</span></div>
+</div></div>
+<div class="plate plate--white"><ol class="rules">
+<li><span><b>Never tinted, never washed.</b> No 8% backgrounds, no pastel pills. A pop is a dot, a stroke or a filled pill carrying ink.</span></li>
+<li><span><b>Selection is a thumb, not a color.</b> The active row, tab or option sits on a sliding white thumb.</span></li>
+<li><span><b>Volt never sits bare on white,</b> and vermilion is never text on white. Both become filled pills with ink text.</span></li>
+<li><span><b>Channels have no colors.</b> Neutral round avatars, written #Volero.</span></li>
+<li><span><b>Primary actions are ink pills.</b> Never a pop.</span></li>
+</ol></div>
+</div>
+</section>
+
+<section class="ch" id="type" data-screen-label="04 Type">
+<header class="ch__h"><div class="ch__n">04</div><div><h2>Type</h2><p>Apple’s system faces, exactly as the app sets them. SF Pro for everything you read, SF Mono only for code.</p></div></header>
+<div class="g3">
+<div class="plate plate--white aa"><div class="plate__label"><span>Primary</span><span>Text and Display, by optical size</span></div><div class="aa__g">Aa</div><div class="aa__foot"><b>SF Pro</b><span>Titles, body, labels, times and counts. Tabular figures. It tracks itself, so body text sets no letter-spacing.</span></div></div>
+<div class="stack">
+<div class="plate face"><div class="plate__label"><span>Code</span></div><div class="face__g" style="font:500 34px/1.1 var(--font-mono);letter-spacing:-.02em">T-4F2A</div><div><b>SF Mono</b><span>Ids, branches, commits, paths, filenames. Never labels.</span></div></div>
+<div class="plate face"><div class="plate__label"><span>Avatars</span></div><div class="face__g crew"><span class="om-avatar" style="width:44px;height:44px;font:600 16px/1 var(--font-rounded)">V</span><span class="om-avatar" style="width:44px;height:44px;font:600 16px/1 var(--font-rounded)">PG</span><span class="om-avatar om-avatar--ink" style="width:44px;height:44px;font:600 16px/1 var(--font-rounded)">AS</span></div><div><b>SF Pro Rounded</b><span>Channel monograms only.</span></div></div>
+</div>
+</div>
+<div class="sub"><h3>Scale</h3><p>14 is the base. Sentence case everywhere, including section captions. Nothing below 10.5.</p></div>
+<div class="scale">
+<div class="scale__r"><span class="meta">Display · 30 / 500</span><div class="x" style="font:var(--type-display);letter-spacing:-.01em">Delegated 3 tasks to #Volero</div><span class="u">Page title</span></div>
+<div class="scale__r"><span class="meta">Title · 26 / 500</span><div class="x" style="font:var(--type-title);letter-spacing:-.01em">Shipping rates snippet</div><span class="u">Thread title</span></div>
+<div class="scale__r"><span class="meta">Heading · 17 / 500</span><div class="x" style="font:var(--type-heading)">Report from researcher</div><span class="u">Cards, panels</span></div>
+<div class="scale__r"><span class="meta">Prose · 14.5 / 1.62</span><div class="x" style="font:var(--type-prose)">Checkout conversion fell from 78.3% to 52.1% after the rate change.</div><span class="u">Agent markdown</span></div>
+<div class="scale__r"><span class="meta">Body · 14 / 1.45</span><div class="x" style="font:var(--type-body)">I’ll bring the numbers back before anything ships.</div><span class="u">Messages, rows</span></div>
+<div class="scale__r"><span class="meta">UI · 13 / 500</span><div class="x" style="font:var(--type-ui)">Open thread</div><span class="u">Buttons, nav</span></div>
+<div class="scale__r"><span class="meta">Caption · 12 / 500</span><div class="x" style="font:var(--type-caption);color:var(--fg-3)">Recent threads</div><span class="u">Section captions</span></div>
+<div class="scale__r"><span class="meta">Code · 11.5 mono</span><div class="x" style="font:var(--type-code)">omni/t-4f2b-shipping-rates</div><span class="u">Branches, paths</span></div>
+</div>
+</section>
+
+<section class="ch" id="shape" data-screen-label="05 Shape and space">
+<header class="ch__h"><div class="ch__n">05</div><div><h2>Shape &amp; space</h2><p>Rounded and pill-first. Every radius, height and shadow is lifted from the app, so the book and the product never disagree.</p></div></header>
+<div class="plate plate--white"><div class="plate__label" style="margin-bottom:22px"><span>Radii</span><span>Bigger things, rounder corners</span></div><div class="radii">
+<div><i style="border-radius:6px"></i><b>6</b><span>Kbd, checkbox</span></div>
+<div><i style="border-radius:12px"></i><b>12</b><span>Tool output</span></div>
+<div><i style="border-radius:14px"></i><b>14</b><span>Fields, code</span></div>
+<div><i style="border-radius:18px"></i><b>18</b><span>Thread rows</span></div>
+<div><i style="border-radius:20px"></i><b>20</b><span>Tool groups</span></div>
+<div><i style="border-radius:22px"></i><b>22</b><span>Pane, menus</span></div>
+<div><i style="border-radius:26px"></i><b>26</b><span>Composer</span></div>
+<div><i style="border-radius:28px"></i><b>28</b><span>Palette, modal</span></div>
+<div><i style="border-radius:999px"></i><b>Pill</b><span>Buttons, nav, chips</span></div>
+</div></div>
+<div class="g2">
+<div class="plate"><div class="plate__label"><span>Heights</span><span>The rhythm of the app</span></div><div class="heights">
+<div><i style="height:20px;width:44px"></i><b>20</b><span>Chip</span></div>
+<div><i style="height:28px;width:60px"></i><b>28</b><span>Small</span></div>
+<div><i style="height:32px"></i><b>32</b><span>Nav</span></div>
+<div><i style="height:34px"></i><b>34</b><span>Button</span></div>
+<div><i style="height:40px;width:110px"></i><b>40</b><span>Search</span></div>
+<div><i style="height:48px;width:110px"></i><b>48</b><span>Palette row</span></div>
+<div><i style="height:56px;width:130px"></i><b>56</b><span>Slide</span></div>
+</div></div>
+<div class="g3" style="gap:12px">
+<div class="plate elev"><div class="elev__art"><div class="elev__s" style="background:var(--surface-3)"></div></div><div class="note" style="padding:0"><b>Flat</b><span>Cards inside the pane: fill, no shadow.</span></div></div>
+<div class="plate elev"><div class="elev__art"><div class="elev__s" style="background:#fff;box-shadow:var(--shadow-card)"></div></div><div class="note" style="padding:0"><b>Sheet</b><span>White on grey: a hairline.</span></div></div>
+<div class="plate elev"><div class="elev__art"><div class="elev__s" style="background:#fff;box-shadow:var(--shadow-menu)"></div></div><div class="note" style="padding:0"><b>Menu</b><span>Palette, picker, toast.</span></div></div>
+</div>
+</div>
+<div class="note"><b>Group, don’t box.</b><span>One level of nesting at most. Tool calls fold into one tray; running threads nest under their channel. Scrims are ink, never blurred.</span></div>
+</section>
+
+<section class="ch" id="motion" data-screen-label="06 Motion">
+<header class="ch__h"><div class="ch__n">06</div><div><h2>Motion</h2><p>Springs for anything you touch. Only agents move on their own. Attention is still.</p></div></header>
+<div class="g2">
+<div class="plate plate--white"><div class="plate__label" style="margin-bottom:10px"><span>Touch</span><span>Bencho springs</span></div><div class="ease">
+<div class="ease__r"><code>--ease-spring</code><div class="track"><i style="animation-timing-function:cubic-bezier(.24,1.34,.38,1)"></i></div><em>320ms</em></div>
+<div class="ease__r"><code>--ease-settle</code><div class="track"><i style="animation-timing-function:cubic-bezier(.28,1.28,.36,1)"></i></div><em>220–420ms</em></div>
+<div class="ease__r"><code>--ease-stretch</code><div class="track"><i style="animation-timing-function:cubic-bezier(.32,.72,.24,1)"></i></div><em>190ms</em></div>
+<div class="ease__r"><code>--ease-out</code><div class="track"><i style="animation-timing-function:cubic-bezier(.22,1,.36,1)"></i></div><em>240ms</em></div>
+</div>
+<div class="note" style="padding:14px 0 0"><span>Hover washes in from the center. Press shrinks to .96. A thumb stretches toward its target, then settles. Try them:</span></div>
+<div class="try"><button class="om-btn om-btn--primary">Merge</button><button class="om-btn om-btn--secondary">Open thread</button><button class="om-btn om-btn--ghost">Cancel</button></div>
+</div>
+<div class="plate"><div class="plate__label" style="margin-bottom:10px"><span>Alive</span><span>Agent work only</span></div><div class="alive">
+<div class="alive__r"><span style="display:grid;place-items:center"><span class="om-dot om-dot--running" style="width:10px;height:10px"><i class="ping"></i><i></i></span></span><div><b>Running ping</b><span>Scale 1 → 2.6 and fade.</span></div><em>1.6s loop</em></div>
+<div class="alive__r"><span style="display:grid;place-items:center"><span class="om-chk-box" style="box-shadow:inset 0 0 0 1.5px var(--fg)"><span class="om-chk-live"></span></span></span><div><b>Plan bead</b><span>The current step pulses.</span></div><em>1.4s loop</em></div>
+<div class="alive__r"><span style="display:grid;place-items:center" id="m-alive"></span><div><b>The mark</b><span>Breathes, ripples, delegates, merges.</span></div><em>4.8s breath</em></div>
+<div class="alive__r"><span style="display:grid;place-items:center"><span class="om-dot om-dot--needs" style="width:10px;height:10px"><i></i></span></span><div><b>Needs you</b><span>Never animates. Waiting is still.</span></div><em>Static</em></div>
+</div>
+<div class="note" style="padding:14px 0 0"><span>Reduced motion is first-class: every alive state has a still equivalent.</span></div>
+</div>
+</div>
+</section>
+
+<section class="ch" id="icons" data-screen-label="07 Iconography">
+<header class="ch__h"><div class="ch__n">07</div><div><h2>Iconography</h2><p>Hand-drawn on a 24 grid with a 1.75 round stroke, in the color of the text beside them. Vendor logos stay exactly as their owners drew them.</p></div></header>
+<div class="plate plate--white"><div class="plate__label" style="margin-bottom:12px"><span>Interface icons</span><span>24 grid · 1.75 stroke · round caps</span></div><div class="icons" id="icon-grid"></div></div>
+<div class="g2">
+<div class="plate"><div class="plate__label" style="margin-bottom:14px"><span>Harnesses</span><span>Simple Icons, unmodified</span></div><div class="harn">
+<div><i><img src="../assets/harness/claude.svg" alt=""></i>Claude Code<span>Claude</span></div>
+<div><i><img src="../assets/harness/openai.svg" alt=""></i>Codex<span>OpenAI</span></div>
+<div><i><img src="../assets/harness/cursor.svg" alt=""></i>Cursor Agent<span>Cursor</span></div>
+</div></div>
+<div class="plate plate--white"><ol class="rules">
+<li><span><b>Logos, never letters.</b> Wherever a harness is named, show its logo. Never CC, CX or CU.</span></li>
+<li><span><b>Never recolor a vendor logo</b> with a status pop. They are their owners’ trademarks.</span></li>
+<li><span><b>Unicode only for keys</b> and arrows: ⌘ ⇧ ↵ ↑ ↓.</span></li>
+<li><span><b>No emoji. No sparkles for “AI”.</b></span></li>
+</ol></div>
+</div>
+</section>
+
+<section class="ch" id="voice" data-screen-label="08 Voice">
+<header class="ch__h"><div class="ch__n">08</div><div><h2>Voice</h2><p>A calm operator. Plain, specific and short. The Conductor speaks in the first person; the interface calls you “you”.</p></div></header>
+<div class="g2">
+<div class="plate plate--white convo">
+<div class="plate__label"><span>In a thread</span><span>#Volero</span></div>
+<div class="u">Why did checkout drop last week?</div>
+<div><div class="who"><img src="../assets/logo/omni-mark.svg" width="18" height="18" alt="">Conductor</div><div class="a">Conversion fell from 78.3% to 52.1% the day the new shipping rates went live. I’ve sent the researcher to confirm it against last month and the builder to draft a fix on <code>omni/t-4f2b-shipping-rates</code>. I’ll bring the numbers back before anything ships.</div></div>
+<div class="inst__row"><span class="om-chip om-chip--needs">Needs you</span><span class="meta">Pause WEEKEND15 while we check?</span></div>
+</div>
+<div class="say">
+<div><h4><span class="om-chip om-chip--done">Say</span></h4><p>Thread</p><p>Harness</p><p>Crew role</p><p>Needs you</p><p>Merge</p><p>78.3% → 52.1%</p><p>Start one above.</p></div>
+<div><h4><span class="om-chip">Not</span></h4><p>Chat, session</p><p>Provider</p><p>Agent, persona</p><p>Action required</p><p>Submit</p><p>A big drop</p><p>Welcome! Let’s get started</p></div>
+</div>
+</div>
+<div class="note"><b>Sentence case, always.</b><span>Buttons, titles, tabs and section captions. Channels are written #Volero. No greetings, no hype, no emoji.</span></div>
+</section>
+
+<section class="ch" id="use" data-screen-label="09 In use">
+<header class="ch__h"><div class="ch__n">09</div><div><h2>In use</h2><p>The Conductor thread: one request fanned out to three crew threads, one running, one waiting on you, one done. The live screen below is the UI kit itself.</p></div></header>
+<div class="screen" id="screen"><iframe src="../ui_kits/omni-os/index.html?screen=conductor&amp;theme=light" title="Conductor thread" loading="lazy"></iframe></div>
+</section>
+
+<footer class="colo" id="colophon" data-screen-label="10 Colophon">
+<div><img src="../assets/logo/omni-wordmark-white.svg" alt="omni" style="height:34px;width:auto;display:block;margin-bottom:22px"><p>Brand book, edition 2. October 2026.<br>Aligned to the Omni OS web app.</p></div>
+<div><h5>Sources</h5><p>Tokens and components from <code>ben-askphill/omni-os</code> (<code>web/src</code>). Interactions from <a href="https://bencho.dev">bencho.dev</a>. Harness logos from <a href="https://simpleicons.org">Simple Icons</a>.</p></div>
+<div><h5>Files</h5><p><code>styles.css</code> for everything. <code>tokens/</code> for values, <code>components/</code> for React primitives, <code>assets/logo/</code> for the mark and wordmark.</p></div>
+</footer>
+
+</div>
+<script>
+(function(){
+const names=['home','inbox','message','hash','search','plus','send','attach','delegate','split','branch','pr','diff','terminal','tool','file','globe','browser','layers','gauge','clock','loop','play','pause','stop','check','x','alert','info','bell','settings','sliders','sidebar','panel','copy','external'];
+document.getElementById('icon-grid').innerHTML=names.map(n=>'<div title="'+n+'"><img src="../assets/icons/'+n+'.svg" alt="'+n+'"></div>').join('');
+const sc=document.getElementById('screen'),fr=sc.querySelector('iframe');
+const fit=()=>{const w=sc.clientWidth||sc.getBoundingClientRect().width;if(w)fr.style.transform='scale('+(w/1440)+')'};
+fit();addEventListener('resize',fit);addEventListener('load',fit);fr.addEventListener('load',fit);
+if(window.ResizeObserver)new ResizeObserver(fit).observe(sc);
+})();
+</script>
+<script type="text/babel">
+omReady(({ OmniMark }) => {
+  const mount=(id,el)=>{const n=document.getElementById(id);if(n){n.innerHTML='';ReactDOM.createRoot(n).render(el)}};
+  mount('m-cover',<OmniMark size={380} state="idle" />);
+  mount('m-liquid',<OmniMark size={240} state="delegating" color="#ffffff" interactive={false} />);
+  mount('m-alive',<OmniMark size={30} state="idle" interactive={false} />);
+  const S=['idle','hover','thinking','delegating','report','attention'];
+  function Att(){const [ack,setAck]=React.useState(false);return <OmniMark size={104} state={ack?'idle':'attention'} onAcknowledge={()=>{setAck(true);setTimeout(()=>setAck(false),2400)}} />}
+  document.querySelectorAll('#m-states .state__m').forEach((n,i)=>{ReactDOM.createRoot(n).render(S[i]==='attention'?<Att/>:<OmniMark size={104} state={S[i]} lean={S[i]==='hover'?0.8:undefined} leanAngle={S[i]==='hover'?-0.6:undefined} />)});
+});
+</script>
+</body></html>

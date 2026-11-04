@@ -1,0 +1,18 @@
+<!-- @dsCard group="14 Phone" name="MoBubble" subtitle="Your message: sent, sending, failed" width=860 height=330 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{margin:0;padding:20px 24px;background:var(--canvas)}.pair{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}.ph{position:relative;isolation:isolate;flex:none;width:390px;overflow:hidden;background:var(--bg);color:var(--fg);border-radius:28px;box-shadow:0 0 0 1px var(--line);padding:16px 0;display:grid;gap:12px;align-content:start}.ph>.pad{padding:0 16px}.ph .cap{padding:0 16px;font:500 12px/1.2 var(--font-sans);color:var(--fg-3)}.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady((NS) => {
+const {MoBubble} = NS;
+function Screen(){return <div className="pad" style={{display:'grid',gap:14}}><MoBubble caption="You · 14:02">Volero’s checkout drop-off spiked after Friday’s deploy. Find out why.</MoBubble><MoBubble state="sending" caption="Sending">Use the DHL table for DE and AT.</MoBubble><MoBubble state="failed" caption="Not sent. Tap to retry">Ship it tonight.</MoBubble></div>}
+function Phone({theme}){return <div className="ph" data-theme={theme}><Screen/></div>}
+function App(){return <div className="pair"><Phone theme="light"/><Phone theme="dark"/></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

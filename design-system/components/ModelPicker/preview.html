@@ -1,0 +1,51 @@
+<!-- @dsCard group="09 Forms" viewport="760x600" name="ModelPicker" subtitle="New thread with Auto; in a thread, open upward; a switch queued for the next turn; effort" width=760 height=600 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px 32px;align-items:start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.open{padding-top:400px}.hint{font:400 12.5px/1.3 var(--font-sans);color:var(--fg-4)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ ModelPicker, EffortPicker, NextTurnChip }) => {
+const E = ['low','medium','high','xhigh','max'];
+const harnesses = [
+  { id: 'claude-code', name: 'Claude Code', plan: 'Max plan', models: [
+    { id: 'opus', label: 'Opus 5.5', default: true, efforts: E, defaultEffort: 'high' },
+    { id: 'sonnet', label: 'Sonnet 5.5', efforts: E, defaultEffort: 'high' },
+    { id: 'claude-haiku-4-5', label: 'Haiku 4.5', note: 'Fast, for small tasks', efforts: ['low','medium','high'] } ] },
+  { id: 'codex', name: 'Codex', plan: 'ChatGPT Pro plan', models: [
+    { id: 'gpt-6-luna', label: 'GPT-6-Luna', default: true, efforts: ['low','medium','high','xhigh'], defaultEffort: 'medium' },
+    { id: 'gpt-5.5', label: 'GPT-5.5', efforts: ['low','medium','high'] } ] },
+  { id: 'cursor', name: 'Cursor Agent', plan: 'Pro plan', available: false, fix: 'cursor-agent login', models: [] },
+  /* A Cursor cloud agent: no efforts, and "Cursor default" lets Cursor pick the model. */
+  { id: 'cursor-cloud', name: 'Cursor Cloud', plan: 'Cursor plan', models: [
+    { id: 'default', label: 'Cursor default', default: true, efforts: [] },
+    { id: 'composer-2', label: 'Composer 2', efforts: [] } ] },
+];
+function App(){
+  const [a,setA]=React.useState({harness:'auto',model:''});
+  const [t,setT]=React.useState({harness:'claude-code',model:'sonnet'});
+  const [eff,setEff]=React.useState('low');
+  const [q,setQ]=React.useState({harness:'codex',model:'gpt-6-luna'});
+  const [qe,setQe]=React.useState('');
+  const queued = !!q;
+  return <div className="grid">
+    <div className="cell"><div className="om-caption">New thread, Auto first</div><ModelPicker harnesses={harnesses} value={a} onChange={setA} defaultOpen /></div>
+    <div className="cell open">
+      <div className="row"><ModelPicker harnesses={harnesses} value={t} onChange={setT} offerAuto={false} up defaultOpen /><EffortPicker harnesses={harnesses} choice={t} value={eff} onChange={setEff} up /></div>
+      <div className="om-caption">Reply composer: opens upward, no Auto</div></div>
+    <div className="cell"><div className="om-caption">Picked during a turn: queued for the next one</div>
+      <div className="row">
+        {queued && <NextTurnChip now="Sonnet 5.5, high" onKeep={() => setQ(null)} />}
+        <ModelPicker harnesses={harnesses} value={q || {harness:'claude-code',model:'sonnet'}} onChange={setQ} offerAuto={false} queued={queued} />
+        <EffortPicker harnesses={harnesses} choice={q || {harness:'claude-code',model:'sonnet'}} value={queued ? qe : 'high'} onChange={setQe} queued={queued} />
+      </div>
+      <div className="hint">{queued ? 'Codex takes over when this turn ends. Next turn × keeps Sonnet 5.5.' : 'Runs on Sonnet 5.5. A pick now waits for the turn to end.'}</div></div>
+    <div className="cell"><div className="om-caption">A thread Auto started, before any switch</div>
+      <ModelPicker harnesses={harnesses} value={{harness:'claude-code',model:'sonnet'}} label="Auto · Sonnet 5.5" offerAuto={false} /></div>
+  </div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

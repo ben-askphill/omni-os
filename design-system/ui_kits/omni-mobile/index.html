@@ -1,0 +1,82 @@
+<!-- @dsCard group="14 In use" viewport="1400x1000" name="Phone — mobile redesign" subtitle="Status-first Activity, three tabs + new delegation, outcome-first threads, lock screen. Every phone is clickable." -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="design_doc_mode" content="canvas">
+<title>Omni OS — mobile redesign</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<script src="../omni-os/data.js"></script>
+<script src="mobile-data.js"></script>
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--fg)}
+a{color:var(--fg);text-decoration:underline;text-underline-offset:2px}a:hover{color:var(--fg-2)}
+.mo-scroll{scrollbar-width:none}.mo-scroll::-webkit-scrollbar{display:none}
+.mo-press{transition:transform 220ms var(--ease-settle)}.mo-press:active{transform:scale(.96)}
+.mo-row{border-radius:14px}.mo-row:active{background:var(--wash)}
+@keyframes mo-push{from{transform:translateX(28px);opacity:0}to{transform:none;opacity:1}}
+@keyframes mo-up{from{transform:translateY(100%)}to{transform:none}}
+@keyframes mo-fade{from{opacity:0}to{opacity:1}}
+@keyframes mo-toast{from{transform:translate(-50%,12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:1ms!important;transition-duration:1ms!important}}
+.mo-frame{position:absolute;display:flex;flex-direction:column;gap:14px;width:390px}
+.mo-label{display:flex;flex-direction:column;gap:3px;min-height:40px}
+.mo-label b{font:500 15px/1.3 var(--font-sans)}
+.mo-label span{font:400 13px/1.4 var(--font-sans);color:var(--fg-3);text-wrap:pretty}
+.mo-intro{position:absolute;left:80px;top:40px;width:1100px;display:flex;flex-direction:column;gap:10px}
+.mo-intro h1{margin:0;font:500 30px/1.1 var(--font-head);letter-spacing:-.01em}
+.mo-intro p{margin:0;font:400 15px/1.55 var(--font-sans);color:var(--fg-2);max-width:78ch}
+.mo-row-title{position:absolute;left:80px;font:500 12px/1 var(--font-sans);color:var(--fg-3)}
+</style>
+</head><body>
+<div class="mo-intro">
+<h1>Omni on a phone: status first, three tabs, outcome-first threads</h1>
+<p>Redesign of the mobile web app against the research brief. Activity replaces the composer-first home; the drawer is gone (Channels is a tab, admin moves to Settings); threads get one header, folded steps, action chips over a one-line composer; panels become single full-screen pushes from the thread menu. Every phone is live: tap through, approve, merge, start a delegation.</p>
+</div>
+<div class="mo-row-title" style="top:232px">Check on agents · steer · delegate</div>
+<div class="mo-row-title" style="top:1242px">Notifications · channels · results</div>
+<div class="mo-row-title" style="top:2252px">Decisions, the thread menu, dark</div>
+<div id="frames"></div>
+<script type="text/babel" src="../omni-os/ios-frame.jsx"></script>
+<script type="text/babel" src="MobileParts.jsx"></script>
+<script type="text/babel" src="MobileScreens.jsx"></script>
+<script type="text/babel" src="MobileThread.jsx"></script>
+<script type="text/babel" src="MobileApp.jsx"></script>
+<script type="text/babel">
+const FRAMES = [
+  [['Activity', 'Home. Needs you as decision cards you answer in place, then Running and Done today.', {}],
+   ['Conductor thread', 'Delegation to three crew threads; the store-ops call is answerable inline.', { stack: [{ name: 'thread', id: 'T-4F29' }] }],
+   ['Crew thread, done', 'Outcome first: summary, report, then the folded steps. Chips above the composer.', { stack: [{ name: 'thread', id: 'T-4F2A' }] }],
+   ['Crew thread, running', 'What it is doing now, the plan, Stop and Changes so far within thumb reach.', { stack: [{ name: 'thread', id: 'T-4F2B' }] }],
+   ['New delegation', 'The + sheet. Conductor by default, or a channel. One model chip, voice first.', { sheet: { name: 'new' } }]],
+  [['Lock screen', 'Needs you with the answer as an action; Done deep-links to the report; Live Activity for running crew.', 'lock'],
+   ['Channels', 'A tab, not a drawer. Needs and running counts per channel. Avatar opens Settings.', { tab: 'channels' }],
+   ['Channel', '#Volero: active and recent threads in the same rows as Activity. New thread in the thumb zone.', { tab: 'channels', stack: [{ name: 'channel', id: 'vo' }] }],
+   ['Library', 'Every report, PR and file across channels, newest first.', { tab: 'library' }],
+   ['Pull request', 'Pushed from the thread. Checks, files, slide to squash and merge.', { stack: [{ name: 'thread', id: 'T-4F2B' }, { name: 'pr' }] }]],
+  [['Decision with options', 'An agent question with a recommended pick, inside its thread.', { stack: [{ name: 'thread', id: 'T-4E91' }] }],
+   ['Thread menu', 'The desktop panel tabs, one at a time: Changes, Browser (watch), Terminal (read), Details.', { stack: [{ name: 'thread', id: 'T-4F2A' }], sheet: { name: 'menu', id: 'T-4F2A' } }],
+   ['Report viewer', 'Artifacts open full screen with share. The thread stays behind it.', { stack: [{ name: 'thread', id: 'T-4F2A' }, { name: 'viewer', art: { name: 'funnel-before-after.html', ch: 'Volero', role: 'researcher', live: true } }] }],
+   ['Activity, dark', 'Same screen on the dark tokens.', {}, true],
+   ['Conductor thread, dark', '', { stack: [{ name: 'thread', id: 'T-4F29' }] }, true]]
+];
+omReady(() => {
+  const host = document.getElementById('frames');
+  FRAMES.forEach((row, r) => row.forEach(([name, note, init, dark], c) => {
+    const el = document.createElement('div');
+    el.className = 'mo-frame';
+    el.style.left = (80 + c * 470) + 'px';
+    el.style.top = (262 + r * 1010) + 'px';
+    el.setAttribute('data-screen-label', String(r * 5 + c + 1).padStart(2, '0') + ' ' + name);
+    document.body.appendChild(el);
+    ReactDOM.createRoot(el).render(<>
+      <div className="mo-label"><b>{name}</b>{note && <span>{note}</span>}</div>
+      <MoFrame initial={init === 'lock' ? {} : init} lock={init === 'lock'} dark={!!dark} />
+    </>);
+  }));
+});
+</script>
+</body></html>

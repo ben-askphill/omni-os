@@ -1,0 +1,41 @@
+<!-- @dsCard group="12 Thread" viewport="760x620" name="Handoff" subtitle="Thread handed to another Mac: picker, preparing, waiting, not picked up, incoming, failed, settled; phone width" width=760 height=620 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.phone{width:390px;margin-top:8px;padding:12px 16px;box-sizing:border-box;border-radius:var(--r-xl);background:var(--surface)}.lab{margin:16px 0 2px}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ HandoffCard, HandoffLine, DevicePicker }) => {
+
+const macs = [
+  { name: "Ben's MacBook Pro", reachability: 'online', label: 'Online on Tailscale' },
+  { name: 'Home Mac Studio', reachability: 'unknown', label: "Can't check Tailscale" },
+  { name: 'Office Mac mini', reachability: 'offline', label: 'Asleep or offline, last seen 3h ago' },
+];
+
+function App(){return <div className="om-thread">
+  <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+    <DevicePicker devices={macs} />
+    <DevicePicker devices={macs} error="Sync is set up on this Mac but not running, so the other Mac cannot be told. Check the Sync page, then try again." />
+  </div>
+  <div className="om-transcript">
+    <HandoffCard tone="working" cancel>Handing off to Ben's MacBook Pro: uploading the session.</HandoffCard>
+    <HandoffCard tone="waiting" cancel>Waiting for Ben's MacBook Pro to pick it up.</HandoffCard>
+    <HandoffCard tone="alert" cancel note="~/work/shop has uncommitted changes on Ben's MacBook Air; they stay there.">Ben's MacBook Pro has not picked this thread up yet. It may be asleep or not running Omni.</HandoffCard>
+    <HandoffCard tone="working">Ben's MacBook Air is handing this thread to this Mac.</HandoffCard>
+    <HandoffCard tone="alert">The handoff to Ben's MacBook Pro failed: This thread's folder is not on this Mac: ~/work/shop. The thread is stopped here; reply to continue it.</HandoffCard>
+    <HandoffLine>Running on Ben's MacBook Pro. Handed off from this Mac.</HandoffLine>
+    <HandoffLine>Handed off from Ben's MacBook Pro. Running on this Mac.</HandoffLine>
+    <HandoffLine tone="cancelled">The handoff to Ben's MacBook Pro was cancelled.</HandoffLine>
+  </div>
+  <div className="om-caption lab">Phone, 390pt</div>
+  <div className="phone">
+    <HandoffCard tone="alert" cancel mobile note="~/work/shop has uncommitted changes on Ben's MacBook Air; they stay there.">Ben's MacBook Pro has not picked this thread up yet. It may be asleep or not running Omni.</HandoffCard>
+  </div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

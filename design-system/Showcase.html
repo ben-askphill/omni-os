@@ -1,0 +1,193 @@
+<!-- @dsCard group="00 Brand book" viewport="1280x4200" name="Showcase" subtitle="Every foundation and component on one live page. Light/dark, comfortable/compact." -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Omni OS — Design system</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="_ds_bundle.js"></script>
+<script src="assets/ds-fallback.js" data-root="."></script>
+<style>
+body{margin:0;background:var(--canvas);color:var(--fg);font:var(--type-body);font-variant-numeric:tabular-nums;transition:background .3s var(--ease-out)}
+a{color:var(--fg);text-decoration:none}a:hover{color:var(--live-text)}
+code,.mono{font-family:var(--font-mono);font-size:.92em}
+.sc{max-width:1280px;margin:0 auto;padding:0 24px 80px;box-sizing:border-box}
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 0;background:var(--canvas)}
+.bar__id{display:flex;align-items:center;gap:12px;margin-right:auto}
+.bar__id span{font:500 13px/1 var(--font-sans);color:var(--fg-3)}
+.bar__ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px;margin:8px 0 96px}
+.hero__txt{border-radius:28px;background:var(--bg);box-shadow:var(--shadow-card);padding:40px;display:grid;align-content:space-between;gap:48px;min-height:460px}
+.hero h1{margin:0;font:500 64px/1 var(--font-head);letter-spacing:-.03em;text-wrap:balance}
+.hero p{margin:20px 0 0;font:400 18px/1.5 var(--font-sans);color:var(--fg-2);max-width:42ch;text-wrap:pretty}
+.hero__links{display:flex;gap:8px;flex-wrap:wrap}
+.hero__mark{border-radius:28px;background:var(--surface);display:grid;grid-template-rows:1fr auto;padding:24px;min-height:460px}
+.hero__mark>div:first-child{display:grid;place-items:center}
+.sec{display:grid;gap:12px;margin-bottom:112px;scroll-margin-top:72px}
+.sec__h{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;padding:0 8px 24px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.sec__n{font:500 44px/1 var(--font-head);color:var(--fg-3);letter-spacing:-.02em}
+.sec__h h2{margin:0;font:500 44px/1 var(--font-head);letter-spacing:-.025em}
+.sec__h p{margin:14px 0 0;font:400 16px/1.5 var(--font-sans);color:var(--fg-2);max-width:56ch;text-wrap:pretty}
+.grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.s2{grid-column:span 2}.s3{grid-column:span 3}.s4{grid-column:span 4}.s6{grid-column:span 6}
+.plate{border-radius:28px;background:var(--surface);padding:22px 24px 24px;box-sizing:border-box;display:grid;grid-template-rows:auto 1fr;gap:20px;min-width:0}
+.plate--w{background:var(--bg);box-shadow:var(--shadow-card)}
+.plate__h{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.plate__h b{font:500 14px/1.3 var(--font-sans)}
+.plate__h span{font:var(--type-caption);color:var(--fg-3);text-align:right}
+.plate__b{display:grid;gap:14px;align-content:start;min-width:0}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.cap{font:var(--type-caption);color:var(--fg-3)}
+.sw{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+.sw div{display:grid;gap:8px}
+.sw i{display:block;height:72px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line)}
+.sw b{font:500 12px/1.2 var(--font-sans)}.sw span{font:400 11px/1.2 var(--font-mono);color:var(--fg-3)}
+.pops{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.pop{border-radius:20px;height:168px;padding:16px;box-sizing:border-box;display:grid;align-content:space-between}
+.pop b{font:500 15px/1.2 var(--font-sans)}.pop span{font:400 12.5px/1.35 var(--font-sans)}
+.prop{display:flex;height:14px;border-radius:999px;overflow:hidden;gap:2px}
+.type{display:grid;gap:0}
+.type>div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:20px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)}
+.type>div:last-child{border-bottom:0}
+.type .cap{font-size:11.5px}
+.radii{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.radii div{display:grid;gap:8px;justify-items:center}
+.radii i{display:block;width:64px;height:64px;background:var(--bg);box-shadow:var(--shadow-card)}
+.elev{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.elev div{height:96px;border-radius:20px;background:var(--elev);display:grid;place-items:end start;padding:12px 14px;box-sizing:border-box;font:var(--type-caption);color:var(--fg-3)}
+.motion{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.motion button{all:unset;cursor:pointer;display:grid;gap:10px;padding:14px;border-radius:20px;background:var(--bg);box-shadow:var(--shadow-card)}
+.motion .trk{position:relative;height:28px;border-radius:999px;background:var(--surface-2)}
+.motion .dot{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:var(--fg)}
+.motion b{font:500 12.5px/1.2 var(--font-sans)}.motion span{font:400 11px/1.2 var(--font-mono);color:var(--fg-3)}
+.ic{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:4px}
+.ic div{display:grid;justify-items:center;gap:6px;padding:10px 2px;border-radius:14px;color:var(--fg-2)}
+.ic div:hover{background:var(--bg);color:var(--fg)}
+.ic span{font:400 10px/1 var(--font-sans);color:var(--fg-3)}
+.states{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.states div{display:grid;justify-items:center;gap:10px;padding:8px 0}
+.states b{font:500 12.5px/1 var(--font-sans)}
+.ws{display:flex;height:720px;padding:8px 8px 8px 0;border-radius:28px;background:var(--canvas);box-shadow:var(--shadow-card);overflow:hidden}
+.ws__main{position:relative;flex:1;display:flex;flex-direction:column;min-width:0;border-radius:22px;background:var(--bg);box-shadow:var(--shadow-card);overflow:hidden}
+.ws__scroll{flex:1;overflow:auto}.ws .om-thread{max-width:768px;margin:0 auto;padding:28px clamp(16px,4vw,32px) 24px;box-sizing:border-box}
+.pal{position:relative;padding:8px 0}
+.foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:24px 8px 0;border-top:1px solid var(--line);font:var(--type-meta);color:var(--fg-3)}
+@media (max-width:1000px){.hero{grid-template-columns:1fr}.hero h1{font-size:48px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.s2,.s3,.s4,.s6{grid-column:span 2}.sec__h{grid-template-columns:1fr;gap:8px}.sw{grid-template-columns:repeat(4,minmax(0,1fr))}.states{grid-template-columns:repeat(3,minmax(0,1fr))}.motion{grid-template-columns:repeat(2,minmax(0,1fr))}.ws .om-side{display:none}.ws{padding-left:8px}}
+</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady((C) => {
+const { OmniLogo, OmniMark, Loader, Button, IconButton, Input, Kbd, Status, StatusGlyph, Monogram, TaskId, Chip, Segmented, Toggle, InlineConfirm, SlideToConfirm, Picker, CheckItem, Ticks, Toast, Icon, CrewMark, HarnessMark, HarnessLogo, ICON_PATHS, Rail, TabStack, CommandPalette, ThreadRow, ThreadGroup, Message, ResultLine, ToolCall, ToolCalls, Delegation, CrewReport, ArtifactEmbed, Composer, GitHubPanel, UsageMeter } = C;
+
+const SECTIONS=[{id:'foundations',label:'Foundations'},{id:'components',label:'Components'},{id:'workspace',label:'In use'}];
+const Plate=({t,s,w,span='s2',children,style})=><div className={`plate ${w?'plate--w':''} ${span}`} style={style}><div className="plate__h"><b>{t}</b>{s&&<span>{s}</span>}</div><div className="plate__b">{children}</div></div>;
+const Sec=({id,n,t,p,children})=><section className="sec" id={id} data-screen-label={t}><div className="sec__h"><div className="sec__n">{n}</div><div><h2>{t}</h2><p>{p}</p></div></div>{children}</section>;
+
+const NEUTRALS=[['canvas','--canvas'],['bg','--bg'],['surface','--surface'],['surface-2','--surface-2'],['surface-3','--surface-3'],['fg-3','--fg-3'],['fg-2','--fg-2'],['fg','--fg']];
+const TYPE=[['Title 30 / 500','500 30px/1.15 var(--font-head)','Volero checkout drop-off',{letterSpacing:'-.01em'}],['Body 14','400 14px/1.45 var(--font-sans)','Three things in parallel: measure the drop, patch the likely cause, check the weekend automation.'],['UI 13','500 13px/1.3 var(--font-sans)','Open thread · New thread · Ask the Conductor'],['Meta 11','400 11px/1.3 var(--font-sans)','12m · step 5/9 · resets in 3h 12m'],['Caption 12','500 12px/1.3 var(--font-sans)','Recent threads'],['Mono 12.5','400 12.5px/1.4 var(--font-mono)','omni/t-4f2b-shipping-rates · 9e1c0af'],['Rounded 13','600 13px/1 var(--font-rounded)','VO  PG  AS']];
+const RADII=[6,12,14,18,20,22,26,28];
+const EASES=[['spring','--ease-spring','320ms'],['settle','--ease-settle','420ms'],['stretch','--ease-stretch','190ms'],['out','--ease-out','240ms']];
+
+const channels=[{id:'conductor',name:'Conductor',threads:[{id:'t0',title:'Volero checkout drop-off',state:'needs'}]},{id:'vo',name:'Volero',kind:'client',running:2,needs:1,threads:[{id:'t1',title:'Patch shipping-rate script',state:'running'},{id:'t2',title:'Size-guide metafields',state:'running'}]},{id:'pg',name:'Pink Gellac',kind:'client',running:1},{id:'as',name:'Acne Studios',kind:'client'},{id:'in',name:'omni-internal',kind:'internal'},{id:'me',name:'personal',kind:'personal'}];
+const usage=[{name:'Claude',five:.71,week:.48},{name:'Codex',five:.93,week:.62},{name:'Cursor',five:.22,week:null}];
+const palItems=[{id:'a',group:'Actions',kind:'command',icon:'plus',label:'New thread',sub:'Start a task'},{id:'c1',group:'Channels',kind:'channel',label:'#Volero',sub:'volero.nl',meta:'2 running',metaLive:true},{id:'t1',group:'Recent threads',kind:'thread',label:'Patch shipping-rate script',sub:'#Volero',taskId:'T-4F2B',state:'running'},{id:'t2',group:'Recent threads',kind:'thread',label:'Pause WEEKEND15?',sub:'#Volero',taskId:'T-4F2C',state:'needs'}];
+const pr={number:812,repo:'volero/theme',title:'Fix shipping-rate script blocking the checkout shipping step',state:'open',branch:'omni/t-4f2b-shipping-rates',base:'main',taskId:'T-4F2B',checks:[{name:'theme-check',state:'done',duration:'38s'},{name:'lighthouse / checkout',state:'done',duration:'1m 12s'},{name:'playwright / checkout-nl',state:'running'}],additions:214,deletions:38,files:[{path:'snippets/shipping-rates.liquid',add:162,del:31},{path:'assets/checkout-rates.js',add:44,del:7}]};
+const doc='<body style="margin:0;font:13px/1.4 system-ui,-apple-system,sans-serif;padding:14px;background:#fff;color:#17181a"><b>Checkout funnel</b> · 7d before vs after<table style="width:100%;margin-top:8px;border-collapse:collapse"><tr><td>Cart → checkout</td><td align=right>61% → 60%</td></tr><tr><td>Shipping step</td><td align=right>78% → <b>52%</b></td></tr></table></body>';
+const branches=[{taskId:'T-4F2A',role:'researcher',title:'Compare checkout funnel before/after the deploy',channel:{name:'Volero'},harness:'codex',state:'done',progress:'report in · 4m'},{taskId:'T-4F2B',role:'builder',title:'Patch shipping-rate script in checkout',channel:{name:'Volero'},harness:'claude-code',state:'running',progress:'step 5/9 · editing snippets/shipping-rates.liquid'},{taskId:'T-4F2C',role:'store-ops',title:'WEEKEND15 still firing on free-shipping carts',channel:{name:'Volero'},harness:'claude-code',state:'needs',note:'Pause it until the patch ships?',actions:<InlineConfirm label="Pause WEEKEND15" icon="pause" confirmLabel="Pause until #812" doneLabel="Paused" undoMs={4000} onConfirm={()=>{}}/>}];
+
+function Motion(){const [on,setOn]=React.useState(false);return <div className="motion">{EASES.map(([n,v,d])=><button key={n} onClick={()=>setOn(o=>!o)} title="Click to play"><div className="trk"><i className="dot" style={{left:on?'calc(100% - 24px)':'4px',transition:`left ${d} var(${v})`}}></i></div><b>{n}</b><span>{v} · {d}</span></button>)}</div>}
+
+function App(){
+  const [theme,setTheme]=React.useState(()=>localStorage.getItem('om-sc-theme')||'light');
+  const [compact,setCompact]=React.useState(()=>localStorage.getItem('om-sc-density')==='compact');
+  const [sec,setSec]=React.useState('foundations');
+  const [seg,setSeg]=React.useState('threads');const [tg,setTg]=React.useState(true);const [role,setRole]=React.useState('builder');
+  const [ck,setCk]=React.useState(['completed','in_progress','pending']);
+  const [rail,setRail]=React.useState('vo');const [tab,setTab]=React.useState('a');const [toastK,setToastK]=React.useState(0);
+  React.useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('om-sc-theme',theme)},[theme]);
+  React.useEffect(()=>{if(compact)document.documentElement.dataset.density='compact';else delete document.documentElement.dataset.density;localStorage.setItem('om-sc-density',compact?'compact':'comfortable')},[compact]);
+  React.useEffect(()=>{const f=()=>{let cur=SECTIONS[0].id;for(const s of SECTIONS){const el=document.getElementById(s.id);if(el&&el.getBoundingClientRect().top<160)cur=s.id}setSec(cur)};window.addEventListener('scroll',f,{passive:true});f();return()=>window.removeEventListener('scroll',f)},[]);
+  const go=(id)=>{const el=document.getElementById(id);if(el)window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-64,behavior:'smooth'})};
+  const next=(i)=>setCk(c=>c.map((v,j)=>j===i?(v==='completed'?'pending':v==='pending'?'in_progress':'completed'):v));
+  const icons=Object.keys(ICON_PATHS||{});
+  const dark=theme==='dark';
+
+  return <div className="sc">
+  <header className="bar">
+    <div className="bar__id"><OmniLogo height={20}/><span>Design system</span></div>
+    <Segmented value={sec} onChange={go} options={SECTIONS}/>
+    <div className="bar__ctl"><Toggle checked={compact} onChange={setCompact} label="Compact"/><Segmented size="sm" radio value={theme} onChange={setTheme} options={[{id:'light',icon:'sun',title:'Light'},{id:'dark',icon:'moon',title:'Dark'}]}/></div>
+  </header>
+
+  <div className="hero" data-screen-label="Hero">
+    <div className="hero__txt">
+      <div><h1>Fluid agents, a calm instrument.</h1><p>The kit for Omni OS: a white, rounded workspace that stays quiet while a crew of agents works inside it. Three status colors, one family of type, Bencho motion.</p></div>
+      <div className="hero__links"><a href="guidelines/brand-book.html"><Button variant="primary" icon="book">Brand book</Button></a><a href="ui_kits/omni-os/index.html"><Button icon="monitor">Desktop kit</Button></a><a href="ui_kits/omni-os/phone.html"><Button variant="ghost">Phone kit</Button></a></div>
+    </div>
+    <div className="hero__mark"><div><OmniMark size={220} state="delegating"/></div><div className="row" style={{justifyContent:'space-between'}}><span className="cap">The mark, delegating</span><span className="cap">Hover to lean</span></div></div>
+  </div>
+
+  <Sec id="foundations" n="01" t="Foundations" p="Pure white with Bencho greys inside it. Color appears only when something is live, needs you, or is done.">
+    <div className="grid">
+      <Plate t="Neutrals" s={dark?'Dark':'Light'} span="s4"><div className="sw">{NEUTRALS.map(([n,v])=><div key={n}><i style={{background:`var(${v})`}}></i><b>{n}</b><span>{v}</span></div>)}</div></Plate>
+      <Plate t="Proportion" s="By area, any screen" span="s2"><div className="prop"><i style={{flex:84,background:'var(--bg)',boxShadow:'inset 0 0 0 1px var(--line)'}}></i><i style={{flex:12,background:'var(--surface-3)'}}></i><i style={{flex:3,background:'var(--fg)'}}></i><i style={{flex:1,background:'var(--live)'}}></i></div><span className="cap">White 84 · greys 12 · ink 3 · status 1</span></Plate>
+      <Plate t="Status" s="The only color in the UI" span="s6"><div className="pops">
+        <div className="pop" style={{background:'var(--live)',color:'var(--on-live)'}}><b>Ultramarine · live</b><span>Running, streaming, in progress. The only pop that pings.</span></div>
+        <div className="pop" style={{background:'var(--needs)',color:'var(--on-needs)'}}><b>Vermilion · needs you</b><span>Waiting on a decision. Never animates.</span></div>
+        <div className="pop" style={{background:'var(--done)',color:'var(--on-done)'}}><b>Volt · done</b><span>Finished, merged, report in. Edged in ink on white.</span></div>
+      </div></Plate>
+      <Plate t="Type" s="SF Pro · SF Mono · SF Pro Rounded" w span="s4"><div className="type">{TYPE.map(([l,f,x,st])=><div key={l}><span className="cap">{l}</span><span style={{font:f,...(st||{}),minWidth:0,overflow:'hidden',textOverflow:'ellipsis'}}>{x}</span></div>)}</div></Plate>
+      <div className="s2" style={{display:'grid',gap:12}}>
+        <Plate t="Radii" s="Pills for everything else"><div className="radii">{RADII.map(r=><div key={r}><i style={{borderRadius:r,width:Math.max(40,r*2.4),height:Math.max(40,r*2.4)}}></i><span className="cap">{r}</span></div>)}</div></Plate>
+        <Plate t="Elevation"><div className="elev"><div style={{boxShadow:'var(--shadow-card)'}}>card</div><div style={{boxShadow:'var(--shadow-thumb)'}}>thumb</div><div style={{boxShadow:'var(--shadow-menu)'}}>menu</div></div></Plate>
+      </div>
+      <Plate t="Motion" s="Click any track" span="s6"><Motion/></Plate>
+    </div>
+  </Sec>
+
+  <Sec id="components" n="02" t="Components" p="Every piece below is the live component from the bundle. Click, toggle, confirm and drag — states are real.">
+    <div className="grid">
+      <Plate t="Button" s="Ink pill is the primary action" span="s3"><div className="row"><Button variant="primary" icon="plus">New thread</Button><Button>Open thread</Button><Button variant="ghost" icon="diff">View diff</Button></div><div className="row"><Button variant="needs" icon="pause">Pause automation</Button><Button variant="primary" busy>Merging</Button><Button size="sm">Small</Button><Button variant="primary" size="lg">Large</Button></div><div className="row"><IconButton label="Search" icon="search"/><IconButton label="Panel" icon="panel" active/><IconButton label="More" icon="more"/><Kbd>⌘K</Kbd><Kbd>Esc</Kbd><Kbd>↵</Kbd></div></Plate>
+      <Plate t="Field" s="14 radius · 4px wash ring" span="s3"><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}><Input label="Thread title" placeholder="Fix checkout drop-off"/><Input label="Branch" mono defaultValue="omni/t-4f2b" hint="from main"/><Input label="Admin token" mono defaultValue="shpat_••••2c" error="Expired 2h ago"/></div></Plate>
+      <Plate t="Status" s="Shape and color" span="s2"><div className="row"><Status state="running"/><Status state="needs"/><Status state="done"/><Status state="settled"/><Status state="queued"/></div><div className="row" style={{gap:16}}>{['running','needs','done','settled','idle'].map(s=><StatusGlyph key={s} state={s}/>)}</div></Plate>
+      <Plate t="Identity" s="Monogram, chip, task id" span="s2"><div className="row"><Monogram name="Volero" size={28}/><Monogram name="Pink Gellac" size={32}/><Monogram name="Conductor" icon="target" size={32}/><Monogram name="Acne" size={40}/></div><div className="row"><Chip>builder</Chip><Chip tone="outline">Automation</Chip><Chip tone="needs">Needs you</Chip><Chip tone="done">New</Chip><TaskId id="T-4F2A"/></div></Plate>
+      <Plate t="Selection" s="Sliding thumb, liquid toggle" span="s2"><Segmented value={seg} onChange={setSeg} options={[{id:'threads',label:'Threads'},{id:'prs',label:'PRs',count:2},{id:'settings',label:'Settings'}]}/><div className="row"><Toggle checked={tg} onChange={setTg} label="Notify"/><span className="cap">Notify when crew needs you</span></div></Plate>
+      <Plate t="Confirm" s="Inline with undo fuse · slide for irreversible" span="s3"><div className="row"><InlineConfirm label="Pause WEEKEND15" icon="pause" confirmLabel="Pause until #812" doneLabel="Paused" undoMs={4000} onConfirm={()=>{}}/><InlineConfirm label="Archive" icon="archive" confirmLabel="Archive thread" needs={false} doneLabel="Archived" onConfirm={()=>new Promise(r=>setTimeout(r,700))}/></div><div style={{maxWidth:380}}><SlideToConfirm label="Slide to merge into main" doneLabel="Merged" busyLabel="Merging" onConfirm={()=>new Promise(r=>setTimeout(r,900))}/></div></Plate>
+      <Plate t="Picker" s="Crew role, channel" span="s3"><div className="row"><Picker label="Crew role" value={role} onChange={setRole} options={[{value:'conductor',label:'Conductor',sub:'Delegates to the crew'},{value:'researcher',label:'Researcher',sub:'Reads, measures, reports'},{value:'builder',label:'Builder',sub:'Changes code, opens PRs'},{value:'store-ops',label:'Store ops',sub:'Shopify admin'}].map(o=>({...o,lead:<span style={{display:'grid',placeItems:'center',width:24,height:24,borderRadius:'50%',background:'var(--bg)'}}><CrewMark role={o.value} size={13}/></span>}))}/><Picker label="Channel" value="Volero" onChange={()=>{}} options={['Volero','Pink Gellac','Acne Studios'].map(n=>({value:n,label:'#'+n,avatar:n}))}/></div></Plate>
+      <Plate t="Plan" s="Checklist and ticks" span="s3"><div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:20,alignItems:'start'}}><div>{['Find where the drop is','Decide on WEEKEND15','Merge #812'].map((x,i)=><CheckItem key={i} state={ck[i]} onClick={()=>next(i)}>{x}</CheckItem>)}</div><div style={{display:'grid',gap:12}}><span className="cap">Claude · 5h window</span><Ticks value={.46}/><span className="cap">Codex · 5h window</span><Ticks value={.93} tone="needs"/></div></div></Plate>
+      <Plate t="Toast" s="Done and needs-you" span="s3"><div style={{display:'grid',gap:10}} key={toastK}><Toast status="done" title="Klaviyo abandoned-cart flow" body="Finished in #Volero" onAction={()=>setToastK(k=>k+1)} onDismiss={()=>setToastK(k=>k+1)}/><Toast status="needs" title="Pause WEEKEND15?" body="Store ops is waiting on you · T-4F2C" action="Decide" onAction={()=>setToastK(k=>k+1)} onDismiss={()=>setToastK(k=>k+1)}/></div></Plate>
+      <Plate t="Icons" s={`${icons.length} on a 24 grid · 1.75 stroke`} span="s4"><div className="ic">{icons.map(n=><div key={n} title={n}><Icon name={n} size={18}/><span>{n.length>9?n.slice(0,9):n}</span></div>)}</div></Plate>
+      <Plate t="Crew and harness" s="Ring-derived · vendor logos verbatim" span="s2"><div style={{display:'grid',gap:10}}>{['conductor','researcher','builder','store-ops','inbox'].map(r=><span key={r} style={{display:'flex',alignItems:'center',gap:10,font:'400 13px var(--font-sans)'}}><span style={{display:'grid',placeItems:'center',width:28,height:28,borderRadius:'50%',background:'var(--surface-2)'}}><CrewMark role={r} size={15}/></span>{r}</span>)}</div><div className="row"><HarnessMark harness="claude-code" withLabel/><HarnessMark harness="codex" withLabel/><HarnessMark harness="cursor" withLabel/></div></Plate>
+      <Plate t="The mark" s="Six states · attention holds until acknowledged" w span="s6"><div className="states">{['idle','hover','thinking','delegating','report','attention'].map(s=><div key={s}><OmniMark size={80} state={s}/><b>{s}</b></div>)}</div><div className="row" style={{justifyContent:'space-between',borderTop:'1px solid var(--line)',paddingTop:16}}><Loader size={22} label="fetching 3 PRs"/><span className="cap">Loader replaces skeleton shimmer</span></div></Plate>
+      <Plate t="Usage" s="5h and week windows" span="s3"><div style={{display:'grid',gap:10}}><UsageMeter label="Claude Code" used={71} limit={100} sub="Max plan · 5h window resets in 3h 12m"/><UsageMeter label="Codex" used={93} limit={100} sub="Over 90% · throttling in about 40m"/><UsageMeter compact label="Cursor" used={22} limit={100}/></div></Plate>
+      <Plate t="Pull request" s="GitHub panel · slide to merge" span="s3"><div style={{borderRadius:22,overflow:'hidden',background:'var(--bg)',boxShadow:'var(--shadow-card)'}}><GitHubPanel pr={pr} onClose={()=>{}}/></div></Plate>
+      <Plate t="Command palette" s="⌘K · 48px rows" span="s3"><div className="pal"><CommandPalette modal={false} items={palItems} onClose={()=>{}}/></div></Plate>
+      <Plate t="Thread rows" s="Running, needs, settled" w span="s3"><div className="om-thread" style={{margin:'-8px -12px'}}><ThreadGroup label="Today" count={3}><ThreadRow title="Patch shipping-rate script in checkout" taskId="T-4F2B" state="running" role="builder" harness="claude-code" time="12m" branch="omni/t-4f2b" preview="Editing snippets/shipping-rates.liquid · step 5/9"/><ThreadRow title="Pause WEEKEND15 until the patch ships?" taskId="T-4F2C" state="needs" role="store-ops" harness="claude-code" time="3m" preview="It stacks with free shipping."/><ThreadRow title="Returns page copy review" taskId="T-4E11" state="settled" role="inbox" harness="cursor" time="Tue" preview="Tightened to 140 words."/></ThreadGroup></div></Plate>
+    </div>
+  </Sec>
+
+  <Sec id="workspace" n="03" t="In use" p="The same pieces composed into the Conductor thread: the sidebar, tabs, a delegation fanning out to three crew threads, a report coming back, and the composer.">
+    <div className="ws">
+      <Rail channels={channels} activeId={rail} onSelect={setRail} conductor={{state:'delegating',running:1}} usage={usage} theme={theme} onTheme={setTheme}/>
+      <div className="ws__main">
+        <TabStack activeId={tab} onSelect={setTab} tabs={[{id:'a',title:'Volero checkout drop-off',state:'needs'},{id:'b',title:'Patch shipping-rate script',state:'running'},{id:'c',title:'funnel-before-after.html',kind:'artifact'},{id:'d',title:'PDP audit',state:'done'}]}/>
+        <div className="ws__scroll"><div className="om-thread"><div className="om-transcript">
+          <Message role="user" time="14:02">Volero’s checkout drop-off spiked after Friday’s theme deploy. Find out why and fix it.</Message>
+          <Message><p>Three things in parallel: measure the drop, patch the likely cause, and check the weekend automation.</p></Message>
+          <ToolCalls><ToolCall name="search_threads" args='channel:volero "shipping"' duration="0.4s" output="3 threads"/><ToolCall name="Read" args="snippets/shipping-rates.liquid" duration="0.2s"/><ToolCall name="Bash" args="git log main --since=2026-09-24" status="running"/></ToolCalls>
+          <Delegation branches={branches}/>
+          <CrewReport role="researcher" taskId="T-4F2A" channel={{name:'Volero'}} time="14:09" title="The drop is at the shipping step, not payment" facts={['7d vs 7d','18,402 sessions','−26 pts at shipping']}><p>Shipping-step completion fell from <strong>78% to 52%</strong> on 25 Sep at 16:40.</p><ArtifactEmbed name="funnel-before-after.html" kind="html" size="48 KB" taskId="T-4F2A" height={110} srcDoc={doc} caption="rendered by researcher"/></CrewReport>
+          <ResultLine>done in 3m 41s · 12 turns</ResultLine>
+          <Composer channel={{name:'Volero'}} model="opus-4.5"/>
+        </div></div></div>
+      </div>
+    </div>
+  </Sec>
+
+  <footer className="foot"><span>Omni OS design system · Edition 2 · October 2026</span><span>SF Pro, SF Pro Rounded, SF Mono · install locally for accurate previews</span></footer>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

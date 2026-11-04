@@ -1,0 +1,93 @@
+/* Omni OS color. Neutrals from apps/web/src/index.css (Bencho warm neutrals); the three status pops are ours. */
+:root{
+color-scheme:light;
+/* raw pops: full saturation, never tinted */
+--ink:#17181a;
+--ultramarine:#2B3BFF;
+--ultramarine-lift:#7280FF;
+--vermilion:#FF4420;
+--volt:#C6F52B;
+/* neutrals: light. Base is pure white (canvas + main); greys only for surfaces inside it. */
+--canvas:#ffffff;
+/* chrome around the pane (sidebar, gutters): dark in both schemes */
+--chrome:#0c0d0f;
+--bg-sidebar:var(--chrome);
+--bg:#ffffff;
+--surface:#f7f7f6;
+--surface-2:#f1f1f0;
+--surface-3:#ecebe7;
+--elev:#ffffff;
+--fg:#17181a;
+--fg-2:#3c3b37;
+--fg-3:#6f6e68;
+--fg-4:#9d9c96;
+--on-ink:#ffffff;
+--line:rgb(23 24 26 / 0.08);
+--line-strong:rgb(23 24 26 / 0.16);
+--thumb:#ffffff;
+--wash:rgb(23 24 26 / 0.06);
+--pane:rgb(255 255 255 / 0.72);
+--pane-edge:rgb(23 24 26 / 0.07);
+--code-bg:var(--surface);
+--mark-hl:rgb(245 158 11 / 0.28);
+--mark:var(--mark-hl);
+/* amber for a meter filling up (context from 70%) */
+--warn:#b45309;
+/* diffs: the one place a line gets a wash */
+--diff-add:color-mix(in srgb,var(--done) 22%,transparent);
+--diff-del:color-mix(in srgb,var(--needs) 12%,transparent);
+--bubble:var(--surface-2);
+/* semantic aliases (kept from v1 so older markup still resolves) */
+--bg-raised:var(--surface);
+--bg-sunken:var(--surface-2);
+--text-1:var(--fg);
+--text-2:var(--fg-2);
+--text-3:var(--fg-3);
+--text-4:var(--fg-4);
+--text-disabled:var(--fg-4);
+--inverse-bg:var(--fg);
+--inverse-bg-hover:#2e2f32;
+--inverse-text:var(--on-ink);
+--inverse-muted:#9d9c96;
+--focus:var(--fg);
+/* status: the only color in the UI */
+--live:var(--ultramarine);
+--live-text:var(--ultramarine);
+--on-live:#ffffff;
+--needs:var(--vermilion);
+--on-needs:var(--ink);
+--done:var(--volt);
+--on-done:var(--ink);
+--done-edge:var(--ink);
+--scrim:rgb(23 24 26 / 0.22);
+}
+/* .scheme-dark: the sidebar always draws with the dark tokens */
+[data-theme="dark"],.scheme-dark{
+color-scheme:dark;
+--canvas:#0c0d0f;
+--bg:#121316;
+--surface:#191b1e;
+--surface-2:#222428;
+--surface-3:#2a2c31;
+--elev:#212429;
+--fg:#eceae5;
+--fg-2:#b8b7b1;
+--fg-3:#908f89;
+--fg-4:#6f6e69;
+--on-ink:#101114;
+--line:rgb(236 235 231 / 0.08);
+--line-strong:rgb(236 235 231 / 0.16);
+--thumb:rgb(255 255 255 / 0.14);
+--wash:rgb(236 234 229 / 0.06);
+--pane:rgb(33 36 41 / 0.72);
+--pane-edge:rgb(255 255 255 / 0.09);
+--mark-hl:rgb(245 181 68 / 0.28);
+--warn:#f5b544;
+--inverse-bg-hover:#d6d4cf;
+--inverse-muted:#6f6e69;
+--live:var(--ultramarine-lift);
+--live-text:var(--ultramarine-lift);
+--on-live:#101114;
+--done-edge:transparent;
+--scrim:rgb(0 0 0 / 0.5);
+}

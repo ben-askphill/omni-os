@@ -1,0 +1,1247 @@
+{
+  "manifestVersion": 3,
+  "name": "Omni OS Design System",
+  "namespace": "OmniOSDesignSystem_a7120f",
+  "files": [
+    "Mac OS Design System (offline).html",
+    "Mac OS Design System.html",
+    "Mobile Design System.html",
+    "Showcase.html",
+    "assets/ds-fallback.js",
+    "assets/harness/README.md",
+    "assets/icons/README.md",
+    "assets/logo/README.md",
+    "assets/notes/COMPONENTS.md",
+    "assets/notes/MIGRATION-REPORT.md",
+    "assets/notes/SKILL.from-standalone.md",
+    "brand/loader.html",
+    "brand/logo-favicons.html",
+    "brand/logo-keyframes.html",
+    "brand/logo-mark.html",
+    "brand/logo-wordmark.html",
+    "components/ArtifactEmbed/README.md",
+    "components/Button/README.md",
+    "components/CheckItem/README.md",
+    "components/CloudAgent/README.md",
+    "components/CommandPalette/README.md",
+    "components/Composer/README.md",
+    "components/CrewMark/README.md",
+    "components/CrewReport/README.md",
+    "components/Delegation/README.md",
+    "components/GitHubPanel/README.md",
+    "components/Handoff/README.md",
+    "components/HarnessMark/README.md",
+    "components/Icon/README.md",
+    "components/IconButton/README.md",
+    "components/InlineConfirm/README.md",
+    "components/Input/README.md",
+    "components/Kbd/README.md",
+    "components/Loader/README.md",
+    "components/Message/README.md",
+    "components/MoArtifactCard/README.md",
+    "components/MoBubble/README.md",
+    "components/MoComposer/README.md",
+    "components/MoDecisionCard/README.md",
+    "components/MoHeader/README.md",
+    "components/MoListRow/README.md",
+    "components/MoRoundButton/README.md",
+    "components/MoSection/README.md",
+    "components/MoSheet/README.md",
+    "components/MoTabBar/README.md",
+    "components/MoThreadRow/README.md",
+    "components/MoToast/README.md",
+    "components/ModelPicker/README.md",
+    "components/Monogram/README.md",
+    "components/OmniLogo/README.md",
+    "components/OmniMark/README.md",
+    "components/Panel/README.md",
+    "components/PhoneActivity/README.md",
+    "components/Picker/README.md",
+    "components/QuestionCard/README.md",
+    "components/Rail/README.md",
+    "components/Segmented/README.md",
+    "components/SlideToConfirm/README.md",
+    "components/Status/README.md",
+    "components/TabStack/README.md",
+    "components/ThreadRow/README.md",
+    "components/Toast/README.md",
+    "components/Toggle/README.md",
+    "components/ToolCall/README.md",
+    "components/UsageMeter/README.md",
+    "components/brand/Loader.d.ts",
+    "components/brand/Loader.jsx",
+    "components/brand/Loader.prompt.md",
+    "components/brand/OmniLogo.d.ts",
+    "components/brand/OmniLogo.jsx",
+    "components/brand/OmniLogo.prompt.md",
+    "components/brand/OmniMark.d.ts",
+    "components/brand/OmniMark.jsx",
+    "components/brand/OmniMark.prompt.md",
+    "components/brand/brand.card.html",
+    "components/bundle.js",
+    "components/core/Button.d.ts",
+    "components/core/Button.jsx",
+    "components/core/Button.prompt.md",
+    "components/core/IconButton.d.ts",
+    "components/core/IconButton.jsx",
+    "components/core/IconButton.prompt.md",
+    "components/core/Input.d.ts",
+    "components/core/Input.jsx",
+    "components/core/Input.prompt.md",
+    "components/core/Kbd.d.ts",
+    "components/core/Kbd.jsx",
+    "components/core/Kbd.prompt.md",
+    "components/core/Monogram.d.ts",
+    "components/core/Monogram.jsx",
+    "components/core/Monogram.prompt.md",
+    "components/core/Status.d.ts",
+    "components/core/Status.jsx",
+    "components/core/Status.prompt.md",
+    "components/core/button-sizes.card.html",
+    "components/core/button-states.card.html",
+    "components/core/button-variants.card.html",
+    "components/core/chip.card.html",
+    "components/core/core.card.html",
+    "components/core/icon-button.card.html",
+    "components/core/input.card.html",
+    "components/core/kbd.card.html",
+    "components/core/monogram.card.html",
+    "components/core/status-glyph.card.html",
+    "components/core/status.card.html",
+    "components/core/task-id.card.html",
+    "components/feedback/Toast.d.ts",
+    "components/feedback/Toast.jsx",
+    "components/feedback/Toast.prompt.md",
+    "components/feedback/feedback.card.html",
+    "components/feedback/toast-done.card.html",
+    "components/feedback/toast-failed.card.html",
+    "components/feedback/toast-needs.card.html",
+    "components/forms/CheckItem.d.ts",
+    "components/forms/CheckItem.jsx",
+    "components/forms/CheckItem.prompt.md",
+    "components/forms/InlineConfirm.d.ts",
+    "components/forms/InlineConfirm.jsx",
+    "components/forms/InlineConfirm.prompt.md",
+    "components/forms/ModelPicker.d.ts",
+    "components/forms/ModelPicker.jsx",
+    "components/forms/ModelPicker.prompt.md",
+    "components/forms/Picker.d.ts",
+    "components/forms/Picker.jsx",
+    "components/forms/Picker.prompt.md",
+    "components/forms/Segmented.d.ts",
+    "components/forms/Segmented.jsx",
+    "components/forms/Segmented.prompt.md",
+    "components/forms/SlideToConfirm.d.ts",
+    "components/forms/SlideToConfirm.jsx",
+    "components/forms/SlideToConfirm.prompt.md",
+    "components/forms/Toggle.d.ts",
+    "components/forms/Toggle.jsx",
+    "components/forms/Toggle.prompt.md",
+    "components/forms/check-item.card.html",
+    "components/forms/forms.card.html",
+    "components/forms/inline-confirm-neutral.card.html",
+    "components/forms/inline-confirm.card.html",
+    "components/forms/model-picker.card.html",
+    "components/forms/model-picker.css",
+    "components/forms/picker-channel.card.html",
+    "components/forms/picker-crew.card.html",
+    "components/forms/segmented-icon.card.html",
+    "components/forms/segmented-vertical.card.html",
+    "components/forms/segmented.card.html",
+    "components/forms/slide-to-confirm.card.html",
+    "components/forms/ticks.card.html",
+    "components/forms/toggle.card.html",
+    "components/icons/CrewMark.d.ts",
+    "components/icons/CrewMark.jsx",
+    "components/icons/CrewMark.prompt.md",
+    "components/icons/HarnessMark.d.ts",
+    "components/icons/HarnessMark.jsx",
+    "components/icons/HarnessMark.prompt.md",
+    "components/icons/Icon.d.ts",
+    "components/icons/Icon.jsx",
+    "components/icons/Icon.prompt.md",
+    "components/icons/crew-mark.card.html",
+    "components/icons/harness-logo.card.html",
+    "components/icons/harness-mark.card.html",
+    "components/icons/icons.card.html",
+    "components/index.d.ts",
+    "components/mobile/MoArtifactCard.d.ts",
+    "components/mobile/MoArtifactCard.jsx",
+    "components/mobile/MoArtifactCard.prompt.md",
+    "components/mobile/MoBubble.d.ts",
+    "components/mobile/MoBubble.jsx",
+    "components/mobile/MoBubble.prompt.md",
+    "components/mobile/MoButtons.d.ts",
+    "components/mobile/MoButtons.jsx",
+    "components/mobile/MoButtons.prompt.md",
+    "components/mobile/MoComposer.d.ts",
+    "components/mobile/MoComposer.jsx",
+    "components/mobile/MoComposer.prompt.md",
+    "components/mobile/MoDecisionCard.d.ts",
+    "components/mobile/MoDecisionCard.jsx",
+    "components/mobile/MoDecisionCard.prompt.md",
+    "components/mobile/MoHeader.d.ts",
+    "components/mobile/MoHeader.jsx",
+    "components/mobile/MoHeader.prompt.md",
+    "components/mobile/MoList.d.ts",
+    "components/mobile/MoList.jsx",
+    "components/mobile/MoList.prompt.md",
+    "components/mobile/MoSection.d.ts",
+    "components/mobile/MoSection.jsx",
+    "components/mobile/MoSection.prompt.md",
+    "components/mobile/MoSheet.d.ts",
+    "components/mobile/MoSheet.jsx",
+    "components/mobile/MoSheet.prompt.md",
+    "components/mobile/MoTabBar.d.ts",
+    "components/mobile/MoTabBar.jsx",
+    "components/mobile/MoTabBar.prompt.md",
+    "components/mobile/MoThreadRow.d.ts",
+    "components/mobile/MoThreadRow.jsx",
+    "components/mobile/MoThreadRow.prompt.md",
+    "components/mobile/MoToast.d.ts",
+    "components/mobile/MoToast.jsx",
+    "components/mobile/MoToast.prompt.md",
+    "components/mobile/mobile.css",
+    "components/mobile/native/CrewMark.tsx",
+    "components/mobile/native/Icon.tsx",
+    "components/mobile/native/MoArtifactCard.tsx",
+    "components/mobile/native/MoBubble.tsx",
+    "components/mobile/native/MoButtons.tsx",
+    "components/mobile/native/MoComposer.tsx",
+    "components/mobile/native/MoDecisionCard.tsx",
+    "components/mobile/native/MoHeader.tsx",
+    "components/mobile/native/MoList.tsx",
+    "components/mobile/native/MoSection.tsx",
+    "components/mobile/native/MoSheet.tsx",
+    "components/mobile/native/MoTabBar.tsx",
+    "components/mobile/native/MoThreadRow.tsx",
+    "components/mobile/native/MoToast.tsx",
+    "components/mobile/native/Press.tsx",
+    "components/mobile/native/StatusGlyph.tsx",
+    "components/mobile/native/icon-paths.ts",
+    "components/mobile/native/index.ts",
+    "components/mobile/native/theme.ts",
+    "components/navigation/CommandPalette.d.ts",
+    "components/navigation/CommandPalette.jsx",
+    "components/navigation/CommandPalette.prompt.md",
+    "components/navigation/Rail.d.ts",
+    "components/navigation/Rail.jsx",
+    "components/navigation/Rail.prompt.md",
+    "components/navigation/TabStack.d.ts",
+    "components/navigation/TabStack.jsx",
+    "components/navigation/TabStack.prompt.md",
+    "components/navigation/command-palette-query.card.html",
+    "components/navigation/command-palette.card.html",
+    "components/navigation/navigation.card.html",
+    "components/navigation/rail-attention.card.html",
+    "components/navigation/rail-sections.card.html",
+    "components/navigation/rail.card.html",
+    "components/navigation/tab-stack-few.card.html",
+    "components/navigation/tab-stack.card.html",
+    "components/omni.css",
+    "components/panels/GitHubPanel.d.ts",
+    "components/panels/GitHubPanel.jsx",
+    "components/panels/GitHubPanel.prompt.md",
+    "components/panels/Panel.d.ts",
+    "components/panels/Panel.jsx",
+    "components/panels/Panel.prompt.md",
+    "components/panels/UsageMeter.d.ts",
+    "components/panels/UsageMeter.jsx",
+    "components/panels/UsageMeter.prompt.md",
+    "components/panels/github-panel-blocked.card.html",
+    "components/panels/github-panel-running.card.html",
+    "components/panels/github-panel.card.html",
+    "components/panels/panel.card.html",
+    "components/panels/panels.card.html",
+    "components/panels/usage-meter-compact.card.html",
+    "components/panels/usage-meter-unit.card.html",
+    "components/panels/usage-meter-warn.card.html",
+    "components/panels/usage-meter.card.html",
+    "components/thread/ArtifactEmbed.d.ts",
+    "components/thread/ArtifactEmbed.jsx",
+    "components/thread/ArtifactEmbed.prompt.md",
+    "components/thread/CloudAgent.d.ts",
+    "components/thread/CloudAgent.jsx",
+    "components/thread/CloudAgent.prompt.md",
+    "components/thread/Composer.d.ts",
+    "components/thread/Composer.jsx",
+    "components/thread/Composer.prompt.md",
+    "components/thread/CrewReport.d.ts",
+    "components/thread/CrewReport.jsx",
+    "components/thread/CrewReport.prompt.md",
+    "components/thread/Delegation.d.ts",
+    "components/thread/Delegation.jsx",
+    "components/thread/Delegation.prompt.md",
+    "components/thread/Handoff.d.ts",
+    "components/thread/Handoff.jsx",
+    "components/thread/Handoff.prompt.md",
+    "components/thread/Message.d.ts",
+    "components/thread/Message.jsx",
+    "components/thread/Message.prompt.md",
+    "components/thread/QuestionCard.d.ts",
+    "components/thread/QuestionCard.jsx",
+    "components/thread/QuestionCard.prompt.md",
+    "components/thread/ThreadRow.d.ts",
+    "components/thread/ThreadRow.jsx",
+    "components/thread/ThreadRow.prompt.md",
+    "components/thread/ToolCall.d.ts",
+    "components/thread/ToolCall.jsx",
+    "components/thread/ToolCall.prompt.md",
+    "components/thread/artifact-embed.card.html",
+    "components/thread/cloud-agent.card.html",
+    "components/thread/cloud-agent.css",
+    "components/thread/composer-big.card.html",
+    "components/thread/composer-filled.card.html",
+    "components/thread/composer.card.html",
+    "components/thread/crew-report-needs.card.html",
+    "components/thread/crew-report.card.html",
+    "components/thread/delegation-single.card.html",
+    "components/thread/delegation.card.html",
+    "components/thread/handoff.card.html",
+    "components/thread/handoff.css",
+    "components/thread/message-agent.card.html",
+    "components/thread/message-user.card.html",
+    "components/thread/question-card.card.html",
+    "components/thread/question-card.css",
+    "components/thread/result-line.card.html",
+    "components/thread/switch-line.card.html",
+    "components/thread/switch-line.css",
+    "components/thread/thread-group.card.html",
+    "components/thread/thread-row-automation.card.html",
+    "components/thread/thread-row-done.card.html",
+    "components/thread/thread-row-marked-done.card.html",
+    "components/thread/thread-row-needs.card.html",
+    "components/thread/thread-row-running.card.html",
+    "components/thread/thread-row-selected.card.html",
+    "components/thread/thread-row-settled.card.html",
+    "components/thread/thread.card.html",
+    "components/thread/tool-call-open.card.html",
+    "components/thread/tool-call.card.html",
+    "components/thread/tool-calls.card.html",
+    "github.md",
+    "guidelines/brand-book.html",
+    "guidelines/colors-inversion.html",
+    "guidelines/colors-neutrals-dark.html",
+    "guidelines/colors-neutrals-light.html",
+    "guidelines/colors-pop-rules.html",
+    "guidelines/colors-pops.html",
+    "guidelines/density-modes.html",
+    "guidelines/elevation.html",
+    "guidelines/heights.html",
+    "guidelines/motion-alive.html",
+    "guidelines/motion-mechanical.html",
+    "guidelines/radii-borders.html",
+    "guidelines/spacing-scale.html",
+    "guidelines/type-mono-voice.html",
+    "guidelines/type-pairing.html",
+    "guidelines/type-scale.html",
+    "phone.md",
+    "support.js",
+    "tokens.css",
+    "tokens/base.css",
+    "tokens/colors.css",
+    "tokens/fonts.css",
+    "tokens/motion.css",
+    "tokens/space.css",
+    "tokens/type.css",
+    "ui_kits/mac/mac.css",
+    "ui_kits/mac/mac.js",
+    "ui_kits/mac/notes/2-window.md",
+    "ui_kits/mac/notes/3-controls.md",
+    "ui_kits/mac/notes/4-composer-transcript.md",
+    "ui_kits/mac/notes/5-delegation-threads.md",
+    "ui_kits/mac/notes/6-inspector.md",
+    "ui_kits/mac/notes/7-screens.md",
+    "ui_kits/mac/notes/8-settings.md",
+    "ui_kits/mac/notes/9-server-menus.md",
+    "ui_kits/omni-mobile/MobileApp.jsx",
+    "ui_kits/omni-mobile/MobileDocs.jsx",
+    "ui_kits/omni-mobile/MobileParts.jsx",
+    "ui_kits/omni-mobile/MobileScreens.jsx",
+    "ui_kits/omni-mobile/MobileThread.jsx",
+    "ui_kits/omni-mobile/index.html",
+    "ui_kits/omni-mobile/mobile-data.js",
+    "ui_kits/omni-os/App.jsx",
+    "ui_kits/omni-os/ChannelScreen.jsx",
+    "ui_kits/omni-os/ConductorScreen.jsx",
+    "ui_kits/omni-os/PhoneConductor.jsx",
+    "ui_kits/omni-os/README.md",
+    "ui_kits/omni-os/cards/channel-compact.html",
+    "ui_kits/omni-os/cards/channel-dark.html",
+    "ui_kits/omni-os/cards/channel-light.html",
+    "ui_kits/omni-os/cards/conductor-dark.html",
+    "ui_kits/omni-os/cards/conductor-light.html",
+    "ui_kits/omni-os/cards/palette-light.html",
+    "ui_kits/omni-os/data.js",
+    "ui_kits/omni-os/index.html",
+    "ui_kits/omni-os/ios-frame.jsx",
+    "ui_kits/omni-os/phone.html",
+    "uploads/Omni Mobile Research/index.html"
+  ],
+  "libraries": [
+    {
+      "name": "react",
+      "version": "18",
+      "global": "React"
+    },
+    {
+      "name": "react-dom",
+      "version": "18",
+      "global": "ReactDOM"
+    }
+  ],
+  "components": [
+    {
+      "name": "Loader",
+      "group": "01 Logo",
+      "summary": "Liquid loader (a bead travelling around the ring) for real waits — replaces skeleton shimmer."
+    },
+    {
+      "name": "OmniLogo",
+      "summary": "The continuous-line “omni” wordmark (20u stroke, 10° lean); use in the rail head, splash, docs."
+    },
+    {
+      "name": "StaticMark"
+    },
+    {
+      "name": "OmniMark",
+      "summary": "The fluid Omni mark; use at splash, in the rail’s Conductor row, and anywhere the Conductor’s state should be felt."
+    },
+    {
+      "name": "Button",
+      "summary": "Pill buttons; primary is ink, needs is reserved for resolving a waiting decision."
+    },
+    {
+      "name": "IconButton",
+      "group": "08 Core",
+      "summary": "32px round icon button with the Bencho hover wash."
+    },
+    {
+      "name": "Input",
+      "group": "08 Core",
+      "summary": "Field: surface fill, 14px radius, wash focus ring."
+    },
+    {
+      "name": "Kbd",
+      "group": "08 Core",
+      "summary": "Keycap for shortcut hints."
+    },
+    {
+      "name": "Monogram",
+      "group": "08 Core",
+      "summary": "Neutral round letter avatar (SF Rounded), TaskId in SF Mono, and Chip."
+    },
+    {
+      "name": "TaskId",
+      "group": "08 Core"
+    },
+    {
+      "name": "Chip",
+      "group": "08 Core"
+    },
+    {
+      "name": "STATUS_LABEL"
+    },
+    {
+      "name": "StatusGlyph",
+      "group": "08 Core"
+    },
+    {
+      "name": "Status",
+      "summary": "Status dots and pills — the only place the pops appear."
+    },
+    {
+      "name": "Toast",
+      "group": "07 Components",
+      "summary": "Toast for a thread that finished while you were elsewhere."
+    },
+    {
+      "name": "CheckItem",
+      "group": "09 Forms",
+      "summary": "Animated plan checklist row and Bencho tick meter."
+    },
+    {
+      "name": "Ticks",
+      "group": "09 Forms"
+    },
+    {
+      "name": "InlineConfirm",
+      "summary": "Ask-in-place confirm with an undo fuse — the default way to take a decision a thread is waiting on."
+    },
+    {
+      "name": "Picker",
+      "summary": "Pill dropdown (Bencho \"pik\") for crew role, channel, harness, model."
+    },
+    {
+      "name": "Thumb"
+    },
+    {
+      "name": "Segmented",
+      "summary": "Segmented pill with a Bencho sliding thumb — tabs, filters, theme switch."
+    },
+    {
+      "name": "SlideToConfirm",
+      "group": "09 Forms",
+      "summary": "Slide-to-confirm for deliberate, irreversible actions (merge to main, send to a client)."
+    },
+    {
+      "name": "Toggle",
+      "group": "09 Forms",
+      "summary": "Liquid on/off switch (Bencho) for settings."
+    },
+    {
+      "name": "CREW_ROLES"
+    },
+    {
+      "name": "CrewMark",
+      "group": "06 Iconography",
+      "summary": "Crew role mark, usually inside a 28px surface-2 circle."
+    },
+    {
+      "name": "HarnessLogo",
+      "group": "06 Iconography"
+    },
+    {
+      "name": "HarnessMark",
+      "group": "06 Iconography",
+      "summary": "Harness mark for a thread: the vendor's own monochrome logo (Claude, OpenAI for Codex, Cursor) in a soft disc, optionally with its name."
+    },
+    {
+      "name": "ICON_PATHS"
+    },
+    {
+      "name": "Icon",
+      "summary": "Omni icon (24 grid, 1.75 round stroke) — web/src set plus delegate, switchboard, split, sidebar, browser, gauge, pause, diff, more."
+    },
+    {
+      "name": "CommandPalette",
+      "group": "11 Navigation",
+      "summary": "⌘K palette across actions, channels, recent threads, T-ids."
+    },
+    {
+      "name": "Rail",
+      "summary": "The sidebar: search pill, New thread, Conductor (live mark), channels by kind with nested running threads, usage card, theme switch."
+    },
+    {
+      "name": "TabStack",
+      "group": "11 Navigation",
+      "summary": "Pill tab bar where overflow collapses into status leaves."
+    },
+    {
+      "name": "GitHubPanel",
+      "group": "13 Panels",
+      "summary": "PR panel: checks, colour-free diff ticks, slide to merge."
+    },
+    {
+      "name": "Panel",
+      "summary": "Side panel column with surface-tray sections."
+    },
+    {
+      "name": "PanelSection"
+    },
+    {
+      "name": "UsageMeter",
+      "group": "13 Panels",
+      "summary": "Usage as Bencho ticks; vermilion past the threshold."
+    },
+    {
+      "name": "ArtifactEmbed",
+      "group": "12 Thread",
+      "summary": "Inline artifact: surface tray + white sheet."
+    },
+    {
+      "name": "Composer",
+      "group": "12 Thread",
+      "summary": "Composer with Bencho pickers for crew role, channel and harness."
+    },
+    {
+      "name": "CrewReport",
+      "group": "12 Thread",
+      "summary": "Crew report card returning to the Conductor."
+    },
+    {
+      "name": "Delegation",
+      "group": "12 Thread",
+      "summary": "Conductor fan-out: branch cards on rounded elbows colored by state."
+    },
+    {
+      "name": "Message",
+      "summary": "Transcript turn: you = right bubble, agents = markdown with no bubble."
+    },
+    {
+      "name": "ResultLine",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ThreadRow",
+      "summary": "Thread list row (32px lead, title + chips + time, preview line) and ThreadGroup."
+    },
+    {
+      "name": "ThreadGroup",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ToolCall",
+      "group": "12 Thread",
+      "summary": "Tool call pill rows, grouped into a surface card."
+    },
+    {
+      "name": "ToolCalls"
+    },
+    {
+      "name": "BrandOverview",
+      "group": "01 Logo"
+    },
+    {
+      "name": "ButtonSizes",
+      "group": "08 Core"
+    },
+    {
+      "name": "ButtonStates",
+      "group": "08 Core"
+    },
+    {
+      "name": "ButtonVariants",
+      "group": "08 Core"
+    },
+    {
+      "name": "CloudAgent",
+      "group": "12 Thread",
+      "summary": "A Cursor cloud agent run in a cursor-cloud thread: status, repo, pushed branch, PR, and a link to the agent on cursor.com."
+    },
+    {
+      "name": "ColorsInversion",
+      "group": "02 Color"
+    },
+    {
+      "name": "ColorsNeutralsDark",
+      "group": "02 Color"
+    },
+    {
+      "name": "ColorsNeutralsLight",
+      "group": "02 Color"
+    },
+    {
+      "name": "ColorsPopRules",
+      "group": "02 Color"
+    },
+    {
+      "name": "ColorsPops",
+      "group": "02 Color"
+    },
+    {
+      "name": "CommandPaletteQuery",
+      "group": "11 Navigation"
+    },
+    {
+      "name": "ComposerBig",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ComposerFilled",
+      "group": "12 Thread"
+    },
+    {
+      "name": "CoreOverview",
+      "group": "07 Components"
+    },
+    {
+      "name": "CrewReportNeeds",
+      "group": "12 Thread"
+    },
+    {
+      "name": "DelegationSingle",
+      "group": "12 Thread"
+    },
+    {
+      "name": "DensityModes",
+      "group": "04 Shape & space"
+    },
+    {
+      "name": "FormsOverview",
+      "group": "07 Components"
+    },
+    {
+      "name": "GithubPanelBlocked",
+      "group": "13 Panels"
+    },
+    {
+      "name": "GithubPanelRunning",
+      "group": "13 Panels"
+    },
+    {
+      "name": "Handoff",
+      "group": "12 Thread",
+      "summary": "Handing a running thread to another synced Mac."
+    },
+    {
+      "name": "Heights",
+      "group": "04 Shape & space"
+    },
+    {
+      "name": "IconsOverview",
+      "group": "07 Components"
+    },
+    {
+      "name": "InlineConfirm2",
+      "group": "09 Forms"
+    },
+    {
+      "name": "InlineConfirmNeutral",
+      "group": "09 Forms"
+    },
+    {
+      "name": "LogoFavicons",
+      "group": "01 Logo"
+    },
+    {
+      "name": "LogoKeyframes",
+      "group": "01 Logo"
+    },
+    {
+      "name": "LogoMark",
+      "group": "01 Logo"
+    },
+    {
+      "name": "LogoWordmark",
+      "group": "01 Logo"
+    },
+    {
+      "name": "MacOSDesignSystem",
+      "group": "00 Brand book"
+    },
+    {
+      "name": "MessageAgent",
+      "group": "12 Thread"
+    },
+    {
+      "name": "MessageUser",
+      "group": "12 Thread"
+    },
+    {
+      "name": "MoArtifactCard",
+      "group": "14 Phone",
+      "summary": "An artifact in the thread: a white peek of the page on its surface card, its name in mono, and maximize to open it full screen."
+    },
+    {
+      "name": "MoBubble",
+      "group": "14 Phone",
+      "summary": "Your message in a thread: a right-aligned surface-2 bubble with who sent it above."
+    },
+    {
+      "name": "MoComposer",
+      "group": "14 Phone",
+      "summary": "The phone composer: action chips, then + for attach, model and effort, the field, and mic, send or stop."
+    },
+    {
+      "name": "MoDecisionCard",
+      "group": "14 Phone",
+      "summary": "The needs-you card: the agent's question with the buttons that answer it, the same card in Activity and in the thread."
+    },
+    {
+      "name": "MoHeader",
+      "group": "14 Phone",
+      "summary": "Headers for the phone: a 52pt bar for pushed screens and a 30pt large title for tab roots."
+    },
+    {
+      "name": "MoListRow",
+      "group": "14 Phone",
+      "summary": "Grouped lists on the phone: an inset surface group of 52pt rows for settings, channels, checks and files."
+    },
+    {
+      "name": "MoRoundButton",
+      "group": "14 Phone",
+      "summary": "The 40pt round button and the 36pt action chip that every phone screen is built from."
+    },
+    {
+      "name": "MoSection",
+      "group": "14 Phone",
+      "summary": "A list section on the phone: a sentence-case caption, a quiet count and an optional action."
+    },
+    {
+      "name": "MoSheet",
+      "group": "14 Phone",
+      "summary": "The phone bottom sheet: 28pt top corners, a grabber and an optional title row, for secondary choices."
+    },
+    {
+      "name": "MoTabBar",
+      "group": "14 Phone",
+      "summary": "The phone tab bar: a floating 60pt pill of labelled tabs with the ink new-delegation disc beside it."
+    },
+    {
+      "name": "MoThreadRow",
+      "group": "14 Phone",
+      "summary": "One row wherever a thread is listed on the phone: crew avatar with its status glyph, title, time, channel and progress."
+    },
+    {
+      "name": "MoToast",
+      "group": "14 Phone",
+      "summary": "A short ink pill that springs up above the tab bar to confirm what just happened."
+    },
+    {
+      "name": "MobileDesignSystem",
+      "group": "00 Brand book"
+    },
+    {
+      "name": "ModelPicker",
+      "group": "09 Forms",
+      "summary": "Model and effort pills for the composer: ModelPicker groups models under each harness (Auto first, sticky plan headers, one search), EffortPicker lists the pic…"
+    },
+    {
+      "name": "MotionAlive",
+      "group": "05 Motion"
+    },
+    {
+      "name": "MotionMechanical",
+      "group": "05 Motion"
+    },
+    {
+      "name": "NavigationOverview",
+      "group": "07 Components"
+    },
+    {
+      "name": "Panel2",
+      "group": "13 Panels"
+    },
+    {
+      "name": "PanelsOverview",
+      "group": "07 Components"
+    },
+    {
+      "name": "PhoneActivity",
+      "group": "14 Phone",
+      "summary": "The Activity screen, the phone home, assembled from the phone components in light and dark."
+    },
+    {
+      "name": "PickerChannel",
+      "group": "09 Forms"
+    },
+    {
+      "name": "PickerCrew",
+      "group": "09 Forms"
+    },
+    {
+      "name": "QuestionCard",
+      "group": "12 Thread",
+      "summary": "An agent's ask_user_question, in the thread."
+    },
+    {
+      "name": "RadiiBorders",
+      "group": "04 Shape & space"
+    },
+    {
+      "name": "Rail2",
+      "group": "11 Navigation"
+    },
+    {
+      "name": "RailAttention",
+      "group": "11 Navigation"
+    },
+    {
+      "name": "RailSections",
+      "group": "11 Navigation"
+    },
+    {
+      "name": "Segmented2",
+      "group": "09 Forms"
+    },
+    {
+      "name": "SegmentedIcon",
+      "group": "09 Forms"
+    },
+    {
+      "name": "SegmentedVertical",
+      "group": "09 Forms"
+    },
+    {
+      "name": "Showcase",
+      "group": "00 Brand book"
+    },
+    {
+      "name": "SpacingScale",
+      "group": "04 Shape & space"
+    },
+    {
+      "name": "Status2",
+      "group": "08 Core"
+    },
+    {
+      "name": "SwitchLine",
+      "group": "12 Thread"
+    },
+    {
+      "name": "TabStackFew",
+      "group": "11 Navigation"
+    },
+    {
+      "name": "ThreadOverview",
+      "group": "07 Components"
+    },
+    {
+      "name": "ThreadRowAutomation",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ThreadRowDone",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ThreadRowMarkedDone",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ThreadRowNeeds",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ThreadRowRunning",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ThreadRowSelected",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ThreadRowSettled",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ToastDone",
+      "group": "10 Feedback"
+    },
+    {
+      "name": "ToastFailed",
+      "group": "10 Feedback"
+    },
+    {
+      "name": "ToastNeeds",
+      "group": "10 Feedback"
+    },
+    {
+      "name": "ToolCallOpen",
+      "group": "12 Thread"
+    },
+    {
+      "name": "ToolCalls2",
+      "group": "12 Thread"
+    },
+    {
+      "name": "TypeMonoVoice",
+      "group": "03 Type"
+    },
+    {
+      "name": "TypePairing",
+      "group": "03 Type"
+    },
+    {
+      "name": "TypeScale",
+      "group": "03 Type"
+    },
+    {
+      "name": "UsageMeterCompact",
+      "group": "13 Panels"
+    },
+    {
+      "name": "UsageMeterUnit",
+      "group": "13 Panels"
+    },
+    {
+      "name": "UsageMeterWarn",
+      "group": "13 Panels"
+    }
+  ],
+  "assetGroups": [
+    {
+      "name": "Other"
+    },
+    {
+      "name": "harness"
+    },
+    {
+      "name": "icons"
+    },
+    {
+      "name": "logo"
+    },
+    {
+      "name": "notes"
+    },
+    {
+      "name": "mac-app",
+      "tile": "l",
+      "order": [
+        "01-tokens.webp",
+        "02-brand-and-icons.webp",
+        "03-main-window.webp",
+        "04-sidebar.webp",
+        "05-command-menu.webp",
+        "06-buttons-and-pills.webp",
+        "07-fields.webp",
+        "08-feedback.webp",
+        "09-composer.webp",
+        "10-transcript.webp",
+        "11-shipping-rates.webp",
+        "12-tool-calls.webp",
+        "13-delegation-and-reports.webp",
+        "14-queued-messages.webp",
+        "15-thread-cards.webp",
+        "16-header-and-context.webp",
+        "17-inspector.webp",
+        "18-home-channel-search.webp",
+        "19-artifacts.webp",
+        "20-pull-requests.webp",
+        "21-automations.webp",
+        "22-settings.webp",
+        "23-server-and-updates.webp",
+        "24-menus-and-alerts.webp"
+      ],
+      "files": [
+        {
+          "path": "assets/mac-app/01-tokens.webp",
+          "id": "aaf31b6c16fc629d87bdb4da44b26f84"
+        },
+        {
+          "path": "assets/mac-app/02-brand-and-icons.webp",
+          "id": "c1d5c050c918906bdf8956642ad5ef0a"
+        },
+        {
+          "path": "assets/mac-app/03-main-window.webp",
+          "id": "65c36b7445ca9a6b7a33ddc9fcc804a9"
+        },
+        {
+          "path": "assets/mac-app/04-sidebar.webp",
+          "id": "21c1bb26fa2687823e9a0eff88a516fe"
+        },
+        {
+          "path": "assets/mac-app/05-command-menu.webp",
+          "id": "d771aa7dceca5ae71f02d462d30e0022"
+        },
+        {
+          "path": "assets/mac-app/06-buttons-and-pills.webp",
+          "id": "6ed2b6e3e2874fbac38291015630a3df"
+        },
+        {
+          "path": "assets/mac-app/07-fields.webp",
+          "id": "868685a56159d6dab5a32165cb59817a"
+        },
+        {
+          "path": "assets/mac-app/08-feedback.webp",
+          "id": "c6af7011cb9186a94d82ccc91023cde8"
+        },
+        {
+          "path": "assets/mac-app/09-composer.webp",
+          "id": "3312aa221bb406f6c02307f052940ead"
+        },
+        {
+          "path": "assets/mac-app/10-transcript.webp",
+          "id": "d630f83cab50b87474e8a59c1e4205e3"
+        },
+        {
+          "path": "assets/mac-app/11-shipping-rates.webp",
+          "id": "9b6e3ee7b370b1d4855f47bf9789692f"
+        },
+        {
+          "path": "assets/mac-app/12-tool-calls.webp",
+          "id": "d05e90e9641e324e962733c95d9df230"
+        },
+        {
+          "path": "assets/mac-app/13-delegation-and-reports.webp",
+          "id": "696ee2b1f348c6713899385844fadfd9"
+        },
+        {
+          "path": "assets/mac-app/14-queued-messages.webp",
+          "id": "cbc1ec412f9ba307de54be46b991678d"
+        },
+        {
+          "path": "assets/mac-app/15-thread-cards.webp",
+          "id": "3aee3a832c9b88ed2cf0072a30eb7073"
+        },
+        {
+          "path": "assets/mac-app/16-header-and-context.webp",
+          "id": "781d6a74cceb1453a1f78484029ea4a3"
+        },
+        {
+          "path": "assets/mac-app/17-inspector.webp",
+          "id": "ed2601e57945e7c6de4a16ed1342b732"
+        },
+        {
+          "path": "assets/mac-app/18-home-channel-search.webp",
+          "id": "d5d2d16ea034100668768d39c3a2f6a1"
+        },
+        {
+          "path": "assets/mac-app/19-artifacts.webp",
+          "id": "71126161c61d5efbeba069260fc09323"
+        },
+        {
+          "path": "assets/mac-app/20-pull-requests.webp",
+          "id": "ebb46cd4903a174a44172526f233c691"
+        },
+        {
+          "path": "assets/mac-app/21-automations.webp",
+          "id": "5960fd239ce511de11b5ac21297bac6e"
+        },
+        {
+          "path": "assets/mac-app/22-settings.webp",
+          "id": "a30fbc95e98773c4d7eef4a3e1a2d8b3"
+        },
+        {
+          "path": "assets/mac-app/23-server-and-updates.webp",
+          "id": "8fae65215a228a2e707e7e8c9660bffa"
+        },
+        {
+          "path": "assets/mac-app/24-menus-and-alerts.webp",
+          "id": "4cdd3d3f96a001d57200ab30a97be047"
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "files": {
+      "assets/mac-app/01-tokens.webp": {
+        "store": "blob",
+        "id": "aaf31b6c16fc629d87bdb4da44b26f84",
+        "bytes": 92830,
+        "type": "image/webp"
+      },
+      "assets/mac-app/02-brand-and-icons.webp": {
+        "store": "blob",
+        "id": "c1d5c050c918906bdf8956642ad5ef0a",
+        "bytes": 67722,
+        "type": "image/webp"
+      },
+      "assets/mac-app/03-main-window.webp": {
+        "store": "blob",
+        "id": "65c36b7445ca9a6b7a33ddc9fcc804a9",
+        "bytes": 102190,
+        "type": "image/webp"
+      },
+      "assets/mac-app/04-sidebar.webp": {
+        "store": "blob",
+        "id": "21c1bb26fa2687823e9a0eff88a516fe",
+        "bytes": 75578,
+        "type": "image/webp"
+      },
+      "assets/mac-app/05-command-menu.webp": {
+        "store": "blob",
+        "id": "d771aa7dceca5ae71f02d462d30e0022",
+        "bytes": 38108,
+        "type": "image/webp"
+      },
+      "assets/mac-app/06-buttons-and-pills.webp": {
+        "store": "blob",
+        "id": "6ed2b6e3e2874fbac38291015630a3df",
+        "bytes": 92398,
+        "type": "image/webp"
+      },
+      "assets/mac-app/07-fields.webp": {
+        "store": "blob",
+        "id": "868685a56159d6dab5a32165cb59817a",
+        "bytes": 48964,
+        "type": "image/webp"
+      },
+      "assets/mac-app/08-feedback.webp": {
+        "store": "blob",
+        "id": "c6af7011cb9186a94d82ccc91023cde8",
+        "bytes": 70576,
+        "type": "image/webp"
+      },
+      "assets/mac-app/09-composer.webp": {
+        "store": "blob",
+        "id": "3312aa221bb406f6c02307f052940ead",
+        "bytes": 122654,
+        "type": "image/webp"
+      },
+      "assets/mac-app/10-transcript.webp": {
+        "store": "blob",
+        "id": "d630f83cab50b87474e8a59c1e4205e3",
+        "bytes": 57204,
+        "type": "image/webp"
+      },
+      "assets/mac-app/11-shipping-rates.webp": {
+        "store": "blob",
+        "id": "9b6e3ee7b370b1d4855f47bf9789692f",
+        "bytes": 40626,
+        "type": "image/webp"
+      },
+      "assets/mac-app/12-tool-calls.webp": {
+        "store": "blob",
+        "id": "d05e90e9641e324e962733c95d9df230",
+        "bytes": 78282,
+        "type": "image/webp"
+      },
+      "assets/mac-app/13-delegation-and-reports.webp": {
+        "store": "blob",
+        "id": "696ee2b1f348c6713899385844fadfd9",
+        "bytes": 66030,
+        "type": "image/webp"
+      },
+      "assets/mac-app/14-queued-messages.webp": {
+        "store": "blob",
+        "id": "cbc1ec412f9ba307de54be46b991678d",
+        "bytes": 49666,
+        "type": "image/webp"
+      },
+      "assets/mac-app/15-thread-cards.webp": {
+        "store": "blob",
+        "id": "3aee3a832c9b88ed2cf0072a30eb7073",
+        "bytes": 82590,
+        "type": "image/webp"
+      },
+      "assets/mac-app/16-header-and-context.webp": {
+        "store": "blob",
+        "id": "781d6a74cceb1453a1f78484029ea4a3",
+        "bytes": 71948,
+        "type": "image/webp"
+      },
+      "assets/mac-app/17-inspector.webp": {
+        "store": "blob",
+        "id": "ed2601e57945e7c6de4a16ed1342b732",
+        "bytes": 119982,
+        "type": "image/webp"
+      },
+      "assets/mac-app/18-home-channel-search.webp": {
+        "store": "blob",
+        "id": "d5d2d16ea034100668768d39c3a2f6a1",
+        "bytes": 100684,
+        "type": "image/webp"
+      },
+      "assets/mac-app/19-artifacts.webp": {
+        "store": "blob",
+        "id": "71126161c61d5efbeba069260fc09323",
+        "bytes": 24212,
+        "type": "image/webp"
+      },
+      "assets/mac-app/20-pull-requests.webp": {
+        "store": "blob",
+        "id": "ebb46cd4903a174a44172526f233c691",
+        "bytes": 90470,
+        "type": "image/webp"
+      },
+      "assets/mac-app/21-automations.webp": {
+        "store": "blob",
+        "id": "5960fd239ce511de11b5ac21297bac6e",
+        "bytes": 32310,
+        "type": "image/webp"
+      },
+      "assets/mac-app/22-settings.webp": {
+        "store": "blob",
+        "id": "a30fbc95e98773c4d7eef4a3e1a2d8b3",
+        "bytes": 163206,
+        "type": "image/webp"
+      },
+      "assets/mac-app/23-server-and-updates.webp": {
+        "store": "blob",
+        "id": "8fae65215a228a2e707e7e8c9660bffa",
+        "bytes": 63760,
+        "type": "image/webp"
+      },
+      "assets/mac-app/24-menus-and-alerts.webp": {
+        "store": "blob",
+        "id": "4cdd3d3f96a001d57200ab30a97be047",
+        "bytes": 76644,
+        "type": "image/webp"
+      }
+    },
+    "blobBytesUsed": 1828634
+  }
+}

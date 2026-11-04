@@ -1,0 +1,93 @@
+<!-- @dsCard group="Mobile web" name="Mobile Web" subtitle="Every screen of the web app on a phone, by flow: 58 captures at 390 × 844, light." page width=1440 height=4000 -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Omni mobile web</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface);color:var(--fg);font:14px/1.45 var(--font-sans);-webkit-font-smoothing:antialiased}
+.cv-bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;padding:12px 16px;background:var(--bg);box-shadow:0 1px 0 var(--line)}
+.cv-bar h1{font:500 15px/1.2 var(--font-head);margin:0}
+.cv-meta{font:12px var(--font-sans);color:var(--fg-3);font-variant-numeric:tabular-nums}
+.cv-zoom{display:flex;gap:4px;align-items:center;margin-left:auto}
+.cv-zoom span{font:12px var(--font-sans);color:var(--fg-3);min-width:40px;text-align:center;font-variant-numeric:tabular-nums}
+.cv-nav{display:flex;gap:4px;flex-wrap:wrap;width:100%}
+.cv-pill{height:30px;padding:0 12px;border:0;border-radius:var(--r-pill,999px);background:var(--surface-2);color:var(--fg-2);font:13px var(--font-sans);cursor:pointer;display:inline-flex;align-items:center;text-decoration:none;transition:transform 220ms var(--ease-settle,cubic-bezier(.2,.9,.25,1))}
+.cv-pill:hover{color:var(--fg);background:var(--surface-3)}
+.cv-pill:active{transform:scale(.96)}
+.cv-pill:focus-visible{outline:1.5px solid var(--focus);outline-offset:2px}
+.cv-canvas{padding:32px 16px 160px}
+.cv-group{margin-bottom:88px;scroll-margin-top:120px}
+.cv-group>header{max-width:680px;margin-bottom:24px}
+.cv-group h2{font:500 22px/1.2 var(--font-head);letter-spacing:-.22px;margin:0;text-wrap:balance}
+.cv-group header p{font:13px/1.5 var(--font-sans);color:var(--fg-3);margin:4px 0 0}
+.cv-row{display:flex;flex-wrap:wrap;gap:56px 64px;align-items:flex-start}
+.cv-screen{width:390px;max-width:100%;flex:none;scroll-margin-top:120px}
+.cv-lab{display:flex;align-items:baseline;gap:8px;margin:0 4px 6px}
+.cv-id{font:500 12px var(--font-mono);color:var(--fg);background:var(--bg);border-radius:var(--r-xs,6px);padding:2px 6px;box-shadow:0 0 0 1px var(--line)}
+.cv-title{font:500 14px var(--font-sans)}
+.cv-tall{font:11px var(--font-sans);color:var(--fg-3);margin-left:auto;white-space:nowrap}
+.cv-route{margin:0 4px 10px;font:11.5px var(--font-mono);color:var(--fg-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cv-phone{width:390px;max-width:100%;border-radius:36px;overflow:hidden;background:#fff;box-shadow:0 0 0 1px var(--line),0 1px 2px var(--line)}
+.cv-phone img{display:block;width:100%;height:auto}
+.cv-note{margin:10px 4px 0;font:12px/1.4 var(--font-sans);color:var(--fg-3)}
+@media (prefers-reduced-motion:reduce){*{transition-duration:1ms!important}}
+</style>
+</head><body>
+<div class="cv-bar">
+  <h1>Omni mobile web</h1>
+  <span class="cv-meta" id="cv-meta"></span>
+  <div class="cv-zoom">
+    <button class="cv-pill" type="button" id="cv-out" aria-label="Zoom out">&minus;</button>
+    <span id="cv-z">100%</span>
+    <button class="cv-pill" type="button" id="cv-in" aria-label="Zoom in">+</button>
+  </div>
+  <nav class="cv-nav" id="cv-nav" aria-label="Flows"></nav>
+</div>
+<main class="cv-canvas" id="cv"></main>
+<script>
+const DATA = {"screens": [{"id": "M01", "file": "06-activity.png", "group": "Tabs", "title": "Activity", "route": "/", "note": "", "h": 1986}, {"id": "M02", "file": "07-activity-needs-you.png", "group": "Tabs", "title": "Activity · Needs you", "route": "/", "note": "Filter: Needs you", "h": 1437}, {"id": "M03", "file": "08-activity-running.png", "group": "Tabs", "title": "Activity · Running", "route": "/", "note": "Filter: Running", "h": 844}, {"id": "M04", "file": "09-activity-done.png", "group": "Tabs", "title": "Activity · Done", "route": "/", "note": "Filter: Done", "h": 844}, {"id": "M05", "file": "10-channels.png", "group": "Tabs", "title": "Channels", "route": "/channels", "note": "", "h": 844}, {"id": "M06", "file": "11-library.png", "group": "Tabs", "title": "Library", "route": "/artifacts", "note": "", "h": 844}, {"id": "M07", "file": "12-prs.png", "group": "Tabs", "title": "PRs", "route": "/prs", "note": "", "h": 844}, {"id": "M08", "file": "40-activity-needs-you-card.png", "group": "Tabs", "title": "Activity · question waiting", "route": "/", "note": "A question waiting at the top of Activity", "h": 2188}, {"id": "M09", "file": "13-search-sheet.png", "group": "Sheets", "title": "Search sheet", "route": "/", "note": "Search button on Activity", "h": 844}, {"id": "M10", "file": "14-search-sheet-results.png", "group": "Sheets", "title": "Search sheet · results", "route": "/", "note": "Typed \"shipping\"", "h": 844}, {"id": "M11", "file": "15-new-delegation.png", "group": "Sheets", "title": "New delegation", "route": "/", "note": "The + on the tab bar", "h": 844}, {"id": "M12", "file": "16-model-sheet.png", "group": "Sheets", "title": "Model sheet", "route": "/", "note": "Model pill in a composer", "h": 844}, {"id": "M13", "file": "18-channel-active.png", "group": "Channel", "title": "Channel · Active", "route": "/c/volero", "note": "", "h": 844}, {"id": "M14", "file": "19-channel-recent.png", "group": "Channel", "title": "Channel · Recent", "route": "/c/volero", "note": "", "h": 844}, {"id": "M15", "file": "20-new-thread-sheet.png", "group": "Channel", "title": "New thread sheet", "route": "/c/volero", "note": "New thread in #Volero", "h": 844}, {"id": "M16", "file": "21-channel-prs.png", "group": "Channel", "title": "Channel PRs", "route": "/c/volero/prs", "note": "", "h": 844}, {"id": "M17", "file": "22-channel-pr-detail.png", "group": "Channel", "title": "Channel PR detail", "route": "/c/volero/prs/12", "note": "", "h": 1395}, {"id": "M18", "file": "23-channel-settings.png", "group": "Channel", "title": "Channel settings", "route": "/c/volero/settings", "note": "", "h": 2155}, {"id": "M19", "file": "24-conductor.png", "group": "Channel", "title": "Conductor", "route": "/c/conductor", "note": "", "h": 844}, {"id": "M20", "file": "25-new-channel.png", "group": "Channel", "title": "New channel", "route": "/new-channel", "note": "", "h": 1707}, {"id": "M21", "file": "26-thread-done.png", "group": "Thread", "title": "Thread · done", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae", "note": "Fake RICH turn: plan, sub-agent, failing command", "h": 844}, {"id": "M22", "file": "37-thread-inline-page.png", "group": "Thread", "title": "Thread · inline page", "route": "/t/8dbb07c3-a80d-4b62-bd8b-a868745fb3f2", "note": "html_render chart in the transcript", "h": 844}, {"id": "M23", "file": "38-thread-running.png", "group": "Thread", "title": "Thread · running", "route": "/t/0ceeeab4-e616-492b-96ad-5ce2de7cc4f1", "note": "", "h": 844}, {"id": "M24", "file": "39-thread-question-card.png", "group": "Thread", "title": "Thread · question card", "route": "/t/92936f2d-e969-47e6-a941-d501ee3d428d", "note": "ask_user_question, Needs your input", "h": 844}, {"id": "M25", "file": "27-thread-options-sheet.png", "group": "Thread sheets", "title": "Thread options sheet", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae", "note": "··· in the thread header", "h": 844}, {"id": "M26", "file": "28-plus-sheet.png", "group": "Thread sheets", "title": "Plus sheet", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae", "note": "+ in the reply composer", "h": 844}, {"id": "M27", "file": "41-continue-sheet.png", "group": "Thread sheets", "title": "Continue sheet", "route": "/t/92936f2d-e969-47e6-a941-d501ee3d428d", "note": "Continue in a new thread", "h": 844}, {"id": "M28", "file": "29-thread-steps.png", "group": "Thread views", "title": "Steps", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae/steps", "note": "", "h": 844}, {"id": "M29", "file": "30-thread-changes.png", "group": "Thread views", "title": "Changes", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae/changes", "note": "", "h": 844}, {"id": "M30", "file": "31-thread-pr.png", "group": "Thread views", "title": "PR", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae/pr", "note": "", "h": 844}, {"id": "M31", "file": "32-thread-browser.png", "group": "Thread views", "title": "Browser", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae/browser", "note": "", "h": 844}, {"id": "M32", "file": "33-thread-terminal.png", "group": "Thread views", "title": "Terminal", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae/terminal", "note": "", "h": 844}, {"id": "M33", "file": "34-thread-actions.png", "group": "Thread views", "title": "Actions", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae/actions", "note": "", "h": 844}, {"id": "M34", "file": "35-thread-details.png", "group": "Thread views", "title": "Details", "route": "/t/c2a034c7-0f32-4cb3-9c38-05929029ebae/details", "note": "", "h": 844}, {"id": "M35", "file": "36-artifact-viewer.png", "group": "Thread views", "title": "Artifact viewer", "route": "/t/8dbb07c3-a80d-4b62-bd8b-a868745fb3f2?artifact=1", "note": "", "h": 844}, {"id": "M36", "file": "42-settings.png", "group": "Settings", "title": "Settings hub", "route": "/settings", "note": "", "h": 1267}, {"id": "M37", "file": "43-settings-general.png", "group": "Settings", "title": "General", "route": "/settings/general", "note": "", "h": 1085}, {"id": "M38", "file": "44-settings-appearance.png", "group": "Settings", "title": "Appearance", "route": "/settings/appearance", "note": "", "h": 844}, {"id": "M39", "file": "45-settings-notifications.png", "group": "Settings", "title": "Notifications", "route": "/settings/notifications", "note": "", "h": 844}, {"id": "M40", "file": "46-settings-models.png", "group": "Settings", "title": "Harnesses & models", "route": "/settings/models", "note": "", "h": 1488}, {"id": "M41", "file": "47-settings-threads.png", "group": "Settings", "title": "Threads", "route": "/settings/threads", "note": "", "h": 844}, {"id": "M42", "file": "48-settings-channels.png", "group": "Settings", "title": "Channels", "route": "/settings/channels", "note": "", "h": 844}, {"id": "M43", "file": "49-settings-workspace.png", "group": "Settings", "title": "Workspace", "route": "/settings/workspace", "note": "", "h": 917}, {"id": "M44", "file": "50-settings-worktrees.png", "group": "Settings", "title": "Worktrees", "route": "/settings/worktrees", "note": "", "h": 1131}, {"id": "M45", "file": "51-settings-machines.png", "group": "Settings", "title": "Machines", "route": "/settings/machines", "note": "", "h": 844}, {"id": "M46", "file": "52-settings-sync.png", "group": "Settings", "title": "Sync", "route": "/settings/sync", "note": "", "h": 844}, {"id": "M47", "file": "53-settings-access.png", "group": "Settings", "title": "Sharing & access", "route": "/settings/access", "note": "", "h": 1515}, {"id": "M48", "file": "54-settings-integrations.png", "group": "Settings", "title": "Integrations", "route": "/settings/integrations", "note": "", "h": 844}, {"id": "M49", "file": "55-settings-secrets.png", "group": "Settings", "title": "Secrets", "route": "/settings/secrets", "note": "", "h": 1288}, {"id": "M50", "file": "56-settings-about.png", "group": "Settings", "title": "About", "route": "/settings/about", "note": "", "h": 844}, {"id": "M51", "file": "57-automations.png", "group": "Settings", "title": "Automations", "route": "/automations", "note": "", "h": 844}, {"id": "M52", "file": "01-setup-step-1.png", "group": "First run", "title": "Setup · you", "route": "/", "note": "Onboarding sheet over Activity", "h": 844}, {"id": "M53", "file": "02-setup-step-2.png", "group": "First run", "title": "Setup · workspace", "route": "/", "note": "Onboarding sheet over Activity", "h": 844}, {"id": "M54", "file": "03-setup-step-3.png", "group": "First run", "title": "Setup · harnesses", "route": "/", "note": "Onboarding sheet over Activity", "h": 844}, {"id": "M55", "file": "04-setup-step-4.png", "group": "First run", "title": "Setup · first channel", "route": "/", "note": "Onboarding sheet over Activity", "h": 844}, {"id": "M56", "file": "05-setup-step-5.png", "group": "First run", "title": "Setup · done", "route": "/", "note": "Onboarding sheet over Activity", "h": 844}, {"id": "M57", "file": "17-search-results-page.png", "group": "Pages", "title": "Search results", "route": "/search?q=sample", "note": "", "h": 844}, {"id": "M58", "file": "58-not-found.png", "group": "Pages", "title": "Not found", "route": "/nope", "note": "", "h": 844}], "groups": [{"name": "Tabs", "blurb": "The four tab roots and Activity's filters. The tab bar floats over them."}, {"name": "Sheets", "blurb": "Global sheets: search, new delegation and the model picker."}, {"name": "Channel", "blurb": "A channel's threads, PRs and settings, the Conductor and new channel."}, {"name": "Thread", "blurb": "One thread in its states: done, running, an inline page and a question."}, {"name": "Thread sheets", "blurb": "Sheets opened from inside a thread."}, {"name": "Thread views", "blurb": "Screens pushed from Thread options."}, {"name": "Settings", "blurb": "The hub and every section, as on a phone."}, {"name": "First run", "blurb": "Onboarding, over Activity."}, {"name": "Pages", "blurb": "Desktop pages under a back bar, and not found."}]};
+const IMG = '../../screens/mobile/';
+const cv = document.getElementById('cv');
+const nav = document.getElementById('cv-nav');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+document.getElementById('cv-meta').textContent = `${DATA.screens.length} screens · 390 × 844 · light · captured 3 Nov 2026 from main @ 81a26ad`;
+for (const g of DATA.groups) {
+  const items = DATA.screens.filter((s) => s.group === g.name);
+  if (!items.length) continue;
+  const slug = 'flow-' + g.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const sec = document.createElement('section');
+  sec.className = 'cv-group';
+  sec.id = slug;
+  sec.innerHTML = `<header><h2>${esc(g.name)}</h2><p>${esc(g.blurb)} ${items.length} screens.</p></header><div class="cv-row"></div>`;
+  const row = sec.querySelector('.cv-row');
+  for (const s of items) {
+    const el = document.createElement('article');
+    el.className = 'cv-screen';
+    el.id = s.id;
+    el.innerHTML = `<div class="cv-lab"><span class="cv-id">${s.id}</span><span class="cv-title">${esc(s.title)}</span>${s.h > 844 ? '<span class="cv-tall">Full scroll height</span>' : ''}</div>
+      <div class="cv-route">#${esc(s.route)}</div>
+      <div class="cv-phone"><img src="${IMG}${s.file}" alt="${s.id} ${esc(s.title)}" width="390" height="${s.h}" loading="lazy"></div>
+      ${s.note ? `<p class="cv-note">${esc(s.note)}</p>` : ''}`;
+    row.appendChild(el);
+  }
+  cv.appendChild(sec);
+  const a = document.createElement('a');
+  a.className = 'cv-pill';
+  a.href = `#${slug}`;
+  a.textContent = g.name;
+  nav.appendChild(a);
+}
+const ZOOMS = [0.25, 0.35, 0.5, 0.75, 1];
+let zi = ZOOMS.length - 1;
+try { const z = Number(localStorage.getItem('cv-zoom')); if (ZOOMS.includes(z)) zi = ZOOMS.indexOf(z); } catch {}
+const applyZoom = () => {
+  cv.style.zoom = ZOOMS[zi];
+  document.getElementById('cv-z').textContent = `${Math.round(ZOOMS[zi] * 100)}%`;
+  try { localStorage.setItem('cv-zoom', String(ZOOMS[zi])); } catch {}
+};
+document.getElementById('cv-out').addEventListener('click', () => { zi = Math.max(0, zi - 1); applyZoom(); });
+document.getElementById('cv-in').addEventListener('click', () => { zi = Math.min(ZOOMS.length - 1, zi + 1); applyZoom(); });
+applyZoom();
+</script>
+</body></html>

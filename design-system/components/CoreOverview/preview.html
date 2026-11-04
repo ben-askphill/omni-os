@@ -1,0 +1,21 @@
+<!-- @dsCard group="07 Components" viewport="720x400" name="Core" subtitle="Button, IconButton, Input, Kbd, Status, Chip, Monogram, TaskId" width=720 height=400 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ Button, IconButton, Input, Kbd, Status, StatusGlyph, Monogram, TaskId, Chip }) => {
+function App(){return <div className="stack">
+<div className="row"><span className="lab om-caption">button</span><Button variant="primary" icon="plus">New thread</Button><Button>Open thread</Button><Button variant="ghost" icon="diff">View diff</Button><Button variant="needs" icon="pause">Pause automation</Button><Button variant="primary" busy>Merging</Button></div>
+<div className="row"><span className="lab om-caption">sizes</span><Button variant="primary" size="sm">Small 28</Button><Button variant="primary">Default 34</Button><Button variant="primary" size="lg">Large 44</Button><IconButton label="Search" icon="search"/><IconButton label="Panel" icon="panel" active/><IconButton label="More" icon="more"/></div>
+<div className="row" style={{alignItems:'flex-start'}}><span style={{paddingTop:30}} className="lab om-caption">field</span><div style={{width:180}}><Input label="Thread title" placeholder="Fix checkout drop-off"/></div><div style={{width:180}}><Input label="Branch" mono defaultValue="omni/t-4f2b" hint="from main"/></div><div style={{width:180}}><Input label="Admin token" mono defaultValue="shpat_••••2c" error="Expired 2h ago"/></div></div>
+<div className="row"><span className="lab om-caption">status</span><Status state="running"/><Status state="needs"/><Status state="done"/><Status state="settled"/><Status state="queued"/><span style={{display:'inline-flex',gap:12,marginLeft:6}}><StatusGlyph state="running"/><StatusGlyph state="needs"/><StatusGlyph state="done"/><StatusGlyph state="settled"/><StatusGlyph state="idle"/></span></div>
+<div className="row"><span className="lab om-caption">identity</span><Monogram name="Volero" size={28}/><Monogram name="Pink Gellac" size={32}/><Monogram name="Conductor" icon="target" size={32}/><Monogram name="Acne" size={44}/><Chip>builder</Chip><Chip tone="outline">Automation</Chip><Chip tone="needs">Needs you</Chip><Chip tone="done">New</Chip><TaskId id="T-4F2A"/><Kbd>⌘K</Kbd><Kbd>Esc</Kbd></div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

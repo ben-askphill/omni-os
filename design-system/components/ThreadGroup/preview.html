@@ -1,0 +1,16 @@
+<!-- @dsCard group="12 Thread" viewport="720x300" name="ThreadGroup" subtitle="Day group with caption and count" width=720 height=300 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ ThreadRow, ThreadGroup }) => {
+
+function App(){return <div className="om-thread"><div className="om-transcript"><ThreadGroup label="Today" count={3}><ThreadRow title="Patch shipping-rate script in checkout" taskId="T-4F2B" state="running" role="builder" harness="claude-code" time="12m"/><ThreadRow title="Pause WEEKEND15 until the patch ships?" taskId="T-4F2C" state="needs" role="store-ops" harness="claude-code" time="3m"/><ThreadRow title="Returns page copy review" taskId="T-4E11" state="settled" role="inbox" harness="cursor" time="Tue"/></ThreadGroup></div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

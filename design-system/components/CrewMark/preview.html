@@ -1,0 +1,16 @@
+<!-- @dsCard group="06 Iconography" viewport="720x110" name="CrewMark" subtitle="One mark per crew role, in 28px discs" width=720 height=110 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>body{padding:20px 24px;background:var(--bg)}.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lab{width:84px;flex:none}.stack{display:grid;gap:16px}.cells{display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start}.cell{display:grid;gap:8px;justify-items:start;align-content:start}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ CrewMark }) => {
+
+function App(){return <div className="cells"><div className="cell"><span className="om-caption">conductor</span><span style={{display:'grid',placeItems:'center',width:28,height:28,borderRadius:'50%',background:'var(--surface-2)'}}><CrewMark role="conductor" size={15}/></span></div><div className="cell"><span className="om-caption">researcher</span><span style={{display:'grid',placeItems:'center',width:28,height:28,borderRadius:'50%',background:'var(--surface-2)'}}><CrewMark role="researcher" size={15}/></span></div><div className="cell"><span className="om-caption">builder</span><span style={{display:'grid',placeItems:'center',width:28,height:28,borderRadius:'50%',background:'var(--surface-2)'}}><CrewMark role="builder" size={15}/></span></div><div className="cell"><span className="om-caption">store-ops</span><span style={{display:'grid',placeItems:'center',width:28,height:28,borderRadius:'50%',background:'var(--surface-2)'}}><CrewMark role="store-ops" size={15}/></span></div><div className="cell"><span className="om-caption">inbox</span><span style={{display:'grid',placeItems:'center',width:28,height:28,borderRadius:'50%',background:'var(--surface-2)'}}><CrewMark role="inbox" size={15}/></span></div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>
