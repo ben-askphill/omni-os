@@ -10,6 +10,7 @@ import './runner/setup.ts';
 import './runner/limits.ts';
 import './runner/switch.ts';
 import './runner/questions.ts';
+import './runner/secret-requests.ts';
 import './runner/fresh-context.ts';
 
 export type { ActiveTask, ModStatus, Msg, PendingMsg, SendMode } from './runner/state.ts';
@@ -40,4 +41,5 @@ export { cancelLimitResume, clearLimit, fireDue, limitClock, resumeLimitNow, sch
 export { reportToParent, saveOwn, settleTeam, wake } from './runner/queue.ts';
 export { buildSystemPrompt } from './runner/prompts.ts';
 export { answerQuestion, askQuestion, awaitAnswer, crewQuestions } from './runner/questions.ts';
+export { askSecret, awaitSecret, cancelSecret, crewSecretRequests, submitSecret } from './runner/secret-requests.ts';
 export { WAIT_MAX_SEC } from './runner/waiters.ts';

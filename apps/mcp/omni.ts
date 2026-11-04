@@ -353,19 +353,20 @@ server.registerTool(
   'crew_questions',
   {
     description:
-      'The questions the threads you delegated to (at any depth, team members included) asked Ben with ask_user_question ' +
-      'and still wait on: the thread and task id that asked, and the questions. Ben answers them on your thread, where ' +
-      'their cards show; you cannot answer for him. A thread waiting here is blocked on Ben, not stuck. thread_id ' +
-      'defaults to your own thread.',
+      'What the threads you delegated to (at any depth, team members included) wait on Ben for: the questions they asked ' +
+      'with ask_user_question, and the secrets they asked for with request_secret (the variable name and its label, never a ' +
+      'value), each with the thread and task id that asked. Ben answers on your thread, where their cards show; you cannot ' +
+      'answer or enter a secret for him. A thread waiting here is blocked on Ben, not stuck. thread_id defaults to your own thread.',
     inputSchema: { thread_id: z.string().optional() },
   },
   async ({ thread_id }) => {
     const id = thread_id ?? SELF;
     if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
-    const { items } = await call(`/threads/${encodeURIComponent(id)}/crew-questions`);
-    return text(
-      items.map((c: any) => ({ thread_id: c.thread_id, thread_title: c.thread_title, task_id: c.task_id, questions: c.question.questions.map((q: any) => q.question) })),
-    );
+    const { items, secrets } = await call(`/threads/${encodeURIComponent(id)}/crew-questions`);
+    return text({
+      questions: items.map((c: any) => ({ thread_id: c.thread_id, thread_title: c.thread_title, task_id: c.task_id, questions: c.question.questions.map((q: any) => q.question) })),
+      secrets: (secrets ?? []).map((s: any) => ({ thread_id: s.thread_id, thread_title: s.thread_title, task_id: s.task_id, name: s.request.ask.name, label: s.request.ask.label })),
+    });
   },
 );
 

@@ -89,8 +89,20 @@ export function armIdle(live: Live) {
   live.clearIdle();
   // Closing stdin now would end the background agents with the process. Wait for them, within a bound.
   if (hasBackground(live)) return live.armIdle(config.taskKeepAliveSeconds * 1000, () => closeLive(live));
+  // Its env lacks a secret saved meanwhile: a fresh process runs the next turn (staleEnv).
+  if (live.envStale) return closeLive(live);
   if (config.keepAliveSeconds <= 0) return closeLive(live);
   live.armIdle(config.keepAliveSeconds * 1000, () => closeLive(live));
+}
+
+/**
+ * A secret was saved for the thread (secret-requests.ts): this process's env lacks it. Closed at once when nothing
+ * runs in it; otherwise it closes once its turn and background tasks end (armIdle), the turn's held messages move to
+ * the process that replaces it (records.ts onResult), and a queued one waits for that process (queue.ts pump).
+ */
+export function staleEnv(live: Live) {
+  live.markEnvStale();
+  if (!live.turn && !hasBackground(live)) closeLive(live);
 }
 
 /** Forget the process: timers, browser profile, live state. */

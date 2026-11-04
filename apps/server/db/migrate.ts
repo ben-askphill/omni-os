@@ -72,6 +72,9 @@ CREATE INDEX IF NOT EXISTS events_user ON events(id) WHERE kind = 'user';
 -- Questions an agent asked and their answers, which Needs you looks for in every thread.
 CREATE INDEX IF NOT EXISTS events_question ON events(id) WHERE kind = 'question';
 CREATE INDEX IF NOT EXISTS events_question_answer ON events(thread_id) WHERE kind = 'question_answer';
+-- Secrets an agent asked for and what became of them, the same way (packages/shared/secret-request.ts).
+CREATE INDEX IF NOT EXISTS events_secret_request ON events(id) WHERE kind = 'secret_request';
+CREATE INDEX IF NOT EXISTS events_secret_request_answer ON events(thread_id) WHERE kind = 'secret_request_answer';
 
 CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(
   body, thread_id UNINDEXED, event_id UNINDEXED, tokenize = 'porter unicode61'

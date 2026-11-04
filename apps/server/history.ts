@@ -164,11 +164,18 @@ export function anchorsFor(threadId: string, page: readonly PageRow[], span: Spa
     wanted = parents(added);
   }
 
-  const answered = new Set(page.filter((r) => r.kind === 'question_answer').map((r) => str(json(r).id)));
-  const asked = [...new Set(page.filter((r) => r.kind === 'question').map((r) => str(json(r).id)))].filter(
-    (id): id is string => !!id && !answered.has(id),
-  );
-  for (const r of repo.answers(threadId, asked)) anchors.add(r);
+  // A question's or a secret request's answer, when the page holds the ask without it.
+  const pairs = [
+    ['question', 'question_answer', repo.answers],
+    ['secret_request', 'secret_request_answer', repo.secretAnswers],
+  ] as const;
+  for (const [ask, answer, rows] of pairs) {
+    const answered = new Set(page.filter((r) => r.kind === answer).map((r) => str(json(r).id)));
+    const asked = [...new Set(page.filter((r) => r.kind === ask).map((r) => str(json(r).id)))].filter(
+      (id): id is string => !!id && !answered.has(id),
+    );
+    for (const r of rows(threadId, asked)) anchors.add(r);
+  }
 
   if (head) {
     for (const kind of ['init', 'result'] as const) {

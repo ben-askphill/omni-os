@@ -1,10 +1,13 @@
-// Stdio MCP server every local thread gets (apps/server/sandbox.ts): ask_user_question, Omni's own AskUserQuestion.
-// The questions show as a card in the thread and in Needs you; the call waits, polling the API, until the user acts.
+// Stdio MCP server every local thread gets (apps/server/sandbox.ts): ask_user_question, Omni's own AskUserQuestion,
+// and request_secret, which asks the user for a credential the task needs. Each shows as a card in the thread and in
+// Needs you; the call waits, polling the API, until the user acts. A secret's value goes from the card to Omni's
+// secret store: it never comes through here, and the agent only ever gets the variable's name.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
 import { HEADER_MAX, OPTIONS_MAX, OPTIONS_MIN, QUESTIONS_MAX } from '@omni/shared/question.ts';
+import { LABEL_MAX, REASON_MAX } from '@omni/shared/secret-request.ts';
 import { ApiError, call, SELF, text } from './api.ts';
 
 /** Seconds each poll waits on the server. Under its 30s cap and under the 35s it counts a waiter as alive. */
@@ -52,17 +55,48 @@ server.registerTool(
       // A 400 says what to fix in the call.
       return refused((err as Error).message);
     }
-    return text(await answerTo(id, extra.signal));
+    return text(await answerTo(`/threads/${SELF}/questions/${id}`, extra.signal));
+  },
+);
+
+server.registerTool(
+  'request_secret',
+  {
+    description:
+      `Ask ${USER} for a secret your task needs and your environment does not have: an API key, a password, a token. ` +
+      'Never ask for one in chat, and never have it pasted into the thread: the value would end up in the transcript. ' +
+      `The request shows as a card in the thread and in Needs you, where ${USER} types the value. It goes into Omni's secret store ` +
+      'under the env var `name`, and you never see it: the result names the variable, nothing more. ' +
+      `Your turn waits on this call until ${USER} saves it, cancels, or sends a message instead, which can take hours. ` +
+      'Once it is saved, end your turn with one short line: Omni starts your next turn in a fresh process with that variable set and tells you to go on. ' +
+      'Use it as $NAME in commands, never print it. Check your environment first: a secret that is already set needs no request.',
+    inputSchema: {
+      name: z.string().describe("The env var the value goes into: UPPER_SNAKE_CASE, named for the service, like STRIPE_TEST_KEY. Not one of Omni's or the shell's own."),
+      label: z.string().max(LABEL_MAX).describe(`What ${USER} is asked for, at most ${LABEL_MAX} characters, like "Stripe test secret key".`),
+      scope: z.enum(['channel', 'global']).optional().describe("channel (the default): this channel's threads get it. global: every channel's threads do."),
+      reason: z.string().max(REASON_MAX).optional().describe(`Why the task needs it, at most ${REASON_MAX} characters, shown on the card.`),
+    },
+  },
+  async (input, extra) => {
+    if (!SELF) return refused('Omni did not say which thread this is (OMNI_THREAD_ID is not set), so the request has nowhere to go.');
+    let id: string;
+    try {
+      ({ id } = await call(`/threads/${SELF}/secret-requests`, { method: 'POST', body: JSON.stringify(input), signal: extra.signal }));
+    } catch (err) {
+      // A 400 says what to fix in the call: the name, the label, the scope.
+      return refused((err as Error).message);
+    }
+    return text(await answerTo(`/threads/${SELF}/secret-requests/${id}`, extra.signal));
   },
 );
 
 const refused = (message: string) => ({ ...text(message), isError: true });
 
-/** The text the agent reads once the user acts. Polls until then; a call the harness cancels stops polling. */
-async function answerTo(id: string, signal: AbortSignal): Promise<string> {
+/** The text the agent reads once the user acts on the request at `path`. Polls until then; a call the harness cancels stops polling. */
+async function answerTo(path: string, signal: AbortSignal): Promise<string> {
   for (;;) {
     try {
-      const r = await call(`/threads/${SELF}/questions/${id}?wait=${WAIT}`, { signal });
+      const r = await call(`${path}?wait=${WAIT}`, { signal });
       if (r.state !== 'pending') return r.text;
     } catch (err) {
       if (signal.aborted || (err instanceof ApiError && err.status < 500)) throw err;

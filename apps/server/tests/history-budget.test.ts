@@ -199,6 +199,7 @@ describe('thread history on a long thread', () => {
       resultBelow: /USING INDEX events_result/,
       calls: /USING INDEX events_call/,
       answers: /USING INDEX events_question_answer/,
+      secretAnswers: /USING INDEX events_secret_request_answer/,
       row: /USING INTEGER PRIMARY KEY/,
       has: /USING INTEGER PRIMARY KEY/,
     };
