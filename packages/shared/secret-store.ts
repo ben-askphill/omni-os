@@ -4,6 +4,9 @@
 export const SECRET_STORES = ['keychain', 'libsecret', 'file'] as const;
 export type SecretStoreKind = (typeof SECRET_STORES)[number];
 
+/** A secret's name: the env var a thread gets it as. */
+export const SECRET_NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
+
 /** A store kind from the server, or keychain for an older server that does not say: those only ran on a Mac. */
 export function secretStoreKind(raw: unknown): SecretStoreKind {
   return (SECRET_STORES as readonly unknown[]).includes(raw) ? (raw as SecretStoreKind) : 'keychain';
