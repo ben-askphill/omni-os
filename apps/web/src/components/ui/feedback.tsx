@@ -154,7 +154,7 @@ export function Label({ children, hint, htmlFor }: { children: ReactNode; hint?:
   return (
     <label htmlFor={htmlFor} className="mb-1.5 block">
       <span className="text-[12.5px] font-medium text-fg-2">{children}</span>
-      {hint && <span className="mt-0.5 block text-[12px] text-fg-3">{hint}</span>}
+      {hint && <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">{hint}</span>}
     </label>
   );
 }

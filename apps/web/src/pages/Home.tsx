@@ -56,7 +56,7 @@ export function HomePage() {
         <NewThreadComposer big />
         <NeedsYouSection inbox={needsYou} showChannel />
         <div className="mt-10">
-          <div className="mb-2 flex items-center justify-between gap-3 px-1">
+          <div className="mb-2 flex items-center justify-between gap-3 px-3 md:px-3.5">
             <h2 className="font-display text-[17px]">Recent</h2>
             <Segmented
               size="sm"

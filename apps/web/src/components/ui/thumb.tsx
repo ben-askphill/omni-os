@@ -128,7 +128,7 @@ export function Segmented<T extends string>({
         } as const;
         const inner = (
           <>
-            {o.icon && <Icon name={o.icon} size={size === 'sm' ? 13 : 14} />}
+            {o.icon && <Icon name={o.icon} size={o.label ? (size === 'sm' ? 13 : 14) : 15} />}
             {o.label}
             {o.badge}
           </>

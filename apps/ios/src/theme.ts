@@ -7,7 +7,7 @@ const light = {
   surface3: '#ecebe7',
   fg: '#17181a',
   fg2: '#3c3b37',
-  fg3: '#6f6e68',
+  fg3: '#62615c',
   fg4: '#9d9c96',
   onInk: '#ffffff',
   line: 'rgba(23, 24, 26, 0.08)',

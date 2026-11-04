@@ -45,11 +45,11 @@ color: #17181a;
 | `--ink` | #17181a | #17181a | Raw pop ink: the text on the vermilion and volt fills (`on-needs`, `on-done`) and the done edge. |
 | `--fg` | #17181a | #eceae5 | Primary text and the ink pill fill, on `canvas`, `bg`, `surface`, `surface-2`, `surface-3` (11.6:1 or more in both themes). |
 | `--fg-2` | #3c3b37 | #b8b7b1 | Secondary text (settled rows, body in lists) on `canvas`, `bg` and every surface step (6.9:1 or more). |
-| `--fg-3` | #6f6e68 | #a09f99 | Tertiary text (meta, captions, timestamps) on `canvas`, `bg`, `surface`, `surface-2` (4.5:1 or more in both themes; 4.3:1 on `surface-3`). |
+| `--fg-3` | #62615c | #a09f99 | Tertiary text (meta, captions, timestamps) on `canvas`, `bg`, `surface`, `surface-2` (5.2:1 or more in both themes, `surface-3` included). |
 | `--fg-4` | #9d9c96 | #83827c | Quaternary text: placeholders and disabled labels. Kept from the source below 4.5:1 (2.75:1 on white; dark is 4.8:1 on `bg`): never for text that must be read. |
 | `--text-1` | #17181a | #eceae5 | v1 alias of `fg`. |
 | `--text-2` | #3c3b37 | #b8b7b1 | v1 alias of `fg-2`. |
-| `--text-3` | #6f6e68 | #a09f99 | v1 alias of `fg-3`. |
+| `--text-3` | #62615c | #a09f99 | v1 alias of `fg-3`. |
 | `--text-4` | #9d9c96 | #83827c | v1 alias of `fg-4`. |
 
 **Interaction states** (same roles, suffixed):

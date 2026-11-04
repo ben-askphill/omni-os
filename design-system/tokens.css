@@ -15,7 +15,7 @@
   --elev: #ffffff; /* Elevated sheets. */
   --fg: #17181a; /* Primary text and the ink pill fill, on `canvas`, `bg`, `surface`, `surface-2`, `surface-3` (11.6:1 or more in both themes). */
   --fg-2: #3c3b37; /* Secondary text (settled rows, body in lists) on `canvas`, `bg` and every surface step (6.9:1 or more). */
-  --fg-3: #6f6e68; /* Tertiary text (meta, captions, timestamps) on `canvas`, `bg`, `surface`, `surface-2` (4.5:1 or more in both themes; 4.3:1 on `surface-3`). */
+  --fg-3: #62615c; /* Tertiary text (meta, captions, timestamps) on `canvas`, `bg`, `surface`, `surface-2` (5.2:1 or more in both themes, `surface-3` included). */
   --fg-4: #9d9c96; /* Quaternary text: placeholders and disabled labels. Kept from the source below 4.5:1 (2.75:1 on white; dark is 4.8:1 on `bg` so dark-mode meta stays legible): never for text that must be read. */
   --on-ink: #ffffff; /* Text and icons on an `fg` (ink) fill, e.g. the primary pill. */
   --line: rgb(23 24 26 / 0.08); /* Hairlines and the default border colour. */
