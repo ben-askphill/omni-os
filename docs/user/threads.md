@@ -103,6 +103,18 @@ An agent can stop and ask you one to four multiple-choice questions with Omni's 
 - If the call is gone by the time you answer (Omni restarted, you pressed Stop, or the harness gave up on it), your answers go to the thread as a message and it runs on them.
 - Sending a message instead (steer or interrupt) closes the card as not answered, and the agent reads your message. A message queued for after the turn leaves the card open.
 
+## When the agent asks for a secret
+
+An agent whose task needs a credential it does not have (an API key, a password, a token) asks for it with Omni's `request_secret` tool instead of asking in chat. Claude Code, Codex and Cursor threads have it, on the same `omni-ask` server as the questions; Hermes and Cursor Cloud threads have no local MCP servers, so not there. The agent names the env var it wants the value under (`STRIPE_TEST_KEY`), what to ask you for, and whether it is for this channel or every channel.
+
+- The request shows as a card in the thread and in Needs you, like a question. Type the value into the card and save it. It goes straight from the card into the secret store ([Configuration](configuration.md#secrets)) under that name and scope: not into the thread, the agent's context, history search or the server log. The agent only ever learns that the secret is saved. If a secret of that name is already set for that scope, the card asks before replacing it.
+- A harness reads its secrets once, when its process starts, so the agent's running process does not have the new one. The call tells the agent to end its turn, and Omni starts the next turn in a fresh process with the variable set and a message saying so. A delegated thread reports to its parent once, from that turn.
+- Cancel closes the card without storing anything; the agent is told to go on without it. Sending a message instead (steer or interrupt) closes it the same way a question's card closes, and the agent reads your message.
+- If the call is gone by the time you save (Omni restarted, you pressed Stop), the message that carries on still starts the next turn, in a process that has the value.
+- A value stays on the machine that saved it ([Sync](sync.md)): a request from a thread that runs on your other Mac is entered there, or after you take the thread over. A delegated thread's card also shows on the threads above it, and the Conductor lists what its crew waits for with `crew_questions` (names and labels only).
+- The agent cannot ask for Omni's own names (`OMNI_*`, the sync and Connect keys, the Grok Bot webhook), the shell's (`PATH`, `HOME`), or a billing key its harness strips (`ANTHROPIC_API_KEY` on Claude Code): the call is refused with the reason.
+- If the agent prints a secret value later, into a tool result or a reply, Omni cuts it from the stored row as `[secret NAME]`. That covers values this server has read or written since it started; the harness's own session files are outside Omni and keep what the agent wrote.
+
 ## What a thread gets
 
 - **Worktree**: in a repo channel, its own git worktree on branch `omni/<id>`. It is removed once nothing in it can be lost ([Known limits](limits.md)). While it is prepared, the thread shows each step (checkout, the channel's setup action if it has one, then the agent) with the setup's output and a Stop button ([Configuration](configuration.md#channel-actions)).
