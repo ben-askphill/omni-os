@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { scopeWords, valueProblem, VALUE_MAX, type SecretAsk, type ThreadSecretRequest } from '@omni/shared/secret-request.ts';
-import { settledWords } from '@omni/shared/secret-request-words.ts';
+import { scopeWords, settledWords, valueProblem, VALUE_MAX, type SecretAsk, type ThreadSecretRequest } from '@omni/shared/secret-request.ts';
 import { api, ApiError, errorText } from '../../api.ts';
 import { Button, ErrorNote, StatusPill } from '../ui.tsx';
 import { ASKING_LABEL } from './QuestionCard.tsx';

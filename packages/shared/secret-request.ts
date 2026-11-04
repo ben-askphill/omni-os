@@ -80,6 +80,14 @@ export function secretResultText(ask: SecretAsk, state: SecretRequestState): str
   return `The user has not entered ${name} yet.`;
 }
 
+/** What a settled request says on the card and the iOS row: where it went and under what name. Empty while pending. */
+export function settledWords(r: Pick<ThreadSecretRequest, 'ask' | 'state' | 'replaced'>): string {
+  if (r.state === 'saved') return `Saved to ${scopeWords(r.ask.scope)} as ${r.ask.name}${r.replaced ? ', replacing the old value' : ''}`;
+  if (r.state === 'cancelled') return 'Cancelled';
+  if (r.state === 'dismissed') return 'Not entered';
+  return '';
+}
+
 /** The message that starts the agent's next turn once a secret is saved, in a process whose env has it. */
 export const secretSavedMessage = (ask: SecretAsk) =>
   `${ask.name} is now in your environment as $${ask.name}, a secret the user saved for ${scopeWords(ask.scope)}. ` +

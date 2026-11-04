@@ -18,8 +18,12 @@ export function parkedOf(items: readonly PendingMsg[]) {
   };
 }
 
-/** Omni wrote it, not Ben: a crew report, the go a team's lead gets once its members have reported, or a PR watch's wake. */
-export const isOmnis = (m: PendingMsg) => m.kind === 'crew_report' || m.source === 'team' || m.source === 'crew' || m.source === 'pr-watch';
+/**
+ * Omni wrote it, not Ben: a crew report, the go a team's lead gets once its members have reported, a PR watch's wake, or
+ * the turn that goes on once a secret the agent asked for is saved.
+ */
+export const isOmnis = (m: PendingMsg) =>
+  m.kind === 'crew_report' || m.source === 'team' || m.source === 'crew' || m.source === 'pr-watch' || m.source === 'secret';
 
 /** "Crew report T-1 from coder": who a crew report is from. */
 export function reportName(m: PendingMsg): string {
