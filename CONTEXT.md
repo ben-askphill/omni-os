@@ -71,8 +71,12 @@ _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. On a phone, Activity shows the same list. It is a view over **Needs you** and related shelves, not another name for **Needs you**.
 _Avoid_: Needs you (the reasons a thread waits), notifications
 
+**Secret request**:
+A secret an agent asks the user for with Omni's `request_secret` tool: the env var name, a label and a scope (this channel or every channel), never a value. Its card sits in the thread where the agent asked, and in **Needs you** until the user saves the value, cancels or writes a message instead, which dismisses it. The value goes from the card into the secret store and nowhere else. A saved one tells the waiting call to end the turn, and the thread goes on in a fresh process whose env has it; when the call is gone, the message that goes on carries that alone.
+_Avoid_: Credential prompt, secret card (in code), pasting a key into the thread
+
 **Needs you**:
-One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock. The **Inbox** view and phone Activity list these threads among others.
+One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** or a **Secret request** waiting on the user, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock. The **Inbox** view and phone Activity list these threads among others.
 _Avoid_: notifications, unread thread
 
 **Marked done**:

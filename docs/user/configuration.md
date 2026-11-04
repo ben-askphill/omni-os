@@ -66,6 +66,8 @@ Values live in the server's secret store under service `omni-os`, account `<scop
 - Scope `channel:<slug>` goes only to that channel's threads and overrides a global with the same name.
 - Billing keys stay out of a harness and the terminal. Sync keys stay out of the terminal, and a global one stays out of a harness. `GROKBOT_WEBHOOK_URL`, `GROKBOT_WEBHOOK_AUTH` and webhook signing secrets (`OMNI_WEBHOOK_*`) stay out of both, at any scope. See [Grok Bot](#grok-bot) and [GitHub webhooks](automations.md#github-webhooks).
 
+An agent can also ask you for a secret from inside a thread, with its `request_secret` tool: a card in the thread takes the value and writes it here, under the name and scope the agent asked for, and the agent only learns that it is saved ([Threads](threads.md#when-the-agent-asks-for-a-secret)). A value the server has read or written since it started is cut from anything the agent prints into the thread afterwards, shown as `[secret NAME]`.
+
 ## Channel actions
 
 A channel's settings list its named actions: a name, a command, the secrets it needs (names only) and a port. Each thread runs them from its Actions tab. They are kept on this Mac and not synced.

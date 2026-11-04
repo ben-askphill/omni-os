@@ -54,7 +54,7 @@ Pages snap to turns. A newest page starts right after a `result`, and an oldest 
 A page also carries rows from outside its span that the clients' folds need. A client treats every held row outside its spans as an anchor: it informs the fold and never renders. Anchors are clipped like page rows and come in this order, within their budget:
 
 1. Parent calls. A call nested under a call outside the page brings that call, recursively. A background agent's calls land turns after the agent started.
-2. Answers. A question whose answer is outside the page brings the answer.
+2. Answers. A question or a secret request whose answer is outside the page brings the answer.
 3. Session, head only. The newest `init` below the page when it has none.
 4. Last result, head only. The newest `result` below the page when it has none.
 
