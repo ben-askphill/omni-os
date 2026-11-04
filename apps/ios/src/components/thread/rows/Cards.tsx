@@ -1,7 +1,6 @@
 import { cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
-import { scopeWords } from '@omni/shared/secret-request.ts';
-import { settledWords } from '@omni/shared/secret-request-words.ts';
+import { scopeWords, settledWords } from '@omni/shared/secret-request.ts';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../../ui/Text';

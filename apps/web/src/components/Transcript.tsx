@@ -68,6 +68,7 @@ const SOURCE_LABEL: Record<string, string> = {
   import: 'Imported',
   limit: 'After the usage limit',
   'pr-watch': 'PR watch',
+  secret: 'After the secret was saved',
 };
 
 

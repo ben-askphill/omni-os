@@ -6,6 +6,7 @@ import {
   secretRequestsIn,
   secretResultText,
   secretSavedMessage,
+  settledWords,
   secretScopeKey,
   valueProblem,
   type SecretAsk,
@@ -91,5 +92,19 @@ describe('secretRequestsIn', () => {
       { id: 'a', event_id: 1, ask: ASK, exists: true, state: 'saved', replaced: true },
       { id: 'b', event_id: 2, ask: ASK, exists: false, state: 'pending', replaced: false },
     ]);
+  });
+});
+
+describe('settledWords', () => {
+  it('says where a saved secret went and under what name', () => {
+    expect(settledWords({ ask: ASK, state: 'saved', replaced: false })).toBe('Saved to this channel as STRIPE_TEST_KEY');
+    expect(settledWords({ ask: { ...ASK, scope: 'global' }, state: 'saved', replaced: false })).toBe('Saved to every channel as STRIPE_TEST_KEY');
+    expect(settledWords({ ask: ASK, state: 'saved', replaced: true })).toBe('Saved to this channel as STRIPE_TEST_KEY, replacing the old value');
+  });
+
+  it('says cancelled and not entered, and nothing while it waits', () => {
+    expect(settledWords({ ask: ASK, state: 'cancelled', replaced: false })).toBe('Cancelled');
+    expect(settledWords({ ask: ASK, state: 'dismissed', replaced: false })).toBe('Not entered');
+    expect(settledWords({ ask: ASK, state: 'pending', replaced: false })).toBe('');
   });
 });
