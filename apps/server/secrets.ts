@@ -1,6 +1,7 @@
 import { db } from './db.ts';
 import { SERVER_ONLY_VARS } from './harness/env-guard.ts';
 import { WEBHOOK_SECRET_PREFIX } from './github-webhook.ts';
+import { SECRET_NAME_RE } from '@omni/shared/secret-store.ts';
 import { secretStore } from './secret-store.ts';
 
 // Secret values live only in the platform's secret store (secret-store.ts): the macOS Keychain, service "omni-os",
@@ -22,7 +23,7 @@ export function secretReachesThread(scope: string, name: string): boolean {
   return true;
 }
 
-export const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
+export const NAME_RE = SECRET_NAME_RE;
 export const SCOPE_RE = /^(global|channel:[a-z0-9-]+)$/;
 
 const account = (scope: string, name: string) => `${scope}/${name}`;

@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { relTime } from '@omni/shared/format.ts';
+import { SECRET_NAME_RE } from '@omni/shared/secret-store.ts';
 import { api, errorText, useApi, type SecretRow } from '../api.ts';
 import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { useApp, useSecretStoreLabel } from '../store.tsx';
 import { Origin } from './settings-parts.tsx';
-
-const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
 
 /** Names Omni looks up itself. Values still go to the secret store; this only fills the form. */
 const KNOWN_GLOBALS: { name: string; blurb: string; grok?: true }[] = [
@@ -59,7 +58,7 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
   }, [res.data, scoped]);
   const globalNames = useMemo(() => new Set((res.data ?? []).filter((s) => s.scope === 'global').map((s) => s.name)), [res.data]);
 
-  const nameValid = NAME_RE.test(name);
+  const nameValid = SECRET_NAME_RE.test(name);
   const exists = (res.data ?? []).some((s) => s.scope === scope && s.name === name);
 
   const save = async (e: FormEvent) => {
