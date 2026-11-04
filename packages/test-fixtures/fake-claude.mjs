@@ -44,6 +44,13 @@
 //                     its tool_result once it returns), and wait as long as MCP_TOOL_TIMEOUT allows (else the SDK's 60s).
 //                     Interruptible like TOOL. Messages sent meanwhile join after its result; the answer quotes the result
 //   ASK_ONE           ASK with only the first of those questions
+//   SECRET[:NAME]     before the answer, ask the user for a secret with Omni's request_secret, as ASK does with
+//                     ask_user_question: STRIPE_TEST_KEY unless NAME is given, channel scope, a fixed label and reason.
+//                     Waits and interrupts like ASK; messages sent meanwhile join after its result; the answer quotes the result
+//   HASENV:NAME       before the answer, a Bash call whose result says whether NAME is set in this process's env, and never
+//                     its value: "NAME is set" or "NAME is not set"
+//   PRINTENV:NAME     before the answer, a Bash call whose result is NAME's value from this process's env, as an agent
+//                     that leaks a secret would print it
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen,
@@ -350,16 +357,16 @@ async function richCalls(t) {
 }
 
 /**
- * ASK: one model call that uses ask_user_question on the omni-ask server, which this process starts as the real CLI
- * starts an MCP server. Resolves to the tool's result text, or null once interrupted (the call is rejected).
+ * ASK and SECRET: one model call that uses `tool` (ask_user_question or request_secret) on the omni-ask server, which
+ * this process starts as the real CLI starts an MCP server. Resolves to the tool's result text, or null once
+ * interrupted (the call is rejected).
  */
-async function askUser(t, questions) {
+async function callOmniAsk(t, tool, input) {
   const id = `toolu_fake_${++seq}`;
-  const input = { questions };
-  assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id, name: 'mcp__omni-ask__ask_user_question', input }]);
+  assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id, name: `mcp__omni-ask__${tool}`, input }]);
   const server = mcpEntry('omni-ask');
   if (!server) {
-    toolResult(id, 'No such tool available: mcp__omni-ask__ask_user_question', true);
+    toolResult(id, `No such tool available: mcp__omni-ask__${tool}`, true);
     return 'no omni-ask server';
   }
   const ac = new AbortController();
@@ -372,7 +379,7 @@ async function askUser(t, questions) {
     client = new Client({ name: 'claude-code', version: VERSION });
     const transport = new StdioClientTransport({ command: server.command, args: server.args ?? [], env: { ...process.env, ...server.env }, stderr: 'ignore' });
     await client.connect(transport, { signal: ac.signal });
-    const res = await client.callTool({ name: 'ask_user_question', arguments: input }, undefined, { signal: ac.signal, timeout: TOOL_TIMEOUT });
+    const res = await client.callTool({ name: tool, arguments: input }, undefined, { signal: ac.signal, timeout: TOOL_TIMEOUT });
     emit({
       type: 'user',
       message: { role: 'user', content: [{ tool_use_id: id, type: 'tool_result', content: res.content, is_error: !!res.isError }] },
@@ -441,6 +448,9 @@ async function runTurn() {
   let limit = null;
   let fullMeter = false;
   let ask = null;
+  let secretAsk = null;
+  const envChecks = [];
+  const envPrints = [];
   const publishes = [];
   const renders = [];
   const scripts = [];
@@ -480,6 +490,10 @@ async function runTurn() {
       if (m.text.includes('FULLMETER')) fullMeter = true;
       const asks = m.text.match(/\bASK(_ONE)?\b/);
       if (asks) ask = asks[1] ? QUESTIONS.slice(0, 1) : QUESTIONS;
+      const secret = m.text.match(/\bSECRET\b(?::([A-Z0-9_]+))?/);
+      if (secret) secretAsk = { name: secret[1] ?? 'STRIPE_TEST_KEY', label: 'Stripe test secret key', scope: 'channel', reason: 'To run the checkout tests' };
+      for (const x of m.text.matchAll(/\bHASENV:([A-Z0-9_]+)/g)) envChecks.push(x[1]);
+      for (const x of m.text.matchAll(/\bPRINTENV:([A-Z0-9_]+)/g)) envPrints.push(x[1]);
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
       for (const x of m.text.matchAll(/RENDER:(\S+)/g)) renders.push(x[1].replace(/-/g, ' '));
       for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
@@ -557,17 +571,28 @@ async function runTurn() {
     assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: toolId, name: 'Artifact', input: { file_path: file, description: 'A fake page', icon: 'chart' } }]);
     toolResult(toolId, `Published ${file} at https://claude.ai/code/artifact/00000000-0000-4000-8000-${String(seq).padStart(12, '0')}`, false);
   }
-  const answers = [];
-  if (ask && (await pause(t, LATENCY))) {
+  // What this process's env holds, read from process.env: the runner spawned it with the channel's secrets.
+  const envCall = (command, description, result) => {
+    const toolId = `toolu_fake_${++seq}`;
     steps++;
-    const answer = await askUser(t, ask);
+    assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: toolId, name: 'Bash', input: { command, description } }]);
+    toolResult(toolId, result, false);
+  };
+  for (const name of envChecks.splice(0)) envCall(`test -n "$${name}"`, `Is ${name} set`, process.env[name] ? `${name} is set` : `${name} is not set`);
+  for (const name of envPrints.splice(0)) envCall(`printenv ${name}`, `Print ${name}`, process.env[name] ?? '');
+  const answers = [];
+  for (const [tool, input] of [...(ask ? [['ask_user_question', { questions: ask }]] : []), ...(secretAsk ? [['request_secret', secretAsk]] : [])]) {
+    if (!(await pause(t, LATENCY))) break;
+    steps++;
+    const answer = await callOmniAsk(t, tool, input);
     if (dead) return;
-    if (answer === null) toolRejected = true;
-    else {
-      answers.push(answer);
-      // Steers sent while it waited join the conversation here, as after any tool.
-      if (!take()) return;
+    if (answer === null) {
+      toolRejected = true;
+      break;
     }
+    answers.push(answer);
+    // Steers sent while it waited join the conversation here, as after any tool.
+    if (!take()) return;
   }
   for (;;) {
     // One model call: either a tool call or the final answer.
