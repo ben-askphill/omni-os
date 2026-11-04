@@ -23,6 +23,7 @@ import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
 import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
 import { dismissQuestions } from './questions.ts';
+import { dismissSecretRequests } from './secret-requests.ts';
 import { runnerPorts } from './ports.ts';
 import { assignRouted, remoteHolder } from '../ownership.ts';
 import { sendUploads } from '../sync/files.ts';
@@ -433,13 +434,17 @@ export async function postMessage(
     const again = acceptedAgain(threadId, opts.requestId, fingerprint);
     if (again) return again;
   }
-  // Ben wrote instead of answering the agent's questions: a call waiting on them returns, so this message is read now.
-  // On a thread that runs elsewhere the dismissal syncs to the machine whose call waits.
+  // Ben wrote instead of answering the agent's questions or entering the secret it asked for: a call waiting on them
+  // returns, so this message is read now. On a thread that runs elsewhere the dismissal syncs to the machine whose call waits.
   const dismiss = source === 'ben' && mode !== 'queue';
+  const dismissAsks = () => {
+    dismissQuestions(threadId);
+    dismissSecretRequests(threadId);
+  };
   // A thread routed to another machine runs there: the message goes to it (run-on.ts).
   if (remoteHolder(thread)) {
     const forwarded = (await runnerPorts().routing.forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, attachments: opts.attachments, context: opts.context })) as PostedThread;
-    if (dismiss) dismissQuestions(threadId);
+    if (dismiss) dismissAsks();
     return forwarded;
   }
   // Refused before anything is saved: the other Mac runs it.
@@ -447,7 +452,7 @@ export async function postMessage(
   if (blocked) throw refusal(blocked, 409);
   // Ben (or the conductor) wrote in it again, so it is not done: what comes of it shows in Needs you.
   threads.setDone(threadId, false);
-  if (dismiss) dismissQuestions(threadId);
+  if (dismiss) dismissAsks();
   const { row, fresh } = messageRequests.accept({
     thread_id: threadId,
     request_id: opts.requestId ?? randomUUID(),

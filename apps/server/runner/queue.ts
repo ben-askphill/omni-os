@@ -120,6 +120,11 @@ export function pump() {
       i++;
       continue;
     }
+    // Its env lacks a secret saved since it started: the turn waits for the fresh process that replaces it (session.ts staleEnv).
+    if (warm?.envStale) {
+      i++;
+      continue;
+    }
     // Harness at its cap: leave this thread queued and try others (arrival order within a harness).
     if ((running[harness] ?? 0) >= capFor(harness)) {
       i++;

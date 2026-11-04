@@ -52,6 +52,8 @@ export class ThreadController {
   shutdown = false;
   /** Holds the channel's persistent browser profile. */
   browser = false;
+  /** A secret was saved for the thread since this process read its env (secret-requests.ts): it closes once idle, and a fresh one runs the next turn. */
+  envStale = false;
   initSeen = false;
   /** Tasks the CLI runs beside the turn, by task id, until they end. Background ones keep the process alive. */
   tasks = new Map<string, ActiveTask>();
@@ -250,6 +252,11 @@ export class ThreadController {
   /** This process holds the channel's browser profile until it exits. */
   holdsBrowser() {
     this.browser = true;
+  }
+
+  /** The env this process read at spawn lacks a secret saved since. */
+  markEnvStale() {
+    this.envStale = true;
   }
 
   /** No more input from here on: new messages wait for a fresh process. */
