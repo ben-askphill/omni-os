@@ -4,6 +4,7 @@ import { duration, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { DelegationCard } from './Delegation.tsx';
+import { Folded } from './Folded.tsx';
 import { HtmlRender } from './HtmlRender.tsx';
 import { PublishedCard } from './Published.tsx';
 import { CloudAgentCard } from './thread/CloudAgentCard.tsx';
@@ -105,18 +106,36 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
   );
 }
 
-function UserBubble({ p, at, threadId, event, clipped }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped }) {
+/** Ben's message, or the one an agent or automation sent. `fold` keeps it to its first lines (a delegated thread's brief). */
+function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean }) {
   const [more, setMore] = useState(false);
   // Where the pill whose description is open starts.
   const [about, setAbout] = useState<number | null>(null);
   const text = p.text ?? '';
-  // A clipped message shows all it came with; Show all under it loads the rest.
-  const long = !clipped && text.length > 1400;
+  // A clipped message shows all it came with; Show all under it loads the rest. A folded one has its own Show more.
+  const long = !clipped && !fold && text.length > 1400;
   const cut = long && !more;
   const pieces = slashPieces(text, p.slash, cut ? 1200 : text.length);
   const open = pieces.find((x) => x.hit?.start === about)?.hit;
   const label = p.source ? SOURCE_LABEL[p.source] : undefined;
   const how = p.dropped ? null : p.mode === 'steer' ? 'Steered' : p.mode === 'interrupt' ? 'Interrupted and sent' : null;
+  const body = (
+    <>
+      {pieces.map(({ text: t, hit }, i) =>
+        hit ? (
+          <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
+        ) : (
+          <Fragment key={i}>{t}</Fragment>
+        ),
+      )}
+      {cut && '...'}
+      {open && (
+        <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
+          {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
+        </span>
+      )}
+    </>
+  );
   return (
     <div className={`group/msg flex flex-col items-end ${p.dropped ? 'opacity-60' : ''}`}>
       <div className="mb-1 flex flex-wrap items-center justify-end gap-x-2 text-[11.5px] text-fg-3">
@@ -141,19 +160,7 @@ function UserBubble({ p, at, threadId, event, clipped }: { p: UserP; at: string;
             p.dropped ? 'border border-dashed border-line-strong' : 'bg-bubble'
           }`}
         >
-          {pieces.map(({ text: t, hit }, i) =>
-            hit ? (
-              <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
-            ) : (
-              <Fragment key={i}>{t}</Fragment>
-            ),
-          )}
-          {cut && '...'}
-          {open && (
-            <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
-              {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
-            </span>
-          )}
+          {fold ? <Folded>{body}</Folded> : body}
           {long && (
             <button type="button" onClick={() => setMore((m) => !m)} className="mt-1 block text-[12px] font-medium text-fg-3 underline underline-offset-2">
               {more ? 'Show less' : 'Show all'}
@@ -326,6 +333,8 @@ interface ItemRowProps {
   isLast: boolean;
   /** The team card's members, on the first item when it is the thread's first message. */
   team?: Branch[];
+  /** The first item is the brief the delegating thread sent: it folds. */
+  brief?: boolean;
   reports: Map<string, string>;
   byId: Map<string, Thread>;
   artifacts: Artifact[];
@@ -341,11 +350,11 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, isLast, team, reports, byId, artifacts, pages, plan }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, isLast, team, brief, reports, byId, artifacts, pages, plan }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
-          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} />;
+          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} />;
           return team ? [bubble, <DelegationCard key="team" branches={team} team reports={reports} />] : bubble;
         }
         case 'text':
@@ -425,6 +434,7 @@ export const Transcript = memo(function Transcript({
   artifacts = NO_ARTIFACTS,
   reports = NO_REPORTS,
   history = null,
+  delegated = false,
 }: {
   threadId: string;
   /** Every row held, anchors included. */
@@ -441,6 +451,8 @@ export const Transcript = memo(function Transcript({
   reports?: Map<string, string>;
   /** The spans `events` holds whole and the loads on them; null shows `events` as the whole thread. */
   history?: ThreadHistory | null;
+  /** Another thread started this one: its first message is that thread's brief. */
+  delegated?: boolean;
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
   const spans = history?.history.spans;
@@ -499,6 +511,7 @@ export const Transcript = memo(function Transcript({
               running={running}
               isLast={idx === lastIdx}
               team={idx === 0 && fromStart && team?.length ? team : undefined}
+              brief={idx === 0 && fromStart && delegated}
               reports={reports}
               byId={byId}
               artifacts={artifacts}

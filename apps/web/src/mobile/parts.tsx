@@ -1,7 +1,8 @@
 // The Omni mobile design system's parts (ui_kits/omni-mobile/MobileParts.jsx), on the Web UI's own components.
 // Metrics are the design's, in CSS pixels on a 390-wide phone.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
+import { Folded } from '../components/Folded.tsx';
 import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
 import type { RowItem } from './rows.ts';
 
@@ -234,51 +235,6 @@ export function MoBubble({ children, caption, above, fold }: { children: ReactNo
         </div>
       )}
     </div>
-  );
-}
-
-/** Lines a folded message shows. */
-const FOLD_LINES = 7;
-/** It folds only when there are this many more, so the button never hides a line or two. */
-const FOLD_SLACK = 2;
-
-function Folded({ children }: { children: ReactNode }) {
-  const box = useRef<HTMLDivElement>(null);
-  const [tall, setTall] = useState(false);
-  const [open, setOpen] = useState(false);
-  // Measured, not counted in characters: the lines depend on the width and the font.
-  const measure = () => {
-    const el = box.current;
-    if (el) setTall(el.scrollHeight > parseFloat(getComputedStyle(el).lineHeight) * (FOLD_LINES + FOLD_SLACK));
-  };
-  useLayoutEffect(measure);
-  useEffect(() => {
-    const seen = new ResizeObserver(() => measure());
-    if (box.current) seen.observe(box.current);
-    return () => seen.disconnect();
-  }, []);
-  const folded = tall && !open;
-  return (
-    <>
-      <div
-        ref={box}
-        className={folded ? 'overflow-hidden [mask-image:linear-gradient(to_bottom,black_55%,transparent)]' : undefined}
-        style={folded ? { maxHeight: `${FOLD_LINES}lh` } : undefined}
-      >
-        {children}
-      </div>
-      {tall && (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-          className="mo-press -mb-1 flex h-8 items-center gap-1 text-[13px] leading-none font-medium whitespace-normal text-fg-2"
-        >
-          {open ? 'Show less' : 'Show more'}
-          <Icon name="chevronDown" size={13} className={open ? 'rotate-180' : undefined} />
-        </button>
-      )}
-    </>
   );
 }
 

@@ -204,7 +204,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               {/* Queued means waiting for a slot: nothing is working yet. */}
               <LinkChannel.Provider value={thread.channel_id}>
                 <ThreadIdCtx.Provider value={id}>
-                  <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} />
+                  <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} />
                 </ThreadIdCtx.Provider>
               </LinkChannel.Provider>
               <div className="mt-4 empty:hidden">
