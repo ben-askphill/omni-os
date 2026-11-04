@@ -64,7 +64,6 @@ const blockers = async (id: string) =>
 const answerEvents = (id: string) => h.byKind(id, 'secret_request_answer').map((e) => e.p);
 const requested = (id: string) => h.until('the secret card', () => h.byKind(id, 'secret_request')[0], 25_000);
 const tool = (id: string) => h.byKind(id, 'tool_use').find((e) => e.p.name === 'mcp__omni-ask__request_secret');
-// After the call's row: the fake numbers its calls per process, so a fresh process reuses the first one's ids.
 const resultOf = (id: string, use: { id: number; p: { id: string } }) => h.byKind(id, 'tool_result').find((e) => e.p.tool_use_id === use.p.id && e.id > use.id);
 /** What the fake's Bash calls answered, in order: its HASENV and PRINTENV directives. */
 const bashResults = (id: string) => h.byKind(id, 'tool_use').filter((e) => e.p.name === 'Bash').map((u) => resultOf(id, u)?.p.text as string);
@@ -159,7 +158,6 @@ describe('entering it', () => {
     expect(await submit(id, rid, { value: NEW, replace: true })).toEqual({ status: 200, body: { state: 'saved', replaced: true, via: 'message' } });
     expect(store()[`channel:scratch/${name}`]).toBe(NEW);
     expect(answerEvents(id)).toEqual([{ id: rid, state: 'saved', replaced: true, via: 'message' }]);
-    // No call waited: the message that goes on carries it, and the thread runs on it in a fresh process.
     await h.untilResults(id, 2);
     expect(h.texts(id, 'user')).toEqual(['plan the quarter', secretSavedMessage(named(name))]);
     expect(h.spawns(id)).toHaveLength(2);
@@ -204,13 +202,11 @@ describe('request_secret from the agent', () => {
     expect(await blockers(t.id)).toEqual([{ kind: 'question', detail: 'Stripe test secret key', count: 1 }]);
     expect(h.thread(t.id).status).toBe('running');
 
-    // The call polls once its request is saved; submitting first would send the continuation as a message.
     await sleep(1000);
     expect(await submit(t.id, req.p.id, { value: VALUE })).toEqual({ status: 200, body: { state: 'saved', replaced: false, via: 'tool' } });
     expect(store()['channel:scratch/STRIPE_TEST_KEY']).toBe(VALUE);
     expect(await listed()).toContain('channel:scratch/STRIPE_TEST_KEY');
 
-    // The call returns, the agent ends its turn, and the thread goes on in a fresh process, queued in between.
     await h.untilResults(t.id, 2);
     expect(resultOf(t.id, tool(t.id)!)?.p).toMatchObject({ text: secretResultText(ASK, 'saved'), is_error: false });
     expect(answerEvents(t.id)).toEqual([{ id: req.p.id, state: 'saved', replaced: false, via: 'tool' }]);
@@ -220,13 +216,11 @@ describe('request_secret from the agent', () => {
     expect(await blockers(t.id)).toEqual([]);
     expect(h.thread(t.id).status).toBe('done');
 
-    // That process has the variable, and a value it prints is cut before the row is stored.
     await ok('POST', `/threads/${t.id}/messages`, { prompt: 'HASENV:STRIPE_TEST_KEY PRINTENV:STRIPE_TEST_KEY check it', mode: 'steer' });
     await h.untilResults(t.id, 3);
     expect(h.spawns(t.id)).toHaveLength(2);
     expect(bashResults(t.id)).toEqual(['STRIPE_TEST_KEY is not set', 'STRIPE_TEST_KEY is set', '[secret STRIPE_TEST_KEY]']);
 
-    // Nowhere else: no table, no file Omni wrote, not the poll, the thread, its history, Needs you or search.
     expect(leaks()).toEqual([]);
     const shown = [await poll(t.id, req.p.id), await ok('GET', `/threads/${t.id}`), await ok('GET', `/threads/${t.id}/history`), await ok('GET', '/needs-you')];
     expect(JSON.stringify(shown)).not.toContain(VALUE);
@@ -298,7 +292,6 @@ describe('request_secret from the agent', () => {
     await h.untilResults(child.id, 2);
     expect((await ok('GET', `/threads/${parent}/crew-questions`)).secrets).toEqual([]);
     expect(await blockers(parent)).toEqual([]);
-    // The parent hears once, from the turn that ran with the secret, not from the one that ended to get it.
     await h.untilResults(parent, 2);
     expect(h.byKind(parent, 'crew_report')).toHaveLength(1);
     expect(h.byKind(child.id, 'result')).toHaveLength(2);

@@ -55,7 +55,6 @@ describe('the secret card, pending', () => {
     expect(out).toContain('A value is already saved under STRIPE_TEST_KEY for this channel. Saving replaces it.');
     expect(out).toMatch(/type="submit"[^>]*>.*?Replace<\/button>/);
     expect(out).not.toContain('Confirm replace');
-    // Only ever the field's own (empty) value: nothing about the old one.
     expect(count(out, '<input')).toBe(1);
   });
 
@@ -147,7 +146,6 @@ describe('the secret card phases', () => {
       error: 'the thread runs on another machine',
     });
     expect(refused(sending(save(typedIn, false)), 0, null, 'Cannot reach the Omni server. Is it running?')).toMatchObject({ at: 'editing', error: 'Cannot reach the Omni server. Is it running?' });
-    // A failed replace goes back to the step it came from, not to a fresh first press.
     expect(refused(sending(save(save(typedIn, true), true)), 400, { error: 'bad' }, 'bad')).toEqual({ at: 'confirmReplace', value: DUMMY, error: 'bad' });
     expect(refused({ at: 'cancelling', value: DUMMY }, 500, null, 'Request failed (500)')).toEqual({ at: 'editing', value: DUMMY, error: 'Request failed (500)' });
   });

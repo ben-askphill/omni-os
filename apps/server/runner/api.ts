@@ -434,8 +434,6 @@ export async function postMessage(
     const again = acceptedAgain(threadId, opts.requestId, fingerprint);
     if (again) return again;
   }
-  // Ben wrote instead of answering the agent's questions or entering the secret it asked for: a call waiting on them
-  // returns, so this message is read now. On a thread that runs elsewhere the dismissal syncs to the machine whose call waits.
   const dismiss = source === 'ben' && mode !== 'queue';
   const dismissAsks = () => {
     dismissQuestions(threadId);

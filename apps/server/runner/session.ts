@@ -89,7 +89,6 @@ export function armIdle(live: Live) {
   live.clearIdle();
   // Closing stdin now would end the background agents with the process. Wait for them, within a bound.
   if (hasBackground(live)) return live.armIdle(config.taskKeepAliveSeconds * 1000, () => closeLive(live));
-  // Its env lacks a secret saved meanwhile: a fresh process runs the next turn (staleEnv).
   if (live.envStale) return closeLive(live);
   if (config.keepAliveSeconds <= 0) return closeLive(live);
   live.armIdle(config.keepAliveSeconds * 1000, () => closeLive(live));

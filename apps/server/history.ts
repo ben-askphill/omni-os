@@ -135,7 +135,7 @@ class Anchors {
  * Rows outside `span` the clients' folds need, clipped, at most budget.anchors and budget.anchorBytes, in rule order:
  * 1. parent calls: a call in the page nested under one that is not, that call, recursively (background agents' calls
  *    land turns after the agent started);
- * 2. answers: a question in the page whose answer is not;
+ * 2. answers: a question or a secret request in the page whose answer is not;
  * 3. session (head only): the newest init below the page when it has none;
  * 4. last result (head only): the newest result below the page when it has none.
  * A kind that refers back to an earlier row (#209) adds a rule here; any other kind needs none.

@@ -54,7 +54,6 @@ const digest = (parts: unknown[]) => createHash('sha256').update(JSON.stringify(
 
 /** Human-written remediation only. Raw tool errors never pass through this filter. */
 export function safeGuidance(text: string): string {
-  // The secret store's values first (secret-scrub.ts): the env holds only this server's own.
   let safe = scrubText(text);
   for (const [key, value] of Object.entries(process.env)) {
     if (/(?:TOKEN|SECRET|PASSWORD|API_KEY|CREDENTIAL)/i.test(key) && value && value.length >= 4) safe = safe.split(value).join('[redacted]');

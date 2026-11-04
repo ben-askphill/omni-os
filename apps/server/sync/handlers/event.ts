@@ -36,7 +36,6 @@ registerHandler('event', {
       return db.prepare('DELETE FROM events WHERE id = ?').run(e.id).changes > 0;
     }
     const e = change.data as EventData;
-    // A row from a build that did not scrub, or a value this Mac knows and the other does not (secret-scrub.ts).
     const payload = scrubSecrets(e.payload);
     const res = db
       .prepare('INSERT INTO events (uid, thread_id, kind, payload, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(uid) DO NOTHING')

@@ -81,7 +81,7 @@ export interface ThreadView<A extends TurnArtifact = TurnArtifact, C extends Tur
   turns: TurnView<A, C>[];
   /** The latest TodoWrite of the latest turn, while it runs. */
   plan: PlanView | null;
-  /** Null while it waits on Ben's answer to a question: it is not doing anything. */
+  /** Null while it waits on Ben to answer a question or enter a secret: it is not doing anything. */
   now: NowDoing | null;
   /** A question or a secret request waits on Ben. */
   asking: boolean;
