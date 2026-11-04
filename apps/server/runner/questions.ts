@@ -1,7 +1,6 @@
 // Questions an agent asks the user with ask_user_question (apps/mcp/ask.ts): asked, waited on, answered or dismissed.
-// The thread's events hold them (packages/shared/question.ts), so they persist, stream and sync like any event. Only
-// which questions a tool call still polls for lives here, in memory: after a restart none does, and an answer goes to
-// the thread as a message instead.
+// The thread's events hold them (packages/shared/question.ts), so they persist, stream and sync like any event. Which
+// calls still wait, and how an answer reaches the agent, is waiters.ts, shared with secret-requests.ts.
 import { randomUUID } from 'node:crypto';
 import {
   ANSWER_EVENT,
@@ -17,22 +16,11 @@ import {
   type QuestionState,
   type ThreadQuestion,
 } from '@omni/shared/question.ts';
-import { bus, publishFeed } from '../bus.ts';
+import { publishFeed } from '../bus.ts';
 import { events, threads } from '../db.ts';
 import { notifyNeedsInput } from '../push-sender.ts';
-import { remoteHolder } from '../ownership.ts';
-import { runningElsewhere, turnBlocked } from '../sync/guard.ts';
-import { runnerPorts } from './ports.ts';
-import { saveOwn, wake } from './queue.ts';
-import { addEvent, lives, refusal, runsHere } from './state.ts';
-
-/** The longest one poll waits for an answer, in seconds. */
-export const WAIT_MAX_SEC = 30;
-/** A call that polled this recently still waits. Longer than one poll, so a poll in flight always counts. */
-const WAITER_FRESH_MS = 35_000;
-
-/** When a tool call last polled each question, by question id. */
-const polled = new Map<string, number>();
+import { addEvent, refusal } from './state.ts';
+import { polling, settle, unpolled, untilSettled, type Via } from './waiters.ts';
 
 function find(threadId: string, id: string): ThreadQuestion {
   if (!threads.get(threadId)) throw refusal('thread not found', 404);
@@ -84,59 +72,25 @@ export function crewQuestions(threadId: string): CrewQuestion[] {
  */
 export async function awaitAnswer(threadId: string, id: string, waitSec: number, signal?: AbortSignal) {
   const q = find(threadId, id);
-  polled.set(id, Date.now());
+  polling(id);
   if (q.state !== 'pending' || waitSec <= 0) return reply(q);
-  await new Promise<void>((resolve) => {
-    const done = () => {
-      clearTimeout(timer);
-      bus.off(`thread:${threadId}`, onEvent);
-      signal?.removeEventListener('abort', done);
-      resolve();
-    };
-    const onEvent = (e: { kind?: string; payload?: unknown }) => {
-      if (e?.kind === ANSWER_EVENT && typeof e.payload === 'string' && (JSON.parse(e.payload) as AnswerPayload).id === id) done();
-    };
-    const timer = setTimeout(done, Math.min(waitSec, WAIT_MAX_SEC) * 1000);
-    bus.on(`thread:${threadId}`, onEvent);
-    signal?.addEventListener('abort', done, { once: true });
-  });
+  await untilSettled(threadId, ANSWER_EVENT, id, waitSec, signal);
   return reply(find(threadId, id));
 }
 
-/** A tool call still waits on the question: its thread's turn runs here and the call polled lately. */
-const waitedOn = (threadId: string, id: string) => !!lives.get(threadId)?.turn && Date.now() - (polled.get(id) ?? 0) < WAITER_FRESH_MS;
+export type Answered = { state: QuestionState; via: Via } | { conflict: QuestionState };
 
-export type Answered = { state: QuestionState; via: AnswerPayload['via'] } | { conflict: QuestionState };
-
-/**
- * Ben's answers. The first answer wins: a later one is a conflict, with the state the first left. The waiting call
- * returns them; when no call waits any more (a restart, Stop, the harness's own timeout) they reach the thread as a
- * message instead, saved before it is woken, once. A thread that runs on another machine (run-on.ts) has its call
- * there: while a turn runs there, the answer event syncs to it and that call returns; between turns, the answer goes
- * to it as a forwarded message.
- */
+/** Ben's answers. The first answer wins: a later one is a conflict, with the state the first left. */
 export async function answerQuestion(threadId: string, id: string, raw: unknown): Promise<Answered> {
   const q = find(threadId, id);
   const parsed = parseAnswers(q.questions, raw);
   if (!parsed.ok) throw refusal(parsed.error, 400);
   if (q.state !== 'pending') return { conflict: q.state };
-  const thread = threads.get(threadId)!;
-  const holder = remoteHolder(thread);
-  const via = waitedOn(threadId, id) || (holder && runningElsewhere(thread)) ? 'tool' : 'message';
   const answers = parsed.value;
   const state = stateOf(answers) as AnswerPayload['state'];
-  if (via === 'message' && holder) {
-    await runnerPorts().routing.forwardMessage(thread, resultText(q.questions, state, answers), { mode: 'steer', from: 'ben' });
-  } else if (via === 'message') {
-    const blocked = turnBlocked(thread, runsHere(threadId));
-    if (blocked) throw refusal(blocked, 409);
-  }
-  addEvent(threadId, ANSWER_EVENT, { id, state, answers, via } satisfies AnswerPayload);
-  polled.delete(id);
-  if (via === 'message' && !holder) {
-    const row = saveOwn(threadId, `question:${id}`, { prompt: resultText(q.questions, state, answers), kind: 'user', source: 'ben', payload: null });
-    if (row) wake(row);
-  }
+  const via = await settle(threads.get(threadId)!, id, `question:${id}`, resultText(q.questions, state, answers), (via) =>
+    addEvent(threadId, ANSWER_EVENT, { id, state, answers, via } satisfies AnswerPayload),
+  );
   settled(threadId);
   return { state, via };
 }
@@ -146,7 +100,7 @@ export function dismissQuestions(threadId: string) {
   const open = questionsIn(events.questions(threadId)).filter((q) => q.state === 'pending');
   for (const q of open) {
     addEvent(threadId, ANSWER_EVENT, { id: q.id, state: 'dismissed', answers: null, via: 'tool' } satisfies AnswerPayload);
-    polled.delete(q.id);
+    unpolled(q.id);
   }
   if (open.length) settled(threadId);
 }
