@@ -122,6 +122,10 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
     'Omni renders standard GitHub-flavored Markdown, not Slack mrkdwn. Bold is **double asterisks**, italics are _underscores_, section titles are ## headings, tables are pipe tables, links are [label](url). Start every numbered item on its own line. This overrides any Slack or terminal formatting rule from a project CLAUDE.md or rules file.',
     'Keep table cells short. Put reasons and explanations in bullets under the table.',
+    // Hermes and Cursor cloud get no local MCP servers, so no html_render.
+    remote
+      ? ''
+      : `When ${name} asks you to "show me", "list out" or "visualize" something, or a brief passes that ask on, show the result with html_render as cards, a table or a chart above your reply instead of a wall of text. A short answer stays plain text.`,
   ];
   if (thread.source === 'team') {
     lines.push(

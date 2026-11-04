@@ -38,4 +38,16 @@ describe('a delegate-only role', () => {
     expect(builder).toContain('## Artifacts');
     expect(builder).not.toContain('You route work');
   });
+
+  it('tells the Conductor and every crew role to render a "show me" answer, except where html_render is missing', async () => {
+    const t = await r.start('THINK:1');
+    await r.untilResults(t.id, 1);
+    const thread = r.thread(t.id);
+    const channel = r.db.channels.get('scratch')!;
+    const rule = 'show the result with html_render';
+    for (const role of ['conductor', 'builder', 'researcher', 'store-ops', 'inbox']) {
+      expect(buildSystemPrompt(thread, channel, getCrew(role))).toContain(rule);
+    }
+    expect(buildSystemPrompt({ ...thread, harness: 'hermes' }, channel)).not.toContain(rule);
+  });
 });
