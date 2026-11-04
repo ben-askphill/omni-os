@@ -11,13 +11,13 @@
     'components/forms/Segmented.jsx','components/forms/Toggle.jsx','components/forms/InlineConfirm.jsx','components/forms/SlideToConfirm.jsx','components/forms/Picker.jsx','components/forms/ModelPicker.jsx','components/forms/CheckItem.jsx','components/feedback/Toast.jsx','components/icons/Icon.jsx','components/icons/CrewMark.jsx','components/icons/HarnessMark.jsx',
     'components/brand/OmniMark.jsx','components/brand/OmniLogo.jsx','components/brand/Loader.jsx',
     'components/navigation/Rail.jsx','components/navigation/TabStack.jsx','components/navigation/CommandPalette.jsx',
-    'components/thread/ThreadRow.jsx','components/thread/Message.jsx','components/thread/ToolCall.jsx','components/thread/Delegation.jsx','components/thread/CrewReport.jsx','components/thread/ArtifactEmbed.jsx','components/thread/Composer.jsx','components/thread/Handoff.jsx','components/thread/QuestionCard.jsx','components/thread/CloudAgent.jsx',
+    'components/thread/ThreadRow.jsx','components/thread/Message.jsx','components/thread/ToolCall.jsx','components/thread/Delegation.jsx','components/thread/CrewReport.jsx','components/thread/ArtifactEmbed.jsx','components/thread/Composer.jsx','components/thread/Handoff.jsx','components/thread/QuestionCard.jsx','components/thread/SecretRequestCard.jsx','components/thread/CloudAgent.jsx',
     'components/panels/Panel.jsx','components/panels/GitHubPanel.jsx','components/panels/UsageMeter.jsx',
     'components/mobile/MoButtons.jsx','components/mobile/MoHeader.jsx','components/mobile/MoSection.jsx','components/mobile/MoThreadRow.jsx','components/mobile/MoList.jsx','components/mobile/MoDecisionCard.jsx',
     'components/mobile/MoTabBar.jsx','components/mobile/MoSheet.jsx','components/mobile/MoComposer.jsx','components/mobile/MoBubble.jsx','components/mobile/MoArtifactCard.jsx','components/mobile/MoToast.jsx'
   ];
   var waiters = [];
-  var REQUIRED = ['Segmented', 'Ticks', 'CheckItem', 'InlineConfirm', 'SlideToConfirm', 'Picker', 'ModelPicker', 'EffortPicker', 'Toast', 'Chip', 'ThreadGroup', 'ResultLine', 'SwitchLine', 'HandoffCard', 'HandoffLine', 'DevicePicker', 'QuestionCard', 'CloudAgentCard', 'MoTabBar', 'MoDecisionCard'];
+  var REQUIRED = ['Segmented', 'Ticks', 'CheckItem', 'InlineConfirm', 'SlideToConfirm', 'Picker', 'ModelPicker', 'EffortPicker', 'Toast', 'Chip', 'ThreadGroup', 'ResultLine', 'SwitchLine', 'HandoffCard', 'HandoffLine', 'DevicePicker', 'QuestionCard', 'SecretRequestCard', 'CloudAgentCard', 'MoTabBar', 'MoDecisionCard'];
   var ready = !!window[NS] && REQUIRED.every(function (k) { return k in window[NS]; });
   window.omReady = function (cb) { if (ready) cb(window[NS]); else waiters.push(cb); };
   function done() { ready = true; window.OmniOS = window[NS]; waiters.splice(0).forEach(function (cb) { cb(window[NS]); }); }
