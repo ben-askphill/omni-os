@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { db, tx } from './db.ts';
+import { scrubText } from './secret-scrub.ts';
 import type { Record as StreamRecord } from './stream.ts';
 
 export const FAILURE_CATEGORIES = ['authentication', 'permission', 'rate_limit', 'timeout', 'unavailable', 'invalid_input', 'not_found', 'command_exit', 'unknown'] as const;
@@ -53,7 +54,8 @@ const digest = (parts: unknown[]) => createHash('sha256').update(JSON.stringify(
 
 /** Human-written remediation only. Raw tool errors never pass through this filter. */
 export function safeGuidance(text: string): string {
-  let safe = text;
+  // The secret store's values first (secret-scrub.ts): the env holds only this server's own.
+  let safe = scrubText(text);
   for (const [key, value] of Object.entries(process.env)) {
     if (/(?:TOKEN|SECRET|PASSWORD|API_KEY|CREDENTIAL)/i.test(key) && value && value.length >= 4) safe = safe.split(value).join('[redacted]');
   }

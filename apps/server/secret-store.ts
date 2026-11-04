@@ -22,14 +22,22 @@ export interface SecretStore {
 export const SERVICE = 'omni-os';
 const run = promisify(execFile);
 
-/** Runs `cmd args`, writing `input` to its stdin so a value never shows up in `ps`. Fails on a non-zero exit or any stderr. */
-function piped(cmd: string, args: string[], input: string): Promise<void> {
+/**
+ * Runs `cmd args`, writing `input` to its stdin so a value never shows up in `ps`. Fails on a non-zero exit or any
+ * stderr, with each of `hidden` cut from the message: `security -i` echoes the command it could not run, value and all.
+ */
+function piped(cmd: string, args: string[], input: string, hidden: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'pipe'] });
     let err = '';
     child.stderr.on('data', (d) => (err += d));
     child.on('error', reject);
-    child.on('close', (code) => (code === 0 && !err.trim() ? resolve() : reject(new Error(err.trim() || `${cmd} exited ${code}`))));
+    child.on('close', (code) => {
+      if (code === 0 && !err.trim()) return resolve();
+      let message = err.trim() || `${cmd} exited ${code}`;
+      for (const h of hidden) if (h) message = message.split(h).join('[value]');
+      reject(new Error(message));
+    });
     child.stdin.end(input);
   });
 }
@@ -46,8 +54,8 @@ export const keychainStore: SecretStore = {
       return null;
     }
   },
-  // `security -i` reads the command from stdin.
-  write: (account, value) => piped('security', ['-i'], `add-generic-password -U -s ${SERVICE} -a ${quote(account)} -w ${quote(value)}\n`),
+  // `security -i` reads the command from stdin. The quoted form first: it holds the raw one unless the value has escapes.
+  write: (account, value) => piped('security', ['-i'], `add-generic-password -U -s ${SERVICE} -a ${quote(account)} -w ${quote(value)}\n`, [quote(value), value]),
   async remove(account) {
     await run('security', ['delete-generic-password', '-s', SERVICE, '-a', account]).catch(() => {});
   },
@@ -64,7 +72,7 @@ export const libsecretStore: SecretStore = {
     }
   },
   // `secret-tool store` reads the value from stdin.
-  write: (account, value) => piped('secret-tool', ['store', `--label=${SERVICE} ${account}`, 'service', SERVICE, 'account', account], value),
+  write: (account, value) => piped('secret-tool', ['store', `--label=${SERVICE} ${account}`, 'service', SERVICE, 'account', account], value, [value]),
   async remove(account) {
     await run('secret-tool', ['clear', 'service', SERVICE, 'account', account]).catch(() => {});
   },

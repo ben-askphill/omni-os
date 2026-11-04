@@ -1,10 +1,15 @@
 import { db, EVENT_COLUMNS, indexEvent, type EventRow } from '../../db.ts';
 import { ANSWER_EVENT, QUESTION_EVENT } from '@omni/shared/question.ts';
+import { SECRET_ANSWER_EVENT, SECRET_REQUEST_EVENT } from '@omni/shared/secret-request.ts';
 import { publishFeed, publishThread } from '../../bus.ts';
+import { scrubSecrets } from '../../secret-scrub.ts';
 import { registerHandler } from '../apply.ts';
 
 // Events: insert-only, keyed by uid, so a change pulled twice lands once. The local id is assigned on arrival,
 // which keeps each thread's events in the order its machine wrote them.
+
+/** A request asked or settled on the other Mac adds or clears a Needs you blocker here. */
+const NEEDS_YOU_KINDS = new Set([QUESTION_EVENT, ANSWER_EVENT, SECRET_REQUEST_EVENT, SECRET_ANSWER_EVENT]);
 
 interface EventData {
   uid: string;
@@ -31,11 +36,13 @@ registerHandler('event', {
       return db.prepare('DELETE FROM events WHERE id = ?').run(e.id).changes > 0;
     }
     const e = change.data as EventData;
+    // A row from a build that did not scrub, or a value this Mac knows and the other does not (secret-scrub.ts).
+    const payload = scrubSecrets(e.payload);
     const res = db
       .prepare('INSERT INTO events (uid, thread_id, kind, payload, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(uid) DO NOTHING')
-      .run(change.entity_id, e.thread_id, e.kind, JSON.stringify(e.payload), e.created_at);
+      .run(change.entity_id, e.thread_id, e.kind, JSON.stringify(payload), e.created_at);
     if (!res.changes) return false;
-    indexEvent(e.thread_id, e.kind, e.payload, Number(res.lastInsertRowid));
+    indexEvent(e.thread_id, e.kind, payload, Number(res.lastInsertRowid));
     return true;
   },
   notify(change) {
@@ -43,7 +50,6 @@ registerHandler('event', {
     const row = byUid(change.entity_id);
     if (!row) return;
     publishThread(row.thread_id, row);
-    // A question asked or answered on the other Mac adds or clears a Needs you blocker here.
-    if (row.kind === QUESTION_EVENT || row.kind === ANSWER_EVENT) publishFeed({ type: 'needs_you', thread_id: row.thread_id });
+    if (NEEDS_YOU_KINDS.has(row.kind)) publishFeed({ type: 'needs_you', thread_id: row.thread_id });
   },
 });

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { scrubSecrets } from '../../secret-scrub.ts';
 import { db, now, tx } from '../connection.ts';
 import { record } from '../sync.ts';
 
@@ -25,7 +26,9 @@ export function indexEvent(threadId: string, kind: string, payload: unknown, eve
 
 export const events = {
   add(threadId: string, kind: string, payload: unknown, createdAt?: string): EventRow {
-    const json = JSON.stringify(payload);
+    // A secret value an agent printed is cut before the row is stored, indexed, streamed or synced (secret-scrub.ts).
+    const clean = scrubSecrets(payload);
+    const json = JSON.stringify(clean);
     const ts = createdAt ?? now();
     const uid = randomUUID();
     const id = tx(() => {
@@ -33,7 +36,7 @@ export const events = {
         .prepare('INSERT INTO events (uid, thread_id, kind, payload, created_at) VALUES (?, ?, ?, ?, ?)')
         .run(uid, threadId, kind, json, ts);
       const id = Number(res.lastInsertRowid);
-      indexEvent(threadId, kind, payload, id);
+      indexEvent(threadId, kind, clean, id);
       record('event', uid);
       return id;
     });
