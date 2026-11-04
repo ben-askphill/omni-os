@@ -181,7 +181,7 @@ export function MoComposer({
             enterKeyHint="send"
             placeholder={hint}
             aria-label={hint}
-            className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-4"
+            className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-3"
           />
           {stop && !canSend && !att.files.length && !mic.on ? (
             <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />

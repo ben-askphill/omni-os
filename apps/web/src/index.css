@@ -759,7 +759,7 @@
     stroke-dashoffset: 0;
   }
   [data-state="completed"] .chk-say {
-    color: var(--fg-4);
+    color: var(--fg-3);
     background-size: 100% 1.5px;
   }
   [data-state="in_progress"] > .chk-box {

@@ -304,7 +304,7 @@ function PlanCard({ todos, threadId }: { todos: Todo[]; threadId: string }) {
   };
 
   return (
-    <section aria-label="Plan" className="rounded-[22px] bg-surface px-4 pt-3.5 pb-3">
+    <section aria-label="Plan" className="rounded-[20px] bg-surface px-4 pt-3.5 pb-3">
       <div className="mb-2.5 flex items-center gap-3">
         <span className="caption">Plan</span>
         <Ticks value={todos.length ? done / todos.length : 0} count={Math.max(1, todos.length)} height={6} className="max-w-40 flex-1" label="Plan progress" />
@@ -317,7 +317,7 @@ function PlanCard({ todos, threadId }: { todos: Todo[]; threadId: string }) {
           {t.status === 'in_progress' && t.activeForm ? t.activeForm : t.content}
         </CheckItem>
       ))}
-      {!active && done === todos.length && todos.length > 0 && <div className="mt-1.5 text-[12px] text-fg-4">All done</div>}
+      {!active && done === todos.length && todos.length > 0 && <div className="mt-1.5 text-[12px] text-fg-3">All done</div>}
     </section>
   );
 }

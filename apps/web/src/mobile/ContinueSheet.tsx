@@ -153,7 +153,7 @@ function Sheet({
                 rows={4}
                 aria-label="Your message"
                 placeholder="What should it do next? It reads this after the carryover."
-                className="w-full resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-4"
+                className="w-full resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-3"
               />
             </div>
             {hint && <p className="m-0 px-3 text-[12.5px] leading-[1.4] text-fg-3">{hint}</p>}

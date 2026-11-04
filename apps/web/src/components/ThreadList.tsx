@@ -87,7 +87,7 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
           {t.role && <Chip>{t.role}</Chip>}
           {source && <Chip tone="outline">{source}</Chip>}
           {pr && <PRMark pr={pr} />}
-          <span className="ml-auto shrink-0 pl-2 font-num text-[11px] text-fg-4 tabular-nums">{relTime(t.updated_at)}</span>
+          <span className="ml-auto shrink-0 pl-2 font-num text-[11px] text-fg-3 tabular-nums">{relTime(t.updated_at)}</span>
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}
@@ -138,7 +138,7 @@ export function ThreadGroups({
         <section key={g.label}>
           <h3 className="caption sticky top-0 z-[2] flex items-center gap-2 bg-bg px-3.5 py-2">
             {g.label}
-            <span className="text-fg-4/70">{g.items.length}</span>
+            <span className="text-fg-3">{g.items.length}</span>
           </h3>
           <Rows threads={g.items} showChannel={showChannel} prs={prs} handoffs={handoffs} />
         </section>
@@ -249,14 +249,14 @@ function FolderHeader({ channel, folder, count, running }: { channel: ChannelWit
           <Icon name={folder.collapsed ? 'chevronRight' : 'chevronDown'} size={12} className="-ml-0.5 shrink-0 text-fg-4" />
           <Icon name="folder" size={13} className="shrink-0 text-fg-3" />
           <span className="min-w-0 truncate">{folder.name}</span>
-          <span className="text-fg-4/70">{count}</span>
+          <span className="text-fg-3">{count}</span>
           {running && <Loader size={11} className="shrink-0 text-live-text" />}
         </button>
       ) : (
         <div aria-label={label} className={cls}>
           <span className="w-3 shrink-0" />
           No folder
-          <span className="text-fg-4/70">{count}</span>
+          <span className="text-fg-3">{count}</span>
         </div>
       )}
     </h3>
@@ -285,7 +285,7 @@ export function ArchivedThreads({ channelId }: { channelId: string }) {
           <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-4" />
           <Icon name="archive" size={13} className="shrink-0 text-fg-3" />
           Archived
-          <span className="text-fg-4/70">{count}</span>
+          <span className="text-fg-3">{count}</span>
         </button>
       </h3>
       {open && (

@@ -122,7 +122,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
             rows={4}
             enterKeyHint="send"
             placeholder={ch ? `Describe the task for #${ch.name}` : 'Ask the Conductor. It delegates to the crew.'}
-            className="resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-4"
+            className="resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-3"
           />
           {(baseRows || runOn.rows) && (
             <div className="flex min-w-0 flex-wrap gap-1.5">

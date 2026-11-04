@@ -116,7 +116,7 @@ export function MoDoneRow({ t, last }: { t: InboxThread; last: boolean }) {
         </span>
         <span className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 ${last ? '' : 'border-b border-line'}`} style={{ paddingRight: actionsWidth(1) }}>
           <span className="min-w-0 flex-1 truncate text-[14px] leading-[1.3] text-fg-3">{title}</span>
-          <span className="shrink-0 text-[12px] leading-none text-fg-4 tabular-nums">{shortTime(t.done_at ?? t.updated_at ?? t.created_at, now)}</span>
+          <span className="shrink-0 text-[12px] leading-none text-fg-3 tabular-nums">{shortTime(t.done_at ?? t.updated_at ?? t.created_at, now)}</span>
         </span>
       </button>
       <RowActions actions={[{ icon: 'undo', label: `Move ${title} back to the inbox`, run: () => act.undo(t) }]} />
