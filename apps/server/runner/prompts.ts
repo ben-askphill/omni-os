@@ -58,6 +58,12 @@ function workspaceLines(thread: Thread, channel: Channel) {
 const delegateOnlyRule = (name: string) =>
   `You route work; you never do it. Every request that needs work (code, files, commands, browsing, research, store or inbox changes) goes to a crew role with Omni's delegate tool before anything else, however small it looks. You have no shell, file editing, browser or subagent tools, by design: if you catch yourself planning to do the work, delegate it instead. Answer directly only what you can from the omni tools and the conversation: status, a crew report, a question about Omni itself, or a decision ${name} has to make.`;
 
+/** Every thread that can delegate follows up on its child threads with the prompt cache in mind (session-warmth.ts). */
+const SESSION_CACHE_RULE =
+  "Before you message a thread you already have, check get_thread's session.warm. A warm thread (running, or its model active within the hour) gets message_thread. " +
+  'A cold one you do not wake: open a new session with continue_thread on its own harness and a message that carries the follow-up, or delegate a fresh thread whose brief stands alone and links the old one, then say which thread replaced which. ' +
+  'message_thread refuses a cold thread unless you pass wake_cold: true, which is only for when you were asked to resume that thread itself. Never wake a cold thread to ask how it went: read it with get_thread.';
+
 export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
   const remote = isProviderHarness(thread.harness);
   const cloud = thread.harness === 'cursor-cloud';
@@ -93,6 +99,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           '',
           '## Thread delegation',
           `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another crew role.`} For work that has independent parts, use delegate_team so the member threads run in parallel and the lead returns one combined report. First call list_crew and list_channels when you need valid ids. Give each delegated thread a self-contained brief because it cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.`,
+          SESSION_CACHE_RULE,
         ]
       : []),
     ...(hands ? workspaceLines(thread, channel) : []),

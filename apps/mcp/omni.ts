@@ -243,17 +243,20 @@ server.registerTool(
       'Send a message to an existing thread (yours or any other). It resumes with full context. ' +
       'If the thread is busy, mode "steer" (default) hands it over at its next step so it adjusts while it keeps working; ' +
       'mode "queue" waits until its current turn ends and then runs as a new turn. ' +
-      'A steer to a thread whose harness cannot steer (Cursor) is queued automatically.',
+      'A steer to a thread whose harness cannot steer (Cursor) is queued automatically. ' +
+      "Only for a thread whose session is warm (get_thread's session.warm: it runs, or its model was active within the hour). " +
+      'A cold thread is refused: continue it with continue_thread or delegate a fresh thread that links it, and read it with get_thread for its status.',
     inputSchema: {
       thread_id: z.string(),
       message: z.string(),
       mode: z.enum(['steer', 'queue']).optional().describe('steer (default): read at its next step if busy. queue: after its current turn.'),
+      wake_cold: z.boolean().optional().describe(`Resume the thread even though its session went cold. Only when ${USER} asked to resume that thread itself.`),
     },
   },
-  async ({ thread_id, message, mode }) => {
+  async ({ thread_id, message, mode, wake_cold }) => {
     const t = await call(`/threads/${thread_id}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer' }),
+      body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer', ...(wake_cold && { wake_cold }) }),
     });
     return text({ thread_id: t.id, status: t.status });
   },
@@ -369,7 +372,8 @@ server.registerTool(
   'continue_thread',
   {
     description:
-      `Continue an idle thread in a new one on a local harness, only when ${USER} asks. The new thread is linked to it, in the same ` +
+      `Continue an idle thread in a new one on a local harness, when ${USER} asks or when you have a follow-up for a thread whose session went cold ` +
+      "(get_thread's session.warm is false; pass the thread's own harness then). The new thread is linked to it, in the same " +
       'channel, with a session of its own and, for repo work, its own worktree on a new branch with the uncommitted changes carried. ' +
       'Its first session reads a carryover of the thread (goal, changed files, checks, recent history) ahead of `message`. ' +
       'Files attached in the thread go only when named in `attachments`: they are copied into the new thread, and any that are missing, too big or not plain files are listed back with why. ' +
@@ -418,7 +422,12 @@ server.registerTool(
 
 server.registerTool(
   'get_thread',
-  { description: 'Status, last reply, artifacts and running subagents of a thread.', inputSchema: { thread_id: z.string() } },
+  {
+    description:
+      'Status, last reply, artifacts and running subagents of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
+      'its last model activity and the minutes since. Reading it never wakes the thread.',
+    inputSchema: { thread_id: z.string() },
+  },
   async ({ thread_id }) => text(await call(`/threads/${thread_id}/summary`)),
 );
 

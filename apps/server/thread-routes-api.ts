@@ -19,6 +19,7 @@ import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
 import { allWithDelegating, delegatingIds, withDelegating } from './delegating.ts';
+import { coldRefusal, sessionWarmth } from './session-warmth.ts';
 import {
   acceptedAgain,
   activeMods,
@@ -215,6 +216,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
     // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
     ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),
+    // Whether its session is still in the prompt cache: a parent messages a warm one and continues a cold one in a new session.
+    session: sessionWarmth(t),
     // The agents it spawned that still run, as the thread panel's Running subagents list shows them.
     running_subagents: activeTasks()
       .filter((k) => k.thread_id === t.id && k.subagent)
@@ -231,7 +234,7 @@ threadActionsApi.get('/:id/base', (c) => {
 threadActionsApi.post('/:id/messages', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, from, mode, request_id, context: raw } = z
+  const { prompt, from, mode, request_id, context: raw, wake_cold } = z
     .object({
       prompt: z.string(),
       from: z.enum(['ben', 'conductor']).default('ben'),
@@ -241,9 +244,16 @@ threadActionsApi.post('/:id/messages', async (c) => {
       request_id: z.string().min(1).max(200).optional(),
       // Records Ben attached (packages/shared/message-context.ts), checked and normalized by parseContexts.
       context: z.unknown().optional(),
+      // A parent thread's send to a thread whose session went cold is refused unless it was asked to resume that thread.
+      wake_cold: z.boolean().default(false),
     })
     .parse(data);
-  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  const target = threads.get(id);
+  if (!target) return c.json({ error: 'not found' }, 404);
+  if (from === 'conductor' && !wake_cold) {
+    const warmth = sessionWarmth(target);
+    if (!warmth.warm) return c.json({ error: coldRefusal(target, warmth), session: warmth }, 409);
+  }
   const context = parseContexts(raw);
   if (!context.ok) return c.json({ error: context.error }, 400);
   if (!prompt && !context.value.length) return c.json({ error: 'Write a message or add context to send.' }, 400);

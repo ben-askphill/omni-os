@@ -42,7 +42,7 @@ A switch keeps one thread. To leave a thread as it is and carry on in a new one,
 - A message that starts with a command, like `/review`, runs first, and the carryover goes with your next message.
 - Hermes and Cursor Cloud can't take a continued thread, and a thread running on them can't be continued, since their files are not on this Mac.
 - A synced thread that works in a folder (no branch) can be forked on a Mac that doesn't have that folder: the new thread starts in the channel's folder, as any new thread does. A thread running on your other Mac can't be forked until it finishes there. A thread whose worktree is not on this Mac (made on the other one, or removed by a cleanup) forks from the last commit of its branch, here or on origin, and its uncommitted changes stay behind. When that branch is gone too, for example deleted after its PR merged, the fork starts in the channel's folder like any new thread. The sheet says which.
-- The Conductor can do the same with `continue_thread`, when you ask it to. It names the attachments to carry, and the answer says which went and why the others did not.
+- The Conductor can do the same with `continue_thread`, when you ask it to, and on its own when it has a follow-up for a thread whose session went cold ([Crew](crew.md)). It names the attachments to carry, and the answer says which went and why the others did not.
 
 ## Auto
 

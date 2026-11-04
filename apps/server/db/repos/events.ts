@@ -53,6 +53,13 @@ export const events = {
          AND json_extract(payload, '$.dropped') IS NOT 1 LIMIT 1`,
       )
       .get(threadId, afterId),
+  /** When the thread's model last did anything (a reply, a tool call or result, a turn's end), null if never. */
+  lastModelAt: (threadId: string) =>
+    (
+      db
+        .prepare(`SELECT MAX(created_at) AS at FROM events WHERE thread_id = ? AND kind IN ('assistant_text', 'tool_use', 'tool_result', 'result')`)
+        .get(threadId) as { at: string | null }
+    ).at,
   uidOf: (id: number) => (db.prepare('SELECT uid FROM events WHERE id = ?').get(id) as { uid: string } | undefined)?.uid ?? null,
   lastAssistantText(threadId: string): string | null {
     const row = db
