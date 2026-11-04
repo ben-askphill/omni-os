@@ -39,4 +39,5 @@ export { switchRun } from './runner/switch.ts';
 export { cancelLimitResume, clearLimit, fireDue, limitClock, resumeLimitNow, scheduleLimitResume, startLimits } from './runner/limits.ts';
 export { reportToParent, saveOwn, settleTeam, wake } from './runner/queue.ts';
 export { buildSystemPrompt } from './runner/prompts.ts';
-export { answerQuestion, askQuestion, awaitAnswer, crewQuestions, WAIT_MAX_SEC } from './runner/questions.ts';
+export { answerQuestion, askQuestion, awaitAnswer, crewQuestions } from './runner/questions.ts';
+export { WAIT_MAX_SEC } from './runner/waiters.ts';
