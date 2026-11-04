@@ -1,5 +1,5 @@
 import { CHANNEL_KIND } from '../../format.ts';
-import { CrewMark, isCrewRole } from '../brand.tsx';
+import { CrewMark, isCrewRole, StaticMark } from '../brand.tsx';
 import type { PickerOption } from '../ui.tsx';
 import type { useApp } from '../../store.tsx';
 
@@ -13,7 +13,7 @@ export function pickerOptions(visibleChannels: Channels, channel: string, crew: 
     label: c.id === 'conductor' ? 'Conductor' : c.name,
     sub: CHANNEL_KIND[c.kind] ?? c.kind,
     avatar: c.name,
-    icon: c.id === 'conductor' ? 'target' : undefined,
+    lead: c.id === 'conductor' ? <StaticMark size={13} title="" /> : undefined,
   }));
   if (!visibleChannels.some((c) => c.id === channel)) channelOptions.push({ value: channel, label: channel, avatar: channel });
   const roleOptions: PickerOption<string>[] = [

@@ -113,7 +113,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
     <div className="scroll-thin h-full overflow-y-auto [scrollbar-gutter:stable]">
       <div className={`mx-auto px-4 pt-6 md:px-8 md:pt-10 ${tab === 'prs' ? (pr ? 'max-w-5xl' : 'max-w-4xl') : 'max-w-3xl'}`}>
         <div className="flex items-center gap-3.5">
-          <Avatar name={ch.name} channelIcon={ch.icon} icon={isConductor ? 'target' : undefined} size={44} />
+          <Avatar name={ch.name} channelIcon={ch.icon} omni={isConductor} size={44} />
           <div className="min-w-0 flex-1">
             <div className="caption mb-1 flex items-center gap-2">
               {CHANNEL_KIND[ch.kind] ?? ch.kind}

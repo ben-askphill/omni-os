@@ -101,7 +101,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, delega
         title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : t.done_at ? 'Marked done' : threadStatusText(t)}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
+        className={`hov group/row z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
           active ? 'font-medium text-fg [--hov:transparent]' : t.done_at ? 'text-fg-4 hover:text-fg' : 'text-fg-3 hover:text-fg'
         }`}
       >
@@ -115,7 +115,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, delega
           </span>
         ) : (
           t.harness && (
-            <span className={`shrink-0 ${active ? 'text-fg-3' : 'text-fg-4'}`}>
+            <span className={`shrink-0 ${active ? 'text-fg-3' : 'text-fg-4 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100'}`}>
               <HarnessLogo harness={t.harness} size={11} />
             </span>
           )

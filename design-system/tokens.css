@@ -16,7 +16,7 @@
   --fg: #17181a; /* Primary text and the ink pill fill, on `canvas`, `bg`, `surface`, `surface-2`, `surface-3` (11.6:1 or more in both themes). */
   --fg-2: #3c3b37; /* Secondary text (settled rows, body in lists) on `canvas`, `bg` and every surface step (6.9:1 or more). */
   --fg-3: #6f6e68; /* Tertiary text (meta, captions, timestamps) on `canvas`, `bg`, `surface`, `surface-2` (4.5:1 or more in both themes; 4.3:1 on `surface-3`). */
-  --fg-4: #9d9c96; /* Quaternary text: placeholders and disabled labels. Kept from the source below 4.5:1 (2.75:1 on white, 3.8:1 on dark canvas): never for text that must be read. */
+  --fg-4: #9d9c96; /* Quaternary text: placeholders and disabled labels. Kept from the source below 4.5:1 (2.75:1 on white; dark is 4.8:1 on `bg` so dark-mode meta stays legible): never for text that must be read. */
   --on-ink: #ffffff; /* Text and icons on an `fg` (ink) fill, e.g. the primary pill. */
   --line: rgb(23 24 26 / 0.08); /* Hairlines and the default border colour. */
   --line-strong: rgb(23 24 26 / 0.16); /* Stronger hairlines, link underlines, scrollbar thumbs. */
@@ -63,8 +63,8 @@
   --elev: #212429;
   --fg: #eceae5;
   --fg-2: #b8b7b1;
-  --fg-3: #908f89;
-  --fg-4: #6f6e69;
+  --fg-3: #a09f99;
+  --fg-4: #83827c;
   --on-ink: #101114;
   --line: rgb(236 235 231 / 0.08);
   --line-strong: rgb(236 235 231 / 0.16);

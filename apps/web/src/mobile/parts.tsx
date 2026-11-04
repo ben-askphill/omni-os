@@ -113,7 +113,7 @@ export function MoAvatar({ role, channel, channelIcon, state, size = 36 }: { rol
           <CrewMark role={role} size={Math.round(size * 0.46)} />
         </span>
       ) : (
-        <Avatar name={channel ?? '?'} channelIcon={channelIcon} icon={channel === 'conductor' ? 'target' : undefined} size={size} />
+        <Avatar name={channel ?? '?'} channelIcon={channelIcon} omni={channel === 'conductor'} size={size} />
       )}
       {state && (
         <span className="absolute -right-px -bottom-px grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">

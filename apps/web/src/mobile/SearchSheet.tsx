@@ -87,7 +87,7 @@ export function SearchSheet() {
             {matched.map((c, i) => (
               <MoListRow
                 key={c.id}
-                icon={<Avatar name={c.name} channelIcon={c.icon} icon={c.id === 'conductor' ? 'target' : undefined} size={28} />}
+                icon={<Avatar name={c.name} channelIcon={c.icon} omni={c.id === 'conductor'} size={28} />}
                 label={c.id === 'conductor' ? 'Conductor' : `#${c.name}`}
                 sub={c.store_domain || c.github_repo || undefined}
                 onClick={() => shell.open(href.channel(c.id))}

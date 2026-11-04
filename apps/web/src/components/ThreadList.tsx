@@ -67,7 +67,7 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
   const mod = mods.findLast((m) => m.thread_id === t.id);
   const preview = t.last_text ? t.last_text.replace(/\s+/g, ' ').slice(0, 240) : showsRunning(t) ? 'Working' : t.status === 'queued' ? 'Waiting for a slot' : '';
   return (
-    <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-3 [--hov:var(--surface)] md:px-3.5">
+    <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-2.5 [--hov:var(--surface)] md:px-3.5">
       {showChannel ? (
         <span className="relative mt-0.5 shrink-0">
           <Avatar name={t.channel_id} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} size={32} />
@@ -77,7 +77,7 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
         </span>
       ) : (
         <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          {t.done_at ? <DoneMark /> : <StatusDot status={shownStatus(t)} />}
+          {t.done_at ? <DoneMark /> : <StatusDot status={shownStatus(t)} size={10} />}
         </span>
       )}
       <div className="min-w-0 flex-1">
@@ -87,7 +87,7 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
           {t.role && <Chip>{t.role}</Chip>}
           {source && <Chip tone="outline">{source}</Chip>}
           {pr && <PRMark pr={pr} />}
-          <span className="ml-auto shrink-0 pl-2 font-num text-[11px] text-fg-3 tabular-nums">{relTime(t.updated_at)}</span>
+          <span className="ml-auto shrink-0 pl-2 font-num text-[12px] text-fg-3 tabular-nums">{relTime(t.updated_at)}</span>
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}

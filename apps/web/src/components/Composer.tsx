@@ -142,7 +142,7 @@ export function NewThreadComposer({
 
   const { channelOptions, roleOptions } = pickerOptions(visibleChannels, channel, crew);
   return (
-    <div className={shell('rounded-xl bg-surface', att.over)} {...att.dropZone}>
+    <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
       {/* Near the top of the page, so it opens downward. */}
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
@@ -372,7 +372,7 @@ export function ReplyComposer({
   };
 
   return (
-    <div className={shell('rounded-xl bg-surface', att.over)} {...att.dropZone}>
+    <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
       <DropHint over={att.over} />
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
       {fileMenu.menu && <FileMenu {...fileMenu.menu} />}

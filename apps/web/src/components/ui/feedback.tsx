@@ -46,7 +46,7 @@ export function Loading({ label = 'Loading' }: { label?: string }) {
 // ---------- ticks and checklist ----------
 
 /** Usage as a row of ticks (Bencho "tick"). `value` is 0..1. Responsive bars keep 3px ticks and 2px gaps. */
-export function Ticks({ value, count = 24, height = 14, tone, label, responsive = false, className = '' }: { value: number; count?: number; height?: number; tone?: 'needs'; label?: string; responsive?: boolean; className?: string }) {
+export function Ticks({ value, count = 24, height = 14, tone, label, responsive = false, className = '' }: { value: number; count?: number; height?: number; tone?: 'needs' | 'muted'; label?: string; responsive?: boolean; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
@@ -61,7 +61,7 @@ export function Ticks({ value, count = 24, height = 14, tone, label, responsive 
   const visibleCount = responsive && width !== null ? Math.max(1, Math.min(count, Math.floor((width + 2) / 5))) : count;
   const v = Math.max(0, Math.min(1, value));
   const on = v > 0 ? Math.max(1, Math.round(v * visibleCount)) : 0;
-  const style = { '--ticks-h': `${height}px`, '--tick-on': tone === 'needs' ? 'var(--needs)' : 'var(--fg)' } as CSSProperties;
+  const style = { '--ticks-h': `${height}px`, '--tick-on': tone === 'needs' ? 'var(--needs)' : tone === 'muted' ? 'var(--fg-3)' : 'var(--fg)' } as CSSProperties;
   return (
     <div ref={ref} role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)} className={`ticks ${className}`} style={style}>
       {Array.from({ length: visibleCount }, (_, i) => (

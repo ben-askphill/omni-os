@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 
-// Desktop panel width in px. null means the default, clamp(340px, 32vw, 600px).
+// Desktop panel width in px. null means the default, clamp(340px, 28vw, 520px).
 export const PANEL_MIN = 320;
 export const THREAD_MIN = 420; // keep the transcript usable next to a wide panel
-export const defaultPanelWidth = () => Math.min(600, Math.max(340, window.innerWidth * 0.32));
+export const defaultPanelWidth = () => Math.min(520, Math.max(340, window.innerWidth * 0.28));
 
 export function PanelResizeHandle({ width, max, onChange, onReset }: { width: number; max: number; onChange: (w: number, done: boolean) => void; onReset: () => void }) {
   const drag = useRef<{ x: number; w: number } | null>(null);

@@ -88,9 +88,15 @@ const ORIGIN_TONE: Record<Provenance, ChipTone> = {
 export function Origin({ of, label, title, onReset, busy }: { of: Provenance; label?: string; title?: string; onReset?: () => void; busy?: boolean }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5">
-      <Chip tone={ORIGIN_TONE[of]} title={title}>
-        {label ?? PROVENANCE_LABEL[of]}
-      </Chip>
+      {of === 'default' ? (
+        <span title={title} className="text-[11.5px] text-fg-3">
+          {label ?? PROVENANCE_LABEL[of]}
+        </span>
+      ) : (
+        <Chip tone={ORIGIN_TONE[of]} title={title}>
+          {label ?? PROVENANCE_LABEL[of]}
+        </Chip>
+      )}
       {onReset && resettable(of) && (
         <button type="button" disabled={busy} onClick={onReset} className="text-[11.5px] text-fg-3 underline-offset-2 hover:text-fg hover:underline disabled:opacity-50">
           Reset

@@ -71,7 +71,7 @@ export function SidebarTop({
             onNavigate?.();
             startNewThread(route, openThread);
           }}
-          className="press flex h-10 w-full items-center justify-center gap-2 rounded-full bg-fg text-[13px] font-medium text-on-ink transition-colors hover:bg-fg/88"
+          className="press flex h-10 w-full items-center justify-center gap-2 rounded-full bg-surface-2 text-[13px] font-medium text-fg shadow-[inset_0_0_0_1px_var(--line-strong)] transition-colors hover:bg-surface-3"
         >
           <Icon name="plus" size={15} strokeWidth={2} /> New thread
         </button>

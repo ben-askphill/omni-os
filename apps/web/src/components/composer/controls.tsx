@@ -107,7 +107,7 @@ export const shell = (shape: string, over = false) =>
   `${shape} relative transition-[background-color,box-shadow] duration-[160ms] ease-out focus-within:bg-bg ${
     over
       ? 'bg-bg shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)]'
-      : 'focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)]'
+      : 'shadow-[inset_0_0_0_1px_var(--pane-edge)] focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)]'
   }`;
 
 export function DropHint({ over }: { over: boolean }) {

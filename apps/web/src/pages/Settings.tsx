@@ -285,7 +285,7 @@ function ChannelsSection() {
         {listed.map((c) => (
           <li key={c.id}>
             <button type="button" onClick={() => setSettingsScope(c.id)} className="flex w-full min-w-0 items-center gap-3 py-2.5 text-left">
-              <Avatar name={c.name} channelIcon={c.icon} icon={c.id === 'conductor' ? 'target' : undefined} size={28} />
+              <Avatar name={c.name} channelIcon={c.icon} omni={c.id === 'conductor'} size={28} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13.5px]">{c.id === 'conductor' ? 'Conductor' : `#${c.name}`}</div>
                 <div className="truncate font-mono text-[11.5px] text-fg-3">{c.repo_path ?? c.base_dir ?? 'Workspace folder'}</div>

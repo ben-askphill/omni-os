@@ -4,6 +4,7 @@ import { api, errorText, type ChannelWithRunning, type Thread } from '../api.ts'
 import { useAutosize } from '../components/composer/controls.tsx';
 import { pickerOptions } from '../components/composer/pickerOptions.tsx';
 import { Icon, Loader, Picker } from '../components/ui.tsx';
+import { StaticMark } from '../components/brand.tsx';
 import { href } from '../router.ts';
 import {
   canSend,
@@ -205,7 +206,7 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
 
   const listed = channels.filter((c) => !c.archived);
   const { channelOptions } = pickerOptions(listed, channel, []);
-  if (!channelOptions.some((o) => o.value === CONDUCTOR)) channelOptions.unshift({ value: CONDUCTOR, label: 'Conductor', avatar: 'Conductor', icon: 'target' });
+  if (!channelOptions.some((o) => o.value === CONDUCTOR)) channelOptions.unshift({ value: CONDUCTOR, label: 'Conductor', avatar: 'Conductor', lead: <StaticMark size={13} title="" /> });
 
   return (
     <div ref={root} className="w-full">

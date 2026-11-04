@@ -17,8 +17,8 @@
   --elev: light-dark(#ffffff, #212429);
   --fg: light-dark(#17181a, #eceae5);
   --fg-2: light-dark(#3c3b37, #b8b7b1);
-  --fg-3: light-dark(#6f6e68, #908f89);
-  --fg-4: light-dark(#9d9c96, #6f6e69);
+  --fg-3: light-dark(#6f6e68, #a09f99);
+  --fg-4: light-dark(#9d9c96, #83827c);
   --on-ink: light-dark(#ffffff, #101114);
   --line: light-dark(rgb(23 24 26 / 0.08), rgb(236 235 231 / 0.08));
   --line-strong: light-dark(rgb(23 24 26 / 0.16), rgb(236 235 231 / 0.16));
@@ -339,7 +339,7 @@
   }
   .glyph[data-s="done"] > i {
     background: var(--done);
-    box-shadow: inset 0 0 0 1px var(--done-edge);
+    box-shadow: inset 0 0 0 1.5px var(--done-edge);
   }
   .glyph[data-s="settled"] > i {
     background: var(--fg-4);
@@ -754,6 +754,7 @@
   }
   [data-state="completed"] > .chk-box .chk-fill {
     transform: scale(1);
+    background: var(--fg-3);
   }
   [data-state="completed"] > .chk-box .chk-tick {
     stroke-dashoffset: 0;

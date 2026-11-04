@@ -17,7 +17,7 @@ function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: 
   const unread = !!item.result;
   return (
     <div className="group/ny relative">
-    <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-3 [--hov:var(--surface)] md:px-3.5">
+    <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-2.5 [--hov:var(--surface)] md:px-3.5">
       {showChannel ? (
         <span className="relative mt-0.5 shrink-0">
           <Avatar name={t.channel_id} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} size={32} />
@@ -27,7 +27,7 @@ function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: 
         </span>
       ) : (
         <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          <StatusDot status={reason.glyph} />
+          <StatusDot status={reason.glyph} size={10} />
         </span>
       )}
       <div className="min-w-0 flex-1">
@@ -35,7 +35,7 @@ function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: 
           <span className={`min-w-0 truncate text-[14px] group-hover:text-fg ${unread ? 'text-fg' : 'text-fg-2'}`}>{t.title || 'Untitled'}</span>
           {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-fg" aria-label="Unread" role="img" />}
           <span
-            className={`ml-auto shrink-0 pl-2 font-num text-[11px] text-fg-3 tabular-nums ${canMarkDone(t.status) ? 'md:group-focus-within/ny:opacity-0 md:group-hover/ny:opacity-0' : ''}`}
+            className={`ml-auto shrink-0 pl-2 font-num text-[12px] text-fg-3 tabular-nums ${canMarkDone(t.status) ? 'md:group-focus-within/ny:opacity-0 md:group-hover/ny:opacity-0' : ''}`}
           >
             {relTime(item.at)}
           </span>
@@ -68,12 +68,12 @@ export function NeedsYouSection({ inbox, showChannel, quiet }: { inbox: Inbox | 
   const parts = [inbox.unread && `${inbox.unread} unread`, inbox.blocked && `${inbox.blocked} blocked`].filter(Boolean).join(' · ');
   return (
     <section aria-label="Needs you" className="mt-10">
-      <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
+      <div className="mb-2 flex items-baseline justify-between gap-3 px-3 md:px-3.5">
         <h2 className="flex items-center gap-2 font-display text-[17px]">
           Needs you
-          {inbox.items.length > 0 && <span className="font-num text-[11.5px] text-fg-3 tabular-nums">{inbox.items.length}</span>}
+          {inbox.items.length > 0 && <span className="font-num text-[12px] text-fg-3 tabular-nums">{inbox.items.length}</span>}
         </h2>
-        {parts && <span className="font-num text-[11.5px] text-fg-3 tabular-nums">{parts}</span>}
+        {parts && <span className="font-num text-[12px] text-fg-3 tabular-nums">{parts}</span>}
       </div>
       {inbox.items.length ? (
         <div className="flex flex-col">

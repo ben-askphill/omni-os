@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { CHANNEL_GLYPHS, parseChannelIcon, svgDataUrl } from '@omni/shared/channel-icon.ts';
-import { Loader } from '../brand.tsx';
+import { Loader, StaticMark } from '../brand.tsx';
 import { Icon, type IconName } from './icons.tsx';
 
 // ---------- buttons ----------
@@ -120,7 +120,8 @@ export function ChannelMark({ icon, size }: { icon: string | null | undefined; s
 }
 
 /** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces the letter. */
-export function Avatar({ name, size = 28, icon, channelIcon, ink, className = '' }: { name: string; size?: number; icon?: IconName; channelIcon?: string | null; ink?: boolean; className?: string }) {
+/** `omni` draws the Conductor's mark, the same one the sidebar shows. */
+export function Avatar({ name, size = 28, icon, omni, channelIcon, ink, className = '' }: { name: string; size?: number; icon?: IconName; omni?: boolean; channelIcon?: string | null; ink?: boolean; className?: string }) {
   const mark = parseChannelIcon(channelIcon);
   return (
     <span
@@ -128,7 +129,9 @@ export function Avatar({ name, size = 28, icon, channelIcon, ink, className = ''
       className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium uppercase leading-none ${ink ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg-2'} ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.42 }}
     >
-      {icon ? (
+      {omni ? (
+        <StaticMark size={size * 0.56} title="" />
+      ) : icon ? (
         <Icon name={icon} size={size * 0.5} />
       ) : mark ? (
         <ChannelMark icon={channelIcon} size={size * { glyph: 0.5, emoji: 0.52, svg: 0.58 }[mark.kind]} />

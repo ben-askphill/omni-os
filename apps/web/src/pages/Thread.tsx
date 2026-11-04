@@ -287,7 +287,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
       {panel.open && (
         <aside className="relative shrink-0 py-2 pr-2" style={{ width: panel.width }}>
           <PanelResizeHandle width={panel.width} max={panel.max} onChange={panel.resize} onReset={panel.reset} />
-          <div className="panel-in h-full overflow-hidden rounded-[18px] border border-line bg-surface">
+          <div className="panel-in h-full overflow-hidden rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))]">
             <ThreadPanel
               thread={thread}
               files={files}

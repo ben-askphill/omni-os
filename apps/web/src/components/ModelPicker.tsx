@@ -137,7 +137,7 @@ export function ModelPicker({
           }
           setOpen(!open);
         }}
-        className="press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] font-medium text-fg transition-colors hover:bg-surface-3 disabled:opacity-45"
+        className="press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] text-fg transition-colors hover:bg-surface-3 disabled:opacity-45"
       >
         {current.h ? (
           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg text-fg">
