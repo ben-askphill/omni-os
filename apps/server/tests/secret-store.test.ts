@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fileStore, libsecretStore, pickSecretStore } from '../secret-store.ts';
+import { fileStore, keychainStore, libsecretStore, pickSecretStore } from '../secret-store.ts';
 
 describe('pickSecretStore', () => {
   it('uses the Keychain on a Mac and the file everywhere else', () => {
@@ -112,5 +112,34 @@ esac
     process.env.PATH = dir.replace(/[^/]+$/, 'nowhere');
     await expect(libsecretStore.write('global/A', 'x')).rejects.toThrow();
     expect(await libsecretStore.read('global/A')).toBeNull();
+  });
+});
+
+describe('keychainStore', () => {
+  const path = process.env.PATH;
+  let dir: string;
+  let log: string;
+
+  // A security that logs each call and fails, quoting what it read on stdin the way a verbose run would.
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'omni-security-'));
+    log = join(dir, 'calls.log');
+    writeFileSync(join(dir, 'security'), `#!/bin/sh\necho "$*" >> "${log}"\nprintf 'security: could not run: %s' "$(cat)" >&2\nexit 1\n`, { mode: 0o755 });
+    process.env.PATH = `${dir}${delimiter}${path ?? ''}`;
+  });
+  afterEach(() => {
+    process.env.PATH = path;
+  });
+
+  it('cuts the value from a failing write\'s message', async () => {
+    const err = await keychainStore.write('channel:x/STRIPE_TEST_KEY', 'dummy "quoted" value-0123456789').catch((e: Error) => e);
+    expect((err as Error).message).toContain('[value]');
+    expect((err as Error).message).not.toContain('value-0123456789');
+  });
+
+  it('refuses a value longer than security reads in one line, before running it', async () => {
+    const err = await keychainStore.write('channel:x/LONG_TOKEN', 'x'.repeat(4_000)).catch((e: Error) => e);
+    expect((err as Error).message).toBe('The value is too long for the Keychain.');
+    expect(() => readFileSync(log, 'utf8')).toThrow();
   });
 });

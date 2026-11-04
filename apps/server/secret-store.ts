@@ -22,10 +22,7 @@ export interface SecretStore {
 export const SERVICE = 'omni-os';
 const run = promisify(execFile);
 
-/**
- * Runs `cmd args`, writing `input` to its stdin so a value never shows up in `ps`. Fails on a non-zero exit or any
- * stderr, with each of `hidden` cut from the message: `security -i` echoes the command it could not run, value and all.
- */
+/** Runs `cmd args`, writing `input` to its stdin so a value never shows up in `ps`. Fails on a non-zero exit or any stderr, with each of `hidden` cut from the message. */
 function piped(cmd: string, args: string[], input: string, hidden: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'pipe'] });
@@ -35,12 +32,18 @@ function piped(cmd: string, args: string[], input: string, hidden: string[]): Pr
     child.on('close', (code) => {
       if (code === 0 && !err.trim()) return resolve();
       let message = err.trim() || `${cmd} exited ${code}`;
-      for (const h of hidden) if (h) message = message.split(h).join('[value]');
+      for (const h of [...hidden].sort((a, b) => b.length - a.length)) if (h) message = message.split(h).join('[value]');
       reject(new Error(message));
     });
     child.stdin.end(input);
   });
 }
+
+/** A value this store cannot hold. Its message names the store and never the value, so a caller can show it. */
+export class ValueTooLong extends Error {}
+
+/** The longest line `security -i` reads (MAX_LINE_LEN in Apple's SecurityTool security.c), kept a little under. */
+const SECURITY_LINE_MAX = 4000;
 
 const quote = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
@@ -54,8 +57,13 @@ export const keychainStore: SecretStore = {
       return null;
     }
   },
-  // `security -i` reads the command from stdin. The quoted form first: it holds the raw one unless the value has escapes.
-  write: (account, value) => piped('security', ['-i'], `add-generic-password -U -s ${SERVICE} -a ${quote(account)} -w ${quote(value)}\n`, [quote(value), value]),
+  // `security -i` reads the command from stdin, one line of at most SECURITY_LINE_MAX bytes. A longer line is cut: the
+  // value is saved short, and the rest runs as a command of its own whose error quotes it, past what `hidden` can cut.
+  write: (account, value) => {
+    const line = `add-generic-password -U -s ${SERVICE} -a ${quote(account)} -w ${quote(value)}\n`;
+    if (Buffer.byteLength(line) >= SECURITY_LINE_MAX) return Promise.reject(new ValueTooLong('The value is too long for the Keychain.'));
+    return piped('security', ['-i'], line, [quote(value), value]);
+  },
   async remove(account) {
     await run('security', ['delete-generic-password', '-s', SERVICE, '-a', account]).catch(() => {});
   },
