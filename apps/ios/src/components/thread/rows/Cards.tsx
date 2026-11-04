@@ -1,5 +1,7 @@
 import { cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
+import { scopeWords } from '@omni/shared/secret-request.ts';
+import { settledWords } from '@omni/shared/secret-request-words.ts';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../../ui/Text';
@@ -88,6 +90,22 @@ function MarkdownIn({ text }: { text: string }) {
 export function QuestionRow({ row }: Of<'question'>) {
   const { answer } = useRowActions();
   return <QuestionCard q={row.q} send={answer} />;
+}
+
+/** A secret the agent asked for. The phone app cannot enter it yet: it says where to. */
+export function SecretRow({ row }: Of<'secret'>) {
+  const { colors } = useOmniTheme();
+  const { ask, state } = row.r;
+  return (
+    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+      <Text style={[styles.caption, { color: colors.fg3 }]}>Secret</Text>
+      <Text style={[styles.cardTitle, { color: colors.fg }]}>{ask.label}</Text>
+      <Text style={[styles.small, { color: colors.fg3, fontFamily: MONO }]}>{`${ask.name} · ${scopeWords(ask.scope)}`}</Text>
+      <Text style={[styles.small, { color: colors.fg2 }]}>
+        {state === 'pending' ? 'Enter it in Omni on the web or the desktop app.' : settledWords(row.r)}
+      </Text>
+    </View>
+  );
 }
 
 export function OutcomeRow({ row }: Of<'outcome'>) {

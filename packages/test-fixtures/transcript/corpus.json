@@ -1686,6 +1686,143 @@
         }
       ],
       "plan": null
+    },
+    {
+      "name": "secret-request",
+      "events": [
+        {
+          "id": 1,
+          "thread_id": "t",
+          "kind": "user",
+          "payload": "{\"text\":\"Run the checkout tests\"}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 2,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"ls\",\"name\":\"Bash\",\"input\":{\"command\":\"ls\"},\"parent\":null}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 3,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"ls\",\"text\":\"ok\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 4,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"req1\",\"name\":\"mcp__omni-ask__request_secret\",\"input\":{\"name\":\"STRIPE_TEST_KEY\",\"label\":\"Stripe test secret key\",\"scope\":\"channel\",\"reason\":\"To run the checkout tests\"},\"parent\":null}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 5,
+          "thread_id": "t",
+          "kind": "secret_request",
+          "payload": "{\"id\":\"s1\",\"ask\":{\"name\":\"STRIPE_TEST_KEY\",\"label\":\"Stripe test secret key\",\"scope\":\"channel\",\"reason\":\"To run the checkout tests\"},\"exists\":true}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 6,
+          "thread_id": "t",
+          "kind": "secret_request_answer",
+          "payload": "{\"id\":\"s1\",\"state\":\"saved\",\"replaced\":true,\"via\":\"tool\"}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 7,
+          "thread_id": "t",
+          "kind": "tool_result",
+          "payload": "{\"tool_use_id\":\"req1\",\"text\":\"The user saved STRIPE_TEST_KEY as a secret for this channel.\",\"is_error\":false,\"truncated\":false}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 8,
+          "thread_id": "t",
+          "kind": "result",
+          "payload": "{\"ok\":true,\"subtype\":\"success\",\"turns\":1}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 9,
+          "thread_id": "t",
+          "kind": "user",
+          "payload": "{\"text\":\"Now the live key\"}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 10,
+          "thread_id": "t",
+          "kind": "tool_use",
+          "payload": "{\"id\":\"req2\",\"name\":\"mcp__omni-ask__request_secret\",\"input\":{\"name\":\"STRIPE_LIVE_KEY\",\"label\":\"Stripe live key\",\"scope\":\"global\",\"reason\":null},\"parent\":null}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        },
+        {
+          "id": 11,
+          "thread_id": "t",
+          "kind": "secret_request",
+          "payload": "{\"id\":\"s2\",\"ask\":{\"name\":\"STRIPE_LIVE_KEY\",\"label\":\"Stripe live key\",\"scope\":\"global\",\"reason\":null},\"exists\":false}",
+          "created_at": "2026-11-04T09:00:00.000Z"
+        }
+      ],
+      "items": [
+        {
+          "type": "user",
+          "key": 1,
+          "text": "Run the checkout tests"
+        },
+        {
+          "type": "tools",
+          "key": 2,
+          "total": 1,
+          "calls": [
+            {
+              "id": "ls",
+              "name": "Bash",
+              "parent": null,
+              "orphan": false,
+              "input": {
+                "command": "ls"
+              },
+              "summary": "ls",
+              "result": {
+                "text": "ok",
+                "is_error": false,
+                "truncated": false
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "secret",
+          "key": 5,
+          "id": "s1",
+          "state": "saved"
+        },
+        {
+          "type": "result",
+          "key": 8,
+          "ok": true,
+          "subtype": "success",
+          "turns": 1
+        },
+        {
+          "type": "user",
+          "key": 9,
+          "text": "Now the live key"
+        },
+        {
+          "type": "secret",
+          "key": 11,
+          "id": "s2",
+          "state": "pending"
+        }
+      ],
+      "plan": null
     }
   ]
 }

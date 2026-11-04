@@ -3,7 +3,7 @@ import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
 import type { Span } from '../history.ts';
 import type { HandoverP, RunName, SwitchP } from '../run-switch.ts';
-import { buildItems, buildTasks, type SwitchItem, type TranscriptEvent } from '../transcript-fold.ts';
+import { buildItems, buildTasks, isAsking, type SwitchItem, type TranscriptEvent } from '../transcript-fold.ts';
 import { projectFold } from './transcript-snapshot.ts';
 
 // One corpus for the transcript fold, which the web and iOS tests read too.
@@ -25,6 +25,7 @@ const REQUIRED = [
   'run-switch',
   'span-floor-break',
   'span-gap',
+  'secret-request',
 ];
 
 describe('transcript fold', () => {
@@ -107,6 +108,26 @@ describe('transcript fold', () => {
     it('leaves a whole result without one', () => {
       const c = callOf([use, result({ tool_use_id: 'c1', text: 'ok', is_error: false, truncated: false })]);
       expect(c.result?.output).toBeUndefined();
+    });
+  });
+
+  describe('secret requests', () => {
+    const found = () => corpus.cases.find((c) => c.name === 'secret-request')!;
+
+    it('puts the card where the secret was asked for and leaves out the tool call', () => {
+      const { items } = buildItems(found().events);
+      expect(items.map((it) => it.type)).toEqual(['user', 'tools', 'secret', 'result', 'user', 'secret']);
+      expect(items.filter((it) => it.type === 'tools').flatMap((it) => it.calls.map((c) => c.name))).toEqual(['Bash']);
+      const [saved, pending] = items.filter((it) => it.type === 'secret');
+      expect(saved.r).toMatchObject({ id: 's1', state: 'saved', replaced: true, exists: true, ask: { name: 'STRIPE_TEST_KEY', scope: 'channel' } });
+      expect(pending.r).toMatchObject({ id: 's2', state: 'pending', replaced: false, ask: { name: 'STRIPE_LIVE_KEY', scope: 'global', reason: null } });
+    });
+
+    it('asks while a request is pending and stops when the answer comes, whichever kind of ask it was', () => {
+      const events = found().events;
+      expect(isAsking(events)).toBe(true);
+      expect(isAsking(events.slice(0, 7))).toBe(false);
+      expect(isAsking(events.slice(0, 5))).toBe(true);
     });
   });
 

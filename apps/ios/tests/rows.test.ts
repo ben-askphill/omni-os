@@ -55,6 +55,7 @@ describe('threadRows covers every item the shared fold produces', () => {
         expect(of(rows, 'prompt').filter((r) => t.prompts.some((p) => r.kind === 'prompt' && r.p === p))).toHaveLength(t.prompts.length);
         for (const r of t.reports) expect(of(rows, 'report').some((x) => x.kind === 'report' && x.r === r)).toBe(true);
         for (const q of t.questions) expect(of(rows, 'question').some((x) => x.kind === 'question' && x.q === q)).toBe(true);
+        for (const r of t.secrets) expect(of(rows, 'secret').some((x) => x.kind === 'secret' && x.r === r)).toBe(true);
         if (t.error) expect(of(rows, 'error').some((x) => x.kind === 'error' && x.text === t.error)).toBe(true);
         if (t.cloud) expect(of(rows, 'cloud').some((x) => x.kind === 'cloud' && x.p === t.cloud)).toBe(true);
         if (t.prose) expect(of(rows, 'prose').some((x) => x.kind === 'prose' && x.text === t.prose)).toBe(true);
