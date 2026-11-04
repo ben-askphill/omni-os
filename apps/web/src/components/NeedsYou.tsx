@@ -40,7 +40,7 @@ function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: 
             {relTime(item.at)}
           </span>
         </div>
-        <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
+        <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] text-fg-3">
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}
           <span className="shrink-0 text-fg-2">{reason.label}</span>
           {reason.detail && <span className="min-w-0 truncate">· {reason.detail}</span>}
@@ -82,7 +82,7 @@ export function NeedsYouSection({ inbox, showChannel, quiet }: { inbox: Inbox | 
           ))}
         </div>
       ) : (
-        <p className="px-1 text-[12.5px] text-fg-4">All caught up. Finished and failed threads you have not opened show up here.</p>
+        <p className="px-3 text-[13px] text-fg-3 md:px-3.5">All caught up. Finished and failed threads you have not opened show up here.</p>
       )}
     </section>
   );

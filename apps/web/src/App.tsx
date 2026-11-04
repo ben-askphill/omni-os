@@ -112,7 +112,7 @@ function Shell() {
         <Sidebar onSearch={openPalette} />
       </SidebarPane>
 
-      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg md:rounded-[22px] md:pb-0 md:shadow-[var(--shadow-card)]">
+      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg md:rounded-[22px] md:pb-0 md:shadow-[var(--shadow-card),inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))]">
         <Page route={route} />
       </main>
 

@@ -304,7 +304,7 @@ function PlanCard({ todos, threadId }: { todos: Todo[]; threadId: string }) {
   };
 
   return (
-    <section aria-label="Plan" className="rounded-[20px] bg-surface px-4 pt-3.5 pb-3">
+    <section aria-label="Plan" className="rounded-[20px] px-4 pt-3.5 pb-3 shadow-[inset_0_0_0_1px_var(--line)]">
       <div className="mb-2.5 flex items-center gap-3">
         <span className="caption">Plan</span>
         <Ticks value={todos.length ? done / todos.length : 0} count={Math.max(1, todos.length)} height={6} tone={!active && done === todos.length ? 'muted' : undefined} className="max-w-40 flex-1" label="Plan progress" />

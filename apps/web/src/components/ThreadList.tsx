@@ -89,7 +89,7 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
           {pr && <PRMark pr={pr} />}
           <span className="ml-auto shrink-0 pl-2 font-num text-[12px] text-fg-3 tabular-nums">{relTime(t.updated_at)}</span>
         </div>
-        <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
+        <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-fg-3">
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}
           {t.branch && <span className="hidden shrink-0 rounded-full bg-surface-2 px-1.5 font-mono text-[10.5px] leading-[18px] text-fg-3 sm:inline">{t.branch}</span>}
           {!t.last_text && showsRunning(t) && <Loader size={11} className="shrink-0" />}

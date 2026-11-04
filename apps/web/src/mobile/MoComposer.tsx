@@ -157,7 +157,7 @@ export function MoComposer({
               type="button"
               onClick={c.onClick}
               disabled={c.disabled}
-              className="mo-press inline-flex h-9 shrink-0 items-center gap-[7px] rounded-full bg-surface-2 px-3.5 text-[13.5px] leading-none font-medium text-fg disabled:opacity-50"
+              className="mo-press inline-flex h-9 shrink-0 items-center gap-[7px] rounded-full px-3.5 text-[13.5px] leading-none text-fg-2 shadow-[inset_0_0_0_1px_var(--line-strong)] disabled:opacity-50"
             >
               {c.icon && <Icon name={c.icon} size={15} />}
               {c.label}

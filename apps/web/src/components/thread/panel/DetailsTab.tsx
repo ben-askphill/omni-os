@@ -71,7 +71,7 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[6.5rem_1fr] gap-2 px-3.5 py-2 text-[12.5px]">
       <dt className="pt-px text-fg-3">{k}</dt>
-      <dd className="min-w-0 break-words text-fg">{children}</dd>
+      <dd className="min-w-0 text-fg [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
