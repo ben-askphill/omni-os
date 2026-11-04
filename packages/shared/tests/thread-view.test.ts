@@ -67,6 +67,25 @@ describe('threadView', () => {
     expect(nowDoing({ name: 'mcp__shopify__run_query', input: { query: '{ shop { name } }' } }).verb).toBe('Using shopify · run_query');
   });
 
+  it('lists the secrets a turn asked for, counts no step for the request and is not busy while one waits', () => {
+    const ask = { name: 'STRIPE_TEST_KEY', label: 'Stripe test secret key', scope: 'channel', reason: null };
+    const asked = [
+      user('Run the checkout tests', 0),
+      tool('req', 'mcp__omni-ask__request_secret', ask, 1),
+      ev('secret_request', { id: 's1', ask, exists: false }, 1),
+    ];
+    const waiting = threadView({ events: asked, thread: thread('running'), artifacts: [], children: [] });
+    expect(waiting.turns[0].secrets.map((r) => [r.id, r.state])).toEqual([['s1', 'pending']]);
+    expect(waiting.turns[0].steps).toBe(0);
+    expect(waiting.asking).toBe(true);
+    expect(waiting.now).toBeNull();
+
+    const saved = threadView({ events: [...asked, ev('secret_request_answer', { id: 's1', state: 'saved', replaced: false, via: 'tool' }, 2)], thread: thread('running'), artifacts: [], children: [] });
+    expect(saved.turns[0].secrets.map((r) => r.state)).toEqual(['saved']);
+    expect(saved.asking).toBe(false);
+    expect(saved.now).toEqual({ verb: 'Thinking', target: '' });
+  });
+
   it('marks how a turn ended: stopped, failed, or an earlier turn that never finished', () => {
     const stopped = threadView({ events: [user('a', 0), result(1, { ok: false, stopped: true })], thread: thread('stopped'), artifacts: [], children: [] });
     expect(stopped.turns[0].status).toBe('stopped');
