@@ -167,6 +167,16 @@ describe('entering it', () => {
     expect(leaks(NEW)).toEqual([]);
   });
 
+  it('lets one of two submits at once write the value, and refuses the other', T, async () => {
+    const id = await busy();
+    const rid = await ask(id, named('POSTMARK_TOKEN'));
+    const values = ['first-dummy-value-1111', 'second-dummy-value-2222'];
+    const [a, b] = await Promise.all(values.map((value) => submit(id, rid, { value })));
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    expect(store()['channel:scratch/POSTMARK_TOKEN']).toBe(values[a.status === 200 ? 0 : 1]);
+    expect(answerEvents(id)).toHaveLength(1);
+  });
+
   it('cancels: the waiting call hears it at once, nothing is stored, and the request is closed', T, async () => {
     const id = await busy();
     const rid = await ask(id, named('NOTION_TOKEN'));

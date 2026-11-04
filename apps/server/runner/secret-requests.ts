@@ -97,6 +97,9 @@ export async function awaitSecret(threadId: string, id: string, waitSec: number,
 
 export type Submitted = { state: 'saved'; replaced: boolean; via: Via } | { conflict: SecretRequestState } | { exists: true };
 
+/** Requests whose value is being written now, so a second submit from another window cannot write over the first. */
+const saving = new Set<string>();
+
 /**
  * Ben entered the value. It goes to the secret store, and only there: not into the event, the message that goes on,
  * a log or an error. A secret of that name already in the scope is kept unless `replace` says to overwrite it. The
@@ -108,6 +111,7 @@ export type Submitted = { state: 'saved'; replaced: boolean; via: Via } | { conf
 export async function submitSecret(threadId: string, id: string, value: string, replace: boolean): Promise<Submitted> {
   const r = find(threadId, id);
   if (r.state !== 'pending') return { conflict: r.state };
+  if (saving.has(id)) throw refusal('This secret is being saved from another window.', 409);
   const thread = threads.get(threadId)!;
   const owner = ownedElsewhere(thread);
   if (owner) {
@@ -118,15 +122,18 @@ export async function submitSecret(threadId: string, id: string, value: string, 
   const scope = secretScopeKey(r.ask.scope, thread.channel_id);
   const exists = hasSecret(scope, r.ask.name);
   if (exists && !replace) return { exists: true };
+  saving.add(id);
   try {
     await setSecret(scope, r.ask.name, value);
   } catch (err) {
+    saving.delete(id);
     // The store's own message, with the value cut from it (secret-store.ts piped). Never the value, never the body.
     console.error(`[secrets] the secret store refused ${r.ask.name}: ${(err as Error).message}`);
     throw refusal('Omni could not write the secret to its store. Check the server log.', 500);
   }
   const via: Via = waitedOn(threadId, id) ? 'tool' : 'message';
   addEvent(threadId, SECRET_ANSWER_EVENT, { id, state: 'saved', replaced: exists, via } satisfies SecretAnswerPayload);
+  saving.delete(id);
   unpolled(id);
   const live = lives.get(threadId);
   if (live) staleEnv(live);
