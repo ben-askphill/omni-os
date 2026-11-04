@@ -3,6 +3,7 @@ import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } 
 import { Attachments, SwitchLine } from '../components/Transcript.tsx';
 import { PRWakeList } from '../components/thread/PRWatch.tsx';
 import { QuestionCard } from '../components/thread/QuestionCard.tsx';
+import { SecretRequestCard } from '../components/thread/SecretRequestCard.tsx';
 import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
 import { ClippedNote } from '../components/thread/HistoryEdgeRow.tsx';
 import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
@@ -146,6 +147,9 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
     ))}
     {t.questions.map((q) => (
       <QuestionCard key={q.id} threadId={thread.id} q={q} touch />
+    ))}
+    {t.secrets.map((r) => (
+      <SecretRequestCard key={r.id} threadId={thread.id} r={r} touch />
     ))}
     <TurnBody t={t} last={last} c={c} />
     {t.switches.map((it) => (
