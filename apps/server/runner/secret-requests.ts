@@ -1,7 +1,6 @@
 // Secrets an agent asks Ben for with request_secret (apps/mcp/ask.ts): asked, waited on, saved, cancelled or dismissed
-// (packages/shared/secret-request.ts). The value goes from the card to the secret store and nowhere else: nothing
-// here keeps it, logs it or puts it in an event. A saved secret reaches the agent in its next process, since a harness
-// reads its env once at spawn (runner/spawn.ts secretsEnv): the live process is marked env-stale (session.ts staleEnv)
+// (packages/shared/secret-request.ts). A saved secret reaches the agent in its next process, since a harness reads
+// its env once at spawn (runner/spawn.ts secretsEnv): the live process is marked env-stale (session.ts staleEnv)
 // and a queued message starts that turn. Which calls still wait, and how an outcome reaches the agent, is waiters.ts.
 import { randomUUID } from 'node:crypto';
 import {
@@ -26,6 +25,7 @@ import type { HarnessId } from '../harness/types.ts';
 import { ownedElsewhere } from '../ownership.ts';
 import { notifyNeedsInput } from '../push-sender.ts';
 import { hasSecret, secretReachesThread, setSecret } from '../secrets.ts';
+import { ValueTooLong } from '../secret-store.ts';
 import { machineName } from '../sync/guard.ts';
 import { staleEnv } from './session.ts';
 import { addEvent, cliLabel, lives, refusal } from './state.ts';
@@ -100,19 +100,13 @@ export type Submitted = { state: 'saved'; replaced: boolean; via: Via } | { conf
 /** Requests whose value is being written now, so a second submit from another window cannot write over the first. */
 const saving = new Set<string>();
 
-/**
- * Ben entered the value. It goes to the secret store, and only there: not into the event, the message that goes on,
- * a log or an error. A secret of that name already in the scope is kept unless `replace` says to overwrite it. The
- * thread must be this machine's: a value never leaves the machine that saves it, so one owned by the other Mac is
- * refused with its name. Then the waiting call returns `saved`, which tells the agent to end its turn, and a queued
- * message starts the next one in a fresh process whose env has the secret (session.ts staleEnv, records.ts onResult).
- * With no call waiting, the queued message alone carries it.
- */
+/** Ben entered the value, for the secret store. A secret of that name already in the scope is kept unless `replace` says to overwrite it. */
 export async function submitSecret(threadId: string, id: string, value: string, replace: boolean): Promise<Submitted> {
   const r = find(threadId, id);
   if (r.state !== 'pending') return { conflict: r.state };
   if (saving.has(id)) throw refusal('This secret is being saved from another window.', 409);
   const thread = threads.get(threadId)!;
+  // Values never sync, so one saved here would never reach the machine that runs the thread.
   const owner = ownedElsewhere(thread);
   if (owner) {
     throw refusal(`This thread is on ${machineName(owner.machine)}. Enter the secret there, or take the thread over first: a value never leaves the machine that saves it.`, 409);
@@ -127,7 +121,7 @@ export async function submitSecret(threadId: string, id: string, value: string, 
     await setSecret(scope, r.ask.name, value);
   } catch (err) {
     saving.delete(id);
-    // The store's own message, with the value cut from it (secret-store.ts piped). Never the value, never the body.
+    if (err instanceof ValueTooLong) throw refusal(err.message, 400);
     console.error(`[secrets] the secret store refused ${r.ask.name}: ${(err as Error).message}`);
     throw refusal('Omni could not write the secret to its store. Check the server log.', 500);
   }
