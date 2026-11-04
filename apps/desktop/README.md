@@ -15,6 +15,7 @@ An Electron window on the Web UI that runs the Omni server itself ([ADR 0010](..
 | `scripts/stage.ts`, `scripts/dist.ts`, `electron-builder.config.cjs` | Stage the server bundle and package the app |
 | `scripts/qa.ts` | The QA harness |
 | `scripts/update-check.ts` | The self-update, end to end on Linux: every way of quitting with an update downloaded |
+| `scripts/version.ts`, `RELEASE.md` | The version bump the release workflow (`.github/workflows/desktop-release.yml`) runs, and how to release |
 
 ## The bridge
 
@@ -122,7 +123,7 @@ npx tsx scripts/dist.ts --platform mac --arch arm64      # or x64, universal; --
 npx tsx scripts/dist.ts --platform linux --arch x64      # the AppImage
 ```
 
-`dist.ts` builds `dist/`, stages `build/omni` with `stage.ts` (the server and MCP bundles, `apps/web/dist`, `crew/`, `automations/`, `mods/`, `prototypes/activity-monitor/`, a `package.json` and a `node_modules` with only the bundle's external packages for that target), then runs electron-builder with `electron-builder.config.cjs`. Artifacts land in `release/` as `Omni-<version>-<os>-<arch>.<ext>`. It never publishes. A Mac build signs with the keychain's Developer ID identity when there is one, and notarizes only when Apple's credentials are in the environment.
+`dist.ts` builds `dist/`, stages `build/omni` with `stage.ts` (the server and MCP bundles, `apps/web/dist`, `crew/`, `automations/`, `mods/`, `prototypes/activity-monitor/`, a `package.json` and a `node_modules` with only the bundle's external packages for that target), then runs electron-builder with `electron-builder.config.cjs`. Artifacts land in `release/` as `Omni-<version>-<os>-<arch>.<ext>`. It uploads them only with `--publish`, which only the release workflow passes ([RELEASE.md](RELEASE.md)). A Mac build signs with the keychain's Developer ID identity when there is one, and notarizes only when Apple's credentials are in the environment.
 
 A Linux build ships `node-pty`'s compiled addon, which must load on glibc 2.28. When the checkout's own build needs a newer glibc (most current distros), `stage.ts` compiles it again in docker's `node:24-bullseye` image, so it needs a working docker, and stops with an error without one. `--host-glibc` skips that and ships this machine's build, which only runs on a glibc as new as this one: fine for a local test, not for a release.
 

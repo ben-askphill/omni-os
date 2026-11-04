@@ -8,7 +8,9 @@ Run it one of two ways: the desktop app, or the server from a checkout with `npm
 
 The desktop app (`apps/desktop`, [ADR 0010](../adr/0010-desktop-app-is-electron.md)) is the Web UI in a window of its own, with the Omni server inside: no repo checkout or Node to install. You still need Claude Code signed in, and `gh` for the GitHub panel ([What you need](#what-you-need)).
 
-- **Mac:** open the DMG and drag Omni to Applications. Take `arm64` for Apple silicon, `x64` for an Intel Mac, or `universal` for either. macOS blocks a build that is not notarized the first time it opens; allow it under **System Settings > Privacy & Security > Open Anyway**.
+Download it from the [latest release](https://github.com/ben-askphill/omni-os/releases/latest). It updates itself from there ([Updating](#updating)).
+
+- **Mac:** open `Omni-<version>-mac-universal.dmg` and drag Omni to Applications. It runs on Apple silicon and Intel, and is signed and notarized, so it opens without a warning. Run it from Applications: from the disk image it cannot update itself.
 - **Linux:** make the AppImage executable and run it: `chmod +x Omni-*.AppImage && ./Omni-*.AppImage`. It adds no launcher entry by itself.
 - **Build it yourself** from a checkout: `cd apps/desktop && npx tsx scripts/dist.ts --platform mac --arch arm64` (or `x64`, `universal`; `--platform linux --arch x64` for the AppImage). The build lands in `apps/desktop/release/`. A Linux build needs a working docker unless this machine's glibc is 2.28 or older, or you pass `--host-glibc` for a build that only runs here. On a Mac, `npm run build:desktop` (`scripts/build-desktop.sh`) builds for this Mac, installs to `~/Applications/Omni.app` and opens it. [apps/desktop/README.md](../../apps/desktop/README.md) has the details.
 

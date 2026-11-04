@@ -32,7 +32,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Glossary](../CONTEXT.md)
 - [Native app pairing contract](internals/app-pairing.md): session pairing, capabilities, and push token registration
 - [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md)
-- [Desktop app](../apps/desktop/README.md): develop against a QA stack, the QA harness (`scripts/qa.ts`), packaging, where data and logs live, and the bridge contract
+- [Desktop app](../apps/desktop/README.md): develop against a QA stack, the QA harness (`scripts/qa.ts`), packaging, where data and logs live, and the bridge contract · [Desktop release](../apps/desktop/RELEASE.md): signing, notarization and the release workflow
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)
 - Reviews: [2026-10-31 consolidation release, the KPIs re-measured](reviews/2026-10-31-consolidation-review.md) · [2026-10-22 bloat and dead code](reviews/2026-10-22-thermo-bloat-review.html) · [2026-10-16 thermo](reviews/2026-10-16-thermo-review.html)

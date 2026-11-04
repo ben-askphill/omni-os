@@ -86,7 +86,8 @@ module.exports = {
   },
   // The static AppImage runtime, so a host with only FUSE 3 runs it without libfuse2.
   toolsets: { appimage: '1.0.3' },
-  // Writes app-update.yml into the app, which is what turns its updater on (src/updates.ts). dist.ts never publishes.
+  // Writes app-update.yml into the app, which is what turns its updater on (src/updates.ts). dist.ts uploads only with
+// --publish, which only the release workflow passes (RELEASE.md).
   // OMNI_UPDATE_URL points a build at a plain HTTP folder instead, to try an update end to end against a local one.
   publish: env.OMNI_UPDATE_URL
     ? [{ provider: 'generic', url: env.OMNI_UPDATE_URL }]

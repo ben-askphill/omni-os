@@ -231,10 +231,11 @@ describe('the command lines', () => {
     expect(parseStageArgs(['--platform', 'win'], { platform: 'linux', arch: 'x64' })).toHaveProperty('error');
   });
 
-  it('hands electron-builder the same arch, and never publishes', () => {
+  it('hands electron-builder the same arch, and publishes only when asked', () => {
     const args = builderArgs({ platform: 'darwin', arch: 'universal', dir: true });
     expect(args).toEqual(expect.arrayContaining(['--mac', '--universal', '--dir']));
     expect(args.slice(-2)).toEqual(['--publish', 'never']);
     expect(builderArgs({ platform: 'linux', arch: 'x64', dir: false })).not.toContain('--dir');
+    expect(builderArgs({ platform: 'linux', arch: 'x64', dir: false, publish: true }).slice(-2)).toEqual(['--publish', 'always']);
   });
 });

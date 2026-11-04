@@ -1,0 +1,165 @@
+# Releases the desktop app: bumps apps/desktop's version on main, tags v<version>, builds the signed and notarized
+# universal Mac app and the Linux AppImage, uploads both with their update feeds to a draft GitHub release, and
+# publishes it once every build is up. Installed apps update from the latest published release (src/updates.ts).
+# Run it from the Actions tab or `gh workflow run desktop-release.yml -f bump=minor`. See apps/desktop/RELEASE.md.
+name: Desktop release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: patch, minor, major, or an exact version such as 0.2.0
+        required: true
+        default: patch
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Version and draft release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          version="$(node apps/desktop/scripts/version.ts "$BUMP")"
+          tag="v$version"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag already exists. Release a higher version."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Commit and tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --quiet; then
+            git commit -am "Release the desktop app $VERSION"
+          fi
+          git tag -a "$TAG" -m "Omni $VERSION"
+          git push --atomic origin HEAD:main "$TAG"
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release create "$TAG" --draft --verify-tag --generate-notes --title "Omni $VERSION"
+
+  mac:
+    name: Mac (universal, signed and notarized)
+    needs: prepare
+    runs-on: macos-15
+    env:
+      CSC_LINK: ${{ secrets.MAC_CERTIFICATE_P12 }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - name: Check the signing secrets
+        run: |
+          missing=()
+          [[ -n "$CSC_LINK" ]] || missing+=(MAC_CERTIFICATE_P12)
+          [[ -n "$CSC_KEY_PASSWORD" ]] || missing+=(MAC_CERTIFICATE_PASSWORD)
+          if [[ -z "$APPLE_API_KEY_P8$APPLE_ID" ]]; then
+            missing+=("APPLE_API_KEY_P8, APPLE_API_KEY_ID and APPLE_API_ISSUER (or APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID)")
+          elif [[ -n "$APPLE_API_KEY_P8" ]]; then
+            [[ -n "$APPLE_API_KEY_ID" ]] || missing+=(APPLE_API_KEY_ID)
+            [[ -n "$APPLE_API_ISSUER" ]] || missing+=(APPLE_API_ISSUER)
+          else
+            [[ -n "$APPLE_APP_SPECIFIC_PASSWORD" ]] || missing+=(APPLE_APP_SPECIFIC_PASSWORD)
+            [[ -n "$APPLE_TEAM_ID" ]] || missing+=(APPLE_TEAM_ID)
+          fi
+          if ((${#missing[@]})); then
+            printf '::error::Missing repository secret: %s\n' "${missing[@]}"
+            echo "Run scripts/desktop-release-secrets.sh on the Mac that holds the Developer ID (apps/desktop/RELEASE.md)."
+            exit 1
+          fi
+      - name: Write the notarization key
+        if: env.APPLE_API_KEY_P8 != ''
+        run: |
+          key="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+          printf '%s\n' "$APPLE_API_KEY_P8" > "$key"
+          echo "APPLE_API_KEY=$key" >> "$GITHUB_ENV"
+          # With the key in place, the Apple ID set stays out of electron-builder's way.
+          echo "APPLE_ID=" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --include=dev
+      - name: Build, sign, notarize and upload
+        working-directory: apps/desktop
+        run: npx tsx scripts/dist.ts --platform mac --arch universal --publish
+      - name: Check the signature and notarization
+        working-directory: apps/desktop/release
+        run: |
+          app=mac-universal/Omni.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -q 'Authority=Developer ID Application' || { echo '::error::Omni.app is not signed with a Developer ID'; exit 1; }
+          spctl --assess --type execute --verbose=2 "$app"
+          xcrun stapler validate "$app"
+
+  linux:
+    name: Linux (AppImage)
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --include=dev
+      # stage.ts compiles node-pty for glibc 2.28 in docker, which the runner has.
+      - name: Build and upload
+        working-directory: apps/desktop
+        run: npx tsx scripts/dist.ts --platform linux --arch x64 --publish
+
+  publish:
+    name: Publish the release
+    needs: [prepare, mac, linux]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - name: Check the update feeds are attached
+        run: |
+          assets="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          echo "$assets"
+          for want in latest-mac.yml latest-linux.yml '\.dmg$' '-mac-universal\.zip$' '\.AppImage$'; do
+            grep -Eq -- "$want" <<<"$assets" || { echo "::error::The release has no asset matching $want"; exit 1; }
+          done
+      - run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false --latest
