@@ -374,6 +374,8 @@ describe("the preview's sections", () => {
     expect(sizeLine({ chars: 24_000, budget: 24_000 })).toBe('24k of 24k characters');
     expect(workspaceText({ workspace: 'worktree' })).toMatch(/new branch and worktree/);
     expect(workspaceText({ workspace: 'folder' })).toMatch(/channel's folder/);
+    expect(workspaceText({ workspace: 'branch' })).toMatch(/not on this machine.*its branch's last commit/);
+    expect(workspaceText({ workspace: 'fresh' })).toMatch(/branch is not here or on origin.*channel's folder/);
   });
 });
 

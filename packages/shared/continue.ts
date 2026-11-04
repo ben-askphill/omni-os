@@ -118,8 +118,12 @@ export interface Carryover {
 export interface ContinuePreview {
   carryover: Carryover;
   revision: string;
-  /** `worktree`: a new worktree and branch from a snapshot of the source. `folder`: the channel's folder, as any new thread. */
-  workspace: 'worktree' | 'folder';
+  /**
+   * `worktree`: a new worktree and branch from a snapshot of the source. `branch`: the source's worktree is not on this
+   * machine, so a new worktree and branch from the last commit of its branch. `fresh`: neither its worktree nor its
+   * branch is here or on origin, so the channel's folder, as any new thread. `folder`: the channel's folder, as any new thread.
+   */
+  workspace: 'worktree' | 'branch' | 'fresh' | 'folder';
   blocked: ContinueBlock | null;
 }
 

@@ -352,8 +352,14 @@ export function attachmentsSummary(c: Pick<Carryover, 'attachments'>): string {
 
 export const sizeLine = carryoverSize;
 
-export const workspaceText = (p: Pick<ContinuePreview, 'workspace'>) =>
-  p.workspace === 'worktree' ? "Starts on a new branch and worktree, from this thread's files as they are now." : "Starts in the channel's folder, as any new thread does.";
+const WORKSPACE_TEXT: Record<ContinuePreview['workspace'], string> = {
+  worktree: "Starts on a new branch and worktree, from this thread's files as they are now.",
+  branch: "This thread's worktree is not on this machine, so it starts on a new branch from its branch's last commit. Changes it never committed stay behind.",
+  fresh: "This thread's worktree is not on this machine, and its branch is not here or on origin, so it starts in the channel's folder, as any new thread does.",
+  folder: "Starts in the channel's folder, as any new thread does.",
+};
+
+export const workspaceText = (p: Pick<ContinuePreview, 'workspace'>) => WORKSPACE_TEXT[p.workspace] ?? WORKSPACE_TEXT.folder;
 
 // ---------- links ----------
 

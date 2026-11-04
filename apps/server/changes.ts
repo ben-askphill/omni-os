@@ -66,7 +66,7 @@ export async function changesCheckout(t: Thread): Promise<{ dir: string } | { re
 }
 
 /** The branch a new branch in this repo would come from: origin's default, else main or master, local or on origin. */
-async function defaultBranch(dir: string): Promise<string | null> {
+export async function defaultBranch(dir: string): Promise<string | null> {
   const originHead = await gitOr(dir, ['rev-parse', '--abbrev-ref', 'origin/HEAD']);
   const candidates = [originHead && originHead !== 'origin/HEAD' ? originHead : null, 'origin/main', 'origin/master', 'main', 'master'];
   for (const ref of candidates) if (ref && (await gitOr(dir, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]))) return ref;

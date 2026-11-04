@@ -397,6 +397,35 @@ describe('the snapshot', () => {
     expect(H.spawns(made)).toEqual([]);
   }, 20_000);
 
+  it("forks from the source's branch when its worktree is not on this machine, and starts fresh once the branch is gone too", async () => {
+    const { dir, src } = await dirtySource();
+    git(dir, 'worktree', 'remove', '--force', src.cwd);
+    const p = await preview(src.id, codex);
+    expect(p.body).toMatchObject({ workspace: 'branch', blocked: null });
+    expect(p.body.carryover.constraints).toContainEqual(expect.stringContaining(`last commit of the source's branch ${src.branch}`));
+    const res = await call('POST', `/threads/${src.id}/continue`, { ...codex, text: 'carry on', request_id: randomUUID(), revision: p.body.revision });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const id = res.body.thread.id;
+    await H.untilResults(id, 1);
+    expect(files(H.thread(id).cwd), 'the branch as committed, without the lost uncommitted changes').toEqual({
+      '.gitignore': '.env\n',
+      'a.txt': 'a.txt as committed\n',
+      'b.txt': 'b.txt as committed\n',
+      'del.txt': 'del.txt as committed\n',
+      'committed.txt': 'committed on the branch\n',
+    });
+    expect(existsSync(src.cwd), 'the source worktree is not made again').toBe(false);
+
+    git(dir, 'branch', '-D', src.branch!);
+    const gone = await preview(src.id, codex);
+    expect(gone.body).toMatchObject({ workspace: 'fresh', blocked: null });
+    expect(gone.body.carryover.constraints).toContainEqual(expect.stringContaining(`branch ${src.branch}, which is not on this machine`));
+    const fresh = await call('POST', `/threads/${src.id}/continue`, { ...codex, text: 'carry on', request_id: randomUUID(), revision: gone.body.revision });
+    expect(fresh.status, JSON.stringify(fresh.body)).toBe(200);
+    await H.untilResults(fresh.body.thread.id, 1);
+    expect(files(H.thread(fresh.body.thread.id).cwd)).not.toHaveProperty('committed.txt');
+  }, 30_000);
+
   it('gives a source in the shared checkout its own worktree at HEAD, and lists its uncommitted changes instead', async () => {
     const { dir, channel } = repoChannel(true);
     const src = await H.runner.createThread({ channel, prompt: 'start' });

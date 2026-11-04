@@ -53,9 +53,15 @@ export interface CarryoverInput {
   /**
    * Where the continued thread works. `snapshot`: its own worktree, from the source's own worktree with its
    * uncommitted changes. `head`: its own worktree at the HEAD of the shared checkout the source ran in. `folder`: the
-   * folder the source worked in. `paths` is the source's checkout as stored and resolved, which read as `.`.
+   * folder the source worked in. `branch`: its own worktree at the last commit of the source's branch, whose worktree is
+   * not on this machine. `gone`: a fresh checkout, since neither that worktree nor its branch is here. `paths` is the
+   * source's checkout as stored and resolved, which read as `.`.
    */
-  workspace: { kind: 'snapshot'; paths: string[] } | { kind: 'head'; paths: string[] } | { kind: 'folder'; cwd: string };
+  workspace:
+    | { kind: 'snapshot' | 'head'; paths: string[] }
+    | { kind: 'branch'; branch: string; paths: string[] }
+    | { kind: 'gone'; branch: string }
+    | { kind: 'folder'; cwd: string };
   /** Repo work: every file that differs from `base` (or `head`); the Carryover lists the first ones. */
   files: { base: string | null; head: string; tree: string; changed: CarryoverFile[] } | null;
   /** Untracked files the snapshot left out: binary, too large, or past its limit. */
@@ -88,10 +94,26 @@ const neutral = (s: string) => s.replace(/<(\/?)omni-(carryover|handover)/gi, 'â
 
 /** Every string the Carryover takes from the transcript or the checkout goes through this. */
 function cleaner(i: CarryoverInput) {
-  const paths = i.workspace.kind === 'folder' ? [] : [...new Set(i.workspace.paths.filter(Boolean))].sort((a, b) => b.length - a.length);
+  const paths = !('paths' in i.workspace) ? [] : [...new Set(i.workspace.paths.filter(Boolean))].sort((a, b) => b.length - a.length);
   const uploads = [...new Set((i.uploads ?? []).filter(Boolean))].sort((a, b) => b.length - a.length);
   const unreadable = (s: string) => uploads.reduce((t, p) => t.split(p).join(SOURCE_UPLOADS), s);
   return (s: string) => neutral(paths.reduce((t, p) => t.split(p).join('.'), unreadable(s)));
+}
+
+/** The Carryover's Workspace constraint: where the continued thread works, and what of the source it has there. */
+function workspaceLine(ws: CarryoverInput['workspace'], head: string): string {
+  switch (ws.kind) {
+    case 'snapshot':
+      return `Workspace: your own worktree, on a new branch at the source's HEAD (${head}), with its uncommitted changes laid in, still uncommitted.`;
+    case 'head':
+      return `Workspace: your own worktree, on a new branch at the source's HEAD (${head}). The source ran in the channel's shared checkout, so its uncommitted changes were not carried.`;
+    case 'branch':
+      return `Workspace: your own worktree, on a new branch at the last commit of the source's branch ${ws.branch} (${head}). The source's worktree is not on this machine, so changes it never committed were not carried.`;
+    case 'gone':
+      return `Workspace: a fresh checkout, as any new thread in this channel gets. The source worked on branch ${ws.branch}, which is not on this machine or its origin, so its files were not carried. If it was merged, its commits are on the default branch.`;
+    case 'folder':
+      return `Workspace: the folder the source worked in, ${ws.cwd}.`;
+  }
 }
 
 /** An earlier Carryover as one history entry: in a handover after a later switch, and in a Carryover of this thread. */
@@ -189,12 +211,8 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
   const constraints = [
     `Channel: #${i.source.channel}`,
     ...(i.role ? [`Crew role: ${i.role}`] : []),
-    ws.kind === 'snapshot'
-      ? `Workspace: your own worktree, on a new branch at the source's HEAD (${head}), with its uncommitted changes laid in, still uncommitted.`
-      : ws.kind === 'head'
-        ? `Workspace: your own worktree, on a new branch at the source's HEAD (${head}). The source ran in the channel's shared checkout, so its uncommitted changes were not carried.`
-        : `Workspace: the folder the source worked in, ${ws.cwd}.`,
-    ...(ws.kind === 'folder'
+    workspaceLine(ws, head),
+    ...(!('paths' in ws)
       ? []
       : ["Paths from the source's checkout are shown relative to its root. Your working directory is your own checkout of the same repo; never write to the source thread's checkout."]),
     ...(todos.length ? [`Open todos: ${listed(todos.map((t) => `${clean(cut(t.content!, CONDENSED_MAX))} (${t.status ?? 'pending'})`), '; ')}`] : []),
