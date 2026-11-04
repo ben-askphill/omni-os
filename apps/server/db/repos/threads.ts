@@ -174,6 +174,17 @@ export const threads = {
          SELECT ${THREAD_COLUMNS} FROM threads WHERE id IN (SELECT id FROM under) AND id != ? ORDER BY created_at, rowid`,
       )
       .all(id, id) as unknown as Thread[],
+  /** The ids of the threads above this one in its delegation chain, without itself. UNION drops a cycle. */
+  ancestors: (id: string) =>
+    (
+      db
+        .prepare(
+          `WITH RECURSIVE up(id) AS (SELECT parent_id FROM threads WHERE id = ? AND parent_id IS NOT NULL
+             UNION SELECT t.parent_id FROM threads t JOIN up ON t.id = up.id WHERE t.parent_id IS NOT NULL)
+           SELECT id FROM up WHERE id != ?`,
+        )
+        .all(id, id) as { id: string }[]
+    ).map((r) => r.id),
   /**
    * The top of this thread's delegation chain: the thread Ben delegated from, where its crew's questions wait on him.
    * Itself when nothing delegated it, and the highest one here when an ancestor has not synced to this Mac.

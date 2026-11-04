@@ -113,6 +113,11 @@ export interface ThreadDetail {
   channel: Channel | undefined;
   events: EventRow[];
   artifacts: Artifact[];
+  /**
+   * The newest files and screenshots of the threads it delegated to, at any depth (packages/shared/crew-artifacts.ts).
+   * Older servers leave it out.
+   */
+  crew_artifacts?: ArtifactWithThread[];
   children: Thread[];
   /** Members of the teams among `children`. Older servers leave it out. */
   team?: Thread[];
@@ -666,6 +671,8 @@ export function openSSE(
 export type StreamMessage =
   | { type: 'event'; event: EventRow }
   | { type: 'artifact'; artifact: Artifact }
+  /** A new or changed file or screenshot of a thread this one delegated to, at any depth. */
+  | { type: 'crew_artifact'; artifact: ArtifactWithThread }
   | { type: 'thread'; thread: Thread; pending?: PendingMsg[]; opening?: Opening | null; live?: boolean; blocked?: string; handoff?: HandoffView | null; takeover?: Takeover }
   /**
    * Sent once per connect, after any replayed rows (#224): the detail as GET /threads/:id has it now. `snapshot`: the
@@ -682,6 +689,7 @@ export function classifyStream(d: unknown): StreamMessage | null {
   if (o.kind === 'sync' && o.thread)
     return { type: 'sync', detail: { ...o, events: Array.isArray(o.events) ? o.events : [] } as unknown as ThreadOpen, snapshot: o.catch_up === 'snapshot' && !!o.history };
   if (o.kind === 'artifact' && o.artifact) return { type: 'artifact', artifact: o.artifact as Artifact };
+  if (o.kind === 'crew_artifact' && o.artifact) return { type: 'crew_artifact', artifact: o.artifact as ArtifactWithThread };
   if (o.kind === 'thread' && o.thread)
     return {
       type: 'thread', thread: o.thread as Thread, pending: o.pending as PendingMsg[] | undefined,

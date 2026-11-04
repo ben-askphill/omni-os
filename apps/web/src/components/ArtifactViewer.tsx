@@ -6,6 +6,7 @@ import { useImageZoom, ZoomableImage, ZoomControls, type ImageZoom } from './Ima
 import { Markdown } from './Markdown.tsx';
 import { PublishedActions } from './Published.tsx';
 import { ErrorNote, Icon, IconButton, IconLink, Loading, Modal, type IconName } from './ui.tsx';
+import { href } from '../router.ts';
 
 export const kindIcon = (kind: string): IconName =>
   kind === 'image' || kind === 'screenshot' ? 'image' : kind === 'html' || kind === 'svg' ? 'globe' : 'file';
@@ -122,7 +123,8 @@ export function ArtifactActions({ a, onExpand }: { a: Artifact; onExpand?: () =>
 }
 
 /** Header + body, with a full-screen mode. */
-export function ArtifactViewer({ a }: { a: Artifact }) {
+/** `from`: the delegated thread that made it, when a parent thread shows it, linked from its header. */
+export function ArtifactViewer({ a, from }: { a: Artifact; from?: { id: string; title: string } }) {
   const [full, setFull] = useState(false);
   const zoom = useImageZoom(artifactUrl(a));
   const fullZoom = useImageZoom(artifactUrl(a));
@@ -134,8 +136,16 @@ export function ArtifactViewer({ a }: { a: Artifact }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-[11.5px] font-medium">{a.name}</div>
-          <div className="font-num text-[11px] text-fg-4">
+          <div className="truncate font-num text-[11px] text-fg-4">
             {a.kind} · {bytes(a.size)} · {a.url ? 'published' : 'updated'} {relTime(a.updated_at)}
+            {from && (
+              <>
+                {' · from '}
+                <a href={href.thread(from.id)} title={`Open thread: ${from.title}`} className="font-sans text-fg-3 underline decoration-line underline-offset-2 hover:text-fg">
+                  {from.title || 'Untitled'}
+                </a>
+              </>
+            )}
           </div>
         </div>
         {isImage(a) && <ZoomControls z={zoom} />}

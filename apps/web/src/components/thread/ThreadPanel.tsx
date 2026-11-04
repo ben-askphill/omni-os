@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, type ComponentProps } from 'react';
-import type { Artifact, Thread } from '../../api.ts';
+import type { Artifact, ArtifactWithThread, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { plural } from '../../format.ts';
 import { crewLine, prLine } from '@omni/shared/thread-glance.ts';
@@ -30,6 +30,7 @@ export function ThreadPanel({
   thread,
   files,
   shots,
+  crewArtifacts,
   selectedArtifact,
   onSelect,
   tab,
@@ -41,6 +42,8 @@ export function ThreadPanel({
   thread: Thread;
   files: Artifact[];
   shots: ComponentProps<typeof BrowserTab>['shots'];
+  /** The files and screenshots of the threads it delegated to, listed under its own. */
+  crewArtifacts: { files: ArtifactWithThread[]; shots: ArtifactWithThread[] };
   selectedArtifact: ComponentProps<typeof ArtifactsTab>['selected'];
   onSelect: ComponentProps<typeof ArtifactsTab>['onSelect'];
   tab: PanelTab;
@@ -59,6 +62,8 @@ export function ThreadPanel({
   const crew = prs.data?.crew ?? [];
   // The thread's own PR leads. A thread without one shows what its delegated threads opened.
   const crewSum = crew.length ? crewLine(crew) : null;
+  const fileCount = files.length + crewArtifacts.files.length;
+  const shotCount = shots.length + crewArtifacts.shots.length;
   const prTab = pr && line ? { title: `PRs: #${pr.number}, ${line.text}`, tone: line.tone } : crewSum ? { title: `PRs: ${plural(crew.length, 'PR')} from delegated threads, ${crewSum.text}`, tone: crewSum.tone } : null;
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -86,9 +91,9 @@ export function ThreadPanel({
                 title: prTab?.title ?? 'PRs',
                 badge: prTab ? <StatusDot status={PR_DOT[prTab.tone]} size={6} /> : undefined,
               },
-              { id: 'artifacts', icon: 'layers', title: 'Artifacts', badge: files.length ? <span className="font-num text-[10.5px] text-fg-4">{files.length}</span> : undefined },
+              { id: 'artifacts', icon: 'layers', title: 'Artifacts', badge: fileCount ? <span className="font-num text-[10.5px] text-fg-4">{fileCount}</span> : undefined },
               { id: 'changes', icon: 'diff', title: 'Changes' },
-              { id: 'browser', icon: 'browser', title: 'Browser', badge: shots.length ? <span className="font-num text-[10.5px] text-fg-4">{shots.length}</span> : undefined },
+              { id: 'browser', icon: 'browser', title: 'Browser', badge: shotCount ? <span className="font-num text-[10.5px] text-fg-4">{shotCount}</span> : undefined },
               ...(desktop ? [{ id: 'web' as const, icon: 'globe' as const, title: 'Web' }] : []),
               { id: 'terminal', icon: 'terminal', title: 'Terminal' },
               { id: 'actions', icon: 'play', title: 'Actions' },
@@ -100,9 +105,9 @@ export function ThreadPanel({
       <div className="min-h-0 flex-1">
         {tab === 'details' && <DetailsTab thread={thread} {...details} />}
         {tab === 'prs' && <PRsTab thread={thread} {...prs} />}
-        {tab === 'artifacts' && <ArtifactsTab artifacts={files} selected={selectedArtifact} onSelect={onSelect} />}
+        {tab === 'artifacts' && <ArtifactsTab artifacts={files} crew={crewArtifacts.files} selected={selectedArtifact} onSelect={onSelect} />}
         {tab === 'changes' && <ChangesTab thread={thread} />}
-        {tab === 'browser' && <BrowserTab channelId={thread.channel_id} threadId={thread.id} shots={shots} />}
+        {tab === 'browser' && <BrowserTab channelId={thread.channel_id} threadId={thread.id} shots={shots} crew={crewArtifacts.shots} />}
         {desktop && webFor === thread.channel_id && (
           <div className={tab === 'web' ? 'h-full' : 'hidden'}>
             <Suspense fallback={<Loading />}>

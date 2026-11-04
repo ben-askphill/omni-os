@@ -55,6 +55,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     jumpTo,
     files,
     shots,
+    crew,
     selectedArtifact,
     setSelected,
     panelTab,
@@ -163,7 +164,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     );
   }
 
-  const artifactCount = files.length + shots.length;
+  const artifactCount = files.length + shots.length + crew.files.length + crew.shots.length;
 
   return (
     <div ref={panel.rootRef} className="flex h-full min-h-0">
@@ -291,6 +292,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               thread={thread}
               files={files}
               shots={shots}
+              crewArtifacts={crew}
               selectedArtifact={selectedArtifact}
               onSelect={setSelected}
               tab={panelTab}

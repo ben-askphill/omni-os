@@ -19,7 +19,7 @@ export type { EventRow } from './db/repos/events.ts';
 export { EVENT_COLUMNS, indexEvent, events } from './db/repos/events.ts';
 export type { SearchHit } from './db/repos/search.ts';
 export { search } from './db/repos/search.ts';
-export type { Artifact } from './db/repos/artifacts.ts';
+export type { Artifact, ArtifactWithThread } from './db/repos/artifacts.ts';
 export { ARTIFACT_COLUMNS, artifacts } from './db/repos/artifacts.ts';
 export { automationRuns } from './db/repos/automation-runs.ts';
 export { kv } from './db/repos/kv.ts';

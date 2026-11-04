@@ -1,7 +1,7 @@
 import { watch, statSync, existsSync } from 'node:fs';
 import { join, sep, extname, basename } from 'node:path';
 import { paths } from './config.ts';
-import { artifacts, threads } from './db.ts';
+import { artifacts, threads, type Artifact } from './db.ts';
 import { publishFeed, publishThread } from './bus.ts';
 
 const KINDS: Record<string, string> = {
@@ -48,9 +48,23 @@ export function register(rel: string) {
   const st = statSync(full);
   if (!st.isFile()) return;
   const row = artifacts.upsert({ thread_id: c.threadId, path: full, name: basename(full), kind: c.kind, size: st.size });
-  publishThread(c.threadId, { kind: 'artifact', artifact: row });
-  publishFeed({ type: 'artifact', artifact: row });
+  announceArtifact(row);
   return row;
+}
+
+/**
+ * Tell the clients about a new or changed artifact: its thread's stream, the feed, and as `crew_artifact` the stream of
+ * every thread above it in its delegation chain, whose panel lists it beside its own (packages/shared/crew-artifacts.ts).
+ */
+export function announceArtifact(row: Artifact) {
+  publishThread(row.thread_id, { kind: 'artifact', artifact: row });
+  publishFeed({ type: 'artifact', artifact: row });
+  const above = threads.ancestors(row.thread_id);
+  if (!above.length) return;
+  const t = threads.get(row.thread_id);
+  if (!t) return;
+  const artifact = { ...row, thread_title: t.title, channel_id: t.channel_id };
+  for (const id of above) publishThread(id, { kind: 'crew_artifact', artifact });
 }
 
 export function startArtifactWatcher() {

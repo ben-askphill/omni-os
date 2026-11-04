@@ -12,6 +12,7 @@ describe('artifact query plans', () => {
       published: /artifacts_url/,
       byUrl: /SEARCH artifacts USING INDEX artifacts_url \(url=\?\)/,
       byThread: /SEARCH artifacts USING INDEX artifacts_thread \(thread_id=\?\)/,
+      crew: /SEARCH a USING INDEX artifacts_thread \(thread_id=\?\)/,
     };
     for (const [name, sql] of Object.entries(ARTIFACT_SQL) as [keyof typeof ARTIFACT_SQL, string][]) {
       const params = Array(sql.split('?').length - 1).fill(1);

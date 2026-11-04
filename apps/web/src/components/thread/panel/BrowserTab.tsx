@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Artifact } from '../../../api.ts';
+import type { Artifact, ArtifactWithThread } from '../../../api.ts';
 import { LiveBrowser } from '../../LiveBrowser.tsx';
 import { Button, Empty, IconButton, Modal } from '../../ui.tsx';
 import { plural } from '../../../format.ts';
@@ -7,16 +7,17 @@ import { Screenshots } from './Screenshots.tsx';
 
 /**
  * The channel's browser, live: the same Chrome the agent drives, which Ben can click and type in.
- * The screenshots the agent saved sit one click away.
+ * The screenshots the agent and the threads it delegated to saved sit one click away.
  */
-export function BrowserTab({ channelId, threadId, shots }: { channelId: string; threadId: string; shots: Artifact[] }) {
+export function BrowserTab({ channelId, threadId, shots, crew }: { channelId: string; threadId: string; shots: Artifact[]; crew: ArtifactWithThread[] }) {
+  const count = shots.length + crew.length;
   const [view, setView] = useState<'live' | 'shots'>('live');
   const [expanded, setExpanded] = useState(false);
   const extra = (
     <>
       <span className="relative">
-        <IconButton icon="image" label={`Screenshots${shots.length ? ` (${shots.length})` : ''}`} size={15} active={view === 'shots'} onClick={() => setView((v) => (v === 'shots' ? 'live' : 'shots'))} />
-        {shots.length > 0 && <span className="pointer-events-none absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-fg-3" />}
+        <IconButton icon="image" label={`Screenshots${count ? ` (${count})` : ''}`} size={15} active={view === 'shots'} onClick={() => setView((v) => (v === 'shots' ? 'live' : 'shots'))} />
+        {count > 0 && <span className="pointer-events-none absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-fg-3" />}
       </span>
       {view === 'live' && <IconButton icon="maximize" label="Expand" size={15} onClick={() => setExpanded(true)} />}
     </>
@@ -30,10 +31,10 @@ export function BrowserTab({ channelId, threadId, shots }: { channelId: string; 
               Live browser
             </Button>
             <span className="flex-1" />
-            <span className="px-2 font-num text-[11px] text-fg-4">{plural(shots.length, 'screenshot')}</span>
+            <span className="px-2 font-num text-[11px] text-fg-4">{plural(count, 'screenshot')}</span>
           </div>
           <div className="min-h-0 flex-1">
-            <Screenshots shots={shots} />
+            <Screenshots shots={shots} crew={crew} />
           </div>
         </>
       ) : expanded ? (

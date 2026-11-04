@@ -26,6 +26,7 @@ import { mergeNote } from '@omni/shared/pr-merge.ts';
 import { checkTone, STEP_WORKING, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { useApp } from '../store.tsx';
 import { toolLabel, toolSummary, type Item, type ToolCall } from '@omni/shared/transcript-fold.ts';
+import { CrewFileList } from './CrewFiles.tsx';
 import { CrewPRList } from './CrewPRs.tsx';
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
@@ -456,7 +457,7 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
 
 export function DetailsScreen() {
   const shell = useShell();
-  const { thread, init, lastResult, history } = useThread();
+  const { thread, init, lastResult, history, crew } = useThread();
   const { channel } = useApp();
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!thread) return <MoHeader onBack={shell.back} title="Details" />;
@@ -494,6 +495,7 @@ export function DetailsScreen() {
       <MoHeader onBack={shell.back} title="Details" sub={thread.title} />
       <Body className="gap-4">
         <AgentsGroup open={(id) => shell.open(href.thread(id))} />
+        <CrewFileList files={crew.files} shots={crew.shots} onOpen={(a) => shell.open(href.thread(thread.id, a.id))} />
         <MoGroup>
           {rows.map(([k, v], i) => (
             <div key={k} className={`flex min-h-12 items-center px-4 text-[14.5px] ${i ? 'border-t border-line' : ''}`}>
@@ -517,10 +519,14 @@ export function DetailsScreen() {
 /** One file, full screen. Share hands over the published page, else the file itself. */
 export function ViewerScreen({ route }: { route: Route }) {
   const shell = useShell();
-  const { thread, files } = useThread();
+  const { thread, files, shots, crew } = useThread();
   const { channel } = useApp();
   const id = route.name === 'thread' ? route.artifact : undefined;
-  const a = files.find((f) => f.id === id);
+  // A delegated thread's file or screenshot opens here too, from the Details list.
+  const mine = files.find((f) => f.id === id) ?? shots.find((f) => f.id === id);
+  const theirs = mine ? undefined : (crew.files.find((f) => f.id === id) ?? crew.shots.find((f) => f.id === id));
+  const a = mine ?? theirs;
+  const from = theirs ? theirs.thread_title || 'Untitled' : null;
   const share = async () => {
     if (!a) return;
     try {
@@ -543,7 +549,14 @@ export function ViewerScreen({ route }: { route: Route }) {
       if ((e as Error).name !== 'AbortError') shell.toast(errorText(e));
     }
   };
-  const sub = thread ? [`#${channel(thread.channel_id)?.name ?? thread.channel_id}`, thread.role].filter(Boolean).join(' · ') : undefined;
+  const sub =
+    theirs && from ? (
+      <a href={href.thread(theirs.thread_id)} className="text-fg-2 hover:text-fg" title={`Open thread: ${from}`}>
+        From {from}
+      </a>
+    ) : thread ? (
+      [`#${channel(thread.channel_id)?.name ?? thread.channel_id}`, thread.role].filter(Boolean).join(' · ')
+    ) : undefined;
   return (
     <>
       <MoHeader

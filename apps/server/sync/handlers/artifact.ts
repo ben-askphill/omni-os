@@ -1,7 +1,7 @@
 import { isAbsolute, join, relative, sep } from 'node:path';
 import { paths } from '../../config.ts';
 import { ARTIFACT_COLUMNS, db, type Artifact } from '../../db.ts';
-import { publishFeed, publishThread } from '../../bus.ts';
+import { announceArtifact } from '../../artifacts.ts';
 import { claim, registerHandler } from '../apply.ts';
 import { fromPortable, safeRel, toRemote } from '../paths.ts';
 
@@ -80,7 +80,6 @@ registerHandler('artifact', {
     const row = byUid(change.entity_id);
     if (!row) return;
     const { uid: _uid, ...artifact } = row;
-    publishThread(artifact.thread_id, { kind: 'artifact', artifact });
-    publishFeed({ type: 'artifact', artifact });
+    announceArtifact(artifact);
   },
 });

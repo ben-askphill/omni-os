@@ -56,4 +56,11 @@ describe('thread stream sync', () => {
     expect(classifyStream({ kind: 'sync', catch_up: 'replay', thread })).toMatchObject({ type: 'sync', snapshot: false });
     expect(classifyStream({ kind: 'sync', catch_up: 'replay' })).toBeNull();
   });
+
+  it("reads a delegated thread's new file apart from the thread's own", () => {
+    const artifact = { id: 7, thread_id: 'child', name: 'shot.png', kind: 'screenshot', thread_title: 'Child', channel_id: 'acme' };
+    expect(classifyStream({ kind: 'crew_artifact', artifact })).toEqual({ type: 'crew_artifact', artifact });
+    expect(classifyStream({ kind: 'artifact', artifact })).toEqual({ type: 'artifact', artifact });
+    expect(classifyStream({ kind: 'crew_artifact' })).toBeNull();
+  });
 });

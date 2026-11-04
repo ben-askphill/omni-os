@@ -10,6 +10,7 @@ import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampThreadReferences } from './message-context/thread-reference.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
+import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
 import { bus } from './bus.ts';
 import { uploadsDir } from './config.ts';
 import { artifacts, channels, events, fileDigests, messageRequests, publicChannel, requestFingerprint, threads, type Thread } from './db.ts';
@@ -183,6 +184,9 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
     events: page.events,
     ...(page.history && { history: page.history }),
     artifacts: artifacts.byThread(t.id),
+    // The newest files and screenshots of the threads it delegated to, at any depth, each with its thread's title.
+    // New ones come on the stream as crew_artifact (artifacts.ts announceArtifact).
+    crew_artifacts: artifacts.crew(t.id, CREW_ARTIFACTS_MAX),
     children: shown(children),
     // Members of the teams this thread started, so its delegation cards can show their state.
     team: shown(children.flatMap((ch) => threads.team(ch.id))),

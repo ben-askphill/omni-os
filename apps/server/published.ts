@@ -4,8 +4,7 @@
 import { copyFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
-import { classify } from './artifacts.ts';
-import { publishFeed, publishThread } from './bus.ts';
+import { announceArtifact, classify } from './artifacts.ts';
 import { artifactsDir, paths } from './config.ts';
 import { artifacts, events, kv, threads, type Artifact } from './db.ts';
 import { observePublication } from './automation-triggers.ts';
@@ -47,8 +46,7 @@ export function linkPublished(threadId: string, p: Published): Artifact | null {
   }
   const row = artifacts.upsert({ thread_id: threadId, path: dest, name: basename(dest), kind: c.kind, size: statSync(dest).size });
   const linked = artifacts.setPublished(row.id, p.url, p.description ?? null) ?? row;
-  publishThread(threadId, { kind: 'artifact', artifact: linked });
-  publishFeed({ type: 'artifact', artifact: linked });
+  announceArtifact(linked);
   return linked;
 }
 

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, errorText, useThreadStream, type Artifact, type Channel, type ContextUsage, type HistoryEvent, type PendingMsg, type Thread, type ThreadOpen } from '../api.ts';
+import { api, errorText, useThreadStream, type Artifact, type ArtifactWithThread, type Channel, type ContextUsage, type HistoryEvent, type PendingMsg, type Thread, type ThreadOpen } from '../api.ts';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { withOpening, type Opening } from '@omni/shared/opening.ts';
 import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '@omni/shared/continue-flow.ts';
+import { crewShown, withCrewArtifact } from '@omni/shared/crew-artifacts.ts';
 import { holds } from '../thread-history.ts';
 import { useInterrupt, useTurnState } from './threadTurn.ts';
 import { useThreadHistory } from './useThreadHistory.ts';
@@ -37,6 +38,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const events = history.history.rows as HistoryEvent[];
   const [revealTarget, setRevealTarget] = useState<number | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  // The files and screenshots of the threads it delegated to, newest first (packages/shared/crew-artifacts.ts).
+  const [crewArtifacts, setCrewArtifacts] = useState<ArtifactWithThread[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [ready, setReady] = useState(false);
@@ -89,6 +92,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setTeam(d.team ?? []);
     setArtifacts(d.artifacts);
     d.artifacts.forEach((a) => artifactIds.current.add(a.id));
+    setCrewArtifacts(d.crew_artifacts ?? []);
   }, []);
 
   const load = useCallback(
@@ -110,7 +114,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
         if (!artifactParamRef.current) {
           const visible = d.artifacts.filter((a) => a.kind !== 'screenshot');
           const html = [...visible].reverse().find((a) => a.kind === 'html');
-          const pick = html ?? visible[visible.length - 1];
+          // A thread with no files of its own opens on the newest its crew made.
+          const pick = html ?? visible[visible.length - 1] ?? crewShown(d.artifacts, d.crew_artifacts ?? []).files[0];
           if (pick) setSelected(pick.id);
         }
         setError(null);
@@ -155,6 +160,9 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
           break;
         case 'artifact':
           upsertArtifact(m.artifact);
+          break;
+        case 'crew_artifact':
+          setCrewArtifacts((prev) => withCrewArtifact(prev, m.artifact));
           break;
         case 'thread':
           setThread((prev) => newer(prev, m.thread));
@@ -207,7 +215,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
 
   const files = useMemo(() => artifacts.filter((a) => a.kind !== 'screenshot'), [artifacts]);
   const shots = useMemo(() => artifacts.filter((a) => a.kind === 'screenshot'), [artifacts]);
-  const selectedArtifact = files.find((a) => a.id === selected) ?? files[files.length - 1];
+  const crew = useMemo(() => crewShown(artifacts, crewArtifacts), [artifacts, crewArtifacts]);
+  const selectedArtifact = files.find((a) => a.id === selected) ?? crew.files.find((a) => a.id === selected) ?? files[files.length - 1] ?? crew.files[0];
 
   return {
     thread,
@@ -222,6 +231,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     jumpTo,
     files,
     shots,
+    /** The crew's files and screenshots, less any this thread lists itself. */
+    crew,
     selectedArtifact,
     setSelected,
     panelTab,

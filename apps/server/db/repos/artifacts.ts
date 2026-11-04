@@ -30,7 +30,15 @@ export const ARTIFACT_SQL = {
     ORDER BY a.updated_at DESC LIMIT ?`,
   byUrl: `SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE url = ? ORDER BY updated_at DESC, id DESC LIMIT 1`,
   byThread: `SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE thread_id = ? ORDER BY created_at`,
+  // Every thread under the given one, at any depth: UNION drops an id met again, so a parent_id cycle ends. CROSS JOIN
+  // keeps SQLite walking the threads first and reading each one's artifacts by index, not scanning every artifact.
+  crew: `WITH RECURSIVE under(id) AS (SELECT id FROM threads WHERE parent_id = ? UNION SELECT t.id FROM threads t JOIN under ON t.parent_id = under.id)
+    SELECT ${A_COLUMNS}, t.title AS thread_title, t.channel_id FROM under CROSS JOIN artifacts a ON a.thread_id = under.id JOIN threads t ON t.id = a.thread_id
+    WHERE under.id != ? ORDER BY a.updated_at DESC, a.id DESC LIMIT ?`,
 };
+
+/** An artifact with the thread that made it, as the Library and a parent thread's panel list it. */
+export type ArtifactWithThread = Artifact & { thread_title: string; channel_id: string };
 
 export const artifacts = {
   upsert(a: { thread_id: string; path: string; name: string; kind: string; size: number }) {
@@ -60,10 +68,12 @@ export const artifacts = {
   },
   /** The latest file per published page, newest first: in one channel, or everywhere. */
   published: (channelId?: string, limit = 20) =>
-    db.prepare(ARTIFACT_SQL.published).all(channelId ?? null, channelId ?? null, limit) as unknown as (Artifact & { thread_title: string; channel_id: string })[],
+    db.prepare(ARTIFACT_SQL.published).all(channelId ?? null, channelId ?? null, limit) as unknown as ArtifactWithThread[],
   /** The newest file published at a claude.ai URL, for naming a link to it. */
   byUrl: (url: string) => db.prepare(ARTIFACT_SQL.byUrl).get(url) as unknown as Artifact | undefined,
   byThread: (threadId: string) => db.prepare(ARTIFACT_SQL.byThread).all(threadId) as unknown as Artifact[],
+  /** The newest files and screenshots of the threads it delegated to, at any depth (packages/shared/crew-artifacts.ts). */
+  crew: (threadId: string, limit: number) => db.prepare(ARTIFACT_SQL.crew).all(threadId, threadId, limit) as unknown as ArtifactWithThread[],
   get: (id: number) => db.prepare(`SELECT ${ARTIFACT_COLUMNS} FROM artifacts WHERE id = ?`).get(id) as unknown as Artifact | undefined,
   uidOf: (id: number) => (db.prepare('SELECT uid FROM artifacts WHERE id = ?').get(id) as { uid: string } | undefined)?.uid ?? null,
   recent: (limit = 60) =>
@@ -73,7 +83,7 @@ export const artifacts = {
          FROM artifacts a JOIN threads t ON t.id = a.thread_id
          WHERE a.kind != 'screenshot' ORDER BY a.updated_at DESC LIMIT ?`,
       )
-      .all(limit) as unknown as (Artifact & { thread_title: string; channel_id: string })[],
+      .all(limit) as unknown as ArtifactWithThread[],
   remove: (path: string) =>
     tx(() => {
       const row = db.prepare('SELECT uid FROM artifacts WHERE path = ?').get(path) as { uid: string } | undefined;
