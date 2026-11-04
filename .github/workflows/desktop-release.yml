@@ -123,7 +123,8 @@ jobs:
         run: |
           app=mac-universal/Omni.app
           codesign --verify --deep --strict --verbose=2 "$app"
-          codesign -dv "$app" 2>&1 | grep -q 'Authority=Developer ID Application' || { echo '::error::Omni.app is not signed with a Developer ID'; exit 1; }
+          # Authority lines appear from verbosity 2 up; plain -dv leaves them out.
+          codesign -dvv "$app" 2>&1 | grep -q 'Authority=Developer ID Application' || { echo '::error::Omni.app is not signed with a Developer ID'; exit 1; }
           spctl --assess --type execute --verbose=2 "$app"
           xcrun stapler validate "$app"
 
