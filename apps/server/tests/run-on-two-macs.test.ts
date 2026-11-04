@@ -100,6 +100,35 @@ describe('a thread run on another machine', () => {
     expect(b.db.messageRequests.byRequestId(id, 'runon:msg-1')!.id).toBe(taken.id);
   }, T.timeout);
 
+  const ask = async (question: string) => {
+    const res = await b.json(`/threads/${id}/questions`, { body: { questions: [{ question, options: [{ label: 'Yes', description: 'Go' }, { label: 'No', description: 'Wait' }] }] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    for (let n = 0; n < 5 && !a.byKind(id, 'question').some((e) => e.p.id === res.body.id); n++) await both();
+    return res.body.id as string;
+  };
+  const yes = { answers: [{ selected: ['Yes'], other: null }] };
+  const stateOn = (m: Mac, qid: string) => m.byKind(id, 'question_answer').find((e) => e.p.id === qid)?.p.state;
+
+  it("takes Ben's answer on the hub to a question the machine running it waits on", async () => {
+    const qid = await ask('Ship the checkout?');
+    // The agent's call on B, waiting.
+    const poll = b.json(`/threads/${id}/questions/${qid}?wait=25`);
+    const res = await a.json(`/threads/${id}/questions/${qid}/answer`, { body: yes });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toEqual({ state: 'answered', via: 'tool' });
+    await both();
+    expect((await poll).body.state).toBe('answered');
+  }, T.timeout);
+
+  it('dismisses a waiting question on the machine running it when Ben writes instead', async () => {
+    const qid = await ask('Ship the header?');
+    const res = await a.json(`/threads/${id}/messages`, { body: { prompt: 'do the header first', request_id: 'msg-2' } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(stateOn(a, qid)).toBe('dismissed');
+    await both();
+    expect(stateOn(b, qid)).toBe('dismissed');
+  }, T.timeout);
+
   it('forwards Stop', async () => {
     expect((await a.json(`/threads/${id}/stop`, { body: {} })).status).toBe(200);
     const stop = a.db.remoteCommands.forThread(id).find((c) => c.kind === 'stop')!;
@@ -110,6 +139,16 @@ describe('a thread run on another machine', () => {
     expect(b.db.remoteCommands.get(stop.id)).toMatchObject({ state: 'accepted', acked_by: 'box-b' });
     await both();
     expect(a.db.remoteCommands.get(stop.id)?.state).toBe('accepted');
+  }, T.timeout);
+
+  it('forwards an answer given between turns as a message to the machine that holds it', async () => {
+    const qid = await ask('Push it yourself later?');
+    const res = await a.json(`/threads/${id}/questions/${qid}/answer`, { body: yes });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toEqual({ state: 'answered', via: 'message' });
+    await both();
+    await waitFor(() => userTexts(b, id).some((t) => t.includes('Push it yourself later?')), () => `the answer on B: ${JSON.stringify(userTexts(b, id))}`);
+    expect(stateOn(b, qid)).toBe('answered');
   }, T.timeout);
 });
 

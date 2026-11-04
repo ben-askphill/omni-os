@@ -433,17 +433,21 @@ export async function postMessage(
     const again = acceptedAgain(threadId, opts.requestId, fingerprint);
     if (again) return again;
   }
+  // Ben wrote instead of answering the agent's questions: a call waiting on them returns, so this message is read now.
+  // On a thread that runs elsewhere the dismissal syncs to the machine whose call waits.
+  const dismiss = source === 'ben' && mode !== 'queue';
   // A thread routed to another machine runs there: the message goes to it (run-on.ts).
   if (remoteHolder(thread)) {
-    return (await runnerPorts().routing.forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, attachments: opts.attachments, context: opts.context })) as PostedThread;
+    const forwarded = (await runnerPorts().routing.forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, attachments: opts.attachments, context: opts.context })) as PostedThread;
+    if (dismiss) dismissQuestions(threadId);
+    return forwarded;
   }
   // Refused before anything is saved: the other Mac runs it.
   const blocked = turnBlocked(thread, runsHere(threadId));
   if (blocked) throw refusal(blocked, 409);
   // Ben (or the conductor) wrote in it again, so it is not done: what comes of it shows in Needs you.
   threads.setDone(threadId, false);
-  // Ben wrote instead of answering the agent's questions: a call waiting on them returns, so this message is read now.
-  if (source === 'ben' && mode !== 'queue') dismissQuestions(threadId);
+  if (dismiss) dismissQuestions(threadId);
   const { row, fresh } = messageRequests.accept({
     thread_id: threadId,
     request_id: opts.requestId ?? randomUUID(),

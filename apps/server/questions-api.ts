@@ -25,6 +25,6 @@ questionsApi.get('/:id/questions/:qid', async (c) => {
 
 /** Answer: `{ answers }` in, one per question (null skips it), `{ state, via }` out. A 409 when it was answered already. */
 questionsApi.post('/:id/questions/:qid/answer', async (c) => {
-  const r = answerQuestion(c.req.param('id'), c.req.param('qid'), await field(c, 'answers'));
+  const r = await answerQuestion(c.req.param('id'), c.req.param('qid'), await field(c, 'answers'));
   return 'conflict' in r ? c.json({ error: 'These questions were already answered.', state: r.conflict }, 409) : c.json(r);
 });

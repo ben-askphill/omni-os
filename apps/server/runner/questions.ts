@@ -20,7 +20,9 @@ import {
 import { bus, publishFeed } from '../bus.ts';
 import { events, threads } from '../db.ts';
 import { notifyNeedsInput } from '../push-sender.ts';
-import { turnBlocked } from '../sync/guard.ts';
+import { remoteHolder } from '../ownership.ts';
+import { runningElsewhere, turnBlocked } from '../sync/guard.ts';
+import { runnerPorts } from './ports.ts';
 import { saveOwn, wake } from './queue.ts';
 import { addEvent, lives, refusal, runsHere } from './state.ts';
 
@@ -109,23 +111,29 @@ export type Answered = { state: QuestionState; via: AnswerPayload['via'] } | { c
 /**
  * Ben's answers. The first answer wins: a later one is a conflict, with the state the first left. The waiting call
  * returns them; when no call waits any more (a restart, Stop, the harness's own timeout) they reach the thread as a
- * message instead, saved before it is woken, once.
+ * message instead, saved before it is woken, once. A thread that runs on another machine (run-on.ts) has its call
+ * there: while a turn runs there, the answer event syncs to it and that call returns; between turns, the answer goes
+ * to it as a forwarded message.
  */
-export function answerQuestion(threadId: string, id: string, raw: unknown): Answered {
+export async function answerQuestion(threadId: string, id: string, raw: unknown): Promise<Answered> {
   const q = find(threadId, id);
   const parsed = parseAnswers(q.questions, raw);
   if (!parsed.ok) throw refusal(parsed.error, 400);
   if (q.state !== 'pending') return { conflict: q.state };
-  const via = waitedOn(threadId, id) ? 'tool' : 'message';
-  if (via === 'message') {
-    const blocked = turnBlocked(threads.get(threadId)!, runsHere(threadId));
-    if (blocked) throw refusal(blocked, 409);
-  }
+  const thread = threads.get(threadId)!;
+  const holder = remoteHolder(thread);
+  const via = waitedOn(threadId, id) || (holder && runningElsewhere(thread)) ? 'tool' : 'message';
   const answers = parsed.value;
   const state = stateOf(answers) as AnswerPayload['state'];
+  if (via === 'message' && holder) {
+    await runnerPorts().routing.forwardMessage(thread, resultText(q.questions, state, answers), { mode: 'steer', from: 'ben' });
+  } else if (via === 'message') {
+    const blocked = turnBlocked(thread, runsHere(threadId));
+    if (blocked) throw refusal(blocked, 409);
+  }
   addEvent(threadId, ANSWER_EVENT, { id, state, answers, via } satisfies AnswerPayload);
   polled.delete(id);
-  if (via === 'message') {
+  if (via === 'message' && !holder) {
     const row = saveOwn(threadId, `question:${id}`, { prompt: resultText(q.questions, state, answers), kind: 'user', source: 'ben', payload: null });
     if (row) wake(row);
   }

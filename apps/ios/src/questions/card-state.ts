@@ -34,7 +34,10 @@ export type Outcome =
   | { kind: 'elsewhere'; state: SettledState | null }
   | { kind: 'failed'; message: string };
 
-/** Sends the answers. A 409 is not a failure: the question is settled and the stream brings that answer. */
+/**
+ * Sends the answers. A 409 with a state is not a failure: the question is settled and the stream brings that answer.
+ * A 409 without one is a refusal (the thread is held elsewhere, say), and Ben reads why.
+ */
 export async function submitAnswers(send: (answers: Answer[]) => Promise<{ state: QuestionState }>, answers: Answer[]): Promise<Outcome> {
   try {
     const res = await send(answers);
@@ -43,7 +46,7 @@ export async function submitAnswers(send: (answers: Answer[]) => Promise<{ state
     if (e instanceof OmniHttpError && e.failure.kind === 'http' && e.failure.status === 409) {
       const body = e.failure.body;
       const state = body && typeof body === 'object' ? (body as { state?: unknown }).state : null;
-      return { kind: 'elsewhere', state: isSettled(state) ? state : null };
+      if (isSettled(state)) return { kind: 'elsewhere', state };
     }
     return { kind: 'failed', message: e instanceof Error && e.message ? e.message : 'Something went wrong' };
   }

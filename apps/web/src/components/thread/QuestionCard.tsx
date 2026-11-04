@@ -21,6 +21,9 @@ export const ASKING_LABEL = 'Needs your input';
 
 const STATE_LABEL: Record<Exclude<QuestionState, 'pending'>, string> = { answered: 'Answered', skipped: 'Skipped', dismissed: 'Not answered' };
 
+/** A 409 for a question someone answered first carries the state that answer left. */
+const answeredAlready = (body: unknown) => !!body && typeof body === 'object' && 'state' in body;
+
 type Settled = { state: Exclude<QuestionState, 'pending'>; answers: Answer[] | null };
 
 /**
@@ -89,8 +92,8 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
       const res = await api.post<{ state: Settled['state'] }>(`/threads/${encodeURIComponent(threadId)}/questions/${encodeURIComponent(q.id)}/answer`, { answers });
       onSent({ state: res.state, answers });
     } catch (e) {
-      // Answered already, from another device or by a message: the stream brings that answer.
-      if (!(e instanceof ApiError && e.status === 409)) setError(errorText(e));
+      // Answered already, from another device or by a message: the stream brings that answer. Any other refusal says why.
+      if (!(e instanceof ApiError && e.status === 409 && answeredAlready(e.body))) setError(errorText(e));
       setBusy(false);
     }
   };

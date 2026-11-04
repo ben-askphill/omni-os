@@ -83,9 +83,9 @@ describe('submitAnswers', () => {
     expect(out).toEqual({ kind: 'elsewhere', state: 'answered' });
   });
 
-  it('reads a 409 without a state as answered elsewhere too', async () => {
-    const out = await submitAnswers(async () => Promise.reject(http(409, 'nope')), answers);
-    expect(out).toEqual({ kind: 'elsewhere', state: null });
+  it('keeps a 409 without a state as a failure that says why', async () => {
+    const out = await submitAnswers(async () => Promise.reject(http(409, { error: 'This thread is running on Box.' })), answers);
+    expect(out).toMatchObject({ kind: 'failed' });
   });
 
   it('keeps any other failure as a failure Ben can retry', async () => {
