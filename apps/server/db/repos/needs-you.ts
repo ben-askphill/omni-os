@@ -175,9 +175,8 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     .prepare(`SELECT ${prefixed} FROM threads t WHERE ${LISTED} ${scope} AND t.limit_state IS NOT NULL`)
     .all(...args) as unknown as Thread[];
 
-  // Questions and secret requests with no answer yet, whatever the asking thread's status, newest first so the first
-  // row per thread is its newest. Each waits on the top of its delegation chain (threads.root), the thread Ben delegated
-  // from, where its card shows too: a delegated thread's or a team member's ask brings that thread here, not the one that asked.
+  // Newest first, so each thread's blocker shows its newest ask. An ask waits on the top of its delegation chain
+  // (threads.root), the thread Ben delegated from, where its card shows too.
   const home = db.prepare(`SELECT ${prefixed} FROM threads t WHERE t.id = ? AND ${LISTED} ${scope}`);
   const asked = [...pendingAsks(QUESTION_EVENT, ANSWER_EVENT), ...pendingAsks(SECRET_REQUEST_EVENT, SECRET_ANSWER_EVENT)]
     .sort((a, b) => b.q_id - a.q_id)
@@ -223,7 +222,6 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
 
 const BLOCKER_ORDER: NeedsYouBlocker['kind'][] = ['question', 'setup', 'uncertain', 'limited', 'recovered'];
 
-/** A pending ask: an event of `kind` in a thread that is not archived, with no event of `answerKind` about the same id. */
 interface PendingAsk {
   q_id: number;
   q_kind: string;
@@ -232,6 +230,7 @@ interface PendingAsk {
   q_at: string;
 }
 
+/** A pending ask: an event of `kind` in a thread that is not archived, with no event of `answerKind` about the same id. */
 function pendingAsks(kind: string, answerKind: string): PendingAsk[] {
   return db
     .prepare(

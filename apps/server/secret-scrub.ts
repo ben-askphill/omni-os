@@ -35,7 +35,7 @@ export function scrubText(s: string): string {
 
 /**
  * The payload with every string in it scrubbed, walked as an object rather than as JSON text: in the text, a value
- * with a quote or a backslash in it would be escaped and missed. The same object back when there is nothing to scrub.
+ * with a quote or a backslash in it would be escaped and missed. The same object back when no value is known.
  */
 export function scrubSecrets<T>(payload: T): T {
   return ordered.length ? (walk(payload) as T) : payload;

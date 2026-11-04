@@ -25,8 +25,7 @@ export const VALUE_MAX = 16_384;
 
 /**
  * Names a request may not set, whatever the scope: Omni's own variables, the harness CLIs' own settings, and variables
- * that change how every program in the agent's shell runs. A channel secret overrides the server env, so a request for
- * PATH would break the next process.
+ * that change how every program in the agent's shell runs.
  */
 const RESERVED = /^(?:OMNI_\w*|CLAUDE_\w*|CODEX_\w*|PATH|HOME|USER|LOGNAME|SHELL|PWD|TMPDIR|TERM|LANG|LC_\w+|NODE_OPTIONS|NODE_PATH|LD_\w+|DYLD_\w+|GIT_\w+|SSH_\w+)$/;
 
@@ -92,8 +91,6 @@ export function settledWords(r: Pick<ThreadSecretRequest, 'ask' | 'state' | 'rep
 export const secretSavedMessage = (ask: SecretAsk) =>
   `${ask.name} is now in your environment as $${ask.name}, a secret the user saved for ${scopeWords(ask.scope)}. ` +
   `Go on with the task. If it is already done, repeat your final report. Never print, echo or write its value.`;
-
-// ---------- in a thread ----------
 
 /** The event kinds a request lives in: `secret_request` when the agent asks, `secret_request_answer` once Ben acts. */
 export const SECRET_REQUEST_EVENT = 'secret_request';

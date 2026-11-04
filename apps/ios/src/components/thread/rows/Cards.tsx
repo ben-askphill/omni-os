@@ -96,7 +96,6 @@ export function QuestionRow({ row }: Of<'question'>) {
   return <QuestionCard q={row.q} send={answer} />;
 }
 
-/** A secret the agent asked for. The phone app cannot enter it yet: it says where to. */
 export function SecretRow({ row }: Of<'secret'>) {
   const { colors } = useOmniTheme();
   const { ask, state } = row.r;

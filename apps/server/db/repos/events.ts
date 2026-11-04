@@ -34,7 +34,6 @@ function requestPair(threadId: string, ask: string, answer: string, id?: string)
 
 export const events = {
   add(threadId: string, kind: string, payload: unknown, createdAt?: string): EventRow {
-    // A secret value an agent printed is cut before the row is stored, indexed, streamed or synced (secret-scrub.ts).
     const clean = scrubSecrets(payload);
     const json = JSON.stringify(clean);
     const ts = createdAt ?? now();

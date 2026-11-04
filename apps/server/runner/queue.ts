@@ -120,7 +120,6 @@ export function pump() {
       i++;
       continue;
     }
-    // Its env lacks a secret saved since it started: the turn waits for the fresh process that replaces it (session.ts staleEnv).
     if (warm?.envStale) {
       i++;
       continue;

@@ -33,7 +33,6 @@ function Asking({ threadId, r, touch }: { threadId: string; r: ThreadSecretReque
   const field = useRef<HTMLInputElement>(null);
   const base = `/threads/${encodeURIComponent(threadId)}/secret-requests/${encodeURIComponent(r.id)}`;
 
-  // The card takes focus when it appears, on a desktop. The phone keeps its keyboard down until Ben taps the field.
   useEffect(() => {
     if (!touch) field.current?.focus({ preventScroll: true });
   }, [touch]);

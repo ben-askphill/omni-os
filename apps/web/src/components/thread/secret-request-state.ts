@@ -2,11 +2,7 @@ import type { SecretRequestState } from '@omni/shared/secret-request.ts';
 
 export type Settled = Exclude<SecretRequestState, 'pending'>;
 
-/**
- * Where a secret request's card stands. The value is in the phases where Ben can still act on it and in none after:
- * saved, cancelled or settled from elsewhere leaves it behind. A failed request keeps it, so a transient error does not
- * cost him the retyping of a long key.
- */
+/** Where a secret request's card stands. */
 export type Phase =
   | { at: 'editing'; value: string; error: string | null }
   /** A secret of that name is set: saving replaces it, so the card asks once more. */
@@ -41,7 +37,7 @@ const SETTLED: readonly string[] = ['saved', 'cancelled', 'dismissed'];
 const field = (body: unknown, key: string) => (body && typeof body === 'object' ? (body as Record<string, unknown>)[key] : undefined);
 
 /**
- * The server refused a send or a cancel (apps/server secret-requests-api.ts). A 409 with `exists` is the replace step. A
+ * The server refused a send or a cancel (apps/server/secret-requests-api.ts). A 409 with `exists` is the replace step. A
  * 409 with a `state` means it was settled from another device or by a message: that is the answer, and the stream brings
  * the rest. Anything else says why, and the value stays for another try.
  */

@@ -138,8 +138,6 @@ export function onResult(live: Live, p: ResultPayload) {
   if (live.inflight.length) return emitThread(id);
   if (limit && !p.ok && !stopped) return limitStop(live, limit.resets_at);
   const status = stopped ? 'stopped' : p.ok ? 'done' : 'failed';
-  // A switch Ben queued, or a secret saved during the turn (session.ts staleEnv), applies now: what waits behind the
-  // turn runs on the process that replaces this one, and the thread stays queued rather than reporting in between.
   if (live.held.length && (queuedRun(threads.get(id)) || live.envStale)) {
     requeueHeld(live);
     return endTurn(live, status, true);

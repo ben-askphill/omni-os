@@ -571,7 +571,6 @@ async function runTurn() {
     assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: toolId, name: 'Artifact', input: { file_path: file, description: 'A fake page', icon: 'chart' } }]);
     toolResult(toolId, `Published ${file} at https://claude.ai/code/artifact/00000000-0000-4000-8000-${String(seq).padStart(12, '0')}`, false);
   }
-  // What this process's env holds, read from process.env: the runner spawned it with the channel's secrets.
   const envCall = (command, description, result) => {
     const toolId = `toolu_fake_${++seq}`;
     steps++;

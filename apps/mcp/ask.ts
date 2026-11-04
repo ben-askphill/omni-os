@@ -83,7 +83,6 @@ server.registerTool(
     try {
       ({ id } = await call(`/threads/${SELF}/secret-requests`, { method: 'POST', body: JSON.stringify(input), signal: extra.signal }));
     } catch (err) {
-      // A 400 says what to fix in the call: the name, the label, the scope.
       return refused((err as Error).message);
     }
     return text(await answerTo(`/threads/${SELF}/secret-requests/${id}`, extra.signal));
