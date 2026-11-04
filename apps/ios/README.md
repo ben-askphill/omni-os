@@ -30,7 +30,7 @@ Pull request shows the branch's PR with its status line, a Watch toggle, review 
 
 ## Run on the iOS simulator
 
-Install Xcode, an iOS simulator runtime, Node 24.3 or later in the 24.x line or Node 26 or later, npm 11.19.0, and CocoaPods. From the repository root:
+Install Xcode, an iOS simulator runtime, Node 24.3 or later in the 24.x line or Node 26 or later, npm 11.19.0 or later in the 11.x line, and CocoaPods. From the repository root:
 
 ```sh
 npm ci --include=dev

@@ -40,7 +40,7 @@ Or open the Actions tab, choose **Desktop release** and **Run workflow**. A run 
 | Linux | Builds the x64 AppImage, with node-pty compiled for glibc 2.28 in docker, and uploads it with `latest-linux.yml` |
 | Publish | Checks that both feeds and all three downloads are attached, then publishes the release as the latest |
 
-Installed apps see a release only once it is published, so a failed run never offers a half-built update. When a build job fails, fix the cause and choose **Re-run failed jobs** on the same run: the version, tag and draft stay, and the uploads replace what the failed attempt left. To abandon a release instead, delete the draft and its tag (`gh release delete v<version> --cleanup-tag`) and run the workflow again with the next version.
+Installed apps see a release only once it is published, so a failed run never offers a half-built update. When a build job fails for a cause outside the code, such as a secret or the runner, fix it and choose **Re-run failed jobs** on the same run: the version, tag and draft stay, and the uploads replace what the failed attempt left. The build jobs check out the tag, so a fix merged to `main` never reaches a re-run. For a cause in the code, and to abandon a release, delete the draft and its tag (`gh release delete v<version> --cleanup-tag`) and run the workflow again with the next version.
 
 Any agent with `gh` can start a release the same way. Starting one is a deploy to every installed copy, so an agent asks first.
 
