@@ -6,7 +6,10 @@ A release is one GitHub Actions run: `.github/workflows/desktop-release.yml`. It
 
 You do these once, on the Mac that has your Apple account. An agent cannot do them.
 
-1. **Create a Developer ID Application certificate.** In Xcode, open Settings, Accounts, select your team, then Manage Certificates. Click **+** and choose **Developer ID Application**. Only the team's Account Holder can create one. Check it in Keychain Access under My Certificates, as `Developer ID Application: <name> (<TEAM ID>)`.
+1. **Create a Developer ID Application certificate.** Only the team's Account Holder can create one, and only on the paid team, not Xcode's free Personal Team (both can carry your name). The developer website is the most reliable way:
+   1. In Keychain Access, choose Keychain Access, Certificate Assistant, **Request a Certificate From a Certificate Authority**. Enter your email, choose **Saved to disk**, and save the `.certSigningRequest`. This also creates the private key in your login keychain.
+   2. At [developer.apple.com/account/resources/certificates/add](https://developer.apple.com/account/resources/certificates/add), choose **Developer ID Application**, the **G2 Sub-CA** profile, and upload the request. A greyed-out Developer ID option means this Apple ID is not the Account Holder of this team, or the team has an agreement to accept under Account, Agreements.
+   3. Download the `.cer` and double-click it. Keychain Access lists it under My Certificates as `Developer ID Application: <name> (<TEAM ID>)`, with the private key under it.
 2. **Export it with its private key.** In Keychain Access, under My Certificates, right-click that certificate (not the key under it) and choose Export. Save it as a `.p12` and give it a password.
 3. **Create a notarization key.** In App Store Connect, open Users and Access, Integrations, App Store Connect API, Team Keys. Add a key with the **Developer** role. Download the `.p8` file (Apple offers it once), and note its Key ID and the Issuer ID at the top of the page.
 4. **Save them as repository secrets.** From a checkout, signed in to `gh` as a repo admin:
