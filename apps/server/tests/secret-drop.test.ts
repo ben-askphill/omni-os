@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { SecretDrop } from '../secret-drop.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 import { tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
@@ -89,6 +90,27 @@ describe('setting a secret on another machine', () => {
     expect((await send({ machine: 'mac-a', name: 'X_KEY', value: 'x' })).status).toBe(400);
     expect((await send({ machine: 'box-b', name: 'lower', value: 'x' })).status).toBe(400);
     expect((await send({ machine: 'box-b', name: 'TWO_LINES', value: 'a\nb' })).status).toBe(400);
+    for (const name of ['NODE_OPTIONS', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'PATH', 'PYTHONPATH', 'GIT_SSH_COMMAND', 'BASH_ENV']) {
+      expect((await send({ machine: 'box-b', name, value: 'x' })).status, name).toBe(403);
+      expect((await send({ name, value: 'x' })).status, name).toBe(403);
+    }
+    // Names that merely start alike are fine.
+    expect((await send({ name: 'PATHFINDER_KEY', value: 'x' })).status).toBe(200);
+  });
+
+  it('the target refuses a hijacking name or an unknown sender even when the seal opens', async () => {
+    const res = await send({ machine: 'box-b', name: 'PLAIN_KEY', value: 'x' });
+    const drop = a.db.kv.get(`secretdrop.${res.body.id}`) as SecretDrop;
+    const seal = (await import('../secret-drop.ts')).seal;
+    const key = (a.db.kv.get('devices.box-b') as { sealKey: string }).sealKey;
+    const forged = { ...drop, id: 'forged-1', name: 'NODE_OPTIONS', sealed: seal('--require /tmp/x.js', key, { ...drop, id: 'forged-1', name: 'NODE_OPTIONS' }) };
+    a.db.kv.set('secretdrop.forged-1', forged);
+    const stranger = { ...drop, id: 'forged-2', sender: 'stranger', sealed: seal('x', key, { ...drop, id: 'forged-2', sender: 'stranger' }) };
+    a.db.kv.set('secretdrop.forged-2', stranger);
+    await both();
+    expect(storeOf(b)['global/NODE_OPTIONS']).toBeUndefined();
+    expect(a.db.kv.get('secretack.forged-1')).toMatchObject({ state: 'rejected', reason: expect.stringContaining('only Settings') });
+    expect(a.db.kv.get('secretack.forged-2')).toMatchObject({ state: 'rejected', reason: expect.stringContaining('synced machine') });
   });
 
   it('the target refuses one sealed to another key, and one past its 24 hours', async () => {

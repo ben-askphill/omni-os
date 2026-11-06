@@ -121,12 +121,20 @@ export async function sealPublicKey(): Promise<string> {
   return b64(rawPublic(createPublicKey(await privateKey())));
 }
 
-/** Refuses a scope or name setSecret would, and Omni's own credentials, which only Settings sets. */
+/**
+ * Names that change how a program starts or what it loads (preload libraries, interpreter options, the shell, PATH).
+ * A secret reaches every thread's environment, so one of these set by an agent would run code in every later thread.
+ * Settings can still set them; an agent cannot, here or on another machine.
+ */
+const HIJACK = /^(LD_|DYLD_|NODE_|NPM_CONFIG_|PYTHON|PERL5|PERL_|RUBY|GIT_|JAVA_TOOL_OPTIONS$|_JAVA_OPTIONS$|BASH_FUNC_)|^(PATH|HOME|SHELL|ENV|BASH_ENV|ZDOTDIR|IFS|GCONV_PATH|TMPDIR|SSL_CERT_FILE|SSL_CERT_DIR|CURL_CA_BUNDLE|REQUESTS_CA_BUNDLE|HTTP_PROXY|HTTPS_PROXY|ALL_PROXY|NO_PROXY|EDITOR|VISUAL|PAGER)$/;
+
+/** Refuses a scope or name setSecret would, Omni's own credentials and names that hijack a process, which only Settings sets. */
 export function checkSecret(scope: string, name: string, value: string) {
   if (!SCOPE_RE.test(scope)) throw refused('scope is global or channel:<channel id>', 400);
   if (!NAME_RE.test(name)) throw refused('name must be UPPER_SNAKE_CASE', 400);
   if (!value || /[\r\n]/.test(value)) throw refused('value must be a single non-empty line', 400);
   if (!secretReachesThread(scope, name)) throw refused(`${name} is one of Omni's own credentials. Set it in Settings on that machine.`, 403);
+  if (HIJACK.test(name)) throw refused(`${name} changes how every thread's programs start, so only Settings can set it.`, 403);
 }
 
 /** A synced machine by id or by name (any case). Refuses one this machine does not know, or a name two share. */
@@ -223,6 +231,11 @@ export async function reconcileSecretDrops(now = Date.now()): Promise<void> {
       continue;
     }
     if (!v.sealed) continue;
+    // Only from a machine that has synced with this one and announced itself.
+    if (v.sender === self || !deviceRecord(v.sender)) {
+      answer(v.id, 'rejected', 'It did not come from a synced machine this one knows.');
+      continue;
+    }
     // A store that cannot be read now (a locked Keychain) is tried again after the next sync, not refused.
     const own = await privateKey();
     let value: string;
