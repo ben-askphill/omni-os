@@ -485,6 +485,46 @@ server.registerTool(
   async () => text(await call('/devices')),
 );
 
+/** How long set_secret waits for another machine to answer before it says the secret is on its way. */
+const SECRET_WAIT_MS = 20_000;
+
+server.registerTool(
+  'set_secret',
+  {
+    description:
+      `Save a secret (an API key or token, as an environment variable for threads) on this machine or another synced one, only when ${USER} asks and gives the value. ` +
+      'With machine left out or "here" it is saved here at once. With another machine it is sealed to that machine\'s own key, goes over sync as ciphertext only, ' +
+      'and that machine saves it in its own secret store after its next sync; this waits briefly for the answer and otherwise says it is on its way (sent_secrets shows it later). ' +
+      'A secret already there under the same scope and name is replaced. Omni\'s own credentials (sync, Connect) are refused. Never repeat the value back.',
+    inputSchema: {
+      name: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/).describe('UPPER_SNAKE_CASE, the environment variable threads see.'),
+      value: z.string().min(1).describe('The secret, one line.'),
+      scope: z.string().optional().describe('global (the default, every channel) or channel:<channel id> for one channel.'),
+      machine: z.string().optional().describe('A synced machine by id or name from list_devices. Leave out, or "here", for this machine.'),
+    },
+  },
+  async ({ name, value, scope, machine }) => {
+    const target = machine?.trim() && machine.trim().toLowerCase() !== 'here' ? machine.trim() : undefined;
+    const sent = await call('/secrets/send', { method: 'POST', body: JSON.stringify({ name, value, scope: scope ?? 'global', machine: target }) });
+    if (!target) return text({ saved: 'here', scope: sent.scope, name: sent.name });
+    const until = Date.now() + SECRET_WAIT_MS;
+    let view = sent;
+    while (view.state === 'sent' && Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 2_000));
+      view = await call(`/secrets/sent/${encodeURIComponent(sent.id)}`);
+    }
+    return text(view.state === 'sent' ? { ...view, note: `On its way: ${view.machine.name} saves it after its next sync. Check with sent_secrets.` } : view);
+  },
+);
+
+server.registerTool(
+  'sent_secrets',
+  {
+    description: 'Secrets this machine sent to other synced machines with set_secret, newest first: machine, scope, name and state (sent, accepted, rejected with why, or expired after 24 hours). Never the values.',
+  },
+  async () => text(await call('/secrets/sent')),
+);
+
 server.registerTool(
   'hand_off_thread',
   {
@@ -629,7 +669,7 @@ server.registerTool('settings', {
     `Read-only: ${USER}'s Omni settings on this machine and where each value comes from. config: data/omni.config.json (you, folders, integrations, ` +
     'network access, run-on machine, worktree retention). env_overrides: config fields an environment variable overrides now, by section.key. ' +
     'server_options: the .env options (models, threads, worktrees, port), each with its value, default and source (env or default). ' +
-    `Changes nothing: ${USER} edits these in Settings, and .env needs a server restart. Channel defaults are list_channels; secrets are names only in Settings > Secrets.`,
+    `Changes nothing: ${USER} edits these in Settings, and .env needs a server restart. Channel defaults are list_channels; secrets are names only in Settings > Secrets, and set_secret saves one here or on another synced machine.`,
   inputSchema: {},
 }, async () => {
   const [setup, server] = await Promise.all([call('/setup'), call('/setup/server')]);

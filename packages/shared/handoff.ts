@@ -17,6 +17,8 @@ export interface DeviceRecord {
   name: string;
   /** Its own node, from `tailscale status --json` Self. Null when Tailscale is not running there. */
   tailscale: { nodeId: string; dnsName: string } | null;
+  /** Its public key for secrets sent to it (apps/server/secret-drop.ts), base64url raw X25519. Missing before that build. */
+  sealKey?: string;
   at: string;
 }
 

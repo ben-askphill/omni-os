@@ -14,6 +14,7 @@ import { runningByHarness } from './runner.ts';
 import { getProfile, profileInput, setProfile } from './profile.ts';
 import { deleteSecret, listSecrets, setSecret } from './secrets.ts';
 import { listDevices } from './sync/devices.ts';
+import { checkSecret, secretDrop, secretDrops, sendSecret } from './secret-drop.ts';
 
 export const metaApi = new Hono();
 
@@ -44,6 +45,23 @@ metaApi.post('/secrets', async (c) => {
   const { scope, name, value } = z.object({ scope: z.string(), name: z.string(), value: z.string() }).parse(await c.req.json());
   await setSecret(scope, name, value);
   return c.json({ ok: true });
+});
+// The Conductor's set_secret: here when machine is left out, else sealed to that synced machine (secret-drop.ts),
+// which saves it after it syncs. Omni's own credentials are refused either way.
+metaApi.post('/secrets/send', async (c) => {
+  const { machine, scope, name, value } = z
+    .object({ machine: z.string().trim().min(1).max(100).optional(), scope: z.string().default('global'), name: z.string(), value: z.string() })
+    .parse(await c.req.json());
+  if (machine) return c.json(sendSecret(machine, scope, name, value));
+  checkSecret(scope, name, value);
+  await setSecret(scope, name, value);
+  return c.json({ machine: null, scope, name, state: 'accepted' });
+});
+/** Secrets this machine sent to others, newest first, with each one's answer. Names only. */
+metaApi.get('/secrets/sent', (c) => c.json(secretDrops()));
+metaApi.get('/secrets/sent/:id', (c) => {
+  const d = secretDrop(c.req.param('id'));
+  return d ? c.json(d) : c.json({ error: 'No sent secret has that id.' }, 404);
 });
 metaApi.delete('/secrets', async (c) => {
   const { scope, name } = z.object({ scope: z.string(), name: z.string() }).parse(await c.req.json());
