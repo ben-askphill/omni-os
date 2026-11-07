@@ -96,7 +96,7 @@ export function ThreadComposer({
                 {c.label}
               </Text>
               <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${c.label}`} hitSlop={space.s6} onPress={() => removeDraftContext(thread.id, c.id)}>
-                <Icon name="close" size={11} weight="semibold" color={colors.fg3} />
+                <Icon name="close" size={11} color={colors.fg3} />
               </Pressable>
             </View>
           ))}
@@ -128,7 +128,7 @@ export function ThreadComposer({
           </RoundButton>
         ) : (
           <RoundButton label={sendLabel(thread, catalog)} busy={outbox.item?.phase === 'sending'} disabled={empty || slotTaken} onPress={() => void send()}>
-            <Icon name="arrowUp" size={16} weight="bold" color={colors.onInk} />
+            <Icon name="arrowUp" size={16} color={colors.onInk} />
           </RoundButton>
         )}
       </View>

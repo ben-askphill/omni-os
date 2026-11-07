@@ -2,7 +2,7 @@ import { CHANNEL_GLYPHS, parseChannelIcon, type ChannelIcon } from '@omni/shared
 
 import type { IconName } from '../ui/symbols';
 
-// Every icon a channel can pick on the computer has an SF Symbol here.
+// Every icon a channel can pick on the computer resolves to a shared drawing here.
 CHANNEL_GLYPHS satisfies readonly IconName[];
 
 /** What a channel avatar draws: the Conductor's mark, the channel's own icon as the Web UI reads it, or its first letter. */

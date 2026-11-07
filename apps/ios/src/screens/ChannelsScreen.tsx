@@ -127,7 +127,7 @@ function ChannelRow({ channel, needs, first, onPress, onLongPress }: { channel: 
         </View>
         {needs > 0 ? <Count glyph="needs" value={needs} /> : null}
         {running > 0 ? <Count glyph="running" value={running} /> : null}
-        <Icon name="chevronRight" size={13} weight="semibold" color={colors.fg4} />
+        <Icon name="chevronRight" size={13} color={colors.fg4} />
       </View>
     </Pressable>
   );

@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CHANNEL_GLYPHS, parseChannelIcon, readSvgIcon, SVG_MAX } from '../channel-icon.ts';
 
-const root = resolve(import.meta.dirname, '../../..');
+import { ICON_PATHS, type IconName } from '../icons.ts';
+
+CHANNEL_GLYPHS satisfies readonly IconName[];
 
 describe('channel icons', () => {
   it('reads emoji, design system icons and nothing', () => {
@@ -46,7 +46,6 @@ describe('channel icons', () => {
   });
 
   it('offers only icons the Web UI draws', () => {
-    const ui = readFileSync(resolve(root, 'apps/web/src/components/ui/icons.tsx'), 'utf8');
-    for (const name of CHANNEL_GLYPHS) expect(ui, name).toMatch(new RegExp(`^  ${name}: '`, 'm'));
+    for (const name of CHANNEL_GLYPHS) expect(ICON_PATHS[name]).toEqual(expect.any(String));
   });
 });

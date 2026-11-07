@@ -41,7 +41,7 @@ export function OptionRow({ label, sub, leading, selected, opens, disabled, onPr
           {sub ? <Text style={[styles.sub, { color: colors.fg3 }]}>{sub}</Text> : null}
         </View>
         {selected === undefined ? null : <Radio on={selected} />}
-        {opens ? <Icon name="chevronRight" size={13} weight="semibold" color={colors.fg4} /> : null}
+        {opens ? <Icon name="chevronRight" size={13} color={colors.fg4} /> : null}
       </View>
     </Pressable>
   );

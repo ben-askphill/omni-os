@@ -154,3 +154,11 @@ For example, run `eas build --platform ios --profile development-simulator` to b
 ## Reference setup
 
 The Expo, React Native, React Navigation, Effect, Uniwind, development client, and EAS setup follows T3 Code's mobile app at `c65f8d552baca1b51e15b5fb4737f07e18cce177`. Omni uses npm workspaces rather than T3's pnpm catalog. The navigation screens package uses the public 4.x release rather than T3's private 5.x fork. T3's unrelated native modules, authentication, widgets, and product-specific Expo configuration are not included in this placeholder app.
+
+## Icons
+
+`src/ui/Icon.tsx` renders the web app's 76 line drawings and Grok mark from `@omni/shared/icons.ts` with native SVG paths. `ui/symbols.ts` only translates older iOS names. New screens can use any shared icon name directly. Vendor logos and crew marks come from `@omni/shared/brand.ts`; `LinkBrand` draws the existing shared link marks.
+
+UIKit tab items use generated template PNGs because they require images rather than SVG nodes. After changing a tab drawing, run `npx tsx packages/shared/scripts/build-tab-icons.ts` from the repo root. The shared tests check their source hash and dimensions.
+
+UIKit still owns system back indicators and share sheets. App icons no longer use SF Symbols. The liquid OmniMark and Loader animations remain web-only; iOS uses the exact static Omni mark and native activity indicators.

@@ -59,14 +59,13 @@ export function RootNavigator() {
         component={ActivityStack}
         options={{
           title: 'Activity',
-          icon: 'tray',
-          selectedIcon: 'tray.fill',
+          icon: 'inbox',
           tabBadge: needsBadge(needs),
           tabAccessibilityLabel: activityTabLabel(needs),
         }}
       />
-      <Tab.Screen name="ChannelsTab" component={ChannelsStack} options={{ title: 'Channels', icon: 'number' }} />
-      <Tab.Screen name="LibraryTab" component={LibraryStack} options={{ title: 'Library', icon: 'square.stack.3d.up', selectedIcon: 'square.stack.3d.up.fill' }} />
+      <Tab.Screen name="ChannelsTab" component={ChannelsStack} options={{ title: 'Channels', icon: 'hash' }} />
+      <Tab.Screen name="LibraryTab" component={LibraryStack} options={{ title: 'Library', icon: 'layers' }} />
     </Tab.Navigator>
   );
 }

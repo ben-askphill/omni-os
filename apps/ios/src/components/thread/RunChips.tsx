@@ -1,3 +1,4 @@
+import { HarnessLogo } from '../../ui/Brand';
 import type { HarnessInfo } from '@omni/client-core';
 import { Pressable, StyleSheet } from 'react-native';
 import { Text } from '../../ui/Text';
@@ -26,10 +27,11 @@ export function RunChip({ thread, harnesses, onPress }: RunChipProps) {
       onPress={onPress}
       style={({ pressed }) => [styles.chip, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
     >
+      <HarnessLogo harness={thread.harness ?? 'claude-code'} />
       <Text numberOfLines={1} style={[styles.label, { color: colors.fg }]}>
         {label}
       </Text>
-      <Icon name="chevronDown" size={10} weight="semibold" color={colors.fg3} />
+      <Icon name="chevronDown" size={10} color={colors.fg3} />
     </Pressable>
   );
 }
