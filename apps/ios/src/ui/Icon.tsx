@@ -3,7 +3,7 @@ import { SymbolView, type SymbolWeight } from 'expo-symbols';
 import { useOmniTheme } from '../theme';
 import { SYMBOLS, type IconName } from './symbols';
 
-export type { IconName };
+export { isIconName, type IconName } from './symbols';
 
 export function Icon({ name, size = 18, color, weight = 'medium' }: { name: IconName; size?: number; color?: string; weight?: SymbolWeight }) {
   const { colors } = useOmniTheme();

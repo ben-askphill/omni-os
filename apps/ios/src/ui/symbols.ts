@@ -73,3 +73,5 @@ export const SYMBOLS = {
 } as const satisfies Record<string, SFSymbol>;
 
 export type IconName = keyof typeof SYMBOLS;
+
+export const isIconName = (name: string): name is IconName => Object.hasOwn(SYMBOLS, name);
