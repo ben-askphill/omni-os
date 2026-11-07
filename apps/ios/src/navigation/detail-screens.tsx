@@ -1,3 +1,5 @@
+import { StyleSheet, View } from 'react-native';
+
 import { createNativeStackNavigator, type NativeStackNavigationOptions, type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { HeaderButton } from '../components/HeaderButton';
@@ -21,7 +23,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { SettingsSectionScreen } from '../screens/SettingsSectionScreen';
 import { ServersScreen } from '../screens/ServersScreen';
 import { ThreadScreen } from '../screens/ThreadScreen';
-import type { ColorTokens } from '../theme';
+import { space, type ColorTokens } from '../theme';
 import type { RootStackParamList } from './types';
 
 export const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -40,7 +42,7 @@ type Navigate = Pick<NativeStackNavigationProp<RootStackParamList>, 'navigate'>;
 
 /**
  * A tab's root screen: Search on the left and Settings on the right as icon buttons. Neither tab root has a back button
- * to take the left. Servers sits inside Settings. New thread is the + beside the tab bar.
+ * to take the left. Servers sits inside Settings. New thread is the last item in the tab bar.
  */
 export function rootHeader(navigation: Navigate) {
   return {
@@ -89,3 +91,11 @@ export function detailScreens({ backTitle }: { backTitle: string }) {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s8,
+  },
+});
