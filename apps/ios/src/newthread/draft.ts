@@ -13,11 +13,12 @@ export const CONDUCTOR = 'conductor';
 export interface Target {
   id: string;
   name: string;
+  icon: string | null;
 }
 
 export function targetsOf(channels: readonly ChannelWithRunning[] | null): Target[] {
   const live = (channels ?? []).filter((c) => !c.archived && c.id !== CONDUCTOR);
-  return [{ id: CONDUCTOR, name: 'Conductor' }, ...live.map((c) => ({ id: c.id, name: c.name }))];
+  return [{ id: CONDUCTOR, name: 'Conductor', icon: null }, ...live.map((c) => ({ id: c.id, name: c.name, icon: c.icon ?? null }))];
 }
 
 /** The Conductor's threads run as its crew role. Another channel's start with none. */

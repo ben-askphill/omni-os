@@ -30,11 +30,11 @@ describe('snippetParts', () => {
 });
 
 describe('matchChannels', () => {
-  const list = [channel('shop', { store_domain: 'shop.example.com' }), channel('old', { archived: 1 }), channel('conductor', { name: 'Conductor' })];
+  const list = [channel('shop', { store_domain: 'shop.example.com', icon: '🛍️' }), channel('old', { archived: 1 }), channel('conductor', { name: 'Conductor' })];
 
-  it('finds live channels by name or id, case-insensitively', () => {
-    expect(matchChannels(list, 'SHO')).toEqual([{ id: 'shop', label: '#shop', detail: 'shop.example.com' }]);
-    expect(matchChannels(list, 'conduct')).toEqual([{ id: 'conductor', label: 'Conductor', detail: null }]);
+  it('finds live channels by name or id, case-insensitively, with the icon their avatar draws', () => {
+    expect(matchChannels(list, 'SHO')).toEqual([{ id: 'shop', name: 'shop', icon: '🛍️', label: '#shop', detail: 'shop.example.com' }]);
+    expect(matchChannels(list, 'conduct')).toEqual([{ id: 'conductor', name: 'Conductor', icon: null, label: 'Conductor', detail: null }]);
   });
 
   it('skips archived channels and matches nothing for an empty query or before the list loads', () => {

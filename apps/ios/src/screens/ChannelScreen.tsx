@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 
 import { channelThreads, threadSections, type ThreadRow } from '../live/channel-model';
 import { useChannels, useHandoffOpen, useLiveHub, usePullRefresh } from '../live/react';
+import { ChannelAvatar } from '../components/ChannelAvatar';
 import { FolderHeader } from '../components/FolderHeader';
 import { HandoffRowView } from '../components/HandoffRowView';
 import { ListHeading } from '../components/ListHeading';
@@ -11,7 +13,7 @@ import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { ThreadSwipeRow } from '../components/ThreadSwipeRow';
 import type { RootScreenProps } from '../navigation/types';
 import { EmptyState } from '../ui/EmptyState';
-import { space, useOmniTheme } from '../theme';
+import { fontSize, space, useOmniTheme, weight } from '../theme';
 
 export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>) {
   const { id } = route.params;
@@ -21,11 +23,12 @@ export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>)
   const { channels } = useChannels();
   const channel = channels?.find((c) => c.id === id) ?? null;
   const name = channel?.name ?? null;
+  const icon = channel?.icon ?? null;
   const [menuId, setMenuId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (name) navigation.setOptions({ title: name });
-  }, [name, navigation]);
+    if (name) navigation.setOptions({ title: name, headerTitle: () => <ChannelTitle name={name} icon={icon} conductor={id === 'conductor'} /> });
+  }, [id, name, icon, navigation]);
 
   const sections = useMemo(() => {
     if (!channel) return [];
@@ -100,7 +103,30 @@ function ChannelThreadRow({ row, onOpen, onMenu }: { row: ThreadRow; onOpen: (th
   return <HandoffRowView row={{ ...row, handoff: row.handoff }} open={open} onToggle={toggle} onOpenThread={onOpen} onMenu={() => onMenu(row.id)} />;
 }
 
+function ChannelTitle({ name, icon, conductor }: { name: string; icon: string | null; conductor: boolean }) {
+  const { colors } = useOmniTheme();
+  return (
+    <View style={styles.title} accessibilityRole="header" accessibilityLabel={name}>
+      <ChannelAvatar name={name} icon={icon} conductor={conductor} size={24} />
+      <Text numberOfLines={1} style={[styles.titleText, { color: colors.fg }]}>
+        {name}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  title: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s4,
+    maxWidth: 240,
+  },
+  titleText: {
+    flexShrink: 1,
+    fontSize: fontSize.heading,
+    fontWeight: weight.medium,
+  },
   header: {
     paddingHorizontal: space.s9,
     paddingTop: space.s2,

@@ -8,6 +8,7 @@ import { Icon } from '../ui/Icon';
 import { AttachControl, AttachNotice } from '../attachments/AttachControl';
 import { AttachmentChips } from '../attachments/AttachmentChips';
 import { clearStaged, removeStagedFile, useStaged } from '../attachments/staged';
+import { ChannelAvatar } from '../components/ChannelAvatar';
 import { HeaderButton } from '../components/HeaderButton';
 import { MachineSheet } from '../components/thread/MachineSheet';
 import { RunOptions } from '../components/thread/RunOptions';
@@ -25,6 +26,7 @@ import {
   targetsOf,
   type DraftInputs,
   type DraftPick,
+  type Target,
 } from '../newthread/draft';
 import { useCrew, useStartThread } from '../newthread/hooks';
 import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
@@ -125,6 +127,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
           {targets.map((t) => (
             <TargetPill
               key={t.id}
+              target={t}
               label={t.id === CONDUCTOR ? t.name : `#${t.name}`}
               on={t.id === target}
               onPress={() => onTarget(t.id)}
@@ -254,7 +257,7 @@ function UploadLine({ progress, onCancel }: { progress: number | null; onCancel:
   );
 }
 
-function TargetPill({ label, on, onPress, onLayout }: { label: string; on: boolean; onPress: () => void; onLayout: (x: number) => void }) {
+function TargetPill({ target, label, on, onPress, onLayout }: { target: Target; label: string; on: boolean; onPress: () => void; onLayout: (x: number) => void }) {
   const { colors } = useOmniTheme();
   return (
     <Pressable
@@ -265,6 +268,7 @@ function TargetPill({ label, on, onPress, onLayout }: { label: string; on: boole
       onLayout={(e) => onLayout(e.nativeEvent.layout.x)}
       style={[styles.pill, { backgroundColor: on ? colors.fg : colors.surface2 }]}
     >
+      <ChannelAvatar name={target.name} icon={target.icon} conductor={target.id === CONDUCTOR} size={24} disc={on ? undefined : colors.bg} />
       <Text numberOfLines={1} style={[styles.pillLabel, { color: on ? colors.onInk : colors.fg }]}>
         {label}
       </Text>
@@ -283,9 +287,12 @@ const styles = StyleSheet.create({
   },
   pill: {
     height: 36,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s3,
     borderRadius: radius.pill,
-    paddingHorizontal: space.s6,
+    paddingLeft: space.s2,
+    paddingRight: space.s6,
   },
   pillLabel: {
     fontSize: fontSize.body,

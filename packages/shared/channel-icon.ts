@@ -53,9 +53,10 @@ export function readSvgIcon(text: string): string {
 /** An SVG icon as an image URL, for <img src>. */
 export const svgDataUrl = (markup: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
 
-// Made on first use: Hermes on iOS may have no Intl.Segmenter, and the app imports this file for the glyph list.
-let graphemes: Intl.Segmenter | undefined;
-const graphemeCount = (v: string) => [...(graphemes ??= new Intl.Segmenter()).segment(v)].length;
+// Hermes, the iPhone app's engine, has no Intl.Segmenter. The server checked the value when it was saved, so a
+// client without one draws what it is given.
+const graphemes = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter() : null;
+const isOneGrapheme = (s: string) => !graphemes || [...graphemes.segment(s)].length === 1;
 
 /** What a stored icon draws, or null for none (the letter avatar) or a value that is neither. */
 export function parseChannelIcon(value: string | null | undefined): ChannelIcon | null {
@@ -72,7 +73,7 @@ export function parseChannelIcon(value: string | null | undefined): ChannelIcon 
     const name = v.slice(GLYPH_PREFIX.length);
     return (CHANNEL_GLYPHS as readonly string[]).includes(name) ? { kind: 'glyph', name: name as ChannelGlyph } : null;
   }
-  return graphemeCount(v) === 1 ? { kind: 'emoji', text: v } : null;
+  return isOneGrapheme(v) ? { kind: 'emoji', text: v } : null;
 }
 
 export const glyphIcon = (name: ChannelGlyph) => `${GLYPH_PREFIX}${name}`;
