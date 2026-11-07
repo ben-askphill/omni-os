@@ -64,12 +64,16 @@ What resuming a **Limit stop** sends: Omni's "continue where you left off", save
 _Avoid_: Retry, auto-resume
 
 **Question card**:
-Questions an agent asks the user with Omni's `ask_user_question` tool: one to four, each with two to four options plus a free-text Other. It sits in the thread where the agent asked, and in **Needs you** until the user answers, skips or writes a message instead, which dismisses it. The first of those wins. The answers go back as the waiting tool call's result; when that call is gone (a restart, Stop, the harness's own timeout), they reach the thread as a message.
+Questions an agent asks the user with Omni's `ask_user_question` tool: one to four, each with two to four options plus a free-text Other. It sits in the thread where the agent asked, and in **Needs you** until the user answers, skips or writes a message instead, which dismisses it. The first of those wins. The answers go back as the waiting tool call's result; when that call is gone (a restart, Stop, the harness's own timeout), they reach the thread as a message. A thread that runs on another machine still takes the answer from the hub: the call returns there while a turn runs, or the answer is forwarded as a message between turns.
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
+**Inbox**:
+The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. On a phone, Activity shows the same list. It is a view over **Needs you** and related shelves, not another name for **Needs you**.
+_Avoid_: Needs you (the reasons a thread waits), notifications
+
 **Needs you**:
-One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock.
-_Avoid_: Inbox (in UI text), notifications, unread thread
+One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock. The **Inbox** view and phone Activity list these threads among others.
+_Avoid_: notifications, unread thread
 
 **Marked done**:
 A user-set flag (`done_at`) that takes a **Thread** out of **Needs you** without changing its run status or removing it from its channel or folder. Mark as not done reverses it. A new message, a run starting or a setup retry clears it. It syncs between Macs; running or queued threads cannot be marked done.
