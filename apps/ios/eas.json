@@ -36,7 +36,7 @@
   },
   "submit": {
     "production": {
-      "ios": { "appName": "Omni OS" }
+      "ios": { "appName": "Omni OS", "ascAppId": "6831903972" }
     }
   }
 }
