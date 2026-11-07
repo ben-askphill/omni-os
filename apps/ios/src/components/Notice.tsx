@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
-import { fontSize, minTarget, space, useOmniTheme, weight } from '../theme';
+import { fontSize, space, useOmniTheme, weight } from '../theme';
+import { Button } from '../ui/Button';
 
 /** A full-screen message with an optional action, for a screen that has nothing else to show yet. */
 export function Notice({ title, body, action }: { title: string; body?: string; action?: { label: string; onPress: () => void } }) {
@@ -11,9 +12,9 @@ export function Notice({ title, body, action }: { title: string; body?: string; 
       <Text style={[styles.title, { color: colors.fg }]}>{title}</Text>
       {body ? <Text style={[styles.body, { color: colors.fg3 }]}>{body}</Text> : null}
       {action ? (
-        <Pressable accessibilityRole="button" onPress={action.onPress} style={styles.action}>
-          <Text style={[styles.actionLabel, { color: colors.fg }]}>{action.label}</Text>
-        </Pressable>
+        <View style={styles.action}>
+          <Button label={action.label} variant="secondary" onPress={action.onPress} />
+        </View>
       ) : null}
     </View>
   );
@@ -34,12 +35,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.body,
   },
   action: {
-    minHeight: minTarget,
-    justifyContent: 'center',
     alignSelf: 'flex-start',
-  },
-  actionLabel: {
-    fontSize: fontSize.body,
-    fontWeight: weight.semibold,
+    marginTop: space.s4,
   },
 });

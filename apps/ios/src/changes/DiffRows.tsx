@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   text: {
     flex: 1,
     fontFamily: mono,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     lineHeight: LINE_HEIGHT,
   },
   file: {
@@ -136,15 +136,15 @@ const styles = StyleSheet.create({
   letter: {
     width: 14,
     fontFamily: mono,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
   },
   label: {
     flex: 1,
     fontFamily: mono,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
   },
   meta: {
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     fontVariant: ['tabular-nums'],
   },
   group: {

@@ -137,6 +137,13 @@ export const motion = {
 /** Apple's minimum touch target. */
 export const minTarget = 44;
 
+/**
+ * The drawn height of a pill control that sits in a row of them: the model, machine and link chips. It is shorter than
+ * the touch target to keep the row light, so every chip also takes `chipSlop` as its hitSlop to reach 44pt.
+ */
+export const chipHeight = 36;
+export const chipSlop = (minTarget - chipHeight) / 2;
+
 export type Scheme = 'light' | 'dark';
 
 export function useOmniTheme(): { scheme: Scheme; colors: ColorTokens } {

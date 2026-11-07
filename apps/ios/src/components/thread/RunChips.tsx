@@ -4,7 +4,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { Text } from '../../ui/Text';
 import { Icon } from '../../ui/Icon';
 
-import { fontSize, radius, space, useOmniTheme, weight } from '../../theme';
+import { chipHeight, chipSlop, fontSize, radius, space, useOmniTheme, weight } from '../../theme';
 import { nextTurnLabel, runChipLabel, type RunThread } from '../../thread/run-model';
 
 interface RunChipProps {
@@ -24,6 +24,7 @@ export function RunChip({ thread, harnesses, onPress }: RunChipProps) {
       accessibilityRole="button"
       accessibilityLabel={`Model: ${label}`}
       accessibilityHint="Opens the model and effort switch"
+      hitSlop={chipSlop}
       onPress={onPress}
       style={({ pressed }) => [styles.chip, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
     >
@@ -48,6 +49,7 @@ export function NextTurnChip({ thread, harnesses, onPress }: RunChipProps) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Next turn runs on ${next}`}
+      hitSlop={chipSlop}
       onPress={onPress}
       style={({ pressed }) => [styles.chip, styles.next, { backgroundColor: pressed ? colors.surface3 : colors.surface2, borderColor: colors.fg3 }]}
     >
@@ -61,7 +63,7 @@ export function NextTurnChip({ thread, harnesses, onPress }: RunChipProps) {
 
 const styles = StyleSheet.create({
   chip: {
-    height: 36,
+    height: chipHeight,
     flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',

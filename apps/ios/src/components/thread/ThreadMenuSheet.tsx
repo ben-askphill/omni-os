@@ -6,7 +6,7 @@ import { Text } from '../../ui/Text';
 
 import type { ThreadMachineControl } from '../../machine/hooks';
 import { machineNote } from '../../machine/state';
-import { fontSize, space, useOmniTheme } from '../../theme';
+import { fontSize, minTarget, space, useOmniTheme } from '../../theme';
 import type { ThreadAction } from '../../thread/actions';
 import { useThreadActions } from '../../thread/hooks';
 import { menuExtras } from '../../thread/menu';
@@ -113,8 +113,9 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
   const accessory = pending || sending ? (
     <ActivityIndicator color={colors.fg3} />
   ) : page !== 'menu' ? (
-    <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} onPress={() => setPage(page === 'takeover' ? 'machine' : 'menu')}>
-      <Text style={[styles.back, { color: colors.fg }]}>‹ Back</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} onPress={() => setPage(page === 'takeover' ? 'machine' : 'menu')} style={styles.back}>
+      <Icon name="chevronLeft" size={15} strokeWidth={2} color={colors.fg} />
+      <Text style={[styles.backLabel, { color: colors.fg }]}>Back</Text>
     </Pressable>
   ) : null;
 
@@ -198,6 +199,12 @@ const styles = StyleSheet.create({
     paddingVertical: space.s6,
   },
   back: {
+    minHeight: minTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s1,
+  },
+  backLabel: {
     fontSize: fontSize.input,
   },
   note: {

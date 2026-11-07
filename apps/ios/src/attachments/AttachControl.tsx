@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import { useLiveHub } from '../live/react';
-import { fontSize, space, useOmniTheme, weight } from '../theme';
+import { fontSize, space, useOmniTheme } from '../theme';
+import { Button } from '../ui/Button';
+import { Icon, type IconName } from '../ui/Icon';
 import { OptionGroup, OptionRow } from '../ui/OptionRow';
 import { Sheet } from '../ui/Sheet';
 import { DEFAULT_MAX_MB, MAX_ATTACHMENTS, describeProblems } from './model';
@@ -12,10 +14,10 @@ import { addStaged, useStaged } from './staged';
 
 const BUTTON_SIZE = 36;
 
-const CHOICES: readonly { pick: Pick; glyph: string; label: string; sub: string }[] = [
-  { pick: 'photo', glyph: '🖼', label: 'Photo library', sub: 'Choose one or more photos' },
-  { pick: 'camera', glyph: '📷', label: 'Camera', sub: 'Take a photo' },
-  { pick: 'file', glyph: '📄', label: 'Files', sub: 'Choose from Files or iCloud Drive' },
+const CHOICES: readonly { pick: Pick; icon: IconName; label: string; sub: string }[] = [
+  { pick: 'photo', icon: 'image', label: 'Photo library', sub: 'Choose one or more photos' },
+  { pick: 'camera', icon: 'camera', label: 'Camera', sub: 'Take a photo' },
+  { pick: 'file', icon: 'file', label: 'Files', sub: 'Choose from Files or iCloud Drive' },
 ];
 
 /**
@@ -78,7 +80,7 @@ export function AttachControl({ scope, disabled = false, onNotice }: { scope: st
         onPress={() => setOpen(true)}
         style={[styles.button, { backgroundColor: colors.surface3, opacity: disabled ? 0.4 : 1 }]}
       >
-        <Text style={[styles.glyph, { color: colors.fg }]}>+</Text>
+        <Icon name="plus" size={18} strokeWidth={2} color={colors.fg} />
       </Pressable>
       <Sheet visible={open} title="Attach" onClose={closed}>
         <View style={styles.body}>
@@ -88,7 +90,7 @@ export function AttachControl({ scope, disabled = false, onNotice }: { scope: st
                 key={c.pick}
                 label={c.label}
                 sub={c.sub}
-                leading={<Text style={styles.choiceGlyph}>{c.glyph}</Text>}
+                leading={<Icon name={c.icon} size={18} color={colors.fg2} />}
                 disabled={room <= 0}
                 last={i === CHOICES.length - 1}
                 onPress={() => choose(c.pick)}
@@ -114,9 +116,7 @@ export function AttachNotice({ text }: { text: string }) {
         {text}
       </Text>
       {permission ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Open Settings" hitSlop={8} onPress={openSettings}>
-          <Text style={[styles.noticeAction, { color: colors.fg }]}>Open Settings</Text>
-        </Pressable>
+        <Button label="Open Settings" variant="ghost" size="small" onPress={openSettings} />
       ) : null}
     </View>
   );
@@ -130,20 +130,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  glyph: {
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: weight.regular,
-  },
   body: {
     gap: space.s6,
     paddingTop: space.s6,
   },
-  choiceGlyph: {
-    fontSize: 20,
-  },
   hint: {
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     paddingHorizontal: space.s9,
   },
   notice: {
@@ -155,10 +147,6 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     flex: 1,
-    fontSize: fontSize.meta + 1,
-  },
-  noticeAction: {
-    fontSize: fontSize.meta + 1,
-    fontWeight: weight.semibold,
+    fontSize: fontSize.caption,
   },
 });

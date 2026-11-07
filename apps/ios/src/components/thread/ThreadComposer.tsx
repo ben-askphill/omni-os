@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   contextLabel: {
     flexShrink: 1,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     fontWeight: weight.semibold,
   },
   notice: {

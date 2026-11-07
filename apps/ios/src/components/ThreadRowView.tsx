@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     gap: space.s3,
   },
   pin: {
-    paddingTop: 4,
+    paddingTop: space.s2,
   },
   title: {
     flex: 1,
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     fontWeight: weight.medium,
   },
   ago: {
-    paddingTop: 2,
+    paddingTop: space.s1,
     fontSize: fontSize.caption,
     fontVariant: ['tabular-nums'],
   },

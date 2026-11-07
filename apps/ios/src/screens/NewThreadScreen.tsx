@@ -29,7 +29,7 @@ import {
   type Target,
 } from '../newthread/draft';
 import { useCrew, useStartThread } from '../newthread/hooks';
-import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
+import { chipHeight, chipSlop, fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { useHarnessCatalog } from '../thread/hooks';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
@@ -168,6 +168,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
             accessibilityLabel={chip ? `Model: ${chip}` : 'Model'}
             accessibilityHint="Opens the model and effort picker"
             disabled={!shown || starting}
+            hitSlop={chipSlop}
             onPress={() => setPicking(true)}
             style={({ pressed }) => [styles.chip, { backgroundColor: pressed ? colors.surface3 : colors.surface2, opacity: shown ? 1 : 0.5 }]}
           >
@@ -186,6 +187,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
               accessibilityLabel={`Run on: ${machineLabel ?? 'default machine'}`}
               accessibilityHint="Opens the list of machines"
               disabled={starting}
+              hitSlop={chipSlop}
               onPress={() => setPickingMachine(true)}
               style={({ pressed }) => [styles.chip, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
             >
@@ -250,9 +252,7 @@ function UploadLine({ progress, onCancel }: { progress: number | null; onCancel:
       <Text accessibilityRole="progressbar" style={[styles.uploadLabel, { color: colors.fg3 }]}>
         {progress === null ? 'Uploading…' : `Uploading ${Math.round(progress * 100)}%`}
       </Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Cancel upload" hitSlop={8} onPress={onCancel}>
-        <Text style={[styles.uploadLabel, styles.uploadCancel, { color: colors.fg }]}>Cancel</Text>
-      </Pressable>
+      <Button label="Cancel" accessibilityLabel="Cancel upload" variant="ghost" size="small" onPress={onCancel} />
     </View>
   );
 }
@@ -264,6 +264,7 @@ function TargetPill({ target, label, on, onPress, onLayout }: { target: Target; 
       accessibilityRole="button"
       accessibilityState={{ selected: on }}
       accessibilityLabel={label}
+      hitSlop={chipSlop}
       onPress={onPress}
       onLayout={(e) => onLayout(e.nativeEvent.layout.x)}
       style={[styles.pill, { backgroundColor: on ? colors.fg : colors.surface2 }]}
@@ -286,7 +287,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.s8,
   },
   pill: {
-    height: 36,
+    height: chipHeight,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s3,
@@ -318,17 +319,16 @@ const styles = StyleSheet.create({
   },
   upload: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: space.s8,
+    paddingLeft: space.s8,
+    paddingRight: space.s4,
   },
   uploadLabel: {
     fontSize: fontSize.body,
   },
-  uploadCancel: {
-    fontWeight: weight.semibold,
-  },
   chip: {
-    height: 36,
+    height: chipHeight,
     minWidth: minTarget,
     flexShrink: 1,
     flexDirection: 'row',

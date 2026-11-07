@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet } from 'react-native';
 import { Text } from '../ui/Text';
 
-import { fontSize, minTarget, useOmniTheme, weight } from '../theme';
+import { fontSize, minTarget, space, useOmniTheme, weight } from '../theme';
 import { Icon, type IconName } from '../ui/Icon';
 
 /**
@@ -30,7 +30,7 @@ export function HeaderButton({
       disabled={disabled}
       onPress={onPress}
       hitSlop={8}
-      style={[styles.button, icon && styles.square, { opacity: disabled ? 0.4 : 1 }]}
+      style={[styles.button, icon ? styles.square : styles.text, { opacity: disabled ? 0.4 : 1 }]}
     >
       {icon ? <Icon name={icon} size={19} color={colors.fg} /> : <Text style={[styles.label, { color: colors.fg }]}>{label}</Text>}
     </Pressable>
@@ -40,11 +40,16 @@ export function HeaderButton({
 const styles = StyleSheet.create({
   button: {
     minHeight: minTarget,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   square: {
     minWidth: minTarget - 8,
-    alignItems: 'center',
+  },
+  /** A word ("Add", "Done") gets room on both sides, so iOS's glass capsule around it does not hug the letters. */
+  text: {
+    minWidth: minTarget,
+    paddingHorizontal: space.s6,
   },
   label: {
     fontSize: fontSize.input,

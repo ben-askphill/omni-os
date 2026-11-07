@@ -2,6 +2,7 @@ import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import { fontSize, radius, space, useOmniTheme, weight } from '../theme';
+import { Icon } from '../ui/Icon';
 import { formatBytes, type Staged } from './model';
 
 const THUMB = 56;
@@ -36,7 +37,7 @@ function Chip({ file, onRemove }: { file: Staged; onRemove?: (id: string) => voi
         <Image accessibilityLabel={file.name} source={{ uri: file.uri }} style={[styles.thumb, { backgroundColor: colors.surface3 }]} />
       ) : (
         <View style={[styles.file, { backgroundColor: colors.surface2, borderColor: colors.line }]}>
-          <Text style={styles.fileGlyph}>📄</Text>
+          <Icon name="file" size={20} color={colors.fg2} />
           <View style={styles.fileText}>
             <Text numberOfLines={1} ellipsizeMode="middle" style={[styles.fileName, { color: colors.fg }]}>
               {file.name}
@@ -53,7 +54,7 @@ function Chip({ file, onRemove }: { file: Staged; onRemove?: (id: string) => voi
           onPress={() => onRemove(file.id)}
           style={[styles.remove, { backgroundColor: colors.fg, borderColor: colors.bg }]}
         >
-          <Text style={[styles.removeGlyph, { color: colors.onInk }]}>×</Text>
+          <Icon name="close" size={9} strokeWidth={3} color={colors.onInk} />
         </Pressable>
       ) : null}
     </View>
@@ -70,13 +71,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   chipWrap: {
-    paddingTop: 6,
-    paddingRight: 6,
+    paddingTop: space.s3,
+    paddingRight: space.s3,
   },
   thumb: {
     width: THUMB,
     height: THUMB,
-    borderRadius: radius.md - 2,
+    borderRadius: radius.sm,
   },
   file: {
     height: THUMB,
@@ -85,18 +86,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.s4,
     paddingHorizontal: space.s6,
-    borderRadius: radius.md - 2,
+    borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  fileGlyph: {
-    fontSize: 22,
   },
   fileText: {
     flexShrink: 1,
     gap: 1,
   },
   fileName: {
-    fontSize: fontSize.body - 1,
+    fontSize: fontSize.ui,
     fontWeight: weight.medium,
   },
   fileSize: {
@@ -112,10 +110,5 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  removeGlyph: {
-    fontSize: 14,
-    lineHeight: 16,
-    fontWeight: weight.bold,
   },
 });
