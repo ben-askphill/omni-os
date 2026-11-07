@@ -6,6 +6,7 @@
   },
   "build": {
     "development": {
+      "node": "24.21.0",
       "env": { "APP_VARIANT": "development", "NODE_OPTIONS": "--max-old-space-size=4096" },
       "channel": "development",
       "developmentClient": true,
@@ -17,6 +18,7 @@
       "ios": { "simulator": true, "image": "macos-tahoe-26.6-xcode-27.1" }
     },
     "preview": {
+      "node": "24.21.0",
       "env": { "APP_VARIANT": "preview", "NODE_OPTIONS": "--max-old-space-size=4096" },
       "channel": "preview",
       "environment": "preview",
@@ -24,6 +26,7 @@
       "ios": { "image": "macos-tahoe-26.6-xcode-27.1" }
     },
     "production": {
+      "node": "24.21.0",
       "env": { "APP_VARIANT": "production", "NODE_OPTIONS": "--max-old-space-size=4096" },
       "channel": "production",
       "environment": "production",
@@ -33,10 +36,7 @@
   },
   "submit": {
     "production": {
-      "ios": {
-        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
-      }
+      "ios": { "appName": "Omni OS" }
     }
   }
 }

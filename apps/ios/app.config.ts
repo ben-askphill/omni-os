@@ -1,4 +1,4 @@
-import type { ExpoConfig } from 'expo/config';
+import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 // expo-camera and expo-image-picker both write NSCameraUsageDescription, so they share one sentence for both uses.
 const CAMERA = 'Omni OS uses the camera to scan the pairing code shown on your computer and to take photos you attach to a message.';
@@ -20,7 +20,7 @@ export function usesDevClient(easProfile: string | undefined): boolean {
   return easProfile !== 'production' && easProfile !== 'preview';
 }
 
-const config: ExpoConfig = {
+export const appConfig: ExpoConfig = {
   name: 'Omni',
   slug: 'omni-os-ios',
   version: '0.1.0',
@@ -73,4 +73,9 @@ const config: ExpoConfig = {
   experiments: { reactCompiler: true },
 };
 
-export default config;
+/**
+ * `eas init` saves the EAS project id, and the account when it differs, in app.json. Expo passes app.json in as
+ * `config`, so keeping it in the merge lets EAS write the id itself. With a plain object export it stops and asks for
+ * a hand edit.
+ */
+export default ({ config }: ConfigContext): ExpoConfig => ({ ...config, ...appConfig });

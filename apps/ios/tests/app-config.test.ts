@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import config, { apsEnvironment, usesDevClient } from '../app.config';
+import config, { apsEnvironment, appConfig, usesDevClient } from '../app.config';
 
 describe('apsEnvironment', () => {
   it('signs distribution profiles for production APNs and everything else for the sandbox', () => {
@@ -27,33 +27,33 @@ describe('usesDevClient', () => {
 
 describe('app config', () => {
   it('adds the notifications plugin that writes the push entitlement', () => {
-    const plugin = config.plugins?.find((entry) => Array.isArray(entry) && entry[0] === 'expo-notifications');
+    const plugin = appConfig.plugins?.find((entry) => Array.isArray(entry) && entry[0] === 'expo-notifications');
     expect(plugin).toBeDefined();
   });
 
   it('keeps the bundle id the server\'s alerts are addressed to', () => {
-    expect(config.ios?.bundleIdentifier).toBe('app.omni-os.ios');
+    expect(appConfig.ios?.bundleIdentifier).toBe('app.omni-os.ios');
   });
 
   it('ships on iPhone only', () => {
-    expect(config.ios?.supportsTablet).toBe(false);
+    expect(appConfig.ios?.supportsTablet).toBe(false);
   });
 
   it('declares no non-exempt encryption, so App Store Connect skips the export question', () => {
-    expect(config.ios?.infoPlist?.ITSAppUsesNonExemptEncryption).toBe(false);
+    expect(appConfig.ios?.infoPlist?.ITSAppUsesNonExemptEncryption).toBe(false);
   });
 
   it('has a local network usage string, since the app connects to a server on the LAN', () => {
-    expect(config.ios?.infoPlist?.NSLocalNetworkUsageDescription).toBeDefined();
+    expect(appConfig.ios?.infoPlist?.NSLocalNetworkUsageDescription).toBeDefined();
   });
 
   it('declares no tracking and no collected data, because the data goes to the user\'s own server', () => {
-    expect(config.ios?.privacyManifests?.NSPrivacyTracking).toBe(false);
-    expect(config.ios?.privacyManifests?.NSPrivacyCollectedDataTypes).toEqual([]);
+    expect(appConfig.ios?.privacyManifests?.NSPrivacyTracking).toBe(false);
+    expect(appConfig.ios?.privacyManifests?.NSPrivacyCollectedDataTypes).toEqual([]);
   });
 
   it('declares the required-reason APIs the release binary calls', () => {
-    const reasons = config.ios?.privacyManifests?.NSPrivacyAccessedAPITypes?.map((entry) => [
+    const reasons = appConfig.ios?.privacyManifests?.NSPrivacyAccessedAPITypes?.map((entry) => [
       entry.NSPrivacyAccessedAPIType,
       entry.NSPrivacyAccessedAPITypeReasons,
     ]);
@@ -62,5 +62,16 @@ describe('app config', () => {
       ['NSPrivacyAccessedAPICategoryFileTimestamp', ['C617.1']],
       ['NSPrivacyAccessedAPICategorySystemBootTime', ['35F9.1']],
     ]);
+  });
+
+  it('keeps the EAS project id that eas init saves in app.json', () => {
+    const merged = config({
+      projectRoot: '.',
+      staticConfigPath: 'app.json',
+      packageJsonPath: 'package.json',
+      config: { extra: { eas: { projectId: 'project-id' } } },
+    });
+    expect(merged.extra?.eas?.projectId).toBe('project-id');
+    expect(merged.ios?.bundleIdentifier).toBe('app.omni-os.ios');
   });
 });
