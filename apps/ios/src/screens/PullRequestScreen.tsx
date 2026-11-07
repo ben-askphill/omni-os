@@ -13,7 +13,8 @@ import { MERGE_ADVICE, prContent, type PRContent } from '../pr/model';
 import { useMerge, usePRWatch, useThreadPR } from '../pr/hooks';
 import type { MergeOutcome } from '../pr/actions';
 import { CheckDot } from '../pr/CheckDot';
-import { Chip, DiffCount, Loading, Section } from '../review/parts';
+import { DiffCount, Loading, Section } from '../review/parts';
+import { Chip } from '../ui/Chip';
 import { fontSize, lineHeight, minTarget, mono, space, useOmniTheme, weight } from '../theme';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
@@ -232,12 +233,12 @@ const styles = StyleSheet.create({
     gap: space.s4,
   },
   meta: {
-    fontSize: fontSize.meta + 1,
-    lineHeight: Math.round((fontSize.meta + 1) * lineHeight.body),
+    fontSize: fontSize.caption,
+    lineHeight: Math.round(fontSize.caption * lineHeight.body),
   },
   branches: {
     fontFamily: mono,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
   },
   status: {
     fontSize: fontSize.body,
@@ -275,8 +276,8 @@ const styles = StyleSheet.create({
     gap: space.s2,
   },
   excerpt: {
-    fontSize: fontSize.body - 1,
-    lineHeight: Math.round((fontSize.body - 1) * lineHeight.body),
+    fontSize: fontSize.ui,
+    lineHeight: Math.round(fontSize.ui * lineHeight.body),
     borderLeftWidth: 2,
     paddingLeft: space.s4,
     marginTop: space.s2,
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
   },
   path: {
     fontFamily: mono,
-    fontSize: fontSize.body - 1,
+    fontSize: fontSize.ui,
   },
   merge: {
     gap: space.s4,
@@ -303,8 +304,8 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   note: {
-    fontSize: fontSize.meta + 1,
-    lineHeight: Math.round((fontSize.meta + 1) * lineHeight.body),
+    fontSize: fontSize.caption,
+    lineHeight: Math.round(fontSize.caption * lineHeight.body),
     textAlign: 'center',
   },
   empty: {

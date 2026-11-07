@@ -200,11 +200,11 @@ const styles = StyleSheet.create({
   },
   sha: {
     fontFamily: mono,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
   },
   footnote: {
-    fontSize: fontSize.meta + 1,
-    lineHeight: Math.round((fontSize.meta + 1) * lineHeight.body),
+    fontSize: fontSize.caption,
+    lineHeight: Math.round(fontSize.caption * lineHeight.body),
   },
   message: {
     paddingHorizontal: space.s9,

@@ -92,10 +92,10 @@ const styles = StyleSheet.create({
   name: {
     flex: 1,
     fontFamily: mono,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
   },
   count: {
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     fontVariant: ['tabular-nums'],
   },
   note: {
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   error: {
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
   },
   actions: {
     flexDirection: 'row',

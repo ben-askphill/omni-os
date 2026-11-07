@@ -1,19 +1,19 @@
 import type { OmniApi } from '@omni/client-core';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Text } from '../ui/Text';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { useLiveHub } from '../live/react';
 import { useRemote } from '../live/use-remote';
 import { RemoteList } from '../settings/RemoteList';
 import { deviceRows, revokeConfirmation, withoutDevice, type DeviceRow } from '../settings/devices-model';
-import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
+import { space } from '../theme';
+import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { GroupedList, ListRow } from '../ui/GroupedList';
 
 const loadDevices = (api: OmniApi) => api.signedInDevices();
 
 export function DevicesScreen() {
-  const { colors } = useOmniTheme();
   const hub = useLiveHub();
   const remote = useRemote(loadDevices);
   const { data, reload, setData } = remote;
@@ -52,17 +52,16 @@ export function DevicesScreen() {
             detail={row.detail}
             trailing={
               <View style={styles.trailing}>
-                {row.current ? <Text style={[styles.marker, { color: colors.fg2, borderColor: colors.lineStrong }]}>This device</Text> : null}
-                <Pressable
-                  accessibilityRole="button"
+                {row.current ? <Chip label="This device" tone="outline" /> : null}
+                <Button
+                  label="Revoke"
+                  variant="ghost"
+                  size="small"
                   accessibilityLabel={row.revokeLabel}
-                  accessibilityState={{ disabled: revoking !== null }}
-                  disabled={revoking !== null}
+                  busy={revoking === row.id}
+                  disabled={revoking !== null && revoking !== row.id}
                   onPress={() => confirm(row)}
-                  style={({ pressed }) => [styles.revoke, { opacity: revoking !== null && revoking !== row.id ? 0.5 : pressed ? 0.6 : 1 }]}
-                >
-                  <Text style={[styles.revokeLabel, { color: colors.fg2 }]}>{revoking === row.id ? 'Revoking' : 'Revoke'}</Text>
-                </Pressable>
+                />
               </View>
             }
           />
@@ -77,24 +76,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s4,
-  },
-  marker: {
-    fontSize: fontSize.meta,
-    fontWeight: weight.semibold,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.s4,
-    paddingVertical: 1,
-  },
-  revoke: {
-    minHeight: minTarget,
-    minWidth: minTarget,
-    paddingHorizontal: space.s4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  revokeLabel: {
-    fontSize: fontSize.body,
-    fontWeight: weight.semibold,
   },
 });

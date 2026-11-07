@@ -14,23 +14,6 @@ export function DiffCount({ add, del }: { add: number; del: number }) {
   );
 }
 
-export type ChipTone = 'live' | 'done' | 'needs' | 'outline';
-
-export function Chip({ label, tone }: { label: string; tone: ChipTone }) {
-  const { colors } = useOmniTheme();
-  const look = {
-    live: { backgroundColor: colors.surface2, color: colors.live },
-    done: { backgroundColor: colors.done, color: colors.ink },
-    needs: { backgroundColor: colors.needs, color: colors.ink },
-    outline: { backgroundColor: colors.surface2, color: colors.fg3 },
-  }[tone];
-  return (
-    <View style={[styles.chip, { backgroundColor: look.backgroundColor }]}>
-      <Text style={[styles.chipLabel, { color: look.color }]}>{label}</Text>
-    </View>
-  );
-}
-
 export function Loading({ label }: { label: string }) {
   const { colors } = useOmniTheme();
   return (
@@ -62,16 +45,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.body,
     fontVariant: ['tabular-nums'],
   },
-  chip: {
-    alignSelf: 'flex-start',
-    borderRadius: radius.pill,
-    paddingHorizontal: space.s4,
-    paddingVertical: 3,
-  },
-  chipLabel: {
-    fontSize: fontSize.meta + 1,
-    fontWeight: weight.semibold,
-  },
   section: {
     gap: space.s2,
   },
@@ -82,7 +55,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.s2,
   },
   group: {
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     overflow: 'hidden',
   },
 });

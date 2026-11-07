@@ -24,7 +24,7 @@ function styleFor(c: ColorTokens): MarkdownStyle {
     codeBlock: {
       color: c.fg,
       fontFamily: MONO,
-      fontSize: 12.5,
+      fontSize: fontSize.small,
       lineHeight: 19,
       backgroundColor: c.surface2,
       borderColor: c.line,
@@ -34,14 +34,14 @@ function styleFor(c: ColorTokens): MarkdownStyle {
       marginTop: 2,
       marginBottom: 10,
     },
-    code: { color: c.fg, fontFamily: MONO, fontSize: 13, backgroundColor: c.surface3, borderColor: c.line },
+    code: { color: c.fg, fontFamily: MONO, fontSize: fontSize.ui, backgroundColor: c.surface3, borderColor: c.line },
     link: { color: c.fg, underline: true },
     linkVariants: { '^omni-thread:': { color: c.fg, underline: true, fontFamily: MONO } },
     strong: { color: c.fg },
     em: { color: c.fg },
     thematicBreak: { color: c.lineStrong, height: 1, marginTop: 10, marginBottom: 10 },
     table: {
-      fontSize: fontSize.body - 1,
+      fontSize: fontSize.ui,
       color: c.fg,
       headerBackgroundColor: c.surface2,
       headerTextColor: c.fg,
@@ -51,7 +51,7 @@ function styleFor(c: ColorTokens): MarkdownStyle {
       borderRadius: 10,
       cellPaddingHorizontal: 10,
       cellPaddingVertical: 6,
-      lineHeight: Math.round((fontSize.body - 1) * lineHeight.body),
+      lineHeight: Math.round(fontSize.ui * lineHeight.body),
     },
   } as MarkdownStyle;
 }

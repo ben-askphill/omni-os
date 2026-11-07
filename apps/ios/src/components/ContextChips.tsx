@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.s4,
   },
   label: {
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     fontWeight: weight.semibold,
   },
 });

@@ -6,7 +6,7 @@ import { blockedNote } from '@omni/shared/thread-machine.ts';
 
 import type { ThreadView } from '../../live/hub';
 import { useChannels } from '../../live/react';
-import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
+import { chipHeight, chipSlop, fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { Icon, type IconName } from '../../ui/Icon';
 import { ChannelAvatar } from '../ChannelAvatar';
 import { glyphFor } from '../StatusDot';
@@ -77,7 +77,7 @@ function LinkChip({ label, icon, hint, onPress }: { label: string; icon: IconNam
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
-      hitSlop={4}
+      hitSlop={chipSlop}
       onPress={onPress}
       style={({ pressed }) => [styles.link, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
     >
@@ -132,15 +132,15 @@ const styles = StyleSheet.create({
     paddingBottom: space.s4,
   },
   link: {
-    height: 36,
+    height: chipHeight,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.s3,
+    gap: space.s4,
     borderRadius: radius.pill,
     paddingHorizontal: space.s6,
   },
   linkLabel: {
-    fontSize: fontSize.ui,
+    fontSize: fontSize.body,
     fontWeight: weight.medium,
   },
   blocked: {

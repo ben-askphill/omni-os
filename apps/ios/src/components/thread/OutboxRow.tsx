@@ -1,11 +1,10 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Text } from '../../ui/Text';
+import { StyleSheet, View } from 'react-native';
 
 import { AttachmentChips } from '../../attachments/AttachmentChips';
 import { restoreStaged } from '../../attachments/staged';
 import type { ThreadLive } from '../../live/hub';
 import { useStore } from '../../live/react';
-import { fontSize, space, useOmniTheme, weight } from '../../theme';
+import { space, useOmniTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { UserBubble } from '../UserBubble';
 import { editInComposer } from './drafts';
@@ -73,9 +72,7 @@ function UploadBar({ progress, onCancel }: { progress: number | null; onCancel: 
       >
         <View style={[styles.fill, { backgroundColor: colors.fg, width: `${Math.round((progress ?? 0) * 100)}%` }]} />
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Cancel upload" hitSlop={8} onPress={onCancel}>
-        <Text style={[styles.cancel, { color: colors.fg }]}>Cancel</Text>
-      </Pressable>
+      <Button label="Cancel" accessibilityLabel="Cancel upload" variant="ghost" size="small" onPress={onCancel} />
     </View>
   );
 }
@@ -104,9 +101,5 @@ const styles = StyleSheet.create({
   fill: {
     height: 4,
     borderRadius: 2,
-  },
-  cancel: {
-    fontSize: fontSize.body,
-    fontWeight: weight.semibold,
   },
 });

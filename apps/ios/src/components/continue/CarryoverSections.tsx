@@ -97,20 +97,20 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   plain: {
-    fontSize: fontSize.body + 1,
-    lineHeight: Math.round((fontSize.body + 1) * lineHeight.body),
+    fontSize: fontSize.subhead,
+    lineHeight: Math.round(fontSize.subhead * lineHeight.body),
   },
   code: {
     fontFamily: MONO,
-    fontSize: fontSize.body - 1,
-    lineHeight: Math.round((fontSize.body - 1) * lineHeight.body),
+    fontSize: fontSize.ui,
+    lineHeight: Math.round(fontSize.ui * lineHeight.body),
   },
   mono: {
     fontFamily: MONO,
   },
   sub: {
-    fontSize: fontSize.meta + 1,
-    lineHeight: Math.round((fontSize.meta + 1) * lineHeight.body),
+    fontSize: fontSize.caption,
+    lineHeight: Math.round(fontSize.caption * lineHeight.body),
   },
   more: {
     paddingHorizontal: space.s8,
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   },
   boxText: {
     padding: space.s6,
-    fontSize: fontSize.meta + 1,
-    lineHeight: Math.round((fontSize.meta + 1) * lineHeight.body),
+    fontSize: fontSize.caption,
+    lineHeight: Math.round(fontSize.caption * lineHeight.body),
   },
 });

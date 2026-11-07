@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   square: {
-    borderRadius: 6,
+    borderRadius: radius.xs,
   },
   tick: {
     fontSize: fontSize.meta,

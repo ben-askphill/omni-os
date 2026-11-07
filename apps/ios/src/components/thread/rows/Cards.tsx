@@ -245,7 +245,7 @@ export function NowRow({ row }: Of<'now'>) {
       <StatusDot glyph="running" />
       <Text numberOfLines={1} style={[styles.nowText, { color: colors.fg }]}>
         {row.now.verb}
-        {row.now.target ? <Text style={{ fontFamily: MONO, fontSize: 13 }}>{` ${row.now.target}`}</Text> : null}
+        {row.now.target ? <Text style={{ fontFamily: MONO, fontSize: fontSize.ui }}>{` ${row.now.target}`}</Text> : null}
       </Text>
       {row.meta ? <Text style={[styles.caption, { color: colors.fg3 }]}>{row.meta}</Text> : null}
     </View>
@@ -291,20 +291,20 @@ export function SwitchRow({ row }: Of<'switch'>) {
 const styles = StyleSheet.create({
   end: { alignItems: 'flex-end', gap: space.s2 },
   bubble: { maxWidth: '86%', borderRadius: radius.xl, paddingHorizontal: space.s8, paddingVertical: space.s6, gap: space.s4 },
-  bubbleText: { fontSize: 15, lineHeight: 22 },
+  bubbleText: { fontSize: fontSize.subhead, lineHeight: 22 },
   dim: { opacity: 0.6 },
   wake: { gap: space.s2 },
   caption: { fontSize: fontSize.meta },
-  small: { fontSize: 12.5, lineHeight: 18 },
-  meta: { fontSize: 12.5 },
+  small: { fontSize: fontSize.small, lineHeight: 18 },
+  meta: { fontSize: fontSize.small },
   card: { borderRadius: radius.xl, paddingHorizontal: space.s6, paddingVertical: space.s6, gap: space.s4 },
-  cardTitle: { fontSize: 13, fontWeight: weight.semibold },
+  cardTitle: { fontSize: fontSize.ui, fontWeight: weight.semibold },
   line: { flexDirection: 'row', alignItems: 'center', gap: space.s4 },
   grow: { flex: 1 },
   loadWhole: { minHeight: 32, justifyContent: 'center' },
-  mono: { fontFamily: MONO, fontSize: 12.5, lineHeight: 19 },
+  mono: { fontFamily: MONO, fontSize: fontSize.small, lineHeight: 19 },
   links: { flexDirection: 'row', gap: space.s8 },
-  link: { fontSize: 13, fontWeight: weight.semibold },
+  link: { fontSize: fontSize.ui, fontWeight: weight.semibold },
   kid: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -314,12 +314,12 @@ const styles = StyleSheet.create({
     paddingVertical: space.s4,
     borderRadius: radius.md,
   },
-  kidTitle: { fontSize: 14 },
+  kidTitle: { fontSize: fontSize.body },
   fileIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   pill: { minHeight: minTarget, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 14 },
   pillText: { flex: 1, fontSize: 13.5 },
-  nowText: { flex: 1, fontSize: 14 },
-  todo: { flex: 1, fontSize: 14, lineHeight: 19 },
+  nowText: { flex: 1, fontSize: fontSize.body },
+  todo: { flex: 1, fontSize: fontSize.body, lineHeight: 19 },
   switch: { alignItems: 'center', gap: space.s2, paddingVertical: space.s2 },
   rule: { height: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginBottom: space.s2 },
 });

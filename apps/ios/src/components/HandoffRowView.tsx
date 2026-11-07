@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import type { ThreadRow } from '../live/channel-model';
-import { fontSize, minTarget, space, useOmniTheme } from '../theme';
+import { fontSize, minTarget, radius, space, useOmniTheme } from '../theme';
 import { Icon } from '../ui/Icon';
 import { glyphFor, StatusDot } from './StatusDot';
 import { ThreadSwipeRow } from './ThreadSwipeRow';
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     marginLeft: space.s8 + 36 + space.s6 - space.s4,
     paddingHorizontal: space.s4,
     alignSelf: 'flex-start',
-    borderRadius: 18,
+    borderRadius: radius.pill,
   },
   chevron: {
     width: 12,
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.s6,
     paddingRight: space.s9,
-    borderRadius: 12,
+    borderRadius: radius.sm,
   },
   childTitle: {
     flex: 1,

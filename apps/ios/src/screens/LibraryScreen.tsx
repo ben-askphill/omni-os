@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.s8,
   },
   card: {
-    borderRadius: radius.md + space.s2,
+    borderRadius: radius.lg,
     padding: space.s2 + 2,
     gap: space.s4,
   },
@@ -170,11 +170,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   name: {
-    fontSize: 12.5,
+    fontSize: fontSize.small,
     fontFamily: 'Menlo',
   },
   where: {
-    fontSize: 12,
+    fontSize: fontSize.caption,
   },
   label: {
     flex: 1,

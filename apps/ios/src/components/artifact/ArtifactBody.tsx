@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     width: COLUMN,
     paddingHorizontal: space.s4,
     paddingVertical: space.s4 - 1,
-    fontSize: 12.5,
+    fontSize: fontSize.small,
   },
   headCell: {
     fontFamily: 'Menlo',
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   },
   mono: {
     fontFamily: 'Menlo',
-    fontSize: 12,
+    fontSize: fontSize.caption,
     lineHeight: 18,
   },
   note: {

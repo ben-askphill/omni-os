@@ -7,6 +7,7 @@ import { Text } from '../ui/Text';
 import type { FileSource, LiveHub } from '../live/hub';
 import { useLiveHub } from '../live/react';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
+import { Icon } from '../ui/Icon';
 import { formatBytes } from './model';
 
 const THUMB = 132;
@@ -122,7 +123,7 @@ function FileLine({ threadId, file }: { threadId: string; file: Attachment }) {
         onPress={() => void press()}
         style={({ pressed }) => [styles.file, { backgroundColor: pressed ? colors.surface3 : colors.surface, borderColor: colors.line }]}
       >
-        <Text style={styles.fileGlyph}>📄</Text>
+        <Icon name="file" size={20} color={colors.fg2} />
         <View style={styles.fileText}>
           <Text numberOfLines={1} ellipsizeMode="middle" style={[styles.fileName, { color: colors.fg }]}>
             {file.name}
@@ -193,7 +194,7 @@ const styles = StyleSheet.create({
   thumb: {
     width: THUMB,
     height: THUMB,
-    borderRadius: radius.md - 2,
+    borderRadius: radius.sm,
   },
   placeholder: {
     alignItems: 'center',
@@ -211,11 +212,8 @@ const styles = StyleSheet.create({
     gap: space.s4,
     paddingHorizontal: space.s6,
     paddingVertical: space.s2,
-    borderRadius: radius.md - 2,
+    borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  fileGlyph: {
-    fontSize: 22,
   },
   fileText: {
     flexShrink: 1,
@@ -270,7 +268,7 @@ const styles = StyleSheet.create({
   viewerError: {
     color: '#ffffff',
     textAlign: 'center',
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     padding: space.s6,
   },
 });

@@ -117,8 +117,8 @@ const styles = StyleSheet.create({
     lineHeight: Math.round(fontSize.body * lineHeight.body),
   },
   sub: {
-    fontSize: fontSize.body - 1,
-    lineHeight: Math.round((fontSize.body - 1) * lineHeight.body),
+    fontSize: fontSize.ui,
+    lineHeight: Math.round(fontSize.ui * lineHeight.body),
   },
   action: {
     alignSelf: 'flex-start',

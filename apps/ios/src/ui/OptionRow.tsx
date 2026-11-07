@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { Icon } from './Icon';
 
-import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
+import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 
 interface OptionRowProps {
   label: string;
@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
     fontSize: fontSize.input,
   },
   sub: {
-    fontSize: fontSize.meta + 1,
-    lineHeight: Math.round((fontSize.meta + 1) * lineHeight.body),
+    fontSize: fontSize.caption,
+    lineHeight: Math.round(fontSize.caption * lineHeight.body),
   },
   radio: {
     width: 22,
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   },
   card: {
     marginHorizontal: space.s8,
-    borderRadius: 14,
+    borderRadius: radius.xl,
     overflow: 'hidden',
   },
 });

@@ -8,6 +8,7 @@ import type { PairedServer } from '../pairing/servers';
 import { STATUS_LABEL } from '../pairing/status';
 import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 
 export function ServersScreen({ navigation }: RootScreenProps<'Servers'>) {
   const { colors } = useOmniTheme();
@@ -51,27 +52,16 @@ export function ServersScreen({ navigation }: RootScreenProps<'Servers'>) {
             >
               <View style={styles.nameRow}>
                 <Text style={[styles.name, { color: colors.fg }]}>{server.name}</Text>
-                {active && (
-                  <Text
-                    style={[styles.activeMarker, { color: colors.fg2, borderColor: colors.lineStrong }]}
-                  >
-                    Active
-                  </Text>
-                )}
+                {active && <Chip label="Active" tone="outline" />}
               </View>
               <Text style={[styles.meta, { color: colors.fg3 }]}>{server.origin}</Text>
               {statusLabel !== null && (
                 <Text style={[styles.meta, { color: colors.fg3 }]}>{statusLabel}</Text>
               )}
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Remove ${server.name}`}
-              onPress={() => confirmRemove(server)}
-              style={styles.remove}
-            >
-              <Text style={[styles.removeLabel, { color: colors.fg2 }]}>Remove</Text>
-            </Pressable>
+            <View style={styles.remove}>
+              <Button label="Remove" variant="ghost" size="small" accessibilityLabel={`Remove ${server.name}`} onPress={() => confirmRemove(server)} />
+            </View>
           </View>
         );
       })}
@@ -110,27 +100,11 @@ const styles = StyleSheet.create({
     fontSize: fontSize.heading,
     fontWeight: weight.semibold,
   },
-  activeMarker: {
-    fontSize: fontSize.meta,
-    fontWeight: weight.semibold,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.s4,
-    paddingVertical: 1,
-  },
   meta: {
     fontSize: fontSize.body,
     lineHeight: Math.round(fontSize.body * lineHeight.body),
   },
   remove: {
-    minHeight: minTarget,
-    minWidth: minTarget,
-    paddingHorizontal: space.s8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeLabel: {
-    fontSize: fontSize.body,
-    fontWeight: weight.semibold,
+    paddingRight: space.s4,
   },
 });

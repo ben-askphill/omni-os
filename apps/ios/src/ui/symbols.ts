@@ -15,6 +15,7 @@ export const SYMBOLS = {
   bell: 'bell',
   branch: 'arrow.triangle.branch',
   browser: 'safari',
+  camera: 'camera',
   check: 'checkmark',
   chevronDown: 'chevron.down',
   chevronLeft: 'chevron.left',

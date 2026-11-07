@@ -11,6 +11,7 @@ import { actionDetail, outputCut, RUN_STATE_LABEL, runGlyph, runWhen } from '../
 import { useActionsLive, useActionsView } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 
 const MONO = 'Menlo';
@@ -118,7 +119,7 @@ function ActionLine({ action }: { action: ChannelAction }) {
         <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
           {action.name}
         </Text>
-        {action.setup ? <Chip label="Setup" /> : null}
+        {action.setup ? <Chip label="Setup" tone="outline" /> : null}
       </View>
       <Text numberOfLines={1} style={[styles.command, { color: colors.fg3 }]}>
         {action.command}
@@ -128,10 +129,6 @@ function ActionLine({ action }: { action: ChannelAction }) {
   );
 }
 
-function Chip({ label }: { label: string }) {
-  const { colors } = useOmniTheme();
-  return <Text style={[styles.chip, { color: colors.fg3, borderColor: colors.lineStrong }]}>{label}</Text>;
-}
 
 interface RunCardProps {
   run: ActionRun;
@@ -168,7 +165,7 @@ function RunCard({ run, latest, setup, now, busy, error, blocked, onStop, onRetr
             <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
               {run.name}
             </Text>
-            {setup ? <Chip label="Setup" /> : null}
+            {setup ? <Chip label="Setup" tone="outline" /> : null}
           </View>
           <View style={styles.stateRow}>
             <StatusPill glyph={runGlyph(run.state)} label={RUN_STATE_LABEL[run.state]} />
@@ -217,7 +214,7 @@ const styles = StyleSheet.create({
     paddingTop: space.s9,
   },
   blocked: {
-    fontSize: fontSize.body - 1,
+    fontSize: fontSize.ui,
     lineHeight: 19,
     padding: space.s6,
     borderRadius: radius.md,
@@ -246,12 +243,12 @@ const styles = StyleSheet.create({
   },
   name: {
     flexShrink: 1,
-    fontSize: fontSize.body + 1,
+    fontSize: fontSize.subhead,
     fontWeight: weight.semibold,
   },
   command: {
     fontFamily: MONO,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
   },
   meta: {
     fontSize: fontSize.meta,
@@ -266,16 +263,8 @@ const styles = StyleSheet.create({
     gap: space.s4,
     marginTop: space.s2,
   },
-  chip: {
-    fontSize: fontSize.meta - 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    overflow: 'hidden',
-  },
   error: {
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     lineHeight: 16,
   },
   output: {
@@ -284,7 +273,7 @@ const styles = StyleSheet.create({
   },
   outputText: {
     fontFamily: MONO,
-    fontSize: fontSize.meta + 1,
+    fontSize: fontSize.caption,
     lineHeight: 17,
     padding: space.s6,
   },

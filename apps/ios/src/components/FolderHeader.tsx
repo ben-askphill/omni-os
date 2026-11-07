@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
-    fontSize: fontSize.body + 1,
+    fontSize: fontSize.subhead,
     fontWeight: weight.semibold,
   },
   counts: {
