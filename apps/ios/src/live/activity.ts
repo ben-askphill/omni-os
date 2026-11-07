@@ -1,16 +1,15 @@
-import type { HarnessUsage, OmniApi, PinnedThread, Thread, Usage } from '@omni/client-core';
+import type { OmniApi, PinnedThread, Thread } from '@omni/client-core';
 
 import { serial } from './serial';
 import { createStore, type Store } from './store';
 
-/** How many threads the recent list holds, as phone web asks for. */
-export const RECENT_LIMIT = 60;
+/** How many threads the recent list holds, as phone web's Inbox asks for (apps/web/src/app/useInbox.ts). */
+export const RECENT_LIMIT = 200;
 
 export interface ActivityState {
   /** Newest activity first. Null until the first load. */
   recent: readonly Thread[] | null;
   pinned: readonly PinnedThread[];
-  usage: HarnessUsage;
   /** The largest file the server takes, from the status the load already read. Null until it says. */
   maxUploadMb: number | null;
   loading: boolean;
@@ -34,7 +33,7 @@ export interface ActivityLiveOptions {
 
 /** Activity's data, kept live from the feed the way phone web's store keeps it. */
 export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions): ActivityLive {
-  const state = createStore<ActivityState>({ recent: null, pinned: [], usage: {}, maxUploadMb: null, loading: false, error: null, loadedAt: null });
+  const state = createStore<ActivityState>({ recent: null, pinned: [], maxUploadMb: null, loading: false, error: null, loadedAt: null });
   const failed = (e: unknown) => state.set((s) => ({ ...s, error: messageOf(e) }));
 
   const refresh = serial(async () => {
@@ -49,7 +48,6 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
     state.set((s) => ({
       recent: recent.status === 'fulfilled' ? recent.value : s.recent,
       pinned: pinned.status === 'fulfilled' ? pinned.value : s.pinned,
-      usage: status.status === 'fulfilled' ? (status.value.usage ?? {}) : s.usage,
       maxUploadMb: status.status === 'fulfilled' ? (status.value.maxUploadMb ?? null) : s.maxUploadMb,
       loading: false,
       error: failure ? messageOf(failure.reason) : null,
@@ -69,19 +67,9 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
 
   function applyFeed(message: unknown) {
     if (!isRecord(message)) return;
-    switch (message.type) {
-      case 'thread':
-        if (!isRecord(message.thread) || typeof message.thread.id !== 'string') return;
-        patchRecent(message.thread as unknown as Thread);
-        void refreshPinned();
-        return;
-      case 'usage': {
-        const harness = typeof message.harness === 'string' ? message.harness : 'claude-code';
-        const usage = isRecord(message.usage) ? (message.usage as Usage) : null;
-        state.set((s) => ({ ...s, usage: { ...s.usage, [harness]: usage } }));
-        return;
-      }
-    }
+    if (message.type !== 'thread' || !isRecord(message.thread) || typeof message.thread.id !== 'string') return;
+    patchRecent(message.thread as unknown as Thread);
+    void refreshPinned();
   }
 
   /** The thread's new copy in its place by activity. An archived one leaves the list. */
