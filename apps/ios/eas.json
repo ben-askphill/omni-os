@@ -20,6 +20,7 @@
       "node": "24.21.0",
       "env": { "APP_VARIANT": "preview", "NODE_OPTIONS": "--max-old-space-size=4096" },
       "environment": "preview",
+      "channel": "preview",
       "distribution": "internal",
       "ios": { "image": "macos-tahoe-26.6-xcode-27.1" }
     },
@@ -27,6 +28,7 @@
       "node": "24.21.0",
       "env": { "APP_VARIANT": "production", "NODE_OPTIONS": "--max-old-space-size=4096" },
       "environment": "production",
+      "channel": "production",
       "autoIncrement": true,
       "ios": { "image": "macos-tahoe-26.6-xcode-27.1" }
     }

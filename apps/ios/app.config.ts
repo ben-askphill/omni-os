@@ -4,20 +4,28 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 const CAMERA = 'Omni OS uses the camera to scan the pairing code shown on your computer and to take photos you attach to a message.';
 
 /**
+ * The build variant: `production`, `preview` or `development`. Each EAS build profile sets APP_VARIANT in eas.json. The
+ * EAS workflow sets it on its fingerprint and update jobs too, because they resolve this config outside a build, and a
+ * different config there gives a different fingerprint, so the update would never match the build. A local
+ * `expo run:ios` sets none.
+ */
+const VARIANT = process.env.APP_VARIANT;
+
+/**
  * The APNs environment the build's `aps-environment` entitlement names. Only the development-client profiles talk to
  * Apple's sandbox. An internal-distribution (`preview`) or store build is signed for production, and the app registers
  * its token under the same name (`pushEnvironment` in src/notifications/environment.ts).
  */
-export function apsEnvironment(easProfile: string | undefined): 'development' | 'production' {
-  return easProfile === 'production' || easProfile === 'preview' ? 'production' : 'development';
+export function apsEnvironment(variant: string | undefined): 'development' | 'production' {
+  return variant === 'production' || variant === 'preview' ? 'production' : 'development';
 }
 
 /**
- * Whether the build carries the development client, which adds the Metro launcher. EAS sets EAS_BUILD_PROFILE. A local
- * `expo run:ios` has none and gets the client. Store and internal test builds run the app alone.
+ * Whether the build carries the development client, which adds the Metro launcher. A local `expo run:ios` has no
+ * variant and gets the client. Store and internal test builds run the app alone.
  */
-export function usesDevClient(easProfile: string | undefined): boolean {
-  return easProfile !== 'production' && easProfile !== 'preview';
+export function usesDevClient(variant: string | undefined): boolean {
+  return variant !== 'production' && variant !== 'preview';
 }
 
 export const appConfig: ExpoConfig = {
@@ -52,11 +60,11 @@ export const appConfig: ExpoConfig = {
     },
   },
   plugins: [
-    ...(usesDevClient(process.env.EAS_BUILD_PROFILE) ? ['expo-dev-client'] : []),
+    ...(usesDevClient(VARIANT) ? ['expo-dev-client'] : []),
     ['expo-build-properties', { ios: { deploymentTarget: '18.0' } }],
     // The scanner reads QR codes only: no video and no microphone.
     ['expo-camera', { cameraPermission: CAMERA, microphonePermission: false }],
-    ['expo-notifications', { mode: apsEnvironment(process.env.EAS_BUILD_PROFILE) }],
+    ['expo-notifications', { mode: apsEnvironment(VARIANT) }],
     // Photos only: no video, so no microphone.
     ['expo-image-picker', { photosPermission: 'Omni OS reads the photos you pick so you can attach them to a message.', cameraPermission: CAMERA, microphonePermission: false }],
     [
@@ -70,12 +78,23 @@ export const appConfig: ExpoConfig = {
       },
     ],
   ],
+  // EAS Update: a published update reaches only builds whose native code it was made for. The fingerprint hashes the
+  // native dependencies and this config, so adding a native module or a plugin option needs a new build.
+  runtimeVersion: { policy: 'fingerprint' },
   experiments: { reactCompiler: true },
 };
+
+/** Where expo-updates asks for new JavaScript. EAS Update serves each project from its own URL. */
+export function updatesUrl(projectId: string | undefined): string | undefined {
+  return projectId ? `https://u.expo.dev/${projectId}` : undefined;
+}
 
 /**
  * `eas init` saves the EAS project id, and the account when it differs, in app.json. Expo passes app.json in as
  * `config`, so keeping it in the merge lets EAS write the id itself. With a plain object export it stops and asks for
- * a hand edit.
+ * a hand edit. The updates URL comes from the same id.
  */
-export default ({ config }: ConfigContext): ExpoConfig => ({ ...config, ...appConfig });
+export default ({ config }: ConfigContext): ExpoConfig => {
+  const url = updatesUrl(config.extra?.eas?.projectId);
+  return { ...config, ...appConfig, ...(url ? { updates: { url } } : {}) };
+};

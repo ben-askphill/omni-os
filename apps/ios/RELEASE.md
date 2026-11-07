@@ -45,13 +45,35 @@ The `production` profile bumps the build number on each build (`autoIncrement`).
 
 Every build profile pins Node 24.21.0, which bundles npm 11.19.0. The Xcode 27 image ships Node 22 and npm 10.9.9 by default, and the root `devEngines` refuses that npm with `EBADDEVENGINES` before anything installs.
 
-Omni does not use EAS Update, so every change ships as a new build. The build profiles set no `channel`: with one, `eas build` asks to install `expo-updates` and stops the run if you say yes. Answer no if an older checkout still asks. Add the channels back together with `expo-updates` if Omni adopts EAS Update.
-
 The other profiles are for testing outside TestFlight:
 
 - `development` builds the development client for a device.
 - `development-simulator` builds the development client for the Simulator.
 - `preview` builds an internal distribution build for devices listed in the developer portal.
+
+## Release on merge
+
+`.eas/workflows/ios-release.yml` runs on EAS when a push to `main` changes `apps/ios`, `packages/shared` or `packages/client-core`. Markdown files and `apps/ios/tests` do not start it. It works out the app's fingerprint, a hash of its native dependencies and its resolved app config, and then takes one of two paths:
+
+- **No production build has this fingerprint.** The change touched native code: a native module, an Expo SDK bump or a config plugin option. The workflow builds with the `production` profile, which takes the next build number from EAS, and submits the build to App Store Connect. "Team (Expo)" has access to every build, so the build reaches its testers once Apple finishes processing it.
+- **A production build has this fingerprint.** The change is JavaScript only. The workflow publishes an EAS Update to the `production` channel. Installed builds with the same fingerprint download it on launch and run it on the next launch, so a tester may need to quit and reopen the app twice.
+
+Builds use the fingerprint as their runtime version (`runtimeVersion` in `app.config.ts`), so an update never reaches a build whose native code it was not made for. The fingerprint depends on the resolved config, which depends on `APP_VARIANT`. Any job or command that resolves the config outside a build must set `APP_VARIANT=production`, as the workflow does, or its fingerprint will not match the build's.
+
+Runs queue one at a time. Put `[eas skip]` in a commit message to skip the run for that push. Start a run by hand with `npx eas-cli@latest workflow:run .eas/workflows/ios-release.yml`. Builds before build 4 were made without `expo-updates` and never receive updates.
+
+### Set up the workflow
+
+1. In expo.dev, open the `omni-os-ios` project under the `omni-os` account, then Project settings, then GitHub. Connect `ben-askphill/omni-os` and set the base directory to `apps/ios`. The Expo GitHub app is already installed on `ben-askphill`; grant it access to `omni-os` if the repository is not listed.
+2. Nothing else. The workflow runs on EAS with the credentials EAS already holds: the signing files and the App Store Connect API key from the first build. GitHub needs no Expo token.
+
+### Publish an update by hand
+
+From `apps/ios`:
+
+```sh
+APP_VARIANT=production npx eas-cli@latest update --channel production --platform ios --environment production --message "<what changed>"
+```
 
 ## Add internal testers
 
@@ -73,7 +95,7 @@ You need Node 24 or 26, and Xcode 27 with its iOS SDK. The Mac needs `/opt/homeb
 ```sh
 git archive HEAD | ssh <mac> 'rm -rf ~/omni-ios-release && mkdir -p ~/omni-ios-release && tar -x -C ~/omni-ios-release'
 
-ssh <mac> 'export PATH=/opt/homebrew/bin:$PATH LANG=en_US.UTF-8; cd ~/omni-ios-release && npm ci --include=dev && cd apps/ios && EAS_BUILD_PROFILE=production npx expo prebuild --platform ios --clean'
+ssh <mac> 'export PATH=/opt/homebrew/bin:$PATH LANG=en_US.UTF-8; cd ~/omni-ios-release && npm ci --include=dev && cd apps/ios && APP_VARIANT=production npx expo prebuild --platform ios --clean'
 
 ssh <mac> 'export PATH=/opt/homebrew/bin:$PATH LANG=en_US.UTF-8; cd ~/omni-ios-release/apps/ios/ios && xcodebuild -workspace Omni.xcworkspace -scheme Omni -configuration Release -destination generic/platform=iOS -archivePath ~/omni-ios-release/build/Omni.xcarchive CODE_SIGNING_ALLOWED=NO archive'
 ```
