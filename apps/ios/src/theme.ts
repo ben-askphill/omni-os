@@ -27,8 +27,6 @@ const light = {
   onDone: '#17181a',
   /** The ring that keeps a lime dot visible on white. */
   doneEdge: '#17181a',
-  /** "Getting full", such as a usage meter past 70%. Darker in light so it reads on white. */
-  warn: '#b45309',
   ink: '#17181a',
   mark: 'rgba(245, 158, 11, 0.28)',
   diffAdd: 'rgba(198, 245, 43, 0.22)',
@@ -60,7 +58,6 @@ const dark: ColorTokens = {
   done: '#c6f52b',
   onDone: '#17181a',
   doneEdge: 'transparent',
-  warn: '#f5b544',
   ink: '#17181a',
   mark: 'rgba(245, 181, 68, 0.28)',
   diffAdd: 'rgba(198, 245, 43, 0.22)',

@@ -51,7 +51,7 @@ Make a pairing code on your computer, then scan its QR code or type the server a
 
 The app accepts only an `https://` server origin. It checks the server's capabilities after pairing and whenever it returns to the foreground. The contract is in `packages/shared/app-pairing.ts`.
 
-With no server paired the app shows Connect. Once one is, the app opens on three native tabs, Activity, Channels and Library, in phone web's order. Activity is home: it shows what needs you, what runs, your pins, the latest threads and what finished today, and its tab carries the needs-you count. Each tab keeps its own stack, so a thread opens inside the tab you tapped it in, and the tab bar hides on pushed screens. Search (left of each tab's header) and Settings (right) open from every tab root. Settings reaches Servers, which switches or removes servers and reaches Add server. The channel list, Activity, the thread view and the connection line come from `src/live/`, which talks to the active server through `@omni/client-core` with the token from the Keychain. Pairing's own calls use the same client.
+With no server paired the app shows Connect. Once one is, the app opens on three native tabs, Activity, Channels and Library, in phone web's order. Activity is home, phone web's Inbox: your pins, then the threads waiting on you with the latest back first, then the Working and Done shelves, which fold. Its header opens the Conductor, and its tab carries the needs-you count. Each tab keeps its own stack, so a thread opens inside the tab you tapped it in, and the tab bar hides on pushed screens. Search (left of each tab's header, beside the Conductor on Activity) and Settings (right) open from every tab root. Settings reaches Servers, which switches or removes servers and reaches Add server. The channel list, Activity, the thread view and the connection line come from `src/live/`, which talks to the active server through `@omni/client-core` with the token from the Keychain. Pairing's own calls use the same client.
 
 A channel's threads list as phone web's Channel screen does. A folder is a header with its thread count and how many run; tap it to close or open it. The server keeps that state, so the phone, the desktop and the Mac follow each other, and the row answers before the server does and goes back with an alert if the server refuses. The Conductor nests the threads it delegated under their parent, with a "3 delegated · 1 running" button to hide them; whether each parent is open is a choice of this phone, kept in the Keychain next to the pairing, open by default. A thread's header has an Actions button: the channel's named commands run in that thread's checkout, with each run's state and output, Stop and Retry. A run belongs to the thread and is not a new thread, as on phone web.
 
@@ -65,9 +65,24 @@ The Simulator has no camera, so use Enter code there.
 
 Search lists the latest threads until you type. After 200 ms of quiet it asks the server's `/search`, which matches every word as a prefix in thread titles and messages, and shows matching channels above the thread hits. A hit opens its thread. It does not scroll to the matching message yet, because the Thread screen takes only an id.
 
-Settings is a grouped list. Servers is the pairing screen. Notifications opens the per-server alert choices (`NotificationSettings`). Devices lists who is signed in to the active server and revokes one. The server decides who may revoke a device, and its refusal is shown as it is. Automations lists the server's automations and pauses or resumes one, as phone web does. Sign out of a server is the same as removing it: the phone tells the server, then forgets the token. The footer shows the app version.
+Settings opens with Servers, then a search over every setting and the same groups and sections as the Web UI and phone web, drawn from `@omni/shared/settings-catalog.ts`, then Devices, Automations and Sign out. A search hit opens its section. Each section edits what the Web UI's section edits, through the same calls, so a value saved on the phone shows on the computer and the other way round:
 
-These screens call the server through `hub.call` (`src/live/hub.ts`), which retries once after a 401 like the live lists, and `useRemote` (`src/live/use-remote.ts`) for lists the live feed does not carry. Appearance follows the system theme. Workspace, Machines, Sync, Integrations, Harness config, Secrets and About stay in the Web UI and the desktop app.
+- General: name, pronouns, timezone and email (`PUT /setup`). The fields come from `@omni/shared/settings.ts`, as on the web.
+- Appearance: Match system, Light or Dark, kept on this phone only.
+- Notifications: the per-server alert choices (`NotificationSettings`).
+- Harnesses & models: each harness with whether it can run and how to fix it, each channel's default model, and the server's `.env` options.
+- Threads: the machine new threads run on, the session and usage-limit options from `.env`, and Automations.
+- Channels: every channel, New channel, and the archived ones with Unarchive.
+- Workspace and Integrations: the GitHub owner and the Hermes URL. Folders show their value, since they are paths on the server's machine.
+- Worktrees: automatic cleanup and its idle days (`PUT /worktrees/retention`).
+- Machines, Sync, Sharing & access and About: what the server reports, read-only, with Devices under Sharing & access.
+- Secrets: names by scope, add or replace a value, delete one. A value is never shown again.
+
+Channel Settings opens from the gear on a channel's header, from holding a channel in Channels, and from Settings › Channels. It edits the fields the Web UI's channel settings edit: name, icon (an emoji or one of the design system's icons), kind, default model, notes, the design system file (picked from Files), the GitHub repo, worktree per thread, the browser window, store domain, portal slug, the channel's actions (each saved on its own), its secrets, and Archive. Save sends `PATCH /channels/:id` with the body `@omni/shared/channel-form.ts` builds, the same one the Web UI sends. The repo path and the base directory show their value: they are paths on the server's machine. An uploaded SVG icon shows and can be cleared, but is uploaded on the computer.
+
+What stays on the computer: running setup again, text size (the app follows iOS Text Size), the worktree disk scan and a hand-picked cleanup, Sync sign-in, pause and the path map, Google sign-in, Omni Connect and pairing, the network fields only the config file sets, folder paths, and the desktop app's own section.
+
+These screens call the server through `hub.request` (`src/live/hub.ts`), which retries once after a 401 like the live lists, and `useRemote` (`src/live/use-remote.ts`) for what the live feed does not carry.
 
 ## Library and artifacts
 

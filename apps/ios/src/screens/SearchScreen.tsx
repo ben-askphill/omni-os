@@ -58,7 +58,7 @@ export function SearchScreen({ navigation }: RootScreenProps<'Search'>) {
                 <ListRow
                   key={c.id}
                   first={i === 0}
-                  lead={<ChannelAvatar name={c.name} icon={c.icon} conductor={c.id === 'conductor'} size={28} />}
+                  leading={<ChannelAvatar name={c.name} icon={c.icon} conductor={c.id === 'conductor'} size={28} />}
                   title={c.label}
                   detail={c.detail ?? undefined}
                   chevron

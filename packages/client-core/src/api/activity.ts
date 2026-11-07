@@ -38,6 +38,8 @@ export interface ServerStatus {
   device?: { name: string; here: boolean };
   /** The largest file the server accepts, in megabytes. Older servers leave it out. */
   maxUploadMb?: number;
+  /** Which server this is: its version, commit and start time. */
+  server?: { version: string; gitHead: string | null; startedAt: string; secretStore?: string };
 }
 
 export function activityApi(http: HttpClient) {

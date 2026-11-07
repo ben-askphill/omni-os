@@ -56,7 +56,6 @@ function activityServer() {
     needsYou: needs('ask') as unknown,
     recent: [thread('b', '2026-11-02T10:00:00Z'), thread('a', '2026-11-02T09:00:00Z')] as unknown[],
     pinned: [] as unknown[],
-    usage: { 'claude-code': { five_hour: { utilization: 40, resetsAt: 0 } } } as unknown,
     fail: new Set<string>(),
   };
   const reply = (path: string): Reply => {
@@ -65,7 +64,7 @@ function activityServer() {
     if (route === '/api/needs-you') return { body: server.needsYou };
     if (route === '/api/recent') return { body: server.recent };
     if (route === '/api/pinned') return { body: server.pinned };
-    if (route === '/api/status') return { body: { usage: server.usage, running: 0 } };
+    if (route === '/api/status') return { body: { usage: {}, running: 0 } };
     return { body: [] };
   };
   return { server, reply };
@@ -85,17 +84,16 @@ afterEach(() => {
 });
 
 describe('activity', () => {
-  it('loads needs you, the 60 latest threads, pins and usage when the hub opens', async () => {
+  it('loads needs you, the 200 latest threads and pins when the hub opens', async () => {
     const { reply } = activityServer();
     const { fetch, calls } = fakeFetch(reply);
     const hub = createLiveHub({ session: session(), transport: fakeTransport().transport, fetch, now: () => NOW });
     await settle();
-    expect(calls).toEqual(expect.arrayContaining(['/api/needs-you', '/api/recent?limit=60', '/api/pinned', '/api/status']));
+    expect(calls).toEqual(expect.arrayContaining(['/api/needs-you', '/api/recent?limit=200', '/api/pinned', '/api/status']));
     const s = hub.activity.get();
     expect(s).toMatchObject({ loading: false, error: null, loadedAt: NOW, pinned: [] });
     expect(hub.needsYou.get().data?.items.map((i) => i.thread.id)).toEqual(['ask']);
     expect(s.recent?.map((t) => t.id)).toEqual(['b', 'a']);
-    expect(s.usage['claude-code']?.five_hour?.utilization).toBe(40);
     hub.close();
   });
 
@@ -146,21 +144,6 @@ describe('activity', () => {
     hub.close();
   });
 
-  it("applies a usage line to its harness, Claude's when it names none", async () => {
-    const { reply } = activityServer();
-    const t = fakeTransport();
-    const hub = createLiveHub({ session: session(), transport: t.transport, fetch: fakeFetch(reply).fetch });
-    await settle();
-    t.feed()?.sink.open();
-    t.feed()?.sink.message(frame({ type: 'usage', usage: { five_hour: { utilization: 80, resetsAt: 0 } } }));
-    t.feed()?.sink.message(frame({ type: 'usage', harness: 'cursor', usage: { monthly: { utilization: 0.5, resetsAt: 0 } } }));
-    expect(hub.activity.get().usage).toEqual({
-      'claude-code': { five_hour: { utilization: 80, resetsAt: 0 } },
-      cursor: { monthly: { utilization: 0.5, resetsAt: 0 } },
-    });
-    hub.close();
-  });
-
   it('loads everything again after the feed reconnects and on return to the front', async () => {
     const { server, reply } = activityServer();
     const t = fakeTransport();
@@ -173,7 +156,7 @@ describe('activity', () => {
     await settle(1_000);
     t.feed()?.sink.open();
     await settle();
-    expect(count('/api/recent?limit=60')).toBe(2);
+    expect(count('/api/recent?limit=200')).toBe(2);
     expect(hub.activity.get().pinned.map((p) => p.id)).toEqual(['p']);
 
     hub.setForeground(false);

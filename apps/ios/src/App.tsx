@@ -9,7 +9,10 @@ import { RootNavigator } from './navigation/RootNavigator';
 import { NotificationsProvider } from './notifications/NotificationsProvider';
 import { PairingProvider } from './pairing/PairingProvider';
 import { ActiveSessionProvider } from './session/ActiveSession';
+import { restoreThemePref } from './settings/appearance';
 import { useOmniTheme } from './theme';
+
+restoreThemePref();
 
 export default function App() {
   const { scheme, colors } = useOmniTheme();

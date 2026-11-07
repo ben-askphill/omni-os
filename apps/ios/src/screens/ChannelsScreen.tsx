@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActionSheetIOS, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import type { ChannelWithRunning } from '@omni/client-core';
@@ -33,6 +33,15 @@ export function ChannelsScreen({ navigation }: RootScreenProps<'Channels'>) {
   const empty = model !== null && !model.conductor && model.groups.length === 0;
   const summary = model ? `${model.listedCount} ${model.listedCount === 1 ? 'channel' : 'channels'} · ${model.running} running` : null;
   const open = (channel: ChannelWithRunning) => navigation.navigate('Channel', { id: channel.id });
+  // Hold a channel for what the Web UI's sidebar menu offers: its settings and a new thread in it.
+  const menu = (channel: ChannelWithRunning) =>
+    ActionSheetIOS.showActionSheetWithOptions(
+      { title: channel.id === 'conductor' ? channel.name : `#${channel.name}`, options: ['Channel settings', 'New thread', 'Cancel'], cancelButtonIndex: 2 },
+      (i) => {
+        if (i === 0) navigation.navigate('ChannelSettings', { id: channel.id });
+        if (i === 1) navigation.navigate('NewThread', { channel: channel.id });
+      },
+    );
 
   return (
     <ScrollView
@@ -67,7 +76,7 @@ export function ChannelsScreen({ navigation }: RootScreenProps<'Channels'>) {
           {model.conductor ? (
             <View style={styles.card}>
               <GroupedList>
-                <ChannelRow channel={model.conductor} needs={needs.get(model.conductor.id) ?? 0} first onPress={() => open(model.conductor!)} />
+                <ChannelRow channel={model.conductor} needs={needs.get(model.conductor.id) ?? 0} first onPress={() => open(model.conductor!)} onLongPress={() => menu(model.conductor!)} />
               </GroupedList>
             </View>
           ) : null}
@@ -77,7 +86,7 @@ export function ChannelsScreen({ navigation }: RootScreenProps<'Channels'>) {
               <View style={styles.card}>
                 <GroupedList>
                   {group.channels.map((channel, i) => (
-                    <ChannelRow key={channel.id} channel={channel} needs={needs.get(channel.id) ?? 0} first={i === 0} onPress={() => open(channel)} />
+                    <ChannelRow key={channel.id} channel={channel} needs={needs.get(channel.id) ?? 0} first={i === 0} onPress={() => open(channel)} onLongPress={() => menu(channel)} />
                   ))}
                 </GroupedList>
               </View>
@@ -89,7 +98,7 @@ export function ChannelsScreen({ navigation }: RootScreenProps<'Channels'>) {
   );
 }
 
-function ChannelRow({ channel, needs, first, onPress }: { channel: ChannelWithRunning; needs: number; first: boolean; onPress: () => void }) {
+function ChannelRow({ channel, needs, first, onPress, onLongPress }: { channel: ChannelWithRunning; needs: number; first: boolean; onPress: () => void; onLongPress: () => void }) {
   const { colors } = useOmniTheme();
   const running = channel.running || 0;
   const conductor = channel.id === 'conductor';
@@ -99,7 +108,9 @@ function ChannelRow({ channel, needs, first, onPress }: { channel: ChannelWithRu
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint="Hold for channel settings."
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.wash }]}
     >
       <ChannelAvatar name={channel.name} icon={channel.icon} conductor={conductor} size={34} />

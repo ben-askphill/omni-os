@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import type { ChannelAction, SetupMode } from '@omni/shared/channel-actions.ts';
+import { ACTION_PORT_HINT, ACTION_SETUP_HINT, actionInput, draftOf, type ActionDraft, type ChannelAction } from '@omni/shared/channel-actions.ts';
 import { api, errorText, useApi } from '../api.ts';
-import { actionInput, draftOf, type ActionDraft, type PortMode } from '../channel-actions.ts';
 import { href } from '../router.ts';
 import { ActionLine } from './thread/panel/ActionsTab.tsx';
 import { Button, Chip, ErrorNote, InlineConfirm, Label, Loading, Segmented } from './ui.tsx';
@@ -79,19 +78,6 @@ export function ChannelActionsEditor({ channelId }: { channelId: string }) {
   );
 }
 
-const SETUP_HINT: Record<SetupMode | 'off', string> = {
-  off: 'Runs only from a thread\'s Actions tab. One action in the channel can also run in each new worktree.',
-  blocking:
-    'Runs once in each new worktree and holds the agent until it succeeds. If it fails, the thread stops at Setup failed with Retry setup. Never on Hermes, Cursor Cloud or a shared checkout.',
-  background: 'Runs once in each new worktree while the agent starts. If it fails, the thread says so and the agent keeps going. Never on Hermes, Cursor Cloud or a shared checkout.',
-};
-
-const PORT_HINT: Record<PortMode, string> = {
-  none: 'The command serves nothing.',
-  free: 'Omni picks a free port each run, so two threads can preview at once. The command reads it as $OMNI_PORT.',
-  fixed: 'Always this port. A second run while it is taken is refused.',
-};
-
 function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?: ChannelAction; onSaved: (a: ChannelAction) => void; onCancel: () => void }) {
   const [d, setD] = useState<ActionDraft>(() => draftOf(action));
   const [busy, setBusy] = useState(false);
@@ -162,7 +148,7 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
         />
       </div>
       <div>
-        <Label hint={PORT_HINT[d.portMode]}>Port</Label>
+        <Label hint={ACTION_PORT_HINT[d.portMode]}>Port</Label>
         <div className="flex flex-wrap items-center gap-2">
           <Segmented
             radio
@@ -189,7 +175,7 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
         </div>
       </div>
       <div>
-        <Label hint={SETUP_HINT[d.setup ?? 'off']}>Run in new worktrees</Label>
+        <Label hint={ACTION_SETUP_HINT[d.setup ?? 'off']}>Run in new worktrees</Label>
         <Segmented
           radio
           size="sm"

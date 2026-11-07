@@ -8,8 +8,6 @@ import {
   type ActionRun,
   type ActionRunState,
   type ChannelAction,
-  type ChannelActionInput,
-  type SetupMode,
   type ThreadActions,
   withRun,
 } from '@omni/shared/channel-actions.ts';
@@ -84,48 +82,6 @@ export function stripRun(data: ThreadActions | undefined): ActionRun | null {
 /** The setup card polls the whole time the worktree is prepared, and a ready thread's strip while its run runs. */
 export const setupPolls = (setup: Thread['setup'], data: ThreadActions | undefined) =>
   setup === 'preparing' || (setup === null && stripRun(data)?.state === 'running');
-
-// ---------- the channel settings editor ----------
-
-export type PortMode = 'none' | 'free' | 'fixed';
-
-/** The editor's fields as typed. `port` is the fixed port's text, kept while another mode is picked. */
-export interface ActionDraft {
-  name: string;
-  command: string;
-  secrets: string;
-  portMode: PortMode;
-  port: string;
-  setup: SetupMode | null;
-}
-
-export function draftOf(a?: ChannelAction): ActionDraft {
-  return {
-    name: a?.name ?? '',
-    command: a?.command ?? '',
-    secrets: a?.secrets.join(', ') ?? '',
-    portMode: a?.port == null ? 'none' : a.port === 0 ? 'free' : 'fixed',
-    port: a?.port ? String(a.port) : '',
-    setup: a?.setup ?? null,
-  };
-}
-
-/** Secret names as typed: comma or space separated, upper-cased, each once. */
-export const parseSecrets = (text: string) => [...new Set(text.toUpperCase().split(/[\s,]+/).filter(Boolean))];
-
-/**
- * What POST or PATCH sends, always with `setup`: PATCH replaces the whole action, so leaving it out would clear it.
- * The server checks the rest; this only catches a fixed port with no number, which would read as 0.
- */
-export function actionInput(d: ActionDraft): { input: ChannelActionInput } | { error: string } {
-  let port: number | null = null;
-  if (d.portMode === 'free') port = 0;
-  if (d.portMode === 'fixed') {
-    if (!/^\d+$/.test(d.port.trim()) || Number(d.port) === 0) return { error: 'Give the fixed port a number, like 9292.' };
-    port = Number(d.port);
-  }
-  return { input: { name: d.name.trim(), command: d.command.trim(), secrets: parseSecrets(d.secrets), port, setup: d.setup } };
-}
 
 function useVisible() {
   const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState === 'visible');

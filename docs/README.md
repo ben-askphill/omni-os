@@ -4,7 +4,7 @@
 
 - [Install and first run](user/install.md): the desktop app, running from a checkout, and the step-by-step agent instructions
 - [Configuration](user/configuration.md): your config, `.env`, placeholders and secrets
-- [Threads](user/threads.md): Needs you and Mark done, the composer, context chips, history, channel actions, Watch PR and Send to Grok Bot
+- [Threads](user/threads.md): Inbox and Needs you, Mark done, the composer, context chips, history, channel actions, Watch PR and Send to Grok Bot
 - [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud
 - [Crew and Conductor](user/crew.md)
 - [Automations](user/automations.md): cron, GitHub PR events, published pages and signed GitHub webhooks
@@ -31,11 +31,11 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Transitions](internals/transitions.md): the one service behind a run switch, a handoff or Take over and a Continue, its four routes, the six older routes that answer through it, and what stays as synced kv for machines on an older build
 - [Glossary](../CONTEXT.md)
 - [Native app pairing contract](internals/app-pairing.md): session pairing, capabilities, and push token registration
-- [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md)
+- [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md): first build, TestFlight, and the EAS workflow on `main` (native build or EAS Update)
 - [Desktop app](../apps/desktop/README.md): develop against a QA stack, the QA harness (`scripts/qa.ts`), packaging, where data and logs live, and the bridge contract · [Desktop release](../apps/desktop/RELEASE.md): signing, notarization and the release workflow
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)
-- Reviews: [2026-10-31 consolidation release, the KPIs re-measured](reviews/2026-10-31-consolidation-review.md) · [2026-10-22 bloat and dead code](reviews/2026-10-22-thermo-bloat-review.html) · [2026-10-16 thermo](reviews/2026-10-16-thermo-review.html)
+- Reviews: [2026-11-07 iOS and phone web visual parity](reviews/2026-11-07-ios-visual-parity.md) · [2026-10-31 consolidation release, the KPIs re-measured](reviews/2026-10-31-consolidation-review.md) · [2026-10-22 bloat and dead code](reviews/2026-10-22-thermo-bloat-review.html) · [2026-10-16 thermo](reviews/2026-10-16-thermo-review.html)
 - Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) (superseded by 0010; the app is deleted) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md) · [0005 One execution owner](adr/0005-one-execution-owner.md) · [0006 Linux app is a window](adr/0006-linux-app-is-a-window.md) (superseded by 0010; the app is deleted) · [0007 Google sign-in through Clerk](adr/0007-google-sign-in-through-clerk.md) · [0008 Cloudflare relay](adr/0008-cloudflare-relay.md) · [0009 Omni Connect](adr/0009-omni-connect.md) · [0010 Desktop app is Electron](adr/0010-desktop-app-is-electron.md)
 
 ## Where a new doc goes
