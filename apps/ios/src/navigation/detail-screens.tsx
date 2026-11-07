@@ -1,5 +1,3 @@
-import { StyleSheet, View } from 'react-native';
-
 import { createNativeStackNavigator, type NativeStackNavigationOptions, type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { HeaderButton } from '../components/HeaderButton';
@@ -19,7 +17,7 @@ import { SearchScreen } from '../screens/SearchScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { ServersScreen } from '../screens/ServersScreen';
 import { ThreadScreen } from '../screens/ThreadScreen';
-import { space, type ColorTokens } from '../theme';
+import type { ColorTokens } from '../theme';
 import type { RootStackParamList } from './types';
 
 export const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -38,18 +36,12 @@ type Navigate = Pick<NativeStackNavigationProp<RootStackParamList>, 'navigate'>;
 
 /**
  * A tab's root screen: Search on the left and Settings on the right as icon buttons. Neither tab root has a back button
- * to take the left. Servers sits inside Settings. Channels also carries New, so a
- * thread can start from the list.
+ * to take the left. Servers sits inside Settings. New thread is the + beside the tab bar.
  */
-export function rootHeader(navigation: Navigate, { newThread = false }: { newThread?: boolean } = {}) {
+export function rootHeader(navigation: Navigate) {
   return {
     headerLeft: () => <HeaderButton label="Search" icon="search" onPress={() => navigation.navigate('Search')} />,
-    headerRight: () => (
-      <View style={styles.actions}>
-        <HeaderButton label="Settings" icon="settings" onPress={() => navigation.navigate('Settings')} />
-        {newThread ? <HeaderButton label="New thread" icon="plus" onPress={() => navigation.navigate('NewThread')} /> : null}
-      </View>
-    ),
+    headerRight: () => <HeaderButton label="Settings" icon="settings" onPress={() => navigation.navigate('Settings')} />,
   };
 }
 
@@ -85,10 +77,3 @@ export function detailScreens({ backTitle }: { backTitle: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s8,
-  },
-});
