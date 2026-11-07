@@ -3,6 +3,7 @@ import { AccessibilityInfo, Alert, Pressable, RefreshControl, ScrollView, StyleS
 
 import { DoneRowView, InboxRowView, ShelfHeader, ShowMore, type RowAction } from '../components/activity/InboxRows';
 import { OmniMark } from '../components/ChannelAvatar';
+import { HeaderButton } from '../components/HeaderButton';
 import { StatusLine } from '../components/StatusLine';
 import { activityInbox, DONE_INITIAL, DONE_PAGE, type ActivityInbox, type InboxRow } from '../live/activity-model';
 import { useActivity, useChannels, useLiveHub, useNeedsYou, usePullRefresh, useShelfOpen } from '../live/react';
@@ -42,17 +43,17 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      // The title sits in the list under the bar, as phone web's MoTitle does, so the bar holds only the Conductor and actions.
+      // The title sits in the list under the bar, as phone web's MoTitle does. Search moves left beside the Conductor and
+      // Settings keeps the right to itself (rootHeader), since iOS draws the gear in its own glass circle.
       headerTitle: '',
-      headerLeft: () => <ConductorButton mark={inbox.mark} onPress={() => navigation.navigate('Channel', { id: 'conductor' })} />,
-      // Native bar buttons, so iOS draws Search and Settings as one glass group, as phone web puts its actions on the right.
-      headerRight: undefined,
-      unstable_headerRightItems: () => [
-        { type: 'button', label: 'Search', icon: { type: 'sfSymbol', name: 'magnifyingglass' }, tintColor: colors.fg, onPress: () => navigation.navigate('Search') },
-        { type: 'button', label: 'Settings', icon: { type: 'sfSymbol', name: 'gearshape' }, tintColor: colors.fg, onPress: () => navigation.navigate('Settings') },
-      ],
+      headerLeft: () => (
+        <View style={styles.headerLeft}>
+          <ConductorButton mark={inbox.mark} onPress={() => navigation.navigate('Channel', { id: 'conductor' })} />
+          <HeaderButton label="Search" icon="search" onPress={() => navigation.navigate('Search')} />
+        </View>
+      ),
     });
-  }, [navigation, colors.fg, inbox.mark]);
+  }, [navigation, inbox.mark]);
 
   const rowActions = (row: InboxRow): RowAction[] => {
     const out: RowAction[] = [];
@@ -202,6 +203,11 @@ const styles = StyleSheet.create({
     lineHeight: Math.round(fontSize.body * 1.5),
     paddingHorizontal: space.s2,
     paddingVertical: space.s8,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s6,
   },
   conductor: {
     minHeight: minTarget,
