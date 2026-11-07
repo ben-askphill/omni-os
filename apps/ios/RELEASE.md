@@ -45,7 +45,7 @@ The `production` profile bumps the build number on each build (`autoIncrement`).
 
 Every build profile pins Node 24.21.0, which bundles npm 11.19.0. The Xcode 27 image ships Node 22 and npm 10.9.9 by default, and the root `devEngines` refuses that npm with `EBADDEVENGINES` before anything installs.
 
-Omni does not use EAS Update, so every change ships as a new build. The `channel` keys in `eas.json` are inert until an update library is added.
+Omni does not use EAS Update, so every change ships as a new build. The build profiles set no `channel`: with one, `eas build` asks to install `expo-updates` and stops the run if you say yes. Answer no if an older checkout still asks. Add the channels back together with `expo-updates` if Omni adopts EAS Update.
 
 The other profiles are for testing outside TestFlight:
 

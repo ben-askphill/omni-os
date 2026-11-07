@@ -8,7 +8,6 @@
     "development": {
       "node": "24.21.0",
       "env": { "APP_VARIANT": "development", "NODE_OPTIONS": "--max-old-space-size=4096" },
-      "channel": "development",
       "developmentClient": true,
       "distribution": "internal",
       "ios": { "image": "macos-tahoe-26.6-xcode-27.1" }
@@ -20,7 +19,6 @@
     "preview": {
       "node": "24.21.0",
       "env": { "APP_VARIANT": "preview", "NODE_OPTIONS": "--max-old-space-size=4096" },
-      "channel": "preview",
       "environment": "preview",
       "distribution": "internal",
       "ios": { "image": "macos-tahoe-26.6-xcode-27.1" }
@@ -28,7 +26,6 @@
     "production": {
       "node": "24.21.0",
       "env": { "APP_VARIANT": "production", "NODE_OPTIONS": "--max-old-space-size=4096" },
-      "channel": "production",
       "environment": "production",
       "autoIncrement": true,
       "ios": { "image": "macos-tahoe-26.6-xcode-27.1" }
