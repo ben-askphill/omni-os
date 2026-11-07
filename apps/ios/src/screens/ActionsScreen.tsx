@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: minTarget,
     justifyContent: 'center',
-    gap: 2,
+    gap: space.s1,
   },
   nameRow: {
     flexDirection: 'row',

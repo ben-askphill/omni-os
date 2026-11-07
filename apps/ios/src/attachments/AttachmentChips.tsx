@@ -71,8 +71,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   chipWrap: {
-    paddingTop: 6,
-    paddingRight: 6,
+    paddingTop: space.s3,
+    paddingRight: space.s3,
   },
   thumb: {
     width: THUMB,

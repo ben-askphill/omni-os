@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
   kidTitle: { fontSize: fontSize.body },
   fileIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  pill: { minHeight: minTarget, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 14 },
+  pill: { minHeight: minTarget, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: space.s7 },
   pillText: { flex: 1, fontSize: 13.5 },
   nowText: { flex: 1, fontSize: fontSize.body },
   todo: { flex: 1, fontSize: fontSize.body, lineHeight: 19 },

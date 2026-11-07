@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   },
   text: {
     flex: 1,
-    gap: 2,
+    gap: space.s1,
   },
   label: {
     fontSize: fontSize.input,

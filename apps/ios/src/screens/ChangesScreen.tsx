@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   summary: {
     paddingHorizontal: space.s8,
     paddingBottom: space.s4,
-    gap: 2,
+    gap: space.s1,
   },
   summaryLine: {
     fontSize: fontSize.body,

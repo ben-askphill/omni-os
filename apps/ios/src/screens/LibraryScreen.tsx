@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   meta: {
     paddingHorizontal: space.s2 + 2,
     paddingBottom: space.s2 + 2,
-    gap: 2,
+    gap: space.s1,
   },
   name: {
     fontSize: fontSize.small,

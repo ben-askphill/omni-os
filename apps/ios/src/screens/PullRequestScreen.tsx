@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   watchText: {
     flex: 1,
-    gap: 2,
+    gap: space.s1,
   },
   rowLabel: {
     fontSize: fontSize.body,

@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     flex: 1,
-    gap: 2,
+    gap: space.s1,
   },
   optionLabel: {
     fontSize: fontSize.body,
