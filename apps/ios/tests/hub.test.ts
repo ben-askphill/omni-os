@@ -122,6 +122,22 @@ describe('channel list', () => {
     hub.close();
   });
 
+  it('shows an icon changed on the computer once the feed says the channel changed', async () => {
+    const t = fakeTransport();
+    let icon: string | null = '🛍️';
+    const { fetch } = fakeFetch((path) => (path === '/api/channels' ? { body: [channel('shop', { icon })] } : {}));
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    expect(hub.channels.get().channels?.[0]?.icon).toBe('🛍️');
+    const [feed] = t.feeds();
+    feed?.sink.open();
+    icon = 'svg:<svg viewBox="0 0 1 1"><rect width="1" height="1"/></svg>';
+    feed?.sink.message(frame({ type: 'channel', id: 'shop' }));
+    await settle(REFRESH_DEBOUNCE_MS);
+    expect(hub.channels.get().channels?.[0]?.icon).toBe(icon);
+    hub.close();
+  });
+
   it('does not refetch for usage or mod lines', async () => {
     const t = fakeTransport();
     const { fetch, calls } = fakeFetch(() => ({ body: [] }));

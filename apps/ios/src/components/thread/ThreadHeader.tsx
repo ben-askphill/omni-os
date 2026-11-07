@@ -5,8 +5,10 @@ import type { HarnessInfo, ThreadStatus } from '@omni/client-core';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
 
 import type { ThreadView } from '../../live/hub';
+import { useChannels } from '../../live/react';
 import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { Icon, type IconName } from '../../ui/Icon';
+import { ChannelAvatar } from '../ChannelAvatar';
 import { glyphFor } from '../StatusDot';
 import { StatusLine } from '../StatusLine';
 import { StatusPill } from '../StatusPill';
@@ -27,10 +29,13 @@ interface ThreadHeaderProps {
 export function ThreadHeader({ view, harnesses, onOpenRun, onOpenChanges, onOpenPR, flash }: ThreadHeaderProps) {
   const { colors } = useOmniTheme();
   const { thread } = view;
+  const { channels } = useChannels();
+  // The live list, not the thread's copy, so an icon changed on the computer shows without reopening the thread.
+  const channel = channels?.find((c) => c.id === thread?.channel_id) ?? view.channel;
   // The handoff card and the Take over note say it when they can, so the same sentence is not shown twice.
   const blocked = blockedNote(view.blocked, view.handoff, thread?.status, view.takeover);
   const status = threadStatusLabel(thread?.status);
-  const where = [view.channel ? `#${view.channel.name}` : null, thread?.pinned_at ? 'Pinned' : null].filter(Boolean).join(' · ');
+  const where = [channel ? `#${channel.name}` : null, thread?.pinned_at ? 'Pinned' : null].filter(Boolean).join(' · ');
   return (
     <>
       <View style={styles.statusBar}>
@@ -38,6 +43,7 @@ export function ThreadHeader({ view, harnesses, onOpenRun, onOpenChanges, onOpen
         {status || where ? (
           <View style={styles.statusRow}>
             {status ? <StatusPill glyph={glyphFor(thread?.status)} label={status} /> : null}
+            {channel ? <ChannelAvatar name={channel.name} icon={channel.icon} conductor={channel.id === 'conductor'} size={18} /> : null}
             {where ? <Text style={[styles.where, { color: colors.fg3 }]}>{where}</Text> : null}
           </View>
         ) : null}

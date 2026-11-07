@@ -14,6 +14,8 @@ export interface ListRowProps {
   title: string;
   /** A line icon before the title, as phone web's settings rows have. */
   icon?: IconName;
+  /** Drawn before the title in place of `icon`, such as a channel's avatar. */
+  lead?: ReactNode;
   detail?: string;
   value?: string;
   /** Replaces the value at the trailing edge, such as a switch. */
@@ -27,11 +29,11 @@ export interface ListRowProps {
   accessibilityHint?: string;
 }
 
-export function ListRow({ title, icon, detail, value, trailing, chevron, tone = 'default', onPress, disabled, first, accessibilityHint }: ListRowProps) {
+export function ListRow({ title, icon, lead, detail, value, trailing, chevron, tone = 'default', onPress, disabled, first, accessibilityHint }: ListRowProps) {
   const { colors } = useOmniTheme();
   const body = (
     <>
-      {icon ? <Icon name={icon} size={18} color={tone === 'destructive' ? colors.fg : colors.fg2} /> : null}
+      {lead ?? (icon ? <Icon name={icon} size={18} color={tone === 'destructive' ? colors.fg : colors.fg2} /> : null)}
       <View style={styles.text}>
         <Text style={[styles.title, { color: colors.fg, opacity: disabled ? 0.5 : 1 }, tone === 'destructive' && styles.destructive]}>
           {title}

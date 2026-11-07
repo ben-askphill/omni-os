@@ -41,15 +41,15 @@ const http = (status: number, message = 'nope') => new OmniHttpError({ kind: 'ht
 
 describe('where a thread can start', () => {
   it('lists the Conductor first, then live channels, and leaves out archived ones', () => {
-    const channels = [channel({ id: 'conductor', name: 'Conductor' }), channel({ id: 'a', name: 'Alpha' }), channel({ id: 'b', name: 'Beta', archived: 1 })];
+    const channels = [channel({ id: 'conductor', name: 'Conductor' }), channel({ id: 'a', name: 'Alpha', icon: 'icon:zap' }), channel({ id: 'b', name: 'Beta', archived: 1 })];
     expect(targetsOf(channels)).toEqual([
-      { id: 'conductor', name: 'Conductor' },
-      { id: 'a', name: 'Alpha' },
+      { id: 'conductor', name: 'Conductor', icon: null },
+      { id: 'a', name: 'Alpha', icon: 'icon:zap' },
     ]);
   });
 
   it('still offers the Conductor before the channels have loaded', () => {
-    expect(targetsOf(null)).toEqual([{ id: 'conductor', name: 'Conductor' }]);
+    expect(targetsOf(null)).toEqual([{ id: 'conductor', name: 'Conductor', icon: null }]);
   });
 
   it("gives the Conductor its crew role and any other channel none", () => {

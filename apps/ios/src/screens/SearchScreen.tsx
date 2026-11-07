@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '../ui/Text';
 
+import { ChannelAvatar } from '../components/ChannelAvatar';
 import { ListHeading } from '../components/ListHeading';
 import { SearchHitRow } from '../components/SearchHitRow';
 import { ThreadRowView } from '../components/ThreadRowView';
@@ -54,7 +55,15 @@ export function SearchScreen({ navigation }: RootScreenProps<'Search'>) {
             <ListHeading>Channels</ListHeading>
             <GroupedList>
               {channelMatches.map((c, i) => (
-                <ListRow key={c.id} first={i === 0} title={c.label} detail={c.detail ?? undefined} chevron onPress={() => navigation.navigate('Channel', { id: c.id })} />
+                <ListRow
+                  key={c.id}
+                  first={i === 0}
+                  lead={<ChannelAvatar name={c.name} icon={c.icon} conductor={c.id === 'conductor'} size={28} />}
+                  title={c.label}
+                  detail={c.detail ?? undefined}
+                  chevron
+                  onPress={() => navigation.navigate('Channel', { id: c.id })}
+                />
               ))}
             </GroupedList>
           </View>
