@@ -92,7 +92,7 @@ const BLOCKER_LABEL: Record<NeedsYouBlocker['kind'], string> = {
 };
 
 /** A blocker first, then work in progress, then an unread result (web: rowStatus). */
-export function rowStatus(t: InboxThread, need: NeedsYouItem | undefined): InboxStatus | null {
+function rowStatus(t: InboxThread, need: NeedsYouItem | undefined): InboxStatus | null {
   const b = need?.blockers[0];
   if (b) return { glyph: 'needs', label: BLOCKER_LABEL[b.kind] };
   if (t.status === 'queued') return { glyph: 'queued', label: 'Queued' };
