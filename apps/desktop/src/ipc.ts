@@ -27,6 +27,7 @@ export interface InvokeChannels {
   'omni:settings:set': { args: [DesktopSettingsPatch]; result: DesktopSettings };
   'omni:updates:get': { args: []; result: DesktopUpdateView };
   'omni:updates:check': { args: []; result: DesktopUpdateView };
+  'omni:updates:download': { args: []; result: DesktopUpdateView };
   'omni:server:info': { args: []; result: DesktopServerInfo };
   'omni:quick-prompt:status': { args: []; result: QuickPromptStatus };
   'omni:native-browser:capture': { args: [webContentsId: number]; result: NativeBrowserShot };

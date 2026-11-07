@@ -131,7 +131,8 @@ export const SETTINGS_ENTRIES = [
   { id: 'desktop-quick-prompt', section: 'desktop', title: 'Quick Prompt', keywords: ['hotkey', 'shortcut', 'keyboard', 'global', 'launcher', 'wispr flow', 'dictate'], surfaces: ['desktop'] },
   { id: 'desktop-login', section: 'desktop', title: 'Open Omni at login', keywords: ['startup', 'launch', 'login items', 'autostart'], surfaces: ['desktop'], needs: 'loginItem' },
   { id: 'desktop-zoom', section: 'desktop', title: 'Zoom', keywords: ['text size', 'scale', 'bigger', 'smaller', 'font size'], surfaces: ['desktop'] },
-  { id: 'desktop-app', section: 'desktop', title: 'App version, server and updates', keywords: ['version', 'update', 'log', 'data folder', 'server', 'relaunch'], surfaces: ['desktop'] },
+  { id: 'desktop-updates', section: 'desktop', title: 'App version and updates', keywords: ['version', 'update', 'upgrade', 'relaunch', 'restart', 'release notes', 'download', 'automatic', 'check for updates'], surfaces: ['desktop'] },
+  { id: 'desktop-app', section: 'desktop', title: 'App server, data folder and log', keywords: ['log', 'data folder', 'server', 'port'], surfaces: ['desktop'] },
   { id: 'version', section: 'about', title: 'Version and build', keywords: ['version', 'commit', 'build', 'update', 'release'] },
   { id: 'files', section: 'about', title: 'Where Omni keeps its files', keywords: ['data folder', 'config file', 'omni.config.json', 'secret store', 'logs'] },
 ] as const satisfies readonly SettingsEntry[];

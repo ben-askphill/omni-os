@@ -163,4 +163,13 @@ jobs:
           for want in latest-mac.yml latest-linux.yml '\.dmg$' '-mac-universal\.zip$' '\.AppImage$'; do
             grep -Eq -- "$want" <<<"$assets" || { echo "::error::The release has no asset matching $want"; exit 1; }
           done
+          # The updater downloads what each feed names, by name. Squirrel.Mac installs only from the zip.
+          feeds="$RUNNER_TEMP/feeds"
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p 'latest-*.yml' -D "$feeds" --clobber
+          for feed in latest-mac.yml latest-linux.yml; do
+            for file in $(sed -nE 's/^ *(- )?(url|path): *//p' "$feeds/$feed" | tr -d "'\""); do
+              grep -Fxq -- "$file" <<<"$assets" || { echo "::error::$feed names $file, which the release does not have"; exit 1; }
+            done
+          done
+          grep -Eq '^path: .*\.zip$' "$feeds/latest-mac.yml" || { echo '::error::latest-mac.yml does not point at the zip, which Squirrel.Mac installs from'; exit 1; }
       - run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false --latest

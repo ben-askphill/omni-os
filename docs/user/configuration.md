@@ -20,7 +20,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | Agents | Harnesses & models (each harness, the default model per channel, the model options from `.env`), Threads (run new threads on, sessions and usage limits from `.env`, a link to Automations) |
 | Code | Channels (each channel's settings and actions), Workspace (your folders, GitHub owner), Worktrees (storage and cleanup) |
 | Connections | Machines (this machine and its server), Sync, Sharing & access (Google account, signed-in devices, Omni Connect, Tailscale logins, public MCP URL), Integrations (Hermes, central brain), Secrets |
-| | Desktop app, only in the desktop app (Quick Prompt and its shortcut, Wispr Flow on a Mac, open at login, zoom, the app's version, server, log and updates), About (version, build, where the files live) |
+| | Desktop app, only in the desktop app (Quick Prompt and its shortcut, Wispr Flow on a Mac, open at login, zoom, updates with their release notes and Check automatically, the app's server and log), About (version, build, where the files live) |
 
 - Search at the top of the nav finds a single setting and scrolls to it.
 - Notifications, Harnesses & models, Channels, Workspace, Worktrees and Secrets have a scope picker: Every channel shows this machine's values, a channel shows what it sets and what it inherits. The pick stays as you move between sections.

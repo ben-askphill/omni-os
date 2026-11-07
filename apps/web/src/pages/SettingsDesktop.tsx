@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  type DesktopReleaseNotes,
   QUICK_PROMPT_SHORTCUTS,
   quickPromptShortcutLabel,
   ZOOM_MAX,
@@ -14,10 +15,9 @@ import {
   type QuickPromptShortcut,
   type QuickPromptStatus,
 } from '@omni/shared/desktop-bridge.ts';
-import { relTime } from '@omni/shared/format.ts';
 import { errorText } from '../api.ts';
-import { appUpdateWords } from '../app-update-notice.ts';
-import { Button, ErrorNote, Loader, Picker } from '../components/ui.tsx';
+import { appUpdateStatus } from '../app-update-notice.ts';
+import { Button, ErrorNote, Loader, Picker, Ticks } from '../components/ui.tsx';
 import { Card, InfoRow, Origin, Row, SwitchRow } from './settings-parts.tsx';
 
 // Settings > Desktop app: what only the desktop app (apps/desktop) has: the Quick Prompt, opening at login, the zoom
@@ -151,21 +151,22 @@ export function DesktopSection({ bridge }: { bridge: DesktopBridge }) {
         </div>
       </Card>
 
+      <UpdatesCard bridge={bridge} autoUpdate={settings.autoUpdate} onAutoUpdate={(on) => void save({ autoUpdate: on })} />
       <AppCard bridge={bridge} />
     </>
   );
 }
 
-function AppCard({ bridge }: { bridge: DesktopBridge }) {
-  const [info, setInfo] = useState<DesktopServerInfo | null>(null);
+/**
+ * The app's own updates (desktop.updates): this version, the updater's state with the one action it allows, the
+ * download's progress, the coming release's notes, and Check automatically. `autoUpdate` is undefined from an app
+ * built before that setting, which always checks by itself.
+ */
+function UpdatesCard({ bridge, autoUpdate, onAutoUpdate }: { bridge: DesktopBridge; autoUpdate: boolean | undefined; onAutoUpdate: (on: boolean) => void }) {
   const [update, setUpdate] = useState<DesktopUpdateView | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    bridge.server
-      .info()
-      .then(setInfo)
-      .catch(() => {});
     bridge.updates
       .get()
       .then(setUpdate)
@@ -175,10 +176,11 @@ function AppCard({ bridge }: { bridge: DesktopBridge }) {
     });
   }, [bridge]);
 
-  const check = async () => {
+  /** Check and Download answer with the view, and later states arrive as update events. */
+  const run = async (call: () => Promise<DesktopUpdateView>) => {
     setBusy(true);
     try {
-      setUpdate(await bridge.updates.check());
+      setUpdate(await call());
     } catch (e) {
       setUpdate({ state: 'error', message: errorText(e) });
     } finally {
@@ -186,15 +188,91 @@ function AppCard({ bridge }: { bridge: DesktopBridge }) {
     }
   };
 
+  const status = appUpdateStatus(update, bridge.packaged ? bridge.version : `${bridge.version} (development)`);
+  const { action } = status;
+  const act = () => {
+    if (action?.kind === 'install') bridge.updates.install();
+    else if (action?.kind === 'fetch') void run(() => bridge.updates.download());
+    else if (action?.kind === 'check') void run(() => bridge.updates.check());
+  };
+  const notes = update && (update.state === 'available' || update.state === 'downloading' || update.state === 'ready') ? update.notes : undefined;
+  const version = update && 'version' in update ? update.version : null;
+
   return (
-    <Card entry="desktop-app" title="This app" subtitle="The desktop app's version, the server behind its windows, and updates.">
+    <Card entry="desktop-updates" title="Updates" subtitle="New versions come from Omni's GitHub releases and install as the app relaunches." origin={<Origin of="device" label="This app only" />}>
+      <div className="flex min-w-0 items-center gap-3" role="status">
+        <div className="min-w-0 flex-1">
+          <div className="font-num text-[13.5px] font-medium">{status.title}</div>
+          <p className={`mt-0.5 text-[12.5px] ${status.failed ? 'text-fg-2' : 'text-fg-3'}`}>{status.detail}</p>
+        </div>
+        {update?.state === 'checking' && <Loader size={14} />}
+        {action && (
+          <Button size="sm" variant={action.kind === 'check' ? 'secondary' : 'primary'} busy={busy} onClick={act} className="shrink-0">
+            {action.label}
+          </Button>
+        )}
+      </div>
+      {status.progress !== null && <Ticks responsive value={status.progress} count={40} height={10} label="Download progress" />}
+      {status.releasesUrl && (
+        <p className="text-[12.5px] text-fg-3">
+          Or get it by hand from the{' '}
+          <a href={status.releasesUrl} target="_blank" rel="noopener noreferrer" className="text-fg underline underline-offset-2">
+            releases page
+          </a>
+          .
+        </p>
+      )}
+      {notes && version && <ReleaseNotes version={version} notes={notes} />}
+      {update && update.state !== 'unsupported' && autoUpdate !== undefined && (
+        <SwitchRow
+          title="Check automatically"
+          detail="At launch and every 4 hours, and download in the background. Off, only Check for Updates looks."
+          checked={autoUpdate}
+          onChange={onAutoUpdate}
+        />
+      )}
+    </Card>
+  );
+}
+
+/** The coming release's notes as plain lines, folded shut, with its page for the rest. */
+function ReleaseNotes({ version, notes }: { version: string; notes: DesktopReleaseNotes }) {
+  if (!notes.lines.length && !notes.url) return null;
+  const link = notes.url && (
+    <a href={notes.url} target="_blank" rel="noopener noreferrer" className="text-fg underline underline-offset-2">
+      {notes.lines.length ? 'All release notes' : `Release notes for ${version}`}
+    </a>
+  );
+  if (!notes.lines.length) return <p className="text-[12.5px] text-fg-3">{link}</p>;
+  return (
+    <details className="text-[12.5px] text-fg-2">
+      <summary className="cursor-pointer select-none text-fg-3">What is new in {version}</summary>
+      <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
+        {notes.lines.map((line, i) => (
+          <li key={i}>{line}</li>
+        ))}
+      </ul>
+      <p className="mt-1.5 text-fg-3">
+        {notes.more > 0 && `And ${notes.more} more. `}
+        {link}
+      </p>
+    </details>
+  );
+}
+
+function AppCard({ bridge }: { bridge: DesktopBridge }) {
+  const [info, setInfo] = useState<DesktopServerInfo | null>(null);
+
+  useEffect(() => {
+    bridge.server
+      .info()
+      .then(setInfo)
+      .catch(() => {});
+  }, [bridge]);
+
+  return (
+    <Card entry="desktop-app" title="This app" subtitle="The server behind the app's windows, its data and its log.">
       <div className="space-y-2 text-[13px]">
-        <InfoRow label="Version">
-          <span className="font-num">
-            {bridge.version}
-            {bridge.packaged ? '' : ' (development)'}
-          </span>
-        </InfoRow>
         <InfoRow label="Server">
           <span className="truncate">{info ? `Port ${info.port}, ${serverOriginLabel(info.startedHere)}` : '…'}</span>
         </InfoRow>
@@ -214,66 +292,7 @@ function AppCard({ bridge }: { bridge: DesktopBridge }) {
             </>
           )}
         </InfoRow>
-        <InfoRow label="Updates">
-          <UpdateLine update={update} busy={busy} onCheck={() => void check()} onInstall={() => bridge.updates.install()} />
-        </InfoRow>
       </div>
     </Card>
   );
-}
-
-function UpdateLine({ update, busy, onCheck, onInstall }: { update: DesktopUpdateView | null; busy: boolean; onCheck: () => void; onInstall: () => void }) {
-  const checkButton = (
-    <Button size="sm" busy={busy} onClick={onCheck}>
-      Check for Updates
-    </Button>
-  );
-  if (!update) return <span className="text-fg-3">…</span>;
-  switch (update.state) {
-    case 'unsupported':
-      return <span className="min-w-0 text-fg-3">{update.reason}</span>;
-    case 'idle':
-      return (
-        <>
-          <span className="min-w-0 flex-1 truncate">{update.checkedAt ? `Up to date, checked ${relTime(update.checkedAt)}` : 'Not checked yet'}</span>
-          {checkButton}
-        </>
-      );
-    case 'checking':
-      return (
-        <span className="flex items-center gap-2 text-fg-3">
-          <Loader size={12} /> Checking…
-        </span>
-      );
-    case 'downloading':
-      return (
-        <span className="flex items-center gap-2 text-fg-3">
-          <Loader size={12} /> {appUpdateWords.downloading(update)}
-        </span>
-      );
-    case 'ready':
-      return (
-        <>
-          <span className="min-w-0 flex-1 truncate">{appUpdateWords.ready(update)}</span>
-          <Button size="sm" variant="primary" onClick={onInstall}>
-            {appUpdateWords.relaunch}
-          </Button>
-        </>
-      );
-    case 'error':
-      return (
-        <>
-          <span className="min-w-0 flex-1 truncate text-fg-2" title={update.message}>
-            {update.message}
-          </span>
-          {update.downloadUrl ? (
-            <Button size="sm" onClick={() => window.open(update.downloadUrl, '_blank', 'noopener,noreferrer')}>
-              Download
-            </Button>
-          ) : (
-            checkButton
-          )}
-        </>
-      );
-  }
 }
