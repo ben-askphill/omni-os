@@ -54,7 +54,6 @@
         "effect",
         "expo-status-bar",
         "babel-plugin-react-compiler",
-        "expo-updates",
         "expo-system-ui"
       ]
     },

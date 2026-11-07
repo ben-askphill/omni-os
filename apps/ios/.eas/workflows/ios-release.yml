@@ -1,0 +1,78 @@
+# Ships the iPhone app when a change to it reaches main. A JavaScript-only change goes out as an EAS Update to the
+# builds already on testers' phones. A native change (a new native module, an Expo SDK bump, an app.config.ts plugin
+# option) gets a new production build, which goes to TestFlight. The "Team (Expo)" internal group has access to every
+# build, so a build reaches its testers once App Store Connect finishes processing it.
+#
+# The fingerprint decides which path runs. It hashes the native dependencies and the resolved app config, and builds
+# use it as their runtime version (`runtimeVersion` in app.config.ts). APP_VARIANT must match the production build
+# profile in eas.json, or the config, and with it the fingerprint, comes out different from the build's.
+#
+# Needs the EAS project linked to the GitHub repository with base directory apps/ios. See RELEASE.md.
+name: iOS release
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'apps/ios/**'
+      # The app bundles these workspace packages.
+      - 'packages/shared/**'
+      - 'packages/client-core/**'
+      - '!**/*.md'
+      - '!apps/ios/tests/**'
+
+# The root package.json asks for npm 11.19 or later (devEngines), and the worker images ship an older npm. Node 24.21.0
+# bundles npm 11.19.0 and matches the `node` pin on every build profile in eas.json.
+defaults:
+  tools:
+    node: 24.21.0
+
+concurrency:
+  group: ios-release
+  cancel_in_progress: false
+
+jobs:
+  fingerprint:
+    name: Fingerprint
+    type: fingerprint
+    environment: production
+    env:
+      APP_VARIANT: production
+
+  get_build:
+    name: Find a build with this fingerprint
+    needs: [fingerprint]
+    type: get-build
+    params:
+      platform: ios
+      profile: production
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+
+  build:
+    name: Build for the App Store
+    needs: [get_build]
+    if: ${{ !needs.get_build.outputs.build_id }}
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit:
+    name: Submit to TestFlight
+    needs: [build]
+    type: submit
+    params:
+      build_id: ${{ needs.build.outputs.build_id }}
+      profile: production
+
+  update:
+    name: Publish an update
+    needs: [get_build]
+    if: ${{ needs.get_build.outputs.build_id }}
+    type: update
+    environment: production
+    env:
+      APP_VARIANT: production
+    params:
+      channel: production
+      platform: ios

@@ -132,6 +132,8 @@ Run EAS commands from `apps/ios`. The one-time Apple and Expo setup, the store b
 - `preview` builds an internal distribution build.
 - `production` builds a production release and increments its build number.
 
+A merge to `main` that touches the app releases it through the EAS workflow in `.eas/workflows/ios-release.yml`: a native change gets a new TestFlight build, and a JavaScript-only change goes out as an EAS Update. See [RELEASE.md](RELEASE.md).
+
 For example, run `eas build --platform ios --profile development-simulator` to build for the simulator. Physical devices and TestFlight need Apple Developer signing and an Expo account. See [RELEASE.md](RELEASE.md) before you build for either.
 
 ## Reference setup

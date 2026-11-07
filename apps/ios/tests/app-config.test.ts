@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import config, { apsEnvironment, appConfig, usesDevClient } from '../app.config';
+import config, { apsEnvironment, appConfig, updatesUrl, usesDevClient } from '../app.config';
 
 describe('apsEnvironment', () => {
   it('signs distribution profiles for production APNs and everything else for the sandbox', () => {
@@ -73,5 +73,16 @@ describe('app config', () => {
     });
     expect(merged.extra?.eas?.projectId).toBe('project-id');
     expect(merged.ios?.bundleIdentifier).toBe('app.omni-os.ios');
+    expect(merged.updates?.url).toBe('https://u.expo.dev/project-id');
+  });
+
+  it('leaves the updates URL out until the project has an id', () => {
+    expect(updatesUrl(undefined)).toBeUndefined();
+    const merged = config({ projectRoot: '.', staticConfigPath: 'app.json', packageJsonPath: 'package.json', config: {} });
+    expect(merged.updates).toBeUndefined();
+  });
+
+  it('ties updates to the native fingerprint, so an update never reaches a build it was not made for', () => {
+    expect(appConfig.runtimeVersion).toEqual({ policy: 'fingerprint' });
   });
 });
