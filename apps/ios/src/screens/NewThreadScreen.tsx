@@ -268,7 +268,7 @@ function TargetPill({ target, label, on, onPress, onLayout }: { target: Target; 
       onLayout={(e) => onLayout(e.nativeEvent.layout.x)}
       style={[styles.pill, { backgroundColor: on ? colors.fg : colors.surface2 }]}
     >
-      <ChannelAvatar name={target.name} icon={target.icon} conductor={target.id === CONDUCTOR} size={22} />
+      <ChannelAvatar name={target.name} icon={target.icon} conductor={target.id === CONDUCTOR} size={24} disc={on ? undefined : colors.bg} />
       <Text numberOfLines={1} style={[styles.pillLabel, { color: on ? colors.onInk : colors.fg }]}>
         {label}
       </Text>
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.s3,
     borderRadius: radius.pill,
-    paddingLeft: space.s3,
+    paddingLeft: space.s2,
     paddingRight: space.s6,
   },
   pillLabel: {

@@ -12,11 +12,26 @@ import { type Glyph, StatusDot } from './StatusDot';
  * or an uploaded SVG) or its first letter in a soft circle, the Omni mark for the Conductor, and a thread's status glyph
  * on the corner when given.
  */
-export function ChannelAvatar({ name, icon, conductor, glyph, size = 36 }: { name: string; icon?: string | null; conductor?: boolean; glyph?: Glyph | null; size?: number }) {
+export function ChannelAvatar({
+  name,
+  icon,
+  conductor,
+  glyph,
+  size = 36,
+  disc,
+}: {
+  name: string;
+  icon?: string | null;
+  conductor?: boolean;
+  glyph?: Glyph | null;
+  size?: number;
+  /** The circle's colour, for an avatar that sits on surface-2 itself, such as a pill. */
+  disc?: string;
+}) {
   const { colors } = useOmniTheme();
   return (
     <View style={{ width: size, height: size }} accessible={false} importantForAccessibility="no-hide-descendants">
-      <View style={[styles.disc, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surface2 }]}>
+      <View style={[styles.disc, { width: size, height: size, borderRadius: size / 2, backgroundColor: disc ?? colors.surface2 }]}>
         <Face face={channelFace(name, icon, conductor)} name={name} size={size} color={colors.fg2} />
       </View>
       {glyph ? (
