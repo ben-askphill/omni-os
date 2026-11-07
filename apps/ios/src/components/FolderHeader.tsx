@@ -25,7 +25,7 @@ export function FolderHeader({ name, collapsed, count, running, onToggle }: Fold
       style={({ pressed }) => [styles.header, { backgroundColor: pressed ? colors.surface2 : colors.bg }]}
     >
       <View style={{ width: 12, alignItems: 'center', transform: [{ rotate: collapsed ? '0deg' : '90deg' }] }}>
-        <Icon name="chevronRight" size={11} weight="semibold" color={colors.fg4} />
+        <Icon name="chevronRight" size={11} color={colors.fg4} />
       </View>
       <Text numberOfLines={1} style={[styles.name, { color: colors.fg2 }]}>
         {name}

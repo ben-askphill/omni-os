@@ -178,7 +178,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
             ) : (
               <ActivityIndicator color={colors.fg3} />
             )}
-            <Icon name="chevronDown" size={10} weight="semibold" color={colors.fg3} />
+            <Icon name="chevronDown" size={10} color={colors.fg3} />
           </Pressable>
           {machineRows ? (
             <Pressable
@@ -192,7 +192,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
               <Text numberOfLines={1} style={[styles.chipLabel, { color: colors.fg }]}>
                 {machineLabel ? `On ${machineLabel}` : 'Run on'}
               </Text>
-              <Icon name="chevronDown" size={10} weight="semibold" color={colors.fg3} />
+              <Icon name="chevronDown" size={10} color={colors.fg3} />
             </Pressable>
           ) : null}
         </View>

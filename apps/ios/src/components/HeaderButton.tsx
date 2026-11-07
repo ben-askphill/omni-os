@@ -5,7 +5,7 @@ import { fontSize, minTarget, useOmniTheme, weight } from '../theme';
 import { Icon, type IconName } from '../ui/Icon';
 
 /**
- * A button in the navigation bar. With `icon` it draws the SF Symbol and the label is read aloud instead, as phone web's
+ * A button in the navigation bar. With `icon` it draws the shared icon and the label is read aloud instead, as phone web's
  * round icon buttons are; without it, the label is the button (Cancel, Start).
  */
 export function HeaderButton({

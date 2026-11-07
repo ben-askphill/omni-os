@@ -1,3 +1,4 @@
+import { tabIcon, type TabIconName } from './tab-icons';
 import {
   createNavigatorFactory,
   TabActions,
@@ -22,9 +23,8 @@ import { tabBarHidden } from './tabs-model';
 
 export interface NativeTabOptions {
   title: string;
-  /** SF Symbol names. */
-  icon: string;
-  selectedIcon?: string;
+  /** Shared drawing used by UIKit as a template image. */
+  icon: TabIconName;
   /** Hidden when undefined. */
   tabBadge?: string;
   /** Read in place of the title, as when the badge needs saying. */
@@ -53,8 +53,8 @@ export interface NativeTabAction {
   /** Must not match a route name. */
   key: string;
   title: string;
-  /** SF Symbol name. */
-  icon: string;
+  /** Shared drawing. */
+  icon: TabIconName;
   accessibilityLabel: string;
   onPress: (tab: string) => void;
 }
@@ -130,8 +130,7 @@ function NativeTabsNavigator({ id, initialRouteName, backBehavior, children, lay
                 specialEffects={{ repeatedTabSelection: { popToRoot: true, scrollToTop: true } }}
                 style={{ backgroundColor: colors.bg }}
                 ios={{
-                  icon: { type: 'sfSymbol', name: options.icon },
-                  selectedIcon: { type: 'sfSymbol', name: options.selectedIcon ?? options.icon },
+                  icon: tabIcon(options.icon),
                   standardAppearance: appearance,
                   scrollEdgeAppearance: appearance,
                 }}
@@ -149,7 +148,7 @@ function NativeTabsNavigator({ id, initialRouteName, backBehavior, children, lay
               tabBarItemAccessibilityLabel={action.accessibilityLabel}
               style={{ backgroundColor: colors.bg }}
               ios={{
-                icon: { type: 'sfSymbol', name: action.icon },
+                icon: tabIcon(action.icon),
                 standardAppearance: appearance,
                 scrollEdgeAppearance: appearance,
               }}

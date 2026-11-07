@@ -112,7 +112,7 @@ export function DoneRowView({ row, last, undo, onPress }: { row: DoneRow; last: 
         style={({ pressed }) => [styles.row, styles.doneRow, { backgroundColor: pressed ? colors.wash : colors.bg }]}
       >
         <View style={styles.gutter}>
-          <Icon name="check" size={13} weight="semibold" color={colors.fg4} />
+          <Icon name="check" size={13} color={colors.fg4} />
         </View>
         <View style={[styles.body, styles.doneBody, { paddingRight: actionsWidth(1) }, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }]}>
           <Text numberOfLines={1} style={[styles.doneTitle, { color: colors.fg3 }]}>
@@ -140,7 +140,7 @@ export function ShelfHeader({ label, count, open, onToggle }: { label: string; c
       <Text style={[styles.shelfLabel, { color: colors.fg3 }]}>{label}</Text>
       <Text style={[styles.shelfCount, { color: colors.fg4 }]}>{count}</Text>
       <View style={[styles.chevron, { transform: [{ rotate: open ? '0deg' : '-90deg' }] }]}>
-        <Icon name="chevronDown" size={12} weight="semibold" color={colors.fg4} />
+        <Icon name="chevronDown" size={12} color={colors.fg4} />
       </View>
     </Pressable>
   );
@@ -152,7 +152,7 @@ export function ShowMore({ count, onPress }: { count: number; onPress: () => voi
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, styles.doneRow, { backgroundColor: pressed ? colors.wash : colors.bg }]}>
       <View style={styles.gutter}>
-        <Icon name="chevronDown" size={12} weight="semibold" color={colors.fg3} />
+        <Icon name="chevronDown" size={12} color={colors.fg3} />
       </View>
       <Text style={[styles.more, { color: colors.fg3 }]}>{`Show ${count} more`}</Text>
     </Pressable>
