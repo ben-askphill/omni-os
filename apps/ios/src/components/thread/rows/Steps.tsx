@@ -6,7 +6,7 @@ import { Text } from '../../../ui/Text';
 import { callDetail } from '../../../thread/call-detail';
 import type { ThreadRow } from '../../../thread/rows';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
-import { type DotTone, StatusDot } from '../../StatusDot';
+import { type Glyph, StatusDot } from '../../StatusDot';
 import { Markdown } from '../Markdown';
 import { useRowActions } from './actions';
 
@@ -22,7 +22,7 @@ function stateOf(call: ToolCall, running: boolean): CallState {
   return call.result.is_error ? 'failed' : 'done';
 }
 
-const TONE: Record<CallState, DotTone> = { running: 'ok', stopped: 'muted', failed: 'warn', done: 'muted' };
+const GLYPH: Record<CallState, Glyph> = { running: 'running', stopped: 'settled', failed: 'needs', done: 'done' };
 const WORD: Record<CallState, string | null> = { running: 'Running', stopped: 'Stopped', failed: 'Failed', done: null };
 
 const peek = (call: ToolCall): string => (call.result && (call.result.is_error || call.name === 'Bash') ? call.result.text.trim().split('\n').slice(0, 3).join('\n').slice(0, 240) : '');
@@ -73,12 +73,12 @@ export function CallRow({ row }: Of<'call'>) {
         style={({ pressed }) => [styles.head, pressed && { backgroundColor: colors.surface2 }]}
       >
         <View style={styles.dot}>
-          <StatusDot tone={TONE[state]} />
+          <StatusDot glyph={GLYPH[state]} />
         </View>
         <View style={styles.grow}>
           <Text numberOfLines={1} style={[styles.name, { color: colors.fg2 }]}>
             {toolLabel(call.name)}
-            {word ? <Text style={{ color: colors.fg3 }}>{`  ${word}`}</Text> : null}
+            {word ? <Text style={{ color: state === 'running' ? colors.live : state === 'failed' ? colors.fg : colors.fg3 }}>{`  ${word}`}</Text> : null}
           </Text>
           {summary ? (
             <Text numberOfLines={open ? 3 : 1} style={[styles.summary, { color: colors.fg3 }]}>

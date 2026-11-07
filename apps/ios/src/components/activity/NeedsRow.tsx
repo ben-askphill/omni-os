@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
 
-import type { NeedsButton, NeedsGlyph, NeedsRow as NeedsRowModel } from '../../live/activity-model';
+import type { NeedsButton, NeedsRow as NeedsRowModel } from '../../live/activity-model';
+import { useChannels } from '../../live/react';
 import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
-import { type DotTone, StatusDot } from '../StatusDot';
-
-const TONE: Record<NeedsGlyph, DotTone> = { needs: 'warn', done: 'ok', settled: 'muted' };
+import { ChannelAvatar } from '../ChannelAvatar';
 
 /**
  * A Needs you item as phone web's card heads it: where it came from, the thread, then why it is here. Tapping opens the
@@ -16,6 +15,8 @@ const TONE: Record<NeedsGlyph, DotTone> = { needs: 'warn', done: 'ok', settled: 
  */
 export function NeedsRow({ row, onPress, onButton }: { row: NeedsRowModel; onPress: () => void; onButton: (b: NeedsButton) => Promise<void> }) {
   const { colors } = useOmniTheme();
+  const { channels } = useChannels();
+  const home = channels?.find((c) => c.id === row.thread.channel_id);
   const [running, setRunning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const title = row.thread.title || 'Untitled';
@@ -37,11 +38,9 @@ export function NeedsRow({ row, onPress, onButton }: { row: NeedsRowModel; onPre
         accessibilityRole="button"
         accessibilityLabel={[title, row.label, row.detail, row.meta].filter(Boolean).join(', ')}
         onPress={onPress}
-        style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.surface2 : colors.bg }]}
+        style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
       >
-        <View style={styles.dot}>
-          <StatusDot tone={TONE[row.glyph]} />
-        </View>
+        <ChannelAvatar name={home?.name ?? row.thread.channel_id} icon={home?.icon} conductor={row.thread.channel_id === 'conductor'} glyph={row.glyph} />
         <View style={styles.body}>
           <Text numberOfLines={1} style={[styles.meta, { color: colors.fg3 }]}>
             {row.meta}
@@ -53,7 +52,7 @@ export function NeedsRow({ row, onPress, onButton }: { row: NeedsRowModel; onPre
             <Text style={[styles.ago, { color: colors.fg3 }]}>{row.ago}</Text>
           </View>
           <Text numberOfLines={4} style={[styles.reason, { color: colors.fg2 }]}>
-            <Text style={{ color: colors.fg }}>{row.label}</Text>
+            <Text style={{ color: colors.fg, fontWeight: weight.medium }}>{row.label}</Text>
             {row.detail ? ` · ${row.detail}` : null}
           </Text>
         </View>
@@ -72,7 +71,11 @@ export function NeedsRow({ row, onPress, onButton }: { row: NeedsRowModel; onPre
           ))}
         </View>
       ) : null}
-      {error ? <Text style={[styles.error, { color: colors.fg }]}>{error}</Text> : null}
+      {error ? (
+        <Text accessibilityRole="alert" style={[styles.error, { color: colors.fg }]}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -81,13 +84,14 @@ const styles = StyleSheet.create({
   buttons: {
     flexDirection: 'row',
     gap: space.s4,
-    paddingLeft: space.s9 + 5 + space.s6,
+    paddingLeft: space.s8 + 36 + space.s6,
     paddingRight: space.s9,
     paddingBottom: space.s6,
   },
   error: {
-    fontSize: fontSize.meta,
-    paddingHorizontal: space.s9,
+    fontSize: fontSize.small,
+    paddingLeft: space.s8 + 36 + space.s6,
+    paddingRight: space.s9,
     paddingBottom: space.s4,
   },
   row: {
@@ -95,11 +99,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: space.s6,
-    paddingHorizontal: space.s9,
+    paddingHorizontal: space.s8,
     paddingVertical: space.s6,
-  },
-  dot: {
-    paddingTop: 5,
   },
   body: {
     flex: 1,
@@ -112,12 +113,12 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: fontSize.input,
-    lineHeight: Math.round(fontSize.input * lineHeight.heading),
+    fontSize: fontSize.subhead,
+    lineHeight: Math.round(fontSize.subhead * 1.3),
     fontWeight: weight.medium,
   },
   ago: {
-    fontSize: fontSize.meta,
+    fontSize: fontSize.caption,
     fontVariant: ['tabular-nums'],
   },
   reason: {
@@ -125,6 +126,6 @@ const styles = StyleSheet.create({
     lineHeight: Math.round(fontSize.body * lineHeight.body),
   },
   meta: {
-    fontSize: fontSize.meta,
+    fontSize: fontSize.caption,
   },
 });

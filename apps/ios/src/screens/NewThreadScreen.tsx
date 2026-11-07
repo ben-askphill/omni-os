@@ -3,6 +3,7 @@ import { offersRunOn } from '@omni/shared/thread-machine.ts';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '../ui/Text';
+import { Icon } from '../ui/Icon';
 
 import { AttachControl, AttachNotice } from '../attachments/AttachControl';
 import { AttachmentChips } from '../attachments/AttachmentChips';
@@ -174,7 +175,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
             ) : (
               <ActivityIndicator color={colors.fg3} />
             )}
-            <Text style={[styles.caret, { color: colors.fg3 }]}>▾</Text>
+            <Icon name="chevronDown" size={10} weight="semibold" color={colors.fg3} />
           </Pressable>
           {machineRows ? (
             <Pressable
@@ -188,7 +189,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
               <Text numberOfLines={1} style={[styles.chipLabel, { color: colors.fg }]}>
                 {machineLabel ? `On ${machineLabel}` : 'Run on'}
               </Text>
-              <Text style={[styles.caret, { color: colors.fg3 }]}>▾</Text>
+              <Icon name="chevronDown" size={10} weight="semibold" color={colors.fg3} />
             </Pressable>
           ) : null}
         </View>
@@ -334,9 +335,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: fontSize.body,
     fontWeight: weight.medium,
-  },
-  caret: {
-    fontSize: fontSize.meta,
   },
   sheetContent: {
     gap: space.s8,

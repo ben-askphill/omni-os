@@ -44,7 +44,7 @@ export function ArtifactScreen({ navigation, route }: RootScreenProps<'Artifact'
       headerRight: () => (
         <View style={styles.actions}>
           {published ? <HeaderButton label="claude.ai" onPress={() => void Linking.openURL(published)} /> : null}
-          {file ? <HeaderButton label="Share" onPress={() => void share()} /> : null}
+          {file ? <HeaderButton label="Share" icon="share" onPress={() => void share()} /> : null}
         </View>
       ),
     });

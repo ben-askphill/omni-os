@@ -47,7 +47,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   useEffect(() => {
     navigation.setOptions({
       title,
-      headerRight: hasThread ? () => <HeaderButton label="•••" accessibilityLabel="Thread menu" onPress={() => setMenuOpen(true)} /> : undefined,
+      headerRight: hasThread ? () => <HeaderButton label="Thread menu" icon="ellipsis" onPress={() => setMenuOpen(true)} /> : undefined,
     });
   }, [navigation, title, hasThread]);
 

@@ -12,20 +12,21 @@ import { useThreadActions } from '../../thread/hooks';
 import { menuExtras } from '../../thread/menu';
 import { folderChoices, organizeItems, type ThreadTarget } from '../../thread/target';
 import { Callout } from '../../ui/Callout';
+import { Icon, type IconName } from '../../ui/Icon';
 import { OptionGroup, OptionRow } from '../../ui/OptionRow';
 import { Sheet } from '../../ui/Sheet';
 import { MachineList } from './MachineSheet';
 import { TakeoverPrompt } from './TakeoverSheet';
 
-const GLYPH: Record<ThreadActionIcon, string> = {
-  pin: '📌',
-  check: '✓',
-  pencil: '✏️',
-  folder: '📁',
-  archive: '🗄',
-  branch: '⑂',
-  message: '💬',
-  grok: '✦',
+const ICON: Record<ThreadActionIcon, IconName> = {
+  pin: 'pin',
+  check: 'check',
+  pencil: 'pencil',
+  folder: 'folder',
+  archive: 'archive',
+  branch: 'fork',
+  message: 'message',
+  grok: 'sparkle',
 };
 
 interface ThreadMenuSheetProps {
@@ -128,7 +129,7 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
                 key={item.id}
                 label={item.label}
                 sub={item.off ?? item.hint}
-                leading={<Text style={[styles.glyph, { color: colors.fg }]}>{GLYPH[item.icon]}</Text>}
+                leading={<Icon name={ICON[item.icon]} size={18} color={colors.fg2} />}
                 opens={item.id === 'move'}
                 disabled={pending || !!item.off}
                 onPress={() => choose(item.id)}
@@ -163,7 +164,7 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
                 key={extra.id}
                 label={extra.label}
                 sub={extra.sub}
-                leading={<Text style={[styles.glyph, { color: colors.fg }]}>{extra.id === 'machine' ? '🖥' : extra.id === 'actions' ? '▶' : GLYPH.branch}</Text>}
+                leading={<Icon name={extra.id === 'machine' ? 'machine' : extra.id === 'actions' ? 'play' : ICON.branch} size={18} color={colors.fg2} />}
                 opens={extra.id === 'machine'}
                 disabled={pending || !!extra.off}
                 onPress={() => (extra.id === 'machine' ? openMachine() : extra.id === 'actions' ? onActions?.() : onFork?.())}
@@ -195,9 +196,6 @@ const styles = StyleSheet.create({
   content: {
     gap: space.s8,
     paddingVertical: space.s6,
-  },
-  glyph: {
-    fontSize: 18,
   },
   back: {
     fontSize: fontSize.input,

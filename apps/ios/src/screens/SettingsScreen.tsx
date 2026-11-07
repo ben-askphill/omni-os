@@ -34,24 +34,25 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
       <View style={styles.section}>
-        <ListHeading>Server</ListHeading>
+        <ListHeading inset>Server</ListHeading>
         <GroupedList>
-          <ListRow first title="Servers" value={activeServer?.name} chevron onPress={() => navigation.navigate('Servers')} />
+          <ListRow first icon="server" title="Servers" value={activeServer?.name} chevron onPress={() => navigation.navigate('Servers')} />
         </GroupedList>
       </View>
 
       <View style={styles.section}>
-        <ListHeading>Preferences</ListHeading>
+        <ListHeading inset>Preferences</ListHeading>
         <GroupedList>
-          <ListRow first title="Notifications" detail="Which alerts this phone gets" chevron onPress={() => navigation.navigate('NotificationSettings')} />
+          <ListRow first icon="bell" title="Notifications" detail="Which alerts this phone gets" chevron onPress={() => navigation.navigate('NotificationSettings')} />
         </GroupedList>
       </View>
 
       <View style={styles.section}>
-        <ListHeading>Account</ListHeading>
+        <ListHeading inset>Account</ListHeading>
         <GroupedList>
-          <ListRow first title="Devices" detail="Where this server is signed in" chevron onPress={() => navigation.navigate('Devices')} />
+          <ListRow first icon="devices" title="Devices" detail="Where this server is signed in" chevron onPress={() => navigation.navigate('Devices')} />
           <ListRow
+            icon="automation"
             title="Automations"
             detail={automationsDetail(automations.data?.length ?? null, automations.error, activeServer?.name ?? null)}
             chevron
@@ -63,7 +64,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
       {activeServer ? (
         <View style={styles.section}>
           <GroupedList>
-            <ListRow first tone="destructive" title={`Sign out of ${activeServer.name}`} onPress={confirmSignOut} />
+            <ListRow first icon="signOut" tone="destructive" title={`Sign out of ${activeServer.name}`} onPress={confirmSignOut} />
           </GroupedList>
         </View>
       ) : null}

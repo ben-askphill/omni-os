@@ -3,6 +3,7 @@ import type { DiffLine } from '@omni/shared/diff.ts';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
+import { Icon } from '../ui/Icon';
 
 import { DiffCount } from '../review/parts';
 import { fontSize, minTarget, mono, space, useOmniTheme, weight } from '../theme';
@@ -64,7 +65,9 @@ export const FileHeader = memo(function FileHeader({ row, onToggle }: FileHeader
       onPress={() => onToggle(key)}
       style={({ pressed }) => [styles.file, { backgroundColor: pressed ? colors.surface3 : colors.surface2, borderTopColor: colors.line }]}
     >
-      <Text style={[styles.caret, { color: colors.fg3 }]}>{row.open ? '▾' : '▸'}</Text>
+      <View style={{ width: 14, alignItems: 'center', transform: [{ rotate: row.open ? '90deg' : '0deg' }] }}>
+        <Icon name="chevronRight" size={10} weight="semibold" color={colors.fg3} />
+      </View>
       <Text style={[styles.letter, { color: colors.fg3 }]}>{STATUS_LETTER[file.status]}</Text>
       <Text numberOfLines={1} ellipsizeMode="middle" style={[styles.label, { color: colors.fg }]}>
         {label}
@@ -129,10 +132,6 @@ const styles = StyleSheet.create({
     gap: space.s4,
     paddingHorizontal: space.s6,
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  caret: {
-    width: 12,
-    fontSize: fontSize.body,
   },
   letter: {
     width: 14,

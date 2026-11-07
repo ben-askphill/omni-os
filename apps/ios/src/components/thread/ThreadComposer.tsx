@@ -12,6 +12,8 @@ import type { ThreadLive } from '../../live/hub';
 import { useStore } from '../../live/react';
 import { canStop, composerPlaceholder, sendLabel } from '../../send/rules';
 import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
+import { tap } from '../../ui/haptics';
+import { Icon } from '../../ui/Icon';
 import { restoreDraft, setDraft, useDraft, useFocusRequests } from './drafts';
 import { NextTurnChip } from './RunChips';
 
@@ -56,6 +58,7 @@ export function ThreadComposer({
 
   const send = async () => {
     if (empty || slotTaken) return;
+    tap();
     const text = draft;
     const attached = getStaged(thread.id);
     setDraft(thread.id, '');
@@ -93,7 +96,7 @@ export function ThreadComposer({
                 {c.label}
               </Text>
               <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${c.label}`} hitSlop={space.s6} onPress={() => removeDraftContext(thread.id, c.id)}>
-                <Text style={[styles.contextRemove, { color: colors.fg3 }]}>✕</Text>
+                <Icon name="close" size={11} weight="semibold" color={colors.fg3} />
               </Pressable>
             </View>
           ))}
@@ -112,12 +115,20 @@ export function ThreadComposer({
           style={[styles.input, { color: colors.fg }]}
         />
         {showStop ? (
-          <RoundButton label={stopping ? 'Stopping' : 'Stop'} busy={stopping} disabled={stopping} onPress={() => void live.send.stop()}>
-            <View style={[styles.stopGlyph, { backgroundColor: colors.onInk }]} />
+          <RoundButton
+            label={stopping ? 'Stopping' : 'Stop'}
+            busy={stopping}
+            disabled={stopping}
+            onPress={() => {
+              tap();
+              void live.send.stop();
+            }}
+          >
+            <Icon name="stop" size={13} color={colors.onInk} />
           </RoundButton>
         ) : (
           <RoundButton label={sendLabel(thread, catalog)} busy={outbox.item?.phase === 'sending'} disabled={empty || slotTaken} onPress={() => void send()}>
-            <Text style={[styles.sendGlyph, { color: colors.onInk }]}>↑</Text>
+            <Icon name="arrowUp" size={16} weight="bold" color={colors.onInk} />
           </RoundButton>
         )}
       </View>
@@ -183,9 +194,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.meta + 1,
     fontWeight: weight.semibold,
   },
-  contextRemove: {
-    fontSize: fontSize.meta + 1,
-  },
   notice: {
     fontSize: fontSize.meta,
     paddingHorizontal: space.s6,
@@ -193,7 +201,7 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     borderWidth: StyleSheet.hairlineWidth,
     paddingLeft: space.s2,
     paddingRight: space.s2,
@@ -215,15 +223,5 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendGlyph: {
-    fontSize: 20,
-    fontWeight: weight.bold,
-    lineHeight: 24,
-  },
-  stopGlyph: {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
   },
 });

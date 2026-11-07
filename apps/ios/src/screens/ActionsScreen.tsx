@@ -4,8 +4,10 @@ import { Text } from '../ui/Text';
 import { anyRunning, liveRun, SETUP_MODE_LABEL, type ActionRun, type ChannelAction } from '@omni/shared/channel-actions.ts';
 
 import { StatusDot } from '../components/StatusDot';
+import { StatusPill } from '../components/StatusPill';
+import { Icon } from '../ui/Icon';
 import { Notice } from '../components/Notice';
-import { actionDetail, outputCut, RUN_STATE_LABEL, runTone, runWhen } from '../live/actions-model';
+import { actionDetail, outputCut, RUN_STATE_LABEL, runGlyph, runWhen } from '../live/actions-model';
 import { useActionsLive, useActionsView } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { Button } from '../ui/Button';
@@ -159,14 +161,19 @@ function RunCard({ run, latest, setup, now, busy, error, blocked, onStop, onRetr
           style={styles.lineText}
         >
           <View style={styles.nameRow}>
-            <Text style={[styles.chevron, { color: colors.fg4, transform: [{ rotate: open ? '90deg' : '0deg' }] }]}>›</Text>
-            <StatusDot tone={runTone(run.state)} />
+            <View style={[styles.chevron, { transform: [{ rotate: open ? '90deg' : '0deg' }] }]}>
+              <Icon name="chevronRight" size={11} weight="semibold" color={colors.fg4} />
+            </View>
+            <StatusDot glyph={runGlyph(run.state)} />
             <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
               {run.name}
             </Text>
             {setup ? <Chip label="Setup" /> : null}
           </View>
-          <Text style={[styles.meta, { color: colors.fg3 }]}>{[RUN_STATE_LABEL[run.state], runWhen(run, now)].filter(Boolean).join(' · ')}</Text>
+          <View style={styles.stateRow}>
+            <StatusPill glyph={runGlyph(run.state)} label={RUN_STATE_LABEL[run.state]} />
+            {runWhen(run, now) ? <Text style={[styles.meta, { color: colors.fg3 }]}>{runWhen(run, now)}</Text> : null}
+          </View>
         </Pressable>
         {running ? (
           <Button label="Stop" variant="secondary" busy={busy} onPress={onStop} />
@@ -251,9 +258,13 @@ const styles = StyleSheet.create({
   },
   chevron: {
     width: 12,
-    fontSize: fontSize.body + 4,
-    lineHeight: 20,
-    textAlign: 'center',
+    alignItems: 'center',
+  },
+  stateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s4,
+    marginTop: space.s2,
   },
   chip: {
     fontSize: fontSize.meta - 1,

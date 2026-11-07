@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
+import { Icon } from './Icon';
 
 import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 
@@ -40,7 +41,7 @@ export function OptionRow({ label, sub, leading, selected, opens, disabled, onPr
           {sub ? <Text style={[styles.sub, { color: colors.fg3 }]}>{sub}</Text> : null}
         </View>
         {selected === undefined ? null : <Radio on={selected} />}
-        {opens ? <Text style={[styles.chevron, { color: colors.fg4 }]}>›</Text> : null}
+        {opens ? <Icon name="chevronRight" size={13} weight="semibold" color={colors.fg4} /> : null}
       </View>
     </Pressable>
   );
@@ -104,10 +105,6 @@ const styles = StyleSheet.create({
   sub: {
     fontSize: fontSize.meta + 1,
     lineHeight: Math.round((fontSize.meta + 1) * lineHeight.body),
-  },
-  chevron: {
-    fontSize: 22,
-    lineHeight: 24,
   },
   radio: {
     width: 22,
