@@ -14,11 +14,10 @@ import type { RootStackParamList } from '../../navigation/types';
 import { fontSize, lineHeight, mono, space, useOmniTheme } from '../../theme';
 import { Callout } from '../../ui/Callout';
 import { ListRow } from '../../ui/GroupedList';
-import { OptionGroup, OptionRow } from '../../ui/OptionRow';
 import { Text } from '../../ui/Text';
 import { channelTitle, runLabel } from '../channel-settings-model';
 import { harnessRows } from '../harness-model';
-import { Footnote, Group, ServerOptionsGroup, SettingsPage } from '../parts';
+import { ChoiceRow, Footnote, Group, ServerOptionsGroup, SettingsPage } from '../parts';
 import { Loading, useSetup } from './OmniSections';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -96,11 +95,11 @@ export function ThreadsSection() {
     <SettingsPage onRefresh={() => Promise.all([setup.reload(), devices.reload()])}>
       {setup.data ? (
         <View style={styles.block}>
-          <OptionGroup title="Run new threads on">
+          <Group title="Run new threads on">
             {rows.map((r, i) => (
-              <OptionRow key={r.value} label={r.label} sub={r.sub} selected={r.value === saved} disabled={busy} onPress={() => void pick(r.value)} last={i === rows.length - 1} />
+              <ChoiceRow key={r.value} first={i === 0} title={r.label} detail={r.sub} selected={r.value === saved} disabled={busy} onPress={() => void pick(r.value)} />
             ))}
-          </OptionGroup>
+          </Group>
           <Footnote>
             {rows.length > 1
               ? 'Unless New picks another machine. Saved on the server, so the computer and the phone start threads in the same place.'
@@ -144,5 +143,6 @@ const styles = StyleSheet.create({
   fix: {
     fontFamily: mono,
     fontSize: fontSize.meta,
+    fontWeight: '400',
   },
 });

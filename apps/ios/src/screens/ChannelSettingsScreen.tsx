@@ -5,7 +5,7 @@ import { channelBody, channelForm, channelFormProblem, CHANNEL_KINDS, slugify, t
 import { bytes } from '@omni/shared/format.ts';
 import { StackActions, useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ChannelAvatar } from '../components/ChannelAvatar';
 import { HeaderButton } from '../components/HeaderButton';
@@ -58,6 +58,7 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const [saved, setSaved] = useState(false);
   const isNew = channel === null;
   const system = channel?.kind === 'system';
   const dirty = channel ? formDirty(form, channel) : !!form.name.trim();
@@ -71,12 +72,15 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
     setForm((cur) => (prev && !formDirty(cur, prev) ? channelForm(channel) : cur));
   }, [channel]);
 
-  const set = <K extends keyof ChannelForm>(key: K, value: ChannelForm[K]) =>
+  const set = <K extends keyof ChannelForm>(key: K, value: ChannelForm[K]) => {
+    setSaved(false);
     setForm((cur) => ({ ...cur, [key]: value, ...(key === 'name' && isNew && !idTouched ? { id: slugify(String(value)) } : {}) }));
+  };
 
   const save = useCallback(async () => {
     const problem = channelFormProblem(form, isNew);
     if (problem) return setError(problem);
+    Keyboard.dismiss();
     setBusy(true);
     setError(null);
     try {
@@ -84,6 +88,7 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         const next = await hub.request((api) => api.updateChannel(channel.id, saveBody(form, channel)));
         base.current = next;
         setForm(channelForm(next));
+        setSaved(true);
         await hub.refreshChannels();
       } else {
         const made = await hub.request((api) => api.createChannel(form.id, channelBody(form, { system: false, github: false })));
@@ -130,6 +135,7 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         <Text style={[styles.heroName, { color: colors.fg }]} numberOfLines={1}>
           {form.name.trim() || 'New channel'}
         </Text>
+        {saved && !dirty ? <Text style={[styles.saved, { color: colors.fg3 }]}>Saved</Text> : null}
       </View>
       {error ? <Callout message={error} /> : null}
 
@@ -337,6 +343,9 @@ const styles = StyleSheet.create({
     gap: space.s4,
     paddingVertical: space.s6,
   },
+  saved: {
+    fontSize: fontSize.small,
+  },
   heroName: {
     fontSize: fontSize.heading,
     fontWeight: weight.semibold,
@@ -347,6 +356,7 @@ const styles = StyleSheet.create({
   glyphs: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: space.s4,
     padding: space.s8,
     borderTopWidth: StyleSheet.hairlineWidth,

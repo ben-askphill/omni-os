@@ -10,7 +10,8 @@ import { useRemote } from '../live/use-remote';
 import { fontSize, lineHeight, minTarget, mono, space, useOmniTheme, weight } from '../theme';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
-import { GroupedList } from '../ui/GroupedList';
+import { GroupedList, ListRow } from '../ui/GroupedList';
+import { Icon } from '../ui/Icon';
 import { Text, TextInput } from '../ui/Text';
 
 // The pieces every Settings screen on the phone is made of: a scrolling page that keeps a focused field above the
@@ -101,7 +102,7 @@ export interface InputRowProps {
 /** A labelled text field inside a group, its label above the value as iOS forms with long values draw them. */
 export function InputRow({ label, value, onChangeText, placeholder, hint, multiline, code, keyboardType, autoCapitalize, readOnly, secure, first, origin }: InputRowProps) {
   const { colors } = useOmniTheme();
-  const font = code ? { fontFamily: mono, fontSize: fontSize.body } : null;
+  const font = code ? { fontFamily: mono, fontSize: fontSize.body, fontWeight: '400' as const } : null;
   return (
     <View style={[styles.field, !first && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
       <View style={styles.labelRow}>
@@ -130,6 +131,22 @@ export function InputRow({ label, value, onChangeText, placeholder, hint, multil
       )}
       {hint ? <Text style={[styles.detail, { color: colors.fg3 }]}>{hint}</Text> : null}
     </View>
+  );
+}
+
+/** One choice of a group, checked when picked, as iOS Settings lists choices. */
+export function ChoiceRow({ title, detail, selected, disabled, first, onPress }: { title: string; detail?: string; selected: boolean; disabled?: boolean; first?: boolean; onPress: () => void }) {
+  const { colors } = useOmniTheme();
+  return (
+    <ListRow
+      first={first}
+      title={title}
+      detail={detail}
+      disabled={disabled}
+      onPress={onPress}
+      trailing={selected ? <Icon name="check" size={16} weight="semibold" color={colors.fg} /> : <View style={styles.check} />}
+      accessibilityHint={selected ? 'Selected' : undefined}
+    />
   );
 }
 
@@ -231,6 +248,10 @@ const styles = StyleSheet.create({
   code: {
     fontFamily: mono,
     fontSize: fontSize.meta,
+    fontWeight: '400',
+  },
+  check: {
+    width: 16,
   },
   trailing: {
     alignItems: 'flex-end',

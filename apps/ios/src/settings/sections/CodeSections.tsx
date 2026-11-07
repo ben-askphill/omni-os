@@ -4,16 +4,16 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
+import { ChannelAvatar } from '../../components/ChannelAvatar';
 import { useChannels, useLiveHub } from '../../live/react';
 import { useRemote } from '../../live/use-remote';
 import type { RootStackParamList } from '../../navigation/types';
 import { Button } from '../../ui/Button';
 import { Callout } from '../../ui/Callout';
 import { ListRow } from '../../ui/GroupedList';
-import { OptionGroup, OptionRow } from '../../ui/OptionRow';
 import { channelTitle, channelWhere } from '../channel-settings-model';
 import { ConfigForm } from '../ConfigForm';
-import { Footnote, Group, ServerOptionsGroup, SettingsPage, SwitchRow } from '../parts';
+import { ChoiceRow, Footnote, Group, ServerOptionsGroup, SettingsPage, SwitchRow } from '../parts';
 import { dayChoices, daysLabel } from '../retention-model';
 import { Loading, useSetup } from './OmniSections';
 
@@ -51,6 +51,7 @@ export function ChannelsSection() {
           <ListRow
             key={c.id}
             first={i === 0}
+            leading={<ChannelAvatar name={c.name} icon={c.icon} conductor={c.id === 'conductor'} size={28} />}
             title={channelTitle(c)}
             detail={channelWhere(c)}
             chevron
@@ -118,11 +119,11 @@ export function WorktreesSection() {
             <SwitchRow first title="Remove idle worktrees on a schedule" value={policy.enabled} disabled={busy} onValueChange={(on) => void save({ enabled: on })} />
           </Group>
           {policy.enabled ? (
-            <OptionGroup title="Idle for at least">
-              {dayChoices(policy).map((d, i, all) => (
-                <OptionRow key={d} label={daysLabel(d)} selected={policy.idleDays === d} disabled={busy} onPress={() => void save({ idleDays: d })} last={i === all.length - 1} />
+            <Group title="Idle for at least" footer="Without a turn or a message.">
+              {dayChoices(policy).map((d, i) => (
+                <ChoiceRow key={d} first={i === 0} title={daysLabel(d)} selected={policy.idleDays === d} disabled={busy} onPress={() => void save({ idleDays: d })} />
               ))}
-            </OptionGroup>
+            </Group>
           ) : null}
           {error ? <Callout message={error} /> : null}
         </>
