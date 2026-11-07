@@ -114,13 +114,106 @@ The iOS app has the same features and mostly the same words as phone web, but it
 - Backgrounds and surfaces match (`#121316`, `#191b1e`). The same gaps show, and missing colour stands out more in dark: phone web's lime Done pill and dots are the only accent on the screen, and iOS has none.
 - The iOS nav bar pills render as dark grey glass, which phone web has no equivalent for.
 
+## Second pass: PRs, Changes, Pull request, Actions, Artifact, Settings pages, streaming
+
+Same stack, plus an `Acme Shop` channel backed by a throwaway git repo (`use_worktree`, `github_repo` acme/shop), the fixture `gh` (`packages/test-fixtures/fake-gh.mjs`, linked into the stack's `bin/`) for PR data, two channel actions (Theme dev on a port, Lint), a thread whose turn edits 4 files and publishes `size-guide-notes.md`, and a RICH turn held open by a 30-minute Bash call.
+
+### PRs tab
+
+![PRs](2026-11-07-ios-visual-parity/30-prs.png)
+
+- iOS has no PR list at all. Phone web has a PRs tab: large title, "3 open across 1 repo", a search field (`label:bug`), Open first / Filters / repo chips, and rows grouped as Authored, Review requested and Others, each with a draft or blue open pill.
+- iOS only reaches a PR from a thread's "Pull request" chip. Adding the tab is new screen work, not a restyle.
+
+### Finished thread with changes and an artifact
+
+![Thread with artifact](2026-11-07-ios-visual-parity/20-thread-artifact.png)
+
+- Phone web puts three things under a finished turn that iOS lacks: a large artifact card (preview area, file name, channel and age), a **Changes 4** card listing each file with +/- counts, and a row of follow-up chips ("Open report", "Review #12 +71 −4", "Ask the Conductor").
+- iOS shows the artifact as a small "md / markdown" row and nothing about the changes; it relies on the Changes and Pull request chips at the top.
+
+### Changes
+
+![Changes](2026-11-07-ios-visual-parity/21-changes.png)
+
+- Close in structure: Since base / This turn, the base line, Unstaged and Untracked groups, file headers with M/A and counts, coloured add and remove rows.
+- Phone web: two line-number columns, no wrapping (long lines cut off at the edge), each file in a rounded card, a refresh button, sentence-case group labels.
+- iOS: one line-number column, wrapped lines, full-bleed file sections, uppercase labels, and a "Tap a line to pick it" hint. Wrapping reads better on a phone; decide which one both should use.
+
+### Pull request
+
+![Pull request](2026-11-07-ios-visual-parity/22-pr.png)
+
+- The closest screen after the question card. Same title block, branch line, Watch PR card and slide-to-merge.
+- Phone web: round back and open-in-browser buttons, grey "Open" pill, an "Ask builder to review" button, checks as a card with lime / red / blue marks, then a Files card.
+- iOS: "Thread" and "GitHub" text pills, a blue "open" pill, a red "1 of 4 checks failing" line with a "Fix checks" button, a Reviews card (phone web shows no reviews here), uppercase labels.
+- Phone web's "Ask builder to review" button renders squashed (about 26px tall, icon and text touching the edges). That is a phone web bug.
+
+### Actions
+
+![Actions](2026-11-07-ios-visual-parity/23b-actions-running.png)
+
+- Same layout on both. Differences: phone web's Run and Stop buttons have play and stop icons, and the run status is a coloured pill (lime "Succeeded", blue "Running"). iOS writes the status as grey text under the name with a grey or black dot.
+- Phone web collapses the running run's log; iOS opens both.
+
+### Artifact viewer
+
+![Artifact](2026-11-07-ios-visual-parity/24-artifact.png)
+
+- Phone web: a sheet with a round × close button, the file name in mono with "#Acme Shop" under it, and a round share icon.
+- iOS: a pushed page whose back button is an **empty circle** (no chevron, no accessibility label; agent-device could not find it and `back` did nothing), the file name truncated, "claude.ai" and "Share" text pills, and a meta line ("markdown · 249 B · published 2m ago").
+- Markdown styling differs: phone web uses a smaller heading and a light table (muted header, row lines only); iOS a larger heading and a fully bordered table with a bold header.
+- The empty back button is a bug to fix regardless of the redesign.
+
+### Turn while streaming
+
+![Streaming](2026-11-07-ios-visual-parity/25-streaming.png)
+
+- Phone web: blue "Running" pill in the header; a status line with a spinner ring, the agent's status text in vermilion ("Looking for the cart code") and the elapsed time (5m 11s); plan items with lime rings; "10 steps so far · ◆ 1 failed" with a wrench icon; and "Review #12" / "New thread" chips above the composer.
+- iOS: "Running · Acme Shop" as grey text under the header; a "● Running `sleep 1800` · step 3/3" line that shows the raw command instead of the status and no elapsed time; plan items struck through in grey; no chips.
+- Both swap the send button for a black stop button.
+- The fake CLI does not stream text deltas, so a half-written answer was not captured; the tool-running state above is what a long turn shows most of the time.
+
+![Streaming steps](2026-11-07-ios-visual-parity/25b-streaming-steps.png)
+
+- Same gaps as the finished Steps screen (cards vs inline, colour). While running, phone web marks the live step with a blue dot; iOS writes "Running" after the tool name with a black dot.
+
+### Settings pages
+
+iOS's four settings pages have no direct phone web twins. The closest sections are compared.
+
+![Servers vs Machines](2026-11-07-ios-visual-parity/26-servers.png)
+
+- iOS Servers showed only "Add server" and "Notifications" buttons, because the app ran on the dev shortcut with no paired server. Recapture it after pairing a real one. Phone web's Machines has a large title, a one-line description, and a key/value card (Machine, Sync, Address, Feed, Threads) with coloured status dots.
+
+![Notifications](2026-11-07-ios-visual-parity/27-notifications.png)
+
+- Phone web: large title, a Scope picker, the device card with a toggle and a status row, and a collapsed "Channels 5 of 5 notify" row.
+- iOS: one card with "Turn on notifications". No per-channel list. Visually the card style matches; the title and description treatment does not.
+
+![Devices vs Sharing and access](2026-11-07-ios-visual-parity/28-devices.png)
+
+- Different content: iOS Devices lists signed-in devices (empty here, no owner signed in); phone web's nearest page is Sharing & access (Google account, Omni Connect, Omni for iOS pairing). Only the page frame can match: large title and description, cards.
+
+![Automations](2026-11-07-ios-visual-parity/29-automations.png)
+
+- Phone web: large title, description with `automations/*.yaml`, refresh button, "Run automations on" card, and an empty state with an icon in a circle. iOS: a plain "No automations" heading and line, left-aligned, no icon.
+
+### What the second pass adds to the list
+
+- **Settings pages share one frame on phone web**: round back button, small title in the bar, then a large title and a one-line description in the page. iOS uses the native bar title and no in-page title. One shared page header component on iOS fixes all four.
+- **Status pills**: Running (blue), Done and Succeeded (lime), Open, draft. iOS writes these as grey text. Same fix as the status colours in the first pass.
+- **Under-turn cards and chips**: artifact card, Changes card, follow-up chips. iOS has none of these.
+- **Bugs found on the way**: iOS artifact viewer's blank back button; phone web's squashed "Ask builder to review" button.
+
 ## Suggested order
 
 1. **Foundations, one PR:** an icon set (SF Symbols through `expo-symbols`, or `react-native-svg` with the web's icons; either one needs a new dev build), the status colours wired through `StatusDot` and the row trailing marks, a `MoAvatar` equivalent, and a grouped-card list component. Check the Claude Design system for each before building it, and add what is missing there.
-2. **Shell:** large-title header with round icon buttons, the + button beside the tab bar, the PRs tab, Live line only when offline.
+2. **Shell:** large-title header with round icon buttons, the + button beside the tab bar, the PRs tab (a new screen: list, search, filters, groups), Live line only when offline, and one page header (large title + description) for every Settings page.
 3. **Lists:** Activity rows, Channels cards, channel screen (segmented Active/Recent, bottom New button) and the channel data fix (list every thread, same "Active" rule as phone web).
-4. **Thread:** header with status pill, chips into the menu, top-aligned transcript, Steps as cards (or its own screen), thread menu groups and icons, the post-turn "Ask the Conductor" / "New thread" row.
-5. **Sheets:** New thread as a bottom sheet with the send button in the field.
+4. **Thread:** header with status pill, chips into the menu, top-aligned transcript, Steps as cards (or its own screen), thread menu groups and icons, the artifact and Changes cards and follow-up chips under a turn, and the running line with status text and elapsed time.
+5. **Sheets:** New thread as a bottom sheet with the send button in the field; the artifact viewer as a sheet with a × button.
+6. **Detail screens:** Changes, Pull request and Actions need the shared parts above (icons, pills, cards) and little else.
 
 ## Open questions
 
@@ -131,6 +224,7 @@ The iOS app has the same features and mostly the same words as phone web, but it
 
 ## Not covered
 
-- PRs, Changes, Pull request, Actions, Artifact viewer, Devices, Servers and Notifications screens were not compared side by side.
-- Live streaming states (a turn mid-stream, sending/failed bubbles, the handoff banner) were not captured.
+- iOS Servers with a real paired server (the dev shortcut leaves the list empty).
+- A turn writing text mid-stream (the fake CLI sends the answer in one piece), sending and failed message bubbles, and the handoff banner.
+- Dark mode for the second-pass screens.
 - Phone web was rendered in desktop Chrome with mobile emulation, not iOS Safari, so safe areas and the home indicator are not exact.
