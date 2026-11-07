@@ -5,6 +5,7 @@ import { ErrorNote, Loading, StatusDot } from '../components/ui.tsx';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp } from '../store.tsx';
 import { asksAuto } from '@omni/shared/thread-run.ts';
+import { runBody } from '@omni/shared/channel-form.ts';
 import { RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, Origin, ServerOptions, useScopedChannel } from './settings-parts.tsx';
 
@@ -120,11 +121,7 @@ function ChannelModelCard({ channel }: { channel: Channel }) {
     setBusy(true);
     setError(null);
     try {
-      await api.patch(`/channels/${encodeURIComponent(channel.id)}`, {
-        default_harness: run.harness || null,
-        default_model: run.model || null,
-        default_effort: run.effort || null,
-      });
+      await api.patch(`/channels/${encodeURIComponent(channel.id)}`, runBody(run));
       await reloadChannels();
     } catch (err) {
       setError(errorText(err));

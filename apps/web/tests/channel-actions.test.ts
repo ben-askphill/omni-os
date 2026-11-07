@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { OUTPUT_LIMIT, type ActionRun, type ChannelAction, type ThreadActions } from '@omni/shared/channel-actions.ts';
-import { actionInput, draftOf, outputCut, parseSecrets, runSummary, setupPolls, setupSteps, stripRun } from '../src/channel-actions.ts';
+import { actionInput, draftOf, OUTPUT_LIMIT, parseSecrets, type ActionRun, type ChannelAction, type ThreadActions } from '@omni/shared/channel-actions.ts';
+import { outputCut, runSummary, setupPolls, setupSteps, stripRun } from '../src/channel-actions.ts';
 
 // The thread Actions tab and the channel settings editor (apps/web/src/channel-actions.ts) on GET /threads/:id/actions.
 

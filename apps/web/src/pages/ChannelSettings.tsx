@@ -6,47 +6,11 @@ import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segm
 import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
-import { lastGrapheme, slugify } from '../format.ts';
+import { lastGrapheme } from '../format.ts';
+import { channelBody, channelForm, channelFormProblem, CHANNEL_ID, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelRun } from '@omni/shared/channel-form.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { Advanced } from './settings-parts.tsx';
-
-interface FormState {
-  id: string;
-  name: string;
-  kind: 'client' | 'internal' | 'personal';
-  repo_path: string;
-  github_repo: string;
-  use_worktree: boolean;
-  base_dir: string;
-  store_domain: string;
-  portal_slug: string;
-  showBrowser: boolean;
-  notes: string;
-  icon: string;
-  /** The default model as a picker choice: model '' is the harness default, model "auto" is Auto. All '' is no default, which runs Auto too. */
-  run: { harness: string; model: string; effort: string };
-}
-
-function fromChannel(c?: Channel): FormState {
-  return {
-    id: c?.id ?? '',
-    name: c?.name ?? '',
-    kind: c && c.kind !== 'system' ? c.kind : 'client',
-    repo_path: c?.repo_path ?? '',
-    github_repo: c?.github_repo ?? '',
-    use_worktree: c ? c.use_worktree === 1 : true,
-    base_dir: c?.base_dir ?? '',
-    store_domain: c?.store_domain ?? '',
-    portal_slug: c?.portal_slug ?? '',
-    showBrowser: c ? c.browser_headless === 0 : false,
-    notes: c?.notes ?? '',
-    icon: c?.icon ?? '',
-    run: { harness: c?.default_harness ?? '', model: c?.default_model ?? '', effort: c?.default_effort ?? '' },
-  };
-}
-
-const orNull = (s: string) => (s.trim() ? s.trim() : null);
 
 function Field({ label, hint, children, htmlFor }: { label: string; hint?: ReactNode; children: ReactNode; htmlFor?: string }) {
   return (
@@ -157,7 +121,7 @@ function IconPicker({ value, name, onChange }: { value: string; name: string; on
 
 /** The model and effort a new thread in the channel starts on, unless the thread or its role picks. */
 /** A channel's default model and effort. `noReset`: the caller shows its own Reset (Settings' provenance chip). */
-export function RunDefaultsField({ channel, value, onChange, noReset }: { channel?: string; value: FormState['run']; onChange: (v: FormState['run']) => void; noReset?: boolean }) {
+export function RunDefaultsField({ channel, value, onChange, noReset }: { channel?: string; value: ChannelRun; onChange: (v: ChannelRun) => void; noReset?: boolean }) {
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(channel));
   if (!harnesses) return null;
   const unset = !(value.harness || value.model || value.effort);
@@ -252,7 +216,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
 
 export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   const { reloadChannels } = useApp();
-  const [f, setF] = useState<FormState>(() => fromChannel(existing));
+  const [f, setF] = useState<ChannelForm>(() => channelForm(existing));
   const [idTouched, setIdTouched] = useState(!!existing);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -261,7 +225,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   const isNew = !existing;
   const isSystem = existing?.kind === 'system';
 
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
+  const set = <K extends keyof ChannelForm>(k: K, v: ChannelForm[K]) => {
     setSaved(false);
     setF((prev) => {
       const next = { ...prev, [k]: v };
@@ -270,7 +234,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
     });
   };
 
-  const idValid = /^[a-z0-9-]{2,40}$/.test(f.id);
+  const idValid = CHANNEL_ID.test(f.id);
   // The values Omni works out (#405). Each shows as a field only when detection failed or you asked to change it.
   const [editing, setEditing] = useState<{ id?: boolean; github?: boolean; base?: boolean }>({});
   const hasRepo = !!f.repo_path.trim();
@@ -285,27 +249,12 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!f.name.trim()) return setError('Give the channel a name.');
-    if (isNew && !idValid) return setError('The id needs 2 to 40 lowercase letters, digits or dashes.');
+    const problem = channelFormProblem(f, isNew);
+    if (problem) return setError(problem);
     setBusy(true);
     setError(null);
-    const body: Record<string, unknown> = {
-      name: f.name.trim(),
-      repo_path: orNull(f.repo_path),
-      use_worktree: f.use_worktree ? 1 : 0,
-      base_dir: orNull(f.base_dir),
-      store_domain: orNull(f.store_domain)?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') ?? null,
-      portal_slug: orNull(f.portal_slug),
-      browser_headless: f.showBrowser ? 0 : 1,
-      notes: orNull(f.notes),
-      icon: orNull(f.icon),
-      default_harness: orNull(f.run.harness),
-      default_model: orNull(f.run.model),
-      default_effort: orNull(f.run.effort),
-    };
-    if (!isSystem) body.kind = f.kind;
-    // Left out unless typed, so the server reads it from the repo path: on create, and when the path changes.
-    if (showGithub) body.github_repo = orNull(f.github_repo);
+    // The GitHub repo goes only when typed, so the server reads it from the repo path: on create, and when the path changes.
+    const body = channelBody(f, { system: isSystem, github: showGithub });
     try {
       if (isNew) {
         const ch = await api.post<Channel>('/channels', { id: f.id, ...body });
@@ -314,7 +263,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
       } else {
         const ch = await api.patch<Channel>(`/channels/${encodeURIComponent(existing.id)}`, body);
         await reloadChannels();
-        setF(fromChannel(ch));
+        setF(channelForm(ch));
         setEditing({});
         setSaved(true);
       }
@@ -355,11 +304,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
               label="Kind"
               value={f.kind}
               onChange={(k) => set('kind', k)}
-              options={[
-                { id: 'client', label: 'Client' },
-                { id: 'internal', label: 'Internal' },
-                { id: 'personal', label: 'Personal' },
-              ]}
+              options={[...CHANNEL_KINDS]}
             />
           </Field>
         )}

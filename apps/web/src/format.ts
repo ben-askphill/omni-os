@@ -185,16 +185,6 @@ export function lastGrapheme(s: string) {
   return all.length ? all[all.length - 1].segment : '';
 }
 
-export function slugify(s: string) {
-  return s
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40);
-}
-
 /** Escape everything, then restore only the <mark> tags the search API adds. */
 export function safeSnippet(s: string) {
   return s

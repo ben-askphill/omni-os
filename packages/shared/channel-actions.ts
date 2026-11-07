@@ -111,3 +111,60 @@ export function withRun(data: ThreadActions, run: ActionRun): ThreadActions {
   const runs = data.runs.some((r) => r.id === run.id) ? data.runs.map((r) => (r.id === run.id ? run : r)) : [run, ...data.runs];
   return { ...data, runs, setup_run: data.setup_run?.id === run.id ? run : data.setup_run };
 }
+
+// ---------- the channel settings editor ----------
+
+export type PortMode = 'none' | 'free' | 'fixed';
+
+/** The editor's fields as typed. `port` is the fixed port's text, kept while another mode is picked. */
+export interface ActionDraft {
+  name: string;
+  command: string;
+  secrets: string;
+  portMode: PortMode;
+  port: string;
+  setup: SetupMode | null;
+}
+
+export function draftOf(a?: ChannelAction): ActionDraft {
+  return {
+    name: a?.name ?? '',
+    command: a?.command ?? '',
+    secrets: a?.secrets.join(', ') ?? '',
+    portMode: a?.port == null ? 'none' : a.port === 0 ? 'free' : 'fixed',
+    port: a?.port ? String(a.port) : '',
+    setup: a?.setup ?? null,
+  };
+}
+
+/** Secret names as typed: comma or space separated, upper-cased, each once. */
+export const parseSecrets = (text: string) => [...new Set(text.toUpperCase().split(/[\s,]+/).filter(Boolean))];
+
+/**
+ * What POST or PATCH sends, always with `setup`: PATCH replaces the whole action, so leaving it out would clear it.
+ * The server checks the rest; this only catches a fixed port with no number, which would read as 0.
+ */
+export function actionInput(d: ActionDraft): { input: ChannelActionInput } | { error: string } {
+  let port: number | null = null;
+  if (d.portMode === 'free') port = 0;
+  if (d.portMode === 'fixed') {
+    if (!/^\d+$/.test(d.port.trim()) || Number(d.port) === 0) return { error: 'Give the fixed port a number, like 9292.' };
+    port = Number(d.port);
+  }
+  return { input: { name: d.name.trim(), command: d.command.trim(), secrets: parseSecrets(d.secrets), port, setup: d.setup } };
+}
+
+/** What each "Run in new worktrees" choice does, under the editor's picker. */
+export const ACTION_SETUP_HINT: Record<SetupMode | 'off', string> = {
+  off: "Runs only from a thread's Actions tab. One action in the channel can also run in each new worktree.",
+  blocking:
+    'Runs once in each new worktree and holds the agent until it succeeds. If it fails, the thread stops at Setup failed with Retry setup. Never on Hermes, Cursor Cloud or a shared checkout.',
+  background: 'Runs once in each new worktree while the agent starts. If it fails, the thread says so and the agent keeps going. Never on Hermes, Cursor Cloud or a shared checkout.',
+};
+
+/** What each port choice does, under the editor's picker. */
+export const ACTION_PORT_HINT: Record<PortMode, string> = {
+  none: 'The command serves nothing.',
+  free: 'Omni picks a free port each run, so two threads can preview at once. The command reads it as $OMNI_PORT.',
+  fixed: 'Always this port. A second run while it is taken is refused.',
+};
