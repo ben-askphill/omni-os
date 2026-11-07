@@ -37,14 +37,12 @@ export function stackOptions(colors: ColorTokens): NativeStackNavigationOptions 
 type Navigate = Pick<NativeStackNavigationProp<RootStackParamList>, 'navigate'>;
 
 /**
- * A tab's root screen: a large title (phone web's MoTitle), Search on the left and Settings on the right as icon buttons.
- * Neither tab root has a back button to take the left. Servers sits inside Settings. Channels also carries New, so a
+ * A tab's root screen: Search on the left and Settings on the right as icon buttons. Neither tab root has a back button
+ * to take the left. Servers sits inside Settings. Channels also carries New, so a
  * thread can start from the list.
  */
 export function rootHeader(navigation: Navigate, { newThread = false }: { newThread?: boolean } = {}) {
   return {
-    headerLargeTitle: true,
-    headerLargeTitleShadowVisible: false,
     headerLeft: () => <HeaderButton label="Search" icon="search" onPress={() => navigation.navigate('Search')} />,
     headerRight: () => (
       <View style={styles.actions}>

@@ -13,6 +13,8 @@ const light = {
   line: 'rgba(23, 24, 26, 0.08)',
   lineStrong: 'rgba(23, 24, 26, 0.16)',
   elev: '#ffffff',
+  /** A segmented control's selected thumb (web: --thumb). */
+  thumb: '#ffffff',
   wash: 'rgba(23, 24, 26, 0.06)',
   scrim: 'rgba(23, 24, 26, 0.22)',
   // Status is the only colour (web: --live, --needs, --done in apps/web/src/index.css). Full saturation, never tinted.
@@ -48,6 +50,7 @@ const dark: ColorTokens = {
   line: 'rgba(236, 235, 231, 0.08)',
   lineStrong: 'rgba(236, 235, 231, 0.16)',
   elev: '#212429',
+  thumb: 'rgba(255, 255, 255, 0.14)',
   wash: 'rgba(236, 234, 229, 0.06)',
   scrim: 'rgba(0, 0, 0, 0.5)',
   live: '#7280ff',

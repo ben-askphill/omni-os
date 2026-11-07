@@ -52,7 +52,7 @@ const SYMBOLS = {
   pin: 'pin',
   play: 'play.fill',
   plus: 'plus',
-  pr: 'arrow.triangle.pull',
+  pr: 'arrow.triangle.merge',
   refresh: 'arrow.clockwise',
   search: 'magnifyingglass',
   server: 'server.rack',

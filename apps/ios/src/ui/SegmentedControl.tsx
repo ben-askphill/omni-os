@@ -31,7 +31,7 @@ export function SegmentedControl<T extends string>({
               if (!selected) selection();
               onChange(option.value);
             }}
-            style={[styles.segment, selected && { backgroundColor: colors.bg }]}
+            style={[styles.segment, selected && [styles.thumb, { backgroundColor: colors.thumb }]]}
           >
             <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.label, { color: selected ? colors.fg : colors.fg3 }]}>
               {option.label}
@@ -60,6 +60,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // web: --shadow-thumb
+  thumb: {
+    shadowColor: '#17181a',
+    shadowOpacity: 0.09,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
   },
   label: {
     fontSize: fontSize.ui,
