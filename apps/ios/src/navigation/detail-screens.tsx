@@ -89,4 +89,3 @@ export function detailScreens({ backTitle }: { backTitle: string }) {
     </>
   );
 }
-
