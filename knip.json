@@ -54,7 +54,8 @@
         "effect",
         "expo-status-bar",
         "babel-plugin-react-compiler",
-        "expo-system-ui"
+        "expo-system-ui",
+        "expo-symbols"
       ]
     },
     "apps/web": {

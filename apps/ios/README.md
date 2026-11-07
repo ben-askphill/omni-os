@@ -161,4 +161,4 @@ The Expo, React Native, React Navigation, Effect, Uniwind, development client, a
 
 UIKit tab items use generated template PNGs because they require images rather than SVG nodes. After changing a tab drawing, run `npx tsx packages/shared/scripts/build-tab-icons.ts` from the repo root. The shared tests check their source hash and dimensions.
 
-UIKit still owns system back indicators and share sheets. App icons no longer use SF Symbols. The liquid OmniMark and Loader animations remain web-only; iOS uses the exact static Omni mark and native activity indicators.
+UIKit still owns system back indicators and share sheets. App icons no longer use SF Symbols. Keep the unused `expo-symbols` native dependency until the next native release so removing it does not force a new build for this JavaScript update. The liquid OmniMark and Loader animations remain web-only; iOS uses the exact static Omni mark and native activity indicators.
