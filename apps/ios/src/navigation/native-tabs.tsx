@@ -13,7 +13,8 @@ import {
   type TabRouterOptions,
   type TypedNavigator,
 } from '@react-navigation/native';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { Tabs, type TabsScreenAppearanceIOS } from 'react-native-screens';
 
 import { useOmniTheme } from '../theme';
@@ -43,7 +44,10 @@ type NativeTabsProps = DefaultNavigatorOptions<
   NativeTabsEventMap,
   NativeTabsNavigationProp<ParamListBase>
 > &
-  TabRouterOptions;
+  TabRouterOptions & {
+    /** Floats over the tabs, given the focused tab's route name. Shown exactly when the tab bar is. */
+    accessory?: (tab: string) => ReactNode;
+  };
 
 export type NativeTabsNavigationProp<
   ParamList extends ParamListBase,
@@ -56,7 +60,7 @@ export type NativeTabsNavigationProp<
  * UIKit's tab bar driven by React Navigation's tab router. Native owns the selection: JS asks for a tab through
  * `navStateRequest`, quoting the last provenance native confirmed, and follows a tap by jumping its own state there.
  */
-function NativeTabsNavigator({ id, initialRouteName, backBehavior, children, layout, screenListeners, screenOptions, screenLayout, UNSTABLE_router }: NativeTabsProps) {
+function NativeTabsNavigator({ id, initialRouteName, backBehavior, children, layout, screenListeners, screenOptions, screenLayout, UNSTABLE_router, accessory }: NativeTabsProps) {
   const { state, descriptors, navigation, NavigationContent } = useNavigationBuilder<
     TabNavigationState<ParamListBase>,
     TabRouterOptions,
@@ -67,6 +71,7 @@ function NativeTabsNavigator({ id, initialRouteName, backBehavior, children, lay
   const { scheme, colors } = useOmniTheme();
   const [provenance, setProvenance] = useState(0);
   const focused = state.routes[state.index]!;
+  const hidden = tabBarHidden(state);
 
   const item = (color: string) => ({ tabBarItemTitleFontColor: color, tabBarItemIconColor: color });
   const appearance: TabsScreenAppearanceIOS = {
@@ -78,52 +83,59 @@ function NativeTabsNavigator({ id, initialRouteName, backBehavior, children, lay
 
   return (
     <NavigationContent>
-      <Tabs.Host
-        navStateRequest={{ selectedScreenKey: focused.name, baseProvenance: provenance }}
-        tabBarHidden={tabBarHidden(state)}
-        colorScheme={scheme}
-        nativeContainerStyle={{ backgroundColor: colors.bg }}
-        ios={{ tabBarTintColor: colors.fg, tabBarControllerMode: 'tabBar', tabBarMinimizeBehavior: 'never' }}
-        onTabSelectionRejected={({ nativeEvent }) => setProvenance(nativeEvent.provenance)}
-        onTabSelected={({ nativeEvent }) => {
-          setProvenance(nativeEvent.provenance);
-          if (nativeEvent.actionOrigin === 'programmatic-js') return;
-          const route = state.routes.find((r) => r.name === nativeEvent.selectedScreenKey);
-          if (!route) return;
-          navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            data: nativeEvent.hasTriggeredSpecialEffect ? { origin: 'native' } : {},
-          });
-          if (route.key !== focused.key) navigation.dispatch({ ...TabActions.jumpTo(route.name), target: state.key });
-        }}
-      >
-        {state.routes.map((route) => {
-          const { options, render } = descriptors[route.key]!;
-          return (
-            <Tabs.Screen
-              key={route.key}
-              screenKey={route.name}
-              title={options.title}
-              badgeValue={options.tabBadge}
-              tabBarItemAccessibilityLabel={options.tabAccessibilityLabel ?? options.title}
-              specialEffects={{ repeatedTabSelection: { popToRoot: true, scrollToTop: true } }}
-              style={{ backgroundColor: colors.bg }}
-              ios={{
-                icon: { type: 'sfSymbol', name: options.icon },
-                selectedIcon: { type: 'sfSymbol', name: options.selectedIcon ?? options.icon },
-                standardAppearance: appearance,
-                scrollEdgeAppearance: appearance,
-              }}
-            >
-              {render()}
-            </Tabs.Screen>
-          );
-        })}
-      </Tabs.Host>
+      <View style={styles.fill}>
+        <Tabs.Host
+          navStateRequest={{ selectedScreenKey: focused.name, baseProvenance: provenance }}
+          tabBarHidden={hidden}
+          colorScheme={scheme}
+          nativeContainerStyle={{ backgroundColor: colors.bg }}
+          ios={{ tabBarTintColor: colors.fg, tabBarControllerMode: 'tabBar', tabBarMinimizeBehavior: 'never' }}
+          onTabSelectionRejected={({ nativeEvent }) => setProvenance(nativeEvent.provenance)}
+          onTabSelected={({ nativeEvent }) => {
+            setProvenance(nativeEvent.provenance);
+            if (nativeEvent.actionOrigin === 'programmatic-js') return;
+            const route = state.routes.find((r) => r.name === nativeEvent.selectedScreenKey);
+            if (!route) return;
+            navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              data: nativeEvent.hasTriggeredSpecialEffect ? { origin: 'native' } : {},
+            });
+            if (route.key !== focused.key) navigation.dispatch({ ...TabActions.jumpTo(route.name), target: state.key });
+          }}
+        >
+          {state.routes.map((route) => {
+            const { options, render } = descriptors[route.key]!;
+            return (
+              <Tabs.Screen
+                key={route.key}
+                screenKey={route.name}
+                title={options.title}
+                badgeValue={options.tabBadge}
+                tabBarItemAccessibilityLabel={options.tabAccessibilityLabel ?? options.title}
+                specialEffects={{ repeatedTabSelection: { popToRoot: true, scrollToTop: true } }}
+                style={{ backgroundColor: colors.bg }}
+                ios={{
+                  icon: { type: 'sfSymbol', name: options.icon },
+                  selectedIcon: { type: 'sfSymbol', name: options.selectedIcon ?? options.icon },
+                  standardAppearance: appearance,
+                  scrollEdgeAppearance: appearance,
+                }}
+              >
+                {render()}
+              </Tabs.Screen>
+            );
+          })}
+        </Tabs.Host>
+        {hidden ? null : accessory?.(focused.name)}
+      </View>
     </NavigationContent>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});
 
 export type NativeTabsTypeBag<ParamList extends ParamListBase = ParamListBase, NavigatorID extends string | undefined = string | undefined> = {
   ParamList: ParamList;

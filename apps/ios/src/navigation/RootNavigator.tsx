@@ -8,12 +8,16 @@ import { useHasSession } from '../session/ActiveSession';
 import { useOmniTheme } from '../theme';
 import { detailScreens, rootHeader, Stack, stackOptions } from './detail-screens';
 import { createNativeTabsNavigator } from './native-tabs';
+import { NewThreadButton } from './NewThreadButton';
 import { activityTabLabel, needsBadge } from './tabs-model';
 import type { TabsParamList } from './types';
 
 const Tab = createNativeTabsNavigator<TabsParamList>();
 
-/** No session shows Connect alone. Any session opens the tabs on Activity, with Search and Settings one tap away on each tab's root. */
+/**
+ * No session shows Connect alone. Any session opens the tabs on Activity, with Search and Settings one tap away on each
+ * tab's root and the + beside the tab bar.
+ */
 export function RootNavigator() {
   const { colors } = useOmniTheme();
   const { ready } = usePairing();
@@ -31,7 +35,7 @@ export function RootNavigator() {
   }
 
   return (
-    <Tab.Navigator initialRouteName="ActivityTab">
+    <Tab.Navigator initialRouteName="ActivityTab" accessory={(tab) => <NewThreadButton tab={tab} />}>
       <Tab.Screen
         name="ActivityTab"
         component={ActivityStack}
@@ -84,7 +88,7 @@ function ChannelsStack() {
       <Stack.Screen
         name="Channels"
         component={ChannelsScreen}
-        options={({ navigation }) => ({ title: 'Channels', ...rootHeader(navigation, { newThread: true }) })}
+        options={({ navigation }) => ({ title: 'Channels', ...rootHeader(navigation) })}
       />
       {detailScreens({ backTitle: 'Channels' })}
     </Stack.Navigator>
