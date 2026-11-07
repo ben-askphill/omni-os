@@ -1,10 +1,11 @@
+import type { ChannelKind } from '@omni/shared/channel-form.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 import type { Thread, ThreadStub } from './threads.ts';
 
 export interface Channel {
   id: string;
   name: string;
-  kind: 'client' | 'internal' | 'personal' | 'system';
+  kind: ChannelKind | 'system';
   repo_path: string | null;
   github_repo: string | null;
   use_worktree: number;
@@ -50,7 +51,7 @@ export type ChannelWithRunning = Channel & {
 };
 
 export interface ListArchived {
-  /** Only the archived ones, in place of the others. */
+  /** The archived ones too, alongside the others. */
   archived?: boolean;
 }
 
@@ -66,5 +67,12 @@ export function channelsApi(http: HttpClient) {
     folders: (channel?: string) => http.request<Folder[]>('GET', apiPath`/folders`, { query: { channel } }),
     /** Opens or closes a folder in every client's channel list: the server keeps the state. A 404 for a folder it does not have. */
     setFolderCollapsed: (id: string, collapsed: boolean) => http.request<Folder>('PATCH', apiPath`/folders/${id}`, { body: { collapsed } }),
+    /** A new channel. `body` is `channelBody` from @omni/shared/channel-form.ts. A 409 when the id is taken. */
+    createChannel: (id: string, body: Record<string, unknown>) => http.request<Channel>('POST', apiPath`/channels`, { body: { id, ...body } }),
+    /** Changes any of a channel's fields, `archived` included. A 400 with the reason for a value it refuses. */
+    updateChannel: (id: string, body: Record<string, unknown>) => http.request<Channel>('PATCH', apiPath`/channels/${id}`, { body }),
+    /** Replaces the channel's design system with one standalone HTML file. */
+    setDesignSystem: (id: string, name: string, html: string) => http.request<Channel>('PUT', apiPath`/channels/${id}/design-system`, { body: { name, html } }),
+    removeDesignSystem: (id: string) => http.request<Channel>('DELETE', apiPath`/channels/${id}/design-system`),
   };
 }
