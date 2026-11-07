@@ -106,9 +106,9 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
     navigation.setOptions({
       title: channel ? channelTitle(channel) : 'New channel',
       headerRight: () =>
-        busy ? <ActivityIndicator color={colors.fg3} /> : <HeaderButton label={isNew ? 'Create' : 'Save'} disabled={!dirty} onPress={() => void save()} />,
+        busy ? <ActivityIndicator color={colors.fg3} /> : <HeaderButton label={isNew ? 'Create' : saved && !dirty ? 'Saved' : 'Save'} disabled={!dirty} onPress={() => void save()} />,
     });
-  }, [navigation, channel, isNew, busy, dirty, save, colors.fg3]);
+  }, [navigation, channel, isNew, busy, dirty, saved, save, colors.fg3]);
 
   function confirmArchive() {
     if (!channel) return;
@@ -135,7 +135,6 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         <Text style={[styles.heroName, { color: colors.fg }]} numberOfLines={1}>
           {form.name.trim() || 'New channel'}
         </Text>
-        {saved && !dirty ? <Text style={[styles.saved, { color: colors.fg3 }]}>Saved</Text> : null}
       </View>
       {error ? <Callout message={error} /> : null}
 
@@ -342,9 +341,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.s4,
     paddingVertical: space.s6,
-  },
-  saved: {
-    fontSize: fontSize.small,
   },
   heroName: {
     fontSize: fontSize.heading,
