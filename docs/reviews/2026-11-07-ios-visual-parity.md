@@ -114,7 +114,7 @@ The iOS app has the same features and mostly the same words as phone web, but it
 - Backgrounds and surfaces match (`#121316`, `#191b1e`). The same gaps show, and missing colour stands out more in dark: phone web's lime Done pill and dots are the only accent on the screen, and iOS has none.
 - The iOS nav bar pills render as dark grey glass, which phone web has no equivalent for.
 
-## Second pass: PRs, Changes, Pull request, Actions, Artifact, Settings pages, streaming
+## Second pass: PRs, Changes, Pull request, Actions, Artifact, Settings pages, streaming, offline
 
 Same stack, plus an `Acme Shop` channel backed by a throwaway git repo (`use_worktree`, `github_repo` acme/shop), the fixture `gh` (`packages/test-fixtures/fake-gh.mjs`, linked into the stack's `bin/`) for PR data, two channel actions (Theme dev on a port, Lint), a thread whose turn edits 4 files and publishes `size-guide-notes.md`, and a RICH turn held open by a 30-minute Bash call.
 
@@ -161,9 +161,9 @@ Same stack, plus an `Acme Shop` channel backed by a throwaway git repo (`use_wor
 ![Artifact](2026-11-07-ios-visual-parity/24-artifact.png)
 
 - Phone web: a sheet with a round × close button, the file name in mono with "#Acme Shop" under it, and a round share icon.
-- iOS: a pushed page whose back button is an **empty circle** (no chevron, no accessibility label; agent-device could not find it and `back` did nothing), the file name truncated, "claude.ai" and "Share" text pills, and a meta line ("markdown · 249 B · published 2m ago").
+- iOS: a pushed page with a round back chevron, the file name truncated, "claude.ai" and "Share" text pills, and a meta line ("markdown · 249 B · published 2m ago").
 - Markdown styling differs: phone web uses a smaller heading and a light table (muted header, row lines only); iOS a larger heading and a fully bordered table with a bold header.
-- The empty back button is a bug to fix regardless of the redesign.
+- The first time it opened, the iOS back button drew as an empty circle with no chevron and no accessibility label, and the simulator could not go back. Reopening it later, in light and dark, showed a working chevron. Seen once, not reproduced; worth a look if it shows up on a device.
 
 ### Turn while streaming
 
@@ -172,7 +172,12 @@ Same stack, plus an `Acme Shop` channel backed by a throwaway git repo (`use_wor
 - Phone web: blue "Running" pill in the header; a status line with a spinner ring, the agent's status text in vermilion ("Looking for the cart code") and the elapsed time (5m 11s); plan items with lime rings; "10 steps so far · ◆ 1 failed" with a wrench icon; and "Review #12" / "New thread" chips above the composer.
 - iOS: "Running · Acme Shop" as grey text under the header; a "● Running `sleep 1800` · step 3/3" line that shows the raw command instead of the status and no elapsed time; plan items struck through in grey; no chips.
 - Both swap the send button for a black stop button.
-- The fake CLI does not stream text deltas, so a half-written answer was not captured; the tool-running state above is what a long turn shows most of the time.
+- Neither client can show a half-written answer: the server never asks the CLI for partial messages (no `include-partial-messages` in `apps/server/`), so a reply lands whole. The tool-running state above is what streaming looks like in Omni.
+
+![Steer while running](2026-11-07-ios-visual-parity/33b-steer-settled.png)
+
+- A message sent during the turn (a steer, sent from the iOS composer). Phone web shows it as the user's own bubble, right-aligned with a dashed border, under "Sent, waiting for the agent". iOS shows a full-width grey card titled "Sent, the agent reads it next". Same state, different wording and a different shape.
+- The iOS keyboard stayed up after sending; synthetic drags in the simulator did not trigger the transcript's interactive dismiss, so check this by hand on a device before calling it a bug.
 
 ![Streaming steps](2026-11-07-ios-visual-parity/25b-streaming-steps.png)
 
@@ -199,12 +204,69 @@ iOS's four settings pages have no direct phone web twins. The closest sections a
 
 - Phone web: large title, description with `automations/*.yaml`, refresh button, "Run automations on" card, and an empty state with an icon in a circle. iOS: a plain "No automations" heading and line, left-aligned, no icon.
 
+### Offline and a failed send
+
+The QA server kept running. Phone web lost it through blocked `/api` requests plus Playwright's offline mode. The iOS app reached the server through a small proxy, and the proxy was stopped once the thread had loaded.
+
+![Offline](2026-11-07-ios-visual-parity/34-offline.png)
+
+- Phone web shows nothing while the server is gone (checked for 8 seconds): same header, same Done pill, no banner.
+- iOS replaces "Live" with "Offline, retrying" (ring dot) under the header right away.
+
+![Failed send](2026-11-07-ios-visual-parity/35-send-failed.png)
+
+- Phone web: a "Cannot reach the Omni server. Is it running?" row with a red diamond above the composer. The text stays in the composer and no bubble is added to the transcript.
+- iOS: the message becomes a right-aligned grey bubble with "Cannot reach the server. Your message is kept here. Retry when you are connected.", a black Retry button and an Edit link. The composer is cleared.
+- With the proxy back, the iOS header went to "Live" within seconds and Retry sent the message (the turn ran and replied).
+- With the API back, phone web still showed the error row 10 seconds later, with the text in the composer. Pressing Send again sent it and cleared the row. Nothing tells the user the server is back.
+- iOS is ahead here. The parity work should keep iOS's failed-send bubble and offline line, and phone web should get them too (see Open questions).
+
 ### What the second pass adds to the list
 
 - **Settings pages share one frame on phone web**: round back button, small title in the bar, then a large title and a one-line description in the page. iOS uses the native bar title and no in-page title. One shared page header component on iOS fixes all four.
 - **Status pills**: Running (blue), Done and Succeeded (lime), Open, draft. iOS writes these as grey text. Same fix as the status colours in the first pass.
 - **Under-turn cards and chips**: artifact card, Changes card, follow-up chips. iOS has none of these.
-- **Bugs found on the way**: iOS artifact viewer's blank back button; phone web's squashed "Ask builder to review" button.
+- **Bugs found on the way**: phone web's squashed "Ask builder to review" button. Possibly the iOS artifact viewer's back button (seen blank once, not reproduced).
+- **Where iOS is ahead**: the offline line under the header and the failed-send bubble with Retry and Edit. Keep both through the redesign.
+
+### Dark mode, second pass
+
+![Steer dark](2026-11-07-ios-visual-parity/33b-steer-settled-dark.png)
+
+- Backgrounds and surfaces match. As in the first pass, phone web's lime, blue and vermilion are the only colour on screen and iOS has none: the plan's lime dots, the vermilion status line and the blue Running pill have no iOS counterpart.
+- iOS's stop button inverts to white in dark, like phone web's.
+
+![Changes dark](2026-11-07-ios-visual-parity/21-changes-dark.png)
+
+- Diff colours match in dark (dark red and olive rows on both).
+
+![Pull request dark](2026-11-07-ios-visual-parity/22-pr-dark.png)
+
+- Matches closely; the check marks (lime, red diamond, blue) are on both here. iOS's "1 of 4 checks failing" line is vermilion, one of the few places iOS already uses a status colour.
+
+![Actions dark](2026-11-07-ios-visual-parity/23b-actions-running-dark.png)
+
+- The Theme dev run had finished by the time of this capture. Phone web's lime "Succeeded" pills stand out; iOS writes "Succeeded" as grey text. iOS Run buttons invert to light pills, like phone web's.
+
+![Artifact dark](2026-11-07-ios-visual-parity/24-artifact-dark.png)
+
+- Phone web shows the document on a lighter raised sheet (`surface`), iOS on the page background, so the iOS viewer reads flatter.
+
+![PRs dark](2026-11-07-ios-visual-parity/30-prs-dark.png)
+
+- Phone web only (iOS has no PR list).
+
+![Servers vs Machines dark](2026-11-07-ios-visual-parity/26-servers-dark.png)
+
+![Notifications dark](2026-11-07-ios-visual-parity/27-notifications-dark.png)
+
+![Devices vs Sharing and access dark](2026-11-07-ios-visual-parity/28-devices-dark.png)
+
+![Automations dark](2026-11-07-ios-visual-parity/29-automations-dark.png)
+
+- The Settings pages hold up in dark: page background, card surface and the secondary button fill match. The light-mode gaps (no in-page title or description, plain empty states, no icon) carry over unchanged.
+- Phone web's only colour here is the lime "Connected" dot on Machines. iOS has no status row to put one on.
+- The iOS back button on Notifications reads "Back" while Servers, Devices and Automations read "Settings" (`headerBackTitle: 'Back'` in `apps/ios/src/navigation/detail-screens.tsx`, likely because Servers opens it too). Phone web shows an icon-only round back button on every page, so this goes away with the shared page header.
 
 ## Suggested order
 
@@ -221,10 +283,10 @@ iOS's four settings pages have no direct phone web twins. The closest sections a
 - Activity filter and usage meters: iOS has them and phone web does not. Keep them on iOS, add them to phone web, or drop them.
 - Search: iOS opens on recent threads, phone web on an empty state. Which one wins?
 - Settings scope stays as the README says, or grows toward phone web's list.
+- Offline and failed sends: iOS's offline line and failed-send bubble with Retry and Edit beat phone web's composer error and silent offline state. Port them to phone web, or treat this as a place where iOS keeps its own design.
 
 ## Not covered
 
 - iOS Servers with a real paired server (the dev shortcut leaves the list empty).
-- A turn writing text mid-stream (the fake CLI sends the answer in one piece), sending and failed message bubbles, and the handoff banner.
-- Dark mode for the second-pass screens.
+- The handoff banner (needs two synced servers).
 - Phone web was rendered in desktop Chrome with mobile emulation, not iOS Safari, so safe areas and the home indicator are not exact.
