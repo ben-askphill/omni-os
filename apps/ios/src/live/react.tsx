@@ -149,6 +149,25 @@ export function useHandoffOpen(parentId: string): [open: boolean, toggle: () => 
   return [!closed.has(parentId), () => prefs.toggle(parentId)];
 }
 
+export type InboxShelf = 'working' | 'done';
+
+const SHELF_PREF_KEY = 'omni.pref.inbox.open';
+let shelfPrefs: HandoffPrefs | null = null;
+
+/**
+ * Whether an Activity shelf is open, and a toggle that remembers it on this device. Every shelf starts folded, as on
+ * phone web; the same toggled-set store as the handoffs keeps the shelves Ben opened.
+ */
+export function useShelfOpen(shelf: InboxShelf): [open: boolean, toggle: () => void] {
+  shelfPrefs ??= createHandoffPrefs({
+    read: () => SecureStore.getItemAsync(SHELF_PREF_KEY),
+    write: (value) => SecureStore.setItemAsync(SHELF_PREF_KEY, value),
+  });
+  const prefs = shelfPrefs;
+  const opened = useStore(prefs.closed);
+  return [opened.has(shelf), () => prefs.toggle(shelf)];
+}
+
 const idle = createStore<null>(null);
 
 /** The thread's view, or null until its screen has opened it. */
