@@ -32,3 +32,4 @@ describe('tab bar on pushed screens', () => {
     expect(tabBarHidden(tabs(0, [{ routes: [{}, {}] }]))).toBe(true);
   });
 });
+
