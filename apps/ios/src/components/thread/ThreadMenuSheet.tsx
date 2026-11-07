@@ -114,7 +114,7 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
     <ActivityIndicator color={colors.fg3} />
   ) : page !== 'menu' ? (
     <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} onPress={() => setPage(page === 'takeover' ? 'machine' : 'menu')} style={styles.back}>
-      <Icon name="chevronLeft" size={15} weight="semibold" color={colors.fg} />
+      <Icon name="chevronLeft" size={15} strokeWidth={2} color={colors.fg} />
       <Text style={[styles.backLabel, { color: colors.fg }]}>Back</Text>
     </Pressable>
   ) : null;

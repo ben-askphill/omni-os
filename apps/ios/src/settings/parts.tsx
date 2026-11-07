@@ -144,7 +144,7 @@ export function ChoiceRow({ title, detail, selected, disabled, first, onPress }:
       detail={detail}
       disabled={disabled}
       onPress={onPress}
-      trailing={selected ? <Icon name="check" size={16} weight="semibold" color={colors.fg} /> : <View style={styles.check} />}
+      trailing={selected ? <Icon name="check" size={16} color={colors.fg} /> : <View style={styles.check} />}
       accessibilityHint={selected ? 'Selected' : undefined}
     />
   );

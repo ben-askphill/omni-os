@@ -41,7 +41,7 @@ export function ListRow({ title, icon, leading, detail, value, trailing, chevron
         {detail ? <Text style={[styles.detail, { color: colors.fg3 }]}>{detail}</Text> : null}
       </View>
       {trailing ?? (value ? <Text style={[styles.value, { color: colors.fg3 }]}>{value}</Text> : null)}
-      {chevron ? <Icon name="chevronRight" size={13} weight="semibold" color={colors.fg4} /> : null}
+      {chevron ? <Icon name="chevronRight" size={13} color={colors.fg4} /> : null}
     </>
   );
   const frame = [styles.row, !first && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }];

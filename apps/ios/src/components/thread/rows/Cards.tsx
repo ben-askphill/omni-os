@@ -1,3 +1,4 @@
+import { CrewMark, isCrewRole } from '../../../ui/Brand';
 import { cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { useState } from 'react';
@@ -70,6 +71,7 @@ export function ReportRow({ row }: Of<'report'>) {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, r.dropped && styles.dim]}>
       <Pressable accessibilityRole="button" onPress={() => openThread(r.thread_id)} style={styles.line}>
+        {isCrewRole(r.role) ? <CrewMark role={r.role} /> : null}
         <Text style={[styles.cardTitle, { color: colors.fg }]}>{`Report from ${r.role || 'the crew'}`}</Text>
         {r.dropped ? <Text style={[styles.caption, { color: colors.fg3 }]}>{r.undelivered ? `Not delivered · ${r.undelivered}` : 'Not delivered'}</Text> : null}
         <View style={styles.grow} />
@@ -232,7 +234,7 @@ export function StepsRow({ row }: Of<'steps'>) {
         {row.failed > 0 ? <Text style={{ color: colors.fg3 }}>{`  ·  ${row.failed} failed`}</Text> : null}
       </Text>
       <View style={{ transform: [{ rotate: row.open ? '90deg' : '0deg' }] }}>
-        <Icon name="chevronRight" size={12} weight="semibold" color={colors.fg4} />
+        <Icon name="chevronRight" size={12} color={colors.fg4} />
       </View>
     </Pressable>
   );

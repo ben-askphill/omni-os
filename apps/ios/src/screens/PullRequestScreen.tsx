@@ -1,3 +1,4 @@
+import { LinkBrand } from '../ui/Brand';
 import { FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT } from '@omni/shared/thread-glance.ts';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
 import { useCallback, useEffect, useState } from 'react';
@@ -104,7 +105,7 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
             <Text style={[styles.meta, { color: colors.fg3 }]}>· {plural(c.files.length, 'file')}</Text>
           </View>
           <Text style={[styles.branches, { color: colors.fg3 }]}>{c.branches}</Text>
-          {pr.githubRepo ? <Text style={[styles.meta, { color: colors.fg3 }]}>{pr.githubRepo}</Text> : null}
+          {pr.githubRepo ? <View style={styles.row}><LinkBrand brand="github" /><Text style={[styles.meta, { color: colors.fg3 }]}>{pr.githubRepo}</Text></View> : null}
           <Text style={[styles.status, { color: c.status.tone === 'needs' ? colors.needs : colors.fg2 }]}>{c.status.text}</Text>
           {fix ? (
             <View style={styles.inline}>

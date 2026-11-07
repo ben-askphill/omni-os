@@ -1,3 +1,4 @@
+import { HarnessLogo } from '../../ui/Brand';
 import type { OmniApi } from '@omni/client-core';
 import { channelForm } from '@omni/shared/channel-form.ts';
 import { setsRun } from '@omni/shared/draft-run.ts';
@@ -41,6 +42,7 @@ export function ModelsSection() {
           {harnessRows(harnesses.data).map((h, i) => (
             <View key={h.id} style={[styles.harness, i > 0 && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
               <View style={styles.head}>
+                <HarnessLogo harness={h.id} />
                 <Text style={[styles.name, { color: colors.fg }]}>{h.name}</Text>
                 <StatusDot glyph={h.ready ? 'done' : 'needs'} size={7} />
                 <Text style={[styles.meta, { color: colors.fg3 }]}>{h.ready ? 'Ready' : 'Not ready'}</Text>

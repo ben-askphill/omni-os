@@ -1,3 +1,5 @@
+import Svg, { Circle, G } from 'react-native-svg';
+import { MARK_TRANSFORM } from '@omni/shared/brand.ts';
 import { StyleSheet, View } from 'react-native';
 import { SvgCss } from 'react-native-svg/css';
 import { Text } from '../ui/Text';
@@ -67,25 +69,12 @@ function Letter({ letter, size, color }: { letter: string; size: number; color: 
 
 /** The static Omni mark (web: StaticMark): a heavy ring with a satellite at its top right. */
 export function OmniMark({ size, color }: { size: number; color: string }) {
-  const ring = size * 0.72;
-  const moon = size * 0.18;
-  return (
-    <View style={{ width: size, height: size }}>
-      <View
-        style={{
-          position: 'absolute',
-          left: (size - ring) / 2 - size * 0.03,
-          top: (size - ring) / 2 + size * 0.03,
-          width: ring,
-          height: ring,
-          borderRadius: ring / 2,
-          borderWidth: size * 0.15,
-          borderColor: color,
-        }}
-      />
-      <View style={{ position: 'absolute', right: size * 0.06, top: size * 0.08, width: moon, height: moon, borderRadius: moon / 2, backgroundColor: color }} />
-    </View>
-  );
+  return <Svg width={size} height={size} viewBox="-64 -64 128 128" accessible={false}>
+    <G transform={MARK_TRANSFORM}>
+      <Circle r={40} fill="none" stroke={color} strokeWidth={20} />
+      <Circle cx={49.5} cy={-49.5} r={12} fill={color} />
+    </G>
+  </Svg>;
 }
 
 const styles = StyleSheet.create({

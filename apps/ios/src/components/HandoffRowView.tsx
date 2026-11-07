@@ -35,7 +35,7 @@ export function HandoffRowView({ row, open, onToggle, onOpenThread, onMenu }: Ha
         style={({ pressed }) => [styles.toggle, { backgroundColor: pressed ? colors.wash : colors.bg }]}
       >
         <View style={[styles.chevron, { transform: [{ rotate: open ? '90deg' : '0deg' }] }]}>
-          <Icon name="chevronRight" size={11} weight="semibold" color={colors.fg4} />
+          <Icon name="chevronRight" size={11} color={colors.fg4} />
         </View>
         <Text style={[styles.summary, { color: colors.fg3 }]}>
           {`${children.length} delegated`}

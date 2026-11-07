@@ -66,7 +66,7 @@ export const FileHeader = memo(function FileHeader({ row, onToggle }: FileHeader
       style={({ pressed }) => [styles.file, { backgroundColor: pressed ? colors.surface3 : colors.surface2, borderTopColor: colors.line }]}
     >
       <View style={{ width: 14, alignItems: 'center', transform: [{ rotate: row.open ? '90deg' : '0deg' }] }}>
-        <Icon name="chevronRight" size={10} weight="semibold" color={colors.fg3} />
+        <Icon name="chevronRight" size={10} color={colors.fg3} />
       </View>
       <Text style={[styles.letter, { color: colors.fg3 }]}>{STATUS_LETTER[file.status]}</Text>
       <Text numberOfLines={1} ellipsizeMode="middle" style={[styles.label, { color: colors.fg }]}>

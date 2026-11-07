@@ -159,7 +159,7 @@ function RunCard({ run, latest, setup, now, busy, error, blocked, onStop, onRetr
         >
           <View style={styles.nameRow}>
             <View style={[styles.chevron, { transform: [{ rotate: open ? '90deg' : '0deg' }] }]}>
-              <Icon name="chevronRight" size={11} weight="semibold" color={colors.fg4} />
+              <Icon name="chevronRight" size={11} color={colors.fg4} />
             </View>
             <StatusDot glyph={runGlyph(run.state)} />
             <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>

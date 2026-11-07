@@ -2,7 +2,7 @@ import { CHANNEL_GLYPHS, glyphIcon, readSvgIcon } from '@omni/shared/channel-ico
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { channelFace } from '../src/components/channel-face';
-import { SYMBOLS } from '../src/ui/symbols';
+import { ICON_PATHS } from '@omni/shared/icons.ts';
 
 const SVG_FILE = '<?xml version="1.0"?>\n<!-- logo -->\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><style>.a{fill:#e11}</style><circle class="a" cx="12" cy="12" r="10"/></svg>';
 
@@ -12,12 +12,12 @@ describe('what a channel avatar draws', () => {
     expect(channelFace('team', '👩‍💻')).toEqual({ kind: 'emoji', text: '👩‍💻' });
   });
 
-  it('draws a design system icon, and every icon the computer offers has an SF Symbol', () => {
+  it('draws a design system icon, and every icon the computer offers has a shared path', () => {
     expect(channelFace('ops', glyphIcon('zap'))).toEqual({ kind: 'glyph', name: 'zap' });
     for (const name of CHANNEL_GLYPHS) {
       const face = channelFace('x', glyphIcon(name));
       expect(face).toEqual({ kind: 'glyph', name });
-      expect(SYMBOLS[name as keyof typeof SYMBOLS], name).toEqual(expect.any(String));
+      expect(ICON_PATHS[name], name).toEqual(expect.any(String));
     }
   });
 

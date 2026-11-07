@@ -54,7 +54,7 @@ function Chip({ file, onRemove }: { file: Staged; onRemove?: (id: string) => voi
           onPress={() => onRemove(file.id)}
           style={[styles.remove, { backgroundColor: colors.fg, borderColor: colors.bg }]}
         >
-          <Icon name="close" size={9} weight="bold" color={colors.onInk} />
+          <Icon name="close" size={9} strokeWidth={3} color={colors.onInk} />
         </Pressable>
       ) : null}
     </View>

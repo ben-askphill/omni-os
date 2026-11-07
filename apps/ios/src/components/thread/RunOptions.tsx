@@ -1,3 +1,4 @@
+import { HarnessLogo } from '../../ui/Brand';
 import { OptionGroup, OptionRow } from '../../ui/OptionRow';
 import type { RunSheetModel } from '../../thread/run-model';
 
@@ -47,6 +48,7 @@ export function RunOptions({ model, disabled, onEffort, onModel, auto }: RunOpti
               <OptionRow
                 key={m.id}
                 label={m.label}
+                leading={<HarnessLogo harness={h.id} />}
                 sub={m.note}
                 selected={m.selected}
                 disabled={disabled}

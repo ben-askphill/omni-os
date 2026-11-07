@@ -80,7 +80,7 @@ export function AttachControl({ scope, disabled = false, onNotice }: { scope: st
         onPress={() => setOpen(true)}
         style={[styles.button, { backgroundColor: colors.surface3, opacity: disabled ? 0.4 : 1 }]}
       >
-        <Icon name="plus" size={18} weight="semibold" color={colors.fg} />
+        <Icon name="plus" size={18} strokeWidth={2} color={colors.fg} />
       </Pressable>
       <Sheet visible={open} title="Attach" onClose={closed}>
         <View style={styles.body}>
