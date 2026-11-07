@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { DEFAULT_DESKTOP_SETTINGS, type DesktopBridge, type DesktopServerInfo, type DesktopUpdateView } from '@omni/shared/desktop-bridge.ts';
+import { DEFAULT_DESKTOP_SETTINGS, type DesktopBridge, type DesktopReleaseNotes, type DesktopServerInfo, type DesktopUpdateView } from '@omni/shared/desktop-bridge.ts';
 
 // Settings > Desktop app, against a fake bridge: what it says about the server behind the window and the app's update.
 
@@ -10,7 +10,7 @@ vi.mock('../src/api.ts', () => ({ api: { get: async () => [], post: async () => 
 
 const { DesktopSection } = await import('../src/pages/SettingsDesktop.tsx');
 
-const bridgeWith = (info: DesktopServerInfo, update: DesktopUpdateView) =>
+const bridgeWith = (info: DesktopServerInfo, update: DesktopUpdateView, calls: string[] = []) =>
   ({
     platform: 'linux',
     version: '0.2.0',
@@ -19,7 +19,12 @@ const bridgeWith = (info: DesktopServerInfo, update: DesktopUpdateView) =>
     onEvent: () => () => {},
     settings: { get: async () => DEFAULT_DESKTOP_SETTINGS, set: async () => DEFAULT_DESKTOP_SETTINGS },
     quickPrompt: { status: async () => ({ registered: true, wispr: false, visible: false }), open: () => {} },
-    updates: { get: async () => update, check: async () => update, install: () => {} },
+    updates: {
+      get: async () => update,
+      check: async () => (calls.push('check'), update),
+      download: async () => (calls.push('download'), update),
+      install: () => void calls.push('install'),
+    },
     server: { info: async () => info, showLog: () => {} },
   }) as unknown as DesktopBridge;
 
@@ -41,6 +46,12 @@ afterEach(() => {
 
 const info = (startedHere: boolean): DesktopServerInfo => ({ port: 4803, dataDir: '/d', logFile: '/home/u/.local/state/omni-os/server.log', startedHere });
 const buttons = (el: HTMLElement) => [...el.querySelectorAll('button')].map((b) => b.textContent?.trim());
+const updates = (el: HTMLElement) => el.querySelector('#setting-desktop-updates') as HTMLElement;
+const click = async (el: HTMLElement, label: string) => {
+  const button = [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === label);
+  if (!button) throw new Error(`no ${label} button`);
+  await act(async () => button.click());
+};
 
 describe('Settings > Desktop app', () => {
   it("offers the log of the app's own server", async () => {
@@ -57,10 +68,49 @@ describe('Settings > Desktop app', () => {
     expect(buttons(el)).not.toContain('Show Log');
   });
 
-  it('words a ready update as the sidebar does', async () => {
-    const el = await render(bridgeWith(info(true), { state: 'ready', version: '0.3.0' }));
-    expect(el.textContent).toContain('Omni 0.3.0 is ready');
-    expect(buttons(el)).toContain('Relaunch to Update');
+  it('words a ready update as the sidebar does, and relaunches to install it', async () => {
+    const calls: string[] = [];
+    const el = await render(bridgeWith(info(true), { state: 'ready', version: '0.3.0' }, calls));
+    expect(updates(el).textContent).toContain('Omni 0.3.0 is ready');
+    await click(updates(el), 'Relaunch to Update');
+    expect(calls).toEqual(['install']);
+  });
+
+  it('shows this version with Check for Updates and Check automatically', async () => {
+    const calls: string[] = [];
+    const el = await render(bridgeWith(info(true), { state: 'idle', checkedAt: null }, calls));
+    expect(updates(el).textContent).toContain('Omni 0.2.0');
+    expect(updates(el).textContent).toContain('Check automatically');
+    expect(updates(el).querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true');
+    await click(updates(el), 'Check for Updates');
+    expect(calls).toEqual(['check']);
+  });
+
+  it('offers Download for a found update, with its release notes and page', async () => {
+    const notes: DesktopReleaseNotes = { lines: ['Show updates in Settings (#556)'], more: 4, url: 'https://github.com/o/r/releases/tag/v0.3.0' };
+    const calls: string[] = [];
+    const el = await render(bridgeWith(info(true), { state: 'available', version: '0.3.0', notes }, calls));
+    const card = updates(el);
+    expect(card.textContent).toContain('Omni 0.3.0 is available');
+    expect(card.textContent).toContain('What is new in 0.3.0');
+    expect(card.querySelector('li')?.textContent).toBe('Show updates in Settings (#556)');
+    expect(card.textContent).toContain('And 4 more.');
+    expect(card.querySelector('a')?.getAttribute('href')).toBe(notes.url);
+    await click(card, 'Download');
+    expect(calls).toEqual(['download']);
+  });
+
+  it('shows the download as ticks', async () => {
+    const el = await render(bridgeWith(info(true), { state: 'downloading', version: '0.3.0', percent: 40 }));
+    expect(updates(el).textContent).toContain('Downloading Omni 0.3.0');
+    expect(updates(el).querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('40');
+  });
+
+  it('says why a development build does not update, without a check or the switch', async () => {
+    const el = await render(bridgeWith(info(true), { state: 'unsupported', reason: 'A development build does not update itself.' }));
+    expect(updates(el).textContent).toContain('A development build does not update itself.');
+    expect(updates(el).textContent).not.toContain('Check automatically');
+    expect(buttons(updates(el))).not.toContain('Check for Updates');
   });
 
   it('draws no login card where the OS opens no app at login', async () => {

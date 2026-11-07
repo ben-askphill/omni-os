@@ -36,7 +36,7 @@ export function UpdateNotice({ className = '' }: { className?: string }) {
   );
 }
 
-/** The desktop app's updater (desktop.updates): a download under way, one ready for Relaunch, or a failure. */
+/** The desktop app's updater (desktop.updates): one to download, a download under way, one ready for Relaunch, or a failure. */
 function AppUpdateNotice({ bridge, className }: { bridge: DesktopBridge; className: string }) {
   const [{ view, afterDownload }, setShown] = useState<{ view: DesktopUpdateView | null; afterDownload: boolean }>({ view: null, afterDownload: false });
   const [retrying, setRetrying] = useState(false);
@@ -61,6 +61,8 @@ function AppUpdateNotice({ bridge, className }: { bridge: DesktopBridge; classNa
   const run = () => {
     if (!action) return;
     if (action.kind === 'install') bridge.updates.install();
+    // The answer comes back as update events: the download's progress, then ready.
+    else if (action.kind === 'fetch') void bridge.updates.download();
     // The app opens a page outside Omni in the default browser.
     else if (action.kind === 'download') window.open(action.url, '_blank', 'noopener,noreferrer');
     else {
@@ -79,7 +81,7 @@ function AppUpdateNotice({ bridge, className }: { bridge: DesktopBridge; classNa
       </div>
       {/* Its own row: the sidebar is too narrow for the text and "Relaunch to Update" side by side. */}
       {action && (
-        <Button size="sm" variant={action.kind === 'install' ? 'primary' : 'ghost'} busy={action.kind === 'retry' && retrying} onClick={run} className="mt-2 w-full">
+        <Button size="sm" variant={action.kind === 'install' || action.kind === 'fetch' ? 'primary' : 'ghost'} busy={action.kind === 'retry' && retrying} onClick={run} className="mt-2 w-full">
           {action.label}
         </Button>
       )}

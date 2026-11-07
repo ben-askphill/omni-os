@@ -63,18 +63,25 @@ export interface DesktopSettings {
   /** Open at login. Only where `loginItemSupported`. */
   launchAtLogin: boolean;
   zoom: number;
+  /**
+   * The app checks for its own update at launch and every 4 hours, and downloads one in the background. Off, only
+   * Check for Updates looks, and Download fetches what it found.
+   */
+  autoUpdate: boolean;
 }
 
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   quickPrompt: { enabled: true, shortcut: 'controlOptionSpace', dictate: true },
   launchAtLogin: false,
   zoom: 1,
+  autoUpdate: true,
 };
 
 export type DesktopSettingsPatch = {
   quickPrompt?: Partial<DesktopSettings['quickPrompt']>;
   launchAtLogin?: boolean;
   zoom?: number;
+  autoUpdate?: boolean;
 };
 
 /** Reads stored settings field by field: an unknown or broken value takes its default, never fails the whole file. */
@@ -89,6 +96,7 @@ export function parseDesktopSettings(raw: unknown): DesktopSettings {
     quickPrompt: { enabled: bool(qp.enabled, d.quickPrompt.enabled), shortcut, dictate: bool(qp.dictate, d.quickPrompt.dictate) },
     launchAtLogin: bool(root.launchAtLogin, d.launchAtLogin),
     zoom: typeof root.zoom === 'number' ? clampZoom(root.zoom) : d.zoom,
+    autoUpdate: bool(root.autoUpdate, d.autoUpdate),
   };
 }
 
@@ -100,14 +108,29 @@ export function applySettingsPatch(current: DesktopSettings, patch: DesktopSetti
   });
 }
 
-/** The app's own updater (electron-updater). `unsupported` covers dev builds, an app in a folder it cannot replace itself in, and no feed. */
+/**
+ * What a release says it changed, as plain text: one line per item of its notes (a merged PR, for the generated
+ * GitHub notes), the first few only. `more`: how many lines were left out. `url`: the release's own page.
+ */
+export interface DesktopReleaseNotes {
+  lines: string[];
+  more: number;
+  url: string | null;
+}
+
+/**
+ * The app's own updater (electron-updater). `unsupported` covers dev builds, an app in a folder it cannot replace
+ * itself in, and no feed. An app from before release notes sends no `notes`.
+ */
 export type DesktopUpdateView =
   | { state: 'unsupported'; reason: string }
   | { state: 'idle'; checkedAt: string | null }
   | { state: 'checking' }
-  | { state: 'downloading'; version: string; percent: number }
+  /** Found while automatic updates are off. Download fetches it. */
+  | { state: 'available'; version: string; notes?: DesktopReleaseNotes }
+  | { state: 'downloading'; version: string; percent: number; notes?: DesktopReleaseNotes }
   /** Downloaded. Relaunch installs it. */
-  | { state: 'ready'; version: string }
+  | { state: 'ready'; version: string; notes?: DesktopReleaseNotes }
   /** `downloadUrl`: the page with the latest build, to get it by hand while the app cannot update itself. */
   | { state: 'error'; message: string; downloadUrl?: string };
 
@@ -157,6 +180,8 @@ export interface DesktopBridge {
   updates: {
     get(): Promise<DesktopUpdateView>;
     check(): Promise<DesktopUpdateView>;
+    /** Downloads the update a check found while automatic updates are off (`available`). */
+    download(): Promise<DesktopUpdateView>;
     /** Quits, installs the downloaded update and opens the app again. */
     install(): void;
   };

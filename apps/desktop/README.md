@@ -131,9 +131,24 @@ On a Mac, `npm run build:desktop` (`scripts/build-desktop.sh`) builds the unpack
 
 ## Updates
 
+The packaged app updates from the GitHub releases the release workflow publishes ([RELEASE.md](RELEASE.md)). The repo is public, so it reads them without a token. Settings > Desktop app > Updates shows this copy's version and the updater's state with the one action it allows: Check for Updates, Download, the download's progress as ticks, or Relaunch to Update. The coming release's notes show folded under it, as plain lines (the first 8 items of the GitHub release, each PR's title and number), with a link to the release. The sidebar notice shows the same states.
+
+**Check automatically** (on by default, `autoUpdate` in the app's `settings.json`) checks at launch and every 4 hours and downloads in the background. Off, only Check for Updates looks, and a found update waits as "available" for Download. Turning it back on checks at once.
+
+A copy that cannot update itself says why and offers no check: a development build, a build from `scripts/build-desktop.sh` (an unpacked `--dir` build, which electron-builder writes no `app-update.yml` into), a Mac app run from its disk image or a translocated copy, and an AppImage in a folder it cannot write.
+
 A downloaded update installs as the app quits, once the server it started has stopped. Keep Server Running in the quit question leaves the update for a later quit, because that server still runs from the files the update replaces. Relaunch to Update asks the same question without that choice: Update When They Finish, Stop Them and Update, or Cancel.
 
-`scripts/update-check.ts` builds this checkout as two AppImages, 0.1.0 and 0.1.1, serves 0.1.1 from a local feed on port 47901 and runs each case on port 47911 against a copy of 0.1.0 with a fake-claude turn where the case needs one. It needs a display, takes a few minutes and keeps its folder in `$TMPDIR` when a case fails. `--old` and `--feed` reuse earlier builds, and `--only <text>` runs the cases whose names contain it. A Mac has no counterpart, as Squirrel.Mac installs only a signed app.
+`scripts/update-check.ts` builds this checkout as two AppImages, 0.1.0 and 0.1.1, serves 0.1.1 from a local feed on port 47901 and runs each case on port 47911 against a copy of 0.1.0 with a fake-claude turn where the case needs one. It needs a display, takes a few minutes and keeps its folder in `$TMPDIR` when a case fails. `--old` and `--feed` reuse earlier builds, and `--only <text>` runs the cases whose names contain it. A Mac has no scripted counterpart, as Squirrel.Mac installs only an update signed like the running app.
+
+On a Mac, the check, the download and the Updates card can still run against a local feed. Build a zip with a feed URL, serve a `latest-mac.yml` with a higher version that names that zip (its `sha512` and `size`), and drive the packaged app with the QA harness (`--app`):
+
+```sh
+OMNI_UPDATE_URL=http://127.0.0.1:47921/ npx tsx scripts/dist.ts --platform mac --arch arm64 -- \
+  -c.extraMetadata.version=0.1.1 -c.mac.identity=- -c.mac.target=zip -c.mac.notarize=false
+```
+
+The app keeps the download in `~/Library/Caches/@omnidesktop-updater`, and Squirrel.Mac its state in `~/Library/Caches/com.omni-os.desktop.ShipIt`. Quitting with an update ready installs it into the test bundle. Never take Relaunch to Update there: the relaunched app gets no `--port` or `--data-dir` and opens on 4747.
 
 ```sh
 npx tsx scripts/update-check.ts

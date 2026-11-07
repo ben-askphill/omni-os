@@ -607,16 +607,33 @@
       ]
     },
     {
-      "id": "desktop-app",
+      "id": "desktop-updates",
       "section": "desktop",
-      "title": "App version, server and updates",
+      "title": "App version and updates",
       "keywords": [
         "version",
         "update",
+        "upgrade",
+        "relaunch",
+        "restart",
+        "release notes",
+        "download",
+        "automatic",
+        "check for updates"
+      ],
+      "surfaces": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "desktop-app",
+      "section": "desktop",
+      "title": "App server, data folder and log",
+      "keywords": [
         "log",
         "data folder",
         "server",
-        "relaunch"
+        "port"
       ],
       "surfaces": [
         "desktop"
@@ -719,6 +736,7 @@
       "expected": [
         "server",
         "channel-actions",
+        "desktop-app",
         "brain"
       ]
     },

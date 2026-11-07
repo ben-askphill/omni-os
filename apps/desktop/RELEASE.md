@@ -38,7 +38,7 @@ Or open the Actions tab, choose **Desktop release** and **Run workflow**. A run 
 | Version and draft release | Sets `apps/desktop/package.json` to the new version (`scripts/version.ts`), commits it to `main`, tags `v<version>` and drafts the release with notes generated from the merged PRs |
 | Mac | Builds the universal app on a macOS runner, signs it with the Developer ID, notarizes and staples it, uploads the DMG, the zip and `latest-mac.yml`, then checks the signature, Gatekeeper's verdict and the staple |
 | Linux | Builds the x64 AppImage, with node-pty compiled for glibc 2.28 in docker, and uploads it with `latest-linux.yml` |
-| Publish | Checks that both feeds and all three downloads are attached, then publishes the release as the latest |
+| Publish | Checks that both feeds and all three downloads are attached, that every file a feed names is there and that the Mac feed points at the zip, then publishes the release as the latest |
 
 Installed apps see a release only once it is published, so a failed run never offers a half-built update. When a build job fails for a cause outside the code, such as a secret or the runner, fix it and choose **Re-run failed jobs** on the same run: the version, tag and draft stay, and the uploads replace what the failed attempt left. The build jobs check out the tag, so a fix merged to `main` never reaches a re-run. For a cause in the code, and to abandon a release, delete the draft and its tag (`gh release delete v<version> --cleanup-tag`) and run the workflow again with the next version.
 
@@ -48,4 +48,36 @@ Any agent with `gh` can start a release the same way. Starting one is a deploy t
 
 `apps/desktop/package.json` holds the app's version, and only the release workflow changes it. Each release tag is `v<version>`. electron-updater installs only a higher version than the running one, so a release never goes back. To pull a bad release, publish a fixed higher version. Turning the bad release back into a draft stops new downloads but not the copies that already downloaded it.
 
-A Mac build from `scripts/build-desktop.sh` carries the version in the checkout and names the same release feed, so it updates to the next published release like a downloaded copy. Squirrel.Mac installs an update only over an app signed by the same team, so a local build signed with an Apple Development or ad hoc identity cannot take one. With the Developer ID certificate in your keychain, `build-desktop.sh` signs with it and updates work.
+A build from `scripts/build-desktop.sh` (what omni-reload runs) is an unpacked `--dir` build, and electron-builder writes no update feed into one. It does not update itself: Settings > Desktop app > Updates says it updates by rebuilding. To follow releases instead, install the DMG from a release. Squirrel.Mac installs an update only over an app signed like it (the same Developer ID team), so a release could not update a copy signed ad hoc or with an Apple Development identity anyway.
+
+## Updates and the update feed
+
+Installed apps read the latest published release's `latest-mac.yml` (or `latest-linux.yml`) and download the file it names. On a Mac that is the zip: Squirrel.Mac installs from it, checks that the new app is signed by the same team as the running one, and swaps the bundle. The Publish job refuses a release whose feeds name a file it does not have, or whose Mac feed does not point at the zip. The repo is public, so the app reads releases without a token; a private repo would need one built into every copy, which anyone with the app could read.
+
+The release body is GitHub's generated notes. The app shows the first 8 items of the coming release as plain text in Settings > Desktop app > Updates, with a link to the release, so a PR title is what a user reads there.
+
+## First update test
+
+What CI and the tests cannot show: a signed, notarized release replacing an older signed, notarized release on a real Mac. Run this once on the Mac, after this change is merged. It uses its own folder, port and data, so your Omni keeps running.
+
+**Test A: 0.1.1 updates to the next release.** 0.1.1 has the updater without the Updates card, so this proves the feed, the signature chain and the install.
+
+1. Download the 0.1.1 DMG: `gh release download v0.1.1 -R ben-askphill/omni-os -p 'Omni-0.1.1-mac-universal.dmg' -D ~/Downloads`
+2. Open it and, in Finder, drag Omni into a new folder `~/OmniUpdateTest`. Dragging in Finder matters: a copy made with `cp` or `ditto` keeps the quarantine flag, runs translocated and cannot update.
+3. Open it on its own port, data and settings:
+   `open -n ~/OmniUpdateTest/Omni.app --args --user-data-dir="$HOME/OmniUpdateTest/user-data" --port 4799 --data-dir "$HOME/OmniUpdateTest/data"`
+   Skip setup. Settings > Desktop app > This app shows Version 0.1.1 and Updates "Up to date".
+4. Release the next version: `gh workflow run desktop-release.yml -f bump=patch`, and wait until the run is green and the release is Latest.
+5. In the test app, press Check for Updates. Expect "Downloading Omni 0.1.2", then "Omni 0.1.2 is ready" in Settings and the sidebar.
+6. Press Relaunch to Update. The app quits and stops its server on 4799. Squirrel.Mac relaunches it without the arguments from step 3, so with your Omni open it hands over to that one and closes. That is expected here.
+7. Check the install: `defaults read ~/OmniUpdateTest/Omni.app/Contents/Info.plist CFBundleShortVersionString` says 0.1.2, and `tail ~/Library/Caches/com.omni-os.desktop.ShipIt/ShipIt_stderr.log` ends with "Installation completed successfully". Open it again with the command from step 3: Settings shows Omni 0.1.2 and the Updates card.
+
+**Test B: 0.1.2 updates to the one after.** This proves the Updates card against a real release.
+
+1. In the test app (0.1.2), turn off Check automatically in Settings > Desktop app > Updates.
+2. Release again (`-f bump=patch`). Merge at least one PR first, so the notes have a line.
+3. Press Check for Updates. Expect "Omni 0.1.3 is available" with a Download button, and "What is new in 0.1.3" listing the merged PRs, with "All release notes" opening the release in the browser.
+4. Press Download: ticks fill, then Relaunch to Update. Repeat steps 6 and 7 of Test A for 0.1.3.
+5. Clean up: quit the test app, then move `~/OmniUpdateTest` and `~/Library/Caches/@omnidesktop-updater` to the Trash.
+
+If a step fails, the updater's message shows in the Updates card (hover it in the sidebar). Squirrel.Mac's own log is `~/Library/Caches/com.omni-os.desktop.ShipIt/ShipIt_stderr.log`. To see the app's `[omni] update:` lines, start it from Terminal instead of `open`: `~/OmniUpdateTest/Omni.app/Contents/MacOS/Omni` with the same arguments.

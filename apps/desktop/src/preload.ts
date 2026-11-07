@@ -40,6 +40,7 @@ const bridge: DesktopBridge = {
   updates: {
     get: () => invoke('omni:updates:get'),
     check: () => invoke('omni:updates:check'),
+    download: () => invoke('omni:updates:download'),
     install: () => send('omni:updates:install'),
   },
   server: {
