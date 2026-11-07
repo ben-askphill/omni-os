@@ -148,8 +148,10 @@ const NAMES = [
   'pr-watch-stopped.json',
   // Every channel's PRs, with one repo gh cannot read.
   'all-prs.json',
-  // A question a delegated thread asked, as the thread that delegated it lists it.
+  // A question and a secret request a delegated thread asked, as the thread that delegated it lists them.
   'crew-questions.json',
+  // That thread once the secret request is cancelled: the request's event and its outcome, as the thread shows them.
+  'thread-secret-request.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -871,8 +873,18 @@ async function scenario() {
   const asker = (await call('POST', '/threads', { channel: 'acme', prompt: 'size the digest', title: 'Size the digest', parent_id: conductor.id })) as Thread;
   await eventually(async () => (await detail(asker.id)).thread.status === 'done', 'the delegated thread to run');
   await call('POST', `/threads/${asker.id}/questions`, { questions: [digestQuestion] });
-  const asked = keep('crew-questions.json', await get(`/threads/${conductor.id}/crew-questions`)) as { items: { thread_id: string }[] };
+  const secretAsk = { name: 'STRIPE_TEST_KEY', label: 'Stripe test secret key', scope: 'channel', reason: 'To run the checkout tests' };
+  const { id: secretId } = (await call('POST', `/threads/${asker.id}/secret-requests`, secretAsk)) as { id: string };
+  const asked = keep('crew-questions.json', await get(`/threads/${conductor.id}/crew-questions`)) as { items: { thread_id: string }[]; secrets: { thread_id: string }[] };
   expect(asked.items.map((q) => q.thread_id)).toEqual([asker.id]);
+  expect(asked.secrets.map((s) => s.thread_id)).toEqual([asker.id]);
+  await call('POST', `/threads/${asker.id}/secret-requests/${secretId}/cancel`, {});
+  const withSecret = await eventually(async () => {
+    const d = await detail(asker.id);
+    return d.thread.status === 'done' && d.events.filter((e) => e.kind === 'result').length >= 2 && d;
+  }, 'the delegated thread to run on the cancelled request');
+  expect(withSecret.events.map((e) => e.kind)).toContain('secret_request_answer');
+  keep('thread-secret-request.json', withSecret);
 }
 
 /** A request body a client sends: the recorded one, so the server must still take it. */

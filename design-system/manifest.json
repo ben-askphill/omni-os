@@ -59,6 +59,7 @@
     "components/Picker/README.md",
     "components/QuestionCard/README.md",
     "components/Rail/README.md",
+    "components/SecretRequestCard/README.md",
     "components/Segmented/README.md",
     "components/SlideToConfirm/README.md",
     "components/Status/README.md",
@@ -281,6 +282,9 @@
     "components/thread/QuestionCard.d.ts",
     "components/thread/QuestionCard.jsx",
     "components/thread/QuestionCard.prompt.md",
+    "components/thread/SecretRequestCard.d.ts",
+    "components/thread/SecretRequestCard.jsx",
+    "components/thread/SecretRequestCard.prompt.md",
     "components/thread/ThreadRow.d.ts",
     "components/thread/ThreadRow.jsx",
     "components/thread/ThreadRow.prompt.md",
@@ -304,6 +308,8 @@
     "components/thread/question-card.card.html",
     "components/thread/question-card.css",
     "components/thread/result-line.card.html",
+    "components/thread/secret-request-card.card.html",
+    "components/thread/secret-request-card.css",
     "components/thread/switch-line.card.html",
     "components/thread/switch-line.css",
     "components/thread/thread-group.card.html",
@@ -840,6 +846,11 @@
     {
       "name": "RailSections",
       "group": "11 Navigation"
+    },
+    {
+      "name": "SecretRequestCard",
+      "group": "12 Thread",
+      "summary": "An agent's request_secret, in the thread."
     },
     {
       "name": "Segmented2",

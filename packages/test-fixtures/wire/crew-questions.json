@@ -3,11 +3,11 @@
     {
       "thread_id": "00000000-0000-4000-8000-000000000074",
       "thread_title": "Size the digest",
-      "task_id": "T-7C8B",
+      "task_id": "T-79F1",
       "channel_id": "acme",
       "question": {
         "id": "00000000-0000-4000-8000-000000000075",
-        "event_id": 230,
+        "event_id": 234,
         "questions": [
           {
             "question": "Which store should the digest cover first?",
@@ -27,6 +27,27 @@
         ],
         "state": "pending",
         "answers": null
+      }
+    }
+  ],
+  "secrets": [
+    {
+      "thread_id": "00000000-0000-4000-8000-000000000074",
+      "thread_title": "Size the digest",
+      "task_id": "T-79F1",
+      "channel_id": "acme",
+      "request": {
+        "id": "00000000-0000-4000-8000-000000000076",
+        "event_id": 235,
+        "ask": {
+          "name": "STRIPE_TEST_KEY",
+          "label": "Stripe test secret key",
+          "scope": "channel",
+          "reason": "To run the checkout tests"
+        },
+        "exists": false,
+        "state": "pending",
+        "replaced": false
       }
     }
   ]

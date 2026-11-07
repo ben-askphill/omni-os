@@ -1,4 +1,5 @@
 import { ANSWER_EVENT, QUESTION_EVENT, type QuestionPayload } from '@omni/shared/question.ts';
+import { SECRET_ANSWER_EVENT, SECRET_REQUEST_EVENT, type SecretRequestPayload } from '@omni/shared/secret-request.ts';
 import { db, now, tx } from '../connection.ts';
 import { outbox, record } from '../sync.ts';
 import { PARKED } from './requests.ts';
@@ -38,8 +39,9 @@ export interface NeedsYouResult {
 }
 
 /**
- * What holds a thread up until Ben acts: `question` (its agent asked him with ask_user_question and waits, even while
- * it runs: `detail` is the newest card's first question, `count` how many questions wait across its cards),
+ * What holds a thread up until Ben acts: `question` (its agent asked him with ask_user_question or request_secret
+ * and waits, even while it runs: `detail` is the newest card's first question or the secret's label, `count` how
+ * many questions and secrets wait across its cards),
  * `setup` (its worktree could not be prepared, `detail` says why), `recovered` (messages a restart kept for Resume),
  * `uncertain` (a message a harness may have read before a restart, sent again only when Ben says so) or `limited`
  * (its harness stopped the turn at the plan's usage limit, apps/server/runner/limits.ts). `count` is how many
@@ -173,25 +175,15 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     .prepare(`SELECT ${prefixed} FROM threads t WHERE ${LISTED} ${scope} AND t.limit_state IS NOT NULL`)
     .all(...args) as unknown as Thread[];
 
-  // Questions with no answer yet, whatever the asking thread's status, newest first so the first row per thread is its
-  // newest. Each waits on the top of its delegation chain (threads.root), the thread Ben delegated from, where its card
-  // shows too: a delegated thread's or a team member's question brings that thread here, not the one that asked.
+  // Newest first, so each thread's blocker shows its newest ask. An ask waits on the top of its delegation chain
+  // (threads.root), the thread Ben delegated from, where its card shows too.
   const home = db.prepare(`SELECT ${prefixed} FROM threads t WHERE t.id = ? AND ${LISTED} ${scope}`);
-  const asked = (
-    db
-      .prepare(
-        `SELECT q.thread_id AS q_thread, q.payload AS q_payload, q.created_at AS q_at
-         FROM events q JOIN threads t ON t.id = q.thread_id
-         WHERE t.archived = 0 AND q.kind = '${QUESTION_EVENT}'
-           AND NOT EXISTS (SELECT 1 FROM events a WHERE a.thread_id = q.thread_id AND a.kind = '${ANSWER_EVENT}'
-             AND json_extract(a.payload, '$.id') = json_extract(q.payload, '$.id'))
-         ORDER BY q.id DESC`,
-      )
-      .all() as { q_thread: string; q_payload: string; q_at: string }[]
-  ).flatMap((q) => {
-    const t = home.get(threads.root(q.q_thread), ...args) as unknown as Thread | undefined;
-    return t ? [{ ...t, ...q }] : [];
-  });
+  const asked = [...pendingAsks(QUESTION_EVENT, ANSWER_EVENT), ...pendingAsks(SECRET_REQUEST_EVENT, SECRET_ANSWER_EVENT)]
+    .sort((a, b) => b.q_id - a.q_id)
+    .flatMap((q) => {
+      const t = home.get(threads.root(q.q_thread), ...args) as unknown as Thread | undefined;
+      return t ? [{ ...t, ...q }] : [];
+    });
 
   const items = new Map<string, NeedsYouItem>();
   const item = (t: Thread, at: string) => {
@@ -209,11 +201,11 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     item(r, r.r_at!).result = { uid: r.r_uid!, status: r.r_status!, event_uid: r.r_event_uid, at: r.r_at! };
   }
   for (const q of asked) {
-    const { questions } = JSON.parse(q.q_payload) as QuestionPayload;
+    const { detail, count } = askBlocker(q);
     const it = item(q, q.q_at);
     const had = it.blockers.find((b) => b.kind === 'question');
-    if (had) had.count += questions.length;
-    else it.blockers.push({ kind: 'question', detail: questions[0].question, count: questions.length });
+    if (had) had.count += count;
+    else it.blockers.push({ kind: 'question', detail, count });
   }
   for (const t of setup) item(t, t.updated_at).blockers.unshift({ kind: 'setup', detail: t.setup_error, count: 0 });
   for (const p of parked) item(p, p.p_at).blockers.push({ kind: p.p_state, detail: null, count: Number(p.p_count) });
@@ -229,6 +221,36 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
 }
 
 const BLOCKER_ORDER: NeedsYouBlocker['kind'][] = ['question', 'setup', 'uncertain', 'limited', 'recovered'];
+
+interface PendingAsk {
+  q_id: number;
+  q_kind: string;
+  q_thread: string;
+  q_payload: string;
+  q_at: string;
+}
+
+/** A pending ask: an event of `kind` in a thread that is not archived, with no event of `answerKind` about the same id. */
+function pendingAsks(kind: string, answerKind: string): PendingAsk[] {
+  return db
+    .prepare(
+      `SELECT q.id AS q_id, q.kind AS q_kind, q.thread_id AS q_thread, q.payload AS q_payload, q.created_at AS q_at
+       FROM events q JOIN threads t ON t.id = q.thread_id
+       WHERE t.archived = 0 AND q.kind = '${kind}'
+         AND NOT EXISTS (SELECT 1 FROM events a WHERE a.thread_id = q.thread_id AND a.kind = '${answerKind}'
+           AND json_extract(a.payload, '$.id') = json_extract(q.payload, '$.id'))`,
+    )
+    .all() as unknown as PendingAsk[];
+}
+
+/** What a pending ask adds to its thread's `question` blocker: a question card's first question and how many it holds, or a secret's label. */
+function askBlocker(q: PendingAsk): { detail: string; count: number } {
+  if (q.q_kind === QUESTION_EVENT) {
+    const { questions } = JSON.parse(q.q_payload) as QuestionPayload;
+    return { detail: questions[0].question, count: questions.length };
+  }
+  return { detail: (JSON.parse(q.q_payload) as SecretRequestPayload).ask.label, count: 1 };
+}
 
 /** Just the thread's own columns, without what the queries joined to it. */
 function pick(row: Thread): Thread {

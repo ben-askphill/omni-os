@@ -116,7 +116,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     '## Secrets',
     remote
       ? 'Omni does not copy Keychain secrets onto this server. Never print, echo or write secret values anywhere.'
-      : 'Channel and global secrets are already in your environment as variables. Never print, echo or write their values anywhere.',
+      : 'Channel and global secrets are already in your environment as variables. Never print, echo or write their values anywhere. ' +
+        `When a task needs a secret you do not have (an API key, a password, a token), ask for it with request_secret, never in chat: ${name} enters it in a card, it goes into the secret store, and your next turn has it as that variable.`,
     '',
     '## Reply',
     'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',

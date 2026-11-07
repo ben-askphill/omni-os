@@ -40,6 +40,8 @@ export const HISTORY_SQL = {
     `SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind = 'tool_use' AND json_extract(payload, '$.id') IN (${ids(n)})`,
   answers: (n: number) =>
     `SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind = 'question_answer' AND json_extract(payload, '$.id') IN (${ids(n)})`,
+  secretAnswers: (n: number) =>
+    `SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind = 'secret_request_answer' AND json_extract(payload, '$.id') IN (${ids(n)})`,
   row: `SELECT ${EVENT_COLUMNS} FROM events WHERE id = ? AND thread_id = ?`,
   has: 'SELECT 1 FROM events WHERE id = ? AND thread_id = ?',
 } as const;
@@ -86,6 +88,11 @@ export const history = {
   answers(threadId: string, questionIds: readonly string[]): EventRow[] {
     if (!questionIds.length) return [];
     return newestById(db.prepare(HISTORY_SQL.answers(questionIds.length)).all(threadId, ...questionIds) as unknown as EventRow[]);
+  },
+  /** The secret_request_answer rows of these requests, newest per request, ascending. */
+  secretAnswers(threadId: string, requestIds: readonly string[]): EventRow[] {
+    if (!requestIds.length) return [];
+    return newestById(db.prepare(HISTORY_SQL.secretAnswers(requestIds.length)).all(threadId, ...requestIds) as unknown as EventRow[]);
   },
   /** One whole row of the thread, null when the id is another thread's or none. */
   row: (threadId: string, id: number) => (db.prepare(HISTORY_SQL.row).get(id, threadId) as EventRow | undefined) ?? null,

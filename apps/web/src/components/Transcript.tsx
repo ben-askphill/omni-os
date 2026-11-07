@@ -11,6 +11,7 @@ import { CloudAgentCard } from './thread/CloudAgentCard.tsx';
 import { PRWakeList } from './thread/PRWatch.tsx';
 import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
+import { SecretRequestCard } from './thread/SecretRequestCard.tsx';
 import { Markdown } from './Markdown.tsx';
 import { CheckItem, copyText, Icon, Loader, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
@@ -67,6 +68,7 @@ const SOURCE_LABEL: Record<string, string> = {
   import: 'Imported',
   limit: 'After the usage limit',
   'pr-watch': 'PR watch',
+  secret: 'After the secret was saved',
 };
 
 
@@ -403,6 +405,8 @@ const ItemRow = memo(
           return <SwitchLine key={it.key} it={it} running={running} />;
         case 'question':
           return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
+        case 'secret':
+          return <SecretRequestCard key={it.key} threadId={threadId} r={it.r} />;
         default:
           return null;
       }
@@ -489,7 +493,7 @@ export const Transcript = memo(function Transcript({
   const lastIdx = items.findLastIndex((it) => it.type !== 'mod');
   const last = items[lastIdx];
   // The turn is waiting on Ben's answer, not working: the card under it says so.
-  const asking = last?.type === 'question' && last.q.state === 'pending';
+  const asking = (last?.type === 'question' && last.q.state === 'pending') || (last?.type === 'secret' && last.r.state === 'pending');
 
   const edgeRow = (key: number) => {
     const edge = edges?.get(key);

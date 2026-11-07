@@ -120,6 +120,10 @@ export function pump() {
       i++;
       continue;
     }
+    if (warm?.envStale) {
+      i++;
+      continue;
+    }
     // Harness at its cap: leave this thread queued and try others (arrival order within a harness).
     if ((running[harness] ?? 0) >= capFor(harness)) {
       i++;

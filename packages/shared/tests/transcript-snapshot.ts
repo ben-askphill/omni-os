@@ -65,6 +65,8 @@ function projectItem(it: Item) {
       return { type: 'switch' as const, key: it.key, p: it.p, done: it.done, superseded: it.superseded };
     case 'question':
       return { type: 'question' as const, key: it.key, id: it.q.id, state: it.q.state };
+    case 'secret':
+      return { type: 'secret' as const, key: it.key, id: it.r.id, state: it.r.state };
     default: {
       const unreachable: never = it;
       return unreachable;

@@ -138,8 +138,7 @@ export function onResult(live: Live, p: ResultPayload) {
   if (live.inflight.length) return emitThread(id);
   if (limit && !p.ok && !stopped) return limitStop(live, limit.resets_at);
   const status = stopped ? 'stopped' : p.ok ? 'done' : 'failed';
-  // A switch Ben queued applies now: what he sent behind the turn waits for the process on the new run.
-  if (live.held.length && queuedRun(threads.get(id))) {
+  if (live.held.length && (queuedRun(threads.get(id)) || live.envStale)) {
     requeueHeld(live);
     return endTurn(live, status, true);
   }

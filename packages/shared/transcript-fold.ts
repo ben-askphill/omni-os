@@ -1,5 +1,6 @@
 import type { HandoverP, SwitchP } from './run-switch.ts';
 import { isQuestionTool, QUESTION_EVENT, questionsIn, type ThreadQuestion } from './question.ts';
+import { isSecretTool, SECRET_REQUEST_EVENT, secretRequestsIn, type ThreadSecretRequest } from './secret-request.ts';
 import type { PRWakeItem } from './pr-watch.ts';
 import type { SlashRecord } from './slash.ts';
 import { spanIndex, type Clipped, type Span } from './history.ts';
@@ -158,7 +159,9 @@ export type Item =
   | { type: 'cloud'; key: number; p: CloudAgentP }
   | SwitchItem
   /** A question the agent asked Ben, where it asked it. The card stands in for the ask_user_question call. */
-  | { type: 'question'; key: number; at: string; q: ThreadQuestion };
+  | { type: 'question'; key: number; at: string; q: ThreadQuestion }
+  /** A secret the agent asked Ben for, where it asked it. The card stands in for the request_secret call. */
+  | { type: 'secret'; key: number; at: string; r: ThreadSecretRequest };
 
 /**
  * A run switch. A handover switch stays pending until its `handover` event fills `done`, or a later handover or back
@@ -244,6 +247,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
     }
   }
   const questions = new Map(questionsIn(events).map((q) => [q.event_id, q]));
+  const secrets = new Map(secretRequestsIn(events).map((r) => [r.event_id, r]));
 
   // Collect plan step updates
   const planUpdates = new Map<number, string>();
@@ -280,7 +284,7 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         const p = payload<ToolUseP>(e);
         // A call that names itself as its parent is dropped. It is not shown at the top of the group.
         if (p.parent && p.parent === p.id) break;
-        if (isQuestionTool(p.name ?? '')) break;
+        if (isQuestionTool(p.name ?? '') || isSecretTool(p.name ?? '')) break;
         const call: ToolCall = {
           id: p.id,
           name: p.name ?? 'tool',
@@ -384,6 +388,13 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         items.push({ type: 'question', key: e.id, at: e.created_at, q });
         break;
       }
+      case SECRET_REQUEST_EVENT: {
+        const r = secrets.get(e.id);
+        if (!r) break;
+        group = null;
+        items.push({ type: 'secret', key: e.id, at: e.created_at, r });
+        break;
+      }
       case 'mod': {
         const p = payload<{ plugin?: unknown; text?: unknown }>(e);
         const text = str(p.text);
@@ -445,8 +456,8 @@ export function keepSame(prev: readonly Item[], next: Item[]): Item[] {
   });
 }
 
-/** Whether the agent waits on Ben's answer to a question it asked in these events. */
-export const isAsking = (events: TranscriptEvent[]) => questionsIn(events).some((q) => q.state === 'pending');
+/** Whether the agent waits on Ben: an answer to a question it asked, or a secret it asked for, in these events. */
+export const isAsking = (events: TranscriptEvent[]) => questionsIn(events).some((q) => q.state === 'pending') || secretRequestsIn(events).some((r) => r.state === 'pending');
 
 // ---------- tool summaries ----------
 

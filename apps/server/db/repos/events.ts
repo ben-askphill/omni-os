@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { scrubSecrets } from '../../secret-scrub.ts';
 import { db, now, tx } from '../connection.ts';
 import { record } from '../sync.ts';
 
@@ -23,9 +24,18 @@ export function indexEvent(threadId: string, kind: string, payload: unknown, eve
   if (text) db.prepare('INSERT INTO search_fts (body, thread_id, event_id) VALUES (?, ?, ?)').run(text, threadId, eventId);
 }
 
+/** A thread's events of a request kind and its answer kind, oldest first; with `id`, one request's. */
+function requestPair(threadId: string, ask: string, answer: string, id?: string): EventRow[] {
+  const one = id ? `AND json_extract(payload, '$.id') = ?` : '';
+  return db
+    .prepare(`SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind IN ('${ask}', '${answer}') ${one} ORDER BY id`)
+    .all(threadId, ...(id ? [id] : [])) as unknown as EventRow[];
+}
+
 export const events = {
   add(threadId: string, kind: string, payload: unknown, createdAt?: string): EventRow {
-    const json = JSON.stringify(payload);
+    const clean = scrubSecrets(payload);
+    const json = JSON.stringify(clean);
     const ts = createdAt ?? now();
     const uid = randomUUID();
     const id = tx(() => {
@@ -33,7 +43,7 @@ export const events = {
         .prepare('INSERT INTO events (uid, thread_id, kind, payload, created_at) VALUES (?, ?, ?, ?, ?)')
         .run(uid, threadId, kind, json, ts);
       const id = Number(res.lastInsertRowid);
-      indexEvent(threadId, kind, payload, id);
+      indexEvent(threadId, kind, clean, id);
       record('event', uid);
       return id;
     });
@@ -79,12 +89,9 @@ export const events = {
     return rows.map((r) => JSON.parse(r.payload).text as string).join('\n\n');
   },
   /** A thread's question and question_answer events (packages/shared/question.ts), oldest first; with `id`, one question's. */
-  questions(threadId: string, id?: string): EventRow[] {
-    const one = id ? `AND json_extract(payload, '$.id') = ?` : '';
-    return db
-      .prepare(`SELECT ${EVENT_COLUMNS} FROM events WHERE thread_id = ? AND kind IN ('question', 'question_answer') ${one} ORDER BY id`)
-      .all(threadId, ...(id ? [id] : [])) as unknown as EventRow[];
-  },
+  questions: (threadId: string, id?: string) => requestPair(threadId, 'question', 'question_answer', id),
+  /** A thread's secret_request and secret_request_answer events (packages/shared/secret-request.ts), oldest first; with `id`, one request's. */
+  secretRequests: (threadId: string, id?: string) => requestPair(threadId, 'secret_request', 'secret_request_answer', id),
   /** The payload of a thread's tool_use event, by the tool call's id. */
   toolUse(threadId: string, toolUseId: string): { id: string; name: string; input: unknown; parent?: string | null } | null {
     const row = db

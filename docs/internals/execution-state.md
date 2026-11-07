@@ -49,6 +49,7 @@ Why a process starts closing, and what the end looks like (`endSession`):
 | --- | --- | --- |
 | Stop, or an interrupt the CLI did not take in time | `stop`: SIGINT, kill after 5s | the turn ends `stopped`; held messages wait for the next process |
 | Idle past the keepalive, or a switch, a fresh context, a stale generation | `close`: stdin ends, terminate after 10s | the thread keeps its status; the next message starts a new process |
+| A secret saved for the thread (`staleEnv`): the env it read at spawn lacks it | `close`, at once when idle, else when the turn and its background tasks end | messages held behind the turn move to the fresh process, which has the secret; the thread stays queued in between and reports nothing |
 | Omni shutting down | `shutdown`: stdin ends, terminate 3s, kill 5s | a running turn is marked failed with an error row; durable messages park for Resume |
 
 `armIdle` schedules the close after `OMNI_KEEPALIVE_SECONDS`, or `OMNI_TASK_KEEPALIVE_SECONDS` while a background task

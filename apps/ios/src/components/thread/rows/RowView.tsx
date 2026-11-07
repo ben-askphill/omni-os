@@ -16,6 +16,7 @@ import {
   PromptRow,
   QuestionRow,
   ReportRow,
+  SecretRow,
   StepsRow,
   SwitchRow,
 } from './Cards';
@@ -27,6 +28,7 @@ const VIEWS: Views = {
   prompt: PromptRow,
   report: ReportRow,
   question: QuestionRow,
+  secret: SecretRow,
   outcome: OutcomeRow,
   conductor: ConductorRow,
   error: ErrorRow,

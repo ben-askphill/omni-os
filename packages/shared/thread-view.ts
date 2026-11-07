@@ -2,6 +2,7 @@
 // and the iOS app draw it. Pure, on top of the transcript fold (transcript-fold.ts), so it reads the same events the
 // desktop transcript does.
 import type { ThreadQuestion } from './question.ts';
+import type { ThreadSecretRequest } from './secret-request.ts';
 import type { Clipped, Span } from './history.ts';
 import { cloudStatus } from './cloud-agent.ts';
 import { buildItems, isAsking, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type Todo, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
@@ -46,6 +47,8 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   reports: ReportP[];
   /** Questions the agent asked Ben during the turn, each shown as its card. */
   questions: ThreadQuestion[];
+  /** Secrets the agent asked Ben for during the turn, each shown as its card. */
+  secrets: ThreadSecretRequest[];
   /** Files the turn wrote last, so each file shows once, with the turn that made its current version. */
   artifacts: A[];
   /** Threads delegated during the turn. */
@@ -78,9 +81,9 @@ export interface ThreadView<A extends TurnArtifact = TurnArtifact, C extends Tur
   turns: TurnView<A, C>[];
   /** The latest TodoWrite of the latest turn, while it runs. */
   plan: PlanView | null;
-  /** Null while it waits on Ben's answer to a question: it is not doing anything. */
+  /** Null while it waits on Ben to answer a question or enter a secret: it is not doing anything. */
   now: NowDoing | null;
-  /** A question waits on Ben's answer. */
+  /** A question or a secret request waits on Ben. */
   asking: boolean;
 }
 
@@ -144,7 +147,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   // Until the first switch, the thread ran where that switch moved it from.
   let harness = items.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
   const start = (key: number, at: string): TurnView<A, C> => {
-    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
+    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], secrets: [], artifacts: [], children: [], result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
     turns.push(t);
     return t;
   };
@@ -168,6 +171,9 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
     } else if (it.type === 'question') {
       cur ??= start(it.key, it.at);
       cur.questions.push(it.q);
+    } else if (it.type === 'secret') {
+      cur ??= start(it.key, it.at);
+      cur.secrets.push(it.r);
     } else if (it.type === 'result') {
       if (cur) cur.result = it.p;
     } else if (it.type === 'error') {

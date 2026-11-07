@@ -3,6 +3,7 @@ import type { Span } from '@omni/shared/history.ts';
 import { same, type CloudAgentP, type Item, type ModLine, type ReportP, type SwitchItem, type ToolCall } from '@omni/shared/transcript-fold.ts';
 import { threadView, type NowDoing, type PlanView, type Prompt, type ThreadView, type TurnView } from '@omni/shared/thread-view.ts';
 import type { ThreadQuestion } from '@omni/shared/question.ts';
+import type { ThreadSecretRequest } from '@omni/shared/secret-request.ts';
 
 import { harnessLabel } from './format';
 
@@ -21,6 +22,7 @@ export type ThreadRow =
   | { kind: 'prompt'; key: string; p: Prompt; caption: string | null }
   | { kind: 'report'; key: string; r: ReportP }
   | { kind: 'question'; key: string; q: ThreadQuestion }
+  | { kind: 'secret'; key: string; r: ThreadSecretRequest }
   | { kind: 'outcome'; key: string; status: IosTurn['status']; tookMs: number | undefined; steps: number; harness: string }
   | { kind: 'conductor'; key: string }
   | { kind: 'error'; key: string; text: string }
@@ -49,6 +51,7 @@ export const ITEM_ROWS: Record<Item['type'], readonly RowKind[]> = {
   cloud: ['cloud'],
   switch: ['switch'],
   question: ['question'],
+  secret: ['secret'],
 };
 
 export interface RowsInput {
@@ -91,6 +94,7 @@ function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, in
   for (const [k, p] of t.prompts.entries()) yield { kind: 'prompt', key: `p${p.key}`, p, caption: caption(thread, p, i === 0, k, input.atStart) };
   for (const [k, r] of t.reports.entries()) yield { kind: 'report', key: `r${t.key}.${k}`, r };
   for (const q of t.questions) yield { kind: 'question', key: `q${q.id}`, q };
+  for (const r of t.secrets) yield { kind: 'secret', key: `sr${r.id}`, r };
 
   const live = last && (t.status === 'running' || t.status === 'queued');
   const open = disclosure.turns.has(t.key);
