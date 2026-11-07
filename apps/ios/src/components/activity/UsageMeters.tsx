@@ -5,6 +5,8 @@ import type { UsageMeter } from '../../live/activity-model';
 import { fontSize, radius, space, useOmniTheme } from '../../theme';
 
 const BAR = 48;
+/** Past this a meter turns amber, as the web's context meter does from 70% (--warn). */
+const FULLISH = 0.7;
 
 /** Each plan's fullest window as a pill: name, a small meter, "42% 5h". Nothing while no harness reports one. */
 export function UsageMeters({ meters }: { meters: UsageMeter[] }) {
@@ -23,7 +25,7 @@ export function UsageMeters({ meters }: { meters: UsageMeter[] }) {
           >
             <Text style={[styles.name, { color: colors.fg }]}>{m.name}</Text>
             <View style={[styles.track, { backgroundColor: colors.surface3 }]}>
-              <View style={[styles.fill, { width: m.fraction * BAR, backgroundColor: colors.fg }]} />
+              <View style={[styles.fill, { width: m.fraction * BAR, backgroundColor: m.fraction >= FULLISH ? colors.warn : colors.fg }]} />
             </View>
             <Text style={[styles.value, { color: colors.fg3 }]}>
               {`${pct}% `}

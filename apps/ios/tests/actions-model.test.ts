@@ -1,7 +1,7 @@
 import { OUTPUT_LIMIT, type ActionRun } from '@omni/shared/channel-actions.ts';
 import { describe, expect, it } from 'vitest';
 
-import { bytes, duration, outputCut, runSummary, runTone, runWhen } from '../src/live/actions-model';
+import { bytes, duration, outputCut, runSummary, runGlyph, runWhen } from '../src/live/actions-model';
 
 const NOW = Date.parse('2026-11-02T12:00:00Z');
 
@@ -52,9 +52,9 @@ describe('outputCut', () => {
   });
 });
 
-describe('runTone and runWhen', () => {
+describe('runGlyph and runWhen', () => {
   it('draws going as solid, failed as a ring and the rest faint', () => {
-    expect(['running', 'failed', 'stopped', 'succeeded'].map((s) => runTone(s as ActionRun['state']))).toEqual(['ok', 'warn', 'muted', 'muted']);
+    expect(['running', 'failed', 'stopped', 'succeeded'].map((s) => runGlyph(s as ActionRun['state']))).toEqual(['running', 'needs', 'settled', 'done']);
   });
 
   it('puts the age before the summary', () => {

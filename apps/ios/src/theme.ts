@@ -12,9 +12,21 @@ const light = {
   onInk: '#ffffff',
   line: 'rgba(23, 24, 26, 0.08)',
   lineStrong: 'rgba(23, 24, 26, 0.16)',
+  elev: '#ffffff',
+  wash: 'rgba(23, 24, 26, 0.06)',
+  scrim: 'rgba(23, 24, 26, 0.22)',
+  // Status is the only colour (web: --live, --needs, --done in apps/web/src/index.css). Full saturation, never tinted.
+  // Needs and done fills carry ink text, and vermilion is never text on white.
   live: '#2b3bff',
+  onLive: '#ffffff',
   needs: '#ff4420',
+  onNeeds: '#17181a',
   done: '#c6f52b',
+  onDone: '#17181a',
+  /** The ring that keeps a lime dot visible on white. */
+  doneEdge: '#17181a',
+  /** "Getting full", such as a usage meter past 70%. Darker in light so it reads on white. */
+  warn: '#b45309',
   ink: '#17181a',
   mark: 'rgba(245, 158, 11, 0.28)',
   diffAdd: 'rgba(198, 245, 43, 0.22)',
@@ -35,9 +47,17 @@ const dark: ColorTokens = {
   onInk: '#101114',
   line: 'rgba(236, 235, 231, 0.08)',
   lineStrong: 'rgba(236, 235, 231, 0.16)',
+  elev: '#212429',
+  wash: 'rgba(236, 234, 229, 0.06)',
+  scrim: 'rgba(0, 0, 0, 0.5)',
   live: '#7280ff',
+  onLive: '#101114',
   needs: '#ff4420',
+  onNeeds: '#17181a',
   done: '#c6f52b',
+  onDone: '#17181a',
+  doneEdge: 'transparent',
+  warn: '#f5b544',
   ink: '#17181a',
   mark: 'rgba(245, 181, 68, 0.28)',
   diffAdd: 'rgba(198, 245, 43, 0.22)',
@@ -45,9 +65,13 @@ const dark: ColorTokens = {
 };
 
 export const space = {
+  s1: 2,
   s2: 4,
+  s3: 6,
   s4: 8,
+  s5: 10,
   s6: 12,
+  s7: 14,
   s8: 16,
   s9: 20,
   s10: 24,
@@ -56,18 +80,35 @@ export const space = {
 } as const;
 
 export const mono = Platform.select({ ios: 'Menlo', default: 'monospace' });
+/** SF Pro Rounded, for monograms (web: --font-rounded). */
+export const rounded = Platform.select({ ios: 'ui-rounded', default: undefined });
 
+/** Radii from the Claude Design system (tokens/space.css; web: --r-*). */
 export const radius = {
+  xs: 6,
+  sm: 12,
   md: 14,
+  lg: 18,
   xl: 20,
+  xxl: 22,
+  xxxl: 28,
   pill: 999,
 } as const;
 
+/** Type sizes from the Claude Design system (tokens/type.css; web: --fs-*). */
 export const fontSize = {
+  label: 10.5,
   meta: 11,
+  code: 11.5,
+  caption: 12,
+  small: 12.5,
+  ui: 13,
   body: 14,
+  prose: 14.5,
+  subhead: 15,
   input: 16,
   heading: 17,
+  title: 26,
   titleLg: 30,
 } as const;
 
@@ -83,6 +124,14 @@ export const lineHeight = {
   tight: 1.1,
   heading: 1.25,
   body: 1.45,
+} as const;
+
+/** Springs for state changes, from the web's --ease-spring and --ease-out (Bencho motion). */
+export const motion = {
+  spring: { damping: 16, stiffness: 260, mass: 0.8 },
+  settle: { damping: 22, stiffness: 300, mass: 0.9 },
+  /** How long the running dot's ping takes (web: --dur-ping). */
+  ping: 1600,
 } as const;
 
 /** Apple's minimum touch target. */

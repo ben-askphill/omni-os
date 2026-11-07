@@ -37,16 +37,19 @@ export function stackOptions(colors: ColorTokens): NativeStackNavigationOptions 
 type Navigate = Pick<NativeStackNavigationProp<RootStackParamList>, 'navigate'>;
 
 /**
- * Search on the left and Settings on the right of a tab's root screen. Neither tab root has a back button to take the
- * left. Servers sits inside Settings. Channels also carries New, so a thread can start from the list.
+ * A tab's root screen: a large title (phone web's MoTitle), Search on the left and Settings on the right as icon buttons.
+ * Neither tab root has a back button to take the left. Servers sits inside Settings. Channels also carries New, so a
+ * thread can start from the list.
  */
 export function rootHeader(navigation: Navigate, { newThread = false }: { newThread?: boolean } = {}) {
   return {
-    headerLeft: () => <HeaderButton label="Search" onPress={() => navigation.navigate('Search')} />,
+    headerLargeTitle: true,
+    headerLargeTitleShadowVisible: false,
+    headerLeft: () => <HeaderButton label="Search" icon="search" onPress={() => navigation.navigate('Search')} />,
     headerRight: () => (
       <View style={styles.actions}>
-        <HeaderButton label="Settings" onPress={() => navigation.navigate('Settings')} />
-        {newThread ? <HeaderButton label="New" accessibilityLabel="New thread" onPress={() => navigation.navigate('NewThread')} /> : null}
+        <HeaderButton label="Settings" icon="settings" onPress={() => navigation.navigate('Settings')} />
+        {newThread ? <HeaderButton label="New thread" icon="plus" onPress={() => navigation.navigate('NewThread')} /> : null}
       </View>
     ),
   };
@@ -62,7 +65,7 @@ export function detailScreens({ backTitle }: { backTitle: string }) {
         options={({ navigation, route }) => ({
           title: 'Channel',
           headerBackTitle: backTitle,
-          headerRight: () => <HeaderButton label="New" accessibilityLabel="New thread" onPress={() => navigation.navigate('NewThread', { channel: route.params.id })} />,
+          headerRight: () => <HeaderButton label="New thread" icon="plus" onPress={() => navigation.navigate('NewThread', { channel: route.params.id })} />,
         })}
       />
       <Stack.Screen name="NewThread" component={NewThreadScreen} options={{ title: 'New thread', presentation: 'modal' }} />

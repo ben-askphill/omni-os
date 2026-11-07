@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../theme';
+import { selection } from './haptics';
 
 interface SegmentedControlProps<T extends string> {
   options: readonly { value: T; label: string; count?: number }[];
@@ -26,10 +27,13 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="button"
             accessibilityLabel={option.count === undefined ? option.label : `${option.label}, ${option.count}`}
             accessibilityState={{ selected }}
-            onPress={() => onChange(option.value)}
+            onPress={() => {
+              if (!selected) selection();
+              onChange(option.value);
+            }}
             style={[styles.segment, selected && { backgroundColor: colors.bg }]}
           >
-            <Text numberOfLines={1} style={[styles.label, { color: selected ? colors.fg : colors.fg3 }]}>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.label, { color: selected ? colors.fg : colors.fg3 }]}>
               {option.label}
               {option.count === undefined ? null : <Text style={[styles.count, { color: colors.fg4 }]}>{` ${option.count}`}</Text>}
             </Text>
@@ -46,15 +50,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     padding: space.s2,
   },
+  // Each segment grows from its own width, so a long label ("Needs you 12") takes the room a short one leaves.
   segment: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    paddingHorizontal: space.s4,
     minHeight: minTarget - space.s4,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
-    fontSize: fontSize.body,
+    fontSize: fontSize.ui,
     fontWeight: weight.semibold,
   },
   count: {

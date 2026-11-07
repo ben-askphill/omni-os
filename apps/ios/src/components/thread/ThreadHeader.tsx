@@ -6,7 +6,10 @@ import { blockedNote } from '@omni/shared/thread-machine.ts';
 
 import type { ThreadView } from '../../live/hub';
 import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
+import { Icon, type IconName } from '../../ui/Icon';
+import { glyphFor } from '../StatusDot';
 import { StatusLine } from '../StatusLine';
+import { StatusPill } from '../StatusPill';
 import { RunChip } from './RunChips';
 
 interface ThreadHeaderProps {
@@ -26,12 +29,18 @@ export function ThreadHeader({ view, harnesses, onOpenRun, onOpenChanges, onOpen
   const { thread } = view;
   // The handoff card and the Take over note say it when they can, so the same sentence is not shown twice.
   const blocked = blockedNote(view.blocked, view.handoff, thread?.status, view.takeover);
-  const statusLine = [threadStatusLabel(thread?.status), view.channel?.name, thread?.pinned_at ? 'Pinned' : null].filter(Boolean).join(' · ');
+  const status = threadStatusLabel(thread?.status);
+  const where = [view.channel ? `#${view.channel.name}` : null, thread?.pinned_at ? 'Pinned' : null].filter(Boolean).join(' · ');
   return (
     <>
       <View style={styles.statusBar}>
         <StatusLine />
-        {statusLine ? <Text style={[styles.meta, { color: colors.fg3 }]}>{statusLine}</Text> : null}
+        {status || where ? (
+          <View style={styles.statusRow}>
+            {status ? <StatusPill glyph={glyphFor(thread?.status)} label={status} /> : null}
+            {where ? <Text style={[styles.where, { color: colors.fg3 }]}>{where}</Text> : null}
+          </View>
+        ) : null}
         {view.error ? <Text style={[styles.meta, { color: colors.fg3 }]}>{`Last update failed: ${view.error}`}</Text> : null}
         {flash ? (
           <Text accessibilityLiveRegion="polite" style={[styles.meta, { color: colors.fg }]}>
@@ -42,8 +51,8 @@ export function ThreadHeader({ view, harnesses, onOpenRun, onOpenChanges, onOpen
       {thread ? (
         <View style={styles.chips}>
           <RunChip thread={thread} harnesses={harnesses} onPress={onOpenRun} />
-          <LinkChip label="Changes" hint="Opens the files this thread changed" onPress={onOpenChanges} />
-          <LinkChip label="Pull request" hint="Opens this branch's pull request" onPress={onOpenPR} />
+          <LinkChip label="Changes" icon="diff" hint="Opens the files this thread changed" onPress={onOpenChanges} />
+          <LinkChip label="Pull request" icon="pr" hint="Opens this branch's pull request" onPress={onOpenPR} />
         </View>
       ) : null}
       {blocked ? (
@@ -55,18 +64,19 @@ export function ThreadHeader({ view, harnesses, onOpenRun, onOpenChanges, onOpen
   );
 }
 
-function LinkChip({ label, hint, onPress }: { label: string; hint: string; onPress: () => void }) {
+function LinkChip({ label, icon, hint, onPress }: { label: string; icon: IconName; hint: string; onPress: () => void }) {
   const { colors } = useOmniTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
+      hitSlop={4}
       onPress={onPress}
       style={({ pressed }) => [styles.link, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
     >
+      <Icon name={icon} size={14} color={colors.fg2} />
       <Text style={[styles.linkLabel, { color: colors.fg }]}>{label}</Text>
-      <Text style={[styles.linkCaret, { color: colors.fg3 }]}>›</Text>
     </Pressable>
   );
 }
@@ -97,7 +107,16 @@ const styles = StyleSheet.create({
     gap: space.s2,
   },
   meta: {
-    fontSize: fontSize.meta,
+    fontSize: fontSize.small,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s4,
+  },
+  where: {
+    flexShrink: 1,
+    fontSize: fontSize.small,
   },
   chips: {
     flexDirection: 'row',
@@ -110,16 +129,13 @@ const styles = StyleSheet.create({
     height: 36,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.s2,
+    gap: space.s3,
     borderRadius: radius.pill,
     paddingHorizontal: space.s6,
   },
   linkLabel: {
-    fontSize: fontSize.body,
+    fontSize: fontSize.ui,
     fontWeight: weight.medium,
-  },
-  linkCaret: {
-    fontSize: fontSize.body,
   },
   blocked: {
     marginHorizontal: space.s9,

@@ -1,9 +1,10 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
-import type { HandoffChild, ThreadRow } from '../live/channel-model';
+import type { ThreadRow } from '../live/channel-model';
 import { fontSize, minTarget, space, useOmniTheme } from '../theme';
-import { type DotTone, StatusDot } from './StatusDot';
+import { Icon } from '../ui/Icon';
+import { glyphFor, StatusDot } from './StatusDot';
 import { ThreadSwipeRow } from './ThreadSwipeRow';
 
 export interface HandoffRowViewProps {
@@ -15,8 +16,6 @@ export interface HandoffRowViewProps {
   onMenu: () => void;
 }
 
-const toneOf = (child: HandoffChild): DotTone => (child.status === 'failed' ? 'warn' : child.busy ? 'ok' : 'muted');
-
 /**
  * A Conductor thread and the threads it delegated. A button under the row opens and closes the children, which sit
  * indented along a rule, each with its state dot, title and the channel it runs in.
@@ -24,7 +23,6 @@ const toneOf = (child: HandoffChild): DotTone => (child.status === 'failed' ? 'w
 export function HandoffRowView({ row, open, onToggle, onOpenThread, onMenu }: HandoffRowViewProps) {
   const { colors } = useOmniTheme();
   const { children, running } = row.handoff;
-  const summary = running > 0 ? `${children.length} delegated · ${running} running` : `${children.length} delegated`;
   return (
     <View>
       <ThreadSwipeRow row={row} onPress={() => onOpenThread(row.id)} onMenu={onMenu} />
@@ -34,10 +32,15 @@ export function HandoffRowView({ row, open, onToggle, onOpenThread, onMenu }: Ha
         accessibilityState={{ expanded: open }}
         onPress={onToggle}
         hitSlop={4}
-        style={({ pressed }) => [styles.toggle, { backgroundColor: pressed ? colors.surface2 : colors.bg }]}
+        style={({ pressed }) => [styles.toggle, { backgroundColor: pressed ? colors.wash : colors.bg }]}
       >
-        <Text style={[styles.chevron, { color: colors.fg4, transform: [{ rotate: open ? '90deg' : '0deg' }] }]}>›</Text>
-        <Text style={[styles.summary, { color: colors.fg3 }]}>{summary}</Text>
+        <View style={[styles.chevron, { transform: [{ rotate: open ? '90deg' : '0deg' }] }]}>
+          <Icon name="chevronRight" size={11} weight="semibold" color={colors.fg4} />
+        </View>
+        <Text style={[styles.summary, { color: colors.fg3 }]}>
+          {`${children.length} delegated`}
+          {running > 0 ? <Text style={{ color: colors.live }}>{` · ${running} running`}</Text> : null}
+        </Text>
       </Pressable>
       {open ? (
         <View accessibilityRole="list" accessibilityLabel={`Threads delegated from ${row.title}`} style={[styles.children, { borderColor: colors.lineStrong }]}>
@@ -47,9 +50,9 @@ export function HandoffRowView({ row, open, onToggle, onOpenThread, onMenu }: Ha
               accessibilityRole="button"
               accessibilityLabel={`${child.title}, #${child.channel}, ${child.status}`}
               onPress={() => onOpenThread(child.id)}
-              style={({ pressed }) => [styles.child, { backgroundColor: pressed ? colors.surface2 : colors.bg }]}
+              style={({ pressed }) => [styles.child, { backgroundColor: pressed ? colors.wash : colors.bg }]}
             >
-              <StatusDot tone={toneOf(child)} />
+              <StatusDot glyph={glyphFor(child.status)} />
               <Text numberOfLines={1} style={[styles.childTitle, { color: colors.fg2 }]}>
                 {child.title}
               </Text>
@@ -70,22 +73,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s2,
-    marginLeft: space.s9 + 8 - 3,
+    marginLeft: space.s8 + 36 + space.s6 - space.s4,
     paddingHorizontal: space.s4,
     alignSelf: 'flex-start',
     borderRadius: 18,
   },
   chevron: {
     width: 12,
-    fontSize: fontSize.body + 4,
-    lineHeight: 20,
-    textAlign: 'center',
+    alignItems: 'center',
   },
   summary: {
-    fontSize: fontSize.meta,
+    fontSize: fontSize.caption,
   },
   children: {
-    marginLeft: space.s9 + 8 - 3,
+    marginLeft: space.s8 + 18,
     paddingLeft: space.s6,
     borderLeftWidth: 1,
     marginBottom: space.s2,

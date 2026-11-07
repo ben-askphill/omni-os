@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
-import { Text } from '../ui/Text';
 
 import { channelThreads, threadSections, type ThreadRow } from '../live/channel-model';
 import { useChannels, useHandoffOpen, useLiveHub, usePullRefresh } from '../live/react';
@@ -11,7 +10,8 @@ import { StatusLine } from '../components/StatusLine';
 import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { ThreadSwipeRow } from '../components/ThreadSwipeRow';
 import type { RootScreenProps } from '../navigation/types';
-import { fontSize, space, useOmniTheme, weight } from '../theme';
+import { EmptyState } from '../ui/EmptyState';
+import { space, useOmniTheme } from '../theme';
 
 export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>) {
   const { id } = route.params;
@@ -64,14 +64,13 @@ export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>)
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={[styles.emptyTitle, { color: colors.fg }]}>
-              {channels === null ? 'Loading threads' : channel ? 'No threads yet' : 'Channel not found'}
-            </Text>
-            {channel === null && channels !== null ? (
-              <Text style={[styles.emptyBody, { color: colors.fg3 }]}>It may have been archived or removed on the server.</Text>
-            ) : null}
-          </View>
+          channels === null ? (
+            <EmptyState icon="hash" title="Loading threads" />
+          ) : channel ? (
+            <EmptyState icon="message" title="No threads yet" body="Start one with the + button above." action={{ label: 'New thread', onPress: () => navigation.navigate('NewThread', { channel: id }) }} />
+          ) : (
+            <EmptyState icon="alert" title="Channel not found" body="It may have been archived or removed on the server." />
+          )
         }
         renderSectionHeader={({ section }) =>
           section.folder ? (
@@ -105,17 +104,5 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: space.s9,
     paddingTop: space.s2,
-  },
-  empty: {
-    paddingHorizontal: space.s9,
-    paddingTop: space.s11,
-    gap: space.s4,
-  },
-  emptyTitle: {
-    fontSize: fontSize.heading,
-    fontWeight: weight.semibold,
-  },
-  emptyBody: {
-    fontSize: fontSize.body,
   },
 });

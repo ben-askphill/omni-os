@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Text } from '../../ui/Text';
 
 import type { ActivityRow, ThreadGroup } from '../../live/activity-model';
-import { fontSize, minTarget, radius, space, useOmniTheme } from '../../theme';
+import { minTarget, radius, space, useOmniTheme } from '../../theme';
+import { Icon } from '../../ui/Icon';
 import { ThreadRowView } from '../ThreadRowView';
 
 /** A thread row, and the Conductor's delegated threads indented under it behind a collapse toggle. */
@@ -24,7 +24,9 @@ export function ThreadGroupView({ group, onOpen }: { group: ThreadGroup; onOpen:
           onPress={() => setExpanded((open) => !open)}
           style={({ pressed }) => [styles.toggle, { backgroundColor: pressed ? colors.surface3 : colors.surface }]}
         >
-          <Text style={[styles.chevron, { color: colors.fg3, transform: [{ rotate: expanded ? '90deg' : '0deg' }] }]}>›</Text>
+          <View style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}>
+            <Icon name="chevronRight" size={13} weight="semibold" color={colors.fg3} />
+          </View>
         </Pressable>
       </View>
       {expanded ? (
@@ -57,12 +59,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chevron: {
-    fontSize: fontSize.heading + 4,
-    lineHeight: 22,
-  },
   children: {
-    marginLeft: space.s9 + space.s2,
+    marginLeft: space.s8 + 18,
     borderLeftWidth: StyleSheet.hairlineWidth,
   },
 });

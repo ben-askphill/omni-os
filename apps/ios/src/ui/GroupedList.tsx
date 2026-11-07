@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
 
 import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
@@ -11,6 +12,8 @@ export function GroupedList({ children }: { children: ReactNode }) {
 
 export interface ListRowProps {
   title: string;
+  /** A line icon before the title, as phone web's settings rows have. */
+  icon?: IconName;
   detail?: string;
   value?: string;
   /** Replaces the value at the trailing edge, such as a switch. */
@@ -24,10 +27,11 @@ export interface ListRowProps {
   accessibilityHint?: string;
 }
 
-export function ListRow({ title, detail, value, trailing, chevron, tone = 'default', onPress, disabled, first, accessibilityHint }: ListRowProps) {
+export function ListRow({ title, icon, detail, value, trailing, chevron, tone = 'default', onPress, disabled, first, accessibilityHint }: ListRowProps) {
   const { colors } = useOmniTheme();
   const body = (
     <>
+      {icon ? <Icon name={icon} size={18} color={tone === 'destructive' ? colors.fg : colors.fg2} /> : null}
       <View style={styles.text}>
         <Text style={[styles.title, { color: colors.fg, opacity: disabled ? 0.5 : 1 }, tone === 'destructive' && styles.destructive]}>
           {title}
@@ -35,7 +39,7 @@ export function ListRow({ title, detail, value, trailing, chevron, tone = 'defau
         {detail ? <Text style={[styles.detail, { color: colors.fg3 }]}>{detail}</Text> : null}
       </View>
       {trailing ?? (value ? <Text style={[styles.value, { color: colors.fg3 }]}>{value}</Text> : null)}
-      {chevron ? <Text style={[styles.chevron, { color: colors.fg4 }]}>›</Text> : null}
+      {chevron ? <Icon name="chevronRight" size={13} weight="semibold" color={colors.fg4} /> : null}
     </>
   );
   const frame = [styles.row, !first && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }];
@@ -65,8 +69,8 @@ const styles = StyleSheet.create({
     minHeight: minTarget,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.s6,
-    paddingHorizontal: space.s9,
+    gap: space.s7,
+    paddingHorizontal: space.s8,
     paddingVertical: space.s6,
   },
   text: {
@@ -74,20 +78,16 @@ const styles = StyleSheet.create({
     gap: space.s2 / 2,
   },
   title: {
-    fontSize: fontSize.input,
+    fontSize: fontSize.subhead,
   },
   destructive: {
     fontWeight: weight.semibold,
   },
   detail: {
-    fontSize: fontSize.body,
-    lineHeight: Math.round(fontSize.body * lineHeight.body),
+    fontSize: fontSize.small,
+    lineHeight: Math.round(fontSize.small * lineHeight.body),
   },
   value: {
     fontSize: fontSize.body,
-  },
-  chevron: {
-    fontSize: fontSize.titleLg - 8,
-    lineHeight: fontSize.titleLg - 6,
   },
 });

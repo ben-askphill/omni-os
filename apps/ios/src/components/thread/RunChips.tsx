@@ -1,6 +1,7 @@
 import type { HarnessInfo } from '@omni/client-core';
 import { Pressable, StyleSheet } from 'react-native';
 import { Text } from '../../ui/Text';
+import { Icon } from '../../ui/Icon';
 
 import { fontSize, radius, space, useOmniTheme, weight } from '../../theme';
 import { nextTurnLabel, runChipLabel, type RunThread } from '../../thread/run-model';
@@ -28,7 +29,7 @@ export function RunChip({ thread, harnesses, onPress }: RunChipProps) {
       <Text numberOfLines={1} style={[styles.label, { color: colors.fg }]}>
         {label}
       </Text>
-      <Text style={[styles.caret, { color: colors.fg3 }]}>▾</Text>
+      <Icon name="chevronDown" size={10} weight="semibold" color={colors.fg3} />
     </Pressable>
   );
 }
@@ -73,8 +74,5 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: fontSize.body,
     fontWeight: weight.medium,
-  },
-  caret: {
-    fontSize: fontSize.meta,
   },
 });

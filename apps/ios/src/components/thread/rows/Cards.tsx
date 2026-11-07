@@ -3,6 +3,7 @@ import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../../ui/Text';
+import { Icon } from '../../../ui/Icon';
 
 import { AttachmentRow } from '../../../attachments/AttachmentRow';
 import { showsBubble } from '../../../context/labels';
@@ -10,7 +11,8 @@ import { duration, plural } from '../../../thread/format';
 import { outcomeText, type ThreadRow } from '../../../thread/rows';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
 import { ContextChips } from '../../ContextChips';
-import { type DotTone, StatusDot } from '../../StatusDot';
+import { OmniMark } from '../../ChannelAvatar';
+import { glyphFor, StatusDot } from '../../StatusDot';
 import { Markdown } from '../Markdown';
 import { QuestionCard } from '../QuestionCard';
 import { useRowActions } from './actions';
@@ -18,8 +20,6 @@ import { useRowActions } from './actions';
 type Of<K extends ThreadRow['kind']> = { row: Extract<ThreadRow, { kind: K }> };
 
 const MONO = 'Menlo';
-
-const statusTone = (status: string): DotTone => (status === 'failed' ? 'warn' : status === 'running' || status === 'queued' ? 'ok' : 'muted');
 
 function LoadWhole({ label, onPress }: { label: string; onPress: () => void }) {
   const { colors } = useOmniTheme();
@@ -94,7 +94,7 @@ export function OutcomeRow({ row }: Of<'outcome'>) {
   const { colors } = useOmniTheme();
   return (
     <View style={styles.line}>
-      <StatusDot tone={statusTone(row.status)} />
+      <StatusDot glyph={glyphFor(row.status)} />
       <Text style={[styles.meta, { color: colors.fg3 }]}>{outcomeText(row, duration(row.tookMs))}</Text>
     </View>
   );
@@ -104,7 +104,7 @@ export function ConductorRow() {
   const { colors } = useOmniTheme();
   return (
     <View style={styles.line}>
-      <StatusDot tone="ok" />
+      <OmniMark size={14} color={colors.fg3} />
       <Text style={[styles.meta, { color: colors.fg3 }]}>Conductor</Text>
     </View>
   );
@@ -131,7 +131,7 @@ export function CloudRow({ row }: Of<'cloud'>) {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <View style={styles.line}>
-        <StatusDot tone={statusTone(st.status)} />
+        <StatusDot glyph={glyphFor(st.status)} />
         <Text style={[styles.cardTitle, { color: colors.fg }]}>{p.name || 'Cursor cloud agent'}</Text>
         <View style={styles.grow} />
         <Text style={[styles.caption, { color: colors.fg3 }]}>{st.label}</Text>
@@ -179,7 +179,7 @@ export function DelegationRow({ row }: Of<'delegation'>) {
           onPress={() => openThread(k.id)}
           style={({ pressed }) => [styles.kid, { backgroundColor: pressed ? colors.surface3 : colors.bg }]}
         >
-          <StatusDot tone={statusTone(k.status)} />
+          <StatusDot glyph={glyphFor(k.status)} />
           <View style={styles.grow}>
             <Text numberOfLines={1} style={[styles.kidTitle, { color: colors.fg }]}>
               {k.title || 'Untitled'}
@@ -231,7 +231,9 @@ export function StepsRow({ row }: Of<'steps'>) {
         {row.live ? `${plural(row.steps, 'step')} so far` : plural(row.steps, 'step')}
         {row.failed > 0 ? <Text style={{ color: colors.fg3 }}>{`  ·  ${row.failed} failed`}</Text> : null}
       </Text>
-      <Text style={[styles.chevron, { color: colors.fg4 }]}>{row.open ? '⌄' : '›'}</Text>
+      <View style={{ transform: [{ rotate: row.open ? '90deg' : '0deg' }] }}>
+        <Icon name="chevronRight" size={12} weight="semibold" color={colors.fg4} />
+      </View>
     </Pressable>
   );
 }
@@ -240,7 +242,7 @@ export function NowRow({ row }: Of<'now'>) {
   const { colors } = useOmniTheme();
   return (
     <View style={[styles.card, styles.line, { backgroundColor: colors.surface }]}>
-      <StatusDot tone="ok" />
+      <StatusDot glyph="running" />
       <Text numberOfLines={1} style={[styles.nowText, { color: colors.fg }]}>
         {row.now.verb}
         {row.now.target ? <Text style={{ fontFamily: MONO, fontSize: 13 }}>{` ${row.now.target}`}</Text> : null}
@@ -265,8 +267,8 @@ export function PlanRow({ row }: Of<'plan'>) {
         const done = t.status === 'completed';
         return (
           <View key={i} style={styles.line}>
-            <StatusDot tone={running ? 'ok' : 'muted'} />
-            <Text style={[styles.todo, { color: running ? colors.fg : colors.fg3 }, done && styles.struck]}>{(running && t.activeForm) || t.content}</Text>
+            <StatusDot glyph={running ? 'running' : done ? 'done' : 'idle'} />
+            <Text style={[styles.todo, { color: running ? colors.fg : done ? colors.fg3 : colors.fg2 }]}>{(running && t.activeForm) || t.content}</Text>
           </View>
         );
       })}
@@ -316,10 +318,8 @@ const styles = StyleSheet.create({
   fileIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   pill: { minHeight: minTarget, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 14 },
   pillText: { flex: 1, fontSize: 13.5 },
-  chevron: { fontSize: 18 },
   nowText: { flex: 1, fontSize: 14 },
   todo: { flex: 1, fontSize: 14, lineHeight: 19 },
-  struck: { textDecorationLine: 'line-through' },
   switch: { alignItems: 'center', gap: space.s2, paddingVertical: space.s2 },
   rule: { height: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginBottom: space.s2 },
 });

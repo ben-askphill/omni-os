@@ -1,6 +1,7 @@
 import type { RunOnRow } from '@omni/shared/thread-machine.ts';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { Text } from '../../ui/Text';
+import { Icon } from '../../ui/Icon';
 
 import { fontSize, space, useOmniTheme } from '../../theme';
 import { Callout } from '../../ui/Callout';
@@ -34,7 +35,7 @@ export function MachineList({ rows, value, note, busy, error, onPick }: MachineL
             key={row.value}
             label={row.label}
             sub={row.sub}
-            leading={<Text style={styles.glyph}>🖥</Text>}
+            leading={<Icon name="machine" size={18} color={colors.fg2} />}
             selected={row.value === value}
             disabled={row.disabled || busy}
             onPress={() => onPick(row.value)}
@@ -74,9 +75,6 @@ const styles = StyleSheet.create({
   content: {
     gap: space.s8,
     paddingVertical: space.s6,
-  },
-  glyph: {
-    fontSize: 18,
   },
   note: {
     paddingHorizontal: space.s9,

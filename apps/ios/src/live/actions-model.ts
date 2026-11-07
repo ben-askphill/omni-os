@@ -41,7 +41,9 @@ export function outputCut(run: ActionRun): string | null {
 }
 
 /** A run's state as a dot: going is solid, failed is a ring, finished is faint. */
-export const runTone = (state: ActionRunState): 'ok' | 'warn' | 'muted' => (state === 'running' ? 'ok' : state === 'failed' ? 'warn' : 'muted');
+/** A run's state as the status glyph it wears: running is blue, a failure needs Ben, a success is done, a stop settles. */
+export const runGlyph = (state: ActionRunState): 'running' | 'needs' | 'done' | 'settled' =>
+  state === 'running' ? 'running' : state === 'failed' ? 'needs' : state === 'succeeded' ? 'done' : 'settled';
 
 export const actionDetail = (action: Pick<ChannelAction, 'port'>) => portLabel(action.port);
 
