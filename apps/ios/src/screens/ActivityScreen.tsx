@@ -3,14 +3,13 @@ import { AccessibilityInfo, Alert, Pressable, RefreshControl, ScrollView, StyleS
 
 import { DoneRowView, InboxRowView, ShelfHeader, ShowMore, type RowAction } from '../components/activity/InboxRows';
 import { OmniMark } from '../components/ChannelAvatar';
-import { HeaderButton } from '../components/HeaderButton';
 import { StatusLine } from '../components/StatusLine';
 import { activityInbox, DONE_INITIAL, DONE_PAGE, type ActivityInbox, type InboxRow } from '../live/activity-model';
 import { useActivity, useChannels, useLiveHub, useNeedsYou, usePullRefresh, useShelfOpen } from '../live/react';
 import { useMinuteClock } from '../live/use-minute-clock';
 import type { RootScreenProps } from '../navigation/types';
 import { usePairing } from '../pairing/PairingProvider';
-import { fontSize, minTarget, space, useOmniTheme, weight } from '../theme';
+import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 import type { ThreadAction } from '../thread/actions';
 import { useThreadActions } from '../thread/hooks';
 import type { ThreadTarget } from '../thread/target';
@@ -43,18 +42,17 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerLargeTitle: true,
-      headerLargeTitleShadowVisible: false,
-      headerLargeStyle: { backgroundColor: colors.bg },
+      // The title sits in the list under the bar, as phone web's MoTitle does, so the bar holds only the Conductor and actions.
+      headerTitle: '',
       headerLeft: () => <ConductorButton mark={inbox.mark} onPress={() => navigation.navigate('Channel', { id: 'conductor' })} />,
-      headerRight: () => (
-        <View style={styles.headerActions}>
-          <HeaderButton label="Search" icon="search" onPress={() => navigation.navigate('Search')} />
-          <HeaderButton label="Settings" icon="settings" onPress={() => navigation.navigate('Settings')} />
-        </View>
-      ),
+      // Native bar buttons, so iOS draws Search and Settings as one glass group, as phone web puts its actions on the right.
+      headerRight: undefined,
+      unstable_headerRightItems: () => [
+        { type: 'button', label: 'Search', icon: { type: 'sfSymbol', name: 'magnifyingglass' }, tintColor: colors.fg, onPress: () => navigation.navigate('Search') },
+        { type: 'button', label: 'Settings', icon: { type: 'sfSymbol', name: 'gearshape' }, tintColor: colors.fg, onPress: () => navigation.navigate('Settings') },
+      ],
     });
-  }, [navigation, colors.bg, inbox.mark]);
+  }, [navigation, colors.fg, inbox.mark]);
 
   const rowActions = (row: InboxRow): RowAction[] => {
     const out: RowAction[] = [];
@@ -73,7 +71,12 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={colors.fg3} />}
     >
       <View style={styles.header}>
-        <Text style={[styles.subtitle, { color: colors.fg3 }]}>{inbox.subtitle}</Text>
+        <View style={styles.titles}>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.fg }]}>
+            Activity
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.fg3 }]}>{inbox.subtitle}</Text>
+        </View>
         {notice !== null && (
           <Callout message={notice}>
             <Button label="Dismiss" variant="secondary" onPress={clearNotice} />
@@ -172,6 +175,15 @@ const styles = StyleSheet.create({
     paddingBottom: space.s6,
     gap: space.s6,
   },
+  titles: {
+    gap: space.s3,
+  },
+  title: {
+    fontSize: fontSize.titleLg,
+    lineHeight: Math.round(fontSize.titleLg * lineHeight.tight),
+    fontWeight: weight.medium,
+    letterSpacing: -0.3,
+  },
   subtitle: {
     fontSize: fontSize.ui,
     fontVariant: ['tabular-nums'],
@@ -190,11 +202,6 @@ const styles = StyleSheet.create({
     lineHeight: Math.round(fontSize.body * 1.5),
     paddingHorizontal: space.s2,
     paddingVertical: space.s8,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s4,
   },
   conductor: {
     minHeight: minTarget,
