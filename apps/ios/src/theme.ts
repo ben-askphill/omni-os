@@ -120,8 +120,8 @@ export const weight = {
   bold: '800',
 } as const;
 
-/** Letter spacing for every text, -0.04em in the design system. React Native takes points, so it scales with the size. */
-export const LETTER_SPACING_EM = -0.04;
+/** Letter spacing for every text, -0.03em in the design system. React Native takes points, so it scales with the size. */
+export const LETTER_SPACING_EM = -0.03;
 export const tracking = (size: number) => Math.round(LETTER_SPACING_EM * size * 100) / 100;
 
 export const lineHeight = {

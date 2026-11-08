@@ -11,7 +11,7 @@ const InsideText = createContext(false);
 const DEFAULT_SIZE = 14;
 
 /**
- * The design system's -0.04em tracking, in points for this style's size. React Native takes letterSpacing in points,
+ * The design system's -0.03em tracking, in points for this style's size. React Native takes letterSpacing in points,
  * not em, so it follows the font size: set on the outermost Text, and again on a nested Text that changes the size
  * (otherwise it inherits its parent's points). A style that sets its own letterSpacing keeps it.
  */
