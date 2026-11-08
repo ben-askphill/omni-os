@@ -81,7 +81,7 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 - **Omni Connect**: open any synced machine from a phone through that relay, without Tailscale
 - **Update**: one button in the desktop sidebar and phone Activity when origin's `main` is ahead of a checkout; syncs, rebuilds and restarts. The packaged desktop app updates itself from its GitHub Releases
 - **Phone layout** with Activity, Channels, Library and PRs tabs, a new-thread sheet and full-screen thread panels. Save it to the iPhone home screen over Tailscale
-- **Native iOS app** that pairs with a server over HTTPS: Activity, Channels, Library, send, attachments, handoff and changes review. See [Remote access](docs/user/remote-access.md#pair-the-native-ios-app) and [apps/ios/README.md](apps/ios/README.md)
+- **Native iOS app** that pairs with a server over HTTPS: Activity (the same Inbox list as phone web), Channels with emoji/icon/SVG avatars, Library, a New tab item, Settings and Channel Settings from the shared catalog, send, attachments, handoff, Changes and PR review, and shared line icons. See [Remote access](docs/user/remote-access.md#pair-the-native-ios-app) and [apps/ios/README.md](apps/ios/README.md)
 
 ## Documentation
 

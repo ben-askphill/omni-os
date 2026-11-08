@@ -29,6 +29,8 @@ Pick the address the phone will use. The card offers this page's address when it
 
 Scan the QR code or type the manual code in the app. The code expires after five minutes and works once. The phone gets its own revocable app session, not the install token. Revoke a session under signed-in devices. A paired phone has the same access as a Google session, including the terminal and agents, so revoking does not undo commands it already ran.
 
+Once paired, the native app's tabs are Activity (phone web's Inbox list), Channels and Library, with New at the end of the tab bar. Settings uses the same shared catalog as the Web UI, including Channel Settings and About (native build, runtime and running update). Channel rows and headers show emoji, icon and SVG avatars. Details live in [apps/ios/README.md](../../apps/ios/README.md).
+
 ## Without Tailscale
 
 [Omni Connect](omni-connect.md) gives each machine a Cloudflare tunnel and a public `https://<name>-xxxxxx.omni-os.app` address, through your sync relay. Sign in with Google once on the relay's Connect page, then open any machine from there. Every request still needs the token or a session.
