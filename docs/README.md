@@ -31,7 +31,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Transitions](internals/transitions.md): the one service behind a run switch, a handoff or Take over and a Continue, its four routes, the six older routes that answer through it, and what stays as synced kv for machines on an older build
 - [Glossary](../CONTEXT.md)
 - [Native app pairing contract](internals/app-pairing.md): session pairing, capabilities, and push token registration
-- [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md): first build, TestFlight, and the EAS workflow on `main` (native build or EAS Update)
+- [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md): Activity as Inbox, Settings and Channel Settings, shared icons, first build, TestFlight, and the EAS workflow on `main` (native build or EAS Update)
 - [Desktop app](../apps/desktop/README.md): develop against a QA stack, the QA harness (`scripts/qa.ts`), packaging, where data and logs live, and the bridge contract · [Desktop release](../apps/desktop/RELEASE.md): signing, notarization and the release workflow
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages
 - [Screenshots on PRs](pr-screenshots.md)

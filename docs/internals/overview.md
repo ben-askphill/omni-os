@@ -63,7 +63,7 @@ apps/server/                @omni/server: Hono API (*-api.ts), runner/, harness/
 apps/mcp/                   @omni/mcp: omni.ts, the conductor tools; ask.ts, ask_user_question for every thread; threads.ts, read_referenced_thread for every thread but the conductor's
 apps/web/                   @omni/web: Web UI (React, Vite)
 apps/desktop/               @omni/desktop: Electron app for macOS and Linux. Shows the Web UI and runs the bundled server
-apps/ios/                   @omni/ios: Expo React Native app (pairing, live threads, Activity, Library)
+apps/ios/                   @omni/ios: Expo React Native app (pairing, live threads, Activity as Inbox, Settings, shared icons)
 packages/shared/            @omni/shared: pure TypeScript the web, desktop and iOS clients use (slash grammar, menu, pills)
 packages/client-core/       @omni/client-core: typed HTTP and thread stream for the iOS app
 packages/test-fixtures/     @omni/test-fixtures: fake CLIs, corpora and wire fixtures the tests share

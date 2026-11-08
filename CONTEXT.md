@@ -64,7 +64,7 @@ What resuming a **Limit stop** sends: Omni's "continue where you left off", save
 _Avoid_: Retry, auto-resume
 
 **Question card**:
-Questions an agent asks the user with Omni's `ask_user_question` tool: one to four, each with two to four options plus a free-text Other. It sits in the thread where the agent asked, and in **Needs you** until the user answers, skips or writes a message instead, which dismisses it. The first of those wins. The answers go back as the waiting tool call's result; when that call is gone (a restart, Stop, the harness's own timeout), they reach the thread as a message. A thread that runs on another machine still takes the answer from the hub: the call returns there while a turn runs, or the answer is forwarded as a message between turns.
+Questions an agent asks the user with Omni's `ask_user_question` tool: one to four, each with two to four options plus a free-text Other. It sits in the thread where the agent asked, and in **Needs you** until the user answers, skips or writes a message instead, which dismisses it. The first of those wins. The answers go back as the waiting tool call's result; when that call is gone (a restart, Stop, the harness's own timeout), they reach the thread as a message. A thread that runs on another machine still takes the answer from the hub (its own card or a parent's), including one the Conductor delegated there: the call returns there while a turn runs, or the answer is forwarded as a message between turns.
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
 **Inbox**:

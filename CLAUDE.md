@@ -27,7 +27,7 @@ Local agent workspace. See README.md for what it does.
 - Backend: `apps/server/` (Hono, node:sqlite, no ORM). `runner.ts` owns the claude CLI lifecycle; `stream.ts` is the pure stream-json parser.
 - Web UI: `apps/web/` (React 19, Tailwind v4, hash router). Talks only to `/api`.
 - Sync relay: `apps/relay/`. A Cloudflare Worker each user deploys; see ADR 0008. It imports nothing from the other packages.
-- iOS app: `apps/ios/` (Expo, React Native). Pairs with a server over HTTPS, reads channels and threads live, sends and steers, Activity, Library, handoff, attachments, Changes and PR review. It imports `@omni/client-core` and `@omni/shared`, nothing from `apps/web`, `apps/desktop` or `apps/server`. See `apps/ios/README.md` and `apps/ios/RELEASE.md`.
+- iOS app: `apps/ios/` (Expo, React Native). Pairs with a server over HTTPS, reads channels and threads live, sends and steers, Activity (phone web's Inbox), Library, Settings and Channel Settings from the shared catalog, New from the tab bar, shared icons and channel avatars, handoff, attachments, Changes and PR review. It imports `@omni/client-core` and `@omni/shared`, nothing from `apps/web`, `apps/desktop` or `apps/server`. See `apps/ios/README.md` and `apps/ios/RELEASE.md`.
 - Desktop app: `apps/desktop/` (Electron). It loads the Web UI and runs the bundled server on Electron's own Node. One codebase builds it for macOS and as a Linux AppImage. It replaced the SwiftUI Mac app and the Linux launcher (ADR 0010). Desktop-only UI goes through `window.omniDesktop` (`packages/shared/desktop-bridge.ts`, read via `apps/web/src/desktop.ts`), always gated on it being there. It imports `@omni/shared` only. QA harness: `apps/desktop/scripts/qa.ts`. See `apps/desktop/README.md`.
 - `packages/shared/`: pure TypeScript the web, desktop and iOS clients use (slash grammar, menu, pills, and shared view models). It imports only itself. `apps/web/` and `apps/desktop/` never import each other, and `apps/desktop` never imports `apps/server`, `apps/mcp`, `apps/ios` or `@omni/client-core`. `turbo boundaries` (run by `npm test`) enforces it with the tags in `turbo.json`.
 - `packages/client-core/`: typed HTTP and thread stream for the iOS app. It imports `@omni/shared` only.
@@ -43,9 +43,10 @@ Local agent workspace. See README.md for what it does.
 You most likely run inside Omni itself, served from :4747 on the user's Mac.
 
 1. **Never touch :4747 or the main checkout's `data/`.** Don't restart, kill, test against or write to them. Use `scripts/qa-stack.sh up` for a throwaway server with its own data dir and fake CLIs.
-2. **Never kill by pattern.** No `pkill -f`, and no `kill` of a PID found by matching a name or path: other threads run their own stacks and fake CLIs. Stop what you started by its port and PID file (`QA_SERVER_PORT=<port> scripts/qa-stack.sh down`).
+2. **Never kill by pattern.** No `pkill -f`, and no `kill` of a PID found by matching a name or path: other threads run their own stacks and fake CLIs. Stop what you started by its port and PID file (`QA_SERVER_PORT=<port> scripts/qa-stack.sh down`). A preview HTTP server you started so the browser can open local HTML: stop it by that process's PID the same way; `pkill -f` on its command line also matches your own shell and kills it.
 3. **Install with dev deps.** Agent shells often set `NODE_ENV=production`, so use `npm install --include=dev`.
 4. **macOS has no `timeout` command.** Bound a slow command with your shell tool's own timeout setting, or `perl -e 'alarm 60; exec @ARGV' <cmd>`.
+5. **Crop or join screenshots with ImageMagick** (`magick`), not Python: Pillow is often missing. See [docs/pr-screenshots.md](docs/pr-screenshots.md).
 
 ## Hit every surface
 
