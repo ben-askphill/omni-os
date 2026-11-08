@@ -14,10 +14,12 @@ import { MERGE_ADVICE, prContent, type PRContent } from '../pr/model';
 import { useMerge, usePRWatch, useThreadPR } from '../pr/hooks';
 import type { MergeOutcome } from '../pr/actions';
 import { CheckDot } from '../pr/CheckDot';
+import { CrewPRList } from '../pr/CrewPRs';
 import { DiffCount, Loading, Section } from '../review/parts';
 import { Chip } from '../ui/Chip';
 import { fontSize, lineHeight, minTarget, mono, space, useOmniTheme, weight } from '../theme';
 import { Button } from '../ui/Button';
+import { GroupedList, ListRow } from '../ui/GroupedList';
 import { Callout } from '../ui/Callout';
 import { SlideToConfirm } from '../ui/SlideToConfirm';
 
@@ -29,9 +31,11 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
   const live = useThreadLive(id);
   const view = useThreadView(live);
   const thread = view?.thread ?? null;
-  const pr = useThreadPR(thread);
-  const watch = usePRWatch(id, pr.number !== null, pr.page.kind === 'pr' ? pr.page.pr : null);
-  const merge = useMerge(pr.channelId, pr.number, pr.reloadDetail);
+  const [picked, setPicked] = useState<string | null>(null);
+  const pr = useThreadPR(thread, picked);
+  // A delegated thread's PR is watched from that thread, so the watch here is for this thread's own PR only.
+  const watch = usePRWatch(id, pr.number !== null && !pr.from, pr.page.kind === 'pr' && !pr.from ? pr.page.pr : null);
+  const merge = useMerge(pr.channelId, pr.number, pr.refresh);
   const [asked, setAsked] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<MergeOutcome | null>(null);
   const insets = useSafeAreaInsets();
@@ -39,12 +43,13 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
   const page = pr.page;
   const content = page.kind === 'pr' ? prContent(page.pr) : null;
   const url = content?.url;
+  const crewOnly = page.kind === 'empty' && !thread?.branch && page.crew.length > 0;
   useEffect(() => {
     navigation.setOptions({
-      title: content ? `#${content.number}` : 'Pull request',
+      title: content ? `#${content.number}` : crewOnly ? 'Delegated PRs' : 'Pull request',
       headerRight: url ? () => <HeaderButton label="GitHub" accessibilityLabel="Open on GitHub" onPress={() => void Linking.openURL(url)} /> : undefined,
     });
-  }, [navigation, content?.number, url]);
+  }, [navigation, content?.number, url, crewOnly]);
 
   const ask = useCallback(
     async (prompt: string) => {
@@ -58,12 +63,19 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
     [live, thread, navigation],
   );
 
+  const from = pr.from;
+  const openCrew = useCallback((p: { url: string }) => {
+    setOutcome(null);
+    setPicked(p.url);
+  }, []);
   const slide = useCallback(async () => {
     setOutcome(null);
+    // Keep the PR on screen once merged, though the first open one would move on to the next.
+    if (from) setPicked(from.url);
     const out = await merge();
     setOutcome(out.kind === 'merged' ? null : out);
     return out.kind === 'merged';
-  }, [merge]);
+  }, [merge, from]);
 
   if (!view || view.status === 'loading') return <Notice title="Loading thread" />;
   if (view.status === 'missing') return <Notice title="Thread not found" body="It may have been archived or removed on the server." />;
@@ -79,19 +91,25 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
   }
   if (page.kind === 'empty') {
     return (
-      <View style={[styles.screen, styles.empty, { backgroundColor: colors.bg }]}>
-        <Text style={[styles.emptyTitle, { color: colors.fg }]}>Pull request</Text>
-        <Text style={[styles.emptyBody, { color: colors.fg3 }]}>{page.text}</Text>
+      <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={[styles.empty, { paddingBottom: Math.max(insets.bottom, space.s9) }]}>
+        {page.text ? (
+          <>
+            <Text style={[styles.emptyTitle, { color: colors.fg }]}>Pull request</Text>
+            <Text style={[styles.emptyBody, { color: colors.fg3 }]}>{page.text}</Text>
+          </>
+        ) : null}
         {page.canOpen ? <Button label="Open PR" accessibilityHint="Asks the agent to push the branch and open a pull request" onPress={() => void ask(OPEN_PR_PROMPT)} /> : null}
         {asked ? <Text style={[styles.meta, { color: colors.fg3 }]}>{asked}</Text> : null}
-      </View>
+        {page.crew.length > 0 ? <CrewPRList crew={page.crew} shown={null} onOpen={openCrew} /> : null}
+      </ScrollView>
     );
   }
 
   const c = content as PRContent;
   const { action, line } = watchCopy(watch.watch);
-  const canWatch = c.open || watch.watching;
-  const fix = c.next?.kind === 'conflicts' || c.next?.kind === 'checks' ? c.next : null;
+  const canWatch = !from && (c.open || watch.watching);
+  // The fix prompts go to this thread, so a delegated thread's PR has none here: its row opens that thread instead.
+  const fix = !from && (c.next?.kind === 'conflicts' || c.next?.kind === 'checks') ? c.next : null;
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.body}>
@@ -115,7 +133,20 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
           {asked ? <Text style={[styles.meta, { color: colors.fg3 }]}>{asked}</Text> : null}
         </View>
 
-        {canWatch || watch.watch ? (
+        {from ? (
+          <GroupedList>
+            <ListRow
+              first
+              icon="message"
+              title={from.thread_title || 'Untitled'}
+              detail="The delegated thread that opened it"
+              chevron
+              onPress={() => navigation.push('Thread', { id: from.thread_id })}
+            />
+          </GroupedList>
+        ) : null}
+
+        {!from && (canWatch || watch.watch) ? (
           <View style={styles.block}>
             <Section title="Watch">
               <Pressable
@@ -181,12 +212,14 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
             </View>
           ))}
         </Section>
+
+        {page.crew.length > 0 ? <CrewPRList crew={page.crew} shown={from?.url ?? null} onOpen={openCrew} /> : null}
       </ScrollView>
 
       {c.open ? (
         <View style={[styles.merge, { paddingBottom: Math.max(insets.bottom, space.s8), borderTopColor: colors.line }]}>
           {c.note ? <Text style={[styles.note, { color: colors.fg3 }]}>{c.note}</Text> : null}
-          {outcome ? <MergeOutcomeNote outcome={outcome} onAsk={ask} /> : null}
+          {outcome ? <MergeOutcomeNote outcome={outcome} onAsk={from ? undefined : ask} /> : null}
           <SlideToConfirm label="Slide to squash and merge" doneLabel={`Merged #${c.number}`} busyLabel="Merging" disabled={!c.canMerge} onConfirm={slide} />
           {!c.canMerge ? <Text style={[styles.note, { color: colors.fg3 }]}>A draft cannot be merged. Mark it ready for review on GitHub.</Text> : null}
         </View>
@@ -195,7 +228,8 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
   );
 }
 
-function MergeOutcomeNote({ outcome, onAsk }: { outcome: MergeOutcome; onAsk: (prompt: string) => Promise<void> }) {
+/** `onAsk` is left out for a delegated thread's PR: Fix conflicts would ask this thread, not the one on the PR's branch. */
+function MergeOutcomeNote({ outcome, onAsk }: { outcome: MergeOutcome; onAsk?: (prompt: string) => Promise<void> }) {
   const { colors } = useOmniTheme();
   if (outcome.kind === 'merged') return null;
   if (outcome.kind === 'refused') {
@@ -204,7 +238,7 @@ function MergeOutcomeNote({ outcome, onAsk }: { outcome: MergeOutcome; onAsk: (p
       <Callout message={failure.title}>
         <Text style={[styles.meta, { color: colors.fg2 }]}>{failure.detail}</Text>
         <Text style={[styles.meta, { color: colors.fg3 }]}>{MERGE_ADVICE[failure.kind]}</Text>
-        {failure.kind === 'conflict' ? <Button variant="secondary" label="Fix conflicts" onPress={() => void onAsk(FIX_CONFLICTS_PROMPT)} /> : null}
+        {failure.kind === 'conflict' && onAsk ? <Button variant="secondary" label="Fix conflicts" onPress={() => void onAsk(FIX_CONFLICTS_PROMPT)} /> : null}
       </Callout>
     );
   }

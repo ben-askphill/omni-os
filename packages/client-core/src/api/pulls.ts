@@ -37,10 +37,33 @@ export interface PRDetail extends PRSummary {
   diff: string;
 }
 
-/** GET /threads/:id/pr: the PRs opened from the thread's branch, newest first, and the one to show. Both empty with no branch or no GitHub repo. */
+/**
+ * A PR a thread under this one in the delegation tree opened, at any depth, oldest delegation first. Open or merged only.
+ * It lives in the delegated thread's channel, which is where to read and merge it.
+ */
+export interface CrewPR {
+  number: number;
+  title: string;
+  state: 'OPEN' | 'MERGED';
+  isDraft: boolean;
+  url: string;
+  repo: string;
+  /** The delegated thread whose branch it came from. */
+  thread_id: string;
+  thread_title: string;
+  channel_id: string;
+  task_id: string | null;
+}
+
+/**
+ * GET /threads/:id/pr: the PRs opened from the thread's branch, newest first, and the one to show. Both empty with no
+ * branch or no GitHub repo. `crew`: the PRs of the threads it delegated to, less its own; a server older than the
+ * field leaves it out.
+ */
 export interface ThreadPRs {
   pr: PRSummary | null;
   prs: PRSummary[];
+  crew?: CrewPR[];
 }
 
 export type MergeMethod = 'squash' | 'merge' | 'rebase';

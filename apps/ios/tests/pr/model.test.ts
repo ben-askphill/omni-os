@@ -1,6 +1,8 @@
+import type { ThreadPRs } from '@omni/client-core';
+import crewWire from '@omni/test-fixtures/wire/crew-prs.json';
 import { describe, expect, it } from 'vitest';
 
-import { NO_BRANCH, NO_PR, noRepo, prContent, prPage, type PRPageInput } from '../../src/pr/model';
+import { crewRows, NO_BRANCH, NO_PR, noRepo, prContent, prPage, prTarget, type PRPageInput } from '../../src/pr/model';
 import type { ReviewFailure } from '../../src/review/failure';
 import { prDetail } from './fixtures';
 
@@ -21,15 +23,23 @@ describe('prPage', () => {
   });
 
   it('says a thread without a branch has no pull request, and offers no Open PR', () => {
-    expect(prPage(input({ thread: { branch: null } }))).toEqual({ kind: 'empty', text: NO_BRANCH, canOpen: false });
+    expect(prPage(input({ thread: { branch: null }, prs: { data: { pr: null, prs: [], crew: [] }, failure: null } }))).toEqual({ kind: 'empty', text: NO_BRANCH, canOpen: false, crew: [] });
+  });
+
+  it('reads a server older than crew as having none', () => {
+    expect(prPage(input({ thread: { branch: null }, prs: { data: { pr: null, prs: [] }, failure: null } }))).toEqual({ kind: 'empty', text: NO_BRANCH, canOpen: false, crew: [] });
+  });
+
+  it('asks for the PRs of a thread without a branch before saying it has none', () => {
+    expect(prPage(input({ thread: { branch: null }, prs: { data: null, failure: null } }))).toEqual({ kind: 'loading' });
   });
 
   it('offers Open PR for a branch without a PR', () => {
-    expect(prPage(input({ prs: { data: { pr: null, prs: [] }, failure: null } }))).toEqual({ kind: 'empty', text: NO_PR, canOpen: true });
+    expect(prPage(input({ prs: { data: { pr: null, prs: [] }, failure: null } }))).toEqual({ kind: 'empty', text: NO_PR, canOpen: true, crew: [] });
   });
 
   it('tells Ben to set the repo when the channel has none', () => {
-    expect(prPage(input({ githubRepo: null }))).toEqual({ kind: 'empty', text: noRepo(12), canOpen: false });
+    expect(prPage(input({ githubRepo: null }))).toEqual({ kind: 'empty', text: noRepo(12), canOpen: false, crew: [] });
   });
 
   it('shows the PR once its detail is in', () => {
@@ -51,6 +61,52 @@ describe('prPage', () => {
 
   it('keeps the PR on screen when a refresh of the list fails', () => {
     expect(prPage(input({ prs: { data: { pr: summary, prs: [summary] }, failure } }))).toMatchObject({ kind: 'pr' });
+  });
+});
+
+// GET /threads/:id/pr on a Conductor thread: no branch of its own, an open PR from one delegate and a merged one from another.
+const conductorPRs = crewWire as ThreadPRs;
+const [childPR, grandchildPR] = conductorPRs.crew!;
+
+describe('delegated PRs', () => {
+  const conductor = (over: Partial<PRPageInput> = {}) =>
+    input({ thread: { branch: null }, prs: { data: conductorPRs, failure: null }, detail: { data: prDetail({ number: 4 }), failure: null }, ...over });
+
+  it("shows a Conductor thread's first open delegated PR, read through the delegated thread's channel", () => {
+    expect(prTarget(conductorPRs)).toEqual({ number: 4, from: childPR });
+    expect(prPage(conductor())).toMatchObject({ kind: 'pr', pr: { number: 4 }, from: { thread_id: childPR.thread_id, channel_id: 'shop' }, crew: conductorPRs.crew });
+  });
+
+  it('shows the delegated PR picked from the list, a merged one too', () => {
+    expect(prTarget(conductorPRs, grandchildPR.url)).toEqual({ number: 9, from: grandchildPR });
+    expect(prPage(conductor({ picked: grandchildPR.url, detail: { data: prDetail({ number: 9, state: 'MERGED' }), failure: null } }))).toMatchObject({
+      kind: 'pr',
+      pr: { number: 9 },
+      from: { channel_id: 'app' },
+    });
+  });
+
+  it('lists only the delegated PRs when none of them is open', () => {
+    const merged = { ...conductorPRs, crew: [grandchildPR] };
+    expect(prPage(conductor({ prs: { data: merged, failure: null } }))).toEqual({ kind: 'empty', text: null, canOpen: false, crew: [grandchildPR] });
+  });
+
+  it("keeps a thread's own PR first and lists its delegates' under it", () => {
+    const own = { pr: summary, prs: [summary], crew: conductorPRs.crew };
+    expect(prTarget(own)).toEqual({ number: 12, from: null });
+    expect(prPage(input({ prs: { data: own, failure: null } }))).toMatchObject({ kind: 'pr', pr: { number: 12 }, from: null, crew: conductorPRs.crew });
+  });
+
+  it('skips a draft when it picks the delegated PR to open on', () => {
+    const draft = { ...childPR, isDraft: true };
+    expect(prTarget({ pr: null, prs: [], crew: [draft, grandchildPR] })).toEqual({ number: null, from: null });
+  });
+
+  it('names each row by its number, task and thread', () => {
+    expect(crewRows(conductorPRs.crew!).map((r) => [r.detail, r.badge.label])).toEqual([
+      ['#4 · T-AB12 · Add the size guide', 'open'],
+      ['#9 · Wire the drawer into the app', 'merged'],
+    ]);
   });
 });
 
