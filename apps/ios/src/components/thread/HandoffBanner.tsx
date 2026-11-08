@@ -3,6 +3,7 @@ import { handoffBanner, mayTakeOver, takeoverShown } from '@omni/shared/thread-m
 import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
+import { Icon } from '../../ui/Icon';
 
 import type { ThreadView } from '../../live/hub';
 import type { ThreadMachineControl } from '../../machine/hooks';
@@ -79,11 +80,7 @@ function Card({ tone, lead, children }: { tone: 'working' | 'waiting' | 'alert';
 
 function Glyph({ tone }: { tone: 'waiting' | 'alert' | 'working' }) {
   const { colors } = useOmniTheme();
-  return (
-    <Text accessibilityElementsHidden importantForAccessibility="no" style={[styles.glyph, { color: tone === 'alert' ? colors.fg : colors.fg3 }]}>
-      {tone === 'alert' ? '⚠' : '◷'}
-    </Text>
-  );
+  return <Icon name={tone === 'alert' ? 'alert' : 'clock'} size={18} color={tone === 'alert' ? colors.fg : colors.fg3} />;
 }
 
 const styles = StyleSheet.create({
@@ -122,8 +119,5 @@ const styles = StyleSheet.create({
   },
   action: {
     alignSelf: 'flex-start',
-  },
-  glyph: {
-    fontSize: 18,
   },
 });

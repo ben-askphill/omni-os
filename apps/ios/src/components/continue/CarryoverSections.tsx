@@ -3,6 +3,7 @@ import type { Carryover } from '@omni/shared/continue.ts';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
+import { Icon } from '../../ui/Icon';
 
 import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
 import { OptionGroup } from '../../ui/OptionRow';
@@ -67,7 +68,8 @@ export function ExactText({ text }: { text: string }) {
         onPress={() => setOpen((v) => !v)}
         style={styles.toggle}
       >
-        <Text style={[styles.toggleLabel, { color: colors.fg }]}>{open ? '▾ Show exact text' : '▸ Show exact text'}</Text>
+        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} color={colors.fg} />
+        <Text style={[styles.toggleLabel, { color: colors.fg }]}>Show exact text</Text>
       </Pressable>
       {open ? (
         <ScrollView nestedScrollEnabled style={[styles.box, { backgroundColor: colors.surface }]}>
@@ -123,7 +125,10 @@ const styles = StyleSheet.create({
   },
   toggle: {
     minHeight: minTarget,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s4,
+    justifyContent: 'flex-start',
   },
   toggleLabel: {
     fontSize: fontSize.body,

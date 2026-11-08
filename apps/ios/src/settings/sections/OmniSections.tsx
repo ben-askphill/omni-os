@@ -1,6 +1,7 @@
 import type { OmniApi } from '@omni/client-core';
 import { relTime } from '@omni/shared/format.ts';
 import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
 import { ActivityIndicator, View } from 'react-native';
 
 import { ListHeading } from '../../components/ListHeading';
@@ -67,7 +68,11 @@ export function AboutSection() {
         {status.data?.device ? <ListRow title="Machine" value={status.data.device.name} /> : null}
       </Group>
       <Group title="This app" footer="Where the server keeps its files is a folder on its machine. The Web UI's About shows it.">
-        <ListRow first title="Version" value={versionLabel(Constants.expoConfig?.version, Constants.expoConfig?.ios?.buildNumber)} />
+        <ListRow first title="Version" value={versionLabel(Constants.expoConfig?.version, Constants.nativeBuildVersion ?? Constants.expoConfig?.ios?.buildNumber)} />
+        <ListRow title="Channel" value={Updates.channel || 'Development'} />
+        <ListRow title="Runtime" detail={Updates.runtimeVersion ?? 'Development'} />
+        <ListRow title="Update" detail={Updates.isEmbeddedLaunch ? 'Bundled with this build' : Updates.updateId ?? 'Development'} />
+        {Updates.createdAt ? <ListRow title="Published" value={Updates.createdAt.toISOString()} /> : null}
       </Group>
     </SettingsPage>
   );

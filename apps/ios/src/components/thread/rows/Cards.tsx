@@ -1,4 +1,4 @@
-import { CrewMark, isCrewRole } from '../../../ui/Brand';
+import { CrewMark, HarnessLogo, isCrewRole } from '../../../ui/Brand';
 import { cloudStatus, prNumber } from '@omni/shared/cloud-agent.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { useState } from 'react';
@@ -58,7 +58,10 @@ export function PromptRow({ row }: Of<'prompt'>) {
           ) : null}
         </View>
       ) : null}
-      {caption ? <Text style={[styles.caption, { color: colors.fg3 }]}>{caption}</Text> : null}
+      {caption ? <View style={styles.line}>
+        {p.dropped || caption === 'Sent while it ran' ? <Icon name={p.dropped ? 'x' : p.mode === 'interrupt' ? 'stop' : 'send'} size={11} color={colors.fg3} /> : null}
+        <Text style={[styles.caption, { color: colors.fg3 }]}>{caption}</Text>
+      </View> : null}
       {p.clipped ? <LoadWhole label="Load whole message" onPress={() => loadWhole(p.key)} /> : null}
     </View>
   );
@@ -133,22 +136,26 @@ export function CloudRow({ row }: Of<'cloud'>) {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <View style={styles.line}>
-        <StatusDot glyph={glyphFor(st.status)} />
+        <HarnessLogo harness="cursor-cloud" size={15} />
         <Text style={[styles.cardTitle, { color: colors.fg }]}>{p.name || 'Cursor cloud agent'}</Text>
         <View style={styles.grow} />
+        <StatusDot glyph={glyphFor(st.status)} />
         <Text style={[styles.caption, { color: colors.fg3 }]}>{st.label}</Text>
       </View>
       {detail ? (
-        <Text numberOfLines={1} style={[styles.small, { color: colors.fg3, fontFamily: MONO }]}>
-          {detail}
-        </Text>
+        <View style={styles.line}>
+          <Icon name="branch" size={13} color={colors.fg3} />
+          <Text numberOfLines={1} style={[styles.small, styles.grow, { color: colors.fg3, fontFamily: MONO }]}>{detail}</Text>
+        </View>
       ) : null}
       <View style={styles.links}>
-        <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(p.url)} hitSlop={8}>
+        <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(p.url)} hitSlop={8} style={styles.line}>
+          <Icon name="external" size={14} />
           <Text style={[styles.link, { color: colors.fg }]}>Open on cursor.com</Text>
         </Pressable>
         {p.pr_url ? (
-          <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(p.pr_url!)} hitSlop={8}>
+          <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(p.pr_url!)} hitSlop={8} style={styles.line}>
+            <Icon name="pr" size={13} />
             <Text style={[styles.link, { color: colors.fg }]}>{`Pull request ${pr ?? ''}`.trim()}</Text>
           </Pressable>
         ) : null}
@@ -181,6 +188,7 @@ export function DelegationRow({ row }: Of<'delegation'>) {
           onPress={() => openThread(k.id)}
           style={({ pressed }) => [styles.kid, { backgroundColor: pressed ? colors.surface3 : colors.bg }]}
         >
+          {isCrewRole(k.role) ? <CrewMark role={k.role} /> : null}
           <StatusDot glyph={glyphFor(k.status)} />
           <View style={styles.grow}>
             <Text numberOfLines={1} style={[styles.kidTitle, { color: colors.fg }]}>
@@ -207,7 +215,7 @@ export function ArtifactRow({ row }: Of<'artifact'>) {
       style={({ pressed }) => [styles.card, styles.line, { backgroundColor: pressed ? colors.surface3 : colors.surface }]}
     >
       <View style={[styles.fileIcon, { backgroundColor: colors.surface3 }]}>
-        <Text style={[styles.caption, { color: colors.fg2, fontFamily: MONO }]}>{row.a.name.split('.').pop()?.slice(0, 4) ?? ''}</Text>
+        <Icon name={row.a.kind === 'image' || row.a.kind === 'screenshot' ? 'image' : row.a.kind === 'html' || row.a.kind === 'svg' ? 'globe' : 'file'} size={18} color={colors.fg2} />
       </View>
       <View style={styles.grow}>
         <Text numberOfLines={1} style={[styles.kidTitle, { color: colors.fg, fontFamily: MONO }]}>
@@ -269,7 +277,7 @@ export function PlanRow({ row }: Of<'plan'>) {
         const done = t.status === 'completed';
         return (
           <View key={i} style={styles.line}>
-            <StatusDot glyph={running ? 'running' : done ? 'done' : 'idle'} />
+            {done ? <Icon name="check" size={13} color={colors.fg3} /> : <StatusDot glyph={running ? 'running' : 'idle'} />}
             <Text style={[styles.todo, { color: running ? colors.fg : done ? colors.fg3 : colors.fg2 }]}>{(running && t.activeForm) || t.content}</Text>
           </View>
         );
