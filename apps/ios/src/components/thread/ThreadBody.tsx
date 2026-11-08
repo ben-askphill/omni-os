@@ -106,7 +106,7 @@ export function ThreadBody({ view, live }: { view: ThreadView; live: ThreadLive 
           ) : undefined
         }
         ListFooterComponent={<OlderFooter hasOlder={view.hasOlder} loading={view.loadingOlder} empty={rows.length === 0} onLoad={() => void live?.loadOlder()} />}
-        ListEmptyComponent={view.status === 'ready' ? <Text style={[styles.meta, { color: colors.fg3 }]}>No messages yet.</Text> : undefined}
+        ListEmptyComponent={view.status === 'ready' ? <Text style={[styles.meta, styles.empty, { color: colors.fg3 }]}>No messages yet.</Text> : undefined}
       />
     </RowActionsContext.Provider>
   );
@@ -141,6 +141,10 @@ function OlderFooter({ hasOlder, loading, empty, onLoad }: { hasOlder: boolean; 
 const styles = StyleSheet.create({
   meta: {
     fontSize: fontSize.meta,
+  },
+  // The list is inverted, so a top margin here shows as the gap below the label, above the pending cards.
+  empty: {
+    marginTop: space.s6,
   },
   content: {
     paddingHorizontal: space.s9,
