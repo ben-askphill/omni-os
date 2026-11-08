@@ -3,6 +3,7 @@ import { ARTIFACT_FILTERS, matchesArtifactFilter, type ArtifactFilter } from '@o
 import { useMemo, useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Text } from '../ui/Text';
+import { Icon } from '../ui/Icon';
 
 import { useArtifactFile } from '../artifacts/use-artifact-file';
 import { extensionOf, hasThumbnail } from '../artifacts/viewer-kind';
@@ -122,11 +123,12 @@ function Thumbnail({ artifact }: { artifact: ArtifactWithThread }) {
   return <Image source={{ uri: load.file.uri }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors />;
 }
 
-/** What a file shows when the app does not draw it: its extension, centred. */
+/** The shared kind drawing and extension when a file has no thumbnail. */
 function Label({ artifact }: { artifact: ArtifactWithThread }) {
   const { colors } = useOmniTheme();
   return (
     <View style={styles.label}>
+      <Icon name={artifact.kind === 'image' || artifact.kind === 'screenshot' ? 'image' : artifact.kind === 'html' || artifact.kind === 'svg' ? 'globe' : 'file'} size={24} color={colors.fg3} />
       <Text style={[styles.ext, { color: colors.fg3 }]}>{extensionOf(artifact.name)}</Text>
     </View>
   );
@@ -178,6 +180,7 @@ const styles = StyleSheet.create({
   },
   label: {
     flex: 1,
+    gap: space.s4,
     alignItems: 'center',
     justifyContent: 'center',
   },

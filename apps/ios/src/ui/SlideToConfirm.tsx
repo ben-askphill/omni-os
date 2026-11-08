@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, PanResponder, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
+import { Icon } from './Icon';
 
 import { fontSize, radius, useOmniTheme, weight } from '../theme';
 import { clampSlide, slideReached } from './slide';
@@ -91,7 +92,7 @@ export function SlideToConfirm({ label, doneLabel, busyLabel, disabled = false, 
       </Text>
       {phase === 'done' ? null : (
         <Animated.View {...pan.panHandlers} style={[styles.thumb, { backgroundColor: colors.fg, transform: [{ translateX: x }] }]}>
-          {phase === 'busy' ? <ActivityIndicator size="small" color={colors.onInk} /> : <Text style={[styles.arrow, { color: colors.onInk }]}>→</Text>}
+          {phase === 'busy' ? <ActivityIndicator size="small" color={colors.onInk} /> : <Icon name="arrowRight" size={20} color={colors.onInk} />}
         </Animated.View>
       )}
     </View>
@@ -127,10 +128,5 @@ const styles = StyleSheet.create({
     borderRadius: THUMB / 2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  arrow: {
-    fontSize: 20,
-    fontWeight: weight.bold,
-    lineHeight: 24,
   },
 });

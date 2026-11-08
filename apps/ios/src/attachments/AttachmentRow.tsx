@@ -161,13 +161,13 @@ function Viewer({ threadId, image, onClose }: { threadId: string; image: Attachm
       <View style={styles.viewer}>
         <View style={styles.viewerBar}>
           <Pressable accessibilityRole="button" accessibilityLabel="Share" onPress={() => void send()} hitSlop={8} style={styles.viewerSide}>
-            <Text style={styles.viewerAction}>Share</Text>
+            <Icon name="share" size={20} color="#fff" />
           </Pressable>
           <Text numberOfLines={1} ellipsizeMode="middle" style={styles.viewerTitle}>
             {image?.name}
           </Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8} style={[styles.viewerSide, styles.viewerEnd]}>
-            <Text style={styles.viewerAction}>Done</Text>
+            <Icon name="x" size={20} color="#fff" />
           </Pressable>
         </View>
         {image ? <RemoteImage threadId={threadId} name={image.name} style={styles.viewerImage} resizeMode="contain" /> : null}
@@ -255,11 +255,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#ffffff',
     fontSize: fontSize.body,
-    fontWeight: weight.semibold,
-  },
-  viewerAction: {
-    color: '#ffffff',
-    fontSize: fontSize.input,
     fontWeight: weight.semibold,
   },
   viewerImage: {

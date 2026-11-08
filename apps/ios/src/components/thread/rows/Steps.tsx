@@ -2,6 +2,8 @@ import { toolLabel, toolSummary, type ToolCall } from '@omni/shared/transcript-f
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../../ui/Text';
+import { Icon } from '../../../ui/Icon';
+import { toolIcon } from '../../../thread/tool-icon';
 
 import { callDetail } from '../../../thread/call-detail';
 import type { ThreadRow } from '../../../thread/rows';
@@ -73,7 +75,9 @@ export function CallRow({ row }: Of<'call'>) {
         style={({ pressed }) => [styles.head, pressed && { backgroundColor: colors.surface2 }]}
       >
         <View style={styles.dot}>
-          <StatusDot glyph={GLYPH[state]} />
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} color={colors.fg4} />
+          <Icon name={toolIcon(call.name)} size={14} color={colors.fg3} />
+          <StatusDot glyph={GLYPH[state]} size={6} />
         </View>
         <View style={styles.grow}>
           <Text numberOfLines={1} style={[styles.name, { color: colors.fg2 }]}>
@@ -164,7 +168,7 @@ const styles = StyleSheet.create({
   indent: { paddingLeft: space.s8, gap: space.s1 },
   call: { gap: space.s2 },
   head: { minHeight: minTarget - 8, flexDirection: 'row', alignItems: 'flex-start', gap: space.s6, paddingVertical: space.s2, borderRadius: radius.md - 4 },
-  dot: { paddingTop: space.s3 },
+  dot: { paddingTop: space.s3, flexDirection: 'row', alignItems: 'center', gap: space.s2 },
   grow: { flex: 1, gap: space.s1 },
   name: { fontSize: fontSize.body - 0.5, fontWeight: weight.medium },
   summary: { fontSize: fontSize.small, lineHeight: 17, fontFamily: MONO },
