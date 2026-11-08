@@ -103,6 +103,8 @@ export interface InputRowProps {
 export function InputRow({ label, value, onChangeText, placeholder, hint, multiline, code, keyboardType, autoCapitalize, readOnly, secure, first, origin }: InputRowProps) {
   const { colors } = useOmniTheme();
   const font = code ? { fontFamily: mono, fontSize: fontSize.body, fontWeight: '400' as const } : null;
+  // A path or id shown, not edited, reads smaller with room between wrapped lines.
+  const shownCode = code ? { fontFamily: mono, fontSize: fontSize.caption, lineHeight: Math.round(fontSize.caption * 1.4), fontWeight: '400' as const } : null;
   return (
     <View style={[styles.field, !first && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
       <View style={styles.labelRow}>
@@ -110,7 +112,7 @@ export function InputRow({ label, value, onChangeText, placeholder, hint, multil
         {origin ? <Text style={[styles.origin, { color: colors.fg4 }]}>{origin}</Text> : null}
       </View>
       {readOnly ? (
-        <Text selectable style={[styles.input, font, { color: value ? colors.fg2 : colors.fg4 }]}>
+        <Text selectable style={[styles.input, shownCode, { color: value ? colors.fg2 : colors.fg4 }]}>
           {value || placeholder || 'Not set'}
         </Text>
       ) : (

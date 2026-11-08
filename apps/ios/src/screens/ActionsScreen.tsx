@@ -67,9 +67,9 @@ export function ActionsScreen({ route }: RootScreenProps<'Actions'>) {
                 <View style={styles.cardRow}>
                   <ActionLine action={a} />
                   {running ? (
-                    <Button label="Stop" variant="secondary" busy={view.busy.has(running.id)} onPress={() => void live.stop(running)} />
+                    <Button label="Stop" variant="secondary" size="compact" busy={view.busy.has(running.id)} onPress={() => void live.stop(running)} />
                   ) : (
-                    <Button label="Run" busy={view.busy.has(a.id)} disabled={!!data.blocked} onPress={() => void live.run(a)} accessibilityHint={`Runs ${a.name} in this thread`} />
+                    <Button label="Run" size="compact" busy={view.busy.has(a.id)} disabled={!!data.blocked} onPress={() => void live.run(a)} accessibilityHint={`Runs ${a.name} in this thread`} />
                   )}
                 </View>
                 {view.errors[a.id] ? <Text style={[styles.error, { color: colors.fg2 }]}>{view.errors[a.id]}</Text> : null}
@@ -173,9 +173,9 @@ function RunCard({ run, latest, setup, now, busy, error, blocked, onStop, onRetr
           </View>
         </Pressable>
         {running ? (
-          <Button label="Stop" variant="secondary" busy={busy} onPress={onStop} />
+          <Button label="Stop" variant="secondary" size="compact" busy={busy} onPress={onStop} />
         ) : run.action_id ? (
-          <Button label="Retry" variant="secondary" busy={busy} disabled={blocked} onPress={onRetry} />
+          <Button label="Retry" variant="secondary" size="compact" busy={busy} disabled={blocked} onPress={onRetry} />
         ) : null}
       </View>
       {run.error ? <Text style={[styles.error, { color: colors.fg2 }]}>{run.error}</Text> : null}

@@ -28,12 +28,16 @@ import type { RootStackParamList } from './types';
 
 export const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const BACK_CHEVRON = require('../../assets/back-chevron.png') as number;
+
 export function stackOptions(colors: ColorTokens): NativeStackNavigationOptions {
   return {
     headerStyle: { backgroundColor: colors.bg },
     headerTintColor: colors.fg,
     headerTitleStyle: { color: colors.fg },
     headerShadowVisible: false,
+    // The design system's back chevron: one 1.75pt stroke, the weight of every other icon, lighter than the system's.
+    headerBackImageSource: BACK_CHEVRON,
     contentStyle: { backgroundColor: colors.bg },
   };
 }

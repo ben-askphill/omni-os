@@ -27,3 +27,21 @@ export function menuExtras(target: ThreadTarget, machine: ThreadMachine | null, 
   if (canActions) extras.push({ id: 'actions', label: 'Actions', sub: "Run the channel's actions in this thread's checkout", off: null });
   return extras;
 }
+
+/** A row of the open thread's first menu group: a screen about the thread's work. */
+export interface MenuLink {
+  id: 'changes' | 'pr';
+  label: string;
+  sub: string;
+}
+
+/**
+ * View changes and Pull request, first in the open thread's menu, each only where the screen can open it. They replace
+ * the chips that sat under the thread's title.
+ */
+export function menuLinks(canChanges: boolean, canPR: boolean): MenuLink[] {
+  const links: MenuLink[] = [];
+  if (canChanges) links.push({ id: 'changes', label: 'View changes', sub: 'What this thread changed in its checkout' });
+  if (canPR) links.push({ id: 'pr', label: 'Pull request', sub: "Review and merge this thread's PR" });
+  return links;
+}

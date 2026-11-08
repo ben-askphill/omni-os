@@ -1,3 +1,4 @@
+import type { OmniApi } from '@omni/client-core';
 import { takeoverShown } from '@omni/shared/thread-machine.ts';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,15 +15,20 @@ import { ThreadFooter } from '../components/thread/ThreadFooter';
 import { TakeoverSheet } from '../components/thread/TakeoverSheet';
 import { ThreadHeader } from '../components/thread/ThreadHeader';
 import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
+import { ThreadTitle } from '../components/thread/ThreadTitle';
 import { useChannels, useThreadLive, useThreadView } from '../live/react';
+import { useRemote } from '../live/use-remote';
 import { useThreadMachine } from '../machine/hooks';
 import type { RootScreenProps } from '../navigation/types';
 import { useOmniTheme } from '../theme';
 import { useHarnessCatalog } from '../thread/hooks';
 import { targetOfThread } from '../thread/target';
+import { threadDeviceName, threadStatusLabel } from '../thread/title';
 
 const FLASH_MS = 3000;
 const FORK_FALLBACK_MS = 800;
+/** The server's own name, for the title when the thread runs here and there is no machine to pick. */
+const loadStatus = (api: OmniApi) => api.status();
 
 export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const { id } = route.params;
@@ -32,6 +38,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const headerHeight = useHeaderHeight();
   const { channels } = useChannels();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPage, setMenuPage] = useState<'menu' | 'machine'>('menu');
   const [runOpen, setRunOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,16 +47,36 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const machine = useThreadMachine(view);
   const catalog = useHarnessCatalog(thread?.channel_id, thread !== null);
   const target = useMemo(() => (thread ? targetOfThread(thread) : null), [thread]);
-  const folders = useMemo(() => channels?.find((c) => c.id === thread?.channel_id)?.folders ?? [], [channels, thread?.channel_id]);
+  const listed = useMemo(() => channels?.find((c) => c.id === thread?.channel_id) ?? null, [channels, thread?.channel_id]);
+  const folders = useMemo(() => listed?.folders ?? [], [listed]);
+  const server = useRemote(loadStatus);
 
   const title = thread?.title || 'Thread';
   const hasThread = thread !== null;
+  const status = thread?.status;
+  const channelName = listed?.name ?? view?.channel?.name ?? null;
+  const device = view ? threadDeviceName({ takeover: takeoverShown(view.takeover, view.handoff), machine: machine.machine, hereName: server.data?.device?.name }) : null;
+  const canPick = machine.machine !== null;
+  const openMenu = useCallback((page: 'menu' | 'machine') => {
+    setMenuPage(page);
+    setMenuOpen(true);
+  }, []);
   useEffect(() => {
     navigation.setOptions({
       title,
-      headerRight: hasThread ? () => <HeaderButton label="Thread menu" icon="ellipsis" onPress={() => setMenuOpen(true)} /> : undefined,
+      headerTitle: () => (
+        <ThreadTitle
+          title={title}
+          status={status}
+          statusLabel={threadStatusLabel(status)}
+          channel={channelName}
+          device={device}
+          onOpenMachine={canPick ? () => openMenu('machine') : undefined}
+        />
+      ),
+      headerRight: hasThread ? () => <HeaderButton label="Thread menu" icon="ellipsis" onPress={() => openMenu('menu')} /> : undefined,
     });
-  }, [navigation, title, hasThread]);
+  }, [navigation, title, status, channelName, device, canPick, hasThread, openMenu]);
 
   // A machine can fall asleep while the thread stays open: read the list again each time the menu opens.
   const { reload: reloadMachines } = machine;
@@ -76,6 +103,8 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   );
   const fork = useCallback(() => leaveMenuFor(() => navigation.navigate('Continue', { id })), [leaveMenuFor, navigation, id]);
   const openActions = useCallback(() => leaveMenuFor(() => navigation.navigate('Actions', { threadId: id })), [leaveMenuFor, navigation, id]);
+  const openChanges = useCallback(() => leaveMenuFor(() => navigation.navigate('Changes', { id })), [leaveMenuFor, navigation, id]);
+  const openPR = useCallback(() => leaveMenuFor(() => navigation.navigate('PullRequest', { id })), [leaveMenuFor, navigation, id]);
 
   const say = useCallback((message: string) => {
     if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -97,14 +126,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
 
   return (
     <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={headerHeight} style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ThreadHeader
-        view={view}
-        harnesses={catalog.harnesses}
-        onOpenRun={() => setRunOpen(true)}
-        onOpenChanges={() => navigation.navigate('Changes', { id })}
-        onOpenPR={() => navigation.navigate('PullRequest', { id })}
-        flash={flash}
-      />
+      <ThreadHeader view={view} flash={flash} />
       <HandoffBanner view={view} machine={machine} />
       <ThreadBody view={view} live={live} />
       {live && view.thread ? (
@@ -112,7 +134,18 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
           <ThreadComposer live={live} thread={view.thread} harnesses={catalog.harnesses} onOpenRun={() => setRunOpen(true)} />
         </ThreadFooter>
       ) : null}
-      <ThreadMenuSheet target={menuOpen ? target : null} folders={folders} onClose={closeMenu} onChanged={say} machine={machine} onFork={fork} onActions={openActions} />
+      <ThreadMenuSheet
+        target={menuOpen ? target : null}
+        openOn={menuPage}
+        folders={folders}
+        onClose={closeMenu}
+        onChanged={say}
+        machine={machine}
+        onFork={fork}
+        onActions={openActions}
+        onChanges={openChanges}
+        onPR={openPR}
+      />
       <TakeoverSheet
         visible={machine.ui.asking}
         takeover={takeoverShown(view.takeover, view.handoff)}

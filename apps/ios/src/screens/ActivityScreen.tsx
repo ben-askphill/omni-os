@@ -1,16 +1,14 @@
 import { useLayoutEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { DoneRowView, InboxRowView, ShelfHeader, ShowMore, type RowAction } from '../components/activity/InboxRows';
-import { OmniMark } from '../components/ChannelAvatar';
-import { HeaderButton } from '../components/HeaderButton';
 import { StatusLine } from '../components/StatusLine';
 import { activityInbox, DONE_INITIAL, DONE_PAGE, type ActivityInbox, type InboxRow } from '../live/activity-model';
 import { useActivity, useChannels, useLiveHub, useNeedsYou, usePullRefresh, useShelfOpen } from '../live/react';
 import { useMinuteClock } from '../live/use-minute-clock';
 import type { RootScreenProps } from '../navigation/types';
 import { usePairing } from '../pairing/PairingProvider';
-import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
+import { fontSize, lineHeight, space, useOmniTheme, weight } from '../theme';
 import type { ThreadAction } from '../thread/actions';
 import { useThreadActions } from '../thread/hooks';
 import type { ThreadTarget } from '../thread/target';
@@ -43,17 +41,11 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      // The title sits in the list under the bar, as phone web's MoTitle does. Search moves left beside the Conductor and
-      // Settings keeps the right to itself (rootHeader), since iOS draws the gear in its own glass circle.
+      // The title sits in the list under the bar, as phone web's MoTitle does. Search keeps the left and Settings the
+      // right (rootHeader), each in its own glass circle.
       headerTitle: '',
-      headerLeft: () => (
-        <View style={styles.headerLeft}>
-          <ConductorButton mark={inbox.mark} onPress={() => navigation.navigate('Channel', { id: 'conductor' })} />
-          <HeaderButton label="Search" icon="search" onPress={() => navigation.navigate('Search')} />
-        </View>
-      ),
     });
-  }, [navigation, inbox.mark]);
+  }, [navigation]);
 
   const rowActions = (row: InboxRow): RowAction[] => {
     const out: RowAction[] = [];
@@ -76,7 +68,6 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
           <Text accessibilityRole="header" style={[styles.title, { color: colors.fg }]}>
             Activity
           </Text>
-          <Text style={[styles.subtitle, { color: colors.fg3 }]}>{inbox.subtitle}</Text>
         </View>
         {notice !== null && (
           <Callout message={notice}>
@@ -142,24 +133,6 @@ function useRowActions() {
   };
 }
 
-/** The Omni mark and "Conductor", which opens the Conductor's channel. The mark turns vermilion while something needs Ben. */
-function ConductorButton({ mark, onPress }: { mark: ActivityInbox['mark']; onPress: () => void }) {
-  const { colors } = useOmniTheme();
-  const tint = mark === 'attention' ? colors.needs : mark === 'delegating' ? colors.live : colors.fg;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={mark === 'idle' ? 'Open the Conductor' : `Open the Conductor, ${mark === 'attention' ? 'something needs you' : 'delegating'}`}
-      hitSlop={8}
-      onPress={onPress}
-      style={({ pressed }) => [styles.conductor, { opacity: pressed ? 0.6 : 1 }]}
-    >
-      <OmniMark size={24} color={tint} />
-      <Text style={[styles.conductorLabel, { color: colors.fg }]}>Conductor</Text>
-    </Pressable>
-  );
-}
-
 function Empty({ inbox, error }: { inbox: ActivityInbox; error: string | null }) {
   const { colors } = useOmniTheme();
   if (inbox.waiting.length) return null;
@@ -183,11 +156,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.titleLg,
     lineHeight: Math.round(fontSize.titleLg * lineHeight.tight),
     fontWeight: weight.medium,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: fontSize.ui,
-    fontVariant: ['tabular-nums'],
   },
   note: {
     fontSize: fontSize.meta,
@@ -203,20 +171,5 @@ const styles = StyleSheet.create({
     lineHeight: Math.round(fontSize.body * 1.5),
     paddingHorizontal: space.s2,
     paddingVertical: space.s8,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s6,
-  },
-  conductor: {
-    minHeight: minTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s4,
-  },
-  conductorLabel: {
-    fontSize: fontSize.body,
-    fontWeight: weight.medium,
   },
 });

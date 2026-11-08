@@ -15,7 +15,7 @@ import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../..
 import { tap } from '../../ui/haptics';
 import { Icon } from '../../ui/Icon';
 import { restoreDraft, setDraft, useDraft, useFocusRequests } from './drafts';
-import { NextTurnChip } from './RunChips';
+import { ModelButton, NextTurnChip } from './RunChips';
 
 const INPUT_LINE_HEIGHT = Math.round(fontSize.input * lineHeight.body);
 const MAX_LINES = 6;
@@ -114,6 +114,7 @@ export function ThreadComposer({
           placeholderTextColor={colors.fg3}
           style={[styles.input, { color: colors.fg }]}
         />
+        <ModelButton thread={thread} harnesses={harnesses} onPress={onOpenRun} />
         {showStop ? (
           <RoundButton
             label={stopping ? 'Stopping' : 'Stop'}

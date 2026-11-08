@@ -1,52 +1,32 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
 
-import type { HarnessInfo, ThreadStatus } from '@omni/client-core';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
 
 import type { ThreadView } from '../../live/hub';
-import { useChannels } from '../../live/react';
-import { chipHeight, chipSlop, fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
-import { Icon, type IconName } from '../../ui/Icon';
-import { ChannelAvatar } from '../ChannelAvatar';
-import { glyphFor } from '../StatusDot';
+import { fontSize, lineHeight, radius, space, useOmniTheme } from '../../theme';
 import { StatusLine } from '../StatusLine';
-import { StatusPill } from '../StatusPill';
-import { RunChip } from './RunChips';
 
 interface ThreadHeaderProps {
   view: ThreadView;
-  /** From `/harnesses`; null until it loads. */
-  harnesses: HarnessInfo[] | null;
-  onOpenRun: () => void;
-  onOpenChanges: () => void;
-  onOpenPR: () => void;
   /** What the last menu action did, for a moment after the sheet closes. */
   flash: string | null;
 }
 
-/** Above the transcript: the connection, the thread's status and channel, its model, a failed refresh, and why a turn cannot start here. */
-export function ThreadHeader({ view, harnesses, onOpenRun, onOpenChanges, onOpenPR, flash }: ThreadHeaderProps) {
+/**
+ * Above the transcript: the connection, a failed refresh, what the last menu action did, and why a turn cannot start
+ * here. The status, channel and machine sit under the title in the navigation bar (ThreadTitle), the model in the
+ * composer, and Changes and Pull request in the thread menu.
+ */
+export function ThreadHeader({ view, flash }: ThreadHeaderProps) {
   const { colors } = useOmniTheme();
   const { thread } = view;
-  const { channels } = useChannels();
-  // The live list, not the thread's copy, so an icon changed on the computer shows without reopening the thread.
-  const channel = channels?.find((c) => c.id === thread?.channel_id) ?? view.channel;
   // The handoff card and the Take over note say it when they can, so the same sentence is not shown twice.
   const blocked = blockedNote(view.blocked, view.handoff, thread?.status, view.takeover);
-  const status = threadStatusLabel(thread?.status);
-  const where = [channel ? `#${channel.name}` : null, thread?.pinned_at ? 'Pinned' : null].filter(Boolean).join(' · ');
   return (
     <>
       <View style={styles.statusBar}>
         <StatusLine />
-        {status || where ? (
-          <View style={styles.statusRow}>
-            {status ? <StatusPill glyph={glyphFor(thread?.status)} label={status} /> : null}
-            {channel ? <ChannelAvatar name={channel.name} icon={channel.icon} conductor={channel.id === 'conductor'} size={18} /> : null}
-            {where ? <Text style={[styles.where, { color: colors.fg3 }]}>{where}</Text> : null}
-          </View>
-        ) : null}
         {view.error ? <Text style={[styles.meta, { color: colors.fg3 }]}>{`Last update failed: ${view.error}`}</Text> : null}
         {flash ? (
           <Text accessibilityLiveRegion="polite" style={[styles.meta, { color: colors.fg }]}>
@@ -54,13 +34,6 @@ export function ThreadHeader({ view, harnesses, onOpenRun, onOpenChanges, onOpen
           </Text>
         ) : null}
       </View>
-      {thread ? (
-        <View style={styles.chips}>
-          <RunChip thread={thread} harnesses={harnesses} onPress={onOpenRun} />
-          <LinkChip label="Changes" icon="diff" hint="Opens the files this thread changed" onPress={onOpenChanges} />
-          <LinkChip label="Pull request" icon="pr" hint="Opens this branch's pull request" onPress={onOpenPR} />
-        </View>
-      ) : null}
       {blocked ? (
         <View style={[styles.blocked, { borderColor: colors.lineStrong }]}>
           <Text style={[styles.blockedText, { color: colors.fg }]}>{blocked}</Text>
@@ -70,78 +43,14 @@ export function ThreadHeader({ view, harnesses, onOpenRun, onOpenChanges, onOpen
   );
 }
 
-function LinkChip({ label, icon, hint, onPress }: { label: string; icon: IconName; hint: string; onPress: () => void }) {
-  const { colors } = useOmniTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={hint}
-      hitSlop={chipSlop}
-      onPress={onPress}
-      style={({ pressed }) => [styles.link, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
-    >
-      <Icon name={icon} size={14} color={colors.fg2} />
-      <Text style={[styles.linkLabel, { color: colors.fg }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function threadStatusLabel(status: ThreadStatus | undefined): string {
-  switch (status) {
-    case 'running':
-      return 'Running';
-    case 'queued':
-      return 'Queued';
-    case 'done':
-      return 'Done';
-    case 'failed':
-      return 'Failed';
-    case 'stopped':
-      return 'Stopped';
-    case 'imported':
-      return 'Imported';
-    default:
-      return '';
-  }
-}
-
 const styles = StyleSheet.create({
   statusBar: {
     paddingHorizontal: space.s9,
-    paddingBottom: space.s4,
     gap: space.s2,
   },
   meta: {
     fontSize: fontSize.small,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s4,
-  },
-  where: {
-    flexShrink: 1,
-    fontSize: fontSize.small,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space.s4,
-    paddingHorizontal: space.s9,
-    paddingBottom: space.s4,
-  },
-  link: {
-    height: chipHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s4,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.s6,
-  },
-  linkLabel: {
-    fontSize: fontSize.body,
-    fontWeight: weight.medium,
+    paddingBottom: space.s2,
   },
   blocked: {
     marginHorizontal: space.s9,
