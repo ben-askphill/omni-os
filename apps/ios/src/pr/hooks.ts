@@ -5,31 +5,35 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLiveHub, useChannels } from '../live/react';
 import { useEvery, useFetched, useOnChange } from '../review/useFetched';
 import { mergePR, setWatch, type MergeOutcome } from './actions';
-import { prPage, type PRPage } from './model';
+import { prPage, prTarget, type PRPage } from './model';
 
 const PR_POLL_MS = 60_000;
 
-/** The thread branch's PR and, through the channel's GitHub repo, its detail. */
-export function useThreadPR(thread: Thread | null) {
+/**
+ * The PR to show and its detail: the thread branch's own, or a delegated thread's (`picked`, else the first ready one),
+ * read and merged through the delegated thread's channel. A thread without a branch asks too, since a Conductor's crew
+ * may have opened PRs.
+ */
+export function useThreadPR(thread: Thread | null, picked: string | null = null) {
   const { channels } = useChannels();
-  const channel = channels?.find((c) => c.id === thread?.channel_id);
-  const githubRepo = channel?.github_repo ?? null;
-  const hasBranch = !!thread?.branch;
   const id = thread?.id ?? '';
 
-  const prs = useFetched<ThreadPRs>(`prs:${id}`, thread && hasBranch ? (api) => api.threadPR(id) : null);
-  const number = prs.data?.pr?.number ?? null;
-  const detail = useFetched<PRDetail>(`pr:${channel?.id}:${number}`, channel && githubRepo && number ? (api) => api.pullRequest(channel.id, number) : null);
+  const prs = useFetched<ThreadPRs>(`prs:${id}`, thread ? (api) => api.threadPR(id) : null);
+  const { number, from } = prTarget(prs.data, picked);
+  const own = channels?.find((c) => c.id === thread?.channel_id);
+  const channelId = from ? from.channel_id : (own?.id ?? null);
+  const githubRepo = from ? from.repo : (own?.github_repo ?? null);
+  const detail = useFetched<PRDetail>(`pr:${channelId}:${number}`, channelId && githubRepo && number ? (api) => api.pullRequest(channelId, number) : null);
 
   const refresh = useCallback(() => {
     prs.reload();
     detail.reload();
   }, [prs.reload, detail.reload]);
   useOnChange(thread?.status, refresh);
-  useEvery(PR_POLL_MS, hasBranch, refresh);
+  useEvery(PR_POLL_MS, !!thread, refresh);
 
-  const page: PRPage = prPage({ thread, githubRepo, prs, detail });
-  return { page, channelId: channel?.id ?? null, githubRepo, number, refresh, reloadList: prs.reload, reloadDetail: detail.reload, loading: prs.loading || detail.loading };
+  const page: PRPage = prPage({ thread, githubRepo, prs, detail, picked });
+  return { page, channelId, githubRepo, number, from, refresh, reloadList: prs.reload, reloadDetail: detail.reload, loading: prs.loading || detail.loading };
 }
 
 /** The thread's PR watch. Read when the thread has a PR, and again whenever `detail` is read again. A refused start leaves its reason in `error`. */
