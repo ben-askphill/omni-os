@@ -9,7 +9,7 @@ import { machineNote } from '../../machine/state';
 import { fontSize, minTarget, space, useOmniTheme } from '../../theme';
 import type { ThreadAction } from '../../thread/actions';
 import { useThreadActions } from '../../thread/hooks';
-import { menuExtras } from '../../thread/menu';
+import { menuExtras, menuLinks } from '../../thread/menu';
 import { folderChoices, organizeItems, type ThreadTarget } from '../../thread/target';
 import { Callout } from '../../ui/Callout';
 import { Icon, type IconName } from '../../ui/Icon';
@@ -29,6 +29,8 @@ const ICON: Record<ThreadActionIcon, IconName> = {
   grok: 'sparkle',
 };
 
+type MenuPage = 'menu' | 'move' | 'machine' | 'takeover';
+
 interface ThreadMenuSheetProps {
   /** The thread the menu acts on, as it is now: the sheet opens when this is set and shows the labels for its state. */
   target: ThreadTarget | null;
@@ -43,28 +45,39 @@ interface ThreadMenuSheetProps {
   onFork?: () => void;
   /** Opens the channel's Actions for the open thread. Without it the menu has no Actions row. */
   onActions?: () => void;
+  /** Opens what the thread changed in its checkout. Without it the menu has no View changes row. */
+  onChanges?: () => void;
+  /** Opens the thread's pull request. Without it the menu has no Pull request row. */
+  onPR?: () => void;
+  /** The page the sheet opens on: the machine name in the open thread's title opens Runs on directly. */
+  openOn?: 'menu' | 'machine';
 }
 
 /** The thread menu as a sheet: pin, done, rename, move to folder and archive, from the header and from a list row. */
-export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, onFork, onActions }: ThreadMenuSheetProps) {
+export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, onFork, onActions, onChanges, onPR, openOn = 'menu' }: ThreadMenuSheetProps) {
   const { colors } = useOmniTheme();
   const run = useThreadActions();
-  const [asked, setPage] = useState<'menu' | 'move' | 'machine' | 'takeover'>('menu');
+  const [asked, setPage] = useState<MenuPage>(openOn);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const open = target !== null;
 
   useEffect(() => {
-    if (open) return;
-    setPage('menu');
+    if (open) {
+      setPage(openOn);
+      if (openOn === 'machine') machine?.dismissError();
+      return;
+    }
     setError(null);
-  }, [open]);
+  // machine changes every render: read it only when the sheet opens.
+  }, [open, openOn]);
 
   const picker = machine?.machine ?? null;
   // The machine pages fall back to the menu when the picker goes away, as when a handoff starts from the other machine.
   const page = (asked === 'machine' || asked === 'takeover') && !picker ? 'menu' : asked;
   const items = useMemo(() => (target ? organizeItems(target) : []), [target]);
   const extras = useMemo(() => (target ? menuExtras(target, picker, !!onFork, !!onActions) : []), [target, picker, onFork, onActions]);
+  const links = useMemo(() => menuLinks(!!onChanges, !!onPR), [onChanges, onPR]);
   const choices = useMemo(() => folderChoices(folders, target?.folderId ?? null), [folders, target?.folderId]);
 
   async function perform(action: ThreadAction) {
@@ -123,6 +136,22 @@ export function ThreadMenuSheet({ target, folders, onClose, onChanged, machine, 
     <Sheet visible={open} title={TITLES[page]} onClose={onClose} accessory={accessory}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {error ? <Callout message={error} /> : null}
+        {page === 'menu' && links.length > 0 ? (
+          <OptionGroup>
+            {links.map((link, i) => (
+              <OptionRow
+                key={link.id}
+                label={link.label}
+                sub={link.sub}
+                leading={<Icon name={link.id === 'changes' ? 'diff' : 'pr'} size={18} color={colors.fg2} />}
+                opens
+                disabled={pending}
+                onPress={() => (link.id === 'changes' ? onChanges?.() : onPR?.())}
+                last={i === links.length - 1}
+              />
+            ))}
+          </OptionGroup>
+        ) : null}
         {page === 'menu' ? (
           <OptionGroup>
             {items.map((item, i) => (

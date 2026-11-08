@@ -145,6 +145,7 @@ const styles = StyleSheet.create({
   fix: {
     fontFamily: mono,
     fontSize: fontSize.meta,
+    lineHeight: Math.round(fontSize.meta * 1.5),
     fontWeight: '400',
   },
 });

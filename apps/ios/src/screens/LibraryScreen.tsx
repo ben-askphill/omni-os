@@ -188,7 +188,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.body,
     fontFamily: 'Menlo',
     textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   empty: {
     fontSize: fontSize.body,

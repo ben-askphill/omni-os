@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { machineOf } from '../../src/machine/facts';
-import { menuExtras } from '../../src/thread/menu';
+import { menuExtras, menuLinks } from '../../src/thread/menu';
 import { forkItem, organizeItems, targetOfThread } from '../../src/thread/target';
 import { device, sync, takeover } from '../machine/fixtures';
 import { thread } from './fixtures';
@@ -53,5 +53,16 @@ describe('the list row menu', () => {
     const ids = organizeItems(targetOfThread(thread())).map((i) => i.id);
     expect(ids).toEqual(['pin', 'done', 'rename', 'move', 'archive']);
     expect(forkItem(targetOfThread(thread()))?.id).toBe('fork');
+  });
+});
+
+describe('menuLinks', () => {
+  it('puts View changes and Pull request first, each only where the screen can open it', () => {
+    expect(menuLinks(true, true).map((l) => [l.id, l.label])).toEqual([
+      ['changes', 'View changes'],
+      ['pr', 'Pull request'],
+    ]);
+    expect(menuLinks(false, true).map((l) => l.id)).toEqual(['pr']);
+    expect(menuLinks(false, false)).toEqual([]);
   });
 });

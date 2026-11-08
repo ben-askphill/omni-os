@@ -8,8 +8,11 @@ interface ButtonProps {
   onPress: () => void;
   /** As the design system's Button: primary is ink, secondary a soft fill, ghost only its label. */
   variant?: 'primary' | 'secondary' | 'ghost';
-  /** `small` for an action inside a row or a notice: a smaller label and padding, the same 44pt target. */
-  size?: 'regular' | 'small';
+  /**
+   * `small` for an action inside a row or a notice: a smaller label and padding, the same 44pt target. `compact` for a
+   * card's trailing action (Run, Retry): a 30pt pill that fits its label, with the 44pt target kept by hit slop.
+   */
+  size?: 'regular' | 'small' | 'compact';
   busy?: boolean;
   disabled?: boolean;
   /** What VoiceOver reads when the label alone is ambiguous in a list ("Revoke iPhone"). */
@@ -21,7 +24,11 @@ interface ButtonProps {
  * The narrowest a filled button gets, so a short label ("Run", "Edit") still reads as a button and not a tag. A ghost
  * button has no fill to look short in and stops at the tap target.
  */
-const MIN_WIDTH = { regular: 88, small: 64 } as const;
+const MIN_WIDTH = { regular: 88, small: 64, compact: 0 } as const;
+
+const COMPACT_HEIGHT = 30;
+/** Grows the compact pill's tap area back to the 44pt target. */
+const COMPACT_SLOP = { top: (minTarget - COMPACT_HEIGHT) / 2, bottom: (minTarget - COMPACT_HEIGHT) / 2, left: 4, right: 4 };
 
 export function Button({
   label,
@@ -45,17 +52,18 @@ export function Button({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy }}
       disabled={inactive}
+      hitSlop={size === 'compact' ? COMPACT_SLOP : undefined}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        size === 'small' ? styles.small : styles.regular,
-        { minWidth: variant === 'ghost' ? minTarget : MIN_WIDTH[size] },
+        styles[size],
+        { minWidth: variant === 'ghost' && size !== 'compact' ? minTarget : MIN_WIDTH[size] },
         { backgroundColor: variant === 'ghost' && pressed ? colors.wash : fill },
         { opacity: disabled ? 0.4 : pressed && variant !== 'ghost' ? 0.85 : 1 },
       ]}
     >
       {/* The label stays laid out under the spinner, so going busy never changes the button's width. */}
-      <Text style={[styles.label, size === 'small' && styles.smallLabel, { color: labelColor, opacity: busy ? 0 : 1 }]}>{label}</Text>
+      <Text style={[styles.label, size !== 'regular' && styles.smallLabel, { color: labelColor, opacity: busy ? 0 : 1 }]}>{label}</Text>
       {busy ? (
         <View style={styles.spinner}>
           <ActivityIndicator color={labelColor} />
@@ -79,6 +87,11 @@ const styles = StyleSheet.create({
   small: {
     paddingHorizontal: space.s6,
     paddingVertical: space.s4,
+  },
+  compact: {
+    minHeight: COMPACT_HEIGHT,
+    paddingHorizontal: 14,
+    paddingVertical: space.s3,
   },
   label: {
     fontSize: fontSize.input,
