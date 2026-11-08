@@ -1,4 +1,4 @@
-import type { AppPairingCode, AppPairingQr } from '@omni/shared/app-pairing.ts';
+import type { AppPairingCode, AppPairingQr, ServerCapabilities } from '@omni/shared/app-pairing.ts';
 import { ApiError, errorText } from './api.ts';
 
 // Settings, Sharing & access, Omni for iOS: which address the phone is told to use, what the QR holds, and what to say
@@ -145,3 +145,14 @@ export const secondsLeft = (expiresAt: string, now: number): number => Math.max(
 
 /** `4:07`. */
 export const clock = (seconds: number): string => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+/**
+ * What the card says when this server cannot send alerts to the app, or null when it can or has not said. A paired
+ * phone can be registered with every alert on and still get nothing until the APNs secrets are saved. `problem` names
+ * the missing ones, never a value.
+ */
+export function pushDeliveryNote(push: ServerCapabilities['push'] | null | undefined): string | null {
+  if (!push || push.delivery) return null;
+  const why = push.problem ? ` (${push.problem})` : '';
+  return `Alerts to the iPhone app are off: this server has no APNs key${why}. Save APNS_AUTH_KEY (the .p8 file's text), APNS_KEY_ID and APNS_TEAM_ID in Secrets. Omni picks them up without a restart.`;
+}

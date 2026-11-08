@@ -222,6 +222,14 @@ describe('when APNs is not configured', () => {
     expect(loaded).toEqual({ config: { key: { keyId: 'KEY1', teamId: 'TEAM1', pem: PEM.trim() }, bundleId: 'app.omni-os.ios' } });
   });
 
+  it('reads a key pasted into a one-line field, with its line breaks dropped or turned into spaces', () => {
+    const body = PEM.split('\n').filter((l) => l && !l.startsWith('-----')).join('');
+    for (const pasted of [PEM.replace(/\n/g, ''), PEM.trim().replace(/\n/g, ' '), body]) {
+      const values: Record<string, string> = { APNS_KEY_ID: 'K', APNS_TEAM_ID: 'T', APNS_AUTH_KEY: pasted };
+      expect(loadPushConfig((name) => values[name])).toMatchObject({ config: { key: { pem: PEM.trim() } } });
+    }
+  });
+
   it('uses the bundle id it is given', () => {
     const values: Record<string, string> = { APNS_KEY_ID: 'K', APNS_TEAM_ID: 'T', APNS_AUTH_KEY: PEM, APNS_BUNDLE_ID: 'app.omni-os.beta' };
     expect(loadPushConfig((name) => values[name])).toMatchObject({ config: { bundleId: 'app.omni-os.beta' } });

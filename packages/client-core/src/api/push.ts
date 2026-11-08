@@ -3,6 +3,7 @@ import type {
   AppPushPreferencesUpdate,
   AppPushTokenRequest,
   AppPushTokenStatus,
+  ServerCapabilities,
 } from '@omni/shared/app-pairing.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 
@@ -19,5 +20,7 @@ export function pushApi(http: HttpClient) {
     /** Sends only the kinds in `update` and returns the full set. */
     setPushPreferences: (update: AppPushPreferencesUpdate) =>
       http.request<AppPushPreferences>('PUT', apiPath`/auth/push-preferences`, { body: update }),
+    /** Whether the server can send alerts at all: `delivery` is false until it has an APNs key. */
+    pushDelivery: async () => (await http.request<ServerCapabilities>('GET', apiPath`/capabilities`)).push,
   };
 }
