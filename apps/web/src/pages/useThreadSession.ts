@@ -204,14 +204,14 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   // Running only. Queued is waiting for a slot, so the transcript does not show a working turn.
   const turnInProgress = thread?.status === 'running';
   const { interrupting, interrupt, actionError, setActionError } = useInterrupt(id, slotBusy, queued, events);
-  const { init, lastResult, betweenTurns } = useTurnState(events);
 
   const applyThread = useCallback((next: Thread, reply = false) => {
     setThread((prev) => newer(prev, next, reply));
   }, []);
 
-  // What the views draw: the opening as the transcript's first row, and not again among the pending messages.
   const shown = useMemo(() => (thread ? withOpening(events, queued, opening, thread) : { events, pending: queued }), [events, queued, opening, thread]);
+  // The shown rows: once the opening message is drawn, its turn is under way and another sent message steers it.
+  const { init, lastResult, betweenTurns } = useTurnState(shown.events);
 
   const files = useMemo(() => artifacts.filter((a) => a.kind !== 'screenshot'), [artifacts]);
   const shots = useMemo(() => artifacts.filter((a) => a.kind === 'screenshot'), [artifacts]);
@@ -243,6 +243,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     notFound,
     ready,
     queued: shown.pending,
+    /** The server's whole pending list, the message drawn in the transcript included: a send it lists has arrived. */
+    listed: queued,
     setQueued,
     warm,
     blocked,

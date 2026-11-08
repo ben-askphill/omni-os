@@ -66,6 +66,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     notFound,
     ready,
     queued,
+    listed,
     setQueued,
     warm,
     blocked,
@@ -237,7 +238,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               />
               <HandoffCard thread={thread} handoff={handoff} onChanged={handedOff} />
               <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} sessionBlocked={!!thread.resume_blocked} canSteer={canSteer(thread.harness, harnesses)} />
-              <SendingMessages threadId={id} pending={queued} />
+              <SendingMessages threadId={id} pending={listed} />
               {!queued.length && (
                 <NextThreadCard
                   thread={thread}

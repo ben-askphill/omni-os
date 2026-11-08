@@ -31,7 +31,6 @@ describe('withOpening', () => {
 });
 
 describe('a later turn started by a message the harness has not read yet', () => {
-  // One finished turn, then Ben's follow-up: on the harness's stdin, so the thread runs, but not replayed yet.
   const done = [row(1, 'init', {}), row(2, 'user', { text: 'First' }), row(3, 'assistant_text', { text: 'ack: First' }), row(4, 'result', { ok: true, subtype: 'success', turns: 1 })];
   const followUp = { uuid: 'b', kind: 'user', text: 'Second', state: 'sent', attachments: [{ name: 'a.png', path: 'uploads/a.png', size: 3, mime: 'image/png', image: true }] };
 

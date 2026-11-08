@@ -36,7 +36,7 @@ import { shownStatus } from '@omni/shared/delegate-count.ts';
 export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
-  const { thread, parent, children, events, history, revealTarget, clearReveal, files, queued, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover } = s;
+  const { thread, parent, children, events, history, revealTarget, clearReveal, files, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover } = s;
   const { needsYou, channel } = useApp();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
@@ -165,7 +165,7 @@ export function ThreadScreen() {
                   setQueued(r.pending);
                 }} />}
             {queued.length > 0 && <Pending thread={thread} items={queued} onPending={setQueued} />}
-            <Sending threadId={thread.id} pending={queued} />
+            <Sending threadId={thread.id} pending={listed} />
             {actionError && <ErrorNote>{actionError}</ErrorNote>}
           </div>
         </HistoryCtx.Provider>
