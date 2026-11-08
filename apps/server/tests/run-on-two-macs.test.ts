@@ -272,6 +272,58 @@ describe('a thread delegated on the other machine', () => {
   }, T.timeout);
 });
 
+describe('a question from a thread delegated on the other machine', () => {
+  // The Conductor delegated on B, so its crewmate runs there and asks there. Ben answers on A, on the card the parent's
+  // thread shows (GET crew-questions), and the call waiting on B returns.
+  const asking = async (question: string) => {
+    const parent = await b.runner.createThread({ channel: 'shop', prompt: 'plan on B', device: 'here' });
+    await b.untilResults(parent.id, 1);
+    const child = await b.runner.createThread({ channel: 'shop', prompt: `TOOL:60000 ${question}`, parent_id: parent.id, source: 'conductor', device: 'here' });
+    await b.untilTool(child.id);
+    const asked = await b.json(`/threads/${child.id}/questions`, { body: { questions: [{ question, options: [{ label: 'Yes', description: 'Go' }, { label: 'No', description: 'Wait' }] }] } });
+    expect(asked.status, JSON.stringify(asked.body)).toBe(200);
+    const crew = async () => (((await a.json(`/threads/${parent.id}/crew-questions`)).body.items ?? []) as { question: { id: string } }[]).map((c) => c.question.id);
+    for (let n = 0; n < 5 && !((await crew()).includes(asked.body.id) && a.thread(child.id)?.status === 'running'); n++) await both();
+    expect(await crew()).toEqual([asked.body.id]);
+    expect(a.thread(child.id).status).toBe('running');
+    expect(a.db.assignments.get(child.id)).toMatchObject({ machine: 'box-b', routed: false });
+    return { child: child.id, qid: asked.body.id as string, crew };
+  };
+
+  it("takes Send on the hub's card to the call waiting on that machine", async () => {
+    const { child, qid, crew } = await asking('Sync the Poows folder?');
+    const poll = b.json(`/threads/${child}/questions/${qid}?wait=25`);
+    const res = await a.json(`/threads/${child}/questions/${qid}/answer`, { body: { answers: [{ selected: ['Yes'], other: null }] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toEqual({ state: 'answered', via: 'tool' });
+    await both();
+    expect((await poll).body).toEqual({ state: 'answered', text: expect.stringContaining('"Sync the Poows folder?"="Yes"') });
+    expect(await crew()).toEqual([]);
+  }, T.timeout);
+
+  it("takes Skip on the hub's card to the call waiting on that machine", async () => {
+    const { child, qid, crew } = await asking('Sync the Acne folder?');
+    const poll = b.json(`/threads/${child}/questions/${qid}?wait=25`);
+    const res = await a.json(`/threads/${child}/questions/${qid}/answer`, { body: { answers: [null] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toEqual({ state: 'skipped', via: 'tool' });
+    await both();
+    expect((await poll).body).toEqual({ state: 'skipped', text: expect.stringContaining('skipped these questions') });
+    expect(await crew()).toEqual([]);
+  }, T.timeout);
+
+  it('dismisses it on that machine when Ben writes to the thread instead', async () => {
+    const { child, qid, crew } = await asking('Sync the Volero folder?');
+    const poll = b.json(`/threads/${child}/questions/${qid}?wait=25`);
+    const res = await a.json(`/threads/${child}/messages`, { body: { prompt: 'Use the Volero folder', request_id: 'instead-of-card' } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.forwarded_to).toBe('Box B');
+    await both();
+    expect((await poll).body.state).toBe('dismissed');
+    expect(await crew()).toEqual([]);
+  }, T.timeout);
+});
+
 describe('remote preparation and takeover', () => {
   it('resolves skills and mentions for fresh prompts and replies, and carries context', async () => {
     writeFileSync(join(shared, 'remote-notes.txt'), 'REMOTE FILE CONTENT');
