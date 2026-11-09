@@ -49,7 +49,7 @@ const fieldSchema = (f: SettingField) =>
 const sectionSchema = (section: SettingSection) =>
   z.object(Object.fromEntries(sectionFields(section).map((f) => [f.key, fieldSchema(f)])) as Record<string, ReturnType<typeof fieldSchema>>);
 
-const automationOverride = z.object({ enabled: z.boolean().optional(), channel: z.string().optional() });
+const automationOverride = z.object({ enabled: z.boolean().optional(), channel: z.string().optional(), deleted: z.boolean().optional() });
 
 const schema = z.object({
   version: z.literal(1).default(1),

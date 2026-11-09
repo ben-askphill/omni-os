@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync, mkdirSync, watch } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, mkdirSync, rmSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import { Cron } from 'croner';
 import YAML from 'yaml';
@@ -77,17 +77,26 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
   return a;
 }
 
+const YAML_FILE = /\.ya?ml$/;
+
+/** The YAML files in dir, by automation id. */
+function yamlFiles(dir: string): [id: string, file: string][] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => YAML_FILE.test(f))
+    .map((f) => [f.replace(YAML_FILE, ''), join(dir, f)]);
+}
+
 /**
  * The shared automations in automations/ and the user's own in data/automations/ (same id there wins). The user
  * config's per-automation overrides (`enabled`, `channel`) apply last, so turning one on never edits a repo file.
+ * A shared one deleted on this machine (`deleted`) is left out; the user's own file of that id still loads.
  */
 export function loadAutomations(): Automation[] {
-  const files = new Map<string, string>();
-  for (const dir of [paths.automations, paths.personalAutomations]) {
-    if (!existsSync(dir)) continue;
-    for (const f of readdirSync(dir)) if (/\.ya?ml$/.test(f)) files.set(f.replace(/\.ya?ml$/, ''), join(dir, f));
-  }
   const overrides = userConfig().automations;
+  const files = new Map<string, string>();
+  for (const [id, file] of yamlFiles(paths.automations)) if (!overrides[id]?.deleted) files.set(id, file);
+  for (const [id, file] of yamlFiles(paths.personalAutomations)) files.set(id, file);
   return [...files].map(([id, file]) => {
     const a = parseAutomation(id, readFileSync(file, 'utf8'), file);
     const o = overrides[id];
@@ -205,6 +214,21 @@ export function setEnabled(id: string, enabled: boolean) {
   if (!a) throw new Error('automation not found');
   updateUserConfig({ automations: { [id]: { enabled } } });
   schedule();
+}
+
+/**
+ * Delete a listed automation on this machine. The user's own YAML in data/automations/ is removed. One shipped in
+ * automations/ stays on disk, since the next update would bring it back, and is hidden here with `deleted` in
+ * data/omni.config.json instead. Its schedule stops now; threads it already started stay. Only files listed under
+ * its id are touched, so the id never becomes a path.
+ */
+export function deleteAutomation(a: Automation): 'file' | 'hidden' {
+  const own = yamlFiles(paths.personalAutomations).filter(([id]) => id === a.id);
+  for (const [, file] of own) rmSync(file);
+  const shipped = yamlFiles(paths.automations).some(([id]) => id === a.id);
+  updateUserConfig({ automations: { [a.id]: shipped ? { deleted: true } : null } });
+  schedule();
+  return own.length ? 'file' : 'hidden';
 }
 
 // Also how a catch-up notices the Mac woke up: timers sleep with it, so this fires soon after wake.

@@ -202,6 +202,8 @@ export const pageFields = (page: SettingPage): readonly SettingField[] => SETTIN
 export interface AutomationOverride {
   enabled?: boolean;
   channel?: string;
+  /** Deleted from the Automations page: a shared automation in automations/ that this machine no longer lists or runs. */
+  deleted?: boolean;
 }
 
 export interface UserConfig {
