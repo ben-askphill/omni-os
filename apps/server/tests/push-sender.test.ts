@@ -1,5 +1,6 @@
 import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { harnessEnv } from '../harness/env-guard.ts';
 import type { ApnsRequest, ApnsResponse, ApnsTransport } from '../push-apns.ts';
 import {
   createPushSender,
@@ -13,6 +14,8 @@ import {
   type PushSenderDeps,
 } from '../push-sender.ts';
 import type { PushTarget } from '../push-preferences.ts';
+import { secretReachesThread } from '../secrets.ts';
+import { terminalEnv } from '../terminal-env.ts';
 
 // startPush reads the secret store first: the Keychain of the Mac running the tests may hold the real key.
 vi.mock('../secrets.ts', async (original) => ({
@@ -291,5 +294,15 @@ describe('push status', () => {
     secrets({ APNS_KEY_ID: 'KEY1', APNS_TEAM_ID: 'TEAM1', APNS_AUTH_KEY: PEM.replace(/\n/g, '') });
     await startPush();
     expect(pushStatus()).toEqual({ delivery: true, problem: null });
+  });
+});
+
+describe('the APNs secrets', () => {
+  it('stay on the server: saved as global secrets, they reach no thread, harness or terminal', () => {
+    for (const name of Object.values(PUSH_SECRETS)) {
+      expect(secretReachesThread('global', name)).toBe(false);
+      expect(harnessEnv('claude-code', {}, { [name]: 'value' }, {})[name]).toBeUndefined();
+      expect(terminalEnv({ [name]: 'value' })[name]).toBeUndefined();
+    }
   });
 });
