@@ -3,7 +3,7 @@ import { formatBytes, summarize, type WorktreeItem } from '../worktree-inventory
 
 const item = (over: Partial<WorktreeItem>): WorktreeItem => ({
   id: 'a', kind: 'managed', verdict: 'kept', dir: '/d/a', repo: '/r', branch: null, threadId: null, threadTitle: null, lastActiveAt: null, channelId: null, channelName: null,
-  folder: true, registered: true, bytes: 100, sharedWith: [], reasons: [], eligibleBecause: null, errors: [], ...over,
+  folder: true, registered: true, bytes: 100, cacheBytes: 0, sharedWith: [], reasons: [], eligibleBecause: null, errors: [], ...over,
 });
 
 describe('summarize', () => {

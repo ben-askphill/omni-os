@@ -107,20 +107,35 @@ function pendingWork(t: Thread): number {
   return queued + messageRequests.parked(t.id).length + messageRequests.unstarted(t.id).length + (t.limit_state === 'scheduled' ? 1 : 0);
 }
 
-/** Top-level ignored files that are not build output, as they are named in the checkout. */
-async function ignoredFiles(dir: string): Promise<string[] | null> {
+/** Top-level ignored entries as they are named in the checkout, split into build output (`caches`) and everything else. */
+async function ignoredEntries(dir: string): Promise<{ caches: string[]; other: string[] } | null> {
   const out = await git(dir, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory');
   if (out === null) return null;
-  return out
-    .split('\n')
-    .filter(Boolean)
-    .filter((p) => !regenerable(dir, p));
+  const caches: string[] = [];
+  const other: string[] = [];
+  for (const listed of out.split('\n').filter(Boolean)) {
+    // Caches without git's trailing slash, to delete and measure; the rest as git lists it, so a folder reads as one.
+    if (regenerable(dir, listed)) caches.push(listed.replace(/\/$/, ''));
+    else other.push(listed);
+  }
+  return { caches, other };
 }
+
+/** The build output and installs in a worktree, as paths from its top, which stripping caches deletes. Null when git cannot list them. */
+export const cachesIn = async (dir: string): Promise<string[] | null> => (await ignoredEntries(dir))?.caches ?? null;
+
+/** What paths under dir use on disk, together, at the lowest priority. */
+const sizeOfAll = (dir: string, paths: string[]) =>
+  paths.length
+    ? run('nice', ['-n', '19', 'du', '-sk', ...paths.map((p) => join(dir, p))], { timeout: 180_000, signal: currentSignal() }).then((r) =>
+        r.stdout.split('\n').filter(Boolean).reduce((n, line) => n + Number(line.split('\t')[0]) * 1024, 0),
+      )
+    : Promise.resolve(0);
 
 function blank(id: string, dir: string, over: Partial<WorktreeItem>): WorktreeItem {
   return {
     id, kind: 'orphan', verdict: 'kept', dir, repo: null, branch: null, threadId: null, threadTitle: null, lastActiveAt: null, channelId: null, channelName: null,
-    folder: true, registered: false, bytes: null, sharedWith: [], reasons: [], eligibleBecause: null, errors: [], ...over,
+    folder: true, registered: false, bytes: null, cacheBytes: null, sharedWith: [], reasons: [], eligibleBecause: null, errors: [], ...over,
   };
 }
 
@@ -147,7 +162,7 @@ async function inspect(id: string, dir: string, opts: InspectOptions, ctx: Known
   if (!lst) return blank(id, dir, { verdict: 'unknown', folder: false, errors: ['the folder disappeared'] });
   // Never followed: a link in here could point at any repository.
   if (lst.isSymbolicLink() || !lst.isDirectory()) {
-    return blank(id, dir, { reasons: [{ code: 'unowned', message: lst.isSymbolicLink() ? 'It is a symlink, which Omni never follows.' : 'It is not a folder.' }], bytes: 0 });
+    return blank(id, dir, { reasons: [{ code: 'unowned', message: lst.isSymbolicLink() ? 'It is a symlink, which Omni never follows.' : 'It is not a folder.' }], bytes: 0, cacheBytes: 0 });
   }
 
   const before = ownership(id);
@@ -227,7 +242,8 @@ async function inspect(id: string, dir: string, opts: InspectOptions, ctx: Known
   if (w.changed) keep('changed', `${plural(w.changed, 'file')} with uncommitted changes.`);
   if (w.untracked) keep('untracked', `${plural(w.untracked, 'untracked file')}.`);
   if (w.unpushed > 0) keep('unpushed', `${plural(w.unpushed, 'commit')} no remote has.`);
-  const ignored = await ignoredFiles(dir);
+  const entries = await ignoredEntries(dir);
+  const ignored = entries?.other ?? null;
   if (ignored === null) (errors.push('could not list ignored files'), safety++);
   else if (ignored.length) {
     const shown = ignored.slice(0, NAMES_SHOWN).join(', ');
@@ -259,8 +275,14 @@ async function inspect(id: string, dir: string, opts: InspectOptions, ctx: Known
     safety++;
   }
 
+  const cacheBytes =
+    entries && opts.size !== false
+      ? await sizeOfAll(dir, entries.caches).catch((err) => (errors.push(`cache size unavailable: ${text(err)}`), null))
+      : null;
+
   const verdict = reasons.length ? 'kept' : safety ? 'unknown' : 'eligible';
   return done({
+    cacheBytes,
     kind: 'managed',
     verdict,
     repo,
@@ -306,7 +328,7 @@ async function staleRegistrations(repos: Set<string>): Promise<WorktreeItem[]> {
       out.push(
         blank(id, dir, {
           kind: 'stale-registration', verdict: 'eligible', eligibleBecause: 'stale', repo, branch: t?.branch ?? null, threadId: t?.id ?? null,
-          threadTitle: t?.title ?? null, lastActiveAt: t?.updated_at ?? null, channelId: ch?.id ?? null, channelName: ch?.name ?? null, folder: false, registered: true, bytes: 0,
+          threadTitle: t?.title ?? null, lastActiveAt: t?.updated_at ?? null, channelId: ch?.id ?? null, channelName: ch?.name ?? null, folder: false, registered: true, bytes: 0, cacheBytes: 0,
         }),
       );
     }
@@ -357,7 +379,7 @@ export function updateScanItem(id: string, item: WorktreeItem | null) {
   if (!current || current.state === 'running') return;
   const i = current.items.findIndex((it) => it.kind !== 'stale-registration' && it.id === id);
   if (i < 0) return;
-  if (item) current.items[i] = { ...item, bytes: item.bytes ?? current.items[i].bytes };
+  if (item) current.items[i] = { ...item, bytes: item.bytes ?? current.items[i].bytes, cacheBytes: item.cacheBytes ?? current.items[i].cacheBytes };
   else current.items.splice(i, 1);
 }
 

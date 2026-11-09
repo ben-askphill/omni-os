@@ -423,6 +423,19 @@
       ]
     },
     {
+      "id": "worktree-slim",
+      "section": "worktrees",
+      "title": "Strip caches",
+      "keywords": [
+        "node_modules",
+        "build output",
+        "cache",
+        "free space",
+        "slim",
+        "disk"
+      ]
+    },
+    {
       "id": "this-machine",
       "section": "machines",
       "title": "Current machine",
