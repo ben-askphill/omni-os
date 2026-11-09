@@ -25,7 +25,33 @@ const CONCURRENCY = 2;
 const REGENERABLE = new Set([
   'node_modules', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', '.parcel-cache', '.vite',
   '__pycache__', '.pytest_cache', '.mypy_cache', '.venv', '.build', 'DerivedData', '.gradle', 'target', '.DS_Store',
+  // SwiftPM's workspace state (the removed Mac app's OmniKit), Expo's cache, and the Playwright MCP's snapshots.
+  '.swiftpm', '.expo', '.playwright-mcp',
 ]);
+
+/** Build output known by its path in the checkout, where its name alone (ios, release) could be anything. */
+const REGENERABLE_PATHS = new Set(['apps/ios/ios', 'apps/desktop/release']);
+
+/** What a test or dev server run in the checkout leaves in its `data/`: the database and these folders, empty. */
+const SERVER_DB = new Set(['omni.db', 'omni.db-shm', 'omni.db-wal']);
+const SERVER_DIRS = new Set(['browsers', 'threads', 'worktrees']);
+
+/** Whether path is a `data/` folder that holds only what a server run left: no thread, worktree or browser in it. */
+function serverLeftovers(path: string): boolean {
+  try {
+    return readdirSync(path, { withFileTypes: true }).every((e) =>
+      e.isFile() ? SERVER_DB.has(e.name) : e.isDirectory() && SERVER_DIRS.has(e.name) && readdirSync(join(path, e.name)).length === 0,
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Whether an ignored path (as git lists it, from the checkout's top) is something a build, install or test run makes again. */
+const regenerable = (dir: string, listed: string) => {
+  const p = listed.replace(/\/$/, '');
+  return REGENERABLE.has(basename(p)) || REGENERABLE_PATHS.has(p) || (p === 'data' && serverLeftovers(join(dir, p)));
+};
 
 const NAMES_SHOWN = 5;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -88,7 +114,7 @@ async function ignoredFiles(dir: string): Promise<string[] | null> {
   return out
     .split('\n')
     .filter(Boolean)
-    .filter((p) => !REGENERABLE.has(basename(p.replace(/\/$/, ''))));
+    .filter((p) => !regenerable(dir, p));
 }
 
 function blank(id: string, dir: string, over: Partial<WorktreeItem>): WorktreeItem {

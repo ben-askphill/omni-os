@@ -45,7 +45,10 @@ export type SweepReason = 'archived' | 'deleted' | 'merged';
 export interface LocalWork {
   /** Modified, staged or deleted tracked files. */
   changed: number;
+  /** Untracked files, not counting `harnessCopies`. */
   untracked: number;
+  /** Untracked copies of harness config that origin's default branch tracks (see `harnessCopies`). Not work. */
+  harnessCopies: string[];
   /** Commits on HEAD no remote has. */
   unpushed: number;
   noCommits: boolean;
@@ -59,10 +62,14 @@ export interface LocalWork {
  * Ignored files (node_modules, build output) are not counted.
  */
 export async function localWork(dir: string, pushedHead?: string | null): Promise<LocalWork> {
-  const w: LocalWork = { changed: 0, untracked: 0, unpushed: 0, noCommits: false, statusFailed: false, pushUnknown: false };
-  const status = await git(dir, 'status', '--porcelain', '--untracked-files=all');
-  if (status === null) w.statusFailed = true;
-  else if (status) for (const line of status.split('\n')) line.startsWith('??') ? w.untracked++ : w.changed++;
+  const w: LocalWork = { changed: 0, untracked: 0, harnessCopies: [], unpushed: 0, noCommits: false, statusFailed: false, pushUnknown: false };
+  const untracked = await untrackedFiles(dir);
+  if (untracked === null) w.statusFailed = true;
+  else {
+    w.changed = untracked.changed;
+    w.harnessCopies = await harnessCopies(dir, untracked.paths);
+    w.untracked = untracked.paths.length - w.harnessCopies.length;
+  }
   const head = await git(dir, 'rev-parse', 'HEAD');
   if (!head) {
     w.noCommits = true;
@@ -73,6 +80,34 @@ export async function localWork(dir: string, pushedHead?: string | null): Promis
   if (ahead === null) w.pushUnknown = true;
   else w.unpushed = Number(ahead);
   return w;
+}
+
+/** The untracked files in dir (paths from its top) and how many tracked files changed, or null when git status fails. */
+async function untrackedFiles(dir: string): Promise<{ paths: string[]; changed: number } | null> {
+  const status = await git(dir, 'status', '--porcelain', '--untracked-files=all');
+  if (status === null) return null;
+  const lines = status ? status.split('\n') : [];
+  return { paths: lines.filter((l) => l.startsWith('??')).map((l) => l.slice(3)), changed: lines.filter((l) => !l.startsWith('??')).length };
+}
+
+/** Where coding agents read their config in a repo. */
+const HARNESS_CONFIG = /^(\.codex\/|\.agents\/|AGENTS\.md$)/;
+
+/**
+ * Of the untracked files in a worktree, the copies of harness config that origin's default branch tracks: `.codex/`,
+ * `.agents/` and `AGENTS.md`. A worktree made before main tracked them had them copied in afterwards, so they are
+ * main's, not the thread's work. They need not match main byte for byte: main has moved on since the copy. A path
+ * main does not track (a skill the thread wrote) is work. Empty when the default branch cannot be read.
+ */
+export async function harnessCopies(dir: string, untracked?: string[]): Promise<string[]> {
+  const paths = untracked ?? (await untrackedFiles(dir))?.paths ?? [];
+  const config = paths.filter((p) => HARNESS_CONFIG.test(p));
+  if (!config.length) return [];
+  const ref = await defaultRef(dir);
+  const tracked = ref ? await git(dir, 'ls-tree', '-r', '--name-only', ref, '--', '.codex', '.agents', 'AGENTS.md') : null;
+  if (!tracked) return [];
+  const onMain = new Set(tracked.split('\n'));
+  return config.filter((p) => onMain.has(p));
 }
 
 /** origin's default branch as a remote ref (origin/main), or null. */
