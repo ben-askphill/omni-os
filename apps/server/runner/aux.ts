@@ -1,8 +1,9 @@
 // Haiku sidecars: a title for a new thread, and after a turn a suggested reply and a proposed follow-up thread.
 import { spawn } from 'node:child_process';
-import { tmpdir } from 'node:os';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { closePipesAfterExit } from '../child.ts';
-import { config } from '../config.ts';
+import { config, paths } from '../config.ts';
 import { events, threads, type Thread } from '../db.ts';
 import { harnessEnv } from '../harness/env-guard.ts';
 import { userName, userPossessive } from '../profile.ts';
@@ -13,13 +14,46 @@ const suggestCalls = new Map<string, number>();
 const nextCalls = new Map<string, number>();
 let suggestSeq = 0;
 
+/**
+ * A call's working directory: a fresh 0700 folder of its own inside a 0700 folder in Omni's data dir, so the CLI's
+ * project settings can only be ones Omni put there (none). A shared temp dir could hold a planted
+ * `.claude/settings.json` with hooks. The caller removes it once the call ends.
+ */
+export function auxRunDir(dir = paths.data): string {
+  const root = join(dir, 'aux-run');
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  chmodSync(root, 0o700);
+  return mkdtempSync(join(root, 'call-'));
+}
+
+function removeRunDir(cwd: string) {
+  try {
+    rmSync(cwd, { recursive: true, force: true });
+  } catch {
+    return;
+  }
+}
+
 /** One Haiku call with no tools and no session. `done` gets its trimmed output, or null when it failed. */
 function haiku(entrypoint: string, prompt: string, done: (out: string | null) => void) {
-  const child = spawn(
-    config.claudeBin,
-    ['-p', '--model', 'haiku', '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
-    { cwd: tmpdir(), env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: entrypoint }), stdio: ['pipe', 'pipe', 'ignore'] },
-  );
+  let cwd: string;
+  try {
+    cwd = auxRunDir();
+  } catch {
+    // Without a private folder the call is skipped: titles keep their placeholder and no suggestion is offered.
+    return;
+  }
+  let child;
+  try {
+    child = spawn(
+      config.claudeBin,
+      ['-p', '--model', 'haiku', '--output-format', 'text', '--strict-mcp-config', '--no-session-persistence', '--tools', ''],
+      { cwd, env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: entrypoint }), stdio: ['pipe', 'pipe', 'ignore'] },
+    );
+  } catch (err) {
+    removeRunDir(cwd);
+    throw err;
+  }
   closePipesAfterExit(child);
   child.stdin.on('error', () => {});
   child.stdin.end(prompt);
@@ -28,6 +62,7 @@ function haiku(entrypoint: string, prompt: string, done: (out: string | null) =>
   child.stdout.on('data', (d) => (out += d));
   child.on('close', (code) => {
     clearTimeout(timer);
+    removeRunDir(cwd);
     // Nobody waits on these calls: a shutdown may have closed the db by the time one ends.
     try {
       done(code === 0 ? out.trim() : null);
@@ -35,7 +70,10 @@ function haiku(entrypoint: string, prompt: string, done: (out: string | null) =>
       return;
     }
   });
-  child.on('error', () => clearTimeout(timer));
+  child.on('error', () => {
+    clearTimeout(timer);
+    removeRunDir(cwd);
+  });
 }
 
 /** Drop the thread's suggested reply and proposed follow-up thread, and any answer still on its way. */
