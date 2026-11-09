@@ -40,11 +40,22 @@ export interface PushConfig {
   bundleId: string;
 }
 
+const PEM_LABEL = /-----(BEGIN|END) PRIVATE KEY-----/g;
+
+/**
+ * The .p8 file as PEM, however its line breaks were kept. A secret is one line, so they arrive as `\n`, as spaces (a
+ * paste into Settings' one-line field) or not at all, and OpenSSL reads none of those.
+ */
+function p8Pem(raw: string): string {
+  const body = raw.replace(/\\n/g, '\n').replace(PEM_LABEL, '').replace(/\s+/g, '');
+  return body ? `-----BEGIN PRIVATE KEY-----\n${body.replace(/.{64}(?=.)/g, '$&\n')}\n-----END PRIVATE KEY-----` : '';
+}
+
 /** The config, or the reason there is none. The reason names secrets and never shows a value. */
 export function loadPushConfig(read: (name: string) => string | null | undefined): { config: PushConfig } | { problem: string } {
   const keyId = read(PUSH_SECRETS.keyId)?.trim() ?? '';
   const teamId = read(PUSH_SECRETS.teamId)?.trim() ?? '';
-  const pem = (read(PUSH_SECRETS.key) ?? '').replace(/\\n/g, '\n').trim();
+  const pem = p8Pem(read(PUSH_SECRETS.key) ?? '');
   const missing = [
     !keyId && PUSH_SECRETS.keyId,
     !teamId && PUSH_SECRETS.teamId,
