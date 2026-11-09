@@ -44,12 +44,12 @@ The server sends alerts directly to Apple with the team's APNs key, a `.p8` file
 
 Set these in the secret store (Keychain, libsecret or `data/secrets.json`), or as environment variables with the same names:
 
-- `APNS_AUTH_KEY`: the `.p8` file's PEM text. Literal `\n` sequences are read as newlines.
+- `APNS_AUTH_KEY`: the `.p8` file's PEM text. The server rebuilds the line breaks, so they may be real, written as `\n`, turned into spaces or missing. A paste into Settings' one-line Secrets field turns them into spaces.
 - `APNS_KEY_ID`: the ten-character id of that key.
 - `APNS_TEAM_ID`: the Apple developer team id.
 - `APNS_BUNDLE_ID`: optional. Defaults to `app.omni-os.ios`.
 
-With any of the first three missing, or the key unreadable, nothing is sent and `push.delivery` is `false`. The server logs once at startup which names are missing, never their values. Restart the server after changing them.
+With any of the first three missing, or the key unreadable, nothing is sent and `push.delivery` is `false`. Settings, then Omni for iOS, in the Web UI and the app's Notifications screen both show that. The server logs once at startup which names are missing, never their values. Restart the server after changing them.
 
 Each registration names its environment, and each request goes to the matching APNs host (`sandbox` or `production`). Alerts expire after 15 minutes. APNs answers every request, so there are no receipts to poll.
 

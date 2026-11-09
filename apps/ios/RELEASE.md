@@ -23,12 +23,12 @@ The first build runs in your own terminal, because EAS asks for your Apple ID an
    `--no-wait` returns once the build is queued. The build and the submission carry on at expo.dev, which links them.
 3. **Save the App Store Connect app id.** In App Store Connect, open the app, then App Information, and copy the Apple ID (a number). Put it in `submit.production.ios.ascAppId` in `eas.json` and commit. A non-interactive submission needs it. It is not secret.
 4. **Create an APNs key** for push alerts. In Certificates, Identifiers and Profiles, under Keys, add a key with **Apple Push Notifications service (APNs)** enabled. Download the `.p8` file once. Note the ten-character Key ID, and the Team ID under Membership details.
-5. **Save the APNs values in Omni's secret store.** Save these three names:
-   - `APNS_AUTH_KEY`: the `.p8` file's text.
+5. **Save the APNs values in Omni's secret store** on every server the phone pairs with, as global secrets under Settings, then Secrets. Save these three names:
+   - `APNS_AUTH_KEY`: the `.p8` file's text. Paste it whole. The field keeps one line, and the server puts the line breaks back.
    - `APNS_KEY_ID`: the Key ID from step 4.
    - `APNS_TEAM_ID`: the Team ID.
 
-   The store is the Keychain on a Mac, `data/secrets.json` on Linux, or libsecret when `OMNI_SECRET_STORE` selects it. Restart the server afterward. The server logs the names of any missing values at startup, never the values. Keep the `.p8` file out of the repository. EAS does not need this key: Omni's server signs alerts with it directly.
+   The store is the Keychain on a Mac, `data/secrets.json` on Linux, or libsecret when `OMNI_SECRET_STORE` selects it. Restart the server afterward. Settings, then Omni for iOS, shows Alerts as On once the server has loaded the key. The server logs the names of any missing values at startup, never the values. Keep the `.p8` file out of the repository. EAS does not need this key: Omni's server signs alerts with it directly.
 6. **Prepare a privacy policy URL** before external testing or App Store review. Internal TestFlight testing does not ask for one. Host a page that says the app stores and sends data only to the Omni server the user pairs with.
 
 ## Build and submit
