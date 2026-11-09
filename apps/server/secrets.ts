@@ -14,7 +14,9 @@ export const LEGACY_SYNC_SECRETS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABA
 export const CONNECT_SECRET_NAMES = ['OMNI_CONNECT_KEY', 'OMNI_CONNECT_TUNNEL_TOKEN'] as const;
 /** This machine's key for secrets other machines send it (secret-drop.ts). Global, and never handed to an agent. */
 export const SEAL_SECRET_NAME = 'OMNI_SEAL_KEY';
-const PRIVATE = new Set<string>([...Object.values(SYNC_SECRETS), ...LEGACY_SYNC_SECRETS, ...CONNECT_SECRET_NAMES, SEAL_SECRET_NAME]);
+/** The APNs signing key push-sender.ts reads. Global, and never handed to an agent. */
+export const APNS_KEY_SECRET = 'APNS_AUTH_KEY';
+const PRIVATE = new Set<string>([...Object.values(SYNC_SECRETS), ...LEGACY_SYNC_SECRETS, ...CONNECT_SECRET_NAMES, SEAL_SECRET_NAME, APNS_KEY_SECRET]);
 const SERVER_ONLY = new Set<string>(SERVER_ONLY_VARS);
 
 /** False for Omni's sync, Connect and seal credentials (global only), the Grok Bot webhook and webhook signing secrets (any scope). */
@@ -29,6 +31,25 @@ export const SCOPE_RE = /^(global|channel:[a-z0-9-]+)$/;
 
 const account = (scope: string, name: string) => `${scope}/${name}`;
 
+type SecretListener = (scope: string, name: string) => void;
+const listeners = new Set<SecretListener>();
+
+/** Called after a secret is set or deleted, with its scope and name. For code that reads a secret once and caches it. */
+export function onSecretChange(fn: SecretListener): () => void {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
+}
+
+function changed(scope: string, name: string) {
+  for (const fn of listeners) {
+    try {
+      fn(scope, name);
+    } catch (err) {
+      console.error('[secrets] change listener failed:', (err as Error).message);
+    }
+  }
+}
+
 export function listSecrets(): { scope: string; name: string; updated_at: string }[] {
   return db.prepare('SELECT scope, name, updated_at FROM secrets ORDER BY scope, name').all() as any;
 }
@@ -42,11 +63,13 @@ export async function setSecret(scope: string, name: string, value: string) {
     `INSERT INTO secrets (scope, name) VALUES (?, ?)
      ON CONFLICT(scope, name) DO UPDATE SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
   ).run(scope, name);
+  changed(scope, name);
 }
 
 export async function deleteSecret(scope: string, name: string) {
   await secretStore().remove(account(scope, name));
   db.prepare('DELETE FROM secrets WHERE scope = ? AND name = ?').run(scope, name);
+  changed(scope, name);
 }
 
 function readSecret(scope: string, name: string): Promise<string | null> {

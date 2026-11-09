@@ -21,12 +21,12 @@ The QR payload is a JSON object with `version` set to `1`, `serverUrl` set to th
   "api": 1,
   "auth": { "via": "session", "method": "pairing", "sessionId": "..." },
   "pairing": { "app": true, "codeTtlSeconds": 300 },
-  "push": { "registration": true, "delivery": false },
+  "push": { "registration": true, "delivery": false, "problem": "missing APNS_KEY_ID, APNS_TEAM_ID, APNS_AUTH_KEY" },
   "streams": { "sse": true, "closeOnRevoke": true }
 }
 ```
 
-For install-token authentication, `auth.via` is `token`, and `auth.method` and `auth.sessionId` are null. A Google session has `auth.method` set to `google`. `push.delivery` is `true` only when the server has an APNs key (see Push delivery). Clients must reject API versions they do not support rather than assume an unknown response is compatible.
+For install-token authentication, `auth.via` is `token`, and `auth.method` and `auth.sessionId` are null. A Google session has `auth.method` set to `google`. `push.delivery` is `true` only when the server has an APNs key (see Push delivery). While it is `false`, `push.problem` says why, naming the missing secrets and never a value. It is `null` once alerts can go out, and absent from servers older than the field. Clients must reject API versions they do not support rather than assume an unknown response is compatible.
 
 ## Sessions
 
@@ -44,12 +44,12 @@ The server sends alerts directly to Apple with the team's APNs key, a `.p8` file
 
 Set these in the secret store (Keychain, libsecret or `data/secrets.json`), or as environment variables with the same names:
 
-- `APNS_AUTH_KEY`: the `.p8` file's PEM text. Literal `\n` sequences are read as newlines.
+- `APNS_AUTH_KEY`: the `.p8` file's PEM text. Settings, then Secrets, takes one line, so paste the file's text there as it is: the server puts the line breaks back. Literal `\n` sequences work too. The key never reaches an agent's environment.
 - `APNS_KEY_ID`: the ten-character id of that key.
 - `APNS_TEAM_ID`: the Apple developer team id.
 - `APNS_BUNDLE_ID`: optional. Defaults to `app.omni-os.ios`.
 
-With any of the first three missing, or the key unreadable, nothing is sent and `push.delivery` is `false`. The server logs once at startup which names are missing, never their values. Restart the server after changing them.
+With any of the first three missing, or the key unreadable, nothing is sent, `push.delivery` is `false` and `push.problem` names the cause. The server logs which names are missing, never their values. Setting or deleting one of these secrets loads them again, so no restart is needed. A value in the environment needs a restart. The iPhone app's Notifications screen and the Omni for iOS card in Settings both show the problem.
 
 Each registration names its environment, and each request goes to the matching APNs host (`sandbox` or `production`). Alerts expire after 15 minutes. APNs answers every request, so there are no receipts to poll.
 

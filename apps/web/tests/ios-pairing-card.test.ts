@@ -9,12 +9,15 @@ import { createRoot, type Root } from 'react-dom/client';
 const CONNECTED = { enabled: true, relayReady: true, signedIn: true, hostname: 'bens-mac-a1b2c3.omni-os.app', url: 'https://bens-mac-a1b2c3.omni-os.app', connectPage: null, tunnel: { state: 'connected', error: null }, error: null };
 let connect: Omit<typeof CONNECTED, 'url'> & { url: string | null } = CONNECTED;
 let via = 'token';
+let push: unknown = { registration: true, delivery: true, problem: null };
 let reply: () => Promise<unknown> = async () => ({ code: 'AB12', expiresAt: new Date(Date.now() + 120_000).toISOString() });
 const posts: string[] = [];
 
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
-  actual.api.get = vi.fn(async (path: string) => (path === '/auth/account' ? { available: true, issuer: null, owner: null, via } : connect)) as typeof actual.api.get;
+  actual.api.get = vi.fn(async (path: string) =>
+    path === '/auth/account' ? { available: true, issuer: null, owner: null, via } : path === '/capabilities' ? { api: 1, push } : connect,
+  ) as typeof actual.api.get;
   actual.api.post = vi.fn(async (path: string) => {
     posts.push(path);
     return reply();
@@ -39,6 +42,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   posts.length = 0;
   via = 'token';
+  push = { registration: true, delivery: true, problem: null };
   reply = async () => ({ code: 'AB12', expiresAt: new Date(Date.now() + 120_000).toISOString() });
   connect = CONNECTED;
   host = document.createElement('div');
@@ -70,6 +74,19 @@ const mount = async () => {
   await act(async () => root.render(createElement(IosPairingSection)));
   await flush();
 };
+
+it('says alerts are off and which APNs secrets are missing, with a way to Secrets', async () => {
+  push = { registration: true, delivery: false, problem: 'missing APNS_KEY_ID, APNS_AUTH_KEY' };
+  await mount();
+  const note = host.querySelector('[data-push-note]');
+  expect(note?.textContent).toContain('Alerts to the iPhone app are off: this server has no APNs key (missing APNS_KEY_ID, APNS_AUTH_KEY).');
+  expect(note?.querySelector('a')?.getAttribute('href')).toContain('secrets');
+});
+
+it('says nothing about alerts when the server can send them', async () => {
+  await mount();
+  expect(host.querySelector('[data-push-note]')).toBeNull();
+});
 
 it('asks for no code until you press the button', async () => {
   await mount();

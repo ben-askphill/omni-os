@@ -135,6 +135,7 @@ function ServerBody({ server }: { server: PairedServer }) {
 
   return (
     <View>
+      {prefs.deliveryNote ? <Text style={[styles.note, { color: colors.fg2 }]}>{prefs.deliveryNote}</Text> : null}
       {renderPrefs()}
       {registration[server.id] === 'failed' ? (
         <Text style={[styles.note, { color: colors.fg2 }]}>{REGISTRATION_FAILED}</Text>

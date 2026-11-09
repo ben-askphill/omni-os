@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import type { ServerCapabilities } from '@omni/shared/app-pairing.ts';
 import type { ConnectStatus } from '@omni/server/connect/service.ts';
 import { api, useApi } from '../api.ts';
 import { QrCode } from '../components/QrCode.tsx';
-import { Button, ErrorNote, Label, Loading, Picker } from '../components/ui.tsx';
+import { Button, ErrorNote, Label, LinkButton, Loading, Picker } from '../components/ui.tsx';
 import {
   clock,
   NEEDS_INSTALL_TOKEN,
@@ -11,12 +12,14 @@ import {
   pairingOptions,
   pairingPayload,
   parseEnteredAddress,
+  pushDeliveryNote,
   parsePairingCode,
   remoteHttpsOrigin,
   secondsLeft,
   SOURCE_LABEL,
   unchecked,
 } from '../pair-ios.ts';
+import { href } from '../router.ts';
 import type { AuthAccount } from './GoogleAccount.tsx';
 import { Advanced, Card, InfoRow } from './settings-parts.tsx';
 
@@ -38,6 +41,7 @@ export function IosPairingSection() {
   const onRemote = !!remoteHttpsOrigin(location.origin);
   const connect = useApi<ConnectStatus>(onRemote ? null : '/connect');
   const account = useApi<AuthAccount>('/auth/account');
+  const pushNote = pushDeliveryNote(useApi<ServerCapabilities>('/capabilities').data?.push);
   const { reload } = connect;
   const [entered, setEntered] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -119,6 +123,14 @@ export function IosPairingSection() {
         <Loading />
       ) : (
         <>
+          {pushNote && (
+            <div data-push-note className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-fg-2">
+              <p className="min-w-0 flex-1 basis-64">{pushNote}</p>
+              <LinkButton size="sm" href={href.settingsSection('secrets')} icon="key">
+                Open Secrets
+              </LinkButton>
+            </div>
+          )}
           {!onRemote && connect.error && !connect.data && <ErrorNote onRetry={reload}>{connect.error}</ErrorNote>}
           {address ? (
             <div className="space-y-2 text-[13px]">

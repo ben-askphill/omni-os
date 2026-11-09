@@ -6,7 +6,12 @@ import {
   type Fetch,
   type OmniApi,
 } from '@omni/client-core';
-import type { AppPushPreferences, AppPushPreferencesUpdate, AppPushTokenRequest } from '@omni/shared/app-pairing.ts';
+import type {
+  AppPushPreferences,
+  AppPushPreferencesUpdate,
+  AppPushTokenRequest,
+  ServerCapabilities,
+} from '@omni/shared/app-pairing.ts';
 
 import type { PushServer } from './registration';
 import type { ThreadProbe } from './tap';
@@ -18,6 +23,8 @@ export interface PushServerApi {
   probeThread(server: PushServer, threadId: string): Promise<ThreadProbe>;
   preferences(server: PushServer): Promise<AppPushPreferences>;
   setPreferences(server: PushServer, update: AppPushPreferencesUpdate): Promise<AppPushPreferences>;
+  /** Whether the server can send alerts at all. */
+  delivery(server: PushServer): Promise<ServerCapabilities['push']>;
 }
 
 export interface PushServerApiDeps {
@@ -50,6 +57,7 @@ export function createPushServerApi(deps: PushServerApiDeps): PushServerApi {
     },
     preferences: (server) => apiFor(server).pushPreferences(),
     setPreferences: (server, update) => apiFor(server).setPushPreferences(update),
+    delivery: (server) => apiFor(server).pushDelivery(),
   };
 }
 

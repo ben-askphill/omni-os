@@ -1,7 +1,8 @@
 import type { AppPushKind, AppPushPreferences } from '@omni/shared/app-pairing.ts';
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 
 import { describePushError } from './api';
+import { deliveryNote } from './delivery';
 import { initialPrefs, prefsReducer, shownPreferences } from './preferences';
 import type { PushServer } from './registration';
 import { useNotifications } from './NotificationsProvider';
@@ -16,6 +17,8 @@ export interface PushPreferencesView {
   saveError: string | null;
   toggle(kind: AppPushKind, value: boolean): void;
   retry(): void;
+  /** Why this server cannot send alerts, once it has said so. Null while it can, or has not answered. */
+  deliveryNote: string | null;
 }
 
 /** One server's alert choices: loaded when the screen opens, and each switch saves on its own, sending only that key. */
@@ -39,6 +42,18 @@ export function usePushPreferences(server: PushServer): PushPreferencesView {
 
   useEffect(() => load(), [load]);
 
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.delivery({ id, origin }).then(
+      (push) => !cancelled && setNote(deliveryNote(push)),
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [api, id, origin]);
+
   return {
     status: state.status,
     message: state.status === 'error' ? state.message : null,
@@ -53,5 +68,6 @@ export function usePushPreferences(server: PushServer): PushPreferencesView {
       );
     },
     retry: () => void load(),
+    deliveryNote: note,
   };
 }

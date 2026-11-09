@@ -1,13 +1,14 @@
 // Push alerts to the native app. An alert only tells the phone to fetch: the title and a generic body, plus the thread or
 // channel id for a deep link. Never the prompt, a question, a thread name or a code. Triggers in the runner call the
-// notify functions at the bottom. With no APNs key configured every call is a no-op, and startPush says so once.
+// notify functions at the bottom. With no APNs key configured every call is a no-op, and startPush says why. Setting or
+// deleting one of the APNs secrets loads the config again, so no restart is needed.
 import { createPrivateKey } from 'node:crypto';
 import { threads, type ThreadStatus } from './db.ts';
 import { sessionIsLive } from './google-auth.ts';
 import { classify, http2Transport, providerTokens, type ApnsKey, type ApnsResponse, type ApnsTransport } from './push-apns.ts';
 import { pushTargets, type PushTarget } from './push-preferences.ts';
 import { forgetPushToken } from './push-tokens.ts';
-import { globalSecret } from './secrets.ts';
+import { globalSecret, onSecretChange } from './secrets.ts';
 import type { AppPushKind } from '@omni/shared/app-pairing.ts';
 
 export interface PushEvent {
@@ -40,11 +41,28 @@ export interface PushConfig {
   bundleId: string;
 }
 
+const PEM_HEAD = '-----BEGIN PRIVATE KEY-----';
+const PEM_TAIL = '-----END PRIVATE KEY-----';
+
+/**
+ * The .p8 key as PEM, however it was saved: the file's text, its newlines written as `\n`, or its newlines lost to the
+ * one-line secret field (Settings, then Secrets, and the secret store refuse line breaks). OpenSSL needs the header,
+ * the base64 and the footer on their own lines, so the base64 is put back on 64-character lines. Empty when there is
+ * nothing to read.
+ */
+export function apnsKeyPem(raw: string): string {
+  const text = raw.replace(/\\n/g, '\n');
+  const start = text.indexOf(PEM_HEAD);
+  const end = text.indexOf(PEM_TAIL);
+  const body = (start >= 0 && end > start ? text.slice(start + PEM_HEAD.length, end) : text).replace(/\s+/g, '');
+  return body ? `${PEM_HEAD}\n${body.match(/.{1,64}/g)!.join('\n')}\n${PEM_TAIL}` : '';
+}
+
 /** The config, or the reason there is none. The reason names secrets and never shows a value. */
 export function loadPushConfig(read: (name: string) => string | null | undefined): { config: PushConfig } | { problem: string } {
   const keyId = read(PUSH_SECRETS.keyId)?.trim() ?? '';
   const teamId = read(PUSH_SECRETS.teamId)?.trim() ?? '';
-  const pem = (read(PUSH_SECRETS.key) ?? '').replace(/\\n/g, '\n').trim();
+  const pem = apnsKeyPem(read(PUSH_SECRETS.key) ?? '');
   const missing = [
     !keyId && PUSH_SECRETS.keyId,
     !teamId && PUSH_SECRETS.teamId,
@@ -77,6 +95,8 @@ export interface PushSender {
   readonly configured: boolean;
   /** Fire and forget. Errors are logged, never thrown into the caller. */
   send(event: PushEvent): void;
+  /** Closes the connection to APNs, when this sender is replaced. */
+  close(): void;
 }
 
 const ALERTS: Record<AppPushKind, { title: string; body: string }> = {
@@ -155,28 +175,52 @@ export function createPushSender(deps: PushSenderDeps): PushSender {
       const body = payloadFor(event);
       for (const t of targets) run(() => deliver(t, body)).catch((err: Error) => deps.log(`[push] ${err.message}`));
     },
+    close: () => deps.transport.close(),
   };
 }
 
-export const noopPushSender: PushSender = { configured: false, send() {} };
+export const noopPushSender: PushSender = { configured: false, send() {}, close() {} };
 
 let installed: PushSender = noopPushSender;
+/** Why alerts cannot go out, naming secrets and never a value. Null once they can, or before startPush has run. */
+let problem: string | null = null;
 
-export function installPushSender(sender: PushSender) {
+export function installPushSender(sender: PushSender, why: string | null = null) {
+  if (installed !== sender) installed.close();
   installed = sender;
+  problem = sender.configured ? null : why;
 }
 
-/** Whether alerts can go out. GET /api/capabilities reports it as push.delivery. */
-export const pushDelivery = () => installed.configured;
+/** Whether alerts can go out, and why not. GET /api/capabilities reports it as push.delivery and push.problem. */
+export const pushStatus = () => ({ delivery: installed.configured, problem: installed.configured ? null : problem });
 
-/** Reads the config once, installs the sender, and logs why it did not when the config is missing. Restart to change it. */
-export async function startPush(): Promise<void> {
+const PUSH_SECRET_NAMES = new Set<string>(Object.values(PUSH_SECRETS));
+let loading: Promise<void> = Promise.resolve();
+let watching = false;
+
+/**
+ * Reads the config, installs the sender, and logs why not when the config is missing. Runs again whenever an APNs
+ * secret is set or deleted. Loads run one after another, so saving the three secrets in a row installs the last read.
+ */
+export function startPush(): Promise<void> {
+  if (!watching) {
+    watching = true;
+    onSecretChange((scope, name) => {
+      if (scope === 'global' && PUSH_SECRET_NAMES.has(name)) void startPush();
+    });
+  }
+  loading = loading.then(loadAndInstall, loadAndInstall);
+  return loading;
+}
+
+async function loadAndInstall(): Promise<void> {
   const values: Record<string, string | null> = {};
   for (const name of Object.values(PUSH_SECRETS)) {
     values[name] = (await globalSecret(name).catch(() => null)) ?? process.env[name] ?? null;
   }
   const loaded = loadPushConfig((name) => values[name]);
   if ('problem' in loaded) {
+    installPushSender(noopPushSender, loaded.problem);
     console.log(`[push] not configured, no alerts will be sent: ${loaded.problem}`);
     return;
   }

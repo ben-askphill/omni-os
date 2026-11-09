@@ -24,7 +24,7 @@ const Q = {
 let sent: PushEvent[] = [];
 beforeEach(() => {
   sent = [];
-  installPushSender({ configured: true, send: (event) => void sent.push(event) });
+  installPushSender({ configured: true, send: (event) => void sent.push(event), close() {} });
 });
 afterEach(() => installPushSender(noopPushSender));
 

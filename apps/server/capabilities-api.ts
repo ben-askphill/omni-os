@@ -2,7 +2,7 @@
 // pairing to learn what to turn on. Add a field when a client needs to know before it tries.
 import { Hono } from 'hono';
 import { PAIRING_TTL_MS } from './app-pairing.ts';
-import { pushDelivery } from './push-sender.ts';
+import { pushStatus } from './push-sender.ts';
 
 export const capabilitiesApi = new Hono();
 
@@ -13,7 +13,7 @@ capabilitiesApi.get('/', (c) => {
     api: 1,
     auth: { via: auth?.via === 'session' ? 'session' : 'token', method: session?.method ?? null, sessionId: session?.session ?? null },
     pairing: { app: true, codeTtlSeconds: PAIRING_TTL_MS / 1000 },
-    push: { registration: true, delivery: pushDelivery() },
+    push: { registration: true, ...pushStatus() },
     streams: { sse: true, closeOnRevoke: true },
   });
 });

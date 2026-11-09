@@ -326,7 +326,7 @@ describe('a paired app session', () => {
       api: 1,
       auth: { via: 'session', method: 'pairing', sessionId },
       pairing: { app: true, codeTtlSeconds: 300 },
-      push: { registration: true, delivery: false },
+      push: { registration: true, delivery: false, problem: null },
       streams: { sse: true, closeOnRevoke: true },
     });
     const list = (await (await req('GET', '/auth/devices', undefined, as(token))).json()) as { devices: { id: string; current: boolean }[] };
