@@ -200,3 +200,8 @@ export function useActionsView(live: ActionsLive | null): ActionsView | null {
     () => (live ? live.view.get() : null),
   );
 }
+
+/** Ben's claude.ai Artifacts and the server's refresh state, for the Library's claude.ai switch. */
+export function useClaudeArtifacts() {
+  return useStore(useLiveHub().claudeArtifacts);
+}

@@ -27,6 +27,7 @@ import {
   type ThreadOpen,
   type UploadTransport,
 } from '@omni/client-core';
+import type { ClaudeArtifactsSchedule } from '@omni/shared/claude-artifacts.ts';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { earlierCursor, type HistoryPage, type Span } from '@omni/shared/history.ts';
 import type { Answer } from '@omni/shared/question.ts';
@@ -43,6 +44,7 @@ import { createActionsLive, type ActionsLive } from './actions';
 import { createActivityLive, type ActivityState } from './activity';
 import { createFolderCollapse, createPendingFolders } from './folders';
 import { linkOf, type Link } from './connection';
+import { createClaudeArtifactsLive, type ClaudeArtifactsLiveState } from './claude-artifacts';
 import { createLibraryLive, type LibraryState } from './library';
 import type { OmniSession } from './session';
 import { createStore, type Store } from './store';
@@ -124,6 +126,8 @@ export interface LiveHub {
   readonly needsYou: Store<NeedsYouState>;
   readonly activity: Store<ActivityState>;
   readonly library: Store<LibraryState>;
+  /** Ben's claude.ai Artifacts, for the Library's claude.ai switch. Loads once the switch is first shown. */
+  readonly claudeArtifacts: Store<ClaudeArtifactsLiveState>;
   refreshChannels(): Promise<void>;
   /** Runs one API call with the session's credentials, retried once after a 401. Rejects with 'Not paired' without a server. */
   request<T>(call: (api: OmniApi) => Promise<T>): Promise<T>;
@@ -134,6 +138,11 @@ export interface LiveHub {
   /** Ben saw this result. The inbox drops it now and the server confirms. */
   markResultRead(uid: string): Promise<void>;
   refreshLibrary(): Promise<void>;
+  /** The claude.ai switch was shown: load the list and ask the server to list again unless it did in the last ten minutes. */
+  openClaudeArtifacts(): Promise<void>;
+  /** Pull to refresh on the claude.ai switch: the server lists again now. */
+  refreshClaudeArtifacts(): Promise<void>;
+  setClaudeArtifactsSchedule(schedule: ClaudeArtifactsSchedule): Promise<void>;
   /** The file's bytes, fetched with the token here and handed on as content. Nothing downstream holds the token. */
   fetchArtifactFile(artifact: Pick<Artifact, 'id' | 'updated_at'>, signal?: AbortSignal): Promise<RawResponse>;
   /** Puts the thread and handoff a handoff, takeover or cancel answer carried into the open thread's view, before the stream repeats them. */
@@ -202,6 +211,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
 
   const activity = createActivityLive({ api, withAuth, now });
   const library = createLibraryLive({ api, withAuth, now });
+  const claudeArtifacts = createClaudeArtifactsLive({ api, withAuth });
 
   function requireApi(): OmniApi {
     if (!api) throw new Error('Not paired');
@@ -315,6 +325,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         if (isNeedsYouChange(message)) void refreshNeedsYou();
         activity.applyFeed(message);
         library.applyFeed(message);
+        claudeArtifacts.applyFeed(message);
       },
       // The feed keeps no replay, so every reconnect refetches the list. The open thread catches up through its own stream.
       onReconnect: () => {
@@ -322,6 +333,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         void refreshNeedsYou();
         void activity.refresh();
         void library.refresh();
+        void claudeArtifacts.reload();
       },
       onState: (state) => {
         feedState = state;
@@ -572,6 +584,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     needsYou,
     activity: activity.state,
     library: library.state,
+    claudeArtifacts: claudeArtifacts.state,
     refreshChannels,
     request: (call) => withAuth(() => call(requireApi())),
     uploadLimitMb,
@@ -584,6 +597,9 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     markResultRead,
     refreshActivity: activity.refresh,
     refreshLibrary: library.refresh,
+    openClaudeArtifacts: claudeArtifacts.open,
+    refreshClaudeArtifacts: claudeArtifacts.refresh,
+    setClaudeArtifactsSchedule: claudeArtifacts.setSchedule,
     fetchArtifactFile: (artifact, signal) => withAuth(() => requireApi().artifactFile(artifact, signal)),
     applyHandoff(thread, handoff) {
       for (const t of openThreads) t.applyHandoff(thread, handoff);

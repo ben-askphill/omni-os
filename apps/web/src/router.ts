@@ -29,7 +29,8 @@ export type Route =
    * result's entry (@omni/shared/settings-catalog.ts) to scroll to.
    */
   | { name: 'settings'; section?: SettingsSection; focus?: string }
-  | { name: 'artifacts' }
+  /** `source: 'claude'`: Ben's claude.ai Artifacts (components/ClaudeArtifacts.tsx) in place of the files threads made. */
+  | { name: 'artifacts'; source?: 'claude' }
   /** Every channel's pull requests in one list: the phone's PRs tab, a Workspace page on the desktop. */
   | { name: 'prs' }
   | { name: 'new-channel' }
@@ -83,6 +84,7 @@ export function parseHash(hash: string): Route {
     if (section) return { name: 'settings', section, focus: q.get('focus') || undefined };
   }
   if (a === 'artifacts' && !b) return { name: 'artifacts' };
+  if (a === 'artifacts' && b === 'claude' && !c) return { name: 'artifacts', source: 'claude' };
   if (a === 'prs' && !b) return { name: 'prs' };
   if (a === 'new-channel' && !b) return { name: 'new-channel' };
   if (a === 'quick-prompt' && !b) return { name: 'quick-prompt' };
@@ -168,6 +170,8 @@ export const href = {
   /** One Settings section: General, Workspace, Machines or Secrets. */
   settingsSection: (section: SettingsSection, focus?: string) => settingsHash(section, focus),
   artifacts: () => '#/artifacts',
+  /** The claude.ai list on the Artifacts page (the phone's Library). */
+  claudeArtifacts: () => '#/artifacts/claude',
   /** Every channel's PRs. One channel's is `prs(id)`. */
   pullRequests: () => '#/prs',
   newChannel: () => '#/new-channel',

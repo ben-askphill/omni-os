@@ -1,0 +1,75 @@
+{
+  "items": [
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "url": "https://claude.ai/artifact/QSdTnbQX1opbT77DCnKk1J",
+      "title": "Quarterly roadmap deck",
+      "scope": "mine",
+      "type": "slides",
+      "updated_on": "2026-11-08",
+      "rank": 0,
+      "local": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "url": "https://claude.ai/artifact/5QqqUYX1DQV3uhpEb1g77C",
+      "title": "Checkout audit — desktop and phone",
+      "scope": "mine",
+      "type": "page",
+      "updated_on": "2026-11-05",
+      "rank": 1,
+      "local": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "url": "https://claude.ai/artifact/QR1b2QEGY7Pd9ketph7gAL",
+      "title": "Team design system",
+      "scope": "mine",
+      "type": "design-system",
+      "updated_on": "2026-11-02",
+      "rank": 2,
+      "local": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "url": "https://claude.ai/artifact/KffYyc8EMmhUZRS7AJXva3",
+      "title": "Shipping rates dashboard",
+      "scope": "mine",
+      "type": "dashboard",
+      "updated_on": "2026-10-28",
+      "rank": 3,
+      "local": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "url": "https://claude.ai/artifact/3xnoYyRuXHnMPuaLkkvCkx",
+      "title": "Customer records — status",
+      "scope": "shared",
+      "type": "page",
+      "updated_on": null,
+      "rank": 4,
+      "local": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "url": "https://claude.ai/artifact/L2oHFX5CyvnRivrHSiUzae",
+      "title": "Migration review · Example Store",
+      "scope": "shared",
+      "type": "page",
+      "updated_on": null,
+      "rank": 5,
+      "local": null
+    }
+  ],
+  "state": {
+    "schedule": "daily",
+    "last_attempt_at": "2026-01-05T09:00:00.000Z",
+    "last_success_at": "2026-01-05T09:00:00.000Z",
+    "types_at": "2026-01-05T09:00:00.000Z",
+    "total": 6,
+    "complete": true,
+    "error": null,
+    "cli_version": "2.1.278",
+    "refreshing": false
+  }
+}

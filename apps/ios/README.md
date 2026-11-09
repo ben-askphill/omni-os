@@ -86,7 +86,7 @@ These screens call the server through `hub.request` (`src/live/hub.ts`), which r
 
 ## Library and artifacts
 
-The Library tab lists the 60 newest files the agents made, as phone web does, with the same filters (All, Pages, Images, Docs, Data, from `@omni/shared/artifacts.ts`). It loads when a server opens, refetches once after a burst of changed files (1.5 seconds of quiet), and again after a reconnect or a return to the foreground. A failed refresh keeps the list on screen and says so. Pull down to refresh.
+The Library tab lists the 60 newest files the agents made, as phone web does, with the same filters (All, Pages, Images, Docs, Data, from `@omni/shared/artifacts.ts`). It loads when a server opens, refetches once after a burst of changed files (1.5 seconds of quiet), and again after a reconnect or a return to the foreground. A failed refresh keeps the list on screen and says so. Pull down to refresh. Its **claude.ai** switch lists your Artifacts on claude.ai from the server's cache ([claude.ai Artifacts](../../docs/user/claude-artifacts.md)): search, Mine, Shared or All, and the freshness line. Opening the switch asks the server for a listing unless it ran in the last ten minutes, pulling down always asks, and a tap opens the page with `Linking.openURL` (the Claude app or Safari).
 
 Tapping a file opens the Artifact screen. `openArtifact(navigation, artifact)` in `src/navigation/open-artifact.ts` is the one entry the thread body calls. The route is registered in every tab's stack, so it opens inside the tab you are in. The screen follows the newest version of the file from the Library's live list.
 

@@ -49,6 +49,8 @@ const NAMES = [
   'threads.json',
   'recent.json',
   'artifacts.json',
+  // The claude.ai Artifacts list after a refresh through the fake CLI's Artifact listing.
+  'claude-artifacts.json',
   'error-not-found.json',
   'thread-stream.sse',
   // A stream opened with a stale `after`: the newest page in a sync, in place of a replay (#224).
@@ -282,6 +284,8 @@ async function boot(): Promise<number> {
       OMNI_CURSOR_DASHBOARD: '0',
       OMNI_CURSOR_API_URL: 'http://127.0.0.1:9',
       OMNI_BROWSER: '0',
+      // No scheduled claude.ai Artifacts listing mid-recording: the test refreshes it once itself.
+      OMNI_CLAUDE_ARTIFACTS: '0',
       OMNI_BRAIN_DIR: join(tmp, 'brain'),
       OMNI_DEFAULT_MODEL: 'sonnet',
       OMNI_KEEPALIVE_SECONDS: '60',
@@ -414,6 +418,9 @@ async function scenario() {
   keep('error-not-found.json', await call('GET', '/threads/nope', undefined, false));
   got.set('thread-stream.sse', await stream.stop());
   got.set('feed.sse', await feed.stop());
+  // After the feed is kept, so its claude_artifacts events stay out of feed.sse.
+  await call('POST', '/claude-artifacts/refresh', { force: true, wait: true });
+  keep('claude-artifacts.json', await get('/claude-artifacts'));
   const stale = capture(`${base}/api/threads/${id}/stream?after=stale`);
   await eventually(async () => sent(stale.text(), 'sync'), () => `the snapshot sync:\n${stale.text()}`);
   // Up to the sync: whether the context reading follows it in time is a race.

@@ -18,7 +18,9 @@ export type FeedEvent =
   /** An event automation's delivery was saved or moved on (automation-triggers.ts). Clients refetch the automations. */
   | { type: 'automation_delivery'; automation: string }
   /** The update check or Update moved on (update.ts). Clients refetch GET /api/update. */
-  | { type: 'update' };
+  | { type: 'update' }
+  /** A claude.ai Artifacts refresh started or ended, or its schedule changed (claude-artifacts.ts). Clients refetch the list when it ends. */
+  | { type: 'claude_artifacts'; state: unknown };
 
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);

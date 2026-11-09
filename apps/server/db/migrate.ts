@@ -254,6 +254,22 @@ CREATE TABLE IF NOT EXISTS pr_watches (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS pr_watches_due ON pr_watches(next_poll_at) WHERE state = 'watching';
+-- Ben's claude.ai Artifacts as the claude CLI lists them (claude-artifacts.ts): a cache of the last good listing, keyed
+-- by the page's uuid. Machine-local, not synced: each Mac lists the same account itself. gone_at hides a page a
+-- complete listing no longer had. The meta table holds the run state and the schedule.
+CREATE TABLE IF NOT EXISTS claude_artifacts (
+  id TEXT PRIMARY KEY,
+  url TEXT NOT NULL,
+  title TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  type TEXT,
+  updated_on TEXT,
+  rank INTEGER NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  gone_at TEXT
+);
+CREATE TABLE IF NOT EXISTS claude_artifacts_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS pr_watch_events (
   thread_id TEXT NOT NULL REFERENCES pr_watches(thread_id) ON DELETE CASCADE,
   key TEXT NOT NULL,

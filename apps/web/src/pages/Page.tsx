@@ -27,7 +27,7 @@ export function Page({ route }: { route: Route }) {
     case 'settings':
       return <SettingsPage section={route.section} focus={route.focus} />;
     case 'artifacts':
-      return <ArtifactsPage />;
+      return <ArtifactsPage source={route.source} />;
     case 'prs':
       return <AllPRsPage />;
     case 'new-channel':

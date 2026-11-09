@@ -39,6 +39,8 @@ export type QAStep =
   | { kind: 'wait'; ms: number }
   | { kind: 'waitFor'; selector: string; timeoutMs: number }
   | { kind: 'expect'; selector: string; text: string | null; timeoutMs: number }
+  /** A link the app handed to the system browser (shell.openExternal, stubbed in a QA run) contains this text. */
+  | { kind: 'expectExternal'; text: string; timeoutMs: number }
   | { kind: 'command'; command: DesktopCommand }
   | { kind: 'menu'; path: string[] }
   | { kind: 'window'; target: WindowTarget; timeoutMs: number }
@@ -131,7 +133,7 @@ export function swiftUICondition(value: string): string | null {
 }
 
 const STEP_KEYS = [
-  'route', 'click', 'fill', 'type', 'press', 'wait', 'sleep', 'expect', 'command', 'menu', 'window', 'openWindow',
+  'route', 'click', 'fill', 'type', 'press', 'wait', 'sleep', 'expect', 'expectExternal', 'command', 'menu', 'window', 'openWindow',
   'openThread', 'appearance', 'zoom', 'size', 'screenshot', 'snapshot', 'quit',
 ] as const;
 
@@ -188,6 +190,14 @@ export function parseStep(raw: unknown): Result<QAStep> {
       const timeoutMs = timeoutOf(inner);
       if (isError(timeoutMs)) return timeoutMs;
       return { kind: 'expect', selector, text: typeof inner.text === 'string' ? inner.text : null, timeoutMs };
+    }
+    case 'expectExternal': {
+      if (typeof value === 'string' && value) return { kind: 'expectExternal', text: value, timeoutMs: DEFAULT_TIMEOUT_MS };
+      const want = text(inner?.text);
+      if (!inner || !want) return { error: 'expectExternal needs the text the opened link contains, or {"text": "...", "timeout": 5}' };
+      const timeoutMs = timeoutOf(inner);
+      if (isError(timeoutMs)) return timeoutMs;
+      return { kind: 'expectExternal', text: want, timeoutMs };
     }
     case 'command':
       return (QA_COMMANDS as readonly unknown[]).includes(value)
@@ -433,7 +443,8 @@ interface Report {
   port: number | null;
   dataDir: string | null;
   steps: StepReport[];
-  facts: { route: string | null; windows: { url: string; title: string; bounds: Bounds | null; zoom: number | null }[] };
+  /** `external`: the links the app handed to the system browser during the run, in order. */
+  facts: { route: string | null; windows: { url: string; title: string; bounds: Bounds | null; zoom: number | null }[]; external: string[] };
   pageErrors: string[];
 }
 
@@ -456,7 +467,7 @@ function bail(out: string | null, report: Report, message: string, code: number)
 }
 
 async function main(argv: readonly string[]): Promise<number> {
-  const report: Report = { ok: true, error: null, app: { executable: null, packaged: false }, port: null, dataDir: null, steps: [], facts: { route: null, windows: [] }, pageErrors: [] };
+  const report: Report = { ok: true, error: null, app: { executable: null, packaged: false }, port: null, dataDir: null, steps: [], facts: { route: null, windows: [], external: [] }, pageErrors: [] };
   const args = parseArgs(argv);
   if (isError(args)) bail(null, report, args.error, 2);
   const out = resolve(args.out);
@@ -543,8 +554,23 @@ async function main(argv: readonly string[]): Promise<number> {
       }),
     );
     report.facts.route = current && !current.isClosed() ? new URL(current.url()).hash || null : null;
+    report.facts.external = await external();
   };
 
+  // A QA run never opens the real browser: the system-browser hand-off is recorded instead, for expectExternal.
+  const external = () =>
+    app.evaluate(() => [...((globalThis as unknown as { __qaExternal?: string[] }).__qaExternal ?? [])]).catch(() => [] as string[]);
+  try {
+    await app.evaluate(({ shell }) => {
+      const opened: string[] = [];
+      (globalThis as unknown as { __qaExternal: string[] }).__qaExternal = opened;
+      shell.openExternal = async (url: string) => {
+        opened.push(url);
+      };
+    });
+  } catch (err) {
+    report.pageErrors.push(`could not stub shell.openExternal: ${(err as Error).message}`);
+  }
   try {
     const first = await app.firstWindow({ timeout: 60_000 });
     // The window opens on /api/auth/desktop-pair, which sends it on to the Web UI.
@@ -637,6 +663,16 @@ async function main(argv: readonly string[]): Promise<number> {
                 if (Date.now() > deadline) throw new Error(`${step.selector} shows "${seen.slice(0, 200)}", not "${want}"`);
                 await page.waitForTimeout(100);
               }
+            }
+            break;
+          }
+          case 'expectExternal': {
+            const deadline = Date.now() + step.timeoutMs;
+            for (;;) {
+              const opened = await external();
+              if (opened.some((u) => u.includes(step.text))) break;
+              if (Date.now() > deadline) throw new Error(`no link with "${step.text}" went to the system browser; it got ${JSON.stringify(opened)}`);
+              await page.waitForTimeout(100);
             }
             break;
           }
