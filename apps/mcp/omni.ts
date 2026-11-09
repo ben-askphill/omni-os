@@ -587,7 +587,7 @@ server.registerTool(
 
 /** A claude.ai page title as one plain line of at most 200 characters: no control characters or line breaks. */
 const plainTitle = (t: string) => {
-  const one = t.replace(/[\u0000-\u001f\u007f-\u009f  ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const one = t.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
   return one.length > 200 ? `${one.slice(0, 199)}…` : one;
 };
 
