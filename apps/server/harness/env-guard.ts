@@ -2,7 +2,7 @@
 // channel and global secrets, then strips the variables that would switch that
 // harness off its subscription onto API billing. The guard wins: a secret whose
 // name is on the strip list never reaches that harness. The Grok Bot webhook is
-// stripped for every harness too. Pure, so it is testable.
+// stripped for every harness too, and so is the APNs key. Pure, so it is testable.
 import type { HarnessId } from './types.ts';
 
 /**
@@ -23,13 +23,15 @@ export const STRIPPED_VARS: Record<HarnessId, string[]> = {
 /** The Grok Bot webhook. The server reads these. A harness process and a thread's terminal do not. */
 export const GROKBOT_WEBHOOK_URL = 'GROKBOT_WEBHOOK_URL';
 export const GROKBOT_WEBHOOK_AUTH = 'GROKBOT_WEBHOOK_AUTH';
-export const SERVER_ONLY_VARS = [GROKBOT_WEBHOOK_URL, GROKBOT_WEBHOOK_AUTH] as const;
+/** The key the server signs the iPhone app's alerts with (PUSH_SECRETS in push-sender.ts). */
+const APNS_VARS = ['APNS_KEY_ID', 'APNS_TEAM_ID', 'APNS_AUTH_KEY', 'APNS_BUNDLE_ID'] as const;
+export const SERVER_ONLY_VARS = [GROKBOT_WEBHOOK_URL, GROKBOT_WEBHOOK_AUTH, ...APNS_VARS] as const;
 
 /**
  * The environment a harness process gets. `base` is Omni's own environment
  * (defaults to process.env). `secrets` are the channel and global secret values.
  * Secrets override the base, then the harness's stripped variables are removed
- * whatever their source. The Grok Bot webhook is removed for every harness.
+ * whatever their source. The Grok Bot webhook and the APNs key are removed for every harness.
  */
 export function harnessEnv(
   harness: HarnessId,
