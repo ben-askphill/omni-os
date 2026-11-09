@@ -1,11 +1,13 @@
-// Omni's windows: each one the Web UI, with the bridge's preload. Links to other sites open in the default browser;
+// Omni's windows: each one the Web UI, with the bridge's preload. Links to other sites open in the default browser
+// (a claude.ai artifact in the Claude app when it is installed, open-external.ts);
 // a link to an Omni route opens an Omni window. The main window opens where it was last closed.
-import { app, BrowserWindow, Menu, screen, session, shell, type WebContents } from 'electron';
+import { app, BrowserWindow, Menu, screen, session, type WebContents } from 'electron';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { clampZoom, ZOOM_STEP } from '@omni/shared/desktop-bridge.ts';
 import type { AppContext } from './context.ts';
 import { editMenuTemplate } from './menu-template.ts';
+import { openExternal } from './open-external.ts';
 import { safeRoute } from './options.ts';
 import {
   appPermissionAllowed,
@@ -204,7 +206,7 @@ export function createOmniWindow(ctx: AppContext, input: { kind: WindowKind; rou
           },
         };
       case 'external':
-        void shell.openExternal(target.url);
+        openExternal(target.url);
         return { action: 'deny' };
       case 'none':
         return { action: 'deny' };
@@ -214,14 +216,14 @@ export function createOmniWindow(ctx: AppContext, input: { kind: WindowKind; rou
     const childGesture = trackGestures(child.webContents);
     child.webContents.setWindowOpenHandler(({ url }) => {
       const target = linkTarget(url, origins());
-      if (target.kind === 'external' && childGesture()) void shell.openExternal(target.url);
+      if (target.kind === 'external' && childGesture()) openExternal(target.url);
       return { action: 'deny' };
     });
     child.webContents.on('will-navigate', (event, url) => {
       if (staysInWindow(url, origins())) return;
       event.preventDefault();
       const target = linkTarget(url, origins());
-      if (target.kind === 'external' && childGesture()) void shell.openExternal(target.url);
+      if (target.kind === 'external' && childGesture()) openExternal(target.url);
     });
   });
 
@@ -230,7 +232,7 @@ export function createOmniWindow(ctx: AppContext, input: { kind: WindowKind; rou
     if (staysInWindow(url, origins())) return;
     event.preventDefault();
     const target = linkTarget(url, origins());
-    if (target.kind === 'external' && gesture()) void shell.openExternal(target.url);
+    if (target.kind === 'external' && gesture()) openExternal(target.url);
   });
 
   // Text fields and selections get the system's Cut, Copy and Paste, with spelling suggestions. Electron only hears

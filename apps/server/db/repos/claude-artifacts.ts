@@ -41,15 +41,15 @@ const meta = {
 function localPublished(): Map<string, NonNullable<ClaudeArtifact['local']>> {
   const rows = db
     .prepare(
-      `SELECT a.id, a.url, a.thread_id, t.title AS thread_title, t.channel_id FROM artifacts a JOIN threads t ON t.id = a.thread_id
+      `SELECT a.id, a.url, a.kind, a.updated_at, a.thread_id, t.title AS thread_title, t.channel_id FROM artifacts a JOIN threads t ON t.id = a.thread_id
        WHERE a.url IS NOT NULL ORDER BY a.updated_at ASC, a.id ASC`,
     )
-    .all() as unknown as { id: number; url: string; thread_id: string; thread_title: string; channel_id: string }[];
+    .all() as unknown as { id: number; url: string; kind: string; updated_at: string; thread_id: string; thread_title: string; channel_id: string }[];
   const out = new Map<string, NonNullable<ClaudeArtifact['local']>>();
   // Oldest first, so the newest file per page is the one left.
   for (const r of rows) {
     const key = artifactKey(r.url);
-    if (key) out.set(key, { artifact_id: r.id, thread_id: r.thread_id, thread_title: r.thread_title, channel_id: r.channel_id });
+    if (key) out.set(key, { artifact_id: r.id, thread_id: r.thread_id, thread_title: r.thread_title, channel_id: r.channel_id, kind: r.kind, updated_at: r.updated_at });
   }
   return out;
 }

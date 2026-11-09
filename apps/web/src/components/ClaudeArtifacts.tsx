@@ -1,30 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  artifactPreview,
+  CLAUDE_ARTIFACT_LAYOUTS,
   CLAUDE_ARTIFACT_SCOPES,
   CLAUDE_ARTIFACTS_SCHEDULES,
   ERROR_TEXT,
   filterClaudeArtifacts,
   freshness,
   GALLERY_URL,
+  GRID_MIN_CARD,
+  parseLayout,
   typeLabel,
   typesIn,
   updatedLabel,
   type ClaudeArtifact,
+  type ClaudeArtifactsLayout,
   type ClaudeArtifactScopeFilter,
   type ClaudeArtifactsResponse,
   type ClaudeArtifactsSchedule,
   type ClaudeArtifactsState,
 } from '@omni/shared/claude-artifacts.ts';
 import { relTime } from '@omni/shared/format.ts';
-import { api, errorText, useApi } from '../api.ts';
+import { api, errorText, useApi, type Artifact } from '../api.ts';
 import { href } from '../router.ts';
-import { useFeed, useNow } from '../store.tsx';
+import { readPref, useFeed, useNow, writePref } from '../store.tsx';
+import { ArtifactThumb } from './ArtifactThumb.tsx';
 import { Loader } from './brand.tsx';
 import { Button, Empty, ErrorNote, Icon, Loading, Picker, Segmented, type IconName } from './ui.tsx';
 
 // Ben's claude.ai Artifacts (apps/server/claude-artifacts.ts): the list on the Artifacts page's claude.ai switch and the
-// phone Library's. Opening a row leaves Omni: a new tab in a browser, the system browser in the desktop app
-// (windows.ts hands a new-window link to shell.openExternal), Safari or the Claude app on a phone.
+// phone Library's, as rows or a grid of cards. Opening one leaves Omni on its https link: a new tab in a browser,
+// the Claude app in the desktop app when it is installed and the browser otherwise (apps/desktop/src/open-external.ts),
+// and on a phone Safari hands it to the Claude app through claude.ai's universal links. A browser cannot tell whether
+// the Claude app is installed, so it never tries the `claude:` scheme.
 
 const TYPE_ICON: Record<string, IconName> = {
   page: 'file',
@@ -36,6 +44,16 @@ const TYPE_ICON: Record<string, IconName> = {
   'design-system': 'grid',
 };
 const typeIcon = (type: string | null): IconName => (type ? (TYPE_ICON[type] ?? 'globe') : 'globe');
+
+/**
+ * Hover, press and keyboard focus (not a click's focus, which would leave an opened card lit) for a row or card. surface-3 is a step past both the resting
+ * surface and the page's bg in light and dark, so a hovered row never matches the page behind the list.
+ */
+const PRESSABLE =
+  'transition-colors hover:bg-surface-3 active:bg-surface-3 has-[a:focus-visible]:bg-surface-3 has-[a:focus-visible]:shadow-[inset_0_0_0_2px_var(--line-strong)]';
+
+const LAYOUT_PREF = 'claudeArtifacts.layout';
+const LAYOUT_ICON: Record<ClaudeArtifactsLayout, IconName> = { list: 'menu', grid: 'grid' };
 
 /** The list, its run state, and the calls that change them. Opening asks for a refresh, which the server skips when its last try is under ten minutes old. */
 export function useClaudeArtifacts() {
@@ -107,7 +125,7 @@ export function FreshnessLine({ state, onRefresh, compact }: { state: ClaudeArti
 /** One page: opens on claude.ai in a new tab or the system browser. A page an Omni thread published links to that thread too. */
 export function ClaudeArtifactRow({ a, now }: { a: ClaudeArtifact; now: number }) {
   return (
-    <li className="group relative flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors hover:bg-elev md:px-4">
+    <li className={`group relative flex min-w-0 items-center gap-3 px-3 py-2.5 md:px-4 ${PRESSABLE}`}>
       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
         <Icon name={typeIcon(a.type)} size={15} />
       </span>
@@ -136,9 +154,77 @@ export function ClaudeArtifactRow({ a, now }: { a: ClaudeArtifact; now: number }
           )}
         </div>
       </div>
-      <Icon name="arrowUpRight" size={15} className="shrink-0 text-fg-4 transition-colors group-hover:text-fg-2" />
+      <Icon name="arrowUpRight" size={15} className="shrink-0 text-fg-4 transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2" />
     </li>
   );
+}
+
+/**
+ * A card's picture: the local file when an Omni thread published the page (served by Omni, never fetched from
+ * claude.ai, which has no preview to fetch), else its type's drawing.
+ */
+function PreviewTile({ a, compact }: { a: ClaudeArtifact; compact?: boolean }) {
+  const p = artifactPreview(a);
+  if (p.kind === 'local') {
+    // A quarter scale on every width, so the page lays out as on a laptop, not at a card's width.
+    return <ArtifactThumb a={{ id: p.artifact_id, kind: p.file_kind as Artifact['kind'], updated_at: p.updated_at }} />;
+  }
+  return (
+    <div className="flex h-full w-full items-center justify-center text-fg-4">
+      <Icon name={typeIcon(p.type)} size={compact ? 24 : 28} strokeWidth={1.25} />
+    </div>
+  );
+}
+
+/** One page as a grid card: its preview, title, badges, and the thread that published it. Opens like a row. */
+export function ClaudeArtifactCard({ a, now, compact }: { a: ClaudeArtifact; now: number; compact?: boolean }) {
+  return (
+    <li className={`group relative flex min-w-0 flex-col rounded-[22px] bg-surface p-1.5 ${PRESSABLE}`}>
+      <div className="relative aspect-[16/10] overflow-hidden rounded-[16px] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]">
+        <PreviewTile a={a} compact={compact} />
+        <span className="absolute top-2 right-2 grid h-6 w-6 place-items-center rounded-full bg-elev text-fg-4 shadow-[var(--shadow-card)] transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2">
+          <Icon name="arrowUpRight" size={13} />
+        </span>
+      </div>
+      <div className="min-w-0 px-2 pt-2.5 pb-1.5">
+        <a
+          href={a.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block truncate text-[13.5px] font-medium text-fg after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+          title={a.title}
+        >
+          {a.title}
+        </a>
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-3">
+          <ArtifactTypeBadge type={a.type} />
+          <span>{a.scope === 'mine' ? 'Mine' : 'Shared'}</span>
+          {a.updated_on && <span className="font-num">{updatedLabel(a.updated_on, now)}</span>}
+        </div>
+        {a.local && (
+          <a
+            href={href.thread(a.local.thread_id, a.local.artifact_id)}
+            className="relative z-10 mt-1 block min-w-0 truncate text-[11.5px] text-fg-2 underline-offset-2 hover:underline"
+            title={`Published by ${a.local.thread_title}`}
+          >
+            From thread: {a.local.thread_title}
+          </a>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** The saved choice between rows and cards, the same on every page that shows the list in this browser. */
+function useLayout(): [ClaudeArtifactsLayout, (l: ClaudeArtifactsLayout) => void] {
+  const [layout, setLayout] = useState(() => parseLayout(readPref<unknown>(LAYOUT_PREF, null)));
+  return [
+    layout,
+    (l) => {
+      setLayout(l);
+      writePref(LAYOUT_PREF, l);
+    },
+  ];
 }
 
 function ErrorState({ state, onRetry }: { state: ClaudeArtifactsState; onRetry: () => void }) {
@@ -162,6 +248,7 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<ClaudeArtifactScopeFilter>('all');
   const [type, setType] = useState('all');
+  const [layout, setLayout] = useLayout();
   const items = res.data?.items ?? [];
   const state = res.data?.state;
   const types = useMemo(() => typesIn(items), [items]);
@@ -207,6 +294,15 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
           options={[{ value: 'all', label: 'All types', avatar: false }, ...types.map((t) => ({ value: t, label: typeLabel(t), icon: typeIcon(t), avatar: false as const }))]}
         />
       )}
+      <Segmented
+        label="Layout"
+        value={layout}
+        onChange={setLayout}
+        size="sm"
+        radio
+        className="ml-auto"
+        options={CLAUDE_ARTIFACT_LAYOUTS.map((l) => ({ id: l.id, icon: LAYOUT_ICON[l.id], title: l.label }))}
+      />
     </div>
   );
 
@@ -225,6 +321,16 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
         <Empty icon="globe" title={items.length ? 'Nothing matches' : 'No artifacts on claude.ai'}>
           {items.length ? 'Try another search or filter.' : 'Pages you publish from Claude show up here after the next refresh.'}
         </Empty>
+      ) : layout === 'grid' ? (
+        <ul
+          className="grid gap-3 md:gap-4"
+          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${compact ? GRID_MIN_CARD.compact : GRID_MIN_CARD.wide}px, 1fr))` }}
+          aria-label="claude.ai artifacts"
+        >
+          {list.map((a) => (
+            <ClaudeArtifactCard key={a.id} a={a} now={now} compact={compact} />
+          ))}
+        </ul>
       ) : (
         <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-[22px] bg-surface" aria-label="claude.ai artifacts">
           {list.map((a) => (

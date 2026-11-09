@@ -2,7 +2,8 @@ import { ARTIFACT_FILTERS, matchesArtifactFilter, type ArtifactFilter } from '@o
 import { useMemo, useState } from 'react';
 import type { ArtifactWithThread } from '../api.ts';
 import { Segmented } from '../components/ui.tsx';
-import { ArtifactThumb, useArtifacts } from '../pages/Artifacts.tsx';
+import { ArtifactThumb } from '../components/ArtifactThumb.tsx';
+import { useArtifacts } from '../pages/Artifacts.tsx';
 import { ArtifactSourceSwitch, ClaudeArtifactsView } from '../components/ClaudeArtifacts.tsx';
 import { href, useRoute } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';

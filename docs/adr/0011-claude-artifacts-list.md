@@ -11,7 +11,8 @@ Ben wants the Artifacts tab of the Claude app inside Omni: a list of his claude.
 - **The cache is machine-local.** `claude_artifacts` and `claude_artifacts_meta` are not synced: each Mac lists the same account itself.
 - **One key for both link forms.** `claude.ai/artifact/<id>` is the page's uuid in base58 (Bitcoin alphabet), and older publishes return `claude.ai/code/artifact/<uuid>`. Rows are keyed by the uuid, so a page an Omni thread published joins to its thread in either form. Checked on a real pair: `XYTPbBk9xkJor7Xz1DtD2a` is `f7567ad1-8b55-4689-b824-1a865c7fe003`.
 - **Refresh:** opening the screen runs only when the last attempt is over ten minutes old. Refresh always runs. A schedule (Off, every 6 hours, Daily; default Daily) is checked hourly. Type badges come from a second pass (`list scope:types`, then one `list type:<Name>` per type) at most once a day, so a plain refresh is one tool call.
-- **Opening leaves Omni:** a new tab in a browser, `shell.openExternal` in the desktop app, `Linking.openURL` on iOS (the Claude app or Safari). Never an in-app web view, which would hold a claude.ai login.
+- **Opening leaves Omni, in the Claude app where Omni can tell it is there.** The desktop app asks the OS whether anything handles `claude:` (the Claude desktop app registers it in its Info.plist) and, if so, opens `claude://claude.ai/artifact/<id>`, which the Claude app routes to its artifact viewer; a failed hand-off falls back to https (`apps/desktop/src/open-external.ts`). iOS opens the https link: claude.ai's apple-app-site-association claims `/artifact/*` and `/code/*` for the Claude app, so iOS picks the app or Safari itself, with no `canOpenURL` and no `LSApplicationQueriesSchemes`. A browser keeps https, since it cannot see installed apps and a `claude:` link with no app behind it fails. The https link stays the one shown and copied. Never an in-app web view, which would hold a claude.ai login.
+- **Grid previews come from Omni, never claude.ai.** The listing has no preview or screenshot URL and claude.ai pages cannot be framed, so a grid card shows the local file when an Omni thread published the page (an image as is, a page scaled down, both served by Omni) and its type's drawing otherwise. iOS draws every card by type, as its Files grid draws pages.
 
 ## Considered
 
@@ -27,4 +28,5 @@ Ben wants the Artifacts tab of the Claude app inside Omni: a list of his claude.
 - The format is undocumented, so a CLI update can break parsing. Omni then says so, keeps the last list, and links to the gallery on claude.ai. The run state records the CLI version to spot it.
 - The list is as fresh as the last run on the server. iOS and phone web read the same cache.
 - Artifacts shared from another organization are not listed; the tool says so itself.
+- The Claude desktop app gates its artifact deep link behind a feature flag. When the flag is off for an account, the app says it could not open the artifact instead of failing the hand-off, so Omni cannot fall back to the browser on its own.
 - Personal, single-user use through the official CLI under Ben's own login. Omni never holds a claude.ai cookie.

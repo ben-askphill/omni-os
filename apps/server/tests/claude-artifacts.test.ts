@@ -253,7 +253,15 @@ describe('/api/claude-artifacts', () => {
     expect(body.state).toMatchObject({ schedule: 'daily', refreshing: false, total: 6 });
     const deck = body.items.find((a) => a.title === 'Quarterly roadmap deck')!;
     expect(artifactKey(deck.url)).toBe(deck.id);
-    expect(deck.local).toEqual({ artifact_id: row.id, thread_id: 't-art', thread_title: 'Made the deck', channel_id: 'ch-art' });
+    expect(deck.local).toEqual({
+      artifact_id: row.id,
+      thread_id: 't-art',
+      thread_title: 'Made the deck',
+      channel_id: 'ch-art',
+      // The grid previews the local file, so it needs the file's kind and version.
+      kind: 'html',
+      updated_at: db.artifacts.get(row.id)!.updated_at,
+    });
     expect(body.items.find((a) => a.title === 'Team design system')?.local).toBeNull();
   });
 

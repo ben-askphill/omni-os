@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { freshnessText, rowDetail, rowLabel, typeIcon } from '../src/components/claude-artifacts/model';
+import { cardDetail, freshnessText, gridLayout, openUrl, rowDetail, rowLabel, typeIcon } from '../src/components/claude-artifacts/model';
 import { createLiveHub } from '../src/live/hub';
 import type { OmniSession } from '../src/live/session';
 
@@ -123,5 +123,23 @@ describe('what the rows and freshness line say', () => {
     expect(freshnessText({ ...STATE, last_success_at: '2026-11-07T09:00:00.000Z' }, NOW).tone).toBe('warn');
     expect(freshnessText({ ...STATE, error: { code: 'signed_out', message: 'x', at: STATE.last_success_at } }, NOW).tone).toBe('warn');
     expect(freshnessText({ ...STATE, last_success_at: null, error: { code: 'signed_out', message: 'x', at: STATE.last_success_at } }, NOW)).toEqual({ text: 'Never fetched', tone: 'warn', busy: false });
+  });
+});
+
+describe('claude.ai grid and links on iOS', () => {
+  it('opens the https link, which iOS hands to the Claude app through claude.ai universal links', () => {
+    expect(openUrl({ url: 'https://claude.ai/artifact/XYTPbBk9xkJor7Xz1DtD2a' })).toBe('https://claude.ai/artifact/XYTPbBk9xkJor7Xz1DtD2a');
+    expect(openUrl({ url: 'https://claude.ai/code/artifact/f7567ad1-8b55-4689-b824-1a865c7fe003' })).toBe('https://claude.ai/code/artifact/f7567ad1-8b55-4689-b824-1a865c7fe003');
+  });
+
+  it('fits two cards on a phone, more on an iPad, and splits the width between them', () => {
+    expect(gridLayout(358, 10)).toEqual({ columns: 2, card: 174 });
+    expect(gridLayout(288, 10)).toEqual({ columns: 1, card: 288 });
+    expect(gridLayout(1000, 10).columns).toBe(6);
+  });
+
+  it("says whose a card is and when it changed", () => {
+    expect(cardDetail({ scope: 'mine', updated_on: '2026-11-08' }, NOW)).toBe('Mine · 8 Nov');
+    expect(cardDetail({ scope: 'shared', updated_on: null }, NOW)).toBe('Shared');
   });
 });
