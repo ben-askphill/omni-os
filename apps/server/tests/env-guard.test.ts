@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GROKBOT_WEBHOOK_AUTH, GROKBOT_WEBHOOK_URL, harnessEnv, STRIPPED_VARS } from '../harness/env-guard.ts';
+import { GROKBOT_WEBHOOK_AUTH, GROKBOT_WEBHOOK_URL, harnessEnv, INHERITED_SERVER_VARS, STRIPPED_VARS } from '../harness/env-guard.ts';
 import { HARNESS_IDS } from '../harness/types.ts';
 
 describe('harness env guard', () => {
@@ -61,5 +61,19 @@ describe('harness env guard', () => {
       expect(env[GROKBOT_WEBHOOK_AUTH]).toBeUndefined();
       expect(env.PATH).toBe('/usr/bin');
     }
+  });
+
+  it('keeps the APNs key Omni inherited out of every harness, but not the APNs ids or a channel secret', () => {
+    expect(INHERITED_SERVER_VARS).toEqual(['APNS_AUTH_KEY']);
+    const dirty = { ...base, APNS_AUTH_KEY: 'from-env', APNS_KEY_ID: 'KEY1', APNS_TEAM_ID: 'TEAM1', APNS_BUNDLE_ID: 'app.omni-os.ios' } as NodeJS.ProcessEnv;
+    for (const harness of HARNESS_IDS) {
+      const env = harnessEnv(harness, {}, {}, dirty);
+      expect(env.APNS_AUTH_KEY).toBeUndefined();
+      expect(env).toMatchObject({ APNS_KEY_ID: 'KEY1', APNS_TEAM_ID: 'TEAM1', APNS_BUNDLE_ID: 'app.omni-os.ios', PATH: '/usr/bin' });
+      // A channel secret of that name is the channel's own (a global one never gets here: secretReachesThread).
+      expect(harnessEnv(harness, {}, { APNS_AUTH_KEY: 'channel-key' }, dirty).APNS_AUTH_KEY).toBe('channel-key');
+    }
+    // Building the child's environment leaves the server's own untouched, so it can still sign with the key.
+    expect(dirty.APNS_AUTH_KEY).toBe('from-env');
   });
 });

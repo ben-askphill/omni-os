@@ -22,7 +22,7 @@ The first build runs in your own terminal, because EAS asks for your Apple ID an
 
    `--no-wait` returns once the build is queued. The build and the submission carry on at expo.dev, which links them.
 3. **Save the App Store Connect app id.** In App Store Connect, open the app, then App Information, and copy the Apple ID (a number). Put it in `submit.production.ios.ascAppId` in `eas.json` and commit. A non-interactive submission needs it. It is not secret.
-4. **Create an APNs key** for push alerts. In Certificates, Identifiers and Profiles, under Keys, add a key with **Apple Push Notifications service (APNs)** enabled. Download the `.p8` file once. Note the ten-character Key ID, and the Team ID under Membership details.
+4. **Create an APNs key** for push alerts. In Certificates, Identifiers and Profiles, under Keys, add a key with **Apple Push Notifications service (APNs)** enabled. Its environment must include Production, because TestFlight and App Store builds get production device tokens (Sandbox & Production works). If you limit the key to topics, include `app.omni-os.ios`. Download the `.p8` file once. Note the ten-character Key ID, and the Team ID under Membership details.
 5. **Save the APNs values in Omni's secret store.** Save these three names:
    - `APNS_AUTH_KEY`: the `.p8` file's text. Paste all of it into the one-line field; the server restores the line breaks.
    - `APNS_KEY_ID`: the Key ID from step 4.

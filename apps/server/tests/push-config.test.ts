@@ -9,6 +9,8 @@ await startRunner({ OMNI_SECRET_STORE: 'file' });
 const { app } = await import('../app.ts');
 const { startPush } = await import('../push-sender.ts');
 const { secretReachesThread } = await import('../secrets.ts');
+const { harnessEnv } = await import('../harness/env-guard.ts');
+const { terminalEnv } = await import('../terminal-env.ts');
 
 const PEM = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
 
@@ -41,5 +43,23 @@ describe('APNs secrets', () => {
   it('keeps the signing key out of every agent environment', () => {
     expect(secretReachesThread('global', 'APNS_AUTH_KEY')).toBe(false);
     expect(secretReachesThread('global', 'APNS_KEY_ID')).toBe(true);
+  });
+
+  it('reads a key set in the server environment, and keeps it out of harness and terminal environments', async () => {
+    for (const name of ['APNS_AUTH_KEY', 'APNS_KEY_ID']) expect((await req('DELETE', '/secrets', { scope: 'global', name })).status).toBe(200);
+    const vars = { APNS_AUTH_KEY: PEM.replace(/\n/g, '\\n'), APNS_KEY_ID: 'ENVKEY1234', APNS_TEAM_ID: 'ENVTEAM123' };
+    Object.assign(process.env, vars);
+    try {
+      await startPush();
+      expect(await push()).toEqual({ registration: true, delivery: true, problem: null });
+      for (const env of [harnessEnv('claude-code', {}), harnessEnv('codex', {}), terminalEnv()]) {
+        expect(env.APNS_AUTH_KEY).toBeUndefined();
+        expect(env.APNS_KEY_ID).toBe('ENVKEY1234');
+        expect(env.APNS_TEAM_ID).toBe('ENVTEAM123');
+      }
+      expect(process.env.APNS_AUTH_KEY).toBe(vars.APNS_AUTH_KEY);
+    } finally {
+      for (const name of Object.keys(vars)) delete process.env[name];
+    }
   });
 });

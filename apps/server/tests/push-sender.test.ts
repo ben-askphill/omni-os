@@ -216,6 +216,22 @@ describe('when APNs is not configured', () => {
     expect(JSON.stringify(loaded)).not.toContain('not-a-key-secret');
   });
 
+  it('refuses at load time a key that parses but cannot sign ES256, naming its type and never its value', () => {
+    const pkcs8 = (pair: { privateKey: { export(o: { type: 'pkcs8'; format: 'pem' }): string | Buffer } }) =>
+      pair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    for (const [pem, problem] of [
+      [pkcs8(generateKeyPairSync('rsa', { modulusLength: 2048 })), 'APNS_AUTH_KEY is RSA, but APNs needs an EC P-256 key'],
+      [pkcs8(generateKeyPairSync('ec', { namedCurve: 'P-384' })), 'APNS_AUTH_KEY is EC on curve secp384r1, but APNs needs P-256'],
+      [pkcs8(generateKeyPairSync('ed25519')), 'APNS_AUTH_KEY is ED25519, but APNs needs an EC P-256 key'],
+    ]) {
+      const values: Record<string, string> = { APNS_KEY_ID: 'K', APNS_TEAM_ID: 'T', APNS_AUTH_KEY: pem };
+      const loaded = loadPushConfig((name) => values[name]);
+      expect(loaded).toEqual({ problem });
+      const body = pem.split('\n').find((l) => l && !l.startsWith('-----'))!;
+      expect(JSON.stringify(loaded)).not.toContain(body);
+    }
+  });
+
   it('reads a key whose newlines were written as \\n, and defaults the bundle id', () => {
     const values: Record<string, string> = { APNS_KEY_ID: ' KEY1 ', APNS_TEAM_ID: 'TEAM1', APNS_AUTH_KEY: PEM.replace(/\n/g, '\\n') };
     const loaded = loadPushConfig((name) => values[name]);

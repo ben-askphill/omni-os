@@ -44,7 +44,7 @@ The server sends alerts directly to Apple with the team's APNs key, a `.p8` file
 
 Set these in the secret store (Keychain, libsecret or `data/secrets.json`), or as environment variables with the same names:
 
-- `APNS_AUTH_KEY`: the `.p8` file's PEM text. Settings, then Secrets, takes one line, so paste the file's text there as it is: the server puts the line breaks back. Literal `\n` sequences work too. The key never reaches an agent's environment.
+- `APNS_AUTH_KEY`: the `.p8` file's PEM text. Settings, then Secrets, takes one line, so paste the file's text there as it is: the server puts the line breaks back. Literal `\n` sequences work too. It must be an EC P-256 key: an RSA key or another curve is refused when the config loads, and `push.problem` names the key type. The key never reaches an agent's environment or a thread's terminal, whether it is a global secret or set in the server's own environment.
 - `APNS_KEY_ID`: the ten-character id of that key.
 - `APNS_TEAM_ID`: the Apple developer team id.
 - `APNS_BUNDLE_ID`: optional. Defaults to `app.omni-os.ios`.

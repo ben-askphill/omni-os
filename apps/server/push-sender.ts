@@ -58,6 +58,23 @@ export function apnsKeyPem(raw: string): string {
   return body ? `${PEM_HEAD}\n${body.match(/.{1,64}/g)!.join('\n')}\n${PEM_TAIL}` : '';
 }
 
+/**
+ * Why `pem` cannot sign APNs tokens, or null when it can. APNs only takes ES256, so a key that parses but is RSA or on
+ * another curve fails here, at load time, rather than on the first alert. Names the key type, never the key.
+ */
+function notP256(pem: string): string | null {
+  let key;
+  try {
+    key = createPrivateKey(pem);
+  } catch {
+    return 'is not a P-256 private key';
+  }
+  if (key.asymmetricKeyType !== 'ec') return `is ${key.asymmetricKeyType?.toUpperCase() ?? 'an unknown type'}, but APNs needs an EC P-256 key`;
+  const curve = key.asymmetricKeyDetails?.namedCurve;
+  if (curve !== 'prime256v1') return `is EC on curve ${curve ?? 'unknown'}, but APNs needs P-256`;
+  return null;
+}
+
 /** The config, or the reason there is none. The reason names secrets and never shows a value. */
 export function loadPushConfig(read: (name: string) => string | null | undefined): { config: PushConfig } | { problem: string } {
   const keyId = read(PUSH_SECRETS.keyId)?.trim() ?? '';
@@ -69,11 +86,8 @@ export function loadPushConfig(read: (name: string) => string | null | undefined
     !pem && PUSH_SECRETS.key,
   ].filter(Boolean) as string[];
   if (missing.length) return { problem: `missing ${missing.join(', ')}` };
-  try {
-    createPrivateKey(pem);
-  } catch {
-    return { problem: `${PUSH_SECRETS.key} is not a P-256 private key` };
-  }
+  const wrongKey = notP256(pem);
+  if (wrongKey) return { problem: `${PUSH_SECRETS.key} ${wrongKey}` };
   return { config: { key: { keyId, teamId, pem }, bundleId: read(PUSH_SECRETS.bundleId)?.trim() || DEFAULT_BUNDLE_ID } };
 }
 

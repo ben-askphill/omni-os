@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 // terminal-env.ts imports secrets.ts, which imports db.ts. Nothing here reads the database.
 vi.mock('../db.ts', () => ({ db: { prepare: vi.fn() } }));
 
-import { GROKBOT_WEBHOOK_AUTH, GROKBOT_WEBHOOK_URL, SERVER_ONLY_VARS, STRIPPED_VARS } from '../harness/env-guard.ts';
+import { GROKBOT_WEBHOOK_AUTH, GROKBOT_WEBHOOK_URL, INHERITED_SERVER_VARS, SERVER_ONLY_VARS, STRIPPED_VARS } from '../harness/env-guard.ts';
 import { SYNC_SECRETS } from '../secrets.ts';
 import { terminalEnv } from '../terminal-env.ts';
 
@@ -66,11 +66,15 @@ describe('terminal env', () => {
     for (const names of Object.values(STRIPPED_VARS)) for (const name of names) dirty[name] = 'secret';
     for (const name of Object.values(SYNC_SECRETS)) dirty[name] = 'secret';
     for (const name of SERVER_ONLY_VARS) dirty[name] = 'secret';
+    for (const name of INHERITED_SERVER_VARS) dirty[name] = 'secret';
+    dirty.APNS_KEY_ID = 'KEY1';
 
     const env = terminalEnv(dirty);
     for (const names of Object.values(STRIPPED_VARS)) for (const name of names) expect(env[name]).toBeUndefined();
     for (const name of Object.values(SYNC_SECRETS)) expect(env[name]).toBeUndefined();
     for (const name of SERVER_ONLY_VARS) expect(env[name]).toBeUndefined();
+    expect(env.APNS_AUTH_KEY).toBeUndefined();
+    expect(env.APNS_KEY_ID).toBe('KEY1');
     expect(env.PATH).toBe('/bin');
     expect(env.HOME).toBe('/home/ben');
   });
