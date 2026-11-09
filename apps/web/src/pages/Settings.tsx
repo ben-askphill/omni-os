@@ -231,6 +231,7 @@ function WorktreesSection() {
       )}
       <div id={settingAnchor('worktree-retention')} className="scroll-mt-6 space-y-5">
         <span id={settingAnchor('worktree-storage')} />
+        <span id={settingAnchor('worktree-slim')} />
         <StorageSection />
       </div>
       <ServerOptions section="worktrees" />

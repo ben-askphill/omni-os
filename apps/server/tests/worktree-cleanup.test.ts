@@ -474,7 +474,7 @@ describe('retention settings', T, () => {
     const res = await app.request('/api/worktrees/retention', json('PUT', { enabled: true, idleDays: 30 }));
     expect(res.status).toBe(200);
     expect(((await res.json()) as View).cleanup.policy).toEqual({ enabled: true, idleDays: 30 });
-    expect(JSON.parse(readFileSync(configPath(), 'utf8')).worktrees).toEqual({ retention: { enabled: true, idleDays: 30 } });
+    expect(JSON.parse(readFileSync(configPath(), 'utf8')).worktrees.retention).toEqual({ enabled: true, idleDays: 30 });
     expect((await app.request('/api/worktrees/retention', json('PUT', { idleDays: 0 }))).status).toBe(400);
     expect(queued()).toBe(before);
     await app.request('/api/worktrees/retention', json('PUT', { enabled: false }));

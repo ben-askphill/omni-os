@@ -26,6 +26,7 @@ import { config, paths } from './config.ts';
 import { userConfig, writeUserConfig } from './user-config.ts';
 import { currentWorktreeScan, inspectWorktree, lastLook, ownership, scanToEnd, text, updateScanItem, type InspectOptions } from './worktree-inventory.ts';
 import { git, harnessCopies, owningRepo } from './worktree-sweep.ts';
+import { slimPass } from './worktree-slim.ts';
 import { keptRef, trashOf, withWorkspace } from './workspace.ts';
 
 const run = promisify(execFile);
@@ -36,7 +37,7 @@ export const retentionPolicy = (): RetentionPolicy => userConfig().worktrees.ret
 /** Saved in this Mac's omni.config.json, which never syncs: the other Mac keeps its own. */
 export function setRetentionPolicy(patch: Partial<RetentionPolicy>): RetentionPolicy {
   const cur = userConfig();
-  return writeUserConfig({ ...cur, worktrees: { retention: { ...cur.worktrees.retention, ...patch } } }).worktrees.retention;
+  return writeUserConfig({ ...cur, worktrees: { ...cur.worktrees, retention: { ...cur.worktrees.retention, ...patch } } }).worktrees.retention;
 }
 
 const runs: Record<CleanupTrigger, CleanupRun | null> = { manual: null, retention: null };
@@ -91,9 +92,16 @@ export async function retentionPass(opts: InspectOptions = {}): Promise<CleanupR
   return runCleanup('retention', cleanupCandidates(scan.items, 'retention', policy, opts.now), opts);
 }
 
-/** A minute after startup, then daily. Each pass reads the policy, so turning it on or off needs no restart. */
+/**
+ * A minute after startup, then daily: the retention pass, then stripping caches (worktree-slim.ts) from what it kept.
+ * Each pass reads its policy, so turning one on or off needs no restart.
+ */
 export function startWorktreeRetention() {
-  const pass = () => retentionPass().catch((err) => console.error('[worktrees] retention pass failed:', text(err)));
+  const pass = () =>
+    retentionPass()
+      .catch((err) => console.error('[worktrees] retention pass failed:', text(err)))
+      .then(() => slimPass())
+      .catch((err) => console.error('[worktrees] cache strip pass failed:', text(err)));
   setTimeout(pass, config.retentionFirstPassMs).unref();
   setInterval(pass, DAY).unref();
 }

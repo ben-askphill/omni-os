@@ -23,6 +23,7 @@
         "folder": true,
         "registered": true,
         "bytes": 24576,
+        "cacheBytes": 0,
         "sharedWith": [],
         "reasons": [
           {
@@ -56,6 +57,7 @@
         "folder": true,
         "registered": true,
         "bytes": 8192,
+        "cacheBytes": 0,
         "sharedWith": [],
         "reasons": [],
         "eligibleBecause": "archived",
@@ -76,6 +78,7 @@
         "folder": true,
         "registered": true,
         "bytes": 8192,
+        "cacheBytes": 0,
         "sharedWith": [],
         "reasons": [],
         "eligibleBecause": "archived",
@@ -142,6 +145,20 @@
     "runs": {
       "manual": null,
       "retention": null
+    }
+  },
+  "slim": {
+    "policy": {
+      "enabled": false,
+      "idleDays": 7
+    },
+    "preview": {
+      "candidates": [],
+      "bytes": 0
+    },
+    "runs": {
+      "manual": null,
+      "scheduled": null
     }
   }
 }

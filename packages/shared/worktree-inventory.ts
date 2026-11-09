@@ -62,6 +62,8 @@ export interface WorktreeItem {
   registered: boolean;
   /** Estimated disk use, null when it could not be measured. */
   bytes: number | null;
+  /** Of that, the build output and installs in it (node_modules, .build, dist...) that stripping caches deletes. Null when not measured. */
+  cacheBytes: number | null;
   /** Other threads that work in this folder. */
   sharedWith: string[];
   /** Why it stays. Empty for eligible and unknown. */

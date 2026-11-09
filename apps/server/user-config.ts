@@ -24,6 +24,7 @@ import {
   type UserConfigPatch,
 } from '@omni/shared/settings.ts';
 import { DEFAULT_RETENTION, RETENTION_DAYS } from '@omni/shared/worktree-cleanup.ts';
+import { DEFAULT_SLIM, SLIM_DAYS } from '@omni/shared/worktree-slim.ts';
 
 export { isTimezone, NAME_MAX };
 export type { AutomationOverride, UserConfig, UserConfigPatch } from '@omni/shared/settings.ts';
@@ -67,6 +68,13 @@ const schema = z.object({
         .object({
           enabled: z.boolean().default(DEFAULT_RETENTION.enabled),
           idleDays: z.number().int().min(RETENTION_DAYS.min).max(RETENTION_DAYS.max).default(DEFAULT_RETENTION.idleDays),
+        })
+        .prefault({}),
+      /** Stripping caches from idle worktrees on a schedule (worktree-slim.ts). */
+      slim: z
+        .object({
+          enabled: z.boolean().default(DEFAULT_SLIM.enabled),
+          idleDays: z.number().int().min(SLIM_DAYS.min).max(SLIM_DAYS.max).default(DEFAULT_SLIM.idleDays),
         })
         .prefault({}),
     })
