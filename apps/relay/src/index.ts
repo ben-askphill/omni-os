@@ -189,6 +189,7 @@ export default {
 export class Relay extends DurableObject<Env> {
   private store: RelayStore | null = null;
   private connectStore: ConnectStore | null = null;
+  private moving: Promise<void> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -208,6 +209,28 @@ export class Relay extends DurableObject<Env> {
       user,
     );
     return this.store;
+  }
+
+  /**
+   * Move change data left inline in SQLite out to R2, in the background, from the cursor saved after each run.
+   * A request starts it, since only a request names the user. Once done, a flag keeps it from scanning again.
+   */
+  private moveInline(store: RelayStore) {
+    this.moving ??= (async () => {
+      const storage = this.ctx.storage;
+      if (await storage.get<boolean>('inline_moved')) return;
+      let after = (await storage.get<number>('inline_moved_to')) ?? 0;
+      for (let next = await store.moveInline(after); next !== null; next = await store.moveInline(after)) {
+        after = next;
+        await storage.put('inline_moved_to', after);
+      }
+      await storage.put('inline_moved', true);
+      console.log('[relay] all change data is in R2');
+    })().catch((err: Error) => {
+      console.error(`[relay] moving change data to R2 stopped: ${err.message}`);
+      // The next request starts it again from the saved cursor.
+      this.moving = null;
+    });
   }
 
   private connectFor(user: string) {
@@ -257,6 +280,7 @@ export class Relay extends DurableObject<Env> {
       const user = req.headers.get('x-omni-user');
       if (!user) throw new RelayError(400, 'No user');
       const store = this.open(user);
+      this.moveInline(store);
 
       if (url.pathname.startsWith('/internal/') && url.pathname !== '/internal/token') return await this.internalRoute(req, user, url.pathname);
 

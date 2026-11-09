@@ -265,3 +265,26 @@ describe('replacing the active worker', () => {
     await sync.setActiveWorker(null);
   });
 });
+
+describe('auto-push while the relay fails', () => {
+  it('waits for the backoff retry instead of pushing on every new outbox row', async () => {
+    const inner = new MemoryTransport();
+    let pushes = 0;
+    const failing: typeof inner = Object.assign(Object.create(inner), {
+      push: async () => {
+        pushes++;
+        throw new Error('HTTP 500');
+      },
+    });
+    const w = sync.createSyncWorker({ transport: failing, machineId: 'mac-a', autoPushMs: 5 });
+    db.threads.update('l1', { title: 'queued' });
+    w.start();
+    await waitFor(() => w.status().failures === 1, 'first push failed');
+    for (let i = 0; i < 5; i++) {
+      db.threads.update('l1', { title: `edit ${i}` });
+      await new Promise((r) => setTimeout(r, 15));
+    }
+    w.stop();
+    expect(pushes).toBe(1);
+  });
+});

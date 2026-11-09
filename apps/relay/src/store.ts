@@ -1,6 +1,8 @@
 // One user's relay: the append-only change log and the machines' tokens, in the SQLite of that user's Durable
 // Object. A Durable Object runs one request at a time, so seq order is commit order and a pull of "seq > cursor"
 // never skips a row that committed late. Plain over an Sql interface, so the tests run it on node:sqlite.
+// The log keeps every change for good. A Durable Object's SQLite has a hard size cap, so SQLite holds only the index
+// and each push's change data goes to Blobs (R2) as one JSON array, the row pointing at "<key>#<index>".
 import { RelayError, sha256 } from './auth.ts';
 
 /** The part of a Durable Object's SqlStorage this uses. */
@@ -10,7 +12,7 @@ export interface Sql {
 
 type ChangeRow = { seq: number; machine_id: string; entity: string; entity_id: string; op: 'upsert' | 'delete'; data: string | null; blob: string | null; ts: string };
 
-/** Where a change too big for a SQLite value goes: R2 in the Worker, a Map in tests. */
+/** Where change data goes: R2 in the Worker, a Map in tests. */
 export interface Blobs {
   put(key: string, body: string): Promise<void>;
   get(key: string): Promise<string | null>;
@@ -31,8 +33,8 @@ export interface RemoteChange extends Change {
 
 /** Changes per push and per pull at most. */
 export const MAX_BATCH = 1000;
-/** A change's JSON longer than this goes to Blobs: a SQLite value in a Durable Object holds at most 2 MB. */
-export const INLINE_MAX = 1_000_000;
+/** Change data moved out of SQLite per batch object at most, so a batch fits in a Durable Object's memory. */
+export const MOVE_MAX_BYTES = 20_000_000;
 /** last_seen_at is written at most this often per token. */
 const TOUCH_MS = 60_000;
 
@@ -126,19 +128,15 @@ export class RelayStore {
     const list = (raw as { changes?: unknown } | null)?.changes;
     if (!Array.isArray(list) || list.length > MAX_BATCH) throw new RelayError(400, `Send {changes: [...]}, at most ${MAX_BATCH}`);
     const changes = list.map(checkChange);
-    // Big ones go to Blobs first, outside the transaction, which cannot wait on R2.
-    const rows = await Promise.all(
-      changes.map(async (c) => {
-        const data = c.data === null ? null : JSON.stringify(c.data);
-        if (data === null || data.length <= INLINE_MAX) return { c, data, blob: null as string | null };
-        const blob = `${this.user}/changes/${crypto.randomUUID()}.json`;
-        await this.blobs.put(blob, data);
-        return { c, data: null, blob };
-      }),
-    );
+    const data = changes.map((c) => (c.data === null ? null : JSON.stringify(c.data)));
+    // Written before the transaction, which cannot wait on R2. A push that fails after this leaves an unread object.
+    const blob = data.some((d) => d !== null) ? await this.putBatch(data.filter((d) => d !== null)) : null;
+    let part = 0;
     this.transaction(() => {
-      for (const { c, data, blob } of rows)
-        this.sql.exec('INSERT INTO changes (machine_id, entity, entity_id, op, data, blob, ts) VALUES (?, ?, ?, ?, ?, ?, ?)', c.machine_id, c.entity, c.entity_id, c.op, data, blob, c.ts);
+      changes.forEach((c, i) => {
+        const at = data[i] === null ? null : `${blob}#${part++}`;
+        this.sql.exec('INSERT INTO changes (machine_id, entity, entity_id, op, data, blob, ts) VALUES (?, ?, ?, ?, NULL, ?, ?)', c.machine_id, c.entity, c.entity_id, c.op, at, c.ts);
+      });
     });
     return new Set(changes.map((c) => c.machine_id));
   }
@@ -153,12 +151,53 @@ export class RelayStore {
         Math.max(1, Math.min(MAX_BATCH, limit)),
       )
       .toArray() as ChangeRow[];
+    // Rows from one push share a batch object: fetch each object once.
+    const batches = new Map<string, Promise<string[]>>();
+    const read = async (blob: string): Promise<string | null> => {
+      const hash = blob.lastIndexOf('#');
+      // A change from before batches: the whole object is its JSON.
+      if (hash < 0) return this.blobs.get(blob);
+      const key = blob.slice(0, hash);
+      if (!batches.has(key)) batches.set(key, this.blobs.get(key).then((t) => (t === null ? [] : (JSON.parse(t) as string[]))));
+      return (await batches.get(key)!)[Number(blob.slice(hash + 1))] ?? null;
+    };
     return Promise.all(
       rows.map(async (r) => {
-        const text = r.blob ? await this.blobs.get(r.blob) : r.data;
+        const text = r.blob ? await read(r.blob) : r.data;
         if (r.blob && text === null) throw new RelayError(500, `Change ${r.seq} lost its data`);
         return { seq: Number(r.seq), machine_id: r.machine_id, entity: r.entity, entity_id: r.entity_id, op: r.op, data: text === null ? null : JSON.parse(text), ts: r.ts };
       }),
     );
+  }
+
+  /** One batch object for these JSON texts. */
+  private async putBatch(texts: string[]): Promise<string> {
+    const key = `${this.user}/changes/${crypto.randomUUID()}.json`;
+    await this.blobs.put(key, JSON.stringify(texts));
+    return key;
+  }
+
+  /**
+   * Move change data still inline in SQLite (rows from before batches) into Blobs, a run of rows after seq `after`
+   * at a time. Returns the last seq moved, or null when none is left. Safe to stop and rerun at any point.
+   */
+  async moveInline(after: number, maxRows = 500): Promise<number | null> {
+    const sizes = this.sql
+      .exec('SELECT seq, length(data) AS n FROM changes WHERE seq > ? AND data IS NOT NULL ORDER BY seq LIMIT ?', after, maxRows)
+      .toArray() as { seq: number; n: number }[];
+    if (!sizes.length) return null;
+    let bytes = 0;
+    let last = Number(sizes[0].seq);
+    for (const { seq, n } of sizes) {
+      if (bytes && bytes + Number(n) > MOVE_MAX_BYTES) break;
+      bytes += Number(n);
+      last = Number(seq);
+    }
+    const rows = this.sql.exec('SELECT seq, data FROM changes WHERE seq > ? AND seq <= ? AND data IS NOT NULL ORDER BY seq', after, last).toArray() as { seq: number; data: string }[];
+    const blob = await this.putBatch(rows.map((r) => r.data));
+    this.transaction(() => {
+      rows.forEach((r, i) => this.sql.exec('UPDATE changes SET data = NULL, blob = ? WHERE seq = ?', `${blob}#${i}`, r.seq));
+    });
+    return last;
   }
 }
