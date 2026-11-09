@@ -3,6 +3,7 @@ import { ARTIFACT_FILTERS, matchesArtifactFilter, type ArtifactFilter } from '@o
 import { relTime, toDate } from '@omni/shared/format.ts';
 import { artifactUrl, useApi, type ArtifactWithThread } from '../api.ts';
 import { kindIcon } from '../components/ArtifactViewer.tsx';
+import { ArtifactSourceSwitch, ClaudeArtifactsView } from '../components/ClaudeArtifacts.tsx';
 import { Empty, ErrorNote, Icon, Loading, PageHeader, Segmented } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { readPref, useApp, useFeed, writePref } from '../store.tsx';
@@ -56,7 +57,23 @@ export function useArtifacts() {
   return res;
 }
 
-export function ArtifactsPage() {
+export function ArtifactsPage({ source }: { source?: 'claude' }) {
+  if (source === 'claude') return <ClaudeArtifactsPage />;
+  return <FilesPage />;
+}
+
+function ClaudeArtifactsPage() {
+  return (
+    <div className="scroll-thin h-full overflow-y-auto">
+      <PageHeader title="Artifacts" subtitle="Your Artifacts on claude.ai, as Claude Code lists them. Each opens on claude.ai." actions={<ArtifactSourceSwitch source="claude" />} />
+      <div className="max-w-4xl px-4 pt-2 pb-16 md:px-8">
+        <ClaudeArtifactsView />
+      </div>
+    </div>
+  );
+}
+
+function FilesPage() {
   const { channel } = useApp();
   const res = useArtifacts();
   const [filter, setFilter] = useState<ArtifactFilter>('all');
@@ -71,7 +88,7 @@ export function ArtifactsPage() {
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader title="Artifacts" subtitle="Pages, reports and files the crew produced, newest first." />
+      <PageHeader title="Artifacts" subtitle="Pages, reports and files the crew produced, newest first." actions={<ArtifactSourceSwitch source="files" />} />
       <div className="px-4 pt-2 pb-16 md:px-8">
         <div className="scroll-thin mb-5 max-w-full overflow-x-auto">
           <Segmented

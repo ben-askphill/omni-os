@@ -35,6 +35,9 @@ describe('linkTarget', () => {
   it('sends the web to the default browser and drops the rest', () => {
     expect(linkTarget('https://github.com/x', origins)).toEqual({ kind: 'external', url: 'https://github.com/x' });
     expect(linkTarget('mailto:a@b.c', origins).kind).toBe('external');
+    // A claude.ai artifact (the Artifacts page's claude.ai list) in either link form.
+    expect(linkTarget('https://claude.ai/artifact/QSdTnbQX1opbT77DCnKk1J', origins)).toEqual({ kind: 'external', url: 'https://claude.ai/artifact/QSdTnbQX1opbT77DCnKk1J' });
+    expect(linkTarget('https://claude.ai/code/artifact/f7567ad1-8b55-4689-b824-1a865c7fe003', origins).kind).toBe('external');
     expect(linkTarget('file:///etc/passwd', origins).kind).toBe('none');
     expect(linkTarget('javascript:alert(1)', origins).kind).toBe('none');
     expect(linkTarget('not a url', origins).kind).toBe('none');

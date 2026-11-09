@@ -6,6 +6,7 @@ import { paths } from './config.ts';
 // The runner's ports are bound before any route can reach it (apps/server/compose.ts).
 import './compose.ts';
 import { artifactsApi } from './artifacts-api.ts';
+import { claudeArtifactsApi } from './claude-artifacts-api.ts';
 import { authApi } from './auth-api.ts';
 import { capabilitiesApi } from './capabilities-api.ts';
 import { browserApi } from './browser-api.ts';
@@ -83,6 +84,7 @@ api.route('/threads', threadHistoryApi);
 api.route('/threads', toolOutputApi);
 api.route('/', feedApi);
 api.route('/artifacts', artifactsApi);
+api.route('/claude-artifacts', claudeArtifactsApi);
 api.route('/', githubApi);
 api.route('/', githubWebhookApi);
 api.route('/', automationDeliveriesApi);

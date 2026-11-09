@@ -7,6 +7,7 @@ import { activityApi } from './activity.ts';
 import { artifactsApi } from './artifacts.ts';
 import { automationsApi } from './automations.ts';
 import { changesApi } from './changes.ts';
+import { claudeArtifactsApi } from './claude-artifacts.ts';
 import { channelsApi } from './channels.ts';
 import { continueApi } from './continue.ts';
 import { crewApi } from './crew.ts';
@@ -28,6 +29,7 @@ export * from './activity.ts';
 export * from './artifacts.ts';
 export * from './automations.ts';
 export * from './changes.ts';
+export * from './claude-artifacts.ts';
 export * from './channels.ts';
 export * from './continue.ts';
 export * from './crew.ts';
@@ -59,6 +61,7 @@ export function createOmniApi(http: HttpClient) {
     ...pushApi(http),
     ...activityApi(http),
     ...artifactsApi(http),
+    ...claudeArtifactsApi(http),
     ...machinesApi(http),
     ...continueApi(http),
     ...searchApi(http),

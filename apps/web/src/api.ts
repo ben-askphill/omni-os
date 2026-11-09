@@ -1,3 +1,4 @@
+import type { ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
@@ -394,6 +395,8 @@ export type FeedEvent =
   | { type: 'automation_delivery'; automation: string }
   /** The update check or Update moved on: refetch GET /api/update. */
   | { type: 'update' }
+  /** A claude.ai Artifacts refresh started or ended, or its schedule changed. Refetch the list once `refreshing` is false. */
+  | { type: 'claude_artifacts'; state: ClaudeArtifactsState }
   | { type: 'reconnect' };
 
 /** GET /api/update (apps/server/update.ts): how far this server is behind main, and where Update is. */

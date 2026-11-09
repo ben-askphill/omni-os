@@ -14,6 +14,12 @@ describe('parseStep', () => {
     expect(parseStep({ quit: true })).toEqual({ kind: 'quit' });
   });
 
+  it('checks a link the app handed to the system browser', () => {
+    expect(parseStep({ expectExternal: 'claude.ai/artifact/' })).toEqual({ kind: 'expectExternal', text: 'claude.ai/artifact/', timeoutMs: 10_000 });
+    expect(parseStep({ expectExternal: { text: 'claude.ai', timeout: 3 } })).toEqual({ kind: 'expectExternal', text: 'claude.ai', timeoutMs: 3_000 });
+    expect(parseStep({ expectExternal: {} })).toHaveProperty('error');
+  });
+
   it('reads waits as ms or a selector', () => {
     expect(parseStep({ wait: 250 })).toEqual({ kind: 'wait', ms: 250 });
     expect(parseStep({ wait: 'text=Settings' })).toEqual({ kind: 'waitFor', selector: 'text=Settings', timeoutMs: 10_000 });
