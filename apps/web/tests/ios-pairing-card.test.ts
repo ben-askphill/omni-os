@@ -9,12 +9,20 @@ import { createRoot, type Root } from 'react-dom/client';
 const CONNECTED = { enabled: true, relayReady: true, signedIn: true, hostname: 'bens-mac-a1b2c3.omni-os.app', url: 'https://bens-mac-a1b2c3.omni-os.app', connectPage: null, tunnel: { state: 'connected', error: null }, error: null };
 let connect: Omit<typeof CONNECTED, 'url'> & { url: string | null } = CONNECTED;
 let via = 'token';
+let push: { registration: boolean; delivery: boolean; problem: string | null } | null = null;
 let reply: () => Promise<unknown> = async () => ({ code: 'AB12', expiresAt: new Date(Date.now() + 120_000).toISOString() });
 const posts: string[] = [];
 
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
-  actual.api.get = vi.fn(async (path: string) => (path === '/auth/account' ? { available: true, issuer: null, owner: null, via } : connect)) as typeof actual.api.get;
+  actual.api.get = vi.fn(async (path: string) => {
+    if (path === '/auth/account') return { available: true, issuer: null, owner: null, via };
+    if (path === '/capabilities') {
+      if (!push) throw new Error('Not found');
+      return { api: 1, push };
+    }
+    return connect;
+  }) as typeof actual.api.get;
   actual.api.post = vi.fn(async (path: string) => {
     posts.push(path);
     return reply();
@@ -39,6 +47,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   posts.length = 0;
   via = 'token';
+  push = null;
   reply = async () => ({ code: 'AB12', expiresAt: new Date(Date.now() + 120_000).toISOString() });
   connect = CONNECTED;
   host = document.createElement('div');
@@ -193,4 +202,34 @@ it('tells a refused browser the same when the server says no', async () => {
   const text = host.querySelector('[role="alert"]')?.textContent ?? '';
   expect(text).toContain('Forbidden: only the install token can pair an app.');
   expect(text).toContain('desktop app');
+});
+
+const pushRow = () => [...host.querySelectorAll('span')].find((el) => el.textContent === 'Push alerts')?.nextElementSibling?.textContent ?? null;
+
+it('shows push alerts on when the server can send them', async () => {
+  push = { registration: true, delivery: true, problem: null };
+  await mount();
+  expect(pushRow()).toBe('On');
+  expect(host.textContent).not.toContain('APNS_AUTH_KEY');
+});
+
+it('says why push alerts are off and which secrets to add, then to restart', async () => {
+  push = { registration: true, delivery: false, problem: 'missing APNS_KEY_ID, APNS_TEAM_ID, APNS_AUTH_KEY' };
+  await mount();
+  expect(pushRow()).toBe('Off');
+  expect(host.textContent).toContain('(missing APNS_KEY_ID, APNS_TEAM_ID, APNS_AUTH_KEY)');
+  expect(host.textContent).toContain('APNS_AUTH_KEY (the .p8 file’s text) in Secrets as global secrets, then restart Omni.');
+});
+
+it('shows push alerts to a browser that signed in with Google too', async () => {
+  via = 'session';
+  push = { registration: true, delivery: false, problem: 'APNS_AUTH_KEY is not a P-256 private key' };
+  await mount();
+  expect(pushRow()).toBe('Off');
+  expect(host.textContent).toContain('APNS_AUTH_KEY is not a P-256 private key');
+});
+
+it('leaves the row out when the server does not answer', async () => {
+  await mount();
+  expect(pushRow()).toBeNull();
 });

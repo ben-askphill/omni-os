@@ -22,13 +22,15 @@ The first build runs in your own terminal, because EAS asks for your Apple ID an
 
    `--no-wait` returns once the build is queued. The build and the submission carry on at expo.dev, which links them.
 3. **Save the App Store Connect app id.** In App Store Connect, open the app, then App Information, and copy the Apple ID (a number). Put it in `submit.production.ios.ascAppId` in `eas.json` and commit. A non-interactive submission needs it. It is not secret.
-4. **Create an APNs key** for push alerts. In Certificates, Identifiers and Profiles, under Keys, add a key with **Apple Push Notifications service (APNs)** enabled. Download the `.p8` file once. Note the ten-character Key ID, and the Team ID under Membership details.
-5. **Save the APNs values in Omni's secret store.** Save these three names:
-   - `APNS_AUTH_KEY`: the `.p8` file's text.
+4. **Create an APNs key** for push alerts. In Certificates, Identifiers and Profiles, under Keys, add a key with **Apple Push Notifications service (APNs)** enabled. Choose an environment that includes Production, because TestFlight and App Store builds get production device tokens. If you limit the key to topics, include `app.omni-os.ios`. Download the `.p8` file once. Note the ten-character Key ID, and the Team ID under Membership details.
+5. **Save the APNs values in Omni.** In Omni's Settings, open Secrets and save these three names as global secrets:
+   - `APNS_AUTH_KEY`: the `.p8` file's text, from the BEGIN line to the END line. The field drops the line breaks. Omni puts them back.
    - `APNS_KEY_ID`: the Key ID from step 4.
    - `APNS_TEAM_ID`: the Team ID.
 
-   The store is the Keychain on a Mac, `data/secrets.json` on Linux, or libsecret when `OMNI_SECRET_STORE` selects it. Restart the server afterward. The server logs the names of any missing values at startup, never the values. Keep the `.p8` file out of the repository. EAS does not need this key: Omni's server signs alerts with it directly.
+   Restart Omni. Then open Settings, Sharing & access, Omni for iOS and check that Push alerts shows On. If it shows Off, the line under it names what is missing or unreadable.
+
+   Do this on every Omni server the phone pairs with. Each server signs its own alerts, so a server without these secrets sends none. Keep the `.p8` file out of the repository. EAS does not need this key.
 6. **Prepare a privacy policy URL** before external testing or App Store review. Internal TestFlight testing does not ask for one. Host a page that says the app stores and sends data only to the Omni server the user pairs with.
 
 ## Build and submit

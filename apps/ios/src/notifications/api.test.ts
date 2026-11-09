@@ -61,6 +61,14 @@ describe('createPushServerApi', () => {
     expect(calls[0]?.method).toBe('GET');
   });
 
+  it("reads the named server's capabilities with that server's own token", async () => {
+    const push = { registration: true, delivery: false, problem: 'missing APNS_KEY_ID' };
+    const { api, calls } = setup(() => json({ api: 1, push }));
+
+    await expect(api.capabilities(b)).resolves.toMatchObject({ push });
+    expect(calls[0]).toMatchObject({ url: 'https://b.example.com/api/capabilities', method: 'GET', authorization: 'Bearer token-b' });
+  });
+
   it('tells a thread that exists from one that does not and from an unreachable server', async () => {
     const { api } = setup((call) => {
       const path = new URL(call.url).pathname;

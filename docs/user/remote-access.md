@@ -27,6 +27,8 @@ In Settings, open Sharing & access and choose Omni for iOS. Pairing takes the in
 
 Pick the address the phone will use. The card offers this page's address when it is HTTPS, then the Omni Connect address while the tunnel is connected. For Tailscale, run `tailscale serve --bg 4747`, open "Use another address" and enter your `.ts.net` name. The card cannot check that the phone reaches an address you typed.
 
+The card's Push alerts row says whether this Omni can send alerts to the app. Off means it has no APNs key yet, and the line under it says which global secrets to add in Secrets (see [apps/ios/RELEASE.md](../../apps/ios/RELEASE.md), step 5).
+
 Scan the QR code or type the manual code in the app. The code expires after five minutes and works once. The phone gets its own revocable app session, not the install token. Revoke a session under signed-in devices. A paired phone has the same access as a Google session, including the terminal and agents, so revoking does not undo commands it already ran.
 
 Once paired, the native app's tabs are Activity (phone web's Inbox list), Channels and Library, with New at the end of the tab bar. Settings uses the same shared catalog as the Web UI, including Channel Settings and About (native build, runtime and running update). Channel rows and headers show emoji, icon and SVG avatars. Details live in [apps/ios/README.md](../../apps/ios/README.md).

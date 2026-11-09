@@ -51,7 +51,12 @@ export interface ServerCapabilities {
     sessionId: string | null;
   };
   pairing: { app: boolean; codeTtlSeconds: number };
-  push: { registration: boolean; delivery: boolean };
+  push: {
+    registration: boolean;
+    delivery: boolean;
+    /** Why `delivery` is off, naming the missing or bad APNs secrets, never a value. An older server omits it. */
+    problem?: string | null;
+  };
   streams: { sse: boolean; closeOnRevoke: boolean };
 }
 

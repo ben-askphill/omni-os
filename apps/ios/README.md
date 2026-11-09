@@ -128,7 +128,7 @@ The server alerts a paired phone when a thread needs an answer, finishes or fail
 - **Registration.** Once allowed, the app sends the native APNs device token (not an Expo token) to every paired server with `PUT /api/auth/push-token`. It does so again on launch, when the app returns to the foreground, when a server is paired and when APNs announces a new token. Removing a server deletes the token first, then signs out.
 - **Environment.** A development client (`__DEV__`) registers `sandbox` tokens and every other build `production`. An EAS `development` build is signed ad hoc and gets production tokens, so start Metro with `EXPO_PUBLIC_PUSH_ENVIRONMENT=production` to register under the right name. `app.config.ts` sets the `aps-environment` entitlement through the `expo-notifications` plugin (`production` for the `preview` and `production` EAS profiles).
 - **Taps.** A tap opens the thread from a cold start, from the background and while the app is open. The alert names a thread and a channel but no server, so with several servers paired the app asks each one for the thread, active server first. A banner for the thread already on screen is suppressed.
-- **Choices.** Settings, then Notifications, shows the four kinds per server. Each switch sends only its own key.
+- **Choices.** Settings, then Notifications, shows the four kinds per server. Each switch sends only its own key. A server whose capabilities say it cannot send alerts (`push.delivery` false, no APNs key) gets a note under its switches, with the server's reason.
 
 To try a tap without Apple, drop a payload on the Simulator:
 

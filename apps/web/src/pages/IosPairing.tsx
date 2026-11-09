@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import type { ServerCapabilities } from '@omni/shared/app-pairing.ts';
 import type { ConnectStatus } from '@omni/server/connect/service.ts';
 import { api, useApi } from '../api.ts';
 import { QrCode } from '../components/QrCode.tsx';
@@ -17,6 +18,7 @@ import {
   SOURCE_LABEL,
   unchecked,
 } from '../pair-ios.ts';
+import { href } from '../router.ts';
 import type { AuthAccount } from './GoogleAccount.tsx';
 import { Advanced, Card, InfoRow } from './settings-parts.tsx';
 
@@ -38,6 +40,7 @@ export function IosPairingSection() {
   const onRemote = !!remoteHttpsOrigin(location.origin);
   const connect = useApi<ConnectStatus>(onRemote ? null : '/connect');
   const account = useApi<AuthAccount>('/auth/account');
+  const push = useApi<ServerCapabilities>('/capabilities').data?.push;
   const { reload } = connect;
   const [entered, setEntered] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -105,10 +108,28 @@ export function IosPairingSection() {
   };
 
   const subtitle = 'Pair the iPhone app by scanning a code. The code is short-lived and holds this Omni’s address, never your token.';
+  const pushAlerts = push && (
+    <div className="space-y-2 text-[13px]">
+      <InfoRow label="Push alerts">
+        <span>{push.delivery ? 'On' : 'Off'}</span>
+      </InfoRow>
+      {!push.delivery && (
+        <p className="text-[12px] text-fg-3">
+          Omni can’t send alerts to the iPhone app{push.problem ? ` (${push.problem})` : ''}. Add <code className="font-mono">APNS_KEY_ID</code>, <code className="font-mono">APNS_TEAM_ID</code> and{' '}
+          <code className="font-mono">APNS_AUTH_KEY</code> (the .p8 file’s text) in{' '}
+          <a className="underline underline-offset-2" href={href.settingsSection('secrets')}>
+            Secrets
+          </a>{' '}
+          as global secrets, then restart Omni.
+        </p>
+      )}
+    </div>
+  );
   if (account.data?.via === 'session') {
     return (
       <Card title="Omni for iOS" subtitle={subtitle}>
         <p className="text-[13px] text-fg-3">{NEEDS_INSTALL_TOKEN}</p>
+        {pushAlerts}
       </Card>
     );
   }
@@ -201,6 +222,7 @@ export function IosPairingSection() {
                 {expired && <span className="text-[12.5px] text-fg-3">The last code expired.</span>}
               </div>
             ))}
+          {pushAlerts}
         </>
       )}
       {error && <ErrorNote>{error}</ErrorNote>}

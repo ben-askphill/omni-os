@@ -186,6 +186,12 @@ describe('push registration', () => {
       { method: 'PUT', url: at('/auth/push-preferences'), body: { finished: false } },
     ]);
   });
+
+  it('reads whether the server can send alerts from its capabilities', async () => {
+    const { sent, api: a } = api();
+    await a.capabilities();
+    expect(sent).toEqual([{ method: 'GET', url: at('/capabilities') }]);
+  });
 });
 
 describe('channel actions in a thread', () => {

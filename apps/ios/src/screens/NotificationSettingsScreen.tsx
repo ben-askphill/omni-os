@@ -6,6 +6,7 @@ import { Text } from '../ui/Text';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import type { PermissionState } from '../notifications/permission';
 import { KIND_COPY, PUSH_KINDS } from '../notifications/preferences';
+import { usePushDeliveryNote } from '../notifications/usePushDeliveryNote';
 import { usePushPreferences } from '../notifications/usePushPreferences';
 import { usePairing } from '../pairing/PairingProvider';
 import type { PairedServer } from '../pairing/servers';
@@ -102,6 +103,7 @@ function ServerBody({ server }: { server: PairedServer }) {
   const { colors } = useOmniTheme();
   const { registration } = useNotifications();
   const prefs = usePushPreferences(server);
+  const deliveryNote = usePushDeliveryNote(server);
 
   function renderPrefs() {
     switch (prefs.status) {
@@ -136,6 +138,7 @@ function ServerBody({ server }: { server: PairedServer }) {
   return (
     <View>
       {renderPrefs()}
+      {deliveryNote ? <Text style={[styles.note, { color: colors.fg2 }]}>{deliveryNote}</Text> : null}
       {registration[server.id] === 'failed' ? (
         <Text style={[styles.note, { color: colors.fg2 }]}>{REGISTRATION_FAILED}</Text>
       ) : null}
