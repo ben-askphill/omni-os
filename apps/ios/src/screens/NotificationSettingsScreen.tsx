@@ -6,7 +6,7 @@ import { Text } from '../ui/Text';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import type { PermissionState } from '../notifications/permission';
 import { KIND_COPY, PUSH_KINDS } from '../notifications/preferences';
-import { usePushPreferences } from '../notifications/usePushPreferences';
+import { usePushDelivery, usePushPreferences } from '../notifications/usePushPreferences';
 import { usePairing } from '../pairing/PairingProvider';
 import type { PairedServer } from '../pairing/servers';
 import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
@@ -33,6 +33,9 @@ const PERMISSION_COPY: Record<
 
 const REGISTRATION_FAILED =
   'This server could not register this phone for alerts. Omni tries again when you open the app.';
+
+const NO_DELIVERY =
+  'This server sends no alerts yet because it has no APNs key. In Omni on that computer, save APNS_KEY_ID, APNS_TEAM_ID and APNS_AUTH_KEY under Settings, Secrets, then restart Omni.';
 
 export function NotificationSettingsScreen() {
   const { colors } = useOmniTheme();
@@ -102,6 +105,7 @@ function ServerBody({ server }: { server: PairedServer }) {
   const { colors } = useOmniTheme();
   const { registration } = useNotifications();
   const prefs = usePushPreferences(server);
+  const delivery = usePushDelivery(server);
 
   function renderPrefs() {
     switch (prefs.status) {
@@ -135,6 +139,7 @@ function ServerBody({ server }: { server: PairedServer }) {
 
   return (
     <View>
+      {delivery === false ? <Text style={[styles.text, { color: colors.fg2 }]}>{NO_DELIVERY}</Text> : null}
       {renderPrefs()}
       {registration[server.id] === 'failed' ? (
         <Text style={[styles.note, { color: colors.fg2 }]}>{REGISTRATION_FAILED}</Text>

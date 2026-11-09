@@ -73,4 +73,13 @@ describe('createPushServerApi', () => {
     expect(await api.probeThread(a, 'gone')).toBe('missing');
     expect(await api.probeThread(a, 'broken')).toBe('error');
   });
+
+  it('reads whether the server can send alerts from its capabilities', async () => {
+    const capabilities = (delivery: boolean) => ({ api: 1, push: { registration: true, delivery } });
+    const { api, calls } = setup((call) => json(capabilities(call.url.startsWith('https://a.'))));
+
+    expect(await api.delivery(a)).toBe(true);
+    expect(await api.delivery(b)).toBe(false);
+    expect(calls[1]).toMatchObject({ url: 'https://b.example.com/api/capabilities', method: 'GET', authorization: 'Bearer token-b' });
+  });
 });

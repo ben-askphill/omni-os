@@ -16,6 +16,7 @@ const TIMEOUT_MS = 10_000;
 export interface PushServerApi {
   register(server: PushServer, body: AppPushTokenRequest): Promise<void>;
   probeThread(server: PushServer, threadId: string): Promise<ThreadProbe>;
+  delivery(server: PushServer): Promise<boolean>;
   preferences(server: PushServer): Promise<AppPushPreferences>;
   setPreferences(server: PushServer, update: AppPushPreferencesUpdate): Promise<AppPushPreferences>;
 }
@@ -48,6 +49,7 @@ export function createPushServerApi(deps: PushServerApiDeps): PushServerApi {
         return error instanceof OmniHttpError && error.failure.kind === 'http' && error.failure.status === 404 ? 'missing' : 'error';
       }
     },
+    delivery: (server) => apiFor(server).pushDelivery(),
     preferences: (server) => apiFor(server).pushPreferences(),
     setPreferences: (server, update) => apiFor(server).setPushPreferences(update),
   };

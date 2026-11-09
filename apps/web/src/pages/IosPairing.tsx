@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { ConnectStatus } from '@omni/server/connect/service.ts';
+import type { ServerCapabilities } from '@omni/shared/app-pairing.ts';
 import { api, useApi } from '../api.ts';
 import { QrCode } from '../components/QrCode.tsx';
 import { Button, ErrorNote, Label, Loading, Picker } from '../components/ui.tsx';
@@ -17,6 +18,7 @@ import {
   SOURCE_LABEL,
   unchecked,
 } from '../pair-ios.ts';
+import { href } from '../router.ts';
 import type { AuthAccount } from './GoogleAccount.tsx';
 import { Advanced, Card, InfoRow } from './settings-parts.tsx';
 
@@ -38,6 +40,8 @@ export function IosPairingSection() {
   const onRemote = !!remoteHttpsOrigin(location.origin);
   const connect = useApi<ConnectStatus>(onRemote ? null : '/connect');
   const account = useApi<AuthAccount>('/auth/account');
+  const capabilities = useApi<Pick<ServerCapabilities, 'push'>>('/capabilities');
+  const delivery = capabilities.data?.push.delivery;
   const { reload } = connect;
   const [entered, setEntered] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -138,6 +142,20 @@ export function IosPairingSection() {
             </div>
           ) : (
             <p className="text-[13px] text-fg-3">{options.problem}</p>
+          )}
+          {delivery !== undefined && (
+            <div className="space-y-2 text-[13px]">
+              <InfoRow label="Alerts">{delivery ? 'On' : 'Off'}</InfoRow>
+              {!delivery && (
+                <p className="text-[12px] text-fg-3">
+                  This Omni has no APNs key, so the iPhone app gets no alerts. Save APNS_KEY_ID, APNS_TEAM_ID and APNS_AUTH_KEY under{' '}
+                  <a className="underline underline-offset-2" href={href.settingsSection('secrets')}>
+                    Secrets
+                  </a>
+                  , then restart Omni.
+                </p>
+              )}
+            </div>
           )}
           <Advanced title="Use another address" open={!address}>
             <form onSubmit={useAddress} className="space-y-2">

@@ -1,5 +1,5 @@
 import type { AppPushKind, AppPushPreferences } from '@omni/shared/app-pairing.ts';
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 
 import { describePushError } from './api';
 import { initialPrefs, prefsReducer, shownPreferences } from './preferences';
@@ -16,6 +16,26 @@ export interface PushPreferencesView {
   saveError: string | null;
   toggle(kind: AppPushKind, value: boolean): void;
   retry(): void;
+}
+
+/** Whether the server can send alerts at all. Null until it answers, and when it cannot be asked. */
+export function usePushDelivery(server: PushServer): boolean | null {
+  const { api } = useNotifications();
+  const [delivery, setDelivery] = useState<boolean | null>(null);
+  const { id, origin } = server;
+
+  useEffect(() => {
+    let cancelled = false;
+    api.delivery({ id, origin }).then(
+      (next) => !cancelled && setDelivery(next),
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [api, id, origin]);
+
+  return delivery;
 }
 
 /** One server's alert choices: loaded when the screen opens, and each switch saves on its own, sending only that key. */

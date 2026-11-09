@@ -3,6 +3,7 @@ import type {
   AppPushPreferencesUpdate,
   AppPushTokenRequest,
   AppPushTokenStatus,
+  ServerCapabilities,
 } from '@omni/shared/app-pairing.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 
@@ -15,6 +16,8 @@ export function pushApi(http: HttpClient) {
     pushTokenStatus: () => http.request<AppPushTokenStatus>('GET', apiPath`/auth/push-token`),
     /** Idempotent: deleting what is not there succeeds. */
     deletePushToken: () => http.request<{ ok: true }>('DELETE', apiPath`/auth/push-token`),
+    /** Whether the server sends alerts at all. False while it has no APNs key, whatever this phone registered. */
+    pushDelivery: async () => (await http.request<Pick<ServerCapabilities, 'push'>>('GET', apiPath`/capabilities`)).push.delivery,
     pushPreferences: () => http.request<AppPushPreferences>('GET', apiPath`/auth/push-preferences`),
     /** Sends only the kinds in `update` and returns the full set. */
     setPushPreferences: (update: AppPushPreferencesUpdate) =>

@@ -9,12 +9,17 @@ import { createRoot, type Root } from 'react-dom/client';
 const CONNECTED = { enabled: true, relayReady: true, signedIn: true, hostname: 'bens-mac-a1b2c3.omni-os.app', url: 'https://bens-mac-a1b2c3.omni-os.app', connectPage: null, tunnel: { state: 'connected', error: null }, error: null };
 let connect: Omit<typeof CONNECTED, 'url'> & { url: string | null } = CONNECTED;
 let via = 'token';
+let delivery = true;
 let reply: () => Promise<unknown> = async () => ({ code: 'AB12', expiresAt: new Date(Date.now() + 120_000).toISOString() });
 const posts: string[] = [];
 
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
-  actual.api.get = vi.fn(async (path: string) => (path === '/auth/account' ? { available: true, issuer: null, owner: null, via } : connect)) as typeof actual.api.get;
+  actual.api.get = vi.fn(async (path: string) => {
+    if (path === '/auth/account') return { available: true, issuer: null, owner: null, via };
+    if (path === '/capabilities') return { push: { registration: true, delivery } };
+    return connect;
+  }) as typeof actual.api.get;
   actual.api.post = vi.fn(async (path: string) => {
     posts.push(path);
     return reply();
@@ -39,6 +44,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   posts.length = 0;
   via = 'token';
+  delivery = true;
   reply = async () => ({ code: 'AB12', expiresAt: new Date(Date.now() + 120_000).toISOString() });
   connect = CONNECTED;
   host = document.createElement('div');
@@ -70,6 +76,20 @@ const mount = async () => {
   await act(async () => root.render(createElement(IosPairingSection)));
   await flush();
 };
+
+it('says alerts are on when this Omni has an APNs key', async () => {
+  await mount();
+  expect(host.textContent).toContain('AlertsOn');
+  expect(host.textContent).not.toContain('no APNs key');
+});
+
+it('says alerts are off, and which secrets turn them on, when this Omni has no APNs key', async () => {
+  delivery = false;
+  await mount();
+  expect(host.textContent).toContain('AlertsOff');
+  expect(host.textContent).toContain('This Omni has no APNs key, so the iPhone app gets no alerts. Save APNS_KEY_ID, APNS_TEAM_ID and APNS_AUTH_KEY under Secrets, then restart Omni.');
+  expect(host.querySelector('a')?.getAttribute('href')).toContain('secrets');
+});
 
 it('asks for no code until you press the button', async () => {
   await mount();
