@@ -117,6 +117,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'folders', section: 'workspace', title: 'Workspace folder, repos folder and GitHub owner', keywords: ['workspace', 'repos', 'folder', 'github owner', 'org', 'CLAUDE.md', 'skills', 'base directory'] },
   { id: 'worktree-retention', section: 'worktrees', title: 'Automatic cleanup', keywords: ['retention', 'idle days', 'delete', 'prune', 'cleanup'] },
   { id: 'worktree-storage', section: 'worktrees', title: 'Worktree storage', keywords: ['disk', 'size', 'scan', 'storage', 'eligible'] },
+  { id: 'worktree-slim', section: 'worktrees', title: 'Strip caches', keywords: ['node_modules', 'build output', 'cache', 'free space', 'slim', 'disk'] },
   { id: 'this-machine', section: 'machines', title: 'Current machine', keywords: ['name', 'device', 'hostname', 'feed', 'address'] },
   { id: 'server', section: 'machines', title: 'Server port and host', keywords: ['port', 'host', 'node', 'repo', 'log', 'OMNI_PORT'] },
   { id: 'sync-status', section: 'sync', title: 'Sync sign-in and status', keywords: ['relay', 'cloudflare', 'worker', 'pause', 'sync now', 'pending'] },
