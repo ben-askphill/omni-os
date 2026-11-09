@@ -222,6 +222,15 @@ describe('when APNs is not configured', () => {
     expect(loaded).toEqual({ config: { key: { keyId: 'KEY1', teamId: 'TEAM1', pem: PEM.trim() }, bundleId: 'app.omni-os.ios' } });
   });
 
+  // Settings' Secrets field is one line: a pasted .p8 arrives with its line breaks turned into spaces, or dropped.
+  it.each([
+    ['spaces', PEM.replace(/\n/g, ' ')],
+    ['nothing', PEM.replace(/\n/g, '')],
+  ])('reads a .p8 pasted into a one-line field, line breaks turned into %s', (_, pasted) => {
+    const values: Record<string, string> = { APNS_KEY_ID: 'KEY1', APNS_TEAM_ID: 'TEAM1', APNS_AUTH_KEY: pasted };
+    expect(loadPushConfig((name) => values[name])).toMatchObject({ config: { key: { pem: PEM.trim() } } });
+  });
+
   it('uses the bundle id it is given', () => {
     const values: Record<string, string> = { APNS_KEY_ID: 'K', APNS_TEAM_ID: 'T', APNS_AUTH_KEY: PEM, APNS_BUNDLE_ID: 'app.omni-os.beta' };
     expect(loadPushConfig((name) => values[name])).toMatchObject({ config: { bundleId: 'app.omni-os.beta' } });
