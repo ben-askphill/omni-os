@@ -712,6 +712,11 @@ server.registerTool(
     refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/skip`, { method: 'POST', body: JSON.stringify(attempt === undefined ? {} : { attempt }) })),
 );
 
+server.registerTool('disk_space', {
+  description: `Read-only: free space on the disk with Omni's data (worktrees, the database) and, when it is on another disk or under a Linux per-user /tmp quota, the temp folder the agent CLIs write command output to, as the server last checked it (every 10 minutes). level is ok, low (under 20 GB, or 15% of a small volume) or critical (under 5 GB, or 5%). When it fills, every shell command fails with ENOSPC or EDQUOT. On low or critical, tell ${USER}; worktree_storage shows what a cleanup could free, and only ${USER} removes anything.`,
+  inputSchema: {},
+}, async () => text(await call('/disk')));
+
 server.registerTool('worktree_storage', {
   description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this machine\'s retention policy would remove and the last cleanup runs. slim: the idle worktrees whose caches (node_modules, build output) stripping would delete while keeping the worktree, its schedule on this machine and the last strip runs; cacheBytes on each item is that part of its size. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees or strips caches, in Settings > Worktrees.',
   inputSchema: { scan: z.boolean().optional() },

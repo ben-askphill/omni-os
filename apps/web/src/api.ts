@@ -1,4 +1,5 @@
 import type { ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
+import type { DiskLevel } from '@omni/shared/disk-space.ts';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
@@ -397,6 +398,8 @@ export type FeedEvent =
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed. Refetch the list once `refreshing` is false. */
   | { type: 'claude_artifacts'; state: ClaudeArtifactsState }
+  /** Free disk space crossed a warning level: refetch GET /api/disk. */
+  | { type: 'disk'; level: DiskLevel }
   | { type: 'reconnect' };
 
 /** GET /api/update (apps/server/update.ts): how far this server is behind main, and where Update is. */
