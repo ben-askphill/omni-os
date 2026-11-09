@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fixture } from '@omni/test-fixtures';
@@ -82,6 +82,15 @@ describe('the guard hook', () => {
     expect(settings.hooks.PreToolUse[0].matcher).toBe('*');
     expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain(process.execPath);
     expect(readFileSync(join(dir, 'claude-artifacts-guard.cjs'), 'utf8')).toBe(mod.GUARD_SCRIPT);
+  });
+
+  it('runs the CLI in a private folder of its own, never a shared temp dir with planted settings', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omni-guard-'));
+    const cwd = mod.listingDir(dir);
+    expect(cwd).toBe(join(dir, 'claude-artifacts-run'));
+    expect(statSync(cwd).mode & 0o777).toBe(0o700);
+    chmodSync(cwd, 0o755);
+    expect(statSync(mod.listingDir(dir)).mode & 0o777).toBe(0o700);
   });
 });
 

@@ -6,8 +6,7 @@
 // app's storage.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Cron } from 'croner';
 import {
@@ -65,6 +64,17 @@ export function guardSettings(dir = paths.data): string {
   if (!existsSync(file) || readFileSync(file, 'utf8') !== GUARD_SCRIPT) writeFileSync(file, GUARD_SCRIPT);
   const env = Object.entries(nodeChildEnv).map(([k, v]) => `${k}=${shq(v)} `).join('');
   return JSON.stringify({ hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: `${env}${shq(process.execPath)} ${shq(file)}` }] }] } });
+}
+
+/**
+ * The run's working directory: a 0700 folder in Omni's data dir, so `--setting-sources project` can only ever find
+ * settings Omni put there (none). A shared temp dir could hold a planted `.claude/settings.json` with hooks.
+ */
+export function listingDir(dir = paths.data): string {
+  const cwd = join(dir, 'claude-artifacts-run');
+  mkdirSync(cwd, { recursive: true, mode: 0o700 });
+  chmodSync(cwd, 0o700);
+  return cwd;
 }
 
 /** What the run is told. Titles are data: the guard holds even if one says otherwise. */
@@ -177,7 +187,7 @@ export function runListing(withTypes: boolean): Promise<RunOutput> {
           '--disallowedTools', 'ArtifactComments,ArtifactData',
           '--allowedTools', TOOL,
         ],
-        { cwd: tmpdir(), env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: 'omni-os-artifacts' }), stdio: ['pipe', 'pipe', 'pipe'] },
+        { cwd: listingDir(), env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: 'omni-os-artifacts' }), stdio: ['pipe', 'pipe', 'pipe'] },
       );
     } catch (err) {
       out.spawnError = (err as Error).message;
