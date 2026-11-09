@@ -9,6 +9,17 @@ vi.mock('../db.ts', () => {
   throw new Error('db.ts must not be imported by sandbox tests');
 });
 
+// An empty data dir of this file's own, set before config.ts loads. Inside an Omni thread OMNI_DATA_DIR is the live
+// install's, whose omni.config.json names the user, so OMNI_USER came out as that name instead of "the user", and
+// the prepareWorkdir tests cleaned up in its threads folder. OMNI_CONFIG would move the config file the same way.
+const DATA_DIR = vi.hoisted(() => {
+  const { mkdtempSync } = require('node:fs') as typeof import('node:fs');
+  const dir = mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'omni-sandbox-data-'));
+  process.env.OMNI_DATA_DIR = dir;
+  delete process.env.OMNI_CONFIG;
+  return dir;
+});
+
 import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, writeCursorDenyConfig } from '../sandbox.ts';
 import { config, paths, browserOutDir, threadDir } from '../config.ts';
 import type { Channel } from '../db.ts';
@@ -48,6 +59,7 @@ beforeEach(() => {
 });
 afterAll(() => {
   config.browser = originalBrowser;
+  rmSync(DATA_DIR, { recursive: true, force: true });
 });
 
 describe('buildMcpConfig: browser', () => {
