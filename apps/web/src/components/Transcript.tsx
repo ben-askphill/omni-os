@@ -15,7 +15,7 @@ import { Markdown } from './Markdown.tsx';
 import { CheckItem, copyText, Icon, Loader, StatusDot, StatusPill, Ticks } from './ui.tsx';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
-import { statusLabel, turnStart } from '../status-line.ts';
+import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';

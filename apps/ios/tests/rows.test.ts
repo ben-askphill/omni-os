@@ -117,12 +117,37 @@ describe('threadRows', () => {
     expect(notes.some((n) => n.startsWith('## Checkout funnel'))).toBe(false);
   });
 
-  it('shows the live turn with its status line, plan and steps so far', () => {
+  it('shows the live turn with its thinking line, plan and steps so far', () => {
     const live = local.find((c) => c.name === 'rich-running')!;
     const rows = threadRows(input(live)).rows;
-    expect(of(rows, 'now')).toHaveLength(1);
+    expect(of(rows, 'thinking')).toHaveLength(1);
+    expect(of(rows, 'now')).toHaveLength(0);
     expect(of(rows, 'steps')[0]).toMatchObject({ live: true, steps: 2 });
     expect(of(rows, 'outcome')).toHaveLength(0);
+  });
+
+  it("labels the thinking line with the agent's status since Ben's last message, else Thinking, timed from the turn", () => {
+    const live = local.find((c) => c.name === 'rich-running')!;
+    const plain = of(threadRows(input(live)).rows, 'thinking')[0];
+    const turn = live.events.findLast((e) => e.kind === 'user')!;
+    expect(plain).toMatchObject({ label: 'Thinking', since: turn.created_at });
+    const status = { kind: 'status', payload: JSON.stringify({ text: 'Compacting the conversation' }), created_at: '2026-11-02T09:09:00Z' };
+    const compacting = of(threadRows(input({ ...live, events: [...live.events, status] })).rows, 'thinking')[0];
+    expect(compacting).toMatchObject({ label: 'Compacting the conversation' });
+  });
+
+  it('drops the thinking line while a question waits on Ben', () => {
+    const asking = local.find((c) => c.name === 'rich-question')!;
+    const rows = threadRows(input({ ...asking, status: 'running' })).rows;
+    expect(of(rows, 'question')).toHaveLength(1);
+    expect(of(rows, 'thinking')).toHaveLength(0);
+  });
+
+  it('waits for a slot instead of thinking while the turn is queued', () => {
+    const live = local.find((c) => c.name === 'rich-running')!;
+    const rows = threadRows(input({ ...live, status: 'queued' })).rows;
+    expect(of(rows, 'thinking')).toHaveLength(0);
+    expect(of(rows, 'now')[0]).toMatchObject({ now: { verb: 'Waiting for a free slot' } });
   });
 
   it('hides a row outside the spans: it informs the fold and never shows', () => {

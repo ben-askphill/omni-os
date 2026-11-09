@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { statusLabel, turnStart } from '../src/status-line.ts';
+import { statusLabel, turnStart } from '../status-line.ts';
 
 // The label next to the spinner while a thread runs: the newest status since Ben's last message.
 const ev = (kind: string, payload: unknown = {}) => ({ kind, payload: JSON.stringify(payload) });
