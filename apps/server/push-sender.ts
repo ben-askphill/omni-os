@@ -40,22 +40,41 @@ export interface PushConfig {
   bundleId: string;
 }
 
+/**
+ * The .p8 text as a PEM, however its line breaks arrived: as they were, written as \n, turned into spaces, or dropped,
+ * which is what a password field does on paste and so how Settings saves it.
+ */
+function pemFrom(text: string): string {
+  const label = /-----BEGIN ([A-Z0-9 ]+?)-----/.exec(text)?.[1] ?? 'PRIVATE KEY';
+  const body = text
+    .replace(/\\n/g, '\n')
+    .replace(/-----(BEGIN|END) [A-Z0-9 ]+?-----/g, '')
+    .replace(/\s+/g, '');
+  return [`-----BEGIN ${label}-----`, ...(body.match(/.{1,64}/g) ?? []), `-----END ${label}-----`].join('\n');
+}
+
+const isP256 = (pem: string) => {
+  try {
+    const key = createPrivateKey(pem);
+    return key.asymmetricKeyType === 'ec' && key.asymmetricKeyDetails?.namedCurve === 'prime256v1';
+  } catch {
+    return false;
+  }
+};
+
 /** The config, or the reason there is none. The reason names secrets and never shows a value. */
 export function loadPushConfig(read: (name: string) => string | null | undefined): { config: PushConfig } | { problem: string } {
   const keyId = read(PUSH_SECRETS.keyId)?.trim() ?? '';
   const teamId = read(PUSH_SECRETS.teamId)?.trim() ?? '';
-  const pem = (read(PUSH_SECRETS.key) ?? '').replace(/\\n/g, '\n').trim();
+  const keyText = read(PUSH_SECRETS.key)?.trim() ?? '';
   const missing = [
     !keyId && PUSH_SECRETS.keyId,
     !teamId && PUSH_SECRETS.teamId,
-    !pem && PUSH_SECRETS.key,
+    !keyText && PUSH_SECRETS.key,
   ].filter(Boolean) as string[];
   if (missing.length) return { problem: `missing ${missing.join(', ')}` };
-  try {
-    createPrivateKey(pem);
-  } catch {
-    return { problem: `${PUSH_SECRETS.key} is not a P-256 private key` };
-  }
+  const pem = pemFrom(keyText);
+  if (!isP256(pem)) return { problem: `${PUSH_SECRETS.key} is not a P-256 private key` };
   return { config: { key: { keyId, teamId, pem }, bundleId: read(PUSH_SECRETS.bundleId)?.trim() || DEFAULT_BUNDLE_ID } };
 }
 
@@ -161,13 +180,21 @@ export function createPushSender(deps: PushSenderDeps): PushSender {
 export const noopPushSender: PushSender = { configured: false, send() {} };
 
 let installed: PushSender = noopPushSender;
+/** Why startPush left alerts off. Null before it has run and once alerts are on. */
+let problem: string | null = null;
 
 export function installPushSender(sender: PushSender) {
   installed = sender;
 }
 
-/** Whether alerts can go out. GET /api/capabilities reports it as push.delivery. */
-export const pushDelivery = () => installed.configured;
+export interface PushStatus {
+  delivery: boolean;
+  /** The reason startPush logged: secret names, never a value. */
+  problem: string | null;
+}
+
+/** Whether alerts can go out, and why not. GET /api/capabilities reports it as push.delivery and push.problem. */
+export const pushStatus = (): PushStatus => ({ delivery: installed.configured, problem });
 
 /** Reads the config once, installs the sender, and logs why it did not when the config is missing. Restart to change it. */
 export async function startPush(): Promise<void> {
@@ -177,9 +204,11 @@ export async function startPush(): Promise<void> {
   }
   const loaded = loadPushConfig((name) => values[name]);
   if ('problem' in loaded) {
-    console.log(`[push] not configured, no alerts will be sent: ${loaded.problem}`);
+    problem = loaded.problem;
+    console.log(`[push] not configured, no alerts will be sent: ${problem}`);
     return;
   }
+  problem = null;
   installPushSender(
     createPushSender({
       config: loaded.config,

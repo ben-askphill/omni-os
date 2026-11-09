@@ -12,6 +12,7 @@ const pairing = await import('../app-pairing.ts');
 const push = await import('../push-tokens.ts');
 const { pushTargets } = await import('../push-preferences.ts');
 const { sessionCookieName } = await import('../api-token.ts');
+const { PUSH_SECRETS, startPush } = await import('../push-sender.ts');
 
 const MASTER = process.env.OMNI_TOKEN!;
 const HOST = { host: '127.0.0.1:4747' };
@@ -45,6 +46,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 describe('minting a code', () => {
@@ -326,11 +329,20 @@ describe('a paired app session', () => {
       api: 1,
       auth: { via: 'session', method: 'pairing', sessionId },
       pairing: { app: true, codeTtlSeconds: 300 },
-      push: { registration: true, delivery: false },
+      push: { registration: true, delivery: false, problem: null },
       streams: { sse: true, closeOnRevoke: true },
     });
     const list = (await (await req('GET', '/auth/devices', undefined, as(token))).json()) as { devices: { id: string; current: boolean }[] };
     expect(list.devices.find((d) => d.id === sessionId)?.current).toBe(true);
+  });
+
+  it('learns from capabilities why the server cannot send alerts', async () => {
+    for (const name of Object.values(PUSH_SECRETS)) vi.stubEnv(name, '');
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    await startPush();
+    const { token } = await pairApp();
+    const caps = (await (await req('GET', '/capabilities', undefined, as(token))).json()) as { push: unknown };
+    expect(caps.push).toEqual({ registration: true, delivery: false, problem: 'missing APNS_KEY_ID, APNS_TEAM_ID, APNS_AUTH_KEY' });
   });
 
   it('cannot change the linked Google account', async () => {
