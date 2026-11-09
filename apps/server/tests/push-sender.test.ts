@@ -1,8 +1,24 @@
-import { generateKeyPairSync } from 'node:crypto';
-import { describe, expect, it, vi } from 'vitest';
+import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApnsRequest, ApnsResponse, ApnsTransport } from '../push-apns.ts';
-import { createPushSender, loadPushConfig, noopPushSender, payloadFor, type PushEvent, type PushSenderDeps } from '../push-sender.ts';
+import {
+  createPushSender,
+  loadPushConfig,
+  noopPushSender,
+  payloadFor,
+  PUSH_SECRETS,
+  pushStatus,
+  startPush,
+  type PushEvent,
+  type PushSenderDeps,
+} from '../push-sender.ts';
 import type { PushTarget } from '../push-preferences.ts';
+
+// startPush reads the secret store first: the Keychain of the Mac running the tests may hold the real key.
+vi.mock('../secrets.ts', async (original) => ({
+  ...(await original<typeof import('../secrets.ts')>()),
+  globalSecret: async () => null,
+}));
 
 const PEM = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
 const NOW = 1_700_000_000_000;
@@ -225,5 +241,55 @@ describe('when APNs is not configured', () => {
   it('uses the bundle id it is given', () => {
     const values: Record<string, string> = { APNS_KEY_ID: 'K', APNS_TEAM_ID: 'T', APNS_AUTH_KEY: PEM, APNS_BUNDLE_ID: 'app.omni-os.beta' };
     expect(loadPushConfig((name) => values[name])).toMatchObject({ config: { bundleId: 'app.omni-os.beta' } });
+  });
+});
+
+describe('reading the .p8 key however its line breaks arrived', () => {
+  const jwk = (pem: string) => createPrivateKey(pem).export({ format: 'jwk' });
+  /** The key a config loaded from this APNS_AUTH_KEY value would sign with, or the problem it reported. */
+  const keyFrom = (value: string) => {
+    const values: Record<string, string> = { APNS_KEY_ID: 'KEY1', APNS_TEAM_ID: 'TEAM1', APNS_AUTH_KEY: value };
+    const loaded = loadPushConfig((name) => values[name]);
+    return 'config' in loaded ? jwk(loaded.config.key.pem) : loaded;
+  };
+
+  it.each([
+    ['pasted into a password field, which drops its line breaks', PEM.replace(/\n/g, '')],
+    ['with its line breaks turned into spaces', PEM.replace(/\n/g, ' ')],
+    ['with its line breaks written as \\n', PEM.replace(/\n/g, '\\n')],
+  ])('reads a key %s', (_, value) => {
+    expect(keyFrom(value)).toEqual(jwk(PEM));
+  });
+
+  it.each([
+    ['an RSA key', generateKeyPairSync('rsa', { modulusLength: 2048 })],
+    ['a P-384 key', generateKeyPairSync('ec', { namedCurve: 'P-384' })],
+  ])('refuses %s', (_, pair) => {
+    expect(keyFrom(pair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString())).toEqual({ problem: 'APNS_AUTH_KEY is not a P-256 private key' });
+  });
+});
+
+describe('push status', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+  const secrets = (values: Partial<Record<string, string>>) => {
+    for (const name of Object.values(PUSH_SECRETS)) vi.stubEnv(name, values[name] ?? '');
+  };
+
+  it('is off, with the reason startPush logged, when the key is missing', async () => {
+    secrets({});
+    await startPush();
+    expect(pushStatus()).toEqual({ delivery: false, problem: 'missing APNS_KEY_ID, APNS_TEAM_ID, APNS_AUTH_KEY' });
+  });
+
+  it('is on, with no problem, once the key is set the way Settings saves it', async () => {
+    secrets({ APNS_KEY_ID: 'KEY1', APNS_TEAM_ID: 'TEAM1', APNS_AUTH_KEY: PEM.replace(/\n/g, '') });
+    await startPush();
+    expect(pushStatus()).toEqual({ delivery: true, problem: null });
   });
 });
