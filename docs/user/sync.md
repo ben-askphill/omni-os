@@ -1,6 +1,6 @@
 # Sync between two Macs
 
-Optional. Each Mac keeps its own SQLite as the source of truth. A relay you deploy to your own Cloudflare account carries the changes between them (channels, sidebar folders, threads, events, artifacts, automation runs and event deliveries, settings) and keeps thread files in R2. With no relay signed in, sync is off and Omni behaves as before. Why a relay and not a shared database: [ADR 0004](../adr/0004-supabase-sync.md). Why Cloudflare and Clerk: [ADR 0008](../adr/0008-cloudflare-relay.md).
+Optional. Each Mac keeps its own SQLite as the source of truth. A relay you deploy to your own Cloudflare account carries the changes between them (channels, sidebar folders, threads, events, artifacts, automation runs and event deliveries, settings) and keeps thread files and each push's change data in R2, so the Durable Object's SQLite holds only the index. With no relay signed in, sync is off and Omni behaves as before. Why a relay and not a shared database: [ADR 0004](../adr/0004-supabase-sync.md). Why Cloudflare and Clerk: [ADR 0008](../adr/0008-cloudflare-relay.md).
 
 ## One-time relay setup
 

@@ -29,7 +29,7 @@ Pick the address the phone will use. The card offers this page's address when it
 
 Scan the QR code or type the manual code in the app. The code expires after five minutes and works once. The phone gets its own revocable app session, not the install token. Revoke a session under signed-in devices. A paired phone has the same access as a Google session, including the terminal and agents, so revoking does not undo commands it already ran.
 
-Once paired, the native app's tabs are Activity (phone web's Inbox list), Channels and Library, with New at the end of the tab bar. Settings uses the same shared catalog as the Web UI, including Channel Settings and About (native build, runtime and running update). Channel rows and headers show emoji, icon and SVG avatars. Details live in [apps/ios/README.md](../../apps/ios/README.md).
+Once paired, the native app's tabs are Activity (phone web's Inbox list), Channels and Library, with New at the end of the tab bar. Settings uses the same shared catalog as the Web UI, including Channel Settings and About (native build, runtime and running update). Channel rows and headers show emoji, icon and SVG avatars. If alerts never arrive, Notifications and the Omni for iOS card name the missing APNs secrets (`APNS_AUTH_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`); saving those secrets loads them without a server restart. Details live in [apps/ios/README.md](../../apps/ios/README.md) and [Native app pairing](../internals/app-pairing.md#push-delivery).
 
 ## Without Tailscale
 
@@ -41,7 +41,7 @@ Below 768px, the Web UI uses its phone layout, whether opened in a browser or sa
 
 - Activity shows the desktop Inbox view's list: pinned threads, the threads waiting on you, and the Working and Done shelves (see [Threads](threads.md#finding-threads-and-clearing-needs-you)). Tap a row to open its thread. Its check marks it done, and the undo on a Done row puts it back.
 - Channels groups clients, internal and personal channels. A channel shows collapsible folders and ungrouped threads in Active and Recent tabs. Active means Needs you or running; both tab counts include folded folders. Folder order and context menus are managed on desktop.
-- Library lists artifacts with thumbnails. Open one full screen to read or share it.
+- Library lists artifacts with thumbnails, and a Files / claude.ai switch lists your Artifacts on claude.ai the same way the Artifacts page does ([claude.ai Artifacts](claude-artifacts.md)). Open one full screen to read or share it.
 - PRs lists the pull requests of every channel with a GitHub repo. Search matches title, number, author, branch and repo (and `label:` tokens); sort and filters narrow the list; rows group into Authored, Review requested and Others for your `gh` login. Tap one to open it on GitHub. Desktop web and the desktop app show the same list at `#/prs`. A repo gh cannot read is named under the list and the rest still show.
 - The + button starts a thread with the Conductor or a channel, with model and effort choices, attachments and dictation.
 
