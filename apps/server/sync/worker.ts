@@ -232,7 +232,9 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       unsubscribe = transport.subscribe?.(machineId, () => worker.syncSoon(300));
       // A second or so, so the Wi-Fi's DNS and routes settle first. A failure still backs off as usual.
       offNetwork = opts.network?.(() => worker.syncSoon(1_000));
-      if (opts.autoPushMs !== undefined) outbox.onRecord(() => worker.syncSoon(opts.autoPushMs));
+      // While syncs fail, new rows wait for the backoff's retry: Omni writes rows every few seconds, and pushing
+      // each one would hammer a failing relay.
+      if (opts.autoPushMs !== undefined) outbox.onRecord(() => void (failures || worker.syncSoon(opts.autoPushMs)));
       void worker.syncNow();
     },
     stop() {
