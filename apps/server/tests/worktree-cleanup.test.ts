@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CleanupRun, CleanupState } from '@omni/shared/worktree-cleanup.ts';
 import type { WorktreeScan } from '@omni/shared/worktree-inventory.ts';
@@ -126,6 +126,30 @@ describe('cleanup: what it removes', T, () => {
     expect(existsSync(join(uploadsDir(t.id), 'brief.pdf'))).toBe(true);
     // The inventory drops it, so it is not offered again.
     expect((await view()).scan!.items.map((i) => i.id)).not.toContain(t.id);
+  });
+
+  it("removes a worktree holding copies of main's harness config and a server run's data folder, and keeps main's own copy", async () => {
+    const main = repo();
+    const { t, wt } = await worktreeThread(main);
+    // main tracks harness config the worktree never had; an older copy was put in it afterwards.
+    mkdirSync(join(main, '.codex'));
+    writeFileSync(join(main, '.codex', 'hooks.json'), '{"v":2}');
+    writeFileSync(join(main, 'AGENTS.md'), 'v2');
+    git(main, 'add', '.');
+    git(main, 'commit', '-q', '-m', 'harness config');
+    git(main, 'push', '-q', 'origin', 'main');
+    mkdirSync(join(wt, '.codex'));
+    writeFileSync(join(wt, '.codex', 'hooks.json'), '{"v":1}');
+    writeFileSync(join(wt, 'AGENTS.md'), 'v1');
+    appendFileSync(join(main, '.git', 'info', 'exclude'), 'data/\n');
+    mkdirSync(join(wt, 'data', 'threads'), { recursive: true });
+    writeFileSync(join(wt, 'data', 'omni.db'), 'x');
+    r.db.threads.update(t.id, { archived: 1 });
+
+    expect(outcomes(await cleanUp([t.id]))).toEqual({ [t.id]: 'removed' });
+    expect(existsSync(wt)).toBe(false);
+    expect(existsSync(trashOf(wt))).toBe(false);
+    expect(readFileSync(join(main, '.codex', 'hooks.json'), 'utf8')).toBe('{"v":2}');
   });
 
   it('checks the branch out again on the next message, and makes the branch again from the kept commit when it is gone', async () => {

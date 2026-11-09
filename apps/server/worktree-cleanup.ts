@@ -1,12 +1,13 @@
 // Removes worktrees from data/worktrees: the ones Ben confirms after reviewing them in Settings > Worktrees and, when
 // this Mac's retention policy is on, the ones a daily pass finds idle long enough. Each is checked again right before
 // it goes, with its folder held (workspace.ts) the way a turn, a terminal or a checkout holds it, so whichever starts
-// first wins. Removal is a `git worktree move` aside, then `git worktree remove` without --force: the branch stays, and
+// first wins. Removal is a `git worktree move` aside, then (after deleting untracked copies of main's harness config,
+// worktree-sweep.ts) `git worktree remove` without --force: the branch stays, and
 // its last commit is kept as refs/omni/removed/<thread>, so the next turn checks it out again. Nothing here syncs: the
 // policy is in this Mac's omni.config.json and the runs live in memory.
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { KeepReason } from '@omni/shared/worktree-inventory.ts';
@@ -24,7 +25,7 @@ import {
 import { config, paths } from './config.ts';
 import { userConfig, writeUserConfig } from './user-config.ts';
 import { currentWorktreeScan, inspectWorktree, lastLook, ownership, scanToEnd, text, updateScanItem, type InspectOptions } from './worktree-inventory.ts';
-import { git, owningRepo } from './worktree-sweep.ts';
+import { git, harnessCopies, owningRepo } from './worktree-sweep.ts';
 import { keptRef, trashOf, withWorkspace } from './workspace.ts';
 
 const run = promisify(execFile);
@@ -143,6 +144,7 @@ async function finishLeftovers() {
     const repo = await owningRepo(trash);
     if (!repo) continue;
     await withWorkspace(join(paths.worktrees, name.slice('.removing-'.length)), async () => {
+      for (const p of await harnessCopies(trash)) rmSync(join(trash, p), { force: true });
       if ((await gitRun(repo, 'worktree', 'remove', trash)) === null) console.log(`[worktrees] finished removing ${trash}`);
     });
   }
@@ -185,6 +187,8 @@ async function removeOne(c: CleanupCandidate, trigger: CleanupTrigger, policy: R
       const unmoved = await gitRun(item.repo, 'worktree', 'move', dir, trash);
       if (unmoved) return out('failed', [], [unmoved]);
       updateScanItem(c.id, null);
+      // Copies of main's harness config are not work, but git refuses to remove a worktree with untracked files.
+      for (const p of await harnessCopies(trash)) rmSync(join(trash, p), { force: true });
       const refusal = await gitRun(item.repo, 'worktree', 'remove', trash);
       if (refusal) return out('failed', [], [`It was moved to ${trash} to be removed, and git would not remove it there: ${refusal}`]);
       return out('removed');
