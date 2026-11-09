@@ -24,7 +24,8 @@ export function ClaudeArtifactCard({ artifact, now, width }: { artifact: ClaudeA
     >
       <View style={[styles.thumb, { backgroundColor: colors.surface2, borderColor: colors.line }]}>
         <Icon name={typeIcon(artifact.type)} size={26} color={colors.fg4} />
-        <View style={[styles.open, { backgroundColor: colors.elev }]}>
+        {/* A hairline edge: in dark, elev and the tile's surface2 are nearly the same grey. */}
+        <View style={[styles.open, { backgroundColor: colors.elev, borderColor: colors.line }]}>
           <Icon name="arrowUpRight" size={12} color={colors.fg3} />
         </View>
       </View>
@@ -46,7 +47,7 @@ export function ClaudeArtifactCard({ artifact, now, width }: { artifact: ClaudeA
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, padding: space.s2 + 2, gap: space.s4 },
   thumb: { height: 96, borderRadius: radius.md - 1, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
-  open: { position: 'absolute', top: space.s3, right: space.s3, width: 22, height: 22, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  open: { position: 'absolute', top: space.s3, right: space.s3, width: 22, height: 22, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   meta: { paddingHorizontal: space.s2 + 2, paddingBottom: space.s2 + 2, gap: space.s2 },
   title: { fontSize: fontSize.small, fontWeight: weight.medium },
   badges: { flexDirection: 'row' },

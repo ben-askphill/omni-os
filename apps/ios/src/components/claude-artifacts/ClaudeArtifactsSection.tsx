@@ -71,7 +71,9 @@ export function ClaudeArtifactsSection({ live, now }: { live: ClaudeArtifactsLiv
               <View style={styles.scope}>
                 <SegmentedControl value={scope} onChange={setScope} options={CLAUDE_ARTIFACT_SCOPES.map((s) => ({ value: s.id, label: s.label, count: counts[s.id] }))} />
               </View>
-              <SegmentedControl value={layout} onChange={setClaudeArtifactsLayout} options={CLAUDE_ARTIFACT_LAYOUTS.map((l) => ({ value: l.id, label: l.label }))} />
+              <View style={styles.layout}>
+                <SegmentedControl value={layout} onChange={setClaudeArtifactsLayout} options={CLAUDE_ARTIFACT_LAYOUTS.map((l) => ({ value: l.id, label: l.label }))} />
+              </View>
             </View>
           </>
         ) : null}
@@ -110,5 +112,7 @@ const styles = StyleSheet.create({
   card: { marginHorizontal: space.s8, borderRadius: radius.lg, overflow: 'hidden' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, paddingHorizontal: space.s8 },
   switches: { flexDirection: 'row', alignItems: 'center', gap: space.s4 },
-  scope: { flex: 1 },
+  scope: { flex: 1, minWidth: 0 },
+  // A fixed width: left to size itself, the List / Grid track took the row and squeezed Whose to nothing.
+  layout: { width: 128 },
 });
