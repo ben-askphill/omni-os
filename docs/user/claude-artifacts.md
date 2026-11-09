@@ -8,7 +8,8 @@ There is no public Artifacts API. Omni asks the claude CLI on the machine runnin
 
 - **When it refreshes:** when you open the list and the last try is over ten minutes old, whenever you press Refresh (or pull down on iOS), and on the schedule under the list: Daily (default), every 6 hours, or Off. Type badges are mapped once a day.
 - **Cost:** each run is a fraction of a cent of your Claude plan's usage, a few seconds long.
-- **Opening one** leaves Omni: a new tab in a browser, your default browser from the desktop app, the Claude app or Safari on an iPhone. You need to be signed in to claude.ai there.
+- **List or grid:** the switch beside the filters shows rows or cards, and each browser, desktop app and iPhone remembers its choice. A card shows the page itself when an Omni thread published it (on the web and in the desktop app), otherwise its type's drawing. Omni never fetches a preview from claude.ai.
+- **Opening one** leaves Omni: in the desktop app, the Claude app when it is installed and your default browser otherwise; on an iPhone, the Claude app when installed (claude.ai's universal links) or Safari; in a browser, a new tab on claude.ai. You need to be signed in to claude.ai there. If the Claude app says it could not open an artifact, open it from a browser tab instead.
 
 ## When it says something is wrong
 

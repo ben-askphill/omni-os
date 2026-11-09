@@ -1,4 +1,4 @@
-import { freshness, typeLabel, updatedLabel, type ClaudeArtifact, type ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
+import { artifactOpenTargets, freshness, gridColumns, GRID_MIN_CARD, typeLabel, updatedLabel, type ClaudeArtifact, type ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
 
 import { shortAgo } from '../../live/channel-model';
 import type { IconName } from '../../ui/Icon';
@@ -45,4 +45,22 @@ export function freshnessText(server: ClaudeArtifactsState | null, now: number):
   const when = ago === 'now' ? 'Fetched just now' : /^\d+[mhd]$/.test(ago) ? `Fetched ${ago} ago` : `Fetched on ${ago}`;
   const count = server.total !== null ? ` · ${server.total} artifact${server.total === 1 ? '' : 's'}` : '';
   return { text: `${when}${count}`, tone: f === 'stale' || server.error ? 'warn' : 'quiet', busy: false };
+}
+
+/**
+ * The link a tap opens: always https. claude.ai's apple-app-site-association claims `/artifact/*` and `/code/*` for
+ * the Claude app, so iOS opens the app when it is installed and Safari when it is not. No `canOpenURL` check, so no
+ * LSApplicationQueriesSchemes entry, and no guess at whether the Claude iOS app answers a `claude:` scheme.
+ */
+export const openUrl = (a: Pick<ClaudeArtifact, 'url'>): string => artifactOpenTargets(a.url, 'ios')[0];
+
+/** The grid across `width`: as many columns as fit cards of at least the phone minimum, and each card's width. */
+export function gridLayout(width: number, gap: number): { columns: number; card: number } {
+  const columns = gridColumns(width, GRID_MIN_CARD.compact, gap);
+  return { columns, card: Math.floor((width - gap * (columns - 1)) / columns) };
+}
+
+/** A card's second line: whose it is and when it changed, shorter than a row's. */
+export function cardDetail(a: Pick<ClaudeArtifact, 'scope' | 'updated_on'>, now: number): string {
+  return [a.scope === 'mine' ? 'Mine' : 'Shared', a.updated_on ? updatedLabel(a.updated_on, now) : null].filter(Boolean).join(' \u00b7 ');
 }

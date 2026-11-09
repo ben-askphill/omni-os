@@ -1,20 +1,32 @@
-import { CLAUDE_ARTIFACT_SCOPES, ERROR_TEXT, filterClaudeArtifacts, GALLERY_URL, type ClaudeArtifactScopeFilter } from '@omni/shared/claude-artifacts.ts';
+import {
+  CLAUDE_ARTIFACT_LAYOUTS,
+  CLAUDE_ARTIFACT_SCOPES,
+  ERROR_TEXT,
+  filterClaudeArtifacts,
+  GALLERY_URL,
+  type ClaudeArtifactScopeFilter,
+} from '@omni/shared/claude-artifacts.ts';
 import { useMemo, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import type { ClaudeArtifactsLiveState } from '../../live/claude-artifacts';
+import { setClaudeArtifactsLayout, useClaudeArtifactsLayout } from '../../settings/claude-artifacts-layout';
 import { fontSize, minTarget, radius, space, useOmniTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { Callout } from '../../ui/Callout';
 import { EmptyState } from '../../ui/EmptyState';
 import { SegmentedControl } from '../../ui/SegmentedControl';
 import { Text, TextInput } from '../../ui/Text';
+import { ClaudeArtifactCard } from './ClaudeArtifactCard';
 import { ClaudeArtifactRow } from './ClaudeArtifactRow';
 import { FreshnessLine } from './FreshnessLine';
+import { gridLayout } from './model';
+
+const GAP = space.s4 + space.s2 / 2;
 
 /**
  * The Library's claude.ai switch: Ben's claude.ai Artifacts as the server last listed them, searchable and filtered by
- * whose they are. Pull to refresh lists again; a failed listing keeps the last good list under its error.
+ * whose they are, as rows or a grid of cards (the choice is kept on this phone; columns follow the width). Pull to refresh lists again; a failed listing keeps the last good list under its error.
  */
 export function ClaudeArtifactsSection({ live, now }: { live: ClaudeArtifactsLiveState; now: number }) {
   const { colors } = useOmniTheme();
@@ -25,6 +37,9 @@ export function ClaudeArtifactsSection({ live, now }: { live: ClaudeArtifactsLiv
   const counts = useMemo(() => Object.fromEntries(CLAUDE_ARTIFACT_SCOPES.map((s) => [s.id, filterClaudeArtifacts(items, { scope: s.id }).length])), [items]);
   const failure = live.server?.error ? ERROR_TEXT[live.server.error.code] : null;
   const gallery = () => void Linking.openURL(GALLERY_URL);
+  const layout = useClaudeArtifactsLayout();
+  const { width } = useWindowDimensions();
+  const grid = gridLayout(width - space.s8 * 2, GAP);
 
   return (
     <View style={styles.wrap}>
@@ -52,12 +67,23 @@ export function ClaudeArtifactsSection({ live, now }: { live: ClaudeArtifactsLiv
               accessibilityLabel="Search artifacts"
               style={[styles.search, { color: colors.fg, backgroundColor: colors.surface2 }]}
             />
-            <SegmentedControl value={scope} onChange={setScope} options={CLAUDE_ARTIFACT_SCOPES.map((s) => ({ value: s.id, label: s.label, count: counts[s.id] }))} />
+            <View style={styles.switches}>
+              <View style={styles.scope}>
+                <SegmentedControl value={scope} onChange={setScope} options={CLAUDE_ARTIFACT_SCOPES.map((s) => ({ value: s.id, label: s.label, count: counts[s.id] }))} />
+              </View>
+              <SegmentedControl value={layout} onChange={setClaudeArtifactsLayout} options={CLAUDE_ARTIFACT_LAYOUTS.map((l) => ({ value: l.id, label: l.label }))} />
+            </View>
           </>
         ) : null}
       </View>
 
-      {list.length ? (
+      {list.length && layout === 'grid' ? (
+        <View style={styles.grid}>
+          {list.map((a) => (
+            <ClaudeArtifactCard key={a.id} artifact={a} now={now} width={grid.card} />
+          ))}
+        </View>
+      ) : list.length ? (
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           {list.map((a, i) => (
             <ClaudeArtifactRow key={a.id} artifact={a} now={now} first={i === 0} />
@@ -82,4 +108,7 @@ const styles = StyleSheet.create({
   inset: { paddingHorizontal: space.s9 },
   search: { minHeight: minTarget, borderRadius: radius.pill, paddingHorizontal: space.s8, fontSize: fontSize.input },
   card: { marginHorizontal: space.s8, borderRadius: radius.lg, overflow: 'hidden' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, paddingHorizontal: space.s8 },
+  switches: { flexDirection: 'row', alignItems: 'center', gap: space.s4 },
+  scope: { flex: 1 },
 });

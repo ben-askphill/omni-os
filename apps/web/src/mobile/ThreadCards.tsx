@@ -3,7 +3,7 @@ import { api, errorText, type Artifact, type PendingMsg, type Thread } from '../
 import { harnessLabel } from '../components/brand.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { useSending } from '../sending.ts';
-import { ArtifactThumb } from '../pages/Artifacts.tsx';
+import { ArtifactThumb } from '../components/ArtifactThumb.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { Attachments } from '../components/Transcript.tsx';
 import { Button, Icon, StatusDot, StatusPill } from '../components/ui.tsx';

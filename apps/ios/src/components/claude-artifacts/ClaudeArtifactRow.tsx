@@ -5,12 +5,12 @@ import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../
 import { Icon } from '../../ui/Icon';
 import { Text } from '../../ui/Text';
 import { ArtifactTypeBadge } from './ArtifactTypeBadge';
-import { rowDetail, rowLabel, typeIcon } from './model';
+import { openUrl, rowDetail, rowLabel, typeIcon } from './model';
 
 /**
  * One claude.ai artifact: its type's drawing, title, type badge, whose it is and when it changed, and the thread that
- * published it when one did. A tap opens it on claude.ai through the system: the Claude app when it claims the link,
- * otherwise Safari, where Ben is signed in. Never an in-app browser, which has no claude.ai session.
+ * published it when one did. A tap opens its https link through the system: the Claude app when it claims the link
+ * (claude.ai's universal links), otherwise Safari, where Ben is signed in. Never an in-app browser, which has no claude.ai session.
  */
 export function ClaudeArtifactRow({ artifact, now, first }: { artifact: ClaudeArtifact; now: number; first?: boolean }) {
   const { colors } = useOmniTheme();
@@ -19,8 +19,9 @@ export function ClaudeArtifactRow({ artifact, now, first }: { artifact: ClaudeAr
       accessibilityRole="link"
       accessibilityLabel={rowLabel(artifact, now)}
       accessibilityHint="Opens on claude.ai"
-      onPress={() => void Linking.openURL(artifact.url)}
-      style={({ pressed }) => [styles.row, !first && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }, { opacity: pressed ? 0.6 : 1 }]}
+      onPress={() => void Linking.openURL(openUrl(artifact))}
+      // Pressed: surface3, a step past both the list's surface and the screen's bg in light and dark (web's hover).
+      style={({ pressed }) => [styles.row, !first && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }, pressed && { backgroundColor: colors.surface3 }]}
     >
       <View style={[styles.disc, { backgroundColor: colors.surface2 }]}>
         <Icon name={typeIcon(artifact.type)} size={16} color={colors.fg3} />

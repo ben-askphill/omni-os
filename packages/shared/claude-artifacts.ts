@@ -157,7 +157,15 @@ export interface ClaudeArtifact {
   /** Its place in the tool's order: Ben's own first, most recently opened or updated first, then shared ones. */
   rank: number;
   /** The newest local file an Omni thread published as this page, when one did. */
-  local: { artifact_id: number; thread_id: string; thread_title: string; channel_id: string } | null;
+  local: {
+    artifact_id: number;
+    thread_id: string;
+    thread_title: string;
+    channel_id: string;
+    /** The local file's kind (`html`, `image`...) and version, for the grid's preview. Missing from older servers. */
+    kind?: string;
+    updated_at?: string;
+  } | null;
 }
 
 /** Why the last refresh failed. The list stays as the last good run left it. */
@@ -254,4 +262,78 @@ export function updatedLabel(on: string, now: number): string {
   const date = new Date(Date.UTC(y, m - 1, d));
   const sameYear = new Date(now).getUTCFullYear() === y;
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC', ...(!sameYear && { year: 'numeric' }) });
+}
+
+// ---------- opening one ----------
+
+/**
+ * The Claude desktop app's deep link for a claude.ai artifact link, or null when there is none. The app registers the
+ * `claude` scheme (CFBundleURLSchemes in its Info.plist) and opens `claude://claude.ai/artifact/<id>` in its own
+ * window. Its handler drops a link with a query other than `sk`/`org`, a hash or a login part, so those keep https.
+ * An older `code/artifact/<uuid>` link maps to `artifact/<uuid>`: the handler reads either id form from that path.
+ */
+export function claudeAppLink(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' || u.hostname !== 'claude.ai' || u.port || u.username || u.password || u.hash || u.search) return null;
+  const id = /^\/(?:code\/)?artifact\/([A-Za-z0-9_-]+)\/?$/.exec(u.pathname)?.[1];
+  return id ? `claude://claude.ai/artifact/${id}` : null;
+}
+
+/**
+ * Where a link opens: `desktop` is the Omni desktop app, `ios` the iOS app, `web` any browser (desktop or phone).
+ * Only the desktop app can tell whether the Claude app is installed (Electron asks the OS who handles `claude:`).
+ * iOS opens the https link: claude.ai's apple-app-site-association claims `/artifact/*` and `/code/*` for the Claude
+ * app, so the system hands it to the app when installed and to Safari when not, with no scheme query. A browser
+ * cannot see installed apps, and a `claude:` link with no app behind it fails silently or with an error, so the
+ * browser keeps https (Safari on an iPhone follows the same universal link).
+ */
+export type ArtifactOpenSurface = 'desktop' | 'ios' | 'web';
+
+/** The links to try in order: the Claude app's deep link first when the desktop app found it, then https. */
+export function artifactOpenTargets(url: string, surface: ArtifactOpenSurface, claudeAppInstalled = false): string[] {
+  const app = surface === 'desktop' && claudeAppInstalled ? claudeAppLink(url) : null;
+  return app ? [app, url] : [url];
+}
+
+// ---------- list or grid ----------
+
+export const CLAUDE_ARTIFACT_LAYOUTS = [
+  { id: 'list', label: 'List' },
+  { id: 'grid', label: 'Grid' },
+] as const;
+export type ClaudeArtifactsLayout = (typeof CLAUDE_ARTIFACT_LAYOUTS)[number]['id'];
+export const DEFAULT_LAYOUT: ClaudeArtifactsLayout = 'list';
+/** A saved layout, or the default when it is missing or not one. */
+export const parseLayout = (saved: unknown): ClaudeArtifactsLayout => (saved === 'grid' || saved === 'list' ? saved : DEFAULT_LAYOUT);
+
+/** Narrowest card: two across on a phone, more as the window widens. */
+export const GRID_MIN_CARD = { compact: 150, wide: 220 } as const;
+
+/** How many cards fit across `width` with `gap` between them, never under `min` wide, at least one. */
+export function gridColumns(width: number, min: number, gap: number): number {
+  if (!(width > 0) || !(min > 0)) return 1;
+  return Math.max(1, Math.floor((width + gap) / (min + gap)));
+}
+
+/**
+ * A card's picture. claude.ai has no preview or screenshot URL (the listing is titles and links, pages cannot be
+ * framed, and its frame endpoint challenges anything that is not a signed-in browser), so Omni never fetches one.
+ * A page an Omni thread published has its file here: an image shows as is, a page as the local file scaled down,
+ * both from Omni's own server. Everything else shows its type's drawing.
+ */
+export type ArtifactPreview =
+  | { kind: 'local'; artifact_id: number; file_kind: string; updated_at: string }
+  | { kind: 'type'; type: string | null };
+
+const PREVIEW_KINDS = new Set(['html', 'image', 'svg']);
+
+export function artifactPreview(a: Pick<ClaudeArtifact, 'type' | 'local'>): ArtifactPreview {
+  const l = a.local;
+  if (l?.kind && l.updated_at && PREVIEW_KINDS.has(l.kind)) return { kind: 'local', artifact_id: l.artifact_id, file_kind: l.kind, updated_at: l.updated_at };
+  return { kind: 'type', type: a.type };
 }

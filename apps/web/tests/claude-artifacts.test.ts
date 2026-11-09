@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { ClaudeArtifactsResponse, ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
 import { describe, expect, it } from 'vitest';
-import { ArtifactTypeBadge, ClaudeArtifactRow, FreshnessLine } from '../src/components/ClaudeArtifacts.tsx';
+import { ArtifactTypeBadge, ClaudeArtifactCard, ClaudeArtifactRow, FreshnessLine } from '../src/components/ClaudeArtifacts.tsx';
 import { href, pageTitle, parseHash } from '../src/router.ts';
 
 // The claude.ai list on the Artifacts page and the phone Library (components/ClaudeArtifacts.tsx), drawn from the
@@ -64,5 +64,39 @@ describe('the freshness line', () => {
     expect(line({ last_success_at: '2026-01-01T00:00:00.000Z' })).toContain('over a day ago');
     expect(line({ refreshing: true })).toContain('Refreshing from claude.ai');
     expect(line({ last_success_at: null })).toContain('Not fetched yet');
+  });
+});
+
+describe('hover and the grid card', () => {
+  const card = (a: ClaudeArtifactsResponse['items'][number]) =>
+    renderToStaticMarkup(createElement('ul', null, createElement(ClaudeArtifactCard, { a, now })));
+
+  it('hovers a row to surface-3, never elev (the page white, where a hovered row looked gone)', () => {
+    const html = renderToStaticMarkup(createElement('ul', null, createElement(ClaudeArtifactRow, { a: wire.items[0], now })));
+    expect(html).toContain('hover:bg-surface-3');
+    expect(html).toContain('has-[a:focus-visible]:bg-surface-3');
+    expect(html).not.toContain('hover:bg-elev');
+  });
+
+  it('opens a card on claude.ai like a row, with the same hover', () => {
+    const html = card(wire.items[0]);
+    expect(html).toContain(`href="${wire.items[0].url}"`);
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('hover:bg-surface-3');
+    expect(html).toContain('Slides');
+  });
+
+  it("previews a thread's local copy from Omni's server, else draws the type and loads nothing", () => {
+    const local = {
+      ...wire.items[0],
+      local: { artifact_id: 42, thread_id: 't1', thread_title: 'Made it', channel_id: 'c1', kind: 'html', updated_at: '2026-11-09T10:00:00.000Z' },
+    };
+    const withCopy = card(local);
+    expect(withCopy).toContain('<iframe src="/api/artifacts/42/raw?v=2026-11-09T10%3A00%3A00.000Z"');
+    expect(withCopy).toContain('From thread: Made it');
+    const without = card({ ...wire.items[0], local: null });
+    expect(without).not.toContain('<iframe');
+    expect(without).not.toContain('<img');
+    expect(without).not.toMatch(/src="https?:/);
   });
 });
