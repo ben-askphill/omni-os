@@ -13,7 +13,7 @@
 import { createCipheriv, createDecipheriv, createPrivateKey, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, randomUUID, type KeyObject } from 'node:crypto';
 import { kv, outbox } from './db.ts';
 import { globalSecret, secretReachesThread, setSecret, NAME_RE, SCOPE_RE, SEAL_SECRET_NAME } from './secrets.ts';
-import { currentRecords, deviceRecord, deviceRecords } from './sync/devices.ts';
+import { deviceRecord, machineFor } from './sync/devices.ts';
 import { syncProblem, type SyncNeed } from './sync/problem.ts';
 import { activeWorker, onSynced } from './sync/worker.ts';
 
@@ -194,18 +194,6 @@ export function checkSecret(scope: string, name: string, value: string) {
   if (!value || /[\r\n]/.test(value)) throw refused('value must be a single non-empty line', 400);
   if (!secretReachesThread(scope, name)) throw refused(`${name} is one of Omni's own credentials. Set it in Settings on that machine.`, 403);
   if (changesHowProgramsStart(name)) throw refused(`${name} changes how every thread's programs start, so only Settings can set it.`, 403);
-}
-
-/** A synced machine by id or by name (any case). Refuses one this machine does not know, or a name two share. */
-export function machineFor(asked: string): { id: string; name: string } {
-  const all = currentRecords(deviceRecords());
-  const byId = all.find((d) => d.id === asked);
-  if (byId) return { id: byId.id, name: byId.name };
-  const named = all.filter((d) => d.name.toLowerCase() === asked.trim().toLowerCase());
-  if (named.length === 1) return { id: named[0].id, name: named[0].name };
-  const known = all.map((d) => `${d.name} (${d.id})`).join(', ') || 'none yet';
-  if (named.length > 1) throw refused(`More than one synced machine is called ${asked}. Pass its id: ${known}.`, 400);
-  throw refused(`No synced machine is called ${asked}. Synced machines: ${known}.`, 404);
 }
 
 /**
