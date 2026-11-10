@@ -105,6 +105,13 @@ function toChanges(rows: OutboxRow[], machineId: string): Change[] {
   return out;
 }
 
+const syncingListeners = new Set<(worker: SyncWorker) => void>();
+/** Called at the start of each sync, before its push, so a write made there goes out in that sync. Returns a function that removes it. */
+export function beforeSync(fn: (worker: SyncWorker) => void): () => void {
+  syncingListeners.add(fn);
+  return () => syncingListeners.delete(fn);
+}
+
 const syncedListeners = new Set<(worker: SyncWorker) => void>();
 /** Called after each sync that went through, with the worker that ran it. Returns a function that removes it. */
 export function onSynced(fn: (worker: SyncWorker) => void): () => void {
@@ -176,6 +183,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   async function cycle(): Promise<SyncResult> {
     const result: SyncResult = { pushed: 0, pulled: 0, applied: 0, skipped: 0, deferred: 0 };
     try {
+      for (const fn of syncingListeners) fn(worker);
       result.pushed = await push();
       await pull(result);
       // Everything the relay had is in: an owner another Mac set would be here by now. A claim goes out at once.

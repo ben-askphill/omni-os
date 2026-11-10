@@ -30,5 +30,7 @@ registerHandler('kv', {
     const thread = /^handoff\.(?:offer|reply|request|holder)\.(.+)$/.exec(change.entity_id)?.[1];
     const t = thread && threads.get(thread);
     if (t) publishFeed({ type: 'thread', thread: t });
+    // Another machine's update status, or an ask for this one (update-fleet.ts): the Update all machines list refetches.
+    if (change.entity_id.startsWith('update.')) publishFeed({ type: 'update' });
   },
 });
