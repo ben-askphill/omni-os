@@ -49,9 +49,11 @@ const fleet = (): FleetView => ({
   ],
 });
 
+const HERE_COMMIT = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3';
 let synced = true;
 let skippedReply: FleetSkip[] = [];
 const gets: string[] = [];
+const fleetGets = () => gets.filter((p) => p === '/update/fleet');
 const posts: { path: string; body: FleetRequest }[] = [];
 const feed = vi.hoisted(() => ({ fn: null as null | ((e: { type: string }) => void) }));
 
@@ -59,6 +61,7 @@ vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
   actual.api.get = vi.fn(async (path: string) => {
     gets.push(path);
+    if (path === '/update') return { current: HERE_COMMIT, phase: 'idle', behind: 3, commits: [], waitingFor: 0, error: null, canApply: true };
     return fleet();
   }) as typeof actual.api.get;
   actual.api.post = vi.fn(async (path: string, body: unknown) => {
@@ -191,6 +194,20 @@ it('asks before Update all, names who is asked and who is left out, and then sen
   expect(dialog()).toBeNull();
 });
 
+it('marks the page to load the new build when Update all restarts this checkout, and not when the server left it out', async () => {
+  sessionStorage.clear();
+  skippedReply = [{ id: 'here', name: 'omarchy', reason: 'Already updating.' }];
+  await click(button(host, 'Update all'));
+  await click(button(dialog()!, 'Update 3 machines'));
+  expect(sessionStorage.getItem('omni.update.from')).toBeNull();
+
+  skippedReply = [];
+  await click(button(host, 'Update all'));
+  await click(button(dialog()!, 'Update 3 machines'));
+  expect(sessionStorage.getItem('omni.update.from')).toBe(HERE_COMMIT);
+  sessionStorage.clear();
+});
+
 it('shows who the server left out after a request, then lets it go', async () => {
   skippedReply = [{ id: 'mini', name: 'mini', reason: 'Offline. Retry asks it anyway: it takes the ask when it next syncs.' }];
   await click(button(host, 'Download all'));
@@ -201,20 +218,20 @@ it('shows who the server left out after a request, then lets it go', async () =>
 });
 
 it('reads the list again on a feed update or reconnect and every 15 seconds', async () => {
-  expect(gets).toEqual(['/update/fleet']);
+  expect(fleetGets()).toEqual(['/update/fleet']);
   await act(async () => feed.fn!({ type: 'update' }));
   await flush();
-  expect(gets).toHaveLength(2);
+  expect(fleetGets()).toHaveLength(2);
   await act(async () => feed.fn!({ type: 'reconnect' }));
   await flush();
-  expect(gets).toHaveLength(3);
+  expect(fleetGets()).toHaveLength(3);
   await act(async () => feed.fn!({ type: 'thread' }));
   await flush();
-  expect(gets).toHaveLength(3);
+  expect(fleetGets()).toHaveLength(3);
 
   await act(async () => vi.advanceTimersByTime(15_000));
   await flush();
-  expect(gets).toHaveLength(4);
+  expect(fleetGets()).toHaveLength(4);
 });
 
 it('points at Sync when no other machine is synced', async () => {
