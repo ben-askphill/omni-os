@@ -125,12 +125,12 @@ export async function sealPublicKey(): Promise<string> {
  * Names a program reads before any of its own code runs, to decide what to load, what to run or whom to trust: the
  * dynamic loader's LD_* (Linux) and DYLD_* (macOS), PATH, interpreter options such as NODE_OPTIONS, git's and npm's
  * own settings, the shell's startup files, TLS trust and proxies, and where the harness CLIs send their requests and
- * read their config. A secret reaches every thread's environment, so one of these set by an agent would run its code,
+ * read their config (CLAUDE_CODE_* and CODEX_* whole: those CLIs read many, and none holds a key to send). A secret reaches every thread's environment, so one of these set by an agent would run its code,
  * or hand it the login, in every later thread. Matched as the environment spells them: exact names, plus prefixes
  * only for namespaces the program owns whole, so PATHS, MY_PATH, LDAP_URL or NODE_AUTH_TOKEN are ordinary secrets.
  * A list like this cannot be complete. It covers the known ways in, not every variable some program reads.
  */
-const STARTUP_PREFIXES = ['LD_', 'DYLD_', 'GIT_', 'NPM_CONFIG_'];
+const STARTUP_PREFIXES = ['LD_', 'DYLD_', 'GIT_', 'NPM_CONFIG_', 'CLAUDE_CODE_', 'CODEX_'];
 const STARTUP_NAMES = new Set([
   'PATH',
   'NODE_OPTIONS',
@@ -166,10 +166,15 @@ const STARTUP_NAMES = new Set([
   'HTTPS_PROXY',
   'ALL_PROXY',
   'NO_PROXY',
+  'NODE_TLS_REJECT_UNAUTHORIZED',
   'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_BEDROCK_BASE_URL',
+  'ANTHROPIC_VERTEX_BASE_URL',
   'OPENAI_BASE_URL',
+  'OPENAI_API_BASE',
   'CLAUDE_CONFIG_DIR',
-  'CODEX_HOME',
+  'CLAUDE_ENV_FILE',
+  'CURSOR_CONFIG_DIR',
   'XDG_CONFIG_HOME',
   'LESSOPEN',
   'LESSCLOSE',

@@ -177,7 +177,24 @@ describe('names that change how programs start', () => {
   // settings, the shell's startup files, and where TLS trust and proxies come from. Then where the harness CLIs send
   // their requests (with the login) and read their config, and a few more that run a command.
   const FAMILY = ['NODE_PATH', 'NODE_EXTRA_CA_CERTS', 'PYTHONPATH', 'PYTHONSTARTUP', 'PERL5OPT', 'RUBYOPT', 'JAVA_TOOL_OPTIONS', 'GIT_SSH_COMMAND', 'GIT_CONFIG_COUNT', 'NPM_CONFIG_SCRIPT_SHELL', 'BASH_ENV', 'ENV', 'HOME', 'SSL_CERT_FILE', 'HTTPS_PROXY'];
-  const HARNESS = ['ANTHROPIC_BASE_URL', 'OPENAI_BASE_URL', 'CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'XDG_CONFIG_HOME', 'LESSOPEN', 'LESSCLOSE', 'PROMPT_COMMAND'];
+  const HARNESS = [
+    'ANTHROPIC_BASE_URL',
+    'ANTHROPIC_BEDROCK_BASE_URL',
+    'ANTHROPIC_VERTEX_BASE_URL',
+    'OPENAI_BASE_URL',
+    'OPENAI_API_BASE',
+    'CLAUDE_CONFIG_DIR',
+    'CLAUDE_ENV_FILE',
+    'CLAUDE_CODE_SHELL_PREFIX',
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'CODEX_HOME',
+    'CURSOR_CONFIG_DIR',
+    'XDG_CONFIG_HOME',
+    'NODE_TLS_REJECT_UNAUTHORIZED',
+    'LESSOPEN',
+    'LESSCLOSE',
+    'PROMPT_COMMAND',
+  ];
   const ORDINARY = [
     'PATHS',
     'MY_PATH',
@@ -200,6 +217,9 @@ describe('names that change how programs start', () => {
     'ANTHROPIC_API_URL_NOTE',
     'CLAUDE_CONFIG',
     'XDG_CACHE_HOME',
+    'CURSOR_API_KEY',
+    'CLAUDE_CODEX',
+    'ANTHROPIC_API_KEY',
   ];
 
   it.each([...CORE, ...FAMILY, ...HARNESS])('refuses %s on every set_secret path', (name) => {
