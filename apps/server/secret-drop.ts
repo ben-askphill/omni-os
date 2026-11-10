@@ -121,12 +121,79 @@ export async function sealPublicKey(): Promise<string> {
   return b64(rawPublic(createPublicKey(await privateKey())));
 }
 
-/** Refuses a scope or name setSecret would, and Omni's own credentials, which only Settings sets. */
+/**
+ * Names a program reads before any of its own code runs, to decide what to load, what to run or whom to trust: the
+ * dynamic loader's LD_* (Linux) and DYLD_* (macOS), PATH, interpreter options such as NODE_OPTIONS, git's and npm's
+ * own settings, the shell's startup files, TLS trust and proxies, and where the harness CLIs send their requests and
+ * read their config (CLAUDE_CODE_* and CODEX_* whole: those CLIs read many, and none holds a key to send). A secret reaches every thread's environment, so one of these set by an agent would run its code,
+ * or hand it the login, in every later thread. Matched as the environment spells them: exact names, plus prefixes
+ * only for namespaces the program owns whole, so PATHS, MY_PATH, LDAP_URL or NODE_AUTH_TOKEN are ordinary secrets.
+ * A list like this cannot be complete. It covers the known ways in, not every variable some program reads.
+ */
+const STARTUP_PREFIXES = ['LD_', 'DYLD_', 'GIT_', 'NPM_CONFIG_', 'CLAUDE_CODE_', 'CODEX_'];
+const STARTUP_NAMES = new Set([
+  'PATH',
+  'NODE_OPTIONS',
+  'NODE_PATH',
+  'NODE_EXTRA_CA_CERTS',
+  'PYTHONPATH',
+  'PYTHONHOME',
+  'PYTHONSTARTUP',
+  'PERL5OPT',
+  'PERL5LIB',
+  'PERL5DB',
+  'PERLLIB',
+  'RUBYOPT',
+  'RUBYLIB',
+  'JAVA_TOOL_OPTIONS',
+  'JDK_JAVA_OPTIONS',
+  'HOME',
+  'SHELL',
+  'ENV',
+  'BASH_ENV',
+  'ZDOTDIR',
+  'IFS',
+  'GCONV_PATH',
+  'TMPDIR',
+  'EDITOR',
+  'VISUAL',
+  'PAGER',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'CURL_CA_BUNDLE',
+  'REQUESTS_CA_BUNDLE',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'ALL_PROXY',
+  'NO_PROXY',
+  'NODE_TLS_REJECT_UNAUTHORIZED',
+  'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_BEDROCK_BASE_URL',
+  'ANTHROPIC_VERTEX_BASE_URL',
+  'OPENAI_BASE_URL',
+  'OPENAI_API_BASE',
+  'CLAUDE_CONFIG_DIR',
+  'CLAUDE_ENV_FILE',
+  'CURSOR_CONFIG_DIR',
+  'XDG_CONFIG_HOME',
+  'LESSOPEN',
+  'LESSCLOSE',
+  'PROMPT_COMMAND',
+]);
+
+/** Whether a secret by this name would change how every thread's programs start. Settings can set one; set_secret cannot. */
+export const changesHowProgramsStart = (name: string): boolean => STARTUP_NAMES.has(name) || STARTUP_PREFIXES.some((p) => name.startsWith(p));
+
+/**
+ * Refuses a scope or name setSecret would, Omni's own credentials and names that change how programs start, which only
+ * Settings sets. Both set_secret paths call it, and so does the receiving machine before it opens a drop.
+ */
 export function checkSecret(scope: string, name: string, value: string) {
   if (!SCOPE_RE.test(scope)) throw refused('scope is global or channel:<channel id>', 400);
   if (!NAME_RE.test(name)) throw refused('name must be UPPER_SNAKE_CASE', 400);
   if (!value || /[\r\n]/.test(value)) throw refused('value must be a single non-empty line', 400);
   if (!secretReachesThread(scope, name)) throw refused(`${name} is one of Omni's own credentials. Set it in Settings on that machine.`, 403);
+  if (changesHowProgramsStart(name)) throw refused(`${name} changes how every thread's programs start, so only Settings can set it.`, 403);
 }
 
 /** A synced machine by id or by name (any case). Refuses one this machine does not know, or a name two share. */
@@ -203,14 +270,46 @@ export function secretDrop(id: string): DropView | null {
   return isDrop(d) ? viewOf(d, ackOf(d.id)) : null;
 }
 
-const answer = (id: string, state: SecretAck['state'], reason: string | null = null) =>
+/** The target's answer to a drop, given once: a later pass never replaces it, so a refusal cannot undo an accepted secret. */
+function answer(id: string, state: SecretAck['state'], reason: string | null = null) {
+  if (ackOf(id)) return;
   kv.set(ACK + id, { state, reason, at: new Date().toISOString() } satisfies SecretAck);
+}
+
+let reconciling: Promise<void> | null = null;
+let again = false;
 
 /**
  * After a sync: open and save every secret sent to this machine that has no answer yet, and clear the sealed value of
- * every one this machine sent that has been answered. Safe to run any number of times.
+ * every one this machine sent that has been answered. Safe to run any number of times. One pass at a time, so two
+ * passes never write the same secret into the store at once (the Keychain refuses one of them): a call during a pass
+ * runs one more pass after it, however many calls came, so a drop that synced meanwhile is still taken. A pass that
+ * throws frees the lock, and a pass queued behind it still runs. `now` is for tests.
  */
-export async function reconcileSecretDrops(now = Date.now()): Promise<void> {
+export function reconcileSecretDrops(now?: number): Promise<void> {
+  if (reconciling) {
+    again = true;
+    return reconciling;
+  }
+  reconciling = (async () => {
+    try {
+      do {
+        again = false;
+        try {
+          await reconcileOnce(now ?? Date.now());
+        } catch (err) {
+          if (!again) throw err;
+          console.error('[secrets] could not take a sent secret, trying again:', (err as Error).message);
+        }
+      } while (again);
+    } finally {
+      reconciling = null;
+    }
+  })();
+  return reconciling;
+}
+
+async function reconcileOnce(now: number): Promise<void> {
   const self = outbox.machineId();
   if (!self) return;
   for (const [key, v] of kv.list<unknown>(DROP)) {
@@ -237,10 +336,13 @@ export async function reconcileSecretDrops(now = Date.now()): Promise<void> {
     }
     try {
       await setSecret(v.scope, v.name, value);
-      answer(v.id, 'accepted');
     } catch (err) {
       answer(v.id, 'rejected', `The secret store refused it: ${(err as Error).message}`);
+      continue;
     }
+    // Outside the try: failing to record the answer is not the store refusing it. The pass throws, and the next one
+    // saves the value again and answers.
+    answer(v.id, 'accepted');
   }
 }
 

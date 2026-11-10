@@ -91,6 +91,18 @@ describe('setting a secret on another machine', () => {
     expect((await send({ machine: 'box-b', name: 'TWO_LINES', value: 'a\nb' })).status).toBe(400);
   });
 
+  it('refuses names that change how programs start, sent to another machine or saved here, and takes look-alikes', async () => {
+    for (const name of ['PATH', 'NODE_OPTIONS', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'GIT_SSH_COMMAND']) {
+      const away = await send({ machine: 'box-b', name, value: 'placeholder' });
+      expect(away.status, name).toBe(403);
+      expect(away.body.error, name).toBe(`${name} changes how every thread's programs start, so only Settings can set it.`);
+      expect((await send({ name, value: 'placeholder' })).status, name).toBe(403);
+      expect(storeOf(a)[`global/${name}`], name).toBeUndefined();
+    }
+    for (const name of ['PATHS', 'LDAP_URL', 'DYLDX']) expect((await send({ name, value: 'placeholder' })).status, name).toBe(200);
+    expect(JSON.stringify(relay.changes)).not.toContain('NODE_OPTIONS');
+  });
+
   it('the target refuses one sealed to another key, and one past its 24 hours', async () => {
     const res = await send({ machine: 'box-b', name: 'WRONG_KEY', value: 'x' });
     const drop = a.db.kv.get(`secretdrop.${res.body.id}`) as Record<string, any>;
