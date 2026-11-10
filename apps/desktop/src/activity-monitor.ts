@@ -40,8 +40,11 @@ async function answers(port: number): Promise<boolean> {
   }
 }
 
-/** What the sampler reads: where the CLIs keep their transcripts, and the tools it samples the system with. */
-const MONITOR_PASSTHROUGH = ['HOME', 'USER', 'LOGNAME', 'TMPDIR', 'LANG', 'LC_ALL', 'PATH', 'CLAUDE_CONFIG_DIR', 'CODEX_HOME'] as const;
+/**
+ * What the sampler reads: where the CLIs keep their transcripts, and the tools it samples the system with.
+ * No CLAUDE_CONFIG_DIR: Omni strips it from Claude Code threads, so their transcripts are always in ~/.claude.
+ */
+const MONITOR_PASSTHROUGH = ['HOME', 'USER', 'LOGNAME', 'TMPDIR', 'LANG', 'LC_ALL', 'PATH', 'CODEX_HOME'] as const;
 
 /** The sampler's environment, on this app's binary acting as Node. */
 export function monitorEnv(app: NodeJS.ProcessEnv, port: number): Record<string, string> {
