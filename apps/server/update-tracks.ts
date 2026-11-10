@@ -57,6 +57,9 @@ export class CheckoutTrack implements Track {
   }
 
   async check(): Promise<void> {
+    // A new ask supersedes the last failure. Left in place, it would read as failed through the check, and the page's
+    // reload-after-Update mark (apps/web/src/update-notice.ts) would drop on it.
+    this.updater.dismiss();
     this.refused = null;
     this.checking++;
     this.changed();
