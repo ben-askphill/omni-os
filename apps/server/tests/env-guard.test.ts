@@ -53,6 +53,51 @@ describe('harness env guard', () => {
     expect(env.OPENAI_API_KEY).toBeUndefined();
   });
 
+  describe('Claude Code base URL and config dir', () => {
+    const redirect = {
+      ANTHROPIC_BASE_URL: 'https://anthropic.example.test',
+      CLAUDE_CONFIG_DIR: '/tmp/fake-claude-config',
+    };
+
+    it('drops both from the server env', () => {
+      const env = harnessEnv('claude-code', {}, {}, { ...base, ...redirect, EDITOR: 'vim', ANTHROPIC_MODEL: 'm' });
+      expect(env.ANTHROPIC_BASE_URL).toBeUndefined();
+      expect(env.CLAUDE_CONFIG_DIR).toBeUndefined();
+      // Unrelated variables, Anthropic-prefixed or not, stay.
+      expect(env.EDITOR).toBe('vim');
+      expect(env.ANTHROPIC_MODEL).toBe('m');
+      expect(env.PATH).toBe('/usr/bin');
+      expect(env.HOME).toBe('/home/ben');
+    });
+
+    it('drops both when they come from a secret or the extra vars', () => {
+      const fromSecret = harnessEnv('claude-code', {}, redirect, base);
+      const fromExtra = harnessEnv('claude-code', { ...redirect, OMNI_THREAD_ID: 't1' }, {}, base);
+      for (const env of [fromSecret, fromExtra]) {
+        expect(env.ANTHROPIC_BASE_URL).toBeUndefined();
+        expect(env.CLAUDE_CONFIG_DIR).toBeUndefined();
+      }
+      expect(fromExtra.OMNI_THREAD_ID).toBe('t1');
+    });
+
+    it('works when neither is set', () => {
+      const env = harnessEnv('claude-code', { OMNI_THREAD_ID: 't1' }, {}, base);
+      expect(env).toEqual({ ...base, OMNI_THREAD_ID: 't1' });
+      expect('ANTHROPIC_BASE_URL' in env).toBe(false);
+      expect('CLAUDE_CONFIG_DIR' in env).toBe(false);
+    });
+
+    it('leaves Codex as it was', () => {
+      expect(STRIPPED_VARS.codex).toEqual(['OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_BASE_URL']);
+      const env = harnessEnv('codex', {}, {}, { ...base, ...redirect, OPENAI_BASE_URL: 'https://openai.example.test', CODEX_HOME: '/tmp/fake-codex-home' });
+      expect(env.OPENAI_BASE_URL).toBeUndefined();
+      // Codex does not use the Claude variables, so they pass through, as does its own home dir.
+      expect(env.ANTHROPIC_BASE_URL).toBe(redirect.ANTHROPIC_BASE_URL);
+      expect(env.CLAUDE_CONFIG_DIR).toBe(redirect.CLAUDE_CONFIG_DIR);
+      expect(env.CODEX_HOME).toBe('/tmp/fake-codex-home');
+    });
+  });
+
   it('keeps the Grok Bot webhook out of every harness', () => {
     const dirty = { ...base, [GROKBOT_WEBHOOK_URL]: 'https://hook.example', [GROKBOT_WEBHOOK_AUTH]: 'from-env' } as NodeJS.ProcessEnv;
     for (const harness of HARNESS_IDS) {
