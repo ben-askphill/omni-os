@@ -62,15 +62,23 @@ function track(): Track {
 const TRACKS: Record<UpdateTrack, true> = { checkout: true, desktop: true, manual: true };
 const PHASES: Record<MachinePhase, true> = { idle: true, checking: true, 'up-to-date': true, available: true, downloading: true, ready: true, waiting: true, applying: true, restarting: true, failed: true };
 
+const str = (v: unknown): v is string => typeof v === 'string';
+const strOrNull = (v: unknown) => v === null || str(v);
+const numOrNull = (v: unknown) => v === null || (typeof v === 'number' && Number.isFinite(v));
+const isTime = (v: unknown): v is string => str(v) && Number.isFinite(Date.parse(v));
+const isTaken = (v: unknown): v is Record<string, string> => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(str);
+
+/** Every field the list shows, checked: another machine wrote it, and a bad one should drop its row, not the page. */
 const isStatus = (v: unknown): v is MachineUpdateStatus => {
   const s = v as Partial<MachineUpdateStatus> | null;
-  return !!s && typeof s.id === 'string' && typeof s.name === 'string' && !!s.track && s.track in TRACKS && !!s.phase && s.phase in PHASES && typeof s.since === 'string';
+  return (
+    !!s && str(s.id) && str(s.name) && str(s.track) && Object.hasOwn(TRACKS, s.track) && str(s.phase) && Object.hasOwn(PHASES, s.phase) && isTime(s.since) &&
+    strOrNull(s.version) && strOrNull(s.available) && strOrNull(s.error) && numOrNull(s.behind) && numOrNull(s.progress) && typeof s.waitingFor === 'number' && isTaken(s.taken)
+  );
 };
 const isAsk = (v: unknown): v is UpdateAsk => {
   const a = v as Partial<UpdateAsk> | null;
-  return (
-    !!a && typeof a.id === 'string' && typeof a.sender === 'string' && typeof a.target === 'string' && FLEET_ACTIONS.includes(a.action as FleetAction) && typeof a.at === 'string' && typeof a.expiresAt === 'string'
-  );
+  return !!a && str(a.id) && str(a.sender) && str(a.target) && FLEET_ACTIONS.includes(a.action as FleetAction) && isTime(a.at) && isTime(a.expiresAt);
 };
 const statusOf = (id: string): MachineUpdateStatus | null => {
   const s = kv.get<unknown>(statusKey(id));
@@ -83,12 +91,12 @@ const askOf = (sender: string, target: string): UpdateAsk | null => {
 
 // ---------- this machine's status ----------
 
-/** This machine's status as it stands. `since` holds while the phase does, and `takenAt` unless given. */
-function ownStatus(id: string, name: string, prev: MachineUpdateStatus | null, now: number, takenAt = prev?.takenAt ?? null): MachineUpdateStatus {
+/** This machine's status as it stands. `since` holds while the phase does, and `taken` unless given. */
+function ownStatus(id: string, name: string, prev: MachineUpdateStatus | null, now: number, taken = prev?.taken ?? {}): MachineUpdateStatus {
   const t = track();
   const state = t.state();
   const since = prev && prev.phase === state.phase ? prev.since : new Date(now).toISOString();
-  return { id, name, track: t.kind, ...state, takenAt, since };
+  return { id, name, track: t.kind, ...state, taken, since };
 }
 
 /** Progress is written at every tenth, not every percent. */
@@ -100,7 +108,7 @@ const same = (a: MachineUpdateStatus, b: MachineUpdateStatus) =>
   a.behind === b.behind &&
   a.error === b.error &&
   a.waitingFor === b.waitingFor &&
-  a.takenAt === b.takenAt &&
+  JSON.stringify(a.taken) === JSON.stringify(b.taken) &&
   a.track === b.track &&
   a.name === b.name &&
   tenth(a.progress) === tenth(b.progress);
@@ -119,22 +127,21 @@ export function publishStatus(now = Date.now()): void {
 }
 
 /**
- * After a sync: take the newest ask for this machine that its status has not taken yet, and run it. The status takes
- * the ask before the action runs, so a restart in the middle never runs it twice. One past its window is taken and
- * dropped. Safe to run any number of times.
+ * After a sync: take every ask for this machine that its status has not taken yet, and run the newest one still in its
+ * window. The status takes them before the action runs, so a restart in the middle never runs one twice. Safe to run
+ * any number of times.
  */
 export function reconcileAsks(now = Date.now()): void {
   const self = outbox.machineId();
   if (!self) return;
   const prev = statusOf(self);
-  const ask = kv
-    .list<unknown>(ASK_PREFIX)
-    .flatMap(([, v]) => (isAsk(v) && v.target === self && !askTaken(v, prev) ? [v] : []))
-    .sort((a, b) => b.at.localeCompare(a.at))[0];
-  if (!ask) return;
-  kv.set(statusKey(self), ownStatus(self, ownName(self), prev, now, ask.at));
-  if (Date.parse(ask.expiresAt) <= now) return;
-  void run(ask.action);
+  const asks = kv.list<unknown>(ASK_PREFIX).flatMap(([, v]) => (isAsk(v) && v.target === self && !askTaken(v, prev) ? [v] : []));
+  if (!asks.length) return;
+  const taken = { ...prev?.taken };
+  for (const a of asks) taken[a.sender] = a.id;
+  kv.set(statusKey(self), ownStatus(self, ownName(self), prev, now, taken));
+  const newest = asks.filter((a) => Date.parse(a.expiresAt) > now).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
+  if (newest) void run(newest.action);
 }
 
 /** Run an action on this machine's track. What the updater itself refuses or fails shows in the status; anything else is logged. */

@@ -6,13 +6,13 @@ import type { Reachability } from './handoff.ts';
 // last-writer-wins never loses one:
 // - `update.status.<machine>`, by that machine: how it updates, what it runs, and where its update stands.
 // - `update.ask.<sender>.<target>`, by the machine that asked: check, download or update, and when.
-// After each sync a machine takes the newest ask for it that its status has not taken yet, once, and runs it on its own
+// After each sync a machine takes every ask for it that its status has not taken yet, once, runs the newest on its own
 // updater: a checkout's Update (update.ts) or the packaged desktop app's (apps/desktop/src/updates.ts).
 
 /**
  * How a machine updates. `checkout`: a server from a git checkout that a supervisor restarts (update.ts). `desktop`:
  * the packaged desktop app's own server, which the app replaces when it updates itself. `manual`: a checkout server
- * nothing restarts, so it can check and download but its update is applied by hand.
+ * nothing restarts, or a copy of the desktop app that cannot update itself, so its update is applied by hand.
  */
 export type UpdateTrack = 'checkout' | 'desktop' | 'manual';
 
@@ -53,8 +53,8 @@ export interface MachineUpdateStatus {
   /** Running turns the restart waits for, while waiting. */
   waitingFor: number;
   error: string | null;
-  /** The `at` of the newest ask it took. An ask at or before it is never run again. */
-  takenAt: string | null;
+  /** The id of the ask it last took from each machine, by that machine's id. An ask taken is never run again. */
+  taken: Record<string, string>;
   /** When `phase` last changed. */
   since: string;
 }
@@ -125,9 +125,9 @@ export interface FleetResult extends FleetView {
   skipped: FleetSkip[];
 }
 
-/** An ask counts as taken once the target's status has taken it or a newer one. */
-export const askTaken = (ask: Pick<UpdateAsk, 'at'>, status: Pick<MachineUpdateStatus, 'takenAt'> | null): boolean =>
-  !!status?.takenAt && status.takenAt >= ask.at;
+/** An ask counts as taken once the target's status names it. Ids, not times: the machines' clocks need not agree. */
+export const askTaken = (ask: Pick<UpdateAsk, 'id' | 'sender'>, status: Pick<MachineUpdateStatus, 'taken'> | null): boolean =>
+  status?.taken?.[ask.sender] === ask.id;
 
 /** A restarting machine drops off Connect and Tailscale for a moment: keep showing it as restarting. */
 const SHOWN_WHILE_OFFLINE = new Set<MachinePhase>(['restarting']);
@@ -148,7 +148,7 @@ const BUSY: Record<FleetAction, ReadonlySet<FleetRowState>> = {
 export function skipReason(m: Pick<FleetMachine, 'state' | 'status'>, action: FleetAction, force = false): string | null {
   if (m.state === 'not-reporting') return 'Runs an older Omni. Update it there once, then it updates from here.';
   if (m.state === 'offline' && !force) return 'Offline. Retry asks it anyway: it takes the ask when it next syncs.';
-  if (action === 'update' && m.status?.track === 'manual') return 'Nothing restarts its server. Apply its update there by hand.';
+  if (action === 'update' && m.status?.track === 'manual') return 'It cannot apply an update by itself. Apply it there by hand.';
   if (BUSY[action].has(m.state)) return action === 'update' ? 'Already updating.' : `Already ${m.state === 'checking' ? 'checking' : 'updating'}.`;
   return null;
 }
@@ -214,7 +214,7 @@ export function rowTone(state: FleetRowState): 'running' | 'needs' | 'done' | 's
   }
 }
 
-export const TRACK_LABEL: Record<UpdateTrack, string> = { checkout: 'Checkout', desktop: 'Desktop app', manual: 'Checkout, applied by hand' };
+export const TRACK_LABEL: Record<UpdateTrack, string> = { checkout: 'Checkout', desktop: 'Desktop app', manual: 'Applied by hand' };
 
 /** "a1b2c3d4 → e5f6a7b8" or "0.4.1 → 0.4.2": what it runs, and what it would move to. */
 export function versionLine(s: Pick<MachineUpdateStatus, 'version' | 'available'> | null): string | null {

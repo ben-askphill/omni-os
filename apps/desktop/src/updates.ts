@@ -135,7 +135,8 @@ export function installUpdates(ctx: AppContext): void {
     return step !== 'wait';
   };
   const report = createUpdateReporter({
-    canReport: () => !!updater && view.state !== 'unsupported' && ctx.backend.current.kind === 'ready' && ctx.backend.info().startedHere,
+    // A copy that cannot update itself reports too, so the other machines show it as one to update by hand.
+    canReport: () => (!!updater || view.state === 'unsupported') && ctx.backend.current.kind === 'ready' && ctx.backend.info().startedHere,
     current: () => ({ version: app.getVersion(), view }),
     send: (body: DesktopUpdateReport) =>
       ctx.backend.api('/api/update/desktop', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
@@ -191,6 +192,7 @@ export function installUpdates(ctx: AppContext): void {
     setImmediate(() => app.quit());
   });
 
+  setInterval(() => void report(), REPORT_EVERY_MS).unref();
   if (view.state === 'unsupported') return;
 
   void import('electron-updater').then(({ autoUpdater }) => {
@@ -218,7 +220,6 @@ export function installUpdates(ctx: AppContext): void {
       if (auto()) void check();
     }, CHECK_EVERY_MS).unref();
     void report();
-    setInterval(() => void report(), REPORT_EVERY_MS).unref();
     // Turned on: look now rather than at the next tick.
     ctx.settings.onChange((next, previous) => {
       if (next.autoUpdate && !previous.autoUpdate) void check();

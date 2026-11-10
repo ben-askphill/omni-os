@@ -21,7 +21,7 @@ const status = (id: string, over: Partial<MachineUpdateStatus>): MachineUpdateSt
   progress: null,
   waitingFor: 0,
   error: null,
-  takenAt: null,
+  taken: {},
   since: ago(1),
   ...over,
 });
@@ -39,7 +39,7 @@ const fleet = (): FleetView => ({
     machine({
       id: 'laptop',
       name: 'laptop',
-      status: status('laptop', { phase: 'failed', error: 'git fetch failed: network unreachable', takenAt: ago(10) }),
+      status: status('laptop', { phase: 'failed', error: 'git fetch failed: network unreachable', taken: { here: 'a' } }),
       ask: { id: 'a', sender: 'here', target: 'laptop', action: 'download', at: ago(10), expiresAt: ago(-20) },
     }),
     machine({ id: 'mini', name: 'mini', reach: 'offline', status: status('mini', {}) }),
@@ -133,7 +133,7 @@ it('says each machine\'s state, how long it has lasted, its version, its progres
   expect(row('mini').textContent).toContain('Retry asks it anyway');
   expect(row('old-mac').textContent).toContain('Not reporting');
   expect(row('nuc').textContent).toContain('3 new commits, ready to update');
-  expect(row('pi').textContent).toContain('Nothing restarts its server');
+  expect(row('pi').textContent).toContain('It cannot apply an update by itself');
 });
 
 it('puts Retry on a failed or offline machine and Update on one that is ready, and nowhere else', () => {
@@ -154,7 +154,7 @@ it('sends a failed machine\'s last ask again to it alone, and an offline one wit
   expect(posts.at(-1)).toEqual({ path: '/update/fleet', body: { action: 'download', machines: ['laptop'], force: true } });
 
   await click(button(row('mini'), 'Retry'));
-  expect(posts.at(-1)?.body).toEqual({ action: 'update', machines: ['mini'], force: true });
+  expect(posts.at(-1)?.body).toEqual({ action: 'check', machines: ['mini'], force: true });
 
   await click(button(row('nuc'), 'Update'));
   expect(posts.at(-1)?.body).toEqual({ action: 'update', machines: ['nuc'] });

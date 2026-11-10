@@ -190,7 +190,7 @@ describe('updating every machine at once', () => {
     a.db.kv.set('update.ask.mac-a.mac-c', { id: 'late', sender: 'mac-a', target: 'mac-c', action: 'update', at, expiresAt: new Date(Date.now() - 1_000).toISOString() });
     await round();
     expect(c.install).not.toHaveBeenCalled();
-    expect(rowOf(await view(a), 'mac-c')).toMatchObject({ state: 'restarting', status: { takenAt: at } });
+    expect(rowOf(await view(a), 'mac-c')).toMatchObject({ state: 'restarting', status: { taken: { 'mac-a': 'late' } } });
   }, 30_000);
 
   it('skips a machine Tailscale says is offline and says so, and Retry asks it anyway', async () => {

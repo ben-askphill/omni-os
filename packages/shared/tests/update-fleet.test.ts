@@ -13,7 +13,7 @@ const status = (over: Partial<MachineUpdateStatus> = {}): MachineUpdateStatus =>
   progress: null,
   waitingFor: 0,
   error: null,
-  takenAt: '2026-11-10T11:00:00Z',
+  taken: { a: 'ask-0' },
   since: '2026-11-10T11:00:00Z',
   ...over,
 });
@@ -30,7 +30,13 @@ const row = (over: Partial<Pick<FleetMachine, 'current' | 'reach' | 'status' | '
 
 describe('rowState', () => {
   it('shows the machine’s own phase once it took the newest ask', () => {
-    expect(rowState(row({ ask: ask('2026-11-10T10:59:00Z') }), NOW)).toBe('ready');
+    expect(rowState(row({ ask: ask('2026-11-10T10:59:00Z', { id: 'ask-0' }) }), NOW)).toBe('ready');
+  });
+
+  it('counts an ask as taken by its id, so a sender whose clock runs behind is not taken for done', () => {
+    expect(rowState(row({ ask: ask('2026-11-10T11:55:00Z', { id: 'ask-0' }) }), NOW)).toBe('ready');
+    expect(rowState(row({ ask: ask('2026-11-10T11:50:00Z', { id: 'ask-2' }) }), NOW)).toBe('sent');
+    expect(rowState(row({ ask: ask('2026-11-10T11:50:00Z', { sender: 'c', id: 'ask-0' }) }), NOW)).toBe('sent');
   });
 
   it('is sent while the ask waits for the target to sync, and expired once its window passed', () => {

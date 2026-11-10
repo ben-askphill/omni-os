@@ -45,10 +45,10 @@ function leftOutNote(m: FleetMachine): string | null {
   return m.state === 'offline' || m.state === 'not-reporting' || m.status?.track === 'manual' ? skipReason(m, 'update') : null;
 }
 
-/** A row's own button. Retry sends the machine's last ask again, to a machine a source says is offline too. */
+/** A row's own button. Retry sends this machine's last ask to it again, or a check when there was none, offline or not. */
 function rowAction(m: FleetMachine): { label: 'Retry' | 'Update'; request: FleetRequest } | null {
   if (m.state === 'failed' || m.state === 'expired' || m.state === 'offline') {
-    return { label: 'Retry', request: { action: m.ask?.action ?? 'update', machines: [m.id], force: true } };
+    return { label: 'Retry', request: { action: m.ask?.action ?? 'check', machines: [m.id], force: true } };
   }
   if ((m.state === 'ready' || m.state === 'available') && skipReason(m, 'update') === null) {
     return { label: 'Update', request: { action: 'update', machines: [m.id] } };

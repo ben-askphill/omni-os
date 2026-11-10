@@ -84,8 +84,39 @@ describe('the desktop app’s server', () => {
     expect((await own()).state).toBe('ready');
   });
 
+  it('keeps an update asked while the app still shows its last failure, until the app has acted on it', async () => {
+    await report({ state: 'error', message: 'net down' });
+    expect((await json('/update/fleet', { action: 'update' })).status).toBe(202);
+    const { command } = (await report({ state: 'error', message: 'net down' })).body;
+    expect(command).toMatchObject({ action: 'download' });
+    await report({ state: 'downloading', version: '0.4.3', percent: 50 }, command!.id);
+    const install = await vi.waitFor(async () => {
+      const next = (await report({ state: 'ready', version: '0.4.3' }, command!.id)).body.command;
+      expect(next).toMatchObject({ action: 'install' });
+      return next!;
+    });
+    await report({ state: 'ready', version: '0.4.3' }, install.id);
+  });
+
+  it('drops an update nobody finished in its window, so the app never relaunches long after the ask', async () => {
+    await report({ state: 'available', version: '0.4.4' });
+    await json('/update/fleet', { action: 'update' });
+    const { command } = (await report({ state: 'available', version: '0.4.4' })).body;
+    expect(command).toMatchObject({ action: 'download' });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 31 * 60_000);
+      expect((await report({ state: 'ready', version: '0.4.4' }, command!.id)).body).toEqual({ command: null });
+      expect((await report({ state: 'ready', version: '0.4.4' }, command!.id)).body).toEqual({ command: null });
+      expect((await own()).state).toBe('ready');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('makes the pages refetch only for a report that moved something, not for each of the app’s ticks', async () => {
     const { bus } = await import('../bus.ts');
+    await report(READY);
     const updates: unknown[] = [];
     const listen = (e: { type: string }) => e.type === 'update' && updates.push(e);
     bus.on('feed', listen);
@@ -98,6 +129,13 @@ describe('the desktop app’s server', () => {
     } finally {
       bus.off('feed', listen);
     }
+  });
+
+  it('a copy of the app that cannot update itself is applied by hand, and Update leaves it out', async () => {
+    await report({ state: 'unsupported', reason: 'This build has no update feed.' });
+    expect(await own()).toMatchObject({ status: { track: 'manual' } });
+    const res = await json('/update/fleet', { action: 'update' });
+    expect(res.body.skipped).toEqual([expect.objectContaining({ id: 'here', reason: expect.stringMatching(/by hand/) })]);
   });
 
   it('a server that is not the app’s answers no command, and refuses a report that is not one', async () => {

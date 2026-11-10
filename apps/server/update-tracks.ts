@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { DesktopUpdateCommand, DesktopUpdateReply, DesktopUpdateReport, MachinePhase, MachineUpdateStatus, UpdateTrack } from '@omni/shared/update-fleet.ts';
+import { ASK_WINDOW_MS, type DesktopUpdateCommand, type DesktopUpdateReply, type DesktopUpdateReport, type MachinePhase, type MachineUpdateStatus, type UpdateTrack } from '@omni/shared/update-fleet.ts';
 import { publishFeed } from './bus.ts';
 import type { Updater, UpdatePhase } from './update.ts';
 
@@ -108,25 +108,35 @@ const desktopView = z.discriminatedUnion('state', [
 /** A report as the app's main process sends it. The release notes it may carry are left out: the server does not read them. */
 export const desktopReport = z.object({ version: z.string(), view: desktopView, done: z.string().nullable().default(null) });
 
+/** How long the row says restarting after the install went out, while the app has not come back on a new version. */
+const RESTART_SHOWN_MS = 2 * 60_000;
+
 export class DesktopTrack implements Track {
-  readonly kind = 'desktop';
   private last: DesktopUpdateReport | null = null;
   private command: DesktopUpdateCommand | null = null;
-  /** When update() was asked, while it still means to install once the download is ready. */
-  private goalAt: number | null = null;
+  /**
+   * An update asked for, until it installs or ends. `download` is the command it issued: until the app names it in
+   * `done`, a report still describes the app from before, and its error or nothing-new does not end the goal.
+   */
+  private goal: { at: number; until: number; download: string | null } | null = null;
   /** Running turns the install waits for, while it waits. */
   private waitingFor: number | null = null;
   private waiting: Promise<void> | null = null;
-  private restarting = false;
+  private restartingUntil = 0;
   private changed: () => void;
 
   constructor(private deps: DesktopTrackDeps) {
     this.changed = deps.changed ?? changedFeed;
   }
 
+  /** A copy of the app that cannot update itself (no feed, a read-only folder) is updated by hand. */
+  get kind(): UpdateTrack {
+    return this.last?.view.state === 'unsupported' ? 'manual' : 'desktop';
+  }
+
   state(): TrackState {
     const base: TrackState = { version: this.last?.version ?? null, available: null, behind: null, phase: 'idle', progress: null, waitingFor: 0, error: null };
-    if (this.restarting) return { ...base, phase: 'restarting' };
+    if (Date.now() < this.restartingUntil) return { ...base, phase: 'restarting' };
     if (this.waitingFor !== null) return { ...base, phase: 'waiting', waitingFor: this.waitingFor };
     const view = this.last?.view;
     if (!view) return base;
@@ -157,9 +167,10 @@ export class DesktopTrack implements Track {
   }
 
   async update(): Promise<void> {
-    this.goalAt = Date.now();
+    const now = Date.now();
+    this.goal = { at: now, until: now + ASK_WINDOW_MS, download: null };
     if (this.last?.view.state === 'ready') return this.installWhenIdle();
-    this.issue('download');
+    this.goal.download = this.issue('download');
   }
 
   report(report: DesktopUpdateReport): DesktopUpdateReply {
@@ -167,11 +178,14 @@ export class DesktopTrack implements Track {
     this.last = report;
     if (this.command && report.done === this.command.id) this.command = null;
     const view = report.view;
-    if (view.state !== 'ready') this.restarting = false;
-    if (this.goalAt !== null) {
+    if (view.state !== 'ready') this.restartingUntil = 0;
+    const goal = this.goal;
+    if (goal && Date.now() > goal.until) this.goal = null;
+    else if (goal) {
+      const acted = goal.download === null || report.done === goal.download;
       // A check since the ask found nothing, or the app could not get it: the update asked for ends here.
-      const nothingNew = view.state === 'idle' && view.checkedAt !== null && Date.parse(view.checkedAt) > this.goalAt;
-      if (view.state === 'error' || nothingNew) this.goalAt = null;
+      const nothingNew = view.state === 'idle' && view.checkedAt !== null && Date.parse(view.checkedAt) > goal.at;
+      if (acted && (view.state === 'error' || nothingNew)) this.goal = null;
       else if (view.state === 'ready') void this.installWhenIdle();
     }
     // The app reports every few seconds: only a report that moved something makes the pages refetch.
@@ -180,9 +194,10 @@ export class DesktopTrack implements Track {
   }
 
   /** Each command gets its own id, and is handed out with every reply until a report names it in `done`. */
-  private issue(action: DesktopUpdateCommand['action']) {
+  private issue(action: DesktopUpdateCommand['action']): string {
     this.command = { id: randomUUID(), action };
     this.changed();
+    return this.command.id;
   }
 
   private installWhenIdle(): Promise<void> {
@@ -193,12 +208,15 @@ export class DesktopTrack implements Track {
   }
 
   private async waitThenInstall(): Promise<void> {
-    while (this.goalAt !== null) {
+    while (this.goal !== null && Date.now() <= this.goal.until) {
       const n = this.deps.runningTurns();
       if (n === 0) {
         this.waitingFor = null;
-        this.goalAt = null;
-        this.restarting = true;
+        this.goal = null;
+        // Restarting until the app comes back on its new version, or for a while if it never does (a quit question
+        // nobody answers on that machine): then the row says ready again instead of restarting for good.
+        this.restartingUntil = Date.now() + RESTART_SHOWN_MS;
+        setTimeout(() => this.changed(), RESTART_SHOWN_MS + 1_000).unref();
         this.issue('install');
         return;
       }
@@ -208,6 +226,7 @@ export class DesktopTrack implements Track {
       }
       await this.deps.sleep(IDLE_POLL_MS);
     }
+    this.goal = null;
     this.waitingFor = null;
     this.changed();
   }

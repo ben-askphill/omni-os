@@ -9,14 +9,16 @@
         "id": "mac-a",
         "name": "Mac A",
         "track": "manual",
-        "version": "70442d98",
-        "available": "94f1271f",
+        "version": "d6e2a30d",
+        "available": "07e9dbef",
         "behind": 2,
         "progress": null,
         "waitingFor": 0,
         "error": null,
         "phase": "checking",
-        "takenAt": "2026-01-05T09:00:00.000Z",
+        "taken": {
+          "mac-a": "00000000-0000-4000-8000-000000000001"
+        },
         "since": "2026-01-05T09:00:00.000Z"
       },
       "ask": {
@@ -38,14 +40,16 @@
         "id": "box-b",
         "name": "Box B",
         "track": "checkout",
-        "version": "70442d98",
-        "available": "94f1271f",
+        "version": "d6e2a30d",
+        "available": "07e9dbef",
         "behind": 2,
         "progress": null,
         "waitingFor": 0,
         "error": null,
         "phase": "restarting",
-        "takenAt": "2026-01-05T09:00:00.000Z",
+        "taken": {
+          "mac-a": "00000000-0000-4000-8000-000000000002"
+        },
         "since": "2026-01-05T09:00:00.000Z"
       },
       "ask": {
@@ -65,16 +69,16 @@
       "reach": "offline",
       "status": {
         "id": "box-d",
-        "name": "omarchy",
+        "name": "Box D",
         "track": "checkout",
-        "version": "70442d98",
+        "version": "d6e2a30d",
         "available": null,
         "behind": 0,
         "progress": null,
         "waitingFor": 0,
         "error": null,
         "phase": "idle",
-        "takenAt": null,
+        "taken": {},
         "since": "2026-01-05T09:00:00.000Z"
       },
       "ask": {
@@ -96,18 +100,20 @@
         "id": "mac-c",
         "name": "Mac C",
         "track": "checkout",
-        "version": "70442d98",
-        "available": "94f1271f",
+        "version": "d6e2a30d",
+        "available": "07e9dbef",
         "behind": 2,
         "progress": null,
         "waitingFor": 0,
         "error": null,
         "phase": "restarting",
-        "takenAt": "2026-01-05T09:00:00.000Z",
+        "taken": {
+          "mac-a": "late"
+        },
         "since": "2026-01-05T09:00:00.000Z"
       },
       "ask": {
-        "id": "00000000-0000-4000-8000-000000000004",
+        "id": "late",
         "sender": "mac-a",
         "target": "mac-c",
         "action": "update",
