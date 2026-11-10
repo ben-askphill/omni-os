@@ -2,7 +2,7 @@
 
 `automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`, `tool-failure-triage`, `docs-daily`), all off until you turn them on. Turning one on or off in the UI writes `automations.<id>.enabled` to `data/omni.config.json`, never the YAML, and `automations.<id>.channel` there moves it to another channel. Your own automations go in `data/automations/`.
 
-Delete on an automation's card removes it from this machine after a confirmation. One of your own in `data/automations/` loses its YAML file. A shared one stays in `automations/`, so an update cannot bring it back: Omni hides it with `automations.<id>.deleted` in `data/omni.config.json`, and removing that key restores it. Either way its schedule stops at once, a webhook automation's signing secret goes with it, and threads it already started stay.
+Delete on an automation's card removes it from this machine after a confirmation. One of your own in `data/automations/` loses its YAML file. A shared one stays in `automations/`, so an update cannot bring it back: Omni hides it with `automations.<id>.deleted` in `data/omni.config.json`, and removing that key restores it. Either way its schedule stops at once, a webhook automation's signing secret goes with it, and threads it already started stay. The hide is per machine, like the on/off override: with sync on, delete it on the machine that runs automations too. Desktop web, phone web and the desktop app all have Delete. The native iOS Automations screen can only toggle.
 
 ```yaml
 name: Morning coffee
