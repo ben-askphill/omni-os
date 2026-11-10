@@ -8,10 +8,12 @@ import type { HarnessId } from './types.ts';
 /**
  * With one of these in its env, a harness CLI bills that key instead of the logged-in
  * plan (and fails when the key is stale). A shell profile or a channel secret must never
- * switch that. Claude's list matches the runner's original API_AUTH_VARS.
+ * switch that. Claude's keys match the runner's original API_AUTH_VARS. A base URL sends
+ * the CLI's traffic and login to another host, and CLAUDE_CONFIG_DIR swaps the login and
+ * settings Omni expects in ~/.claude (where it reads Claude transcripts), so both go too.
  */
 export const STRIPPED_VARS: Record<HarnessId, string[]> = {
-  'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'],
+  'claude-code': ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'CLAUDE_CONFIG_DIR'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_BASE_URL'],
   cursor: ['CURSOR_API_KEY', 'CURSOR_AUTH_TOKEN'],
   // The bearer token is sent on the HTTP client, never inherited by the holder process.
