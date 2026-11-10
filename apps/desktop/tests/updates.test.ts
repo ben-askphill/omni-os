@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { applySettingsPatch, DEFAULT_DESKTOP_SETTINGS, parseDesktopSettings, type DesktopUpdateView } from '@omni/shared/desktop-bridge.ts';
 import {
+  commandStep,
   initialView,
   installOnQuit,
   NOTE_LINES,
+  parseCommand,
   reduceUpdate,
   releaseNotes,
   releasePage,
@@ -249,5 +251,55 @@ describe('installing at quit', () => {
   it('installs nothing before an update is ready or before the quit flow let the app go', () => {
     expect(installOnQuit({ state: 'downloading', version: '0.2.0', percent: 50 }, { forUpdate: false, serverKeepsRunning: false })).toBeNull();
     expect(installOnQuit(ready, null)).toBeNull();
+  });
+});
+
+describe('a command from the server', () => {
+  const idle: DesktopUpdateView = { state: 'idle', checkedAt: null };
+  const available: DesktopUpdateView = { state: 'available', version: '0.2.0' };
+  const downloading: DesktopUpdateView = { state: 'downloading', version: '0.2.0', percent: 10 };
+  const ready: DesktopUpdateView = { state: 'ready', version: '0.2.0' };
+  const failed: DesktopUpdateView = { state: 'error', message: 'offline' };
+  const unsupported: DesktopUpdateView = { state: 'unsupported', reason: 'dev' };
+  const checking: DesktopUpdateView = { state: 'checking' };
+  const step = (action: 'check' | 'download' | 'install', view: DesktopUpdateView) => commandStep({ id: 'c1', action }, view);
+
+  it('check looks for an update when the app is not already on one', () => {
+    expect([idle, failed, available].map((view) => step('check', view))).toEqual(['check', 'check', 'check']);
+    expect([checking, downloading, ready, unsupported].map((view) => step('check', view))).toEqual(['none', 'none', 'none', 'none']);
+  });
+
+  it('download fetches a found update, and finds one first when none is known, even with Check automatically off', () => {
+    expect(step('download', available)).toBe('download');
+    expect(step('download', idle)).toBe('check-and-download');
+    expect(step('download', failed)).toBe('check-and-download');
+  });
+
+  it('download does nothing once the update is on its way or here, or the app cannot update', () => {
+    expect([downloading, ready, unsupported].map((view) => step('download', view))).toEqual(['none', 'none', 'none']);
+  });
+
+  it('download waits for a check under way to find its update', () => {
+    expect(step('download', checking)).toBe('wait');
+    // The check ends in available, and the same command then downloads.
+    expect(step('download', run([found('0.2.0')], checking))).toBe('none');
+    expect(step('download', run([{ type: 'available', version: '0.2.0', autoDownload: false }], checking))).toBe('download');
+  });
+
+  it('install relaunches into an update that is downloaded, and into nothing else', () => {
+    expect(step('install', ready)).toBe('install');
+    expect([idle, checking, available, downloading, failed, unsupported].map((view) => step('install', view))).toEqual(Array(6).fill('none'));
+  });
+
+  it('reads the command out of the server answer, and nothing from an answer it does not know', () => {
+    expect(parseCommand({ command: { id: 'c7', action: 'install' } })).toEqual({ id: 'c7', action: 'install' });
+    expect(parseCommand({ command: { id: 'c7', action: 'install', extra: 1 } })).toEqual({ id: 'c7', action: 'install' });
+    expect(parseCommand({ command: null })).toBeNull();
+    expect(parseCommand({})).toBeNull();
+    expect(parseCommand(null)).toBeNull();
+    expect(parseCommand('ok')).toBeNull();
+    expect(parseCommand({ command: { id: 'c7', action: 'reboot' } })).toBeNull();
+    expect(parseCommand({ command: { id: '', action: 'check' } })).toBeNull();
+    expect(parseCommand({ command: { action: 'check' } })).toBeNull();
   });
 });
