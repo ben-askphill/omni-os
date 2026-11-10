@@ -174,8 +174,10 @@ describe('taking sent secrets, one pass at a time', () => {
 describe('names that change how programs start', () => {
   const CORE = ['PATH', 'NODE_OPTIONS', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'LD_AUDIT', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH'];
   // The rest of the family from the guard's first version (2bc34f2e): interpreter and loader settings, git and npm
-  // settings, the shell's startup files, and where TLS trust and proxies come from.
+  // settings, the shell's startup files, and where TLS trust and proxies come from. Then where the harness CLIs send
+  // their requests (with the login) and read their config, and a few more that run a command.
   const FAMILY = ['NODE_PATH', 'NODE_EXTRA_CA_CERTS', 'PYTHONPATH', 'PYTHONSTARTUP', 'PERL5OPT', 'RUBYOPT', 'JAVA_TOOL_OPTIONS', 'GIT_SSH_COMMAND', 'GIT_CONFIG_COUNT', 'NPM_CONFIG_SCRIPT_SHELL', 'BASH_ENV', 'ENV', 'HOME', 'SSL_CERT_FILE', 'HTTPS_PROXY'];
+  const HARNESS = ['ANTHROPIC_BASE_URL', 'OPENAI_BASE_URL', 'CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'XDG_CONFIG_HOME', 'LESSOPEN', 'LESSCLOSE', 'PROMPT_COMMAND'];
   const ORDINARY = [
     'PATHS',
     'MY_PATH',
@@ -195,9 +197,12 @@ describe('names that change how programs start', () => {
     'PYTHON_VERSION',
     'NPM_TOKEN',
     'OPENAI_API_KEY',
+    'ANTHROPIC_API_URL_NOTE',
+    'CLAUDE_CONFIG',
+    'XDG_CACHE_HOME',
   ];
 
-  it.each([...CORE, ...FAMILY])('refuses %s on every set_secret path', (name) => {
+  it.each([...CORE, ...FAMILY, ...HARNESS])('refuses %s on every set_secret path', (name) => {
     expect(changesHowProgramsStart(name)).toBe(true);
     expect(() => checkSecret('global', name, PLACEHOLDER)).toThrow(expect.objectContaining({ status: 403, message: `${name} changes how every thread's programs start, so only Settings can set it.` }));
     expect(() => checkSecret('channel:shop', name, PLACEHOLDER)).toThrow(expect.objectContaining({ status: 403 }));

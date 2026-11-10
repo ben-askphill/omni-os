@@ -124,10 +124,11 @@ export async function sealPublicKey(): Promise<string> {
 /**
  * Names a program reads before any of its own code runs, to decide what to load, what to run or whom to trust: the
  * dynamic loader's LD_* (Linux) and DYLD_* (macOS), PATH, interpreter options such as NODE_OPTIONS, git's and npm's
- * own settings, the shell's startup files, TLS trust and proxies. A secret reaches every thread's environment, so one
- * of these set by an agent would run its code in every later thread. Matched as the environment spells them: exact
- * names, plus prefixes only for namespaces the program owns whole, so PATHS, MY_PATH, LDAP_URL or NODE_AUTH_TOKEN are
- * ordinary secrets.
+ * own settings, the shell's startup files, TLS trust and proxies, and where the harness CLIs send their requests and
+ * read their config. A secret reaches every thread's environment, so one of these set by an agent would run its code,
+ * or hand it the login, in every later thread. Matched as the environment spells them: exact names, plus prefixes
+ * only for namespaces the program owns whole, so PATHS, MY_PATH, LDAP_URL or NODE_AUTH_TOKEN are ordinary secrets.
+ * A list like this cannot be complete. It covers the known ways in, not every variable some program reads.
  */
 const STARTUP_PREFIXES = ['LD_', 'DYLD_', 'GIT_', 'NPM_CONFIG_'];
 const STARTUP_NAMES = new Set([
@@ -165,6 +166,14 @@ const STARTUP_NAMES = new Set([
   'HTTPS_PROXY',
   'ALL_PROXY',
   'NO_PROXY',
+  'ANTHROPIC_BASE_URL',
+  'OPENAI_BASE_URL',
+  'CLAUDE_CONFIG_DIR',
+  'CODEX_HOME',
+  'XDG_CONFIG_HOME',
+  'LESSOPEN',
+  'LESSCLOSE',
+  'PROMPT_COMMAND',
 ]);
 
 /** Whether a secret by this name would change how every thread's programs start. Settings can set one; set_secret cannot. */
