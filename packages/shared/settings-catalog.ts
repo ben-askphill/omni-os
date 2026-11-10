@@ -119,6 +119,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'worktree-storage', section: 'worktrees', title: 'Worktree storage', keywords: ['disk', 'size', 'scan', 'storage', 'eligible'] },
   { id: 'worktree-slim', section: 'worktrees', title: 'Strip caches', keywords: ['node_modules', 'build output', 'cache', 'free space', 'slim', 'disk'] },
   { id: 'this-machine', section: 'machines', title: 'Current machine', keywords: ['name', 'device', 'hostname', 'feed', 'address'] },
+  { id: 'update-machines', section: 'machines', title: 'Update all machines', keywords: ['update', 'upgrade', 'version', 'download', 'restart', 'devices', 'fleet', 'every machine', 'check for updates'] },
   { id: 'server', section: 'machines', title: 'Server port and host', keywords: ['port', 'host', 'node', 'repo', 'log', 'OMNI_PORT'] },
   { id: 'sync-status', section: 'sync', title: 'Sync sign-in and status', keywords: ['relay', 'cloudflare', 'worker', 'pause', 'sync now', 'pending'] },
   { id: 'path-map', section: 'sync', title: 'Path map', keywords: ['folders', 'paths', 'other machine', 'map'] },
