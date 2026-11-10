@@ -37,7 +37,7 @@ const { startTriggerDeliveries } = await import('./automation-triggers.ts');
 const { watchDelegating } = await import('./delegating.ts');
 const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
-const { startSync } = await import('./sync/worker.ts');
+const { activeWorker, startSync } = await import('./sync/worker.ts');
 const { startConnect, stopConnect } = await import('./connect/service.ts');
 const { recoverHandoffs } = await import('./handoff.ts');
 const { startWorktreeRetention } = await import('./worktree-cleanup.ts');
@@ -136,6 +136,11 @@ const shutdown = (sig: string, code = 0) => {
     process.exit(code);
   });
 };
-onRestart(() => shutdown('update', RESTART_EXIT_CODE));
+/** How long a restart for Update waits for the push that tells the other machines it is restarting (update-fleet.ts). */
+const RESTART_PUSH_MS = 3_000;
+onRestart(() => {
+  const pushed = activeWorker()?.syncNow().catch(() => null);
+  void Promise.race([pushed, new Promise((resolve) => setTimeout(resolve, RESTART_PUSH_MS))]).finally(() => exiting || shutdown('update', RESTART_EXIT_CODE));
+});
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));

@@ -84,6 +84,22 @@ describe('the desktop app’s server', () => {
     expect((await own()).state).toBe('ready');
   });
 
+  it('makes the pages refetch only for a report that moved something, not for each of the app’s ticks', async () => {
+    const { bus } = await import('../bus.ts');
+    const updates: unknown[] = [];
+    const listen = (e: { type: string }) => e.type === 'update' && updates.push(e);
+    bus.on('feed', listen);
+    try {
+      await report(READY);
+      await report(READY);
+      expect(updates).toHaveLength(0);
+      await report({ state: 'downloading', version: '0.4.3', percent: 10 });
+      expect(updates).toHaveLength(1);
+    } finally {
+      bus.off('feed', listen);
+    }
+  });
+
   it('a server that is not the app’s answers no command, and refuses a report that is not one', async () => {
     const updater = new update.Updater({
       root: '/nowhere',

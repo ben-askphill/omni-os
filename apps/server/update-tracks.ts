@@ -161,6 +161,7 @@ export class DesktopTrack implements Track {
   }
 
   report(report: DesktopUpdateReport): DesktopUpdateReply {
+    const before = JSON.stringify(this.state());
     this.last = report;
     if (this.command && report.done === this.command.id) this.command = null;
     const view = report.view;
@@ -171,7 +172,8 @@ export class DesktopTrack implements Track {
       if (view.state === 'error' || nothingNew) this.goalAt = null;
       else if (view.state === 'ready') void this.installWhenIdle();
     }
-    this.changed();
+    // The app reports every few seconds: only a report that moved something makes the pages refetch.
+    if (JSON.stringify(this.state()) !== before) this.changed();
     return { command: this.command };
   }
 
