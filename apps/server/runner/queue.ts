@@ -232,7 +232,7 @@ export function fileReport(parentId: string, key: string, prompt: string, report
   if (!parent) return;
   const row = saveOwn(parent.id, key, { prompt, kind: 'crew_report', payload: report, source: 'crew' });
   if (!row) return;
-  notifyCrewReport(parent.id);
+  notifyCrewReport(parent.id, report);
   // Ben stopped the parent: the report waits for him rather than starting it again. A parent whose worktree is not
   // ready keeps it too, and Retry sends it once the worktree is made.
   if (parent.setup || (parent.status === 'stopped' && !lives.get(parent.id)?.turn && !waiting.includes(parent.id))) {
@@ -257,7 +257,7 @@ function teamReported(leadId: string, key: string, prompt: string, report: Recor
     return ev;
   });
   if (!row) return;
-  notifyCrewReport(leadId);
+  notifyCrewReport(leadId, report);
   publishThread(leadId, row);
   emitThread(leadId);
   settleTeam(leadId);
