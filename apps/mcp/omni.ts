@@ -496,7 +496,7 @@ server.registerTool(
       `Save a secret (an API key or token, as an environment variable for threads) on this machine or another synced one, only when ${USER} asks and gives the value. ` +
       'With machine left out or "here" it is saved here at once. With another machine it is sealed to that machine\'s own key, goes over sync as ciphertext only, ' +
       'and that machine saves it in its own secret store after its next sync; this waits briefly for the answer and otherwise says it is on its way (sent_secrets shows it later). ' +
-      'A secret already there under the same scope and name is replaced. Omni\'s own credentials (sync, Connect) are refused. Never repeat the value back.',
+      'A secret already there under the same scope and name is replaced. Omni\'s own credentials (sync, Connect) and names that change how programs start (PATH, NODE_OPTIONS, LD_*, DYLD_*, GIT_*, PYTHONPATH and similar) are refused: those are Settings only. Never repeat the value back.',
     inputSchema: {
       name: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/).describe('UPPER_SNAKE_CASE, the environment variable threads see.'),
       value: z.string().min(1).describe('The secret, one line.'),
