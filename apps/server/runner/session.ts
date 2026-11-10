@@ -124,13 +124,14 @@ export function abortStart(live: Live, status: ThreadStatus) {
  */
 export function endTurn(live: Live, status: ThreadStatus, more = false) {
   const id = live.threadId;
-  const runText = events.lastRunText(id, live.closeTurn());
+  const turnFrom = live.closeTurn();
+  const runText = events.lastRunText(id, turnFrom);
   const t = threads.update(id, {
     status: more ? 'queued' : status,
     has_run: 1,
     last_text: runText ? runText.slice(0, 600) : threads.get(id)?.last_text ?? null,
   });
-  if (!more) notifyEnded(id, status);
+  if (!more) notifyEnded(id, status, events.lastRunReply(id, turnFrom));
   applyQueued(id);
   // Shown done at once; the checkout after the turn is saved behind it.
   finishTurnSnapshot(live);
