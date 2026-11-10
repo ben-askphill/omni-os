@@ -1,5 +1,6 @@
 import { db, threads } from '../../db.ts';
 import { publishFeed } from '../../bus.ts';
+import { ASK_PREFIX, STATUS_PREFIX } from '@omni/shared/update-fleet.ts';
 import { claim, registerHandler } from '../apply.ts';
 
 // kv: last writer wins per key, the value as JSON. sync.* keys (machine id, cursor, switches, path map) belong to
@@ -30,7 +31,7 @@ registerHandler('kv', {
     const thread = /^handoff\.(?:offer|reply|request|holder)\.(.+)$/.exec(change.entity_id)?.[1];
     const t = thread && threads.get(thread);
     if (t) publishFeed({ type: 'thread', thread: t });
-    // Another machine's update status, or an ask for this one (update-fleet.ts): the Update all machines list refetches.
-    if (change.entity_id.startsWith('update.')) publishFeed({ type: 'update' });
+    // The Update all machines list refetches (update-fleet.ts).
+    if (change.entity_id.startsWith(STATUS_PREFIX) || change.entity_id.startsWith(ASK_PREFIX)) publishFeed({ type: 'update' });
   },
 });

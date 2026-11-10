@@ -125,7 +125,7 @@ export function installUpdates(ctx: AppContext): void {
     return view;
   });
 
-  // A command from the server this app started, for a fleet ask: the same steps the page's buttons take.
+  // A command from the server this app started, for a fleet ask. Check and download take the page buttons' steps; install waits for idle like Update When They Finish.
   const carryOut = (command: DesktopUpdateCommand): boolean => {
     const step = commandStep(command, view);
     if (step === 'check') void check();
