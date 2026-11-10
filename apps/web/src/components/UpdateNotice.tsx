@@ -9,7 +9,7 @@ import { Loader } from './brand.tsx';
 import { Button, Icon } from './ui.tsx';
 
 /** GET /api/update, fresh on every update and reconnect message. Reloads the page once an Update it started lands. */
-function useUpdate() {
+export function useUpdate() {
   const res = useApi<UpdateView>('/update');
   const { data, reload, setData } = res;
   useFeed((e) => {

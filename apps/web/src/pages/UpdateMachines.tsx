@@ -16,9 +16,11 @@ import {
 } from '@omni/shared/update-fleet.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { Button, Chip, ConfirmDialog, ErrorNote, Loading, StatusDot, Ticks } from '../components/ui.tsx';
+import { useUpdate } from '../components/UpdateNotice.tsx';
 import { desktop } from '../desktop.ts';
 import { href } from '../router.ts';
 import { useFeed } from '../store.tsx';
+import { markUpdateStarted } from '../update-notice.ts';
 import { Card } from './settings-parts.tsx';
 
 // Settings, Machines: Update all machines. Check, Download all and Update all ask every synced machine through
@@ -59,6 +61,7 @@ const machineCount = (n: number) => `${n} ${n === 1 ? 'machine' : 'machines'}`;
 export function UpdateMachinesCard() {
   const res = useApi<FleetView>('/update/fleet');
   const { data, reload, setData } = res;
+  const here = useUpdate();
   const [sending, setSending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [skipped, setSkipped] = useState<FleetSkip[]>([]);
@@ -90,6 +93,11 @@ export function UpdateMachinesCard() {
     setSkipped([]);
     try {
       const result = await api.post<FleetResult>('/update/fleet', request);
+      // This checkout restarts on a new build: the page loads it once the server answers on the new commit, as after
+      // the sidebar's Update. The desktop app relaunches with its page.
+      const self = rows.find((m) => m.current);
+      const restartsHere = request.action === 'update' && self?.status?.track === 'checkout' && !result.skipped.some((s) => s.id === self.id);
+      if (restartsHere && (!request.machines || request.machines.includes(self.id))) markUpdateStarted(sessionStorage, here.data?.current ?? null);
       setData(result);
       setSkipped(result.skipped);
       reload();
