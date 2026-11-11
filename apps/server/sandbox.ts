@@ -219,9 +219,17 @@ export const THREADS_SERVER = 'omni-threads';
 /** How long a harness lets an ask_user_question call wait for the user: a day. */
 export const ASK_TIMEOUT_SEC = 86_400;
 
+/** One server entry. `timeout` (ms) is Claude Code's, written only into its own config file (writeMcpConfig). */
+interface McpServer {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  timeout?: number;
+}
+
 /** Per-thread MCP servers, layered on top of the user's normal Claude Code MCP config. Hermes gets none: it runs elsewhere. */
 export function buildMcpConfig(input: McpInput) {
-  const servers: Record<string, { command: string; args: string[]; env?: Record<string, string> }> = {};
+  const servers: Record<string, McpServer> = {};
   const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
 
   servers[ASK_SERVER] = { command: paths.mcpRunner, args: [paths.mcpAsk], env: api };
@@ -252,8 +260,13 @@ export function buildMcpConfig(input: McpInput) {
   return { mcpServers: servers };
 }
 
+/**
+ * The Claude Code `--mcp-config` file. Claude Code aborts a stdio MCP call that is silent for 30 minutes unless the
+ * server's own `timeout` (ms) is longer, whatever MCP_TOOL_TIMEOUT says, so ask_user_question gets a day here.
+ */
 export function writeMcpConfig(input: McpInput): string {
   const cfg = buildMcpConfig(input);
+  cfg.mcpServers[ASK_SERVER] = { ...cfg.mcpServers[ASK_SERVER], timeout: ASK_TIMEOUT_SEC * 1000 };
   mkdirSync(threadDir(input.threadId), { recursive: true });
   const file = join(threadDir(input.threadId), 'mcp.json');
   writeFileSync(file, JSON.stringify(cfg, null, 2));

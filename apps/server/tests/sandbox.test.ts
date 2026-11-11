@@ -20,7 +20,7 @@ const DATA_DIR = vi.hoisted(() => {
   return dir;
 });
 
-import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, writeCursorDenyConfig } from '../sandbox.ts';
+import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, writeCursorDenyConfig, writeMcpConfig } from '../sandbox.ts';
 import { config, paths, browserOutDir, threadDir } from '../config.ts';
 import type { Channel } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
@@ -157,6 +157,16 @@ describe('buildMcpConfig: omni-ask', () => {
       });
     }
     expect(existsSync(paths.mcpAsk)).toBe(true);
+  });
+});
+
+describe('writeMcpConfig', () => {
+  it('lets ask_user_question wait a day without Claude Code\'s 30-minute idle abort, and no other server', () => {
+    const file = writeMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, omniUrl: OMNI_URL });
+    const { mcpServers } = JSON.parse(readFileSync(file, 'utf8'));
+    expect(mcpServers['omni-ask'].timeout).toBe(86_400_000);
+    expect(mcpServers['omni-ask'].args).toEqual([paths.mcpAsk]);
+    for (const [name, server] of Object.entries<{ timeout?: number }>(mcpServers)) if (name !== 'omni-ask') expect(server.timeout, name).toBeUndefined();
   });
 });
 
