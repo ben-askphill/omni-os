@@ -96,9 +96,9 @@ describe('trafficLights', () => {
   });
 
   it('centres them in the channel rail, which grows with the zoom', () => {
-    expect(trafficLights(1320, 1, 'rail')).toEqual({ x: 6, y: 29 });
-    expect(trafficLights(1320, 1.2, 'rail')).toEqual({ x: 13, y: 29 });
-    expect(trafficLights(1320, 0.8, 'rail')).toEqual({ x: 2, y: 29 });
+    expect(trafficLights(1320, 1, 'rail')).toEqual({ x: 19, y: 29 });
+    expect(trafficLights(1320, 1.2, 'rail')).toEqual({ x: 29, y: 29 });
+    expect(trafficLights(1320, 0.8, 'rail')).toEqual({ x: 9, y: 29 });
     expect(trafficLights(700, 1, 'rail')).toEqual({ x: 12, y: 7 });
   });
 });

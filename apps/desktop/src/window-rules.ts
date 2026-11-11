@@ -150,8 +150,8 @@ export function restoreBounds(saved: Rect, workAreas: readonly Rect[], min: { wi
 /** Below this many CSS pixels the Web UI shows its phone layout (useIsMobile in apps/web/src/store.tsx). */
 export const PHONE_LAYOUT_BELOW = 768;
 
-/** The channel rail's width in CSS pixels (apps/web/src/components/rail/ChannelRail.tsx). */
-export const RAIL_WIDTH = 72;
+/** The channel rail's width in CSS pixels in the macOS app, widened there from 72 to fit the lights (apps/web/src/index.css). */
+export const RAIL_WIDTH = 98;
 /** The three macOS traffic lights, edge to edge, in window points (about 60 on macOS 26). */
 const TRAFFIC_LIGHTS_WIDTH = 60;
 
