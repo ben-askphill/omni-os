@@ -34,7 +34,9 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
   }, [selectedId, ref, channels.length]);
 
   return (
-    <nav aria-label="Channels" className="scheme-dark rail-chrome flex h-full w-[72px] shrink-0 flex-col items-center bg-[var(--chrome)] pb-3.5 text-fg">
+    <nav aria-label="Channels" className="scheme-dark rail-chrome relative flex h-full w-[72px] shrink-0 flex-col items-center bg-[var(--chrome)] pb-3.5 text-fg">
+      {/* The glass capsule behind the macOS traffic lights, in the desktop app only (index.css). */}
+      <span aria-hidden="true" className="rail-lights-glass" />
       {/* rail-top: the desktop app's macOS window drags by this strip, where its traffic lights sit (index.css). */}
       <div className="rail-top flex w-full shrink-0 items-end justify-center pt-3.5">
         <a href={href.home()} aria-label="Omni, Inbox" className="grid h-10 w-10 place-items-center text-fg">

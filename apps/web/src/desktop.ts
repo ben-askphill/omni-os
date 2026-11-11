@@ -18,4 +18,11 @@ if (desktop && typeof document !== 'undefined') {
   strip.className = 'desktop-drag-strip';
   strip.setAttribute('aria-hidden', 'true');
   document.body?.append(strip);
+  // The native traffic lights keep their size at every zoom, so the glass index.css draws behind them in the channel
+  // rail divides its window-point sizes by this.
+  const setZoom = (zoom: number) => document.documentElement.style.setProperty('--desktop-zoom', String(zoom));
+  void desktop.settings.get().then((s) => setZoom(s.zoom));
+  desktop.onEvent((e) => {
+    if (e.type === 'settings') setZoom(e.settings.zoom);
+  });
 }

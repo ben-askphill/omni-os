@@ -157,11 +157,11 @@ const TRAFFIC_LIGHTS_WIDTH = 60;
 
 /**
  * Where the macOS traffic lights go: beside the wordmark in the classic sidebar's top row, centred in the channel
- * rail's top strip, or in the strip index.css puts above the phone layout. The page's width in CSS pixels is the
- * window's divided by the zoom; the lights themselves never zoom.
+ * rail's top strip 15pt down (the height the Claude desktop app uses), or in the strip index.css puts above the phone
+ * layout. The page's width in CSS pixels is the window's divided by the zoom; the lights themselves never zoom.
  */
 export function trafficLights(contentWidth: number, zoom: number, layout: DesktopLayout = 'classic'): { x: number; y: number } {
   if (contentWidth / zoom < PHONE_LAYOUT_BELOW) return { x: 12, y: 7 };
-  if (layout === 'rail') return { x: Math.max(2, Math.round((RAIL_WIDTH * zoom - TRAFFIC_LIGHTS_WIDTH) / 2)), y: 29 };
+  if (layout === 'rail') return { x: Math.max(2, Math.round((RAIL_WIDTH * zoom - TRAFFIC_LIGHTS_WIDTH) / 2)), y: 15 };
   return { x: 18, y: 29 };
 }
