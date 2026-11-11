@@ -20,15 +20,49 @@ const NONE: SendingMsg[] = [];
 
 const changed = () => listeners.forEach((l) => l());
 
+/**
+ * Files Ben sent from this window, by thread: the browser's own copy, so the message shows them at once instead of
+ * downloading each one back from the server (seconds for a large screenshot over a remote connection).
+ */
+const local = new Map<string, { name: string; size: number; url: string }[]>();
+/** How long a local copy stands in. By then the server's copy is the one in the HTTP cache anyway. */
+const LOCAL_MS = 10 * 60_000;
+
+/** Keep the files just sent to a thread (a reply, or a new thread's first message) for `localUrl`. */
+export function keepLocalFiles(threadId: string, files: File[]): { name: string; url: string }[] {
+  const kept = files.map((f) => ({ name: f.name, size: f.size, url: URL.createObjectURL(f) }));
+  if (!kept.length) return kept;
+  local.set(threadId, [...(local.get(threadId) ?? []), ...kept]);
+  setTimeout(() => {
+    const rest = (local.get(threadId) ?? []).filter((k) => !kept.includes(k));
+    if (rest.length) local.set(threadId, rest);
+    else local.delete(threadId);
+    kept.forEach((k) => URL.revokeObjectURL(k.url));
+  }, LOCAL_MS);
+  return kept;
+}
+
+/**
+ * This window's copy of a file the thread's message carries, if it sent it. The server may rename a file
+ * (uploads.ts safeName, or photo-2.png beside a photo.png), so a size no other kept file has also matches.
+ */
+export function localUrl(threadId: string, a: Pick<Attachment, 'name' | 'size'>): string | undefined {
+  const kept = local.get(threadId);
+  if (!kept) return undefined;
+  const same = kept.filter((k) => k.size === a.size);
+  return (same.find((k) => k.name === a.name) ?? (same.length === 1 ? same[0] : undefined))?.url;
+}
+
 /** Record a send that just left the composer. The returned function drops it, once the send answers or fails. */
 export function beginSend(threadId: string, requestId: string, text: string, files: File[]): () => void {
+  const urls = keepLocalFiles(threadId, files);
   const m: SendingMsg = {
     request_id: requestId,
     text,
     at: new Date().toISOString(),
-    files: files.map((f) => ({
+    files: files.map((f, i) => ({
       attachment: { name: f.name, path: '', size: f.size, mime: f.type, image: f.type.startsWith('image/') },
-      url: URL.createObjectURL(f),
+      url: urls[i].url,
     })),
   };
   byThread.set(threadId, [...(byThread.get(threadId) ?? []), m]);
@@ -37,7 +71,6 @@ export function beginSend(threadId: string, requestId: string, text: string, fil
     const rest = (byThread.get(threadId) ?? []).filter((x) => x !== m);
     if (rest.length) byThread.set(threadId, rest);
     else byThread.delete(threadId);
-    m.files.forEach((f) => URL.revokeObjectURL(f.url));
     changed();
   };
 }
