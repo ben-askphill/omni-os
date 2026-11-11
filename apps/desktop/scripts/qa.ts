@@ -12,10 +12,10 @@ import { mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } fro
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { DesktopBridge, DesktopCommand } from '@omni/shared/desktop-bridge.ts';
+import type { DesktopCommand } from '@omni/shared/desktop-bridge.ts';
 import type { ElectronApplication, Page } from 'playwright';
 import { type Probe, probePort, tokenFile } from '../src/backend/launch.ts';
-import { EVENT } from '../src/ipc.ts';
+import { runStep, setZoom, type StepSession } from './qa-steps.ts';
 
 export const LIVE_PORT = 4747;
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -625,169 +625,33 @@ async function main(argv: readonly string[]): Promise<number> {
     }
   };
 
+  const session: StepSession = {
+    app,
+    get page() {
+      return current;
+    },
+    set page(value) {
+      current = value;
+    },
+    get appearance() {
+      return appearance;
+    },
+    set appearance(value) {
+      appearance = value;
+    },
+    out,
+    style,
+    pick,
+    external,
+  };
+
   if (report.error === null) {
     for (const [i, step] of script.steps.entries()) {
       const started = Date.now();
       const result: StepReport = { step: i + 1, action: JSON.stringify(rawSteps[i]), ok: true, ms: 0, error: null, files: [] };
-      const act = async (): Promise<void> => {
-        const page = current;
-        if (!page || page.isClosed()) throw new Error('the current window is closed; pick another with a window step');
-        switch (step.kind) {
-          case 'route':
-            await page.evaluate((route) => {
-              window.location.hash = route.slice(1);
-            }, step.route);
-            await page.waitForFunction((route) => window.location.hash === route, step.route, { timeout: DEFAULT_TIMEOUT_MS });
-            break;
-          case 'click':
-            await page.locator(step.selector).first().click({ timeout: step.timeoutMs });
-            break;
-          case 'fill':
-            await page.locator(step.selector).first().fill(step.text, { timeout: step.timeoutMs });
-            break;
-          case 'type':
-            await page.keyboard.type(step.text);
-            break;
-          case 'press':
-            await page.keyboard.press(step.key);
-            break;
-          case 'wait':
-            await page.waitForTimeout(step.ms);
-            break;
-          case 'waitFor':
-            await page.locator(step.selector).first().waitFor({ state: 'visible', timeout: step.timeoutMs });
-            break;
-          case 'expect': {
-            const target = page.locator(step.selector).first();
-            await target.waitFor({ state: 'visible', timeout: step.timeoutMs });
-            if (step.text !== null) {
-              const want = step.text;
-              const deadline = Date.now() + step.timeoutMs;
-              let seen = '';
-              for (;;) {
-                seen = (await target.innerText()).trim();
-                if (seen.includes(want)) break;
-                if (Date.now() > deadline) throw new Error(`${step.selector} shows "${seen.slice(0, 200)}", not "${want}"`);
-                await page.waitForTimeout(100);
-              }
-            }
-            break;
-          }
-          case 'expectExternal': {
-            const deadline = Date.now() + step.timeoutMs;
-            for (;;) {
-              const opened = await external();
-              if (opened.some((u) => u.includes(step.text))) break;
-              if (Date.now() > deadline) throw new Error(`no link with "${step.text}" went to the system browser; it got ${JSON.stringify(opened)}`);
-              await page.waitForTimeout(100);
-            }
-            break;
-          }
-          case 'command':
-            await (await browserWindow(page)).evaluate((win, payload) => win.webContents.send(payload.channel, payload.event), {
-              channel: EVENT,
-              event: { type: 'command' as const, command: step.command },
-            });
-            break;
-          case 'menu': {
-            const id = await (await browserWindow(page)).evaluate((win) => win.id);
-            // No named helpers inside these: tsx wraps them in a __name call that the main process does not define.
-            const tree = await app.evaluate(({ Menu }) => {
-              const root: MenuNode[] = [];
-              const queue = [{ from: Menu.getApplicationMenu()?.items ?? [], into: root }];
-              for (let next = queue.shift(); next; next = queue.shift()) {
-                for (const it of next.from) {
-                  const node: MenuNode = { label: it.label, visible: it.visible, enabled: it.enabled, items: [] };
-                  next.into.push(node);
-                  if (it.submenu) queue.push({ from: it.submenu.items, into: node.items });
-                }
-              }
-              return root;
-            });
-            const indices = resolveMenuPath(tree, step.path);
-            if (isError(indices)) throw new Error(indices.error);
-            const error = await app.evaluate(({ BrowserWindow, Menu }, input) => {
-              let items = Menu.getApplicationMenu()?.items ?? [];
-              let item: (typeof items)[number] | undefined;
-              for (const i of input.indices) {
-                item = items[i];
-                items = item?.submenu?.items ?? [];
-              }
-              if (!item) return 'the menu changed under the step';
-              const win = BrowserWindow.fromId(input.id) ?? undefined;
-              item.click(undefined, win, win?.webContents);
-              return null;
-            }, { indices, id });
-            if (error) throw new Error(error);
-            break;
-          }
-          case 'window':
-            current = await pick(step.target, step.timeoutMs);
-            await current.waitForLoadState('domcontentloaded');
-            await style(current);
-            await current.bringToFront();
-            break;
-          case 'openWindow': {
-            const opened = app.waitForEvent('window', { timeout: step.timeoutMs });
-            await page.evaluate((route) => {
-              const bridge = (window as unknown as { omniDesktop?: DesktopBridge }).omniDesktop;
-              if (!bridge) throw new Error('this window has no desktop bridge');
-              bridge.openWindow(route);
-            }, step.route);
-            current = await opened;
-            await current.waitForLoadState('domcontentloaded');
-            await current.waitForSelector('#root > *', { timeout: step.timeoutMs });
-            await style(current);
-            break;
-          }
-          case 'appearance': {
-            appearance = step.appearance;
-            const mode = step.appearance;
-            await app.evaluate(({ nativeTheme }, m) => {
-              nativeTheme.themeSource = m;
-            }, mode);
-            for (const w of app.windows()) if (!w.isClosed()) await style(w);
-            break;
-          }
-          case 'zoom':
-            await setZoom(app, page, step.factor);
-            break;
-          case 'size': {
-            const size = step.size;
-            await (await browserWindow(page)).evaluate((win, s) => win.setSize(s.width, s.height), size);
-            break;
-          }
-          case 'screenshot': {
-            const win = await browserWindow(page);
-            // A hidden window draws no frames, so its frame wait and its capture would never answer.
-            if (!(await win.evaluate((w) => w.isVisible() && !w.isMinimized()))) throw new Error('the window is hidden or minimized; show it or pick another with a window step');
-            // A blank window is a failed load, not a screenshot worth keeping.
-            const drawn = await page.evaluate(() => {
-              const body = document.body;
-              return !!body && (body.innerText.trim().length > 0 || !!body.querySelector('img, svg, canvas, video'));
-            });
-            // Two frames, so the capture holds what the last step changed and not the frame before it. A window the OS
-            // reports as covered may draw no frames until the capture wakes it, so the wait is capped and not required.
-            await withDeadline(page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))), 2_000, 'no frame').catch(() => {});
-            // The window's own capture: Playwright's page.screenshot crops a zoomed page to its CSS viewport.
-            const png = await withDeadline(
-              win.evaluate(async (w) => (await w.webContents.capturePage()).toPNG().toString('base64')),
-              15_000,
-              'the window capture did not answer in 15s',
-            );
-            const file = join(out, `${step.name}.png`);
-            writeFileSync(file, Buffer.from(png, 'base64'));
-            result.files.push(file);
-            if (!drawn) throw new Error('the window drew nothing');
-            break;
-          }
-          case 'quit':
-            break;
-        }
-      };
       try {
         const ceiling = stepCeilingMs(step);
-        await withDeadline(act(), ceiling, `the step did not finish within ${ceiling / 1000}s`);
+        await withDeadline(runStep(step, session, result.files), ceiling, `the step did not finish within ${ceiling / 1000}s`);
       } catch (err) {
         result.ok = false;
         result.error = (err as Error).message.split('\n')[0];
@@ -856,15 +720,6 @@ export function withDeadline<T>(work: Promise<T>, ms: number, what: string): Pro
     timer = setTimeout(() => reject(new Error(what)), ms);
   });
   return Promise.race([work, late]).finally(() => clearTimeout(timer));
-}
-
-/** Through the bridge, as the View menu does, so the setting and the window agree; then on the window directly. */
-async function setZoom(app: ElectronApplication, page: Page, factor: number): Promise<void> {
-  await page.evaluate(async (z) => {
-    const bridge = (window as unknown as { omniDesktop?: DesktopBridge }).omniDesktop;
-    if (bridge) await bridge.settings.set({ zoom: z });
-  }, factor);
-  await (await app.browserWindow(page)).evaluate((win, z) => win.webContents.setZoomFactor(z), factor);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
