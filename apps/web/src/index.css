@@ -1374,18 +1374,43 @@ html:has(.mo-app) body {
 [data-desktop="darwin"] .desktop-titlebar :is(a, button, input, select, textarea, [role="button"]) {
   -webkit-app-region: no-drag;
 }
-/* The channel rail layout: the native traffic lights sit centred at the rail's top (29px down: window-rules.ts
-   trafficLights centres them in the 98px rail), so the rail's top strip grows to hold them above the Omni mark, and it and the list panel's title
-   row drag the window. Linux draws its own frame, so neither changes there.
+/* The channel rail layout: the native traffic lights sit centred at the rail's top, 15 window points down as in the
+   Claude desktop app (window-rules.ts trafficLights centres them in the 98px rail), on a liquid-glass capsule. The
+   rail's top strip holds them above the Omni mark, and it and the list panel's title row drag the window. Linux draws
+   its own frame, so none of this changes there.
    The three lights are 14px with 9px gaps (macOS 27), so they end 78 window pixels in. The rail widens from 72px to
-   98px to keep them off the list panel down to the smallest zoom (0.8 x 98 = 78.4), and the top strip is tall
-   enough that at 0.8 they still clear the Omni mark (their bottom: 43 / 0.8 = 54px). */
+   98px to keep them off the list panel down to the smallest zoom (0.8 x 98 = 78.4).
+   The lights never zoom, so the capsule's sizes are window points divided by --desktop-zoom (desktop.ts): 7pt round
+   the 60 x 14pt cluster, from 8pt down to 36pt. The top strip clears the capsule's bottom by 8px at every zoom. */
 [data-desktop="darwin"] .rail-shell .rail-chrome {
   width: 98px;
 }
 [data-desktop="darwin"] .rail-shell .rail-top {
   -webkit-app-region: drag;
-  padding-top: 52px;
+  padding-top: calc(36px / var(--desktop-zoom, 1) + 8px);
+}
+.rail-lights-glass {
+  display: none;
+}
+[data-desktop="darwin"] .rail-shell .rail-lights-glass {
+  display: block;
+  position: absolute;
+  top: calc(8px / var(--desktop-zoom, 1));
+  left: 50%;
+  width: calc(74px / var(--desktop-zoom, 1));
+  height: calc(28px / var(--desktop-zoom, 1));
+  translate: -50% 0;
+  border-radius: 999px;
+  pointer-events: none;
+  /* The design system's dark glass pill (iOS.jsx IOSGlassPill): blur and tint, a shine on the rim, a soft drop. */
+  background: rgb(120 120 128 / 0.28);
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 0.5px solid rgb(255 255 255 / 0.15);
+  box-shadow:
+    inset 1.5px 1.5px 1px rgb(255 255 255 / 0.15),
+    inset -1px -1px 1px rgb(255 255 255 / 0.08),
+    0 2px 6px rgb(0 0 0 / 0.35),
+    0 6px 16px rgb(0 0 0 / 0.2);
 }
 [data-desktop="darwin"] .rail-shell .rail-panel-top {
   -webkit-app-region: drag;
