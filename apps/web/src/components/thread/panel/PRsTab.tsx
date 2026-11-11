@@ -129,7 +129,7 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk, onMerged }: {
                   <StatusDot status={TONE_DOT[line.tone]} size={6} />
                   <span className="truncate">{line.text}</span>
                 </span>
-                <span className="flex items-center gap-2 text-[11px] text-fg-4">
+                <span className="flex items-center gap-2 text-[11px] text-fg-3">
                   <span className="font-num text-fg-3">+{p.additions}</span>
                   <span className="font-num">−{p.deletions}</span>
                   <span>{relTime(p.updatedAt)}</span>
@@ -186,7 +186,7 @@ export function CrewPRs({ crew, first }: { crew: CrewPR[]; first: boolean }) {
 
 /** Start or stop the PR watch, over its status line. A watch that ended with its PR keeps its line, without the toggle. */
 function WatchCard({ w, open }: { w: PRWatchState; open: boolean }) {
-  if (!open && !w.watching) return w.watch ? <p className="mt-4 px-2 text-[11.5px] text-fg-4">{watchCopy(w.watch).line}</p> : null;
+  if (!open && !w.watching) return w.watch ? <p className="mt-4 px-2 text-[11.5px] text-fg-3">{watchCopy(w.watch).line}</p> : null;
   const { action, line } = watchCopy(w.watch);
   return (
     <button

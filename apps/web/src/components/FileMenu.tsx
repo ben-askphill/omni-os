@@ -155,7 +155,7 @@ export function FileMenu({
           <Icon name="file" size={14} className="shrink-0 text-fg-3" />
           <span className="flex min-w-0 flex-1 items-baseline gap-2">
             <span className="shrink-0 text-[13px] font-medium text-fg">{r.name}</span>
-            <span className="truncate text-[11.5px] text-fg-4">{r.detail}</span>
+            <span className="truncate text-[11.5px] text-fg-3">{r.detail}</span>
           </span>
           {r.kind === 'artifact' && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">artifact</span>}
         </div>

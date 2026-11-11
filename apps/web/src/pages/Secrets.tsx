@@ -226,7 +226,7 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
                     {scopeLabel(sc, channelName)}
                   </a>
                 )}
-                <span className="text-fg-4/70">{rows.length}</span>
+                <span className="text-fg-3">{rows.length}</span>
               </h3>
               <ul className="rounded-[20px] bg-surface p-1.5">
                 {rows.map((s) => {
@@ -234,7 +234,7 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
                   return (
                     <li key={s.name} className="rounded-2xl px-2.5 py-1.5">
                       <div className="flex min-h-9 items-center gap-3">
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg text-fg-4">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
                           <Icon name="key" size={13} />
                         </span>
                         <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{s.name}</span>
@@ -244,7 +244,7 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
                           ) : (
                             <Origin of="channel" label={globalNames.has(s.name) ? 'Overrides global' : 'Set on this channel'} />
                           ))}
-                        <span className="hidden shrink-0 font-num text-[11px] text-fg-4 sm:inline" title={s.updated_at}>
+                        <span className="hidden shrink-0 font-num text-[11px] text-fg-3 sm:inline" title={s.updated_at}>
                           {relTime(s.updated_at)}
                         </span>
                         <InlineConfirm label="Delete" icon="trash" confirmLabel="Delete" doneLabel="Deleted" busyLabel="Deleting" undoMs={5000} onConfirm={() => remove(s)} />

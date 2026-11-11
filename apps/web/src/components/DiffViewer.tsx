@@ -4,9 +4,9 @@ import { Icon } from './ui.tsx';
 
 export const LINE_CLASS: Record<DiffLine['kind'], string> = {
   hunk: 'bg-surface text-fg-3',
-  add: 'bg-[var(--diff-add)]',
-  del: 'bg-[var(--diff-del)]',
-  note: 'text-fg-4',
+  add: 'bg-[var(--diff-add-bg)]',
+  del: 'bg-[var(--diff-del-bg)]',
+  note: 'text-fg-3',
   context: 'text-fg-2',
 };
 
@@ -17,7 +17,7 @@ export interface LineSelect {
   press(i: number, extend: boolean): void;
 }
 
-// The numbers go a step darker: fg-4 on the mark tint is too faint in dark mode.
+// The numbers go a step darker: fg-3 on the mark tint is too faint in dark mode.
 const PICKED = ' bg-[image:linear-gradient(var(--mark),var(--mark))] shadow-[inset_2px_0_0_var(--fg-3)] [&_[aria-hidden]]:text-fg-2';
 const pickable = (l: DiffLine) => l.kind === 'add' || l.kind === 'del' || l.kind === 'context';
 
@@ -71,10 +71,10 @@ export const DiffFile = memo(function DiffFile({
               {shown.map((l, i) => {
                 const gutters = numbered && (
                   <>
-                    <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
+                    <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-3 select-none" aria-hidden>
                       {l.old ?? ''}
                     </span>
-                    <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
+                    <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-3 select-none" aria-hidden>
                       {l.new ?? ''}
                     </span>
                   </>

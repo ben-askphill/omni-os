@@ -4,7 +4,7 @@ import { NewThreadComposer } from '../components/Composer.tsx';
 import { NeedsYouSection } from '../components/NeedsYou.tsx';
 import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
 import { OmniMark } from '../components/brand.tsx';
-import { Empty, Segmented, StatusDot, glyphFor } from '../components/ui.tsx';
+import { Empty, Segmented, StatusDot, asksForYou, glyphFor } from '../components/ui.tsx';
 import { greeting } from '../greeting.ts';
 import { useApp } from '../store.tsx';
 import { isWorking } from '@omni/shared/delegate-count.ts';
@@ -27,7 +27,7 @@ function Pulse() {
     <span className="inline-flex h-7 items-center gap-2 rounded-full bg-surface px-3 font-num text-[11.5px] text-fg-2 tabular-nums">
       <StatusDot status={busy ? 'running' : 'idle'} size={7} />
       {busy ? `${status.running} running` : 'All quiet'}
-      {status.queued > 0 && <span className="text-fg-4">· {status.queued} queued</span>}
+      {status.queued > 0 && <span className="text-fg-3">· {status.queued} queued</span>}
     </span>
   );
 }
@@ -39,8 +39,8 @@ export function HomePage() {
   const shown = all?.filter(FILTERS[filter]);
   const count = (f: Filter) => all?.filter(FILTERS[f]).length ?? 0;
   const { status, needsYou, profile } = useApp();
-  const markState = needsYou?.items.length || all?.some((t) => glyphFor(t.status) === 'needs' && !t.done_at) ? 'attention' : status && status.running > 0 ? 'thinking' : 'idle';
-  const badge = (n: number) => (n ? <span className="font-num text-[10.5px] text-fg-4 tabular-nums">{n}</span> : null);
+  const markState = needsYou?.items.length || all?.some((t) => asksForYou(glyphFor(t.status)) && !t.done_at) ? 'attention' : status && status.running > 0 ? 'thinking' : 'idle';
+  const badge = (n: number) => (n ? <span className="font-num text-[10.5px] text-fg-3 tabular-nums">{n}</span> : null);
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">

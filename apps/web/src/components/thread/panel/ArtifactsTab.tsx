@@ -52,7 +52,7 @@ function Row({ a, thread, on, onSelect }: { a: Artifact; thread?: string; on: bo
       <Icon name={kindIcon(a.kind)} size={13} className="text-fg-3" />
       <span className="min-w-0 flex-1 truncate font-medium">{a.name}</span>
       {thread && <span className="max-w-[45%] shrink truncate text-[11px] text-fg-3">{thread}</span>}
-      <span className="shrink-0 font-num text-[10.5px] text-fg-4">{relTime(a.updated_at)}</span>
+      <span className="shrink-0 font-num text-[10.5px] text-fg-3">{relTime(a.updated_at)}</span>
     </button>
   );
 }

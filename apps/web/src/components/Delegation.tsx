@@ -59,7 +59,7 @@ function BranchRow({ b, report }: { b: Branch; report?: string }) {
           {b.channel && <span>#{b.channel}</span>}
           <HarnessMark harness={b.harness} />
           {b.task_id && <span className="font-mono text-[11.5px] text-fg-2">{b.task_id}</span>}
-          {detail && <span className={report && !busy ? 'font-medium text-fg-2' : 'text-fg-4'}>{detail}</span>}
+          {detail && <span className={report && !busy ? 'font-medium text-fg-2' : 'text-fg-3'}>{detail}</span>}
         </BranchFace>
       </a>
     </RailItem>
@@ -100,10 +100,10 @@ export function DelegationCard({
         {lead ? (
           <a href={href.thread(lead.id)} className="min-w-0 truncate text-fg-3 hover:text-fg" title="Open the lead thread">
             {lead.title}
-            {lead.channel && <span className="text-fg-4"> · #{lead.channel}</span>}
+            {lead.channel && <span className="text-fg-3"> · #{lead.channel}</span>}
           </a>
         ) : (
-          <span className="min-w-0 truncate font-mono text-[11.5px] text-fg-4">{ids.join(' ')}</span>
+          <span className="min-w-0 truncate font-mono text-[11.5px] text-fg-3">{ids.join(' ')}</span>
         )}
         {lead && (
           <span className="ml-auto shrink-0">

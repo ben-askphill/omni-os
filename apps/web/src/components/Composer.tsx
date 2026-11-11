@@ -190,7 +190,7 @@ export function NewThreadComposer({
           >
             <Icon name="folder" size={13} className="text-fg-3" />
             <span className="truncate">{folder.name}</span>
-            <Icon name="x" size={12} className="text-fg-4" />
+            <Icon name="x" size={12} className="text-fg-3" />
           </button>
         )}
         <div className="ml-auto flex items-center gap-2.5">

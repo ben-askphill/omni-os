@@ -2,11 +2,12 @@ import { useState, type ReactNode } from 'react';
 import type { BackgroundTask, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { HarnessMark, Loader } from '../brand.tsx';
-import { Chip, copyText, Icon, IconButton, STATUS_LABEL, StatusDot, type IconName } from '../ui.tsx';
+import { Chip, copyText, Icon, IconButton, statusLabel, StatusDot, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
-import { isWorking, shownStatus } from '@omni/shared/delegate-count.ts';
+import { isWorking } from '@omni/shared/delegate-count.ts';
+import { threadGlyph } from '@omni/shared/status.ts';
 import { toDate } from '@omni/shared/format.ts';
 import { duration } from '../../format.ts';
 import { useNow } from '../../store.tsx';
@@ -33,10 +34,10 @@ function QuickRow({
 }) {
   const body = (
     <>
-      <Icon name={icon} size={15} className={`shrink-0 ${disabled ? 'text-fg-4' : 'text-fg-3'}`} />
-      <span className={`flex min-w-0 flex-1 items-center gap-2 ${disabled ? 'text-fg-4' : 'text-fg'}`}>{children}</span>
+      <Icon name={icon} size={15} className={`shrink-0 ${disabled ? 'text-fg-disabled' : 'text-fg-3'}`} />
+      <span className={`flex min-w-0 flex-1 items-center gap-2 ${disabled ? 'text-fg-disabled' : 'text-fg'}`}>{children}</span>
       {trailing}
-      {onClick && !disabled && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-4" />}
+      {onClick && !disabled && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-3" />}
     </>
   );
   const cls = 'flex min-h-[36px] w-full min-w-0 items-center gap-2.5 rounded-[11px] px-2 text-left text-[12.5px]';
@@ -100,7 +101,7 @@ export function ThreadQuickCard({
   const badge = pr ? prBadge(pr) : null;
   const line = pr ? prLine(pr) : null;
   const model = thread.model || init?.model;
-  const status = shownStatus(thread);
+  const status = threadGlyph(thread);
   const branchDisabled = !thread.branch;
 
   return (
@@ -113,7 +114,7 @@ export function ThreadQuickCard({
         trailing={!remote && cwd ? <CopyPath path={cwd} /> : undefined}
       >
         <span className="min-w-0 truncate">{machineLabel(machineName)}</span>
-        {thread.task_id && <span className="shrink-0 font-num text-[10px] text-fg-4">{thread.task_id}</span>}
+        {thread.task_id && <span className="shrink-0 font-num text-[10px] text-fg-3">{thread.task_id}</span>}
       </QuickRow>
       {cloud && cloudUrl ? (
         <QuickRow icon="external" label="Open in Cursor" onClick={() => window.open(cloudUrl, '_blank', 'noopener,noreferrer')}>
@@ -129,12 +130,12 @@ export function ThreadQuickCard({
         <span className="shrink-0 whitespace-nowrap">
           <HarnessMark harness={thread.harness} withLabel />
         </span>
-        {model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-4">default model</span>}
+        {model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
       </QuickRow>
       <QuickRow icon={slotBusy ? 'zap' : 'clock'}>
         <StatusDot status={slotBusy ? 'running' : status} size={7} />
         <span className="truncate">
-          {slotBusy ? 'Turn running' : (STATUS_LABEL[status] ?? status)}
+          {slotBusy ? 'Turn running' : statusLabel(status)}
           {warm !== undefined && !remote && (
             <span className="text-fg-3"> · {warm ? 'Live session' : 'Cold start next message'}</span>
           )}
@@ -142,7 +143,7 @@ export function ThreadQuickCard({
       </QuickRow>
       {branchDisabled ? (
         <QuickRow icon="branch" disabled>
-          <span className="text-fg-4">No branch</span>
+          <span className="text-fg-3">No branch</span>
         </QuickRow>
       ) : (
         <>
@@ -284,7 +285,7 @@ function Lineage({
           <Branch last={i === total - 1} />
           <StatusDot status={c.status} size={6} />
           <span className="min-w-0 flex-1 truncate">{c.title || 'Untitled'}</span>
-          <Icon name="chevronRight" size={12} className="shrink-0 text-fg-4" />
+          <Icon name="chevronRight" size={12} className="shrink-0 text-fg-3" />
         </button>
       ))}
       {agents.map((t, i) => (

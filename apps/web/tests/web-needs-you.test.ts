@@ -15,10 +15,10 @@ const byTitle = (n: NeedsYou, title: string) => n.items.find((i) => i.thread.tit
 describe('Needs you reasons', () => {
   it('says why each thread is there, a blocker before its result', () => {
     const n = inbox();
-    expect(reasonOf(byTitle(n, 'Fix the widget'))).toMatchObject({ glyph: 'needs', label: 'Worktree could not be prepared' });
+    expect(reasonOf(byTitle(n, 'Fix the widget'))).toMatchObject({ glyph: 'failed', label: 'Worktree could not be prepared' });
     expect(reasonOf(byTitle(n, 'Fix the widget')).detail).toBe(byTitle(n, 'Fix the widget').thread.setup_error);
     expect(reasonOf(byTitle(n, 'Plan the launch'))).toMatchObject({ glyph: 'needs', label: 'A message waits for Resume' });
-    expect(reasonOf(byTitle(n, 'Fix the cart total'))).toMatchObject({ glyph: 'needs', label: 'Failed' });
+    expect(reasonOf(byTitle(n, 'Fix the cart total'))).toMatchObject({ glyph: 'failed', label: 'Failed' });
     expect(reasonOf(byTitle(n, 'Audit the checkout'))).toMatchObject({ glyph: 'done', label: 'Finished' });
   });
 

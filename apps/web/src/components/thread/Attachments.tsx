@@ -33,7 +33,7 @@ export function Attachments({ threadId, items, href }: { threadId: string; items
             </span>
             <span className="min-w-0 flex-1 leading-tight">
               <span className="block truncate font-medium text-fg-2">{a.name}</span>
-              <span className="block font-num text-[10.5px] text-fg-4">{bytes(a.size)}</span>
+              <span className="block font-num text-[10.5px] text-fg-3">{bytes(a.size)}</span>
             </span>
             <Icon name="download" size={14} className="text-fg-3" />
           </a>

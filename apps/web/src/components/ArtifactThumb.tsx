@@ -27,7 +27,7 @@ export function ArtifactThumb({ a, scale }: { a: Pick<ArtifactWithThread, 'id' |
     );
   }
   return (
-    <div className="flex h-full w-full items-center justify-center text-fg-4">
+    <div className="flex h-full w-full items-center justify-center text-fg-3">
       <Icon name={kindIcon(a.kind)} size={28} strokeWidth={1.25} />
     </div>
   );

@@ -33,7 +33,7 @@ export function PRDetailTabBody({ tab, p, onFiles }: { tab: DetailTab; p: PRDeta
                       <Avatar name={c.who ?? '?'} size={22} />
                       <span className="font-medium text-fg-2">{c.who ?? 'unknown'}</span>
                       {c.kind === 'review' && <Chip tone={c.state === 'APPROVED' ? 'done' : c.state === 'CHANGES_REQUESTED' ? 'needs' : 'default'}>{c.state.toLowerCase().replace(/_/g, ' ')}</Chip>}
-                      {c.at && <span className="ml-auto font-num text-[11px] text-fg-4">{fullDate(c.at)}</span>}
+                      {c.at && <span className="ml-auto font-num text-[11px] text-fg-3">{fullDate(c.at)}</span>}
                     </div>
                     {ghBody(c.body) && (
                       <div className="px-4 pt-2 pb-3.5">
@@ -70,7 +70,7 @@ export function PRDetailTabBody({ tab, p, onFiles }: { tab: DetailTab; p: PRDeta
                   onClick={() => onFiles()}
                   className="hov flex h-9 w-full min-w-0 items-center gap-2 rounded-2xl px-3 text-left text-[12.5px] [--hov:var(--surface-2)]"
                 >
-                  <Icon name="file" size={13} className="text-fg-4" />
+                  <Icon name="file" size={13} className="text-fg-3" />
                   <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
                   <span className="font-num text-[11px] text-fg-2">+{f.additions}</span>
                   <span className="font-num text-[11px] text-fg-3">-{f.deletions}</span>

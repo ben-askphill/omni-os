@@ -9,7 +9,8 @@ import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
 import { Avatar, Button, Chip, DoneMark, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
-import { isWorking, showsRunning, shownStatus } from '@omni/shared/delegate-count.ts';
+import { isWorking, showsRunning } from '@omni/shared/delegate-count.ts';
+import { threadGlyph } from '@omni/shared/status.ts';
 
 /** Loads a thread list and keeps it current from /feed. With `archived`, the list holds archived threads only. */
 export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500, archived = false) {
@@ -72,17 +73,17 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
         <span className="relative mt-0.5 shrink-0">
           <Avatar name={t.channel_id} omni={t.channel_id === 'conductor'} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} avatarBg={channels.find((c) => c.id === t.channel_id)?.avatar_bg} size={32} />
           <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-            {t.done_at ? <DoneMark size={8} /> : <StatusDot status={shownStatus(t)} size={8} />}
+            {t.done_at ? <DoneMark size={8} /> : <StatusDot status={threadGlyph(t)} size={8} />}
           </span>
         </span>
       ) : (
         <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          {t.done_at ? <DoneMark /> : <StatusDot status={shownStatus(t)} size={10} />}
+          {t.done_at ? <DoneMark /> : <StatusDot status={threadGlyph(t)} size={10} />}
         </span>
       )}
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className={`min-w-0 truncate text-[14px] group-hover:text-fg ${t.done_at ? 'text-fg-4' : 'text-fg-2'}`}>{t.title || 'Untitled'}</span>
+          <span className={`min-w-0 truncate text-[14px] group-hover:text-fg ${t.done_at ? 'text-fg-3' : 'text-fg-2'}`}>{t.title || 'Untitled'}</span>
           {t.done_at && <Chip tone="outline">Done</Chip>}
           {t.role && <Chip>{t.role}</Chip>}
           {source && <Chip tone="outline">{source}</Chip>}
@@ -199,7 +200,7 @@ function FolderGroups({ threads, channel, prs, handoffs = [] }: { threads: Threa
             (g.threads.length ? (
               <Rows threads={g.threads} prs={prs} draggable handoffs={handoffs} />
             ) : (
-              <div className="px-3.5 pb-1 text-[12.5px] leading-7 text-fg-4">No threads yet. Drag one here or use Move to folder.</div>
+              <div className="px-3.5 pb-1 text-[12.5px] leading-7 text-fg-3">No threads yet. Drag one here or use Move to folder.</div>
             ))}
         </section>
       ))}
@@ -208,7 +209,7 @@ function FolderGroups({ threads, channel, prs, handoffs = [] }: { threads: Threa
         {unfiled.length ? (
           <Rows threads={unfiled} prs={prs} draggable handoffs={handoffs} />
         ) : (
-          <div className="px-3.5 pb-1 text-[12.5px] leading-7 text-fg-4">Every thread is in a folder.</div>
+          <div className="px-3.5 pb-1 text-[12.5px] leading-7 text-fg-3">Every thread is in a folder.</div>
         )}
       </section>
     </div>
@@ -246,7 +247,7 @@ function FolderHeader({ channel, folder, count, running }: { channel: ChannelWit
     <h3 className="sticky top-0 z-[2] bg-bg" onDragOver={onOver} onDragLeave={() => setOver(false)} onDrop={onDrop}>
       {folder ? (
         <button type="button" data-folder-id={folder.id} onClick={() => void folders.toggle(folder.id)} aria-expanded={!folder.collapsed} aria-label={label} title={label} className={`hov ${cls} [--hov:var(--surface)]`}>
-          <Icon name={folder.collapsed ? 'chevronRight' : 'chevronDown'} size={12} className="-ml-0.5 shrink-0 text-fg-4" />
+          <Icon name={folder.collapsed ? 'chevronRight' : 'chevronDown'} size={12} className="-ml-0.5 shrink-0 text-fg-3" />
           <Icon name="folder" size={13} className="shrink-0 text-fg-3" />
           <span className="min-w-0 truncate">{folder.name}</span>
           <span className="text-fg-3">{count}</span>
@@ -282,7 +283,7 @@ export function ArchivedThreads({ channelId }: { channelId: string }) {
           aria-expanded={open}
           className="hov caption flex w-full items-center gap-2 rounded-full px-3.5 py-2 text-left [--hov:var(--surface)]"
         >
-          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-4" />
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-3" />
           <Icon name="archive" size={13} className="shrink-0 text-fg-3" />
           Archived
           <span className="text-fg-3">{count}</span>

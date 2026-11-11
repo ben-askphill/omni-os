@@ -47,7 +47,7 @@ function McpList({ servers }: { servers: string[] }) {
           {good.length} connected
           {bad.length > 0 && <span className="text-fg-3"> · {bad.length} not connected</span>}
         </span>
-        <Icon name="chevronDown" size={12} className={`shrink-0 text-fg-4 transition-transform group-hover:text-fg-3 ${open ? '' : '-rotate-90'}`} />
+        <Icon name="chevronDown" size={12} className={`shrink-0 text-fg-3 transition-transform group-hover:text-fg-3 ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && (
         <div className="mt-1.5 flex flex-wrap gap-1">

@@ -15,7 +15,7 @@ function ThreadReferenceDetail({ body: b }: { body: ThreadReference }) {
         {b.channel_name}
         {b.cross_channel && <span className="ml-1.5 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">other channel</span>}
       </div>
-      <div className="truncate font-mono text-[11px] text-fg-4">
+      <div className="truncate font-mono text-[11px] text-fg-3">
         thread {shortId(b.thread)} · attached {fullDate(b.captured_at)}
       </div>
       <p className="mt-1.5 text-[11.5px] leading-snug text-fg-3">Only this reference went with the message. The agent reads the thread when it needs to.</p>

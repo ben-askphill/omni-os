@@ -68,7 +68,7 @@ export function SearchPage({ q }: { q: string }) {
                         <StatusDot status={h.status} />
                         <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{h.title}</span>
                         <span className="shrink-0 rounded-full bg-surface-2 px-2 text-[11.5px] leading-5 text-fg-2">#{channel(h.channel_id)?.name ?? h.channel_id}</span>
-                        <span className="w-16 shrink-0 text-right font-num text-[11px] text-fg-4">{relTime(h.updated_at)}</span>
+                        <span className="w-16 shrink-0 text-right font-num text-[11px] text-fg-3">{relTime(h.updated_at)}</span>
                       </div>
                       {h.snippet && (
                         <p

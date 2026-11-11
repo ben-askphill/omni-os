@@ -154,7 +154,7 @@ export function ClaudeArtifactRow({ a, now }: { a: ClaudeArtifact; now: number }
           )}
         </div>
       </div>
-      <Icon name="arrowUpRight" size={15} className="shrink-0 text-fg-4 transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2" />
+      <Icon name="arrowUpRight" size={15} className="shrink-0 text-fg-3 transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2" />
     </li>
   );
 }
@@ -170,7 +170,7 @@ function PreviewTile({ a, compact }: { a: ClaudeArtifact; compact?: boolean }) {
     return <ArtifactThumb a={{ id: p.artifact_id, kind: p.file_kind as Artifact['kind'], updated_at: p.updated_at }} />;
   }
   return (
-    <div className="flex h-full w-full items-center justify-center text-fg-4">
+    <div className="flex h-full w-full items-center justify-center text-fg-3">
       <Icon name={typeIcon(p.type)} size={compact ? 24 : 28} strokeWidth={1.25} />
     </div>
   );
@@ -182,7 +182,7 @@ export function ClaudeArtifactCard({ a, now, compact }: { a: ClaudeArtifact; now
     <li className={`group relative flex min-w-0 flex-col rounded-[22px] bg-surface p-1.5 ${PRESSABLE}`}>
       <div className="relative aspect-[16/10] overflow-hidden rounded-[16px] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]">
         <PreviewTile a={a} compact={compact} />
-        <span className="absolute top-2 right-2 grid h-6 w-6 place-items-center rounded-full bg-elev text-fg-4 shadow-[var(--shadow-card)] transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2">
+        <span className="absolute top-2 right-2 grid h-6 w-6 place-items-center rounded-full bg-elev text-fg-3 shadow-[var(--shadow-card)] transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2">
           <Icon name="arrowUpRight" size={13} />
         </span>
       </div>
@@ -283,7 +283,7 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
         options={CLAUDE_ARTIFACT_SCOPES.map((s) => ({
           id: s.id,
           label: s.label,
-          badge: counts[s.id] ? <span className="font-num text-[10.5px] text-fg-4 tabular-nums">{counts[s.id]}</span> : undefined,
+          badge: counts[s.id] ? <span className="font-num text-[10.5px] text-fg-3 tabular-nums">{counts[s.id]}</span> : undefined,
         }))}
       />
       {types.length > 0 && (
@@ -346,7 +346,7 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
           onChange={res.setSchedule}
           options={CLAUDE_ARTIFACTS_SCHEDULES.map((s) => ({ value: s.id, label: s.label, avatar: false as const }))}
         />
-        <span className="basis-full text-fg-4 sm:basis-auto">Listed by Claude Code under your own login, about a tenth of a cent of usage per run.</span>
+        <span className="basis-full text-fg-3 sm:basis-auto">Listed by Claude Code under your own login, about a tenth of a cent of usage per run.</span>
       </div>
     </div>
   );

@@ -64,7 +64,7 @@ function ContextChip({ r, open, controls, onToggle, onRemove }: { r: ContextRead
         </span>
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate font-mono text-[12px] font-medium text-fg-2">{label}</span>
-          {note && <span className="block truncate text-[11px] text-fg-4">{note}</span>}
+          {note && <span className="block truncate text-[11px] text-fg-3">{note}</span>}
         </span>
       </button>
       {onRemove && <IconButton icon="x" label={`Remove ${label}`} size={13} className="mr-1 h-6 w-6" onClick={onRemove} />}

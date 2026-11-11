@@ -76,7 +76,7 @@ export function paletteItems(q: string, channels: ChannelWithRunning[], recent: 
           <StatusDot status={t.status} />
         </span>
       ),
-      right: <span className="font-num text-[11px] text-fg-4">{relTime(t.updated_at)}</span>,
+      right: <span className="font-num text-[11px] text-fg-3">{relTime(t.updated_at)}</span>,
       run: () => go(href.thread(t.id)),
     })),
     { id: 'x:light', group: 'Theme', label: 'Light theme', lead: lead('sun'), run: () => setTheme('light') },

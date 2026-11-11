@@ -40,7 +40,7 @@ export function PRToolbar({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex h-8 min-w-[200px] flex-1 items-center gap-2 rounded-full bg-surface px-3 text-fg-4 shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] focus-within:bg-bg focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)]">
+        <label className="flex h-8 min-w-[200px] flex-1 items-center gap-2 rounded-full bg-surface px-3 text-fg-3 shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] focus-within:bg-bg focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)]">
           <Icon name="search" size={14} />
           <input
             type="search"
@@ -92,7 +92,7 @@ function FilterMenu({ q, set, prs }: { q: PRQuery; set: SetPRQuery; prs: ListedP
     // On a phone this menu and the repo's hang from the pills' row, not the button, so they stay on screen.
     <div ref={wrap} className="sm:relative">
       <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} className={pill}>
-        <Icon name="sliders" size={14} className="text-fg-4" />
+        <Icon name="sliders" size={14} className="text-fg-3" />
         Filters
         {n > 0 && <Chip tone="ink">{n}</Chip>}
       </button>
@@ -116,7 +116,7 @@ function FilterMenu({ q, set, prs }: { q: PRQuery; set: SetPRQuery; prs: ListedP
                     >
                       <span className="pik-mark">{on && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
                       <span className="min-w-0 flex-1 truncate text-[13px] text-fg">{o.label}</span>
-                      <span className="font-num text-[11.5px] text-fg-4">{o.count}</span>
+                      <span className="font-num text-[11.5px] text-fg-3">{o.count}</span>
                     </button>
                   );
                 })}
@@ -151,7 +151,7 @@ function PickedChips({ q, set }: { q: PRQuery; set: SetPRQuery }) {
           className="press"
         >
           <Chip className="gap-1 pr-1.5 hover:bg-surface-3">
-            <span className="text-fg-4">{FACETS[p.facet].title}</span>
+            <span className="text-fg-3">{FACETS[p.facet].title}</span>
             {p.label}
             <Icon name="x" size={11} />
           </Chip>
@@ -170,7 +170,7 @@ export function PRGroupHead({ g, className = '' }: { g: PRGroup<unknown>; classN
     <div className={`caption flex items-center gap-2 ${className}`}>
       <Icon name={g.icon as IconName} size={14} />
       {g.label}
-      <span className="font-num text-fg-4">{g.prs.length}</span>
+      <span className="font-num text-fg-3">{g.prs.length}</span>
       <span className="h-px flex-1 bg-line" />
     </div>
   );

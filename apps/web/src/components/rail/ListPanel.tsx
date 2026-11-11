@@ -142,7 +142,7 @@ function ChannelList({ id }: { id: string }) {
               {threads.length ? (
                 threads.map((t) => <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} handoffs={c.handoffs} flush />)
               ) : (
-                <div className="px-3 text-[12px] text-fg-4">No threads yet.</div>
+                <div className="px-3 text-[12px] text-fg-3">No threads yet.</div>
               )}
               <NavLink to={href.channel(c.id)} active={tab === 'threads' && !openId}>
                 <span className="text-fg-3">See all threads</span>

@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { ChannelWithRunning } from '../../api.ts';
 import { href } from '../../router.ts';
 import { useApp } from '../../store.tsx';
-import { monogram, needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
+import { monogram } from '@omni/shared/monogram.ts';
+import { needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
 import { OmniMark, StaticMark } from '../brand.tsx';
-import { ChannelMark, Icon, StatusDot, type IconName } from '../ui.tsx';
+import { ChannelMark, Icon, Monograms, StatusDot, type IconName } from '../ui.tsx';
 
 /**
  * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights. From the top: the Omni mark, the Inbox and the Conductor, then
@@ -15,6 +16,7 @@ import { ChannelMark, Icon, StatusDot, type IconName } from '../ui.tsx';
  */
 export function ChannelRail({ selection }: { selection: RailSelection }) {
   const { channels, needsYou, profile } = useApp();
+  const marks = useContext(Monograms);
   const needs = needsByChannel(needsYou?.items);
   const { clients, rest } = railGroups(channels);
   const conductor = channels.find((c) => c.id === 'conductor');
@@ -22,7 +24,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
   const badgeOf = (c: ChannelWithRunning) => railBadge(c.running, needs.get(c.id) ?? 0);
   const disc = (c: ChannelWithRunning) => (
     <RailItem key={c.id} to={href.channel(c.id)} label={c.name} selected={isChannel(c.id)} badge={badgeOf(c)}>
-      <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={22} /> : monogram(c.name)}</Disc>
+      <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={22} /> : (marks.get(c.id) ?? monogram(c.name))}</Disc>
     </RailItem>
   );
   const { ref, fade } = useScrollFade();

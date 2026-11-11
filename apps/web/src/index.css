@@ -18,7 +18,10 @@
   --fg: light-dark(#17181a, #eceae5);
   --fg-2: light-dark(#3c3b37, #b8b7b1);
   --fg-3: light-dark(#62615c, #a09f99);
+  /* fg-4 is 2.75:1 on white: placeholders, disabled labels and decoration only, never text that must be read
+     (apps/web/tests/fg4-contrast.test.ts). --fg-disabled names that use. */
   --fg-4: light-dark(#9d9c96, #83827c);
+  --fg-disabled: var(--fg-4);
   --on-ink: light-dark(#ffffff, #101114);
   --line: light-dark(rgb(23 24 26 / 0.08), rgb(236 235 231 / 0.08));
   --line-strong: light-dark(rgb(23 24 26 / 0.16), rgb(236 235 231 / 0.16));
@@ -35,8 +38,10 @@
   --done: #c6f52b;
   --on-done: var(--ink);
   --done-edge: light-dark(var(--ink), transparent);
-  /* Amber for "getting full" (the context meter from 70%). Darker in light mode so it reads on white. */
+  /* Amber for "getting full" (the context meter from 70%) and the Limited status. Darker in light mode so it reads on white. */
   --warn: light-dark(#b45309, #f5b544);
+  /* Destructive labels (Button variant="danger"): a red that reads as text, unlike vermilion. */
+  --danger-text: light-dark(#c0300f, #ff8a6e);
   /* Categorical series for charts, in fixed order (html_render pages read them as --chart-1 to --chart-6). */
   --chart-1: light-dark(#2a78d6, #3987e5);
   --chart-2: light-dark(#eb6834, #d95926);
@@ -48,9 +53,11 @@
   --bubble: var(--surface-2);
   --code-bg: var(--surface);
   --mark: light-dark(rgb(245 158 11 / 0.28), rgb(245 181 68 / 0.28));
-  /* Diffs are the one place a line gets a wash, drawn from the done and needs pops. */
-  --diff-add: color-mix(in srgb, var(--done) 22%, transparent);
-  --diff-del: color-mix(in srgb, var(--needs) 12%, transparent);
+  /* Diffs are the one place a line gets a wash. Green and red of their own, not the done and needs status hues. */
+  --diff-add-bg: light-dark(rgb(26 127 55 / 0.1), rgb(74 222 128 / 0.12));
+  --diff-add-fg: light-dark(#1a6b34, #7ee2a0);
+  --diff-del-bg: light-dark(rgb(196 45 15 / 0.08), rgb(255 122 92 / 0.12));
+  --diff-del-fg: light-dark(#a3290f, #ff9a80);
   --wash: color-mix(in srgb, var(--fg) 6%, transparent);
   --pane-edge: light-dark(rgb(23 24 26 / 0.07), rgb(255 255 255 / 0.09));
   --shadow-menu:
@@ -115,6 +122,9 @@
   --r-2xl: 22px;
   --r-3xl: 28px;
   --r-pill: 999px;
+  /* Content widths: reading and forms, and list pages. Both centred in the pane. */
+  --measure: 768px;
+  --w-page: 896px;
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -172,6 +182,8 @@
   --color-done: var(--done);
   --color-on-done: var(--on-done);
   --color-warn: var(--warn);
+  --color-danger-text: var(--danger-text);
+  --color-fg-disabled: var(--fg-disabled);
   --color-bubble: var(--bubble);
   --color-code: var(--code-bg);
   /* The faces live on :root (below), so the channel rail Beta can swap them. */
@@ -332,8 +344,9 @@
     transform: scale(0.96);
   }
 
-  /* ---- status glyphs: running pings ultramarine, needs is a still vermilion diamond,
-     done is a volt disc with an ink edge on white, settled is grey, idle and queued are hollow ---- */
+  /* ---- status glyphs (packages/shared/status.ts): running pings ultramarine, needs is a still vermilion diamond,
+     failed a vermilion cross, limited an amber ring, done a volt disc with an ink edge on white, settled is grey,
+     idle and queued are hollow ---- */
   .glyph {
     position: relative;
     display: inline-block;
@@ -354,6 +367,28 @@
     border-radius: 1.5px;
     background: var(--needs);
     transform: rotate(45deg) scale(0.86);
+  }
+  .glyph[data-s="failed"] > i {
+    border-radius: 0;
+  }
+  .glyph[data-s="failed"] > i::before,
+  .glyph[data-s="failed"] > i::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 120%;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--needs);
+    translate: -50% -50%;
+    rotate: 45deg;
+  }
+  .glyph[data-s="failed"] > i::after {
+    rotate: -45deg;
+  }
+  .glyph[data-s="limited"] > i {
+    box-shadow: inset 0 0 0 2px var(--warn);
   }
   .glyph[data-s="done"] > i {
     background: var(--done);
@@ -388,6 +423,12 @@
   }
   .spill[data-s="needs"] .glyph > i {
     background: var(--on-needs);
+  }
+  .spill[data-s="failed"] {
+    color: var(--danger-text);
+  }
+  .spill[data-s="limited"] {
+    color: var(--warn);
   }
   .spill[data-s="done"] {
     background: var(--done);
@@ -908,7 +949,7 @@
   color: var(--fg-3);
 }
 .md li::marker {
-  color: var(--fg-4);
+  color: var(--fg-3);
 }
 .md a {
   color: var(--fg);

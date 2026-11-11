@@ -75,7 +75,7 @@ function ThreadActionsView({ threadId, channelId }: { threadId: string; channelI
         <section aria-label="Runs" className="mt-5">
           <div className={HEADING}>
             <span>Runs</span>
-            <span className="font-num text-fg-4">{data.runs.length}</span>
+            <span className="font-num text-fg-3">{data.runs.length}</span>
           </div>
           <div className="space-y-2">
             {data.runs.map((r, i) => (
@@ -113,7 +113,7 @@ export function ActionLine({ action }: { action: Pick<ChannelAction, 'name' | 'c
       <div className="truncate font-mono text-[11.5px] text-fg-3" title={action.command}>
         {action.command}
       </div>
-      <div className="text-[11.5px] text-fg-4">{portLabel(action.port)}</div>
+      <div className="text-[11.5px] text-fg-3">{portLabel(action.port)}</div>
     </div>
   );
 }
@@ -143,7 +143,7 @@ function RunRow({
     <div className={CARD}>
       <div className="flex items-start gap-2 py-2 pr-2.5 pl-2">
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="hov flex min-w-0 flex-1 items-start gap-1.5 rounded-[12px] px-1.5 py-1 text-left">
-          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} className="mt-[3px] shrink-0 text-fg-4" />
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} className="mt-[3px] shrink-0 text-fg-3" />
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="min-w-0 truncate text-[13px] font-medium text-fg">{run.name}</span>
@@ -187,7 +187,7 @@ export function RunOutput({ run, className = 'px-2 pb-2', height = 'max-h-72' }:
   const cut = outputCut(run);
   return (
     <div className={className}>
-      {cut && <div className="px-1.5 pb-1 text-[11.5px] text-fg-4">{cut}</div>}
+      {cut && <div className="px-1.5 pb-1 text-[11.5px] text-fg-3">{cut}</div>}
       <pre
         ref={ref}
         onScroll={(e) => {
@@ -196,7 +196,7 @@ export function RunOutput({ run, className = 'px-2 pb-2', height = 'max-h-72' }:
         }}
         className={`scroll-thin ${height} overflow-auto rounded-[14px] bg-surface-2 px-3 py-2.5 font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words text-fg-2`}
       >
-        {run.output || <span className="text-fg-4">{run.state === 'running' ? 'Waiting for output' : 'No output'}</span>}
+        {run.output || <span className="text-fg-3">{run.state === 'running' ? 'Waiting for output' : 'No output'}</span>}
       </pre>
     </div>
   );

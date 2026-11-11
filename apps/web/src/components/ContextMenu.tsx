@@ -141,7 +141,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
       onKeyDown={onKey}
       className={`pop-in fixed z-[60] ${referencing ? 'max-h-[calc(100vh-1rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto rounded-[22px]' : 'min-w-[190px] max-w-[280px] rounded-[16px] p-1.5'} bg-elev shadow-[var(--shadow-menu)]`}
     >
-      {title && <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">{title}</div>}
+      {title && <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-3">{title}</div>}
       {referencing && row ? (
         <ThreadReferencePanel thread={row} onPicked={onClose} />
       ) : moving && row ? (

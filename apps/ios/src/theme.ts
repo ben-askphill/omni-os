@@ -29,8 +29,17 @@ const light = {
   doneEdge: '#17181a',
   ink: '#17181a',
   mark: 'rgba(245, 158, 11, 0.28)',
-  diffAdd: 'rgba(198, 245, 43, 0.22)',
-  diffDel: 'rgba(255, 68, 32, 0.12)',
+  /** Amber for a meter filling up and the Limited status (web: --warn). */
+  warn: '#b45309',
+  /** Destructive labels (web: --danger-text). */
+  dangerText: '#c0300f',
+  /** Placeholders and disabled labels only, never text that must be read (web: --fg-disabled). */
+  fgDisabled: '#9d9c96',
+  // Diffs get a green and red of their own, not the status hues (web: --diff-*).
+  diffAddBg: 'rgba(26, 127, 55, 0.10)',
+  diffAddFg: '#1a6b34',
+  diffDelBg: 'rgba(196, 45, 15, 0.08)',
+  diffDelFg: '#a3290f',
 } as const;
 
 export type ColorTokens = { [K in keyof typeof light]: string };
@@ -60,8 +69,13 @@ const dark: ColorTokens = {
   doneEdge: 'transparent',
   ink: '#17181a',
   mark: 'rgba(245, 181, 68, 0.28)',
-  diffAdd: 'rgba(198, 245, 43, 0.22)',
-  diffDel: 'rgba(255, 68, 32, 0.12)',
+  warn: '#f5b544',
+  dangerText: '#ff8a6e',
+  fgDisabled: '#83827c',
+  diffAddBg: 'rgba(74, 222, 128, 0.12)',
+  diffAddFg: '#7ee2a0',
+  diffDelBg: 'rgba(255, 122, 92, 0.12)',
+  diffDelFg: '#ff9a80',
 };
 
 export const space = {

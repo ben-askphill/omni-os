@@ -86,8 +86,8 @@ function Preparing({ thread, data, mobile }: { thread: Thread; data: ThreadActio
           <li key={s.id} aria-current={s.state === 'active' ? 'step' : undefined} className="flex min-w-0 items-baseline gap-2 text-[12.5px] leading-snug">
             <StatusDot status={s.state === 'done' ? 'done' : s.state === 'active' ? 'running' : 'idle'} size={7} className="shrink-0 -translate-y-px" />
             <span className="flex min-w-0 flex-wrap gap-x-2">
-              <span className={`min-w-0 break-words ${s.state === 'todo' ? 'text-fg-4' : 'text-fg-2'} ${s.state === 'active' ? 'font-medium text-fg' : ''}`}>{s.label}</span>
-              {s.detail && <span className="text-fg-4">{s.detail}</span>}
+              <span className={`min-w-0 break-words ${s.state === 'todo' ? 'text-fg-3' : 'text-fg-2'} ${s.state === 'active' ? 'font-medium text-fg' : ''}`}>{s.label}</span>
+              {s.detail && <span className="text-fg-3">{s.detail}</span>}
             </span>
           </li>
         ))}
@@ -177,14 +177,14 @@ function Frame({
           </div>
           {children}
           {thread.branch && (
-            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[11.5px] text-fg-4">
+            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[11.5px] text-fg-3">
               <Icon name="branch" size={12} className="shrink-0" />
               <span className="truncate font-mono" title={thread.cwd}>
                 {thread.branch}
               </span>
             </div>
           )}
-          {from && <p className="mt-1 text-[11.5px] text-fg-4">{from}</p>}
+          {from && <p className="mt-1 text-[11.5px] text-fg-3">{from}</p>}
         </div>
       </div>
       {error && <ErrorNote className="mx-3 mb-3">{error}</ErrorNote>}
@@ -227,7 +227,7 @@ function Strip({
             </span>
             <span className="mt-0.5 flex items-center gap-1 font-num text-[11.5px] text-fg-3">
               <span className="truncate">{[runSummary(run), open ? 'Hide output' : 'Show output'].filter(Boolean).join(' · ')}</span>
-              <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="shrink-0 text-fg-4" />
+              <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="shrink-0 text-fg-3" />
             </span>
           </span>
         </button>

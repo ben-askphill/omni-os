@@ -89,9 +89,9 @@ function AllPRRow({ p, i }: { p: ListedPR; i: number }) {
   return (
     <a href={p.url} target="_blank" rel="noreferrer" style={{ '--i': i } as CSSProperties} className="hov block rounded-[18px] px-3.5 py-3 [--hov:var(--surface)]">
       <div className="flex min-w-0 items-center gap-2">
-        <Icon name="pr" size={14} className={b.label === 'open' ? 'text-live-text' : b.label === 'merged' ? 'text-fg-2' : 'text-fg-4'} />
+        <Icon name="pr" size={14} className={b.label === 'open' ? 'text-live-text' : b.label === 'merged' ? 'text-fg-2' : 'text-fg-3'} />
         <span className="min-w-0 truncate text-[14px] font-medium">{p.title}</span>
-        <span className="shrink-0 font-num text-[11.5px] text-fg-4">#{p.number}</span>
+        <span className="shrink-0 font-num text-[11.5px] text-fg-3">#{p.number}</span>
         <Chip tone={b.tone}>{b.label}</Chip>
         <span className="ml-auto shrink-0">
           <ChecksSummary c={p.checks} />
@@ -105,7 +105,7 @@ function AllPRRow({ p, i }: { p: ListedPR; i: number }) {
             {l}
           </Chip>
         ))}
-        <span className="ml-auto shrink-0 font-num text-[11px] text-fg-4">{relTime(p.updatedAt)}</span>
+        <span className="ml-auto shrink-0 font-num text-[11px] text-fg-3">{relTime(p.updatedAt)}</span>
       </div>
     </a>
   );

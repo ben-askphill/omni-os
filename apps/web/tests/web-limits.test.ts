@@ -32,7 +32,7 @@ describe('limit stop answers', () => {
   it('lists the stop in Needs you, with when it resumes', () => {
     const item = fixture<NeedsYou>('needs-you.json').items.find((i) => i.blockers.some((b) => b.kind === 'limited'))!;
     expect(item.blockers[0]).toMatchObject({ kind: 'limited', scheduled: true });
-    expect(reasonOf(item)).toMatchObject({ glyph: 'needs', label: 'Usage limit reached', detail: expect.stringMatching(/^Resumes at /) });
+    expect(reasonOf(item)).toMatchObject({ glyph: 'limited', label: 'Usage limit reached', detail: expect.stringMatching(/^Resumes at /) });
     expect(reasonOf({ ...item, blockers: [{ kind: 'limited', detail: null, count: 0, resets_at: at(17), scheduled: false }] }).detail).toMatch(/^Resets at /);
     expect(reasonOf({ ...item, blockers: [{ kind: 'limited', detail: null, count: 0, resets_at: null, scheduled: false }] }).detail).toBe('No reset time given');
     // The other Mac's stop (sync): the same reset, and where it is.

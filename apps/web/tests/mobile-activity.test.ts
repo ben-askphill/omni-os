@@ -19,7 +19,7 @@ describe('needsCard', () => {
   it('answers each blocker with the action the thread page offers, then Mark done', () => {
     const cards = cardsOf(inbox());
     const byTitle = (t: string) => cards.find((c) => c.thread.title === t)!;
-    expect(byTitle('Tidy the copy')).toMatchObject({ kind: 'limited', label: 'Usage limit reached', glyph: 'needs' });
+    expect(byTitle('Tidy the copy')).toMatchObject({ kind: 'limited', label: 'Usage limit reached', glyph: 'limited' });
     // Scheduled already: cancel it, or resume now.
     expect(byTitle('Tidy the copy').actions).toEqual([
       { kind: 'limit', label: 'Cancel', action: 'cancel' },

@@ -282,7 +282,7 @@ function Toolbar({ nav, go, act, address, tools }: { nav: NavState; go: (url: st
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center truncate px-4 text-[13px]" aria-hidden>
             <span className="truncate">
               <span className="text-fg">{hostPart}</span>
-              <span className="text-fg-4">{path}</span>
+              <span className="text-fg-3">{path}</span>
             </span>
           </span>
         )}

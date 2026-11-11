@@ -8,9 +8,9 @@ export function RunOnChip({ rows, value, onClick }: { rows: RunOnRow[]; value: s
   return (
     <button type="button" onClick={onClick} aria-label={`Run on: ${row?.label ?? 'none'}`} className="mo-press inline-flex h-8 max-w-full min-w-0 items-center gap-1.5 self-start rounded-full bg-surface-2 pr-3 pl-2.5 text-[12.5px] font-medium text-fg">
       <Icon name="monitor" size={13} className="shrink-0 text-fg-3" />
-      <span className="shrink-0 text-fg-4">On</span>
+      <span className="shrink-0 text-fg-3">On</span>
       <span className="truncate">{row?.label ?? 'Choose'}</span>
-      <Icon name="chevronDown" size={12} className="shrink-0 text-fg-4" />
+      <Icon name="chevronDown" size={12} className="shrink-0 text-fg-3" />
     </button>
   );
 }

@@ -59,7 +59,7 @@ export function SidebarTop({
             onNavigate?.();
             onSearch();
           }}
-          className="press flex h-10 w-full items-center gap-2.5 rounded-full bg-bg/70 pr-2 pl-3.5 text-[13px] text-fg-4 shadow-[var(--shadow-card)] transition-colors hover:text-fg-3"
+          className="press flex h-10 w-full items-center gap-2.5 rounded-full bg-bg/70 pr-2 pl-3.5 text-[13px] text-fg-3 shadow-[var(--shadow-card)] transition-colors hover:text-fg-3"
         >
           <Icon name="search" size={15} />
           <span className="flex-1 text-left">Search or jump to</span>

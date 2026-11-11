@@ -136,7 +136,7 @@ export function ArtifactViewer({ a, from }: { a: Artifact; from?: { id: string; 
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-[11.5px] font-medium">{a.name}</div>
-          <div className="truncate font-num text-[11px] text-fg-4">
+          <div className="truncate font-num text-[11px] text-fg-3">
             {a.kind} · {bytes(a.size)} · {a.url ? 'published' : 'updated'} {relTime(a.updated_at)}
             {from && (
               <>

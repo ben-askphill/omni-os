@@ -115,9 +115,9 @@ export function SlashMenu({
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-baseline gap-2">
                     <span className="shrink-0 font-mono text-[13px] font-medium text-fg">/{c.name}</span>
-                    {c.argumentHint && <span className="truncate font-mono text-[12px] text-fg-4">{c.argumentHint}</span>}
+                    {c.argumentHint && <span className="truncate font-mono text-[12px] text-fg-3">{c.argumentHint}</span>}
                   </span>
-                  {c.description && <span className="block truncate text-[11.5px] text-fg-4">{c.description}</span>}
+                  {c.description && <span className="block truncate text-[11.5px] text-fg-3">{c.description}</span>}
                 </span>
                 <span className="shrink-0 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">{SOURCE_TAG[c.source]}</span>
               </div>

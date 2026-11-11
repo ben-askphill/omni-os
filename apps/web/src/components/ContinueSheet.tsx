@@ -279,7 +279,7 @@ function SectionView({ section }: { section: PreviewSection }) {
     <section>
       <div className="mb-1 flex items-baseline gap-1.5 px-1">
         <span className="caption">{section.title}</span>
-        {section.count != null && <span className="font-num text-[11px] text-fg-4">{section.count}</span>}
+        {section.count != null && <span className="font-num text-[11px] text-fg-3">{section.count}</span>}
       </div>
       <div className="divide-y divide-line rounded-[18px] bg-surface">
         {section.rows.map((r) => (

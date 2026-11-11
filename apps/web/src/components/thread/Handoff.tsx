@@ -41,7 +41,7 @@ export function HandoffCard({
   if (banner.size === 'line') {
     return (
       <div role="status" className={`flex items-center gap-2 text-fg-3 ${mobile ? 'px-1 text-[13px]' : 'mt-5 text-[12.5px]'}`}>
-        <Icon name={banner.tone === 'done' ? 'share' : 'x'} size={13} className="shrink-0 text-fg-4" />
+        <Icon name={banner.tone === 'done' ? 'share' : 'x'} size={13} className="shrink-0 text-fg-3" />
         <span className="min-w-0">{banner.text}</span>
       </div>
     );

@@ -58,7 +58,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     <div className="scrim fixed inset-0 z-50 flex items-start justify-center px-3 pt-[max(12px,10vh)]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div role="dialog" aria-modal="true" aria-label="Command menu" className="pop-in flex max-h-[min(640px,80vh)] w-full max-w-[620px] flex-col overflow-hidden rounded-[28px] bg-elev shadow-[var(--shadow-menu)]">
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line pr-4 pl-6">
-          <Icon name="search" size={18} className="text-fg-4" />
+          <Icon name="search" size={18} className="text-fg-3" />
           <input
             ref={input}
             value={q}
@@ -105,7 +105,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   {item.lead}
                   <span className="flex min-w-0 flex-1 items-baseline gap-2">
                     <span className="truncate text-[13.5px] text-fg">{item.label}</span>
-                    {item.sub && <span className="truncate text-[12px] text-fg-4">{item.sub}</span>}
+                    {item.sub && <span className="truncate text-[12px] text-fg-3">{item.sub}</span>}
                   </span>
                   {item.right}
                   {index === safeCursor && <Icon name="arrowRight" size={14} className="text-fg-3" />}
@@ -115,7 +115,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           ))}
           {!items.length && <div className="px-4 py-10 text-center text-[13px] text-fg-3">{recent.loading ? 'Loading' : 'Nothing matches'}</div>}
         </div>
-        <div className="hidden shrink-0 items-center gap-4 border-t border-line px-6 py-2.5 text-[11.5px] text-fg-4 sm:flex">
+        <div className="hidden shrink-0 items-center gap-4 border-t border-line px-6 py-2.5 text-[11.5px] text-fg-3 sm:flex">
           <span className="flex items-center gap-1.5">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd> move

@@ -271,7 +271,7 @@ export function PathMapEditor() {
               {rows.map((r, i) => (
                 <li key={i} className="flex items-center gap-2">
                   <input aria-label="Path on the other machine" className="field min-w-0 flex-1 font-mono !text-[12.5px]" value={r.from} onChange={(e) => edit(i, { from: e.target.value })} placeholder="~/work" spellCheck={false} />
-                  <Icon name="arrowRight" size={14} className="shrink-0 text-fg-4" />
+                  <Icon name="arrowRight" size={14} className="shrink-0 text-fg-3" />
                   <input aria-label="Path on this machine" className="field min-w-0 flex-1 font-mono !text-[12.5px]" value={r.to} onChange={(e) => edit(i, { to: e.target.value })} placeholder="~/code" spellCheck={false} />
                   <Button variant="ghost" size="sm" icon="trash" aria-label="Remove" onClick={() => (setSaved(false), setRows(rows.filter((_, j) => j !== i)))} />
                 </li>

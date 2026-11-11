@@ -125,7 +125,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
               )}
             </div>
             <h1 className="flex min-w-0 items-baseline gap-1 font-display text-[26px] leading-[1.1] md:text-[30px]">
-              {!isConductor && <span className="text-fg-4">#</span>}
+              {!isConductor && <span className="text-fg-3">#</span>}
               <span className="truncate">{ch.name}</span>
             </h1>
           </div>
@@ -143,7 +143,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
               </a>
             )}
             {ch.repo_path && (
-              <span className="inline-flex h-7 max-w-full items-center rounded-full px-2.5 font-mono text-[11px] text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]" title={ch.repo_path}>
+              <span className="inline-flex h-7 max-w-full items-center rounded-full px-2.5 font-mono text-[11px] text-fg-3 shadow-[inset_0_0_0_1px_var(--line)]" title={ch.repo_path}>
                 <span className="truncate">{ch.repo_path}</span>
               </span>
             )}

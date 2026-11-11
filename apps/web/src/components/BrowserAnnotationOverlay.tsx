@@ -389,10 +389,10 @@ export function ElementInspector({ element: e, at, bounds }: { element: Inspecte
     >
       <div className="flex items-baseline gap-[var(--sp-4)]">
         <span className="min-w-0 flex-1 truncate font-mono text-[length:var(--fs-12)] text-fg">{elementName(e)}</span>
-        <span className="shrink-0 font-num text-fg-4">{`${e.size.width} × ${e.size.height}`}</span>
+        <span className="shrink-0 font-num text-fg-3">{`${e.size.width} × ${e.size.height}`}</span>
       </div>
       {e.path.length > 1 && (
-        <div className="mt-[var(--sp-1)] truncate text-left font-mono text-[length:var(--fs-label)] text-fg-4" dir="rtl" title={e.path.join(' › ')}>
+        <div className="mt-[var(--sp-1)] truncate text-left font-mono text-[length:var(--fs-label)] text-fg-3" dir="rtl" title={e.path.join(' › ')}>
           <bdi>{e.path.join(' › ')}</bdi>
         </div>
       )}
@@ -401,7 +401,7 @@ export function ElementInspector({ element: e, at, bounds }: { element: Inspecte
         <dl className="mt-[var(--sp-3)] grid grid-cols-[auto_minmax(0,1fr)] gap-x-[var(--sp-6)] gap-y-[var(--sp-1)] border-t border-line pt-[var(--sp-3)]">
           {rows.map((r) => (
             <div key={r.label} className="contents">
-              <dt className="text-fg-4">{r.label}</dt>
+              <dt className="text-fg-3">{r.label}</dt>
               <dd className="m-0 flex min-w-0 items-center gap-[var(--sp-3)] font-mono text-[length:var(--fs-meta)]">
                 {r.swatch && <span className="h-2.5 w-2.5 shrink-0 rounded-[3px] shadow-[inset_0_0_0_1px_var(--line-strong)]" style={{ background: r.swatch }} />}
                 <span className="truncate">{r.value}</span>
@@ -476,7 +476,7 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
           <span className="min-w-0 truncate">
             {flash ?? (phone ? 'Tap an element or drag an area' : 'Click an element or drag an area')}
             {!flash && !phone && (
-              <span className="text-fg-4">
+              <span className="text-fg-3">
                 {' · '}
                 <Kbd>⌥</Kbd> click uses the page
               </span>

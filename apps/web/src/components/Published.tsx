@@ -58,7 +58,7 @@ export function PublishedCard({ p, threadId, artifact }: { p: Published; threadI
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-baseline gap-2">
             <span className="min-w-0 truncate text-[13.5px] font-medium text-fg">{p.title}</span>
-            <span className="shrink-0 text-[11.5px] text-fg-4">{p.update ? 'Republished' : 'Published'} on claude.ai</span>
+            <span className="shrink-0 text-[11.5px] text-fg-3">{p.update ? 'Republished' : 'Published'} on claude.ai</span>
           </div>
           {p.description && <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">{p.description}</div>}
         </div>

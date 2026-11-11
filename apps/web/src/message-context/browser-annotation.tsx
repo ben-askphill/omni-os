@@ -81,7 +81,7 @@ function BrowserAnnotationDetail({ body: b }: { body: BrowserAnnotation }) {
       <div className="mt-1.5 text-[11.5px] text-fg-3">
         {marks.length ? `${marksLabel(marks.length)} · ` : ''}Area {rect.width}×{rect.height} at {rect.x}, {rect.y} · viewport {viewport.width}×{viewport.height} at {viewport.scale}x · scrolled to {scroll.x}, {scroll.y}
       </div>
-      <div className="text-[11px] text-fg-4">Captured {fullDate(b.captured_at)}</div>
+      <div className="text-[11px] text-fg-3">Captured {fullDate(b.captured_at)}</div>
       {b.element && <PickedElementDetails element={b.element} defaultOpen />}
     </div>
   );

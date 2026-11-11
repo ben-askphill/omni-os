@@ -6,7 +6,7 @@ import { MoGroup, MoListRow, MoSection } from './parts.tsx';
 /** The PRs the threads this one delegated to opened. A row shows that PR, with its merge and the thread that opened it. */
 export function CrewPRList({ crew, onOpen }: { crew: CrewPR[]; onOpen: (pr: CrewPR) => void }) {
   return (
-    <MoSection title="From delegated threads" count={crew.length} right={<span className="text-[12px] leading-[1.3] text-fg-4">{crewLine(crew).text}</span>} pad={false}>
+    <MoSection title="From delegated threads" count={crew.length} right={<span className="text-[12px] leading-[1.3] text-fg-3">{crewLine(crew).text}</span>} pad={false}>
       <MoGroup>
         {crew.map((p, i) => {
           const b = prBadge(p);

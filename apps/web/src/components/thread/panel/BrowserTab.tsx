@@ -31,7 +31,7 @@ export function BrowserTab({ channelId, threadId, shots, crew }: { channelId: st
               Live browser
             </Button>
             <span className="flex-1" />
-            <span className="px-2 font-num text-[11px] text-fg-4">{plural(count, 'screenshot')}</span>
+            <span className="px-2 font-num text-[11px] text-fg-3">{plural(count, 'screenshot')}</span>
           </div>
           <div className="min-h-0 flex-1">
             <Screenshots shots={shots} crew={crew} />

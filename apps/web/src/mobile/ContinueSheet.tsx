@@ -164,7 +164,7 @@ function Sheet({
             </Button>
           </div>
           {run && (
-            <MoSection title="Carryover" right={p && <span className="text-[12px] leading-[1.3] text-fg-4 tabular-nums">{sizeLine(p.carryover)}</span>}>
+            <MoSection title="Carryover" right={p && <span className="text-[12px] leading-[1.3] text-fg-3 tabular-nums">{sizeLine(p.carryover)}</span>}>
               {s.preview.kind === 'failed' ? (
                 <ErrorNote onRetry={recheck}>{s.preview.error}</ErrorNote>
               ) : (

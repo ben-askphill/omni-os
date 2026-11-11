@@ -22,7 +22,7 @@ export function SubagentRow({ t, onJump }: { t: BackgroundTask; onJump: (eventId
     >
       <Loader size={11} className="shrink-0 text-live-text" />
       <span className="min-w-0 flex-1 truncate">{t.description}</span>
-      {kind && <span className="max-w-[40%] shrink-0 truncate font-mono text-[11px] text-fg-4">{kind}</span>}
+      {kind && <span className="max-w-[40%] shrink-0 truncate font-mono text-[11px] text-fg-3">{kind}</span>}
       <span className="shrink-0 font-num text-[11px] text-fg-3 tabular-nums">{duration(Math.max(0, now - toDate(t.started_at).getTime()))}</span>
     </button>
   );

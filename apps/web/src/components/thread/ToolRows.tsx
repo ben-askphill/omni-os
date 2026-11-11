@@ -23,7 +23,7 @@ function toolIcon(name: string) {
 // ---------- tool rows ----------
 
 function Pre({ children, tone, className = '' }: { children: ReactNode; tone?: 'bad' | 'add' | 'del'; className?: string }) {
-  const bg = tone === 'add' ? 'bg-[var(--diff-add)]' : tone === 'del' ? 'bg-[var(--diff-del)]' : 'bg-code';
+  const bg = tone === 'add' ? 'bg-[var(--diff-add-bg)]' : tone === 'del' ? 'bg-[var(--diff-del-bg)]' : 'bg-code';
   return (
     <pre
       className={`scroll-thin max-h-80 overflow-auto rounded-xl px-3 py-2.5 font-mono text-[11.5px] leading-[1.6] whitespace-pre-wrap break-words shadow-[inset_0_0_0_1px_var(--line)] ${bg} ${tone === 'bad' ? 'text-fg' : 'text-fg-2'} ${className}`}
@@ -66,7 +66,7 @@ function ToolInput({ c }: { c: ToolCall }) {
     return (
       <>
         <div className="font-mono text-[11.5px] break-all text-fg-3">
-          {str(i.file_path)} <span className="text-fg-4">({lines.length} lines)</span>
+          {str(i.file_path)} <span className="text-fg-3">({lines.length} lines)</span>
         </div>
         <Pre tone="add">{lines.slice(0, 80).join('\n')}{lines.length > 80 ? '\n...' : ''}</Pre>
       </>
@@ -126,7 +126,7 @@ function TaskBadge({ t }: { t: TaskView }) {
   const end = TASK_END[t.status ?? ''] ?? t.status ?? 'done';
   const took = t.ended ? duration(toDate(t.ended).getTime() - toDate(t.started).getTime()) : '';
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg-4 tabular-nums">
+    <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg-3 tabular-nums">
       {end === 'failed' && <StatusDot status="needs" size={7} />}
       <span className={end === 'failed' ? 'text-fg' : ''}>{end}</span>
       {took && <span>· {took}</span>}
@@ -153,11 +153,11 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
         aria-expanded={open}
         className="hov group flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-2.5 text-left text-[12.5px]"
       >
-        <Icon name="chevronRight" size={12} className={`text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
+        <Icon name="chevronRight" size={12} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
         <Icon name={toolIcon(c.name)} size={13} className="text-fg-3" />
         <span className={`shrink-0 font-medium text-fg-2`}>{toolLabel(c.name)}</span>
         <span className={`min-w-0 flex-1 truncate text-fg-3 ${mono ? 'font-mono text-[11.5px]' : ''}`}>{summary}</span>
-        {c.children.length > 0 && !task?.running && <span className="shrink-0 font-num text-[11px] text-fg-4">{c.children.length} sub-calls</span>}
+        {c.children.length > 0 && !task?.running && <span className="shrink-0 font-num text-[11px] text-fg-3">{c.children.length} sub-calls</span>}
         {task ? (
           <TaskBadge t={task} />
         ) : pending && running ? (
@@ -167,7 +167,7 @@ function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | n
             <StatusDot status="needs" size={7} /> error{exit !== undefined && ` · exit ${exit}`}
           </span>
         ) : stopped ? (
-          <span className="shrink-0 font-num text-[11px] text-fg-4">stopped</span>
+          <span className="shrink-0 font-num text-[11px] text-fg-3">stopped</span>
         ) : null}
       </button>
       {open && (
@@ -209,11 +209,11 @@ export function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null
           {(task?.background || c.input.run_in_background === true) && <span>background</span>}
           {calls > 0 && <span className="font-num">{plural(calls, 'tool')}</span>}
           {task && (
-            <span className="font-num text-fg-4 tabular-nums">
+            <span className="font-num text-fg-3 tabular-nums">
               {busy ? <Elapsed since={task.started} /> : task.ended ? duration(toDate(task.ended).getTime() - toDate(task.started).getTime()) : null}
             </span>
           )}
-          <Icon name="chevronRight" size={11} className={`text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
+          <Icon name="chevronRight" size={11} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
         </BranchFace>
       </button>
       {open && (
@@ -269,7 +269,7 @@ export function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolC
         aria-expanded={open}
         className="hov flex h-10 w-full min-w-0 items-center gap-2 rounded-[20px] px-3.5 text-left text-[12.5px]"
       >
-        <Icon name="chevronRight" size={12} className={`text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
+        <Icon name="chevronRight" size={12} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
         <Icon name="tool" size={13} className="text-fg-3" />
         <span className="shrink-0 font-medium text-fg-2">
           <span className="font-num">{total}</span> tool calls

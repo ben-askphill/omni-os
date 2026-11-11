@@ -209,7 +209,7 @@ function ContextPanel({
                   : `${approx}${formatTokens(context.used)} tokens, window unknown`
                 : 'No reading yet'}
             </div>
-            {context?.model && <div className="mt-0.5 truncate text-[11.5px] text-fg-4">{context.model}</div>}
+            {context?.model && <div className="mt-0.5 truncate text-[11.5px] text-fg-3">{context.model}</div>}
           </div>
           <button
             type="button"
@@ -260,7 +260,7 @@ function ContextPanel({
             {largest.map((r, i) => (
               <div key={i} className="flex items-baseline gap-2 py-[3px] text-[12px]">
                 <span className="shrink-0 text-fg-2">{shortTool(r.tool)}</span>
-                <Tail text={shortPath(r.label, thread.cwd)} title={r.label} className="text-fg-4" />
+                <Tail text={shortPath(r.label, thread.cwd)} title={r.label} className="text-fg-3" />
                 <span className="shrink-0 font-num text-fg-3 tabular-nums">{formatTokens(r.tokens)}</span>
               </div>
             ))}
@@ -281,7 +281,7 @@ function ContextPanel({
         )}
 
         {context && (
-          <p className="mt-3 text-[11px] text-fg-4">
+          <p className="mt-3 text-[11px] text-fg-3">
             {SOURCE_NOTE[context.source]} Updated {relTime(context.updated_at)}.
           </p>
         )}
@@ -325,7 +325,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
     <div className="mt-3.5">
       <div className="mb-1 flex items-baseline gap-1.5">
         <span className="caption">{title}</span>
-        {note && <span className="text-[10.5px] text-fg-4">{note}</span>}
+        {note && <span className="text-[10.5px] text-fg-3">{note}</span>}
       </div>
       {children}
     </div>
@@ -337,7 +337,7 @@ function Bar({ label, title, tokens, of, faint }: { label: string; title?: strin
   return (
     <div className="py-[3px]" title={title ?? label}>
       <div className="flex items-baseline gap-2 text-[12px]">
-        <span className={`min-w-0 flex-1 truncate ${faint ? 'text-fg-4' : 'text-fg-2'}`}>{label}</span>
+        <span className={`min-w-0 flex-1 truncate ${faint ? 'text-fg-3' : 'text-fg-2'}`}>{label}</span>
         <span className="shrink-0 font-num text-fg-3 tabular-nums">{formatTokens(tokens)}</span>
       </div>
       <div className="mt-[3px] h-[3px] overflow-hidden rounded-full bg-[var(--wash)]">
@@ -421,7 +421,7 @@ function CompactAction({ thread, view, onCompacted }: { thread: Thread; view: Co
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 text-[11.5px] text-fg-4">{blocked ?? 'Summarize the conversation to free up room.'}</span>
+          <span className="min-w-0 flex-1 text-[11.5px] text-fg-3">{blocked ?? 'Summarize the conversation to free up room.'}</span>
           <Button size="sm" variant="secondary" icon="layers" disabled={!!blocked || !view} onClick={() => setAsking(true)} title={blocked ?? undefined}>
             Compact
           </Button>

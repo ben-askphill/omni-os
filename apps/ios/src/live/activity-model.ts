@@ -7,13 +7,12 @@ import {
   delegatesByParent,
   delegateSummary,
   isWorking,
-  shownStatus,
   showsRunning,
   type DelegateNeeds,
   type DelegateSummary,
 } from '@omni/shared/delegate-count.ts';
 
-import { glyphFor, type Glyph } from '../components/glyph';
+import { STATUS, asksForYou, threadGlyph, type Glyph } from '@omni/shared/status.ts';
 import { canMarkDone, targetOfStub, type ThreadTarget } from '../thread/target';
 import { shortAgo } from './channel-model';
 
@@ -83,27 +82,29 @@ export interface ActivityInput {
 export const DONE_INITIAL = 10;
 export const DONE_PAGE = 25;
 
-const BLOCKER_LABEL: Record<NeedsYouBlocker['kind'], string> = {
-  question: 'Input',
-  setup: 'Setup failed',
-  limited: 'Limited',
-  uncertain: 'Resume',
-  recovered: 'Resume',
+const BLOCKER_GLYPH: Record<NeedsYouBlocker['kind'], Glyph> = {
+  question: 'needs',
+  setup: 'failed',
+  limited: 'limited',
+  uncertain: 'needs',
+  recovered: 'needs',
 };
+
+const as = (glyph: Glyph): InboxStatus => ({ glyph, label: STATUS[glyph].label });
 
 /** A blocker first, then work in progress, then an unread result (web: rowStatus). */
 function rowStatus(t: InboxThread, need: NeedsYouItem | undefined): InboxStatus | null {
   const b = need?.blockers[0];
-  if (b) return { glyph: 'needs', label: BLOCKER_LABEL[b.kind] };
-  if (t.status === 'queued') return { glyph: 'queued', label: 'Queued' };
-  if (showsRunning(t)) return { glyph: 'running', label: 'Working' };
+  if (b) return as(BLOCKER_GLYPH[b.kind]);
+  if (t.status === 'queued') return as('queued');
+  if (showsRunning(t)) return as('running');
   switch (need?.result?.status) {
     case 'failed':
-      return { glyph: 'needs', label: 'Failed' };
+      return as('failed');
     case 'done':
-      return { glyph: 'done', label: 'Finished' };
+      return as('done');
     case 'stopped':
-      return { glyph: 'settled', label: 'Stopped' };
+      return as('settled');
   }
   return null;
 }
@@ -153,7 +154,7 @@ export function activityInbox({ recent, needsYou, pinned, channels, now }: Activ
       title: t.title || 'Untitled',
       channel: names.get(t.channel_id) ?? t.channel_id,
       channelId: t.channel_id,
-      glyph: status?.glyph ?? glyphFor(shownStatus(t)),
+      glyph: status?.glyph ?? threadGlyph(t),
       status,
       time: shortAgo(at(t), now),
       branch: t.branch ?? null,
@@ -172,7 +173,7 @@ export function activityInbox({ recent, needsYou, pinned, channels, now }: Activ
     waiting,
     working,
     done: shelves.done.map((t) => ({ id: t.id, title: t.title || 'Untitled', time: shortAgo(t.done_at ?? at(t), now), target: targetOfStub(t) })),
-    mark: waiting.some((r) => r.status?.glyph === 'needs') ? 'attention' : working.length ? 'delegating' : 'idle',
+    mark: waiting.some((r) => !!r.status && asksForYou(r.status.glyph)) ? 'attention' : working.length ? 'delegating' : 'idle',
     loaded: recent !== null,
   };
 }

@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
 import type { Thread } from '../../api.ts';
-import { shownStatus } from '@omni/shared/delegate-count.ts';
+import { threadGlyph } from '@omni/shared/status.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { openMenu } from '../ContextMenu.tsx';
 import { Button, IconButton, StatusPill } from '../ui.tsx';
-import { ASKING_LABEL } from './QuestionCard.tsx';
 
 // The header keeps the context meter, Done (Restore on an archived thread), the status, the thread menu and the panel
 // toggle. Pin, rename, move, archive, fork, reference, hand off and Send to Grok Bot are in the thread menu (⋯), the
@@ -61,7 +60,7 @@ export function HeaderActions({
           Restore
         </Button>
       )}
-      <StatusPill status={asking ? 'needs' : shownStatus(thread)} label={asking ? ASKING_LABEL : undefined} />
+      <StatusPill status={asking ? 'needs' : threadGlyph(thread)} />
       <IconButton
         icon="more"
         label="Thread actions"

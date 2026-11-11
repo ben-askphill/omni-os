@@ -16,7 +16,7 @@ import { NeedsActions } from './NeedsCard.tsx';
 import { MoAvatar, MoDiff, MoStripes } from './parts.tsx';
 import { useShell } from './shell.tsx';
 import type { NowDoing, PlanView, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
-import { shownStatus } from '@omni/shared/delegate-count.ts';
+import { threadGlyph } from '@omni/shared/status.ts';
 
 /** The phone's turn, carrying the web's own artifact and thread rows. */
 export type TurnView = TurnOf<Artifact, Thread>;
@@ -66,7 +66,7 @@ export function StepsRow({ t, live, onClick }: { t: TurnView; live?: boolean; on
           </>
         )}
       </span>
-      <Icon name="chevronRight" size={15} className="text-fg-4" />
+      <Icon name="chevronRight" size={15} className="text-fg-3" />
     </button>
   );
 }
@@ -82,7 +82,7 @@ export function ArtifactCard({ a, sub, onOpen }: { a: Artifact; sub: string; onO
           <span className="truncate font-mono text-[13px] leading-[1.3]">{a.name}</span>
           <span className="truncate text-[12px] leading-[1.3] text-fg-3">{sub}</span>
         </span>
-        <Icon name="chevronRight" size={15} className="text-fg-4" />
+        <Icon name="chevronRight" size={15} className="text-fg-3" />
       </div>
     </button>
   );
@@ -95,7 +95,7 @@ export function ChangesCard({ files, onOpen }: { files: { path: string; add: num
       <button type="button" onClick={onOpen} className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] leading-none font-medium">
         Changes <span className="font-normal text-fg-3">{files.length}</span>
         <span className="flex-1" />
-        <Icon name="chevronRight" size={15} className="text-fg-4" />
+        <Icon name="chevronRight" size={15} className="text-fg-3" />
       </button>
       {shown.map((f) => (
         <div key={f.path} className="flex items-center gap-2.5 border-t border-line px-4 py-2.5 font-mono text-[12.5px] leading-[1.3]">
@@ -170,7 +170,7 @@ export function Delegation({ kids }: { kids: Thread[] }) {
                 <span className="truncate text-[14px] leading-[1.3]">{k.title || 'Untitled'}</span>
                 <span className="truncate text-[12px] leading-[1.3] text-fg-3">{[k.role, k.task_id, `#${channel(k.channel_id)?.name ?? k.channel_id}`].filter(Boolean).join(' · ')}</span>
               </span>
-              <StatusPill status={card?.glyph === 'needs' ? 'needs' : shownStatus(k)} />
+              <StatusPill status={card?.glyph ?? threadGlyph(k)} />
             </button>
             {card && (
               <div className="px-3 pb-3 pl-[54px]">

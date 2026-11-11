@@ -129,8 +129,8 @@ export function MoShelf({ label, shelf }: { label: string; shelf: InboxShelf }) 
   return (
     <button type="button" onClick={shelf.toggle} aria-expanded={shelf.open} className="mo-row flex h-11 w-full items-center gap-1.5 px-1 text-left">
       <span className="text-[12px] leading-[1.3] font-medium text-fg-3">{label}</span>
-      <span className="text-[12px] leading-[1.3] text-fg-4 tabular-nums">{shelf.count}</span>
-      <Icon name="chevronDown" size={14} className={`ml-auto text-fg-4 transition-transform ${shelf.open ? '' : '-rotate-90'}`} />
+      <span className="text-[12px] leading-[1.3] text-fg-3 tabular-nums">{shelf.count}</span>
+      <Icon name="chevronDown" size={14} className={`ml-auto text-fg-3 transition-transform ${shelf.open ? '' : '-rotate-90'}`} />
     </button>
   );
 }

@@ -85,26 +85,26 @@ describe('the Activity inbox', () => {
     expect(ids(a.waiting)).toEqual(['old', 'newer']);
   });
 
-  it('keeps a running thread that asked a question waiting, labelled Input', () => {
+  it('keeps a running thread that asked a question waiting, labelled Needs you', () => {
     const ask = thread('ask', { status: 'running' });
     const a = inbox({ recent: [ask], needsYou: needs(item(ask, { blockers: [{ kind: 'question', detail: null, count: 1 }] })) });
     expect(ids(a.working)).toEqual([]);
-    expect(a.waiting[0]?.status).toEqual({ glyph: 'needs', label: 'Input' });
+    expect(a.waiting[0]?.status).toEqual({ glyph: 'needs', label: 'Needs you' });
     expect(a.mark).toBe('attention');
   });
 
   it('labels a row by its blocker, then its work, then its unread result, else shows the time', () => {
     const rows = (t: Thread, n?: NeedsYouItem) => inbox({ recent: [t], needsYou: needs(...(n ? [n] : [])) });
     const failed = thread('f', { status: 'failed' });
-    expect(rows(failed, item(failed, { result: result('failed') })).waiting[0]?.status).toEqual({ glyph: 'needs', label: 'Failed' });
+    expect(rows(failed, item(failed, { result: result('failed') })).waiting[0]?.status).toEqual({ glyph: 'failed', label: 'Failed' });
     const done = thread('d');
-    expect(rows(done, item(done, { result: result('done') })).waiting[0]?.status).toEqual({ glyph: 'done', label: 'Finished' });
+    expect(rows(done, item(done, { result: result('done') })).waiting[0]?.status).toEqual({ glyph: 'done', label: 'Done' });
     const quiet = rows(thread('q', { updated_at: at(180) })).waiting[0];
     expect(quiet?.status).toBeNull();
     expect(quiet?.time).toBe('3h');
     expect(quiet?.glyph).toBe('done');
     const busy = rows(thread('b', { status: 'running' })).working[0];
-    expect(busy).toMatchObject({ status: { glyph: 'running', label: 'Working' }, receded: true, canMarkDone: false });
+    expect(busy).toMatchObject({ status: { glyph: 'running', label: 'Running' }, receded: true, canMarkDone: false });
   });
 
   it('keeps a Conductor job in Working while a thread it delegated works, and counts its delegates', () => {

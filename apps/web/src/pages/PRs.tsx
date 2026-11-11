@@ -16,7 +16,7 @@ function NoRepo({ channel }: { channel: Channel }) {
 }
 
 export function ChecksSummary({ c }: { c: Checks }) {
-  if (!c.passed && !c.failed && !c.pending) return <span className="text-[12px] text-fg-4">no checks</span>;
+  if (!c.passed && !c.failed && !c.pending) return <span className="text-[12px] text-fg-3">no checks</span>;
   return (
     <span className="inline-flex items-center gap-2 font-num text-[11.5px] tabular-nums" title={`${c.passed} passed, ${c.failed} failed, ${c.pending} pending`}>
       {c.passed > 0 && <span className="inline-flex items-center gap-1 text-fg-2"><StatusDot status="done" size={7} /> {c.passed}</span>}
@@ -72,9 +72,9 @@ export function PRList({ channel }: { channel: Channel }) {
           {q.data.map((p, i) => (
             <a key={p.number} href={href.pr(channel.id, p.number)} style={{ '--i': i } as CSSProperties} className="hov block rounded-[18px] px-3.5 py-3 [--hov:var(--surface)]">
               <div className="flex min-w-0 items-center gap-2">
-                <Icon name="pr" size={14} className={p.isDraft || p.state === 'CLOSED' ? 'text-fg-4' : p.state === 'MERGED' ? 'text-fg-2' : 'text-live-text'} />
+                <Icon name="pr" size={14} className={p.isDraft || p.state === 'CLOSED' ? 'text-fg-3' : p.state === 'MERGED' ? 'text-fg-2' : 'text-live-text'} />
                 <span className="min-w-0 truncate text-[14px] font-medium">{p.title}</span>
-                <span className="shrink-0 font-num text-[11.5px] text-fg-4">#{p.number}</span>
+                <span className="shrink-0 font-num text-[11.5px] text-fg-3">#{p.number}</span>
                 {p.isDraft && <Chip tone="outline">Draft</Chip>}
                 <ReviewChip d={p.reviewDecision} />
                 <span className="ml-auto shrink-0">
@@ -84,12 +84,12 @@ export function PRList({ channel }: { channel: Channel }) {
               <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 pl-[22px] text-[12px] text-fg-3">
                 <span>{p.author?.login ?? 'unknown'}</span>
                 <span className="min-w-0 truncate font-mono text-[11.5px]">
-                  {p.headRefName} <span className="text-fg-4">into</span> {p.baseRefName}
+                  {p.headRefName} <span className="text-fg-3">into</span> {p.baseRefName}
                 </span>
                 <span className="font-num text-[11px]">
                   <span className="text-fg-2">+{p.additions}</span> <span className="text-fg-3">-{p.deletions}</span>
                 </span>
-                <span className="ml-auto font-num text-[11px] text-fg-4">{relTime(p.updatedAt)}</span>
+                <span className="ml-auto font-num text-[11px] text-fg-3">{relTime(p.updatedAt)}</span>
               </div>
             </a>
           ))}
@@ -148,7 +148,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
       <div className="@container mt-3">
         <header className="grid grid-cols-1 gap-y-2.5 @3xl:grid-cols-[minmax(0,1fr)_auto] @3xl:gap-x-6">
           <h2 className="font-display text-[22px] leading-[1.25] text-pretty @3xl:col-start-1 @3xl:row-start-1">
-            {p.title} <span className="font-num text-[15px] whitespace-nowrap text-fg-4">#{p.number}</span>
+            {p.title} <span className="font-num text-[15px] whitespace-nowrap text-fg-3">#{p.number}</span>
           </h2>
           <div className="order-last flex flex-row-reverse items-center justify-end gap-1.5 @3xl:order-none @3xl:col-start-2 @3xl:row-start-1 @3xl:flex-row @3xl:self-start">
             <LinkButton size="sm" variant="ghost" icon="external" href={p.url} target="_blank">
@@ -168,7 +168,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
             )}
             {p.author?.login && <span>{p.author.login}</span>}
             <span className="min-w-0 truncate font-mono text-[11.5px]" title={`${p.headRefName} into ${p.baseRefName}`}>
-              {p.headRefName} <span className="text-fg-4">→</span> {p.baseRefName}
+              {p.headRefName} <span className="text-fg-3">→</span> {p.baseRefName}
             </span>
             <ChecksSummary c={p.checks} />
             <span className="font-num text-[11.5px]">
@@ -202,8 +202,8 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
         onChange={setTab}
         tabs={[
           { id: 'conversation', label: 'Conversation' },
-          { id: 'checks', label: 'Checks', badge: <span className="font-num text-[10.5px] text-fg-4">{p.checkRuns.length}</span> },
-          { id: 'files', label: 'Files', badge: <span className="font-num text-[10.5px] text-fg-4">{p.files?.length ?? 0}</span> },
+          { id: 'checks', label: 'Checks', badge: <span className="font-num text-[10.5px] text-fg-3">{p.checkRuns.length}</span> },
+          { id: 'files', label: 'Files', badge: <span className="font-num text-[10.5px] text-fg-3">{p.files?.length ?? 0}</span> },
           { id: 'diff', label: 'Diff' },
         ]}
       />

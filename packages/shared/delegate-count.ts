@@ -49,9 +49,6 @@ export const showsRunning = (t: WorkState) => t.status === 'running' || !!t.dele
 /** The thread is at work, for the Running lists and counts: running, queued, or waiting on a thread it delegated. */
 export const isWorking = (t: WorkState) => t.status === 'running' || t.status === 'queued' || !!t.delegating;
 
-/** The status a thread's dot, pill or label shows: running while what it delegated works, its own otherwise. */
-export const shownStatus = (t: WorkState) => (t.delegating && t.status !== 'queued' ? 'running' : t.status);
-
 const working = (c: DelegateChild) => isWorking(c);
 
 /**

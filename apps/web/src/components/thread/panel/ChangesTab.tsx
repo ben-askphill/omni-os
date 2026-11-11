@@ -185,7 +185,7 @@ function ThisTurn({ thread }: { thread: Thread }) {
         </div>
         <IconButton icon="refresh" label="Refresh this turn" size={14} onClick={reload} className={loading ? 'opacity-50' : ''} />
       </div>
-      <p className="px-3.5 pb-2.5 text-[11.5px] leading-snug text-fg-4">{TURN_NOTE}</p>
+      <p className="px-3.5 pb-2.5 text-[11.5px] leading-snug text-fg-3">{TURN_NOTE}</p>
       {error && (
         <ErrorNote className="mx-3 mb-2" onRetry={reload}>
           {error}
@@ -220,7 +220,7 @@ function Groups({ groups, total, sel }: { groups: ChangeGroupView[]; total: numb
     <section key={g.kind} className="mb-4" aria-label={`${g.title} changes`}>
       <div className="flex items-center gap-2 px-1.5 pb-1.5 text-[11.5px] font-medium text-fg-3">
         <span>{g.title}</span>
-        <span className="font-num text-fg-4">{g.files.length}</span>
+        <span className="font-num text-fg-3">{g.files.length}</span>
       </div>
       <div className="space-y-2">
         {g.files.map((f) => {

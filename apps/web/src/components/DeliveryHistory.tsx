@@ -21,7 +21,7 @@ const PAGE = 20;
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
-      <dt className="min-w-0 break-words text-fg-4">{label}</dt>
+      <dt className="min-w-0 break-words text-fg-3">{label}</dt>
       <dd className="min-w-0 break-words whitespace-pre-wrap text-fg-2">{children}</dd>
     </>
   );
@@ -114,7 +114,7 @@ function DeliveryRow({ d, onRow, onChanged }: { d: DeliveryView; onRow: (d: Deli
           </span>
           <span className="ml-auto flex shrink-0 items-center justify-end gap-2 md:w-28">
             {d.thread_status && <StatusDot status={d.thread_status} size={7} />}
-            <span className="font-num text-[11px] text-fg-4" title={fullDate(d.created_at)}>
+            <span className="font-num text-[11px] text-fg-3" title={fullDate(d.created_at)}>
               {relTime(d.created_at)}
             </span>
           </span>
@@ -128,7 +128,7 @@ function DeliveryRow({ d, onRow, onChanged }: { d: DeliveryView; onRow: (d: Deli
           <dl className={`${FACTS} mt-3 border-t border-line pt-3`}>
             <Fact label="Received">
               {fullDate(d.created_at)}
-              {ago && <span className="text-fg-4"> · {ago}</span>}
+              {ago && <span className="text-fg-3"> · {ago}</span>}
             </Fact>
             {d.attempt > 1 && <Fact label="Attempt">{d.attempt}</Fact>}
             {expiry && <Fact label={expiry.label}>{expiry.value}</Fact>}

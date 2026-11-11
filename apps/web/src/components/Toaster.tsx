@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { api, type Thread } from '../api.ts';
 import { href, useRoute } from '../router.ts';
 import { useFeed } from '../store.tsx';
-import { Icon, IconButton, StatusDot, type IconName } from './ui.tsx';
+import { Icon, IconButton, STATUS, StatusDot, glyphFor, threadGlyph, type IconName } from './ui.tsx';
 
 export interface ToastInput {
   title: ReactNode;
@@ -31,7 +31,7 @@ function ToastView({ t, dismiss }: { t: ToastItem; dismiss: (id: number) => void
     return () => clearTimeout(tm);
   }, [hover, t.leaving, t.id, t.timeout, dismiss]);
   return (
-    <div role="status" className="toast float" data-leaving={t.leaving || undefined} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+    <div role={t.status && glyphFor(t.status) === 'failed' ? 'alert' : 'status'} className="toast float" data-leaving={t.leaving || undefined} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       {t.status ? <StatusDot status={t.status} /> : t.icon ? <Icon name={t.icon} size={15} className="text-fg-3" /> : null}
       <div className="min-w-0 flex-1 py-1">
         <div className="truncate font-medium text-fg">{t.title}</div>
@@ -76,7 +76,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-const FINISHED: Record<string, string> = { done: 'Finished', failed: 'Failed', stopped: 'Stopped' };
+const FINISHED = new Set(['done', 'failed', 'stopped']);
 
 /** Toasts when a thread that was running or queued finishes, unless you are already looking at it. */
 export function ThreadNotifier() {
@@ -102,11 +102,11 @@ export function ThreadNotifier() {
     const prev = seen.current.get(t.id);
     seen.current.set(t.id, t.status);
     if (prev !== 'running' && prev !== 'queued') return;
-    const verb = FINISHED[t.status];
-    if (!verb) return;
+    if (!FINISHED.has(t.status)) return;
+    const glyph = threadGlyph(t);
     const r = routeRef.current;
     if (r.name === 'thread' && r.id === t.id && document.visibilityState === 'visible') return;
-    toast({ status: t.status, title: t.title || 'Untitled thread', body: `${verb} in #${t.channel_id}`, href: href.thread(t.id) });
+    toast({ status: glyph, title: t.title || 'Untitled thread', body: `${STATUS[glyph].label} in #${t.channel_id}`, href: href.thread(t.id) });
   });
 
   return null;

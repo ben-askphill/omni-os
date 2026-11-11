@@ -1,12 +1,13 @@
 import { avatarInk } from '@omni/shared/avatar-color.ts';
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { createContext, useContext, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { monogram } from '@omni/shared/monogram.ts';
 import { CHANNEL_GLYPHS, parseChannelIcon, svgDataUrl } from '@omni/shared/channel-icon.ts';
 import { Loader, StaticMark } from '../brand.tsx';
 import { Icon, type IconName } from './icons.tsx';
 
 // ---------- buttons ----------
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'needs';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'needs' | 'danger';
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-fg text-on-ink hover:enabled:bg-fg/88',
@@ -14,6 +15,8 @@ const VARIANTS: Record<Variant, string> = {
   ghost: 'hov text-fg-2 hover:text-fg',
   // Destructive or blocking actions: vermilion fill with ink text, never vermilion text.
   needs: 'bg-needs text-on-needs hover:enabled:bg-[color-mix(in_srgb,var(--needs)_90%,var(--fg))]',
+  // A destructive action at rest: a red label, no fill. Ask before it runs with InlineConfirm (inline-confirm.tsx).
+  danger: 'hov text-danger-text',
 };
 
 // A busy button is working, not unavailable: it keeps its fill and shows the loader instead of fading out.
@@ -22,6 +25,7 @@ const DISABLED: Record<Variant, string> = {
   secondary: 'disabled:opacity-45',
   ghost: 'disabled:opacity-40',
   needs: 'disabled:opacity-40',
+  danger: 'disabled:opacity-45',
 };
 
 const SIZES = {
@@ -135,14 +139,25 @@ export function ChannelMark({ icon, size, avatarBg }: { avatarBg?: string | null
   return <span className="inline-grid place-items-center overflow-visible leading-none" style={{ fontSize: size * 0.85, width: size, height: size }}>{mark.text}</span>;
 }
 
-/** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces the letter. */
+/**
+ * The channels' monograms (packages/shared/monograms), keyed by channel id and name, so two channels never share one.
+ * The app's store provides it; a name it does not know (a person, a role) takes its plain monogram.
+ */
+export const Monograms = createContext<ReadonlyMap<string, string>>(new Map());
+
+export function useMonogram(name: string): string {
+  return useContext(Monograms).get(name) ?? monogram(name);
+}
+
+/** Monogram avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces the letters. */
 /** `omni` draws the Conductor's mark, the same one the sidebar shows. */
 export function Avatar({ name, size = 28, icon, omni, channelIcon, avatarBg, ink, className = '' }: { name: string; size?: number; icon?: IconName; omni?: boolean; channelIcon?: string | null; avatarBg?: string | null; ink?: boolean; className?: string }) {
   const mark = parseChannelIcon(channelIcon);
+  const letters = useMonogram(name);
   return (
     <span
       aria-hidden="true"
-      className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium uppercase leading-none ${ink ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg-2'} ${className}`}
+      className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium leading-none ${ink ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg-2'} ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.42, ...(avatarBg ? { backgroundColor: avatarBg, color: avatarInk(avatarBg) } : {}) }}
     >
       {omni ? (
@@ -152,7 +167,7 @@ export function Avatar({ name, size = 28, icon, omni, channelIcon, avatarBg, ink
       ) : mark ? (
         <ChannelMark icon={channelIcon} size={size * { glyph: 0.5, emoji: 0.52, svg: 0.58 }[mark.kind]} />
       ) : (
-        name.replace(/[^a-z0-9]/gi, '').slice(0, 1) || '?'
+        letters
       )}
     </span>
   );

@@ -99,7 +99,7 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
         setDone(true);
         setTimeout(() => setDone(false), 1400);
       }}
-      className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-4 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
+      className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-3 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
     >
       <Icon name={done ? 'check' : 'copy'} size={12} /> {done ? 'Copied' : 'Copy'}
     </button>
@@ -131,7 +131,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
       {cut && '...'}
       {open && (
         <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
-          {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
+          {open.description || 'No description'} <span className="text-fg-3">· {SOURCE_TAG[open.source]}</span>
         </span>
       )}
     </>
@@ -150,7 +150,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
             <Icon name="x" size={11} /> {p.undelivered ? 'Not delivered' : 'Not sent'}
           </span>
         )}
-        <span className="font-num text-[11px] text-fg-4">{clock(toDate(at))}</span>
+        <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} /> : null}
       <ContextChips records={p.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
@@ -182,7 +182,7 @@ function ResultLine({ p }: { p: ResultP }) {
   const bad = !p.ok && !p.stopped;
   const tokens = p.input_tokens != null ? `${p.input_tokens} in / ${p.output_tokens ?? 0} out` : null;
   return (
-    <div className="flex items-center gap-3 py-1 font-num text-[12px] font-medium text-fg-4">
+    <div className="flex items-center gap-3 py-1 font-num text-[12px] font-medium text-fg-3">
       <div className="h-px flex-1 bg-line" />
       <span className={`flex items-center gap-2 ${bad ? 'text-fg-2' : ''}`}>
         {bad ? (
@@ -205,7 +205,7 @@ export function SwitchLine({ it, running }: { it: SwitchItem; running: boolean }
   const note = handoverNote(it.p, it.done, it.superseded);
   const waiting = it.p.mode === 'handover' && !it.done && !it.superseded && running;
   return (
-    <div className="py-1 text-center text-[12px] font-medium text-fg-4">
+    <div className="py-1 text-center text-[12px] font-medium text-fg-3">
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-line" />
         {/* Inline, so a line that wraps on a phone keeps its icon on the first line. */}
@@ -224,7 +224,7 @@ export function SwitchLine({ it, running }: { it: SwitchItem; running: boolean }
 /** Mod log lines: dim system rows, each with the plugin that wrote it, in the status line's quiet style. */
 function ModLog({ lines }: { lines: ModLine[] }) {
   return (
-    <div className="space-y-0.5 text-[12px] leading-[1.5] text-fg-4">
+    <div className="space-y-0.5 text-[12px] leading-[1.5] text-fg-3">
       {lines.map((l) => (
         <div key={l.key} className="flex min-w-0 items-baseline gap-2">
           <span className="shrink-0 font-mono text-[11px] text-fg-3">{l.plugin}</span>

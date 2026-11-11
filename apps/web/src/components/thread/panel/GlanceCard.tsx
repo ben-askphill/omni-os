@@ -13,7 +13,7 @@ function GlanceRow({ icon, children, onClick, label }: { icon: IconName; childre
     <>
       <Icon name={icon} size={15} className="shrink-0 text-fg-3" />
       <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
-      {onClick && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-4" />}
+      {onClick && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-3" />}
     </>
   );
   const cls = 'flex h-10 w-full min-w-0 items-center gap-2.5 rounded-[12px] px-2.5 text-left text-[12.5px]';
@@ -85,7 +85,7 @@ export function GlanceCard({ thread, prs, changes, next, step, onAsk, onMerged, 
               <span className="text-fg">{plural(changes.files.length, 'file')} changed</span>
               <span className="ml-auto flex shrink-0 gap-1.5 font-num text-[11.5px] tabular-nums">
                 <span className="text-fg-2">+{changes.add}</span>
-                <span className="text-fg-4">−{changes.del}</span>
+                <span className="text-fg-3">−{changes.del}</span>
               </span>
             </>
           ) : (

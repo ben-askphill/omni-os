@@ -1,7 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
-import { ASKING_LABEL } from '../components/thread/QuestionCard.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
@@ -33,7 +32,7 @@ import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { runningSubagents } from '../subagents.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
-import { shownStatus } from '@omni/shared/delegate-count.ts';
+import { asksForYou, threadGlyph, type Glyph } from '@omni/shared/status.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
 export function ThreadScreen() {
@@ -115,7 +114,7 @@ export function ThreadScreen() {
   const sub = conductor ? `Conductor · ${plural(crew.length, 'crew thread')}` : [`#${ch?.name ?? thread.channel_id}`, thread.role, harnessLabel(thread.harness)].filter(Boolean).join(' · ');
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
-  const needs = card?.glyph === 'needs' || (conductor && !!needsYou?.items.some((i) => kidIds.has(i.thread.id) && reasonOf(i).glyph === 'needs'));
+  const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
   const ctx: TurnCtx = { thread, view, history, conductor, crew, ch, changes, pr, now, shell, status };
 
   const openFromCard = (tab: PanelTab) => {
@@ -141,7 +140,7 @@ export function ThreadScreen() {
         sub={parent ? <span>{sub} · <a href={href.thread(parent.id)} className="text-fg-2 hover:text-fg" title={`Delegated from ${parent.title}`}>Parent: {parent.title}</a></span> : sub}
         right={
           <>
-            <StatusPill status={view.asking || needs ? 'needs' : shownStatus(thread)} label={view.asking ? ASKING_LABEL : needs ? 'Needs you' : undefined} />
+            <StatusPill status={view.asking ? 'needs' : (needs ?? threadGlyph(thread))} />
             <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
             <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
           </>

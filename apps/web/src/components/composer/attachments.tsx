@@ -105,7 +105,7 @@ export function AttachmentStrip({ files, onRemove }: { files: File[]; onRemove: 
           )}
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate font-medium text-fg-2">{f.name}</span>
-            <span className="block font-num text-[10.5px] text-fg-4">{bytes(f.size)}</span>
+            <span className="block font-num text-[10.5px] text-fg-3">{bytes(f.size)}</span>
           </span>
           <IconButton icon="x" label={`Remove ${f.name}`} size={13} className="h-6 w-6" onClick={() => onRemove(f)} />
         </span>

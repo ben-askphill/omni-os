@@ -82,7 +82,7 @@ export function moveFocus(ref: RefObject<HTMLDivElement | null>, key: 'ArrowDown
   items[(i + (key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
 }
 
-const CAPTION = 'caption truncate px-2.5 pt-1 pb-1.5 text-fg-4';
+const CAPTION = 'caption truncate px-2.5 pt-1 pb-1.5 text-fg-3';
 
 export function MenuCaption({ children }: { children: string }) {
   return <div className={CAPTION}>{children}</div>;
@@ -109,7 +109,7 @@ export function FolderChoices({ current, choices, onPick }: { current: string | 
           </button>
         );
       })}
-      {!choices.length && <div className="px-2.5 py-1.5 text-[12px] text-fg-4">This channel has no folders yet. Add one with the + beside its name.</div>}
+      {!choices.length && <div className="px-2.5 py-1.5 text-[12px] text-fg-3">This channel has no folders yet. Add one with the + beside its name.</div>}
     </>
   );
 }
@@ -122,7 +122,7 @@ export function MenuGroups({ groups }: { groups: { title?: string; items: MenuIt
     <>
       {groups.map((g, gi) => (
         <div key={g.title ?? gi} role={g.title ? 'group' : undefined} aria-label={g.title}>
-          {g.title && <div className={`caption truncate px-2.5 pb-1 text-fg-4 ${gi ? 'mt-1 border-t border-line pt-2' : 'pt-1'}`}>{g.title}</div>}
+          {g.title && <div className={`caption truncate px-2.5 pb-1 text-fg-3 ${gi ? 'mt-1 border-t border-line pt-2' : 'pt-1'}`}>{g.title}</div>}
           {g.items.map((it) => (
             <button
               key={it.label}
@@ -136,7 +136,7 @@ export function MenuGroups({ groups }: { groups: { title?: string; items: MenuIt
               {it.off ? (
                 <span className="flex min-w-0 flex-col py-1.5">
                   <span>{it.label}</span>
-                  <span className="text-[11.5px] leading-snug text-fg-4">{it.off}</span>
+                  <span className="text-[11.5px] leading-snug text-fg-3">{it.off}</span>
                 </span>
               ) : (
                 it.label

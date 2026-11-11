@@ -69,7 +69,7 @@ function FilesPage() {
             options={ARTIFACT_FILTERS.map((f) => ({
               id: f.id,
               label: f.label,
-              badge: counts[f.id] ? <span className="font-num text-[10.5px] text-fg-4 tabular-nums">{counts[f.id]}</span> : undefined,
+              badge: counts[f.id] ? <span className="font-num text-[10.5px] text-fg-3 tabular-nums">{counts[f.id]}</span> : undefined,
             }))}
           />
         </div>
@@ -112,7 +112,7 @@ function FilesPage() {
                   <div className="mt-0.5 truncate text-[12px] text-fg-3" title={a.thread_title}>
                     {a.thread_title}
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2 text-[11.5px] text-fg-4">
+                  <div className="mt-1.5 flex items-center gap-2 text-[11.5px] text-fg-3">
                     <span className="truncate">#{channel(a.channel_id)?.name ?? a.channel_id}</span>
                     <span className="ml-auto shrink-0 font-num text-[10.5px]">{relTime(a.updated_at)}</span>
                   </div>

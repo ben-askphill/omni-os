@@ -34,7 +34,7 @@ function RunStrip({ runs }: { runs: Automation['runs'] }) {
 }
 
 const TRIGGER_CHIP = 'inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap';
-const FILTER_CHIP = 'inline-flex min-h-6 max-w-full items-center rounded-[12px] px-2 py-0.5 font-mono text-[11px] leading-snug break-words text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]';
+const FILTER_CHIP = 'inline-flex min-h-6 max-w-full items-center rounded-[12px] px-2 py-0.5 font-mono text-[11px] leading-snug break-words text-fg-3 shadow-[inset_0_0_0_1px_var(--line)]';
 
 /** What starts the automation: its event or schedule, then what it narrows to. */
 function TriggerChips({ a, channelName }: { a: Automation; channelName: (id: string) => string }) {
@@ -142,11 +142,11 @@ function WebhookPanel({ id, webhook, onChanged }: { id: string; webhook: NonNull
               </span>
             )}
             {webhook.secret_set ? (
-              <span className="mt-0.5 block truncate text-[11.5px] text-fg-4" title={webhook.secret}>
+              <span className="mt-0.5 block truncate text-[11.5px] text-fg-3" title={webhook.secret}>
                 Secret <span className="font-mono">{webhook.secret}</span>
               </span>
             ) : (
-              <span className="mt-0.5 block text-[11.5px] text-fg-4">GitHub deliveries are refused until you set the same secret you gave the hook on GitHub.</span>
+              <span className="mt-0.5 block text-[11.5px] text-fg-3">GitHub deliveries are refused until you set the same secret you gave the hook on GitHub.</span>
             )}
           </span>
           {!editing && (
@@ -238,7 +238,7 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
     <div className={`rounded-[24px] bg-surface transition-opacity ${a.error ? 'shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--bad)_35%,transparent)]' : ''}`}>
       {/* On a phone the details span under the actions too, so the chips are not squeezed into a narrow column. */}
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 p-4 md:p-5">
-        <span className={`row-span-2 mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-bg transition-colors ${enabled && !a.error ? 'text-fg' : 'text-fg-4'}`}>
+        <span className={`row-span-2 mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-bg transition-colors ${enabled && !a.error ? 'text-fg' : 'text-fg-3'}`}>
           <Icon name="zap" size={16} />
         </span>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -322,7 +322,7 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
             <span className="caption">Deliveries</span>
           </div>
           {a.deliveries.length === 0 ? (
-            <div className="text-[12.5px] text-fg-4">{a.on?.event === 'github_webhook' ? 'No GitHub deliveries since it was turned on.' : 'No pages published since it was turned on.'}</div>
+            <div className="text-[12.5px] text-fg-3">{a.on?.event === 'github_webhook' ? 'No GitHub deliveries since it was turned on.' : 'No pages published since it was turned on.'}</div>
           ) : (
             <DeliveryHistory automation={a.id} latest={a.deliveries} latestMore={a.deliveries_more} onChanged={onChanged} />
           )}
@@ -335,7 +335,7 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
           <RunStrip runs={a.runs} />
         </div>
         {a.runs.length === 0 ? (
-          <div className="text-[12.5px] text-fg-4">Never run.</div>
+          <div className="text-[12.5px] text-fg-3">Never run.</div>
         ) : (
           <ul className="-mx-2">
             {a.runs.map((r, i) => {
@@ -343,8 +343,8 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
                 <>
                   <StatusDot status={r.status ?? 'failed'} size={7} />
                   <span className="min-w-0 flex-1 truncate">{r.title ?? 'Thread removed'}</span>
-                  {r.trigger !== 'cron' && <span className="shrink-0 font-num text-[10.5px] text-fg-4">{r.trigger}</span>}
-                  <span className="w-24 shrink-0 text-right font-num text-[11px] text-fg-4">{relTime(r.created_at)}</span>
+                  {r.trigger !== 'cron' && <span className="shrink-0 font-num text-[10.5px] text-fg-3">{r.trigger}</span>}
+                  <span className="w-24 shrink-0 text-right font-num text-[11px] text-fg-3">{relTime(r.created_at)}</span>
                 </>
               );
               return (

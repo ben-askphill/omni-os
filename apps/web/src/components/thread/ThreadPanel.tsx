@@ -80,7 +80,7 @@ export function ThreadPanel({
                 icon: 'info',
                 title: 'Details',
                 badge: agents.length ? (
-                  <span className="font-num text-[10.5px] text-fg-4" title={`${plural(agents.length, 'subagent')} running`}>
+                  <span className="font-num text-[10.5px] text-fg-3" title={`${plural(agents.length, 'subagent')} running`}>
                     {agents.length}
                   </span>
                 ) : undefined,
@@ -91,9 +91,9 @@ export function ThreadPanel({
                 title: prTab?.title ?? 'PRs',
                 badge: prTab ? <StatusDot status={PR_DOT[prTab.tone]} size={6} /> : undefined,
               },
-              { id: 'artifacts', icon: 'layers', title: 'Artifacts', badge: fileCount ? <span className="font-num text-[10.5px] text-fg-4">{fileCount}</span> : undefined },
+              { id: 'artifacts', icon: 'layers', title: 'Artifacts', badge: fileCount ? <span className="font-num text-[10.5px] text-fg-3">{fileCount}</span> : undefined },
               { id: 'changes', icon: 'diff', title: 'Changes' },
-              { id: 'browser', icon: 'browser', title: 'Browser', badge: shotCount ? <span className="font-num text-[10.5px] text-fg-4">{shotCount}</span> : undefined },
+              { id: 'browser', icon: 'browser', title: 'Browser', badge: shotCount ? <span className="font-num text-[10.5px] text-fg-3">{shotCount}</span> : undefined },
               ...(desktop ? [{ id: 'web' as const, icon: 'globe' as const, title: 'Web' }] : []),
               { id: 'terminal', icon: 'terminal', title: 'Terminal' },
               { id: 'actions', icon: 'play', title: 'Actions' },

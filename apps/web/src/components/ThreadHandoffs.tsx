@@ -31,7 +31,7 @@ export function ThreadHandoffs({ parent, children, renderParent, channelIndent =
           aria-expanded={expanded}
           aria-controls={`${idPrefix}-handoffs-${parent.id}`}
           onClick={toggle}
-          className="hov z-[2] grid h-7 w-5 shrink-0 place-items-center rounded-md text-fg-4 hover:text-fg"
+          className="hov z-[2] grid h-7 w-5 shrink-0 place-items-center rounded-md text-fg-3 hover:text-fg"
         >
           <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={11} />
         </button>

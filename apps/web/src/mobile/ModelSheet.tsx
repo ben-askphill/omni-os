@@ -76,7 +76,7 @@ export function ModelSheet({
           </MoSection>
         )}
         {harnesses.map((h) => (
-          <MoSection key={h.id} title={h.name} right={<span className="text-[12px] text-fg-4">{h.available ? h.plan : 'Unavailable'}</span>}>
+          <MoSection key={h.id} title={h.name} right={<span className="text-[12px] text-fg-3">{h.available ? h.plan : 'Unavailable'}</span>}>
             <MoGroup>
               {h.available ? (
                 h.models.map((m, i) => (
@@ -90,7 +90,7 @@ export function ModelSheet({
                     label={
                       <>
                         {m.label}
-                        {m.default && <span className="text-fg-4"> (default)</span>}
+                        {m.default && <span className="text-fg-3"> (default)</span>}
                       </>
                     }
                     sub={m.note || undefined}

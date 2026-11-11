@@ -14,7 +14,7 @@ import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ThreadIdCtx, ToolOutput } from '../components/thread/ToolOutput.tsx';
-import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, STATUS_LABEL, StatusDot } from '../components/ui.tsx';
+import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, statusLabel, StatusDot } from '../components/ui.tsx';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { carriedText } from '@omni/shared/continue.ts';
 import { relTime } from '@omni/shared/format.ts';
@@ -69,7 +69,7 @@ function Step({ c, depth, running, cwd, tails }: { c: ToolCall; depth: number; r
         <StatusDot status={state} size={8} />
         <span className="shrink-0 text-[13px] font-medium">{toolLabel(c.name)}</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-[1.3] text-fg-2">{toolSummary(c, cwd)}</span>
-        {tappable && <Icon name="chevronRight" size={14} className={`shrink-0 text-fg-4 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />}
+        {tappable && <Icon name="chevronRight" size={14} className={`shrink-0 text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />}
       </span>
       {out && !open && <span className={`ml-[18px] block ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{out}</span>}
     </>
@@ -431,7 +431,7 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
   const previous = children.filter((c) => !isWorking(c));
   type R = { key: string; icon: ReactNode; label: ReactNode; sub?: ReactNode; right?: ReactNode; go?: () => void };
   const rows: R[] = [];
-  if (parent) rows.push({ key: `p${parent.id}`, icon: 'arrowUpRight', label: parent.title || 'Untitled', sub: `Delegated it · ${STATUS_LABEL[parent.status] ?? parent.status}`, go: () => open(parent.id) });
+  if (parent) rows.push({ key: `p${parent.id}`, icon: 'arrowUpRight', label: parent.title || 'Untitled', sub: `Delegated it · ${statusLabel(parent.status)}`, go: () => open(parent.id) });
   if (links.from) {
     const f = links.from;
     rows.push({ key: `f${f.id}`, icon: <AgentGlyph harness={f.harness} status={f.status} />, label: linkName(f), sub: f.carried ? `Continued from · ${carriedText(f.carried)}` : 'Continued from', go: () => open(f.id) });
@@ -441,7 +441,7 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
   for (const t of agents) rows.push({ key: `a${t.task_id}`, icon: <Loader size={15} className="text-live-text" />, label: t.description, sub: subagentKind(t) ? `Subagent · ${subagentKind(t)}` : 'Subagent' });
   if (previous.length) {
     rows.push({ key: 'prev', icon: 'delegate', label: 'Previous agents', right: <span className="flex items-center gap-1.5">{previous.length}<Icon name="chevronDown" size={14} className={showPrev ? '' : '-rotate-90'} /></span>, go: () => setShowPrev((v) => !v) });
-    if (showPrev) for (const c of previous) rows.push({ key: `d${c.id}`, icon: <AgentGlyph harness={c.harness} status={c.status} />, label: c.title || 'Untitled', sub: STATUS_LABEL[c.status] ?? c.status, right: relTime(c.updated_at), go: () => open(c.id) });
+    if (showPrev) for (const c of previous) rows.push({ key: `d${c.id}`, icon: <AgentGlyph harness={c.harness} status={c.status} />, label: c.title || 'Untitled', sub: statusLabel(c.status), right: relTime(c.updated_at), go: () => open(c.id) });
   }
   if (!rows.length) return null;
   return (

@@ -102,7 +102,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, delega
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
         className={`hov group/row z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
-          active ? 'font-medium text-fg [--hov:transparent]' : t.done_at ? 'text-fg-4 hover:text-fg' : 'text-fg-3 hover:text-fg'
+          active ? 'font-medium text-fg [--hov:transparent]' : t.done_at ? 'text-fg-3 hover:text-fg' : 'text-fg-3 hover:text-fg'
         }`}
       >
         <span className="grid w-3 shrink-0 place-items-center">
@@ -115,7 +115,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, delega
           </span>
         ) : (
           t.harness && (
-            <span className={`shrink-0 ${active ? 'text-fg-3' : 'text-fg-4 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100'}`}>
+            <span className={`shrink-0 ${active ? 'text-fg-3' : 'text-fg-3 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100'}`}>
               <HarnessLogo harness={t.harness} size={11} />
             </span>
           )
@@ -167,7 +167,7 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
       />
       <span className="min-w-0 flex-1 truncate">{t.description}</span>
       <Loader size={10} className="shrink-0 text-live-text" />
-      <span className="shrink-0 font-num text-[11px] text-fg-4 tabular-nums">{duration(Math.max(0, now - toDate(t.started_at).getTime()))}</span>
+      <span className="shrink-0 font-num text-[11px] text-fg-3 tabular-nums">{duration(Math.max(0, now - toDate(t.started_at).getTime()))}</span>
     </a>
   );
 }
@@ -209,7 +209,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, de
           </span>
         ) : (
           <span
-            className={`max-w-[45%] shrink-0 truncate text-[11px] font-normal text-fg-4 ${
+            className={`max-w-[45%] shrink-0 truncate text-[11px] font-normal text-fg-3 ${
               unpin ? 'mr-6 transition-opacity md:mr-0 md:group-focus-within/pin:opacity-0 md:group-hover/pin:opacity-0' : ''
             }`}
           >
@@ -262,7 +262,7 @@ export function ThreadSection({ label, closed, onToggle, count, children }: { la
         className="caption flex w-full items-center gap-1 px-3 pt-1 pb-2 text-left transition-colors hover:text-fg-2"
       >
         {label}
-        <Icon name={closed ? 'chevronRight' : 'chevronDown'} size={11} className="text-fg-4" />
+        <Icon name={closed ? 'chevronRight' : 'chevronDown'} size={11} className="text-fg-3" />
         {closed && <span className="ml-auto font-num tabular-nums">{count}</span>}
       </button>
       {!closed && <div className="space-y-px">{children}</div>}

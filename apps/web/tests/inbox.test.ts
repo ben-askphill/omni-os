@@ -89,10 +89,10 @@ describe('inboxLayout', () => {
 
   it('labels a card by what it waits on before what it is doing', () => {
     const question = need('a', '2026-10-02', [{ kind: 'question', detail: null, count: 1 }]);
-    expect(rowStatus(t('a', { status: 'running' }), question)?.label).toBe('Input');
-    expect(rowStatus(t('a', { status: 'running' }), undefined)?.label).toBe('Working');
-    expect(rowStatus(t('a'), undefined, 2)?.label).toBe('Working');
-    expect(rowStatus(t('a'), need('a', '2026-10-02'))).toEqual({ glyph: 'done', label: 'Finished' });
+    expect(rowStatus(t('a', { status: 'running' }), question)?.label).toBe('Needs you');
+    expect(rowStatus(t('a', { status: 'running' }), undefined)?.label).toBe('Running');
+    expect(rowStatus(t('a'), undefined, 2)?.label).toBe('Running');
+    expect(rowStatus(t('a'), need('a', '2026-10-02'))).toEqual({ glyph: 'done', label: 'Done' });
     expect(rowStatus(t('a'), undefined)).toBeNull();
   });
 
@@ -100,7 +100,7 @@ describe('inboxLayout', () => {
     const l = inboxLayout({ threads: [t('job', { status: 'done', delegating: true }), t('idle')], needs: [], delegated: none, open: null });
     expect(ids(l.working)).toEqual(['job']);
     expect(ids(l.inbox)).toEqual(['idle']);
-    expect(rowStatus(t('job', { status: 'done', delegating: true }), undefined)).toEqual({ glyph: 'running', label: 'Working' });
+    expect(rowStatus(t('job', { status: 'done', delegating: true }), undefined)).toEqual({ glyph: 'running', label: 'Running' });
     // Once nothing it delegated works, it is back to its own status.
     expect(rowStatus(t('job', { status: 'done', delegating: false }), undefined)).toBeNull();
   });
