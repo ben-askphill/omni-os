@@ -25,18 +25,20 @@ describe('the thread quick card', () => {
     const html = renderToStaticMarkup(
       createElement(ThreadQuickCard, {
         thread: thread(),
-        channel: { id: 'omni', name: 'omni-os' } as never,
         init: { model: 'composer' },
         warm: true,
         slotBusy: true,
         agents: [],
+        parent: null,
+        children: [],
         prs: undefined,
-        changes: { files: [{}, {}], add: 3, del: 1 },
         step: null,
         artifactCount: 2,
         machineName: 'BenBook',
         cwd: '/home/ben/omni-os/data/worktrees/t1',
         onOpen: () => {},
+        onOpenThread: () => {},
+        onJump: () => {},
       }),
     );
     expect(html).toContain('Thread quick actions');
@@ -50,20 +52,61 @@ describe('the thread quick card', () => {
     const html = renderToStaticMarkup(
       createElement(ThreadQuickCard, {
         thread: thread({ branch: null }),
-        channel: undefined,
         init: null,
         warm: undefined,
         slotBusy: false,
         agents: [],
+        parent: null,
+        children: [],
         prs: undefined,
-        changes: null,
         step: null,
         artifactCount: 0,
         machineName: undefined,
         cwd: '/w',
         onOpen: () => {},
+        onOpenThread: () => {},
+        onJump: () => {},
       }),
     );
     expect(html).toContain('No branch');
+  });
+
+  const base = {
+    init: null,
+    warm: true,
+    slotBusy: true,
+    prs: undefined,
+    step: null,
+    artifactCount: 0,
+    machineName: 'BenBook',
+    cwd: '/w',
+    onOpen: () => {},
+    onOpenThread: () => {},
+    onJump: () => {},
+  };
+
+  it('leaves Actions and Changes out, and shows no lineage while nothing runs', () => {
+    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread(), agents: [], parent: null, children: [] }));
+    expect(html).not.toContain('Channel actions');
+    expect(html).not.toContain('aria-label="Changes"');
+    expect(html).not.toContain('Lineage');
+  });
+
+  it('draws the lineage at the bottom while agents run: parent, this thread, then what runs under it', () => {
+    const html = renderToStaticMarkup(
+      createElement(ThreadQuickCard, {
+        ...base,
+        thread: thread({ title: 'Builder' }),
+        parent: thread({ id: 'p', title: 'Conductor', status: 'running' }),
+        children: [thread({ id: 'c1', title: 'Delegated fix', status: 'running' }), thread({ id: 'c2', title: 'Finished one', status: 'done' })],
+        agents: [{ task_id: 'a1', thread_id: 't1', subagent: true, description: 'Find the cart code', subagent_type: 'Explore', started_at: '2026-10-28T09:00:00.000Z', event_id: 7 } as never],
+      }),
+    );
+    expect(html).toContain('Lineage');
+    expect(html).toContain('2 running');
+    const order = ['All details', 'Conductor', 'Builder', 'Delegated fix', 'Find the cart code'].map((t) => html.indexOf(t));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(html).not.toContain('Finished one');
   });
 });

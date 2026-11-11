@@ -274,18 +274,20 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             <div className="absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)] md:static md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pl-1">
               <ThreadQuickCard
                 thread={thread}
-                channel={channel}
                 init={init}
                 warm={warm}
                 slotBusy={slotBusy}
                 agents={agents}
+                parent={parent}
+                children={children}
                 prs={prs}
-                changes={changes}
                 step={step}
                 artifactCount={artifactCount}
                 machineName={hereName}
                 cwd={workCwd}
                 onOpen={openFromCard}
+                onOpenThread={(t) => navigate(href.thread(t))}
+                onJump={jumpTo}
               />
             </div>
           )}

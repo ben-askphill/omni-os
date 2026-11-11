@@ -39,7 +39,7 @@ import { shownStatus } from '@omni/shared/delegate-count.ts';
 export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
-  const { thread, parent, children, events, history, revealTarget, clearReveal, files, shots, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover, init, warm, crew: crewArtifacts } = s;
+  const { thread, parent, children, events, history, revealTarget, clearReveal, files, shots, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover, init, warm, crew: crewArtifacts, jumpTo } = s;
   const { needsYou, channel, tasks } = useApp();
   const hereName = useHereName();
   // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
@@ -154,18 +154,26 @@ export function ThreadScreen() {
             <div className="pop-in absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)]">
               <ThreadQuickCard
                 thread={thread}
-                channel={ch}
                 init={init}
                 warm={warm}
                 slotBusy={slotBusy}
                 agents={agents}
+                parent={parent}
+                children={children}
                 prs={pr}
-                changes={changes}
                 step={step}
                 artifactCount={artifactCount}
                 machineName={hereName}
                 cwd={workCwd}
                 onOpen={openFromCard}
+                onOpenThread={(id) => {
+                  setQuick(false);
+                  shell.open(href.thread(id));
+                }}
+                onJump={(at) => {
+                  setQuick(false);
+                  jumpTo(at);
+                }}
               />
             </div>
           </>
