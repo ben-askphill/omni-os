@@ -144,7 +144,7 @@ function InboxCard({
         className={`hov z-[1] block rounded-[14px] [grid-area:1/1] px-3 py-2 transition-colors ${active ? '[--hov:transparent]' : ''} ${receded ? 'opacity-70' : ''}`}
       >
         <span className="flex h-4 items-center gap-1.5 text-[11.5px] text-fg-4">
-          <span className="grid w-3 shrink-0 place-items-center">
+          <span className="grid min-w-3 shrink-0 place-items-center">
             <ChannelLead channel={channel} />
           </span>
           {pinned && <Icon name="pin" size={11} className="shrink-0 text-fg-3" />}
