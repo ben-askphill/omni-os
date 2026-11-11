@@ -1358,7 +1358,12 @@ html:has(.mo-app) body {
 }
 /* The channel rail layout: the native traffic lights sit at the rail's top (18px in, 29px down: window-rules.ts
    trafficLights), so the rail's top strip grows to hold them above the Omni mark, and it and the list panel's title
-   row drag the window. Linux draws its own frame, so neither changes there. */
+   row drag the window. Linux draws its own frame, so neither changes there.
+   The three lights are 14px with 9px gaps (macOS 27), so they end 78 window pixels in. The rail widens from 72px to
+   98px to keep them off the list panel down to the smallest zoom (0.8 x 98 = 78.4). */
+[data-desktop="darwin"] .rail-shell .rail-chrome {
+  width: 98px;
+}
 [data-desktop="darwin"] .rail-shell .rail-top {
   -webkit-app-region: drag;
   padding-top: 44px;
