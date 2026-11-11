@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { stepOf, type PRStep } from '@omni/shared/thread-glance.ts';
 import { api, errorText, type SendMode, type Thread } from '../api.ts';
 import { OPEN_PR_PROMPT } from '../components/thread/ThreadPR.tsx';
 import { useApp } from '../store.tsx';
@@ -11,6 +12,7 @@ export function useThreadActions({
   id,
   thread,
   slotBusy,
+  underway,
   applyThread,
   setActionError,
   pin,
@@ -18,17 +20,35 @@ export function useThreadActions({
   id: string;
   thread: Thread | null;
   slotBusy: boolean;
+  /** The step the thread itself shows underway (`stepUnderway`), which takes over from `sending` once it catches up. */
+  underway: PRStep | null;
   applyThread: (t: Thread, replace?: boolean) => void;
   setActionError: (e: string | null) => void;
   pin: () => void;
 }) {
   const { reloadChannels, setDone } = useApp();
-  // The step prompt being sent, so its button turns to working at the click, before the thread shows the message.
+  // The step prompt being sent, so its button turns to working at the click, before the thread shows the message. It
+  // stays set after the POST returns, until the stream brings the message and `underway` names the same step: clearing
+  // it with the POST flipped the button back to its label for that gap.
   const [sending, setSending] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  useEffect(() => {
+    if (sending && underway !== null && underway === stepOf(sending)) setSending(null);
+  }, [sending, underway]);
+  // In case the stream never shows it (another client cleared the queue, the turn ended between two renders).
+  useEffect(() => {
+    if (!sent) return;
+    const t = setTimeout(() => {
+      setSending(null);
+      setSent(false);
+    }, 15_000);
+    return () => clearTimeout(t);
+  }, [sent]);
   const [restoring, setRestoring] = useState(false);
 
   const ask = async (prompt: string) => {
     setSending(prompt);
+    setSent(false);
     setActionError(null);
     try {
       // Mid-turn, wait for the work to finish instead of steering it to commit halfway.
@@ -36,9 +56,9 @@ export function useThreadActions({
       const t = await api.post<Thread>(`/threads/${encodeURIComponent(id)}/messages`, { prompt, mode });
       applyThread(t, true);
       pin();
+      setSent(true);
     } catch (e) {
       setActionError(errorText(e));
-    } finally {
       setSending(null);
     }
   };

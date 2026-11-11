@@ -24,8 +24,13 @@ export function useThreadPR(thread: Pick<Thread, 'id' | 'branch'> | null, slotBu
       setData((prev) => prev ?? { pr: null, prs: [], crew: [] });
     }
   }, [id]);
+  // GitHub works out `mergeable` and the checks a few seconds after a push, so the read at the turn's end can still say
+  // CONFLICTING. Two more reads catch it instead of the minute-long tick.
   useEffect(() => {
-    if (!slotBusy) void load();
+    if (slotBusy) return;
+    void load();
+    const t = [5_000, 15_000].map((ms) => setTimeout(() => void load(), ms));
+    return () => t.forEach(clearTimeout);
   }, [load, slotBusy, thread?.branch]);
   // Idle, the effect above already asked.
   useEffect(() => {
