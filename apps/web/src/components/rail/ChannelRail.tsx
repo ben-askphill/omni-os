@@ -8,7 +8,7 @@ import { OmniMark, StaticMark } from '../brand.tsx';
 import { ChannelMark, Icon, StatusDot, type IconName } from '../ui.tsx';
 
 /**
- * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights. From the top: the Omni mark, Home and the Conductor, then
+ * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights. From the top: the Omni mark, the Inbox and the Conductor, then
  * client channels and internal and personal channels as discs that scroll between two pinned blocks, then Add
  * channel, Settings and Ben's monogram. On macOS the desktop app's native traffic lights sit in the rail's top strip.
  */
@@ -36,13 +36,13 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
     <nav aria-label="Channels" className="scheme-dark rail-chrome flex h-full w-[72px] shrink-0 flex-col items-center bg-[var(--chrome)] pb-3.5 text-fg">
       {/* rail-top: the desktop app's macOS window drags by this strip, where its traffic lights sit (index.css). */}
       <div className="rail-top flex w-full shrink-0 items-end justify-center pt-3.5">
-        <a href={href.home()} aria-label="Omni home" className="grid h-10 w-10 place-items-center text-fg">
+        <a href={href.home()} aria-label="Omni, Inbox" className="grid h-10 w-10 place-items-center text-fg">
           <OmniMark size={30} title="" />
         </a>
       </div>
       <div className="mt-1.5 flex flex-col items-center gap-1">
-        <RailItem to={href.home()} label="Home" selected={selection.kind === 'home'}>
-          <Disc selected={selection.kind === 'home'} icon="home" />
+        <RailItem to={href.home()} label="Inbox" selected={selection.kind === 'inbox'}>
+          <Disc selected={selection.kind === 'inbox'} icon="inbox" />
         </RailItem>
         {conductor && (
           <RailItem to={href.channel('conductor')} label="Conductor" selected={isChannel('conductor')} badge={badgeOf(conductor)}>

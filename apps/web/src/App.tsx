@@ -17,7 +17,7 @@ import { QuickPromptPage } from './pages/QuickPrompt.tsx';
 import { ChannelRail } from './components/rail/ChannelRail.tsx';
 import { ListPanel } from './components/rail/ListPanel.tsx';
 import { useLayout } from './layout-pref.ts';
-import { inboxStaysOpen, listMode, railSelection } from './rail-model.ts';
+import { cameFromInbox, listMode, railSelection } from './rail-model.ts';
 
 const SIDEBAR_WIDTH = 252;
 const SIDEBAR_MIN = 200;
@@ -110,17 +110,15 @@ function Shell() {
   usePageTitle(route);
 
   const layout = useLayout();
-  const [inbox, setInbox] = useState(() => readPref('rail.inbox', false));
-  const showInbox = (open: boolean) => (setInbox(open), writePref('rail.inbox', open));
-  const inboxOpen = inbox && inboxStaysOpen(route);
-  // Leaving for a channel, Settings or Add channel closes the Inbox, so coming back to a thread shows its channel.
+  // A thread opened from the Inbox keeps it in the panel; one opened from a channel shows that channel.
+  const [lastFromInbox, setLastFromInbox] = useState(() => readPref('rail.inbox', false));
+  const fromInbox = cameFromInbox(route, lastFromInbox);
   useEffect(() => {
-    if (inbox && !inboxStaysOpen(route)) {
-      setInbox(false);
-      writePref('rail.inbox', false);
-    }
-  }, [inbox, route]);
-  const selection = railSelection(route, openThread, inboxOpen);
+    if (fromInbox === lastFromInbox) return;
+    setLastFromInbox(fromInbox);
+    writePref('rail.inbox', fromInbox);
+  }, [fromInbox, lastFromInbox]);
+  const selection = railSelection(route, openThread, fromInbox);
   // The desktop app puts its macOS traffic lights where this layout leaves room for them (apps/desktop windows.ts).
   // The rail Beta also swaps the type faces (index.css :root[data-layout]); the phone layout keeps Apple's.
   useEffect(() => {
@@ -134,7 +132,7 @@ function Shell() {
   return layout === 'rail' ? (
     <div className="desktop-shell rail-shell flex h-full min-h-0 flex-row bg-bg">
       <ChannelRail selection={selection} />
-      <ListPanel mode={listMode(selection, inboxOpen)} onSearch={openPalette} onInbox={showInbox} />
+      <ListPanel mode={listMode(selection)} onSearch={openPalette} />
       <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg">
         <Page route={route} />
       </main>

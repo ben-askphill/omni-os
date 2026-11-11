@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inboxStaysOpen, listMode, monogram, needsByChannel, railBadge, railGroups, railSelection } from '../src/rail-model.ts';
+import { cameFromInbox, listMode, monogram, needsByChannel, railBadge, railGroups, railSelection } from '../src/rail-model.ts';
 
 const ch = (id: string, name: string, kind: string, extra: { archived?: boolean; running?: number } = {}) => ({ id, name, kind, running: 0, ...extra });
 
@@ -25,30 +25,32 @@ describe('railSelection', () => {
     expect(railSelection({ name: 'thread', id: 't1' }, { id: 't1', channel_id: 'volero' })).toEqual({ kind: 'channel', id: 'volero' });
   });
 
-  it('falls back to Home while the thread loads and for workspace pages', () => {
-    expect(railSelection({ name: 'thread', id: 't1' }, { id: 't0', channel_id: 'volero' })).toEqual({ kind: 'home' });
-    expect(railSelection({ name: 'prs' }, null)).toEqual({ kind: 'home' });
-    expect(railSelection({ name: 'artifacts' }, null)).toEqual({ kind: 'home' });
+  it('selects the Inbox on the landing page, while a thread loads and for workspace pages', () => {
+    expect(railSelection({ name: 'home' }, null)).toEqual({ kind: 'inbox' });
+    expect(railSelection({ name: 'thread', id: 't1' }, { id: 't0', channel_id: 'volero' })).toEqual({ kind: 'inbox' });
+    expect(railSelection({ name: 'prs' }, null)).toEqual({ kind: 'inbox' });
+    expect(railSelection({ name: 'artifacts' }, null)).toEqual({ kind: 'inbox' });
   });
 
   it('selects Settings and the add-channel control on their pages', () => {
     expect(railSelection({ name: 'settings' }, null)).toEqual({ kind: 'settings' });
     expect(railSelection({ name: 'new-channel' }, null)).toEqual({ kind: 'new-channel' });
   });
-  it('keeps Home selected for a thread opened from the Inbox, so the panel stays on it', () => {
+  it('keeps the Inbox selected for a thread opened from it, so the panel stays on it', () => {
     const sel = railSelection({ name: 'thread', id: 't1' }, { id: 't1', channel_id: 'volero' }, true);
-    expect(sel).toEqual({ kind: 'home' });
-    expect(listMode(sel, true)).toEqual({ kind: 'inbox' });
+    expect(sel).toEqual({ kind: 'inbox' });
+    expect(listMode(sel)).toEqual({ kind: 'inbox' });
   });
 });
 
-describe('inboxStaysOpen', () => {
-  it('holds through threads and workspace pages, and closes on a channel, Settings or Add channel', () => {
-    expect(inboxStaysOpen({ name: 'thread', id: 't1' })).toBe(true);
-    expect(inboxStaysOpen({ name: 'prs' })).toBe(true);
-    expect(inboxStaysOpen({ name: 'channel', id: 'acne', tab: 'threads' })).toBe(false);
-    expect(inboxStaysOpen({ name: 'settings' })).toBe(false);
-    expect(inboxStaysOpen({ name: 'new-channel' })).toBe(false);
+describe('cameFromInbox', () => {
+  it('is set by every page that shows the Inbox, cleared by a channel, and kept by a thread', () => {
+    expect(cameFromInbox({ name: 'home' }, false)).toBe(true);
+    expect(cameFromInbox({ name: 'prs' }, false)).toBe(true);
+    expect(cameFromInbox({ name: 'settings' }, false)).toBe(true);
+    expect(cameFromInbox({ name: 'channel', id: 'acne', tab: 'threads' }, true)).toBe(false);
+    expect(cameFromInbox({ name: 'thread', id: 't1' }, true)).toBe(true);
+    expect(cameFromInbox({ name: 'thread', id: 't1' }, false)).toBe(false);
   });
 });
 
@@ -82,9 +84,9 @@ describe('badges', () => {
 });
 
 describe('listMode', () => {
-  it('shows a channel list for a channel, else Home or the Inbox', () => {
-    expect(listMode({ kind: 'channel', id: 'x' }, true)).toEqual({ kind: 'channel', id: 'x' });
-    expect(listMode({ kind: 'home' }, true)).toEqual({ kind: 'inbox' });
-    expect(listMode({ kind: 'settings' }, false)).toEqual({ kind: 'home' });
+  it('shows a channel list for a channel, else the Inbox', () => {
+    expect(listMode({ kind: 'channel', id: 'x' })).toEqual({ kind: 'channel', id: 'x' });
+    expect(listMode({ kind: 'inbox' })).toEqual({ kind: 'inbox' });
+    expect(listMode({ kind: 'settings' })).toEqual({ kind: 'inbox' });
   });
 });
