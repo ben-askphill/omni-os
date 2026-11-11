@@ -139,13 +139,14 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     card.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     setToAgents(false);
   }, [toAgents, panelTab, children, panel.open]);
-  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, applyThread, setActionError, pin });
+  const underway = useMemo(() => stepUnderway(events, queued, slotBusy), [events, queued, slotBusy]);
+  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, underway, applyThread, setActionError, pin });
   // The branch's PRs and changes: the PRs tab and the Details tab's branch card read them, and the PRs tab's badge.
   const [prs, reloadPRs] = useThreadPR(thread, slotBusy);
   const watch = usePRWatch(thread?.id, prs);
   const changes = useBranchChanges(thread, slotBusy);
   const next = prNext(prs?.pr ?? null, !!changes?.files.length);
-  const step = useMemo(() => stepOf(sending) ?? stepUnderway(events, queued, slotBusy), [sending, events, queued, slotBusy]);
+  const step = stepOf(sending) ?? underway;
 
   useThreadPresence(id, thread);
   useThreadInterruptKey({ slotBusy, interrupting, interrupt });

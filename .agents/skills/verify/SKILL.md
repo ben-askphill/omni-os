@@ -23,6 +23,8 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 - Every `/api` call needs the stack's own token (`status` prints it; it is `$QA_DIR/data/api-token`, default `$TMPDIR/omni-qa-<port>/data/api-token`). Your shell's `OMNI_TOKEN` is the live server's, so never use it here. `T=$(cat "${TMPDIR:-/tmp}/omni-qa-4757/data/api-token")`
 - Create a thread: `curl -s -X POST localhost:4757/api/threads -H "Authorization: Bearer $T" -H 'content-type: application/json' -d '{"channel":"inbox","prompt":"RICH"}'`
 - The web URLs `up` and `status` print end in `?pair=<token>`, which pairs the browser. A bare URL shows the pairing screen.
+- A plain fake turn ends in about 30 ms, too fast to watch a working state. Start the stack with `FAKE_CLAUDE_LATENCY_MS=1500` in its environment for turns that last a few seconds.
+- A PR on a thread's branch: `fake-gh.mjs` ignores `--head`, so `pr list` hands every thread the same fixture PRs. Put a small `gh` script in `$QA_DIR/bin` (first on the server's PATH, read at each call) that answers `pr list --head <branch>` with the PR you need and passes everything else to `fake-gh.mjs`.
 - Need some other state (folders, channels, a stuck request)? Build it through the API first; reach into the sqlite db in the QA data dir only when no route exists.
 
 ## 3. Drive it
