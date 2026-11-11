@@ -8,11 +8,12 @@ import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
 import { PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
+import { setLayout, useLayout } from '../layout-pref.ts';
 import { desktop } from '../desktop.ts';
 import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
-import { useApp, useSecretStoreLabel } from '../store.tsx';
+import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
 import { ChannelSettingsForm, Section } from './ChannelSettings.tsx';
 import { GoogleAccountSection } from './GoogleAccount.tsx';
 import { ConnectSection } from './Connect.tsx';
@@ -23,7 +24,7 @@ import { DesktopSection } from './SettingsDesktop.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
 import { StorageSection } from './Storage.tsx';
 import { PathMapEditor, SyncSection } from './Sync.tsx';
-import { Advanced, Card, InfoRow, Origin, Row, ScopeBar, ServerOptions, settingAnchor, SwitchRow, useScopedChannel } from './settings-parts.tsx';
+import { Advanced, Card, InfoRow, Origin, Row, rowHintId, ScopeBar, ServerOptions, settingAnchor, SwitchRow, useScopedChannel } from './settings-parts.tsx';
 
 // Settings: a searchable nav of grouped sections beside one section at a time (@omni/shared/settings-catalog.ts),
 // the same sections in the same order as the phone's Settings screen. A scoped
@@ -231,6 +232,7 @@ function WorktreesSection() {
       )}
       <div id={settingAnchor('worktree-retention')} className="scroll-mt-6 space-y-5">
         <span id={settingAnchor('worktree-storage')} />
+        <span id={settingAnchor('worktree-slim')} />
         <StorageSection />
       </div>
       <ServerOptions section="worktrees" />
@@ -285,7 +287,7 @@ function ChannelsSection() {
         {listed.map((c) => (
           <li key={c.id}>
             <button type="button" onClick={() => setSettingsScope(c.id)} className="flex w-full min-w-0 items-center gap-3 py-2.5 text-left">
-              <Avatar name={c.name} channelIcon={c.icon} omni={c.id === 'conductor'} size={28} />
+              <Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} omni={c.id === 'conductor'} size={28} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13.5px]">{c.id === 'conductor' ? 'Conductor' : `#${c.name}`}</div>
                 <div className="truncate font-mono text-[11.5px] text-fg-3">{c.repo_path ?? c.base_dir ?? 'Workspace folder'}</div>
@@ -470,16 +472,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
       />
     );
   };
-  const rows = (list: readonly SettingField[]) =>
-    pairHalves(list).map((group) =>
-      group.length === 1 ? (
-        field(group[0])
-      ) : (
-        <div key={settingId(group[0])} className="grid gap-4 sm:grid-cols-2">
-          {group.map(field)}
-        </div>
-      ),
-    );
+  const rows = (list: readonly SettingField[]) => <div className="space-y-5">{list.map(field)}</div>;
   const advanced = fields.filter((f) => f.advanced);
   const entry = FORM_ENTRY[part];
 
@@ -523,19 +516,7 @@ function formPatch(fields: readonly SettingField[], values: Record<string, strin
   return patch;
 }
 
-/** Consecutive half-width fields share a row. */
-function pairHalves(fields: readonly SettingField[]): SettingField[][] {
-  const out: SettingField[][] = [];
-  for (const f of fields) {
-    const last = out.at(-1);
-    if (f.half && last?.[0]?.half && last.length < 2) last.push(f);
-    else out.push([f]);
-  }
-  return out;
-}
-
 const MONO = new Set<SettingField['input']>(['folder', 'url', 'owner']);
-const NARROW = new Set<SettingField['input']>(['text', 'email', 'owner']);
 
 function ConfigField({
   field: f,
@@ -551,16 +532,19 @@ function ConfigField({
   origin: ReactNode;
 }) {
   const id = `set-${f.key}`;
+  const hint = settingHint(f, fallbacks);
+  const describedBy = hint ? rowHintId(id) : undefined;
   const input = f.readonly ? (
-    <input id={id} className={`field w-full font-mono !text-[13px] text-fg-2`} value={value} placeholder={settingPlaceholder(f, fallbacks) || 'Not set'} readOnly aria-readonly />
+    <input id={id} className={`field w-full font-mono !text-[13px] text-fg-2`} value={value} placeholder={settingPlaceholder(f, fallbacks) || 'Not set'} readOnly aria-readonly aria-describedby={describedBy} />
   ) : f.input === 'pronouns' ? (
-    <PronounsInput id={id} value={value} onChange={onChange} />
+    <PronounsInput id={id} value={value} onChange={onChange} describedBy={describedBy} />
   ) : f.input === 'timezone' ? (
-    <TimezoneInput id={id} value={value} onChange={onChange} />
+    <TimezoneInput id={id} value={value} onChange={onChange} describedBy={describedBy} />
   ) : (
     <input
       id={id}
-      className={`field w-full${NARROW.has(f.input) ? ' max-w-sm' : ''}${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
+      aria-describedby={describedBy}
+      className={`field w-full${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
       type={f.input === 'email' ? 'email' : 'text'}
       value={value}
       maxLength={f.max}
@@ -572,7 +556,7 @@ function ConfigField({
     />
   );
   return (
-    <Row label={f.label} htmlFor={id} hint={settingHint(f, fallbacks)} origin={origin}>
+    <Row label={f.label} htmlFor={id} hint={hint} origin={origin}>
       {input}
     </Row>
   );
@@ -580,6 +564,8 @@ function ConfigField({
 
 function AppearanceCard() {
   const [theme, setTheme] = useTheme();
+  const layout = useLayout();
+  const mobile = useIsMobile();
   return (
     <>
       <Card entry="theme" title="Theme" subtitle="Follows your system, or stays light or dark." origin={<Origin of="device" label="This browser only" />}>
@@ -595,6 +581,21 @@ function AppearanceCard() {
           ]}
         />
       </Card>
+      {!mobile && (
+      <Card
+        entry="layout"
+        title="New layout"
+        subtitle="Channels as a rail of discs, with a list of the selected channel's threads beside it. Still in progress: turn it off to go back to the classic sidebar. The phone layout stays as it is."
+        origin={<Origin of="device" label="This browser only" />}
+      >
+        <div className="flex items-center gap-3 rounded-[16px] bg-bg px-4 py-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium">
+            Channel rail <Chip tone="live">Beta</Chip>
+          </div>
+          <Toggle checked={layout === 'rail'} onChange={(on) => setLayout(on ? 'rail' : 'classic')} label="Use the new channel rail layout (Beta)" />
+        </div>
+      </Card>
+      )}
       {desktop ? (
         <Card
           entry="zoom"

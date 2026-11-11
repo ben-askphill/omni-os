@@ -17,6 +17,9 @@
 # RICH, TOOL:<ms> or LIMIT drives a turn without spending a plan (see packages/test-fixtures/fake-claude.mjs).
 # Cursor Cloud threads talk to a fake Cursor API (packages/test-fixtures/fake-cursor-api.mjs) with a stand-in key, so
 # the real CURSOR_API_KEY is never read; they need a channel with a GitHub repo set.
+# The update check is off and no supervisor restarts the server, whatever the calling shell says (an agent's shell
+# carries the live server's OMNI_SUPERVISOR). QA_UPDATE_CHECK=1 turns the check on; QA_SUPERVISOR=qa lets Update run,
+# and then the server exits after it with nothing to start it again.
 # The stack has its own API token in its data dir: curl it with -H "Authorization: Bearer $(cat <data>/data/api-token)",
 # and open the printed web URLs, which pair the browser.
 set -euo pipefail
@@ -73,7 +76,7 @@ SH
   # OMNI_TOKEN cleared: an agent's shell carries the live server's, and this stack makes its own.
   OMNI_TOKEN= OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="${QA_CLAUDE_BIN:-$fx/fake-claude.mjs}" OMNI_CODEX_BIN="${QA_CODEX_BIN:-$fx/fake-codex.mjs}" OMNI_CURSOR_BIN="${QA_CURSOR_BIN:-$fx/fake-cursor.mjs}" \
-    OMNI_BROWSER="${QA_BROWSER:-0}" OMNI_SUGGESTIONS=0 OMNI_UPDATE_CHECK=0 OMNI_CAFFEINATE=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
+    OMNI_BROWSER="${QA_BROWSER:-0}" OMNI_SUGGESTIONS=0 OMNI_UPDATE_CHECK="${QA_UPDATE_CHECK:-0}" OMNI_SUPERVISOR="${QA_SUPERVISOR:-}" OMNI_CAFFEINATE=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
     OMNI_CURSOR_API_URL="$cursor_api" OMNI_CURSOR_CLOUD_POLL_MS=1500 PATH="$DIR/bin:$PATH" \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     detach npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &

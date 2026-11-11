@@ -79,7 +79,7 @@ export function MoInboxRow({
   return (
     <div className="relative">
       <button type="button" onClick={() => shell.open(href.thread(t.id))} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
-        <MoAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} state={status?.glyph ?? t.status} />
+        <MoAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} state={status?.glyph ?? t.status} />
         <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last ? '' : 'border-b border-line'}`} style={{ paddingRight: reserve }}>
           <span className="flex items-baseline gap-2">
             <span className={`min-w-0 flex-1 truncate text-[15px] leading-[1.3] ${receded ? 'text-fg-3' : 'text-fg'}`}>{title}</span>

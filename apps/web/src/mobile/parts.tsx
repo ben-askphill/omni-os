@@ -105,7 +105,7 @@ export function MoEmpty({ children }: { children: ReactNode }) {
  * Who works the thread: its crew mark, or the channel's letter when it runs without a role, with its status on the
  * corner.
  */
-export function MoAvatar({ role, channel, channelIcon, state, size = 36 }: { role?: string | null; channel?: string; channelIcon?: string | null; state?: Glyph | string | null; size?: number }) {
+export function MoAvatar({ role, channel, channelIcon, avatarBg, state, size = 36 }: { role?: string | null; channel?: string; channelIcon?: string | null; avatarBg?: string | null; state?: Glyph | string | null; size?: number }) {
   return (
     <span className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
       {isCrewRole(role) ? (
@@ -113,7 +113,7 @@ export function MoAvatar({ role, channel, channelIcon, state, size = 36 }: { rol
           <CrewMark role={role} size={Math.round(size * 0.46)} />
         </span>
       ) : (
-        <Avatar name={channel ?? '?'} channelIcon={channelIcon} omni={channel === 'conductor'} size={size} />
+        <Avatar name={channel ?? '?'} channelIcon={channelIcon} avatarBg={avatarBg} omni={channel === 'conductor'} size={size} />
       )}
       {state && (
         <span className="absolute -right-px -bottom-px grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
@@ -137,7 +137,7 @@ export function MoDiff({ add, del }: { add: number; del: number }) {
 export function MoRow({ it, onOpen, last, trailing }: { it: RowItem; onOpen: () => void; last?: boolean; trailing?: ReactNode }) {
   return (
     <button type="button" onClick={onOpen} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
-      <MoAvatar role={it.role} channel={it.channelId} channelIcon={it.channelIcon} state={it.status} />
+      <MoAvatar role={it.role} channel={it.channelId} channelIcon={it.channelIcon} avatarBg={it.avatarBg} state={it.status} />
       <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last ? '' : 'border-b border-line'}`}>
         <span className="flex items-baseline gap-2">
           <span className={`min-w-0 flex-1 truncate text-[15px] leading-[1.3] ${it.settled ? 'text-fg-2' : 'text-fg'}`}>{it.title}</span>

@@ -1,6 +1,6 @@
 // The environment for the thread's shell. It is Ben's login shell, so it keeps PATH, HOME,
-// and the rest of the server environment. It is not a harness child: it loses every billing
-// key on every harness strip list, Omni's sync credentials, the Grok Bot webhook, and the
+// and the rest of the server environment. It is not a harness child: it loses every variable
+// on every harness strip list, Omni's sync credentials, the Grok Bot webhook, and the
 // server's own Node flags.
 import { SERVER_ONLY_VARS, STRIPPED_VARS } from './harness/env-guard.ts';
 import { LEGACY_SYNC_SECRETS, SYNC_SECRETS } from './secrets.ts';

@@ -33,8 +33,8 @@ export function NotificationsIntroScreen({ navigation }: RootScreenProps<'Notifi
         Know when an agent needs you
       </Text>
       <Text style={[styles.body, { color: colors.fg2 }]}>
-        Omni can alert this phone when a thread needs an answer, finishes or fails, or a crew member reports back. An
-        alert only tells you where to go.
+        Omni can alert this phone when a thread needs an answer, finishes or fails, or a crew member reports back. Each
+        alert shows the thread's title and the start of the reply or question.
       </Text>
 
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.line }]}>

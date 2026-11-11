@@ -8,7 +8,7 @@ import { canMarkDone } from '../../needs-you.ts';
 import { href, useHash } from '../../router.ts';
 import { useApp, useNow } from '../../store.tsx';
 import { HarnessLogo, Loader, OmniMark } from '../brand.tsx';
-import { ChannelMark, DoneMark, Icon, StatusDot, Thumb, useSlidingThumb } from '../ui.tsx';
+import { Avatar, ChannelMark, DoneMark, Icon, StatusDot, Thumb, useSlidingThumb } from '../ui.tsx';
 import { DelegateCount, DelegateCountSpace } from '../DelegateCount.tsx';
 import { useRowDelegates } from './SidebarRows.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
@@ -97,8 +97,9 @@ function Shelf({ label, count, open, onToggle }: { label: string; count: number;
 }
 
 function ChannelLead({ channel }: { channel: ReturnType<typeof useApp>['channels'][number] | undefined }) {
+  if (channel?.avatar_bg) return <Avatar name={channel.name} channelIcon={channel.icon} avatarBg={channel.avatar_bg} omni={channel.id === 'conductor'} size={18} />;
   if (channel?.id === 'conductor') return <OmniMark size={13} />;
-  if (channel && parseChannelIcon(channel.icon)) return <ChannelMark icon={channel.icon} size={12} />;
+  if (channel && parseChannelIcon(channel.icon)) return <ChannelMark icon={channel.icon} avatarBg={channel.avatar_bg} size={12} />;
   return <span className="font-num text-[11px] leading-none text-fg-4">#</span>;
 }
 
@@ -143,7 +144,7 @@ function InboxCard({
         className={`hov z-[1] block rounded-[14px] [grid-area:1/1] px-3 py-2 transition-colors ${active ? '[--hov:transparent]' : ''} ${receded ? 'opacity-70' : ''}`}
       >
         <span className="flex h-4 items-center gap-1.5 text-[11.5px] text-fg-4">
-          <span className="grid w-3 shrink-0 place-items-center">
+          <span className="grid min-w-3 shrink-0 place-items-center">
             <ChannelLead channel={channel} />
           </span>
           {pinned && <Icon name="pin" size={11} className="shrink-0 text-fg-3" />}

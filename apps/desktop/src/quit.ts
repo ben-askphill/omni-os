@@ -162,8 +162,11 @@ export function quitToUpdate(): void {
   app.quit();
 }
 
-/** Update When They Finish: asks again once no turn runs. Ends without asking if the server stops or the app quits. */
-async function updateWhenIdle(ctx: AppContext): Promise<void> {
+/**
+ * Update When They Finish: asks again once no turn runs. Ends without asking if the server stops or the app quits.
+ * An update a fleet ask installs (carryOut in updates.ts) takes the same way, with nobody there to answer.
+ */
+export async function updateWhenIdle(ctx: AppContext): Promise<void> {
   if (waitingToUpdate) return;
   waitingToUpdate = true;
   try {

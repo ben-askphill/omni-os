@@ -1,10 +1,11 @@
-// Push alerts to the native app. An alert only tells the phone to fetch: the title and a generic body, plus the thread or
-// channel id for a deep link. Never the prompt, a question, a thread name or a code. Triggers in the runner call the
-// notify functions at the bottom. With no APNs key configured every call is a no-op, and startPush says why. Setting or
+// Push alerts to the native app: the thread's title, what happened, and a plain-text preview of the reply, question or
+// report (push-preview.ts), plus the thread and channel ids for a deep link. Never the prompt or a code. Triggers in
+// the runner call the notify functions at the bottom. With no APNs key configured every call is a no-op, and startPush says why. Setting or
 // deleting one of the APNs secrets loads the config again, so no restart is needed.
 import { createPrivateKey } from 'node:crypto';
 import { threads, type ThreadStatus } from './db.ts';
 import { sessionIsLive } from './google-auth.ts';
+import { clip, pushPreview, TITLE_MAX } from './push-preview.ts';
 import { classify, http2Transport, providerTokens, type ApnsKey, type ApnsResponse, type ApnsTransport } from './push-apns.ts';
 import { pushTargets, type PushTarget } from './push-preferences.ts';
 import { forgetPushToken } from './push-tokens.ts';
@@ -15,6 +16,12 @@ export interface PushEvent {
   kind: AppPushKind;
   threadId: string;
   channelId: string | null;
+  /** The thread's title, the alert's title. */
+  title: string | null;
+  /** The markdown the alert previews: the turn's last reply, the question or the crew report. */
+  text: string | null;
+  /** Crew reports: the title of the thread that reported. */
+  from?: string | null;
 }
 
 /** Secret names (secret store first, then an environment variable of the same name). Values are never logged. */
@@ -99,16 +106,29 @@ export interface PushSender {
   close(): void;
 }
 
-const ALERTS: Record<AppPushKind, { title: string; body: string }> = {
-  needsInput: { title: 'Omni needs you', body: 'A thread is waiting for your answer.' },
-  finished: { title: 'Thread finished', body: 'Open Omni to see the result.' },
-  failed: { title: 'Thread failed', body: 'Open Omni to see what happened.' },
-  crewReport: { title: 'Crew report', body: 'A crew member reported back in Conductor.' },
+/** `label` says what happened, under the thread's title. `title` and `body` stand in when there is no title or text. */
+const ALERTS: Record<AppPushKind, { label: string; title: string; body: string }> = {
+  needsInput: { label: 'Needs your answer', title: 'Omni needs you', body: 'A thread is waiting for your answer.' },
+  finished: { label: 'Finished', title: 'Thread finished', body: 'Open Omni to see the result.' },
+  failed: { label: 'Failed', title: 'Thread failed', body: 'Open Omni to see what happened.' },
+  crewReport: { label: 'Crew report', title: 'Crew report', body: 'A crew member reported back in Conductor.' },
 };
+
+const oneLine = (text: string | null | undefined) => text?.replace(/\s+/g, ' ').trim() || null;
+
+/** The `aps.alert` iOS shows: the thread's title, what happened, and a preview of the text. */
+export function alertFor(event: PushEvent): { title: string; subtitle?: string; body: string } {
+  const fixed = ALERTS[event.kind];
+  const body = pushPreview(event.text) ?? fixed.body;
+  const title = oneLine(event.title);
+  if (!title) return { title: fixed.title, body };
+  const from = oneLine(event.from);
+  return { title: clip(title, TITLE_MAX), subtitle: clip(from ? `${fixed.label}: ${from}` : fixed.label, TITLE_MAX), body };
+}
 
 export function payloadFor(event: PushEvent): string {
   return JSON.stringify({
-    aps: { alert: ALERTS[event.kind], sound: 'default' },
+    aps: { alert: alertFor(event), sound: 'default' },
     omni: { kind: event.kind, threadId: event.threadId, channelId: event.channelId },
   });
 }
@@ -250,25 +270,34 @@ function emit(event: PushEvent) {
   }
 }
 
-/** The agent asked a question and waits for an answer. */
-export function notifyNeedsInput(threadId: string) {
-  emit({ kind: 'needsInput', threadId, channelId: threads.get(threadId)?.channel_id ?? null });
+/** The agent asked a question and waits for an answer. The alert previews the first question. */
+export function notifyNeedsInput(threadId: string, question: string | null = null) {
+  const t = threads.get(threadId);
+  emit({ kind: 'needsInput', threadId, channelId: t?.channel_id ?? null, title: t?.title ?? null, text: question });
 }
 
 /**
  * A turn ended. Done or failed only; stopped and queued are silent. A finished child is already reported to its parent,
- * so only a failed child alerts.
+ * so only a failed child alerts. `reply` is the turn's last assistant text, or why it failed; none falls back to a
+ * generic line.
  */
-export function notifyEnded(threadId: string, status: ThreadStatus) {
+export function notifyEnded(threadId: string, status: ThreadStatus, reply: string | null = null) {
   if (status !== 'done' && status !== 'failed') return;
   const t = threads.get(threadId);
   if (status === 'done' && t?.parent_id) return;
-  emit({ kind: status === 'done' ? 'finished' : 'failed', threadId, channelId: t?.channel_id ?? null });
+  emit({
+    kind: status === 'done' ? 'finished' : 'failed',
+    threadId,
+    channelId: t?.channel_id ?? null,
+    title: t?.title ?? null,
+    text: reply,
+  });
 }
 
 /** A crew report landed in a thread. Only the Conductor's reports alert: that is where Ben reads them. */
-export function notifyCrewReport(parentId: string) {
+export function notifyCrewReport(parentId: string, report: Record<string, unknown> = {}) {
   const t = threads.get(parentId);
   if (t?.channel_id !== 'conductor') return;
-  emit({ kind: 'crewReport', threadId: parentId, channelId: t.channel_id });
+  const str = (value: unknown) => (typeof value === 'string' ? value : null);
+  emit({ kind: 'crewReport', threadId: parentId, channelId: t.channel_id, title: t.title, text: str(report.text), from: str(report.title) });
 }

@@ -125,7 +125,7 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
 /** The thread could not be prepared, or Ben stopped it first: why, on the thread, with its first prompt kept for Retry. */
 export function failSetup(threadId: string, reason: string, stopped = false) {
   threads.update(threadId, { setup: 'failed', setup_error: reason, status: stopped ? 'stopped' : 'failed' });
-  if (!stopped) notifyEnded(threadId, 'failed');
+  if (!stopped) notifyEnded(threadId, 'failed', `Omni could not prepare this thread's worktree: ${reason}`);
   for (const r of messageRequests.unstarted(threadId)) messageRequests.park(r.id);
   emitThread(threadId);
   const t = threads.get(threadId);

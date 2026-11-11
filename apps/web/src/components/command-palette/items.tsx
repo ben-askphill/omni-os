@@ -3,6 +3,7 @@ import { sectionShows, SETTINGS_SECTION_DEFS } from '@omni/shared/settings-catal
 import { relTime } from '@omni/shared/format.ts';
 import type { ChannelWithRunning, Thread, ThreadStub } from '../../api.ts';
 import { desktop } from '../../desktop.ts';
+import { readLayout } from '../../layout-pref.ts';
 import { href, navigate, startNewThread, type Route } from '../../router.ts';
 import { setTheme } from '../theme.tsx';
 import { Avatar, Icon, StatusDot, type IconName } from '../ui.tsx';
@@ -37,7 +38,10 @@ export function paletteItems(q: string, channels: ChannelWithRunning[], recent: 
 
   const base: Item[] = [
     { id: 'a:new', group: 'Actions', label: 'New thread', sub: 'Start a task', lead: lead('plus'), run: newThread },
-    { id: 'p:home', group: 'Go to', label: 'Home', lead: lead('home'), run: () => go(href.home()) },
+    // The channel rail lands on the Inbox; the classic sidebar on Home.
+    readLayout() === 'rail'
+      ? { id: 'p:home', group: 'Go to', label: 'Inbox', lead: lead('inbox'), run: () => go(href.home()) }
+      : { id: 'p:home', group: 'Go to', label: 'Home', lead: lead('home'), run: () => go(href.home()) },
     { id: 'p:artifacts', group: 'Go to', label: 'Artifacts', lead: lead('layers'), run: () => go(href.artifacts()) },
     { id: 'p:claude-artifacts', group: 'Go to', label: 'claude.ai artifacts', sub: 'Your Artifacts on claude.ai', lead: lead('globe'), run: () => go(href.claudeArtifacts()) },
     { id: 'p:prs', group: 'Go to', label: 'Pull requests', lead: lead('pr'), run: () => go(href.pullRequests()) },
@@ -58,7 +62,7 @@ export function paletteItems(q: string, channels: ChannelWithRunning[], recent: 
       group: 'Channels',
       label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`,
       sub: c.store_domain ?? c.github_repo ?? undefined,
-      lead: <Avatar name={c.name} channelIcon={c.icon} omni={c.id === 'conductor'} size={28} />,
+      lead: <Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} omni={c.id === 'conductor'} size={28} />,
       right: c.running ? <span className="font-num text-[11px] text-live-text">{c.running} running</span> : undefined,
       run: () => go(href.channel(c.id)),
     })),

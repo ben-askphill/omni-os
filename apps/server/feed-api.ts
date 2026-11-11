@@ -4,6 +4,7 @@ import { sessionSSE } from './sse.ts';
 import { about } from './about.ts';
 import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { config } from './config.ts';
+import { diskView, refreshDisk } from './disk-space.ts';
 import { needsYou, resultReads, search, threads, type Thread } from './db.ts';
 import { allWithDelegating, withDelegating } from './delegating.ts';
 import { handoffView } from './handoff/records.ts';
@@ -51,6 +52,9 @@ feedApi.get('/status', (c) =>
     grokBot: grokBotConfigured(),
   }),
 );
+
+/** Free space on the disk with Omni's data and the temp folder, as last checked (every 10 minutes); checks now before the first. */
+feedApi.get('/disk', async (c) => c.json(diskView().checkedAt ? diskView() : await refreshDisk()));
 
 /** Sub-agents, background shells and workflows still running, across every thread. */
 feedApi.get('/tasks', (c) => c.json(activeTasks()));

@@ -122,6 +122,27 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 }
+/* Apple's typefaces (developer.apple.com/fonts). Their license rules out serving them as web fonts,
+   so these name the local install; without it, Safari and iOS reach the same system copies through
+   system-ui and ui-*. SF Pro adjusts to each size by itself: its optical-size axis moves from Text to
+   Display, and its tracking table spaces letters the way macOS does, so body text adds no letter-spacing.
+   Kept out of the `:root, .scheme-dark` rule so a dark-scheme block inherits the rail's faces below. */
+:root {
+  --face-sans: "SF Pro", "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --face-head: "SF Pro", "SF Pro Display", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --face-rounded: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, sans-serif;
+  --face-serif: "New York", ui-serif, Georgia, serif;
+  --face-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* The channel rail Beta (App.tsx sets data-layout) sets type the way the Linux desktop app does on GNOME and
+   Omarchy: Adwaita Sans for text, headings and initials, JetBrains Mono for code. main.tsx bundles both (OFL), so a
+   Mac shows them too; a browser downloads them only once the rail uses them. */
+:root[data-layout="rail"] {
+  --face-sans: "Adwaita Sans", system-ui, sans-serif;
+  --face-head: var(--face-sans);
+  --face-rounded: var(--face-sans);
+  --face-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+}
 /* The sidebar always draws with the dark tokens. The tokens re-declare here (see the :root rule)
    so light-dark() resolves against this scheme, not the root's. */
 .scheme-dark {
@@ -153,15 +174,12 @@
   --color-warn: var(--warn);
   --color-bubble: var(--bubble);
   --color-code: var(--code-bg);
-  /* Apple's typefaces (developer.apple.com/fonts). Their license rules out serving them as web fonts,
-     so these name the local install; without it, Safari and iOS reach the same system copies through
-     system-ui and ui-*. SF Pro adjusts to each size by itself: its optical-size axis moves from Text to
-     Display, and its tracking table spaces letters the way macOS does, so body text adds no letter-spacing. */
-  --font-sans: "SF Pro", "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  --font-head: "SF Pro", "SF Pro Display", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  --font-rounded: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, sans-serif;
-  --font-serif: "New York", ui-serif, Georgia, serif;
-  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The faces live on :root (below), so the channel rail Beta can swap them. */
+  --font-sans: var(--face-sans);
+  --font-head: var(--face-head);
+  --font-rounded: var(--face-rounded);
+  --font-serif: var(--face-serif);
+  --font-mono: var(--face-mono);
   /* Numbers are sans with tabular figures; mono is only for code (ids, branches, commits, paths). */
   --font-num: var(--font-sans);
   /* Tailwind's font-normal … font-bold read the weight scale. */
@@ -1354,6 +1372,25 @@ html:has(.mo-app) body {
   padding-left: 84px;
 }
 [data-desktop="darwin"] .desktop-titlebar :is(a, button, input, select, textarea, [role="button"]) {
+  -webkit-app-region: no-drag;
+}
+/* The channel rail layout: the native traffic lights sit at the rail's top (18px in, 29px down: window-rules.ts
+   trafficLights), so the rail's top strip grows to hold them above the Omni mark, and it and the list panel's title
+   row drag the window. Linux draws its own frame, so neither changes there.
+   The three lights are 14px with 9px gaps (macOS 27), so they end 78 window pixels in. The rail widens from 72px to
+   98px to keep them off the list panel down to the smallest zoom (0.8 x 98 = 78.4), and the top strip is tall
+   enough that at 0.8 they still clear the Omni mark (their bottom: 43 / 0.8 = 54px). */
+[data-desktop="darwin"] .rail-shell .rail-chrome {
+  width: 98px;
+}
+[data-desktop="darwin"] .rail-shell .rail-top {
+  -webkit-app-region: drag;
+  padding-top: 52px;
+}
+[data-desktop="darwin"] .rail-shell .rail-panel-top {
+  -webkit-app-region: drag;
+}
+[data-desktop="darwin"] .rail-shell :is(.rail-top, .rail-panel-top) :is(a, button, input, select, textarea, [role="button"]) {
   -webkit-app-region: no-drag;
 }
 /* The phone layout, in a narrow window: a strip above it for the traffic lights, to drag the window by

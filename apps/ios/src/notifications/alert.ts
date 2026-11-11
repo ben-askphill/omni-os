@@ -1,6 +1,6 @@
 import type { AppPushKind } from '@omni/shared/app-pairing.ts';
 
-/** What the server puts under `omni` in every alert: where to go, never what was said. */
+/** What the server puts under `omni` in every alert: where to go. The preview text is in `aps.alert`, which iOS shows. */
 export interface OmniAlert {
   kind: AppPushKind;
   threadId: string;

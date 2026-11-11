@@ -496,7 +496,7 @@ server.registerTool(
       `Save a secret (an API key or token, as an environment variable for threads) on this machine or another synced one, only when ${USER} asks and gives the value. ` +
       'With machine left out or "here" it is saved here at once. With another machine it is sealed to that machine\'s own key, goes over sync as ciphertext only, ' +
       'and that machine saves it in its own secret store after its next sync; this waits briefly for the answer and otherwise says it is on its way (sent_secrets shows it later). ' +
-      'A secret already there under the same scope and name is replaced. Omni\'s own credentials (sync, Connect) are refused. Never repeat the value back.',
+      'A secret already there under the same scope and name is replaced. Omni\'s own credentials (sync, Connect) and names that change how programs start (PATH, NODE_OPTIONS, LD_*, DYLD_*, GIT_*, PYTHONPATH and similar) are refused: those are Settings only. Never repeat the value back.',
     inputSchema: {
       name: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/).describe('UPPER_SNAKE_CASE, the environment variable threads see.'),
       value: z.string().min(1).describe('The secret, one line.'),
@@ -712,8 +712,13 @@ server.registerTool(
     refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/skip`, { method: 'POST', body: JSON.stringify(attempt === undefined ? {} : { attempt }) })),
 );
 
+server.registerTool('disk_space', {
+  description: `Read-only: free space on the disk with Omni's data (worktrees, the database) and, when it is on another disk or under a Linux per-user /tmp quota, the temp folder the agent CLIs write command output to, as the server last checked it (every 10 minutes). level is ok, low (under 20 GB, or 15% of a small volume) or critical (under 5 GB, or 5%). When it fills, every shell command fails with ENOSPC or EDQUOT. On low or critical, tell ${USER}; worktree_storage shows what a cleanup could free, and only ${USER} removes anything.`,
+  inputSchema: {},
+}, async () => text(await call('/disk')));
+
 server.registerTool('worktree_storage', {
-  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this machine\'s retention policy would remove and the last cleanup runs. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees, in Settings > Worktrees.',
+  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this machine\'s retention policy would remove and the last cleanup runs. slim: the idle worktrees whose caches (node_modules, build output) stripping would delete while keeping the worktree, its schedule on this machine and the last strip runs; cacheBytes on each item is that part of its size. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees or strips caches, in Settings > Worktrees.',
   inputSchema: { scan: z.boolean().optional() },
 }, async ({ scan }) => text(await call('/worktrees/scan', scan ? { method: 'POST' } : undefined)));
 
@@ -781,9 +786,30 @@ server.registerTool('note_tool_failure_recovery', {
   inputSchema: { id: z.string(), recovery: z.enum(['recovered', 'not_recovered', 'unknown']), retry_of: z.string().optional() },
 }, async ({ id, ...body }) => text(await call(`/tool-failures/occurrences/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) })));
 
+/** omni_update on this server alone, through its own Update (update.ts). */
+const UPDATE_HERE = { check: { path: '/update/check', method: 'POST' }, apply: { path: '/update', method: 'POST' }, status: { path: '/update', method: 'GET' } } as const;
+/** omni_update's actions as POST /api/update/fleet names them. */
+const FLEET_ACTION = { check: 'check', download: 'download', apply: 'update' } as const;
+
 server.registerTool('omni_update', {
-  description: `Omni's own update. check: fetch origin's main and say how many commits this server is behind, with their subjects. apply: the Update button. It waits until no turn runs (this one included, so it starts after your turn ends), updates the main checkout to main, rebuilds the Web UI and restarts the server. Only works when a supervisor started the server from a checkout: the desktop app run with --dev, or a service manager with OMNI_SUPERVISOR set. The packaged desktop app updates itself and offers to relaunch, so there check finds nothing and apply is refused. Apply only when ${USER} asks.`,
-  inputSchema: { action: z.enum(['check', 'apply']) },
-}, async ({ action }) => text(await call(action === 'check' ? '/update/check' : '/update', { method: 'POST' })));
+  description:
+    `Omni's own update, here or on every synced machine. check: find what is new (a checkout fetches origin's main and says how many commits it is behind, here with their subjects; the desktop app looks for a release). ` +
+    'download: bring it over without applying (a checkout fetches the commits; the desktop app downloads the release). apply: the Update button. On each machine it waits until no turn runs there (this one included, so here it starts after your turn ends), ' +
+    'then a checkout updates to main, rebuilds the Web UI and restarts the server, and the packaged desktop app relaunches itself into the downloaded release. status: where each machine stands. ' +
+    'machines: "here" (the default) acts on this server alone; "all" asks every synced machine; or name some (names or ids from list_devices, comma-separated). ' +
+    'The asks reach the others over sync and each machine runs on its own, so one that fails never holds up another. One that is offline, runs an older Omni, or whose server nothing restarts is skipped and the answer says why; ' +
+    `naming an offline machine asks it anyway, and it takes the ask when it next syncs, within 30 minutes. Apply only when ${USER} asks.`,
+  inputSchema: {
+    action: z.enum(['check', 'download', 'apply', 'status']),
+    machines: z.string().optional().describe('"here" (the default), "all", or machine names or ids, comma-separated.'),
+  },
+}, async ({ action, machines }) => {
+  const where = machines?.trim() || 'here';
+  const here = where.toLowerCase() === 'here';
+  if (here && action !== 'download') return text(await call(UPDATE_HERE[action].path, { method: UPDATE_HERE[action].method }));
+  if (action === 'status') return text(await call('/update/fleet'));
+  const named = here ? ['here'] : where.toLowerCase() === 'all' ? undefined : where.split(',').map((m) => m.trim()).filter(Boolean);
+  return text(await call('/update/fleet', { method: 'POST', body: JSON.stringify({ action: FLEET_ACTION[action], machines: named, force: !here && !!named }) }));
+});
 
 await server.connect(new StdioServerTransport());

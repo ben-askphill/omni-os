@@ -444,7 +444,7 @@ interface Report {
   dataDir: string | null;
   steps: StepReport[];
   /** `external`: the links the app handed to the system browser during the run, in order. */
-  facts: { route: string | null; windows: { url: string; title: string; bounds: Bounds | null; zoom: number | null }[]; external: string[] };
+  facts: { route: string | null; windows: { url: string; title: string; bounds: Bounds | null; zoom: number | null; trafficLights: { x: number; y: number } | null }[]; external: string[] };
   pageErrors: string[];
 }
 
@@ -548,8 +548,15 @@ async function main(argv: readonly string[]): Promise<number> {
       windows.map(async (w) => {
         const shape = await app
           .browserWindow(w)
-          .then((h) => h.evaluate((win) => ({ bounds: win.getContentBounds(), zoom: win.webContents.getZoomFactor() })))
-          .catch(() => ({ bounds: null, zoom: null }));
+          .then((h) =>
+            h.evaluate((win) => ({
+              bounds: win.getContentBounds(),
+              zoom: win.webContents.getZoomFactor(),
+              // macOS only: where the window's traffic lights sit (windows.ts placeTrafficLights).
+              trafficLights: process.platform === 'darwin' ? win.getWindowButtonPosition() : null,
+            })),
+          )
+          .catch(() => ({ bounds: null, zoom: null, trafficLights: null }));
         return { url: w.url(), title: await w.title().catch(() => ''), ...shape };
       }),
     );

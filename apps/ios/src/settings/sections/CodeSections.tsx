@@ -51,7 +51,7 @@ export function ChannelsSection() {
           <ListRow
             key={c.id}
             first={i === 0}
-            leading={<ChannelAvatar name={c.name} icon={c.icon} conductor={c.id === 'conductor'} size={28} />}
+            leading={<ChannelAvatar name={c.name} icon={c.icon} avatarBg={c.avatar_bg} conductor={c.id === 'conductor'} size={28} />}
             title={channelTitle(c)}
             detail={channelWhere(c)}
             chevron

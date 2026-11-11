@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { PROVENANCE_LABEL, resettable, type Provenance } from '@omni/shared/settings-catalog.ts';
 import type { ServerOption, ServerOptionsState } from '@omni/shared/settings.ts';
 import { useApi } from '../api.ts';
-import { Chip, ErrorNote, Icon, Label, Picker, Toggle, type ChipTone } from '../components/ui.tsx';
+import { Chip, ErrorNote, Icon, Picker, Toggle, type ChipTone } from '../components/ui.tsx';
 import { setSettingsScope, useSettingsScope } from '../settings-scope.ts';
 import { useApp } from '../store.tsx';
 
@@ -55,16 +55,28 @@ export function Card({ title, subtitle, entry, origin, children }: { title: stri
   );
 }
 
+/** The id of a Row's hint, for the control's aria-describedby. */
+export const rowHintId = (htmlFor: string) => `${htmlFor}-hint`;
+
+/**
+ * A labelled setting: the label with its origin on one line, the hint under them at the row's full width, then the
+ * control. The label line is a chip tall with or without an origin, so every row starts on the same rhythm.
+ */
 export function Row({ label, hint, htmlFor, origin, children }: { label: string; hint?: string; htmlFor: string; origin?: ReactNode; children: ReactNode }) {
   return (
     <div>
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <Label htmlFor={htmlFor} hint={hint}>
+      <div className="mb-1.5">
+        <div className="flex min-h-5 items-center gap-3">
+          <label htmlFor={htmlFor} className="min-w-0 flex-1 text-[12.5px] font-medium text-fg-2">
             {label}
-          </Label>
+          </label>
+          {origin}
         </div>
-        {origin}
+        {hint && (
+          <p id={rowHintId(htmlFor)} className="mt-0.5 text-[13px] leading-[18px] text-fg-3">
+            {hint}
+          </p>
+        )}
       </div>
       {children}
     </div>
@@ -83,13 +95,14 @@ const ORIGIN_TONE: Record<Provenance, ChipTone> = {
 
 /**
  * Where a value comes from (T3's provenance), with Reset beside a value Omni saved. `label` replaces the standard
- * wording, as "Set by OMNI_TZ" or "Set on #acme".
+ * wording, as "Set by OMNI_TZ" or "Set on #acme". The mark stays at the right edge and Reset sits to its left, so the
+ * marks of a column of rows line up whether or not a row can reset. A default is plain text in a chip's box (#551).
  */
 export function Origin({ of, label, title, onReset, busy }: { of: Provenance; label?: string; title?: string; onReset?: () => void; busy?: boolean }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5">
+    <span className="inline-flex shrink-0 flex-row-reverse items-center gap-1.5">
       {of === 'default' ? (
-        <span title={title} className="text-[11.5px] text-fg-3">
+        <span title={title} className="inline-flex h-5 items-center px-2 text-[11.5px] text-fg-3">
           {label ?? PROVENANCE_LABEL[of]}
         </span>
       ) : (
@@ -130,7 +143,7 @@ export function ScopeBar() {
         searchable={listed.length > 7}
         options={[
           { value: '', label: 'Every channel', sub: 'Machine-wide values', icon: 'monitor', avatar: false },
-          ...listed.map((c) => ({ value: c.id, label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`, channelIcon: c.icon })),
+          ...listed.map((c) => ({ value: c.id, label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`, avatarBg: c.avatar_bg, channelIcon: c.icon })),
         ]}
       />
       <span className="max-sm:basis-full">{channel ? 'Showing what this channel sets and what it inherits.' : "Showing this machine's values. Pick a channel to see its own."}</span>

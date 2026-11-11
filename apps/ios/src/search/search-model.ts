@@ -25,6 +25,7 @@ export interface ChannelMatch {
   id: string;
   name: string;
   icon: string | null;
+  avatar_bg?: string | null;
   label: string;
   detail: string | null;
 }
@@ -34,7 +35,7 @@ export function matchChannels(channels: readonly ChannelWithRunning[] | null, qu
   if (!needle) return [];
   return (channels ?? [])
     .filter((c) => !c.archived && `${c.name} ${c.id}`.toLowerCase().includes(needle))
-    .map((c) => ({ id: c.id, name: c.name, icon: c.icon ?? null, label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`, detail: c.store_domain || c.github_repo || null }));
+    .map((c) => ({ id: c.id, name: c.name, icon: c.icon ?? null, avatar_bg: c.avatar_bg, label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`, detail: c.store_domain || c.github_repo || null }));
 }
 
 export interface HitRow {

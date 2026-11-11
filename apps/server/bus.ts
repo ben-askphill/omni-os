@@ -20,7 +20,9 @@ export type FeedEvent =
   /** The update check or Update moved on (update.ts). Clients refetch GET /api/update. */
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed (claude-artifacts.ts). Clients refetch the list when it ends. */
-  | { type: 'claude_artifacts'; state: unknown };
+  | { type: 'claude_artifacts'; state: unknown }
+  /** Free disk space crossed a warning level (disk-space.ts). Clients refetch GET /api/disk. */
+  | { type: 'disk'; level: string };
 
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);

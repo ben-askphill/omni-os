@@ -30,7 +30,7 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
     >
-      <ChannelAvatar name={home?.name ?? row.channel ?? row.target.channelId} icon={home?.icon} conductor={row.target.channelId === 'conductor'} glyph={glyph} />
+      <ChannelAvatar name={home?.name ?? row.channel ?? row.target.channelId} icon={home?.icon} avatarBg={home?.avatar_bg} conductor={row.target.channelId === 'conductor'} glyph={glyph} />
       <View style={[styles.body, { borderBottomColor: colors.line }]}>
         <View style={styles.top}>
           <Text numberOfLines={2} style={[styles.title, { color: settled ? colors.fg2 : colors.fg }]}>

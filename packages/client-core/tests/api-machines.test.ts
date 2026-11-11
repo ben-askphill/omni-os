@@ -33,6 +33,19 @@ describe('machines', () => {
     ]);
   });
 
+  it('reads the update fleet and asks it to update', async () => {
+    const view = { machines: [], synced: true };
+    const first = api({ json: view });
+    expect(await first.api.updateFleet()).toEqual(view);
+    const result = { ...view, skipped: [] };
+    const second = api({ json: result });
+    expect(await second.api.askFleet({ action: 'update', machines: ['m-air'], force: true })).toEqual(result);
+    expect([first.sent, second.sent]).toEqual([
+      [{ method: 'GET', url: at('/update/fleet') }],
+      [{ method: 'POST', url: at('/update/fleet'), body: { action: 'update', machines: ['m-air'], force: true } }],
+    ]);
+  });
+
   it('hands a thread to a machine by device id, takes it over, and cancels', async () => {
     const answer = { thread: { id: 't/1', status: 'stopped' }, handoff: null };
     const { sent, api: a } = api({ json: answer });

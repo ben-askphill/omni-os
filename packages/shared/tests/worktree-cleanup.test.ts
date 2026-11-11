@@ -7,7 +7,7 @@ const daysAgo = (d: number) => new Date(NOW - d * 24 * 3600 * 1000).toISOString(
 
 const item = (over: Partial<WorktreeItem>): WorktreeItem => ({
   id: 'a', kind: 'managed', verdict: 'eligible', dir: '/d/a', repo: '/r', branch: 'omni/a', threadId: 'a', threadTitle: 'A', lastActiveAt: daysAgo(30),
-  channelId: 'c', channelName: 'C', folder: true, registered: true, bytes: 100, sharedWith: [], reasons: [], eligibleBecause: 'archived', errors: [], ...over,
+  channelId: 'c', channelName: 'C', folder: true, registered: true, bytes: 100, cacheBytes: 0, sharedWith: [], reasons: [], eligibleBecause: 'archived', errors: [], ...over,
 });
 
 const on = { enabled: true, idleDays: 14 };

@@ -14,11 +14,13 @@ const { MemoryTransport } = await import('../sync/transport.ts');
 const sync = await import('../sync/worker.ts');
 const files = await import('../sync/files.ts');
 const { app } = await import('../app.ts');
+const { register } = await import('../artifacts.ts');
+const { artifacts } = await import('../db.ts');
 
 const relay = new MemoryTransport();
 const home = join(r.tmp, 'home');
 mkdirSync(home);
-files.configureFileSync({ home, env: {}, turnDelayMs: 20, openEveryMs: 0 });
+files.configureFileSync({ home, env: {}, turnDelayMs: 20, openEveryMs: 0, fileWaitMs: 2_000, fileRetryMs: 20 });
 const worker = sync.createSyncWorker({ transport: relay, machineId: 'mac-a' });
 sync.setActiveWorker(worker);
 
@@ -186,6 +188,31 @@ describe('file sync hooks', () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('png bytes');
     expect((await app.request(`/api/threads/${t.id}/uploads/nope.png`)).status).toBe(404);
+  });
+
+  it('uploads an artifact as soon as it is saved, before the turn ends', async () => {
+    const t = await r.start('first', { title: 'Mid-turn' });
+    await r.untilResults(t.id, 1);
+    await new Promise((res) => setTimeout(res, 100));
+    write(join(r.paths.threads, t.id, 'artifacts', 'shot.png'), 'png now');
+    register(join(t.id, 'artifacts', 'shot.png'));
+    const m = await waitFor(() => manifest(t.id)?.files['artifacts/shot.png'] && manifest(t.id), 'the saved artifact in the manifest');
+    expect(m.files['artifacts/shot.png'].sha).toBe(sha('png now'));
+    expect(text(`blobs/${sha('png now')}`)).toBe('png now');
+  });
+
+  it('serves an artifact whose file reaches the relay after its row', async () => {
+    const t = await r.start('first', { title: 'Row first' });
+    await r.untilResults(t.id, 1);
+    await new Promise((res) => setTimeout(res, 100));
+    const path = join(r.paths.threads, t.id, 'artifacts', 'late.png');
+    const row = artifacts.upsert({ thread_id: t.id, path, name: 'late.png', kind: 'image', size: 9 });
+    const res = app.request(`/api/artifacts/${row.id}/raw`);
+    await new Promise((res) => setTimeout(res, 100));
+    fromOtherMac(t.id, { files: { 'artifacts/late.png': 'late png' } });
+    const got = await res;
+    expect(got.status).toBe(200);
+    expect(await got.text()).toBe('late png');
   });
 
   it('does nothing while sync is off', async () => {

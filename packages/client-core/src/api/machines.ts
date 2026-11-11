@@ -1,4 +1,5 @@
 import type { Device, HandoffView } from '@omni/shared/handoff.ts';
+import type { FleetRequest, FleetResult, FleetView } from '@omni/shared/update-fleet.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 import type { Thread } from './threads.ts';
 
@@ -47,6 +48,10 @@ export function machinesApi(http: HttpClient) {
     /** Asks the machine that holds the thread to hand it to this one. Answers like a handoff, with the request as the handoff. A 409 says why not. */
     takeOver: (threadId: string) => http.request<HandoffAnswer>('POST', apiPath`/threads/${threadId}/takeover`, { body: {} }),
     /** Cancels this machine's Take over before it has the thread, or a handoff from it before the other machine picks the thread up. */
+    /** Update all machines: every synced machine with where its update stands (apps/server/update-fleet.ts). */
+    updateFleet: () => http.request<FleetView>('GET', apiPath`/update/fleet`),
+    /** Asks machines to check, download or update. Every machine when `machines` is left out; `force` asks offline ones too. */
+    askFleet: (request: FleetRequest) => http.request<FleetResult>('POST', apiPath`/update/fleet`, { body: request }),
     cancelHandoff: (threadId: string) => http.request<HandoffAnswer>('POST', apiPath`/threads/${threadId}/handoff/cancel`, { body: {} }),
   };
 }

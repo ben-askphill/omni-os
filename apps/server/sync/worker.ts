@@ -70,6 +70,8 @@ export interface SyncWorker {
   readonly transport: SyncTransport;
   /** Sync now. Joins a sync in flight, then runs one more so the caller's writes are in it. Never rejects. */
   syncNow(): Promise<SyncResult>;
+  /** Push the outbox and nothing more: no pull, so no listener runs. After any sync in flight. Never rejects. */
+  flush(): Promise<void>;
   /** Sync within ms, coalescing calls. */
   syncSoon(ms?: number): void;
   start(): void;
@@ -103,6 +105,13 @@ function toChanges(rows: OutboxRow[], machineId: string): Change[] {
     out.push({ machine_id: machineId, entity: g.entity, entity_id: g.entity_id, op: g.op, data, ts: g.ts });
   }
   return out;
+}
+
+const syncingListeners = new Set<(worker: SyncWorker) => void>();
+/** Called at the start of each sync, before its push, so a write made there goes out in that sync. Returns a function that removes it. */
+export function beforeSync(fn: (worker: SyncWorker) => void): () => void {
+  syncingListeners.add(fn);
+  return () => syncingListeners.delete(fn);
 }
 
 const syncedListeners = new Set<(worker: SyncWorker) => void>();
@@ -176,6 +185,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   async function cycle(): Promise<SyncResult> {
     const result: SyncResult = { pushed: 0, pulled: 0, applied: 0, skipped: 0, deferred: 0 };
     try {
+      for (const fn of syncingListeners) fn(worker);
       result.pushed = await push();
       await pull(result);
       // Everything the relay had is in: an owner another Mac set would be here by now. A claim goes out at once.
@@ -216,6 +226,10 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
         queued = null;
         return worker.syncNow();
       }));
+    },
+    async flush() {
+      await inflight;
+      await push().catch(() => 0);
     },
     syncSoon(ms = 1_000) {
       if (soon) return;
@@ -291,6 +305,11 @@ export function setActiveWorker(w: SyncWorker | null): Promise<void> {
 /** Sync now, for anything that wants its change on the other Mac sooner. Null when sync is off. */
 export async function syncNow(): Promise<SyncResult | null> {
   return active ? active.syncNow() : null;
+}
+
+/** On the way out: push what is written, for at most `ms`. Takes nothing in, so nothing new starts. */
+export function flushSync(ms: number): Promise<void> {
+  return Promise.race([active?.flush(), new Promise<void>((resolve) => setTimeout(resolve, ms).unref())]).then(() => undefined);
 }
 
 const globalNames = () => new Set(listSecrets().filter((s) => s.scope === 'global').map((s) => s.name));

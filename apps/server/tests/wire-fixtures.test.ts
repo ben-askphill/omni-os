@@ -34,8 +34,9 @@ const HINT = `The server JSON the clients read changed shape. If that is on purp
 /**
  * Every fixture this test owns. A few come from elsewhere: sync-status.json is checked
  * by sync-setup.test.ts, and those that take two machines by their own tests: devices.json and thread-handoff.json by
- * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts, and
- * thread-undelivered.json by delivery-gap-run-on.test.ts.
+ * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts,
+ * thread-undelivered.json by delivery-gap-run-on.test.ts, update-fleet.json by update-fleet-two-macs.test.ts, and
+ * update-desktop.json and update-desktop-request.json by update-desktop.test.ts.
  */
 const NAMES = [
   'harnesses.json',
@@ -140,10 +141,13 @@ const NAMES = [
   'thread-actions.json',
   // The storage scan over the worktrees above, once it has finished.
   'worktree-scan.json',
-  // A cleanup of two of them that removes one and keeps the other, then this Mac's retention policy turned on.
+  // A cleanup of two of them that removes one and keeps the other, then this Mac's retention policy turned on, then
+  // its schedule for stripping caches.
   'worktree-cleanup.json',
   'worktree-retention-request.json',
   'worktree-retention.json',
+  'worktree-slim-request.json',
+  'worktree-slim.json',
   // A thread with no PR watch, then one polled through the fake gh, then stopped.
   'pr-watch-none.json',
   'pr-watch.json',
@@ -849,6 +853,8 @@ async function scenario() {
 
   const retentionBody = request('worktree-retention-request.json', { enabled: true, idleDays: 30 });
   keep('worktree-retention.json', await call('PUT', '/worktrees/retention', retentionBody));
+  const slimBody = request('worktree-slim-request.json', { enabled: false, idleDays: 14 });
+  keep('worktree-slim.json', await call('PUT', '/worktrees/slim', slimBody));
 
   // Last, since it gives acme a GitHub repo. The app sends {} for the branch's PR; acme threads have no branch, so
   // this one names the PR.

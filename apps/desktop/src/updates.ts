@@ -10,10 +10,13 @@ import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { AppUpdater, UpdateInfo } from 'electron-updater';
 import type { DesktopUpdateView } from '@omni/shared/desktop-bridge.ts';
+import type { DesktopUpdateCommand, DesktopUpdateReport } from '@omni/shared/update-fleet.ts';
 import type { AppContext } from './context.ts';
 import { handle, on } from './handle.ts';
-import { quitPlan, quitToUpdate } from './quit.ts';
+import { quitPlan, quitToUpdate, updateWhenIdle } from './quit.ts';
+import { createUpdateReporter } from './update-report.ts';
 import {
+  commandStep,
   initialView,
   installOnQuit,
   reduceUpdate,
@@ -28,6 +31,8 @@ import {
 } from './update-state.ts';
 
 const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
+/** How often the app reports its updater to the server it started, when no view change did. */
+const REPORT_EVERY_MS = 5000;
 /** How long a held quit waits for Squirrel.Mac to fetch, check and stage the update before the app exits anyway. */
 const MAC_INSTALL_WAIT_MS = 120_000;
 
@@ -87,12 +92,14 @@ export function installUpdates(ctx: AppContext): void {
     if (sameView(next, view)) return;
     view = next;
     ctx.broadcast({ type: 'update', update: view });
+    void report();
   };
 
-  const check = async () => {
+  /** `downloads`: go on to download what it finds, whatever Check automatically says. */
+  const check = async (downloads = auto()) => {
     if (!updater || !shouldCheck(view)) return;
     // Read as the check finds an update: off, it waits for Download.
-    updater.autoDownload = auto();
+    updater.autoDownload = downloads;
     try {
       await updater.checkForUpdates();
     } catch (err) {
@@ -105,13 +112,36 @@ export function installUpdates(ctx: AppContext): void {
     await check();
     return view;
   });
-  handle('omni:updates:download', async () => {
-    if (!updater || view.state !== 'available') return view;
+  const startDownload = () => {
+    if (!updater || view.state !== 'available') return;
     apply({ type: 'download-started' });
     // Not awaited: the page gets `downloading` now, then the progress, the finished download or a failure as the
     // updater's events. A failure is its error event too, which apply() already took.
     updater.downloadUpdate().catch(() => {});
+  };
+
+  handle('omni:updates:download', async () => {
+    startDownload();
     return view;
+  });
+
+  // A command from the server this app started, for a fleet ask. Check and download take the page buttons' steps; install waits for idle like Update When They Finish.
+  const carryOut = (command: DesktopUpdateCommand): boolean => {
+    const step = commandStep(command, view);
+    if (step === 'check') void check();
+    else if (step === 'check-and-download') void check(true);
+    else if (step === 'download') startDownload();
+    else if (step === 'install') void updateWhenIdle(ctx);
+    return step !== 'wait';
+  };
+  const report = createUpdateReporter({
+    // A copy that cannot update itself reports too, so the other machines show it as one to update by hand.
+    canReport: () => (!!updater || view.state === 'unsupported') && ctx.backend.current.kind === 'ready' && ctx.backend.info().startedHere,
+    current: () => ({ version: app.getVersion(), view }),
+    send: (body: DesktopUpdateReport) =>
+      ctx.backend.api('/api/update/desktop', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+    carryOut,
+    onFirstFailure: (err) => console.warn('[omni] update: the server did not take the update report:', updateErrorText(err)),
   });
 
   let handedOff = false;
@@ -162,6 +192,7 @@ export function installUpdates(ctx: AppContext): void {
     setImmediate(() => app.quit());
   });
 
+  setInterval(() => void report(), REPORT_EVERY_MS).unref();
   if (view.state === 'unsupported') return;
 
   void import('electron-updater').then(({ autoUpdater }) => {
@@ -188,6 +219,7 @@ export function installUpdates(ctx: AppContext): void {
     setInterval(() => {
       if (auto()) void check();
     }, CHECK_EVERY_MS).unref();
+    void report();
     // Turned on: look now rather than at the next tick.
     ctx.settings.onChange((next, previous) => {
       if (next.autoUpdate && !previous.autoUpdate) void check();

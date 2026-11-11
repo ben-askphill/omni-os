@@ -32,7 +32,7 @@ import { crewLine, prLine, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { runningSubagents } from '../subagents.ts';
-import { statusLabel } from '../status-line.ts';
+import { statusLabel } from '@omni/shared/status-line.ts';
 import { shownStatus } from '@omni/shared/delegate-count.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */

@@ -49,6 +49,20 @@ export const deviceName = (id: string): string | null => deviceRecord(id)?.name 
 /** This machine's name for a handoff or a refusal: as it announced itself, else its host name. Never "this Mac". */
 export const ownName = (id: string): string => deviceName(id) ?? hostname();
 
+const refused = (message: string, status: number) => Object.assign(new Error(message), { status });
+
+/** A synced machine by id or by name (any case). Refuses one this machine does not know, or a name two share. */
+export function machineFor(asked: string): { id: string; name: string } {
+  const all = currentRecords(deviceRecords());
+  const byId = all.find((d) => d.id === asked);
+  if (byId) return { id: byId.id, name: byId.name };
+  const named = all.filter((d) => d.name.toLowerCase() === asked.trim().toLowerCase());
+  if (named.length === 1) return { id: named[0].id, name: named[0].name };
+  const known = all.map((d) => `${d.name} (${d.id})`).join(', ') || 'none yet';
+  if (named.length > 1) throw refused(`More than one synced machine is called ${asked}. Pass its id: ${known}.`, 400);
+  throw refused(`No synced machine is called ${asked}. Synced machines: ${known}.`, 404);
+}
+
 let announcedAt = 0;
 
 /** This machine's public key for sealed secrets, or undefined when its secret store cannot be reached now. */

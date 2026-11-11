@@ -20,6 +20,7 @@ import {
   SwitchRow,
 } from './Cards';
 import { CallRow, ModRow, NoteRow } from './Steps';
+import { ThinkingRow } from './ThinkingRow';
 
 type Views = { [K in RowKind]: ComponentType<{ row: Extract<ThreadRow, { kind: K }> }> };
 
@@ -40,6 +41,7 @@ const VIEWS: Views = {
   mod: ModRow,
   switch: SwitchRow,
   now: NowRow,
+  thinking: ThinkingRow,
   plan: PlanRow,
 };
 

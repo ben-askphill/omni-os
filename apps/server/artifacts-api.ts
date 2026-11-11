@@ -19,7 +19,7 @@ artifactsApi.get('/published', (c) =>
 
 artifactsApi.get('/:id/raw', async (c) => {
   const a = artifacts.get(Number(c.req.param('id')));
-  if (a && !existsSync(a.path)) await threadFilesReady(a.thread_id);
+  if (a && !existsSync(a.path)) await threadFilesReady(a.thread_id, a.path);
   // A path that escapes the threads dir is the same as missing. Do not serve it.
   if (!a || !existsSync(a.path) || relative(paths.threads, a.path).startsWith('..')) return c.text('not found', 404);
   c.header('Content-Type', mimeFor(a.path, a.kind));

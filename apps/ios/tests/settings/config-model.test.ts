@@ -13,7 +13,7 @@ const state = (over: Partial<SetupState['config']> = {}, env: Record<string, str
     integrations: { hermesUrl: '', centralBrainDir: '', tailscaleLogin: '', mcpPublicUrl: '', clerkPublishableKey: '', clerkClientId: '' },
     runOn: { device: '' },
     automations: {},
-    worktrees: { retention: { enabled: false, idleDays: 14 } },
+    worktrees: { retention: { enabled: false, idleDays: 14 }, slim: { enabled: false, idleDays: 7 } },
     ...over,
   },
   resolved: { timezone: 'Europe/Amsterdam', workspaceRoot: '~/Omni', reposDir: '~/code', centralBrainDir: '~/central-brain', hermesUrl: '' },

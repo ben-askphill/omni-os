@@ -359,7 +359,11 @@ const WORKSPACE_TEXT: Record<ContinuePreview['workspace'], string> = {
   folder: "Starts in the channel's folder, as any new thread does.",
 };
 
-export const workspaceText = (p: Pick<ContinuePreview, 'workspace'>) => WORKSPACE_TEXT[p.workspace] ?? WORKSPACE_TEXT.folder;
+/** Where the new thread starts, and on which machine when Settings > Threads sends new threads to another one. */
+export const workspaceText = (p: Pick<ContinuePreview, 'workspace' | 'runs_on'>) => {
+  const where = WORKSPACE_TEXT[p.workspace] ?? WORKSPACE_TEXT.folder;
+  return p.runs_on ? `${where} It runs on ${p.runs_on.name}, where Settings > Threads sends new threads.` : where;
+};
 
 // ---------- links ----------
 

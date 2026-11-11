@@ -1,6 +1,6 @@
 # Sync between two Macs
 
-Optional. Each Mac keeps its own SQLite as the source of truth. A relay you deploy to your own Cloudflare account carries the changes between them (channels, sidebar folders, threads, events, artifacts, automation runs and event deliveries, settings) and keeps thread files in R2. With no relay signed in, sync is off and Omni behaves as before. Why a relay and not a shared database: [ADR 0004](../adr/0004-supabase-sync.md). Why Cloudflare and Clerk: [ADR 0008](../adr/0008-cloudflare-relay.md).
+Optional. Each Mac keeps its own SQLite as the source of truth. A relay you deploy to your own Cloudflare account carries the changes between them (channels, sidebar folders, threads, events, artifacts, automation runs and event deliveries, settings) and keeps thread files and each push's change data in R2, so the Durable Object's SQLite holds only the index. With no relay signed in, sync is off and Omni behaves as before. Why a relay and not a shared database: [ADR 0004](../adr/0004-supabase-sync.md). Why Cloudflare and Clerk: [ADR 0008](../adr/0008-cloudflare-relay.md).
 
 ## One-time relay setup
 
@@ -24,7 +24,7 @@ Every machine has to use the Clerk app the relay trusts. If they differ, setup s
 Before this, the relay was a Supabase project. A machine that still holds the Supabase credentials says "Sync moved to Cloudflare" in Settings > Sync. Sign in to the new relay once on each machine. The sign-in removes the Supabase credentials, and the machine's history is queued again for the new relay, so nothing is lost. Once every machine has moved, you can delete the Supabase project.
 
 - Path map: paths travel with the home folder as `~`. When the other Mac keeps a folder somewhere else, map it under Advanced in Settings > Sync, like `~/work` to `~/code`.
-- Files: after a Mac's first sync, Omni uploads the files and session files of every thread it wrote last, in the background (the log counts progress every 50 threads). After that, a thread's files go up after each turn. The bucket fills a few minutes after the rows.
+- Files: after a Mac's first sync, Omni uploads the files and session files of every thread it wrote last, in the background (the log counts progress every 50 threads). After that, a thread's files go up after each turn, and an artifact goes up a moment after it is written, so the other Mac can open it while the turn still runs. The bucket fills a few minutes after the rows.
 - Before a thread resumes, Omni downloads its latest session file. When that download fails or takes over 15 seconds, the thread does not resume the copy on this Mac, which may miss turns the other Mac ran. A "Session not up to date" card says why, and your message waits. Try again downloads it again; Start with fresh context starts a new session that reads the thread so far. Both are on desktop web, the phone and the desktop app.
 - `npm run sync:backfill`: queue every existing row again, for instance after restoring a database. It is idempotent and skips rows the other Mac wrote last.
 - Signing in to a different relay or user starts that relay from the beginning and queues the history again.
@@ -52,6 +52,7 @@ Pick where a new thread runs: this machine, or any other synced machine, such as
 - Take over brings the thread back to this machine; from then on it runs here.
 - If the other machine cannot start it, the thread stops here with why. A worktree thread's Retry runs it on this machine; any other keeps its first message for Resume.
 - Team members stay with their lead on the hub.
+- [Fork thread](harnesses.md#continuing-on-another-harness) follows the same default: the fork goes to that machine with the source's snapshot as its worktree.
 - The other machine needs its own harness logins. On a Linux box, use `claude setup-token` and save it as the global secret `CLAUDE_CODE_OAUTH_TOKEN`. For Codex, run `codex login --device-auth` there; never copy `~/.codex/auth.json` from a Mac, or the two keep logging each other out.
 
 ## Where a thread runs

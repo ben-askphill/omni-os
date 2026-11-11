@@ -15,7 +15,7 @@ export const CLAUDE_ALIASES: Record<string, string> = {
   opus: 'claude-opus-5-5',
   sonnet: 'claude-sonnet-5-5',
   haiku: 'claude-haiku-4-5',
-  fable: 'claude-fable-5-1',
+  fable: 'claude-fable-5-2',
 };
 
 const claudeModel = (id: string, label: string, isDefault = false): ModelEntry => ({
@@ -32,6 +32,7 @@ export function claudeModels(defaultModelId = 'claude-sonnet-5-5'): ModelEntry[]
     claudeModel('claude-sonnet-5-5', 'Sonnet 5.5'),
     claudeModel('claude-opus-5-5', 'Opus 5.5'),
     claudeModel('claude-sonnet-5', 'Sonnet 5'),
+    claudeModel('claude-fable-5-2', 'Fable 5.2'),
     claudeModel('claude-fable-5-1', 'Fable 5.1'),
     claudeModel('claude-haiku-4-5', 'Haiku 4.5'),
   ];

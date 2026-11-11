@@ -1,3 +1,4 @@
+import { resolveAvatarColor } from '@omni/shared/avatar-color.ts';
 import { db, tx } from '../connection.ts';
 import { record } from '../sync.ts';
 
@@ -17,6 +18,8 @@ export interface Channel {
   notes: string | null;
   /** One emoji, or `icon:<name>` for a design system icon (packages/shared/channel-icon.ts), shown in place of the letter avatar and the sidebar's #. */
   icon: string | null;
+  avatar_bg?: string | null;
+  avatar_bg_manual?: number;
   /** What a new thread here runs on when neither the thread nor its role picks. Null for Claude Code's default. */
   default_harness: string | null;
   default_model: string | null;
@@ -44,11 +47,12 @@ export const channels = {
       .all() as unknown as Channel[],
   get: (id: string) => db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as unknown as Channel | undefined,
   create(c: Partial<Channel> & { id: string; name: string }) {
+    c = { ...c, ...resolveAvatarColor(c) };
     return tx(() => {
       db.prepare(
-        `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes, icon,
+        `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes, icon, avatar_bg, avatar_bg_manual,
            default_harness, default_model, default_effort)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         c.id,
         c.name,
@@ -62,6 +66,8 @@ export const channels = {
         c.browser_headless ?? 1,
         c.notes ?? null,
         c.icon ?? null,
+        c.avatar_bg ?? null,
+        c.avatar_bg_manual ?? 0,
         c.default_harness ?? null,
         c.default_model ?? null,
         c.default_effort ?? null,
@@ -71,9 +77,10 @@ export const channels = {
     });
   },
   update(id: string, patch: Partial<Channel>) {
+    patch = resolveAvatarColor(patch, channels.get(id));
     const allowed = [
       'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir',
-      'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'design_system', 'design_system_name', 'archived',
+      'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'avatar_bg', 'avatar_bg_manual', 'design_system', 'design_system_name', 'archived',
       'default_harness', 'default_model', 'default_effort',
     ] as const;
     const keys = allowed.filter((k) => k in patch);

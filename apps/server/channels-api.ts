@@ -71,6 +71,8 @@ const channelSchema = z.object({
   browser_headless: z.coerce.number().int().min(0).max(1).optional(),
   notes: z.string().nullish(),
   icon: channelIcon,
+  avatar_bg: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'use a six-digit hex color').nullish(),
+  avatar_bg_manual: z.number().int().min(0).max(1).optional(),
   default_harness: runDefault,
   default_model: runDefault,
   default_effort: runDefault,

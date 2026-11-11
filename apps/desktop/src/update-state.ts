@@ -1,6 +1,7 @@
 // The app updater's state, as the Web UI shows it (DesktopUpdateView): when this copy can update itself, and how
 // electron-updater's events move it. Pure, so tests pin each step; updates.ts wires it to the updater.
 import type { DesktopReleaseNotes, DesktopUpdateView } from '@omni/shared/desktop-bridge.ts';
+import type { DesktopUpdateCommand } from '@omni/shared/update-fleet.ts';
 import type { QuitPlan } from './quit.ts';
 
 export type UpdaterEvent =
@@ -194,4 +195,36 @@ export function shouldCheck(view: DesktopUpdateView): boolean {
 export function installOnQuit(view: DesktopUpdateView, plan: QuitPlan | null): { relaunch: boolean } | null {
   if (view.state !== 'ready' || !plan || plan.serverKeepsRunning) return null;
   return { relaunch: plan.forUpdate };
+}
+
+/**
+ * What the app does for a command the server handed out, given where its updater stands. `check-and-download` finds
+ * an update and downloads it even with Check automatically off. `wait` is a command the view does not let it act on
+ * yet: it is not carried out, so the server hands it out again once the view has moved. `none` is a command with
+ * nothing left to do.
+ */
+export type CommandStep = 'check' | 'download' | 'check-and-download' | 'install' | 'wait' | 'none';
+
+export function commandStep(command: DesktopUpdateCommand, view: DesktopUpdateView): CommandStep {
+  if (view.state === 'unsupported') return 'none';
+  switch (command.action) {
+    case 'check':
+      return shouldCheck(view) ? 'check' : 'none';
+    case 'download':
+      if (view.state === 'available') return 'download';
+      // A check under way ends in available when Check automatically is off, and that is when to download.
+      if (view.state === 'checking') return 'wait';
+      return shouldCheck(view) ? 'check-and-download' : 'none';
+    case 'install':
+      return view.state === 'ready' ? 'install' : 'none';
+  }
+}
+
+/** The command in a server's answer to a report, or null for none or anything else (an older server's answer). */
+export function parseCommand(reply: unknown): DesktopUpdateCommand | null {
+  const raw = reply && typeof reply === 'object' ? (reply as { command?: unknown }).command : null;
+  if (!raw || typeof raw !== 'object') return null;
+  const { id, action } = raw as Partial<DesktopUpdateCommand>;
+  if (typeof id !== 'string' || !id) return null;
+  return action === 'check' || action === 'download' || action === 'install' ? { id, action } : null;
 }

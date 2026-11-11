@@ -165,7 +165,7 @@ export function Delegation({ kids }: { kids: Thread[] }) {
         return (
           <div key={k.id} className="flex flex-col rounded-2xl bg-elev shadow-[var(--shadow-card)]">
             <button type="button" onClick={() => shell.open(href.thread(k.id))} className="flex items-center gap-2.5 px-3 py-2.5 text-left">
-              <MoAvatar role={k.role} channel={k.channel_id} channelIcon={channel(k.channel_id)?.icon} size={32} />
+              <MoAvatar role={k.role} channel={k.channel_id} channelIcon={channel(k.channel_id)?.icon} avatarBg={channel(k.channel_id)?.avatar_bg} size={32} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[14px] leading-[1.3]">{k.title || 'Untitled'}</span>
                 <span className="truncate text-[12px] leading-[1.3] text-fg-3">{[k.role, k.task_id, `#${channel(k.channel_id)?.name ?? k.channel_id}`].filter(Boolean).join(' · ')}</span>
