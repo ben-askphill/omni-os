@@ -8,7 +8,7 @@ import { OmniMark, StaticMark } from '../brand.tsx';
 import { ChannelMark, Icon, StatusDot, type IconName } from '../ui.tsx';
 
 /**
- * The channel rail ("D · Ink rail"): 72px of dark chrome. From the top: the Omni mark, Home and the Conductor, then
+ * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights. From the top: the Omni mark, Home and the Conductor, then
  * client channels and internal and personal channels as discs that scroll between two pinned blocks, then Add
  * channel, Settings and Ben's monogram. On macOS the desktop app's native traffic lights sit in the rail's top strip.
  */
