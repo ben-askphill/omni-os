@@ -106,7 +106,7 @@ export function ThreadQuickCard({
   return (
     <section
       aria-label="Thread quick actions"
-      className={`w-full rounded-[18px] border border-line bg-surface p-1.5 shadow-[0_2px_14px_rgb(0_0_0/0.07),inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))] ${className}`}
+      className={`w-full rounded-[18px] border border-line bg-surface p-1.5 shadow-[inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))] ${className}`}
     >
       <QuickRow
         icon="monitor"
