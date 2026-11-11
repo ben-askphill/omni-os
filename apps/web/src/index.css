@@ -1360,13 +1360,14 @@ html:has(.mo-app) body {
    trafficLights), so the rail's top strip grows to hold them above the Omni mark, and it and the list panel's title
    row drag the window. Linux draws its own frame, so neither changes there.
    The three lights are 14px with 9px gaps (macOS 27), so they end 78 window pixels in. The rail widens from 72px to
-   98px to keep them off the list panel down to the smallest zoom (0.8 x 98 = 78.4). */
+   98px to keep them off the list panel down to the smallest zoom (0.8 x 98 = 78.4), and the top strip is tall
+   enough that at 0.8 they still clear the Omni mark (their bottom: 43 / 0.8 = 54px). */
 [data-desktop="darwin"] .rail-shell .rail-chrome {
   width: 98px;
 }
 [data-desktop="darwin"] .rail-shell .rail-top {
   -webkit-app-region: drag;
-  padding-top: 44px;
+  padding-top: 52px;
 }
 [data-desktop="darwin"] .rail-shell .rail-panel-top {
   -webkit-app-region: drag;
