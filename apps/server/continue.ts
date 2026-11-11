@@ -251,10 +251,23 @@ async function capture(sourceId: string, to: RunName, picked: readonly string[])
   };
 }
 
-/** POST /api/threads/:id/continue/preview: the Carryover for this run, and whether the thread can be continued now. */
+/**
+ * Where a new thread goes: Settings > Threads' "Run new threads on", as for a thread started from the composer. A
+ * machine that cannot take it now (offline, or sync off) is a block, so the preview says why before Ben writes.
+ */
+async function machineFor(): Promise<{ route: { from: Mac; to: Mac } | null; block: ContinueBlock | null }> {
+  try {
+    return { route: await targetFor(undefined), block: null };
+  } catch (err) {
+    return { route: null, block: { code: 'machine', message: (err as Error).message } };
+  }
+}
+
+/** POST /api/threads/:id/continue/preview: the Carryover for this run, whether the thread can be continued now, and where. */
 export async function previewContinue(sourceId: string, run: Run, attachments: readonly string[] = []): Promise<ContinuePreview> {
   if (!threads.get(sourceId)) throw refusal('thread not found', 404);
-  return (await capture(sourceId, await targetRun(run), attachments)).preview;
+  const [{ preview }, machine] = await Promise.all([capture(sourceId, await targetRun(run), attachments), machineFor()]);
+  return { ...preview, blocked: preview.blocked ?? machine.block, runs_on: machine.route?.to ?? null };
 }
 
 /** The same message on the same run hashes the same. */
@@ -285,8 +298,8 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   const again = startedBefore(sourceId, body.request_id, fingerprint);
   if (again) return again;
   const to = await targetRun(body);
-  // Where it runs: Settings > Threads' "Run new threads on", as for a thread started from the composer.
-  const route = await targetFor(undefined);
+  const { route, block } = await machineFor();
+  if (block) throw busy(block);
   const idle = sourceBlock(threads.get(sourceId) ?? first);
   if (idle) throw busy(idle);
   const cap = await capture(sourceId, to, body.attachments ?? []);

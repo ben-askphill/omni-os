@@ -67,6 +67,7 @@ describe('a fork with "Run new threads on" set to another machine', () => {
     expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: 'box-b' } } })).status).toBe(200);
     const p = await a.json(`/threads/${source}/continue/preview`, { body: claude });
     expect(p.status, JSON.stringify(p.body)).toBe(200);
+    expect(p.body).toMatchObject({ runs_on: { id: 'box-b', name: 'Box B' }, blocked: null });
     const res = await a.json(`/threads/${source}/continue`, { body: { ...claude, text: 'carry on', request_id: randomUUID(), revision: p.body.revision } });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     fork = res.body.thread.id;
@@ -95,5 +96,26 @@ describe('a fork with "Run new threads on" set to another machine', () => {
     expect(sent.endsWith("the user's message:\ncarry on")).toBe(true);
     expect(b.texts(fork, 'user')).toEqual(['carry on']);
     expect(a.runner.isLive(fork)).toBe(false);
+  }, T.timeout);
+
+  it('is blocked in the preview, and refused, while that machine is offline', async () => {
+    a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: false }]));
+    try {
+      const p = await a.json(`/threads/${source}/continue/preview`, { body: claude });
+      expect(p.status, JSON.stringify(p.body)).toBe(200);
+      expect(p.body.runs_on).toBeNull();
+      expect(p.body.blocked).toMatchObject({ code: 'machine', message: expect.stringContaining('Box B is offline') });
+      const res = await a.json(`/threads/${source}/continue`, { body: { ...claude, text: 'again', request_id: randomUUID(), revision: p.body.revision } });
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({ code: 'busy', block: { code: 'machine' } });
+    } finally {
+      a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: true }]));
+    }
+  }, T.timeout);
+
+  it('runs here, with no machine named, once the setting is this machine again', async () => {
+    expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: '' } } })).status).toBe(200);
+    const p = await a.json(`/threads/${source}/continue/preview`, { body: claude });
+    expect(p.body).toMatchObject({ runs_on: null, blocked: null });
   }, T.timeout);
 });
