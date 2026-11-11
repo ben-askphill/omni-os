@@ -25,7 +25,7 @@ export function PRNextButton({ next, thread, pr, step, onAsk, size = 'sm' }: { n
       </LinkButton>
     ) : null;
   return (
-    <Button size={size} variant={next.kind === 'open' ? 'primary' : 'secondary'} icon={next.kind === 'open' ? 'pr' : 'zap'} busy={step !== null} title={next.prompt} onClick={() => onAsk(next.prompt)}>
+    <Button size={size} variant={next.kind === 'open' ? 'primary' : 'secondary'} icon={next.kind === 'open' ? 'pr' : 'zap'} busy={step === next.kind} disabled={step !== null} onClick={() => onAsk(next.prompt)}>
       {step === next.kind ? `${STEP_WORKING[step]}…` : next.label}
     </Button>
   );
@@ -62,10 +62,10 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk }: { thread: T
     return (
       <div className="rounded-[20px] bg-bg px-4 py-5 text-center" aria-live="polite">
         <div className="text-[13px] font-medium text-fg">{opening ? `${STEP_WORKING.open}…` : 'No PR yet'}</div>
-        <p className="mx-auto mt-1 max-w-[260px] text-[12.5px] leading-relaxed text-fg-3">
+        <p className="mx-auto mt-1 min-h-[2lh] max-w-[260px] text-[12.5px] leading-relaxed text-fg-3">
           {opening ? (
             <>
-              The agent is committing and pushing <span className="font-mono text-[12px]">{thread.branch}</span>. The PR shows here once it opens.
+              The agent is pushing <span className="font-mono text-[12px]">{thread.branch}</span>. The PR shows up here.
             </>
           ) : (
             <>
@@ -74,7 +74,7 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk }: { thread: T
           )}
         </p>
         <div className="mt-3 flex justify-center">
-          <Button size="sm" variant="primary" icon="pr" busy={step !== null} title={OPEN_PR_PROMPT} onClick={() => onAsk(OPEN_PR_PROMPT)}>
+          <Button size="sm" variant="primary" icon="pr" busy={opening} disabled={step !== null} onClick={() => onAsk(OPEN_PR_PROMPT)}>
             {opening ? STEP_WORKING.open : 'Open PR'}
           </Button>
         </div>
@@ -116,7 +116,7 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk }: { thread: T
         <div className="mt-2.5 flex flex-wrap gap-1.5 px-1">
           <PRNextButton next={next} thread={thread} pr={pr} step={step} onAsk={onAsk} />
           {canOpen && next?.kind !== 'open' && (
-            <Button size="sm" variant="ghost" icon="pr" busy={step !== null} title={OPEN_PR_PROMPT} onClick={() => onAsk(OPEN_PR_PROMPT)}>
+            <Button size="sm" variant="ghost" icon="pr" busy={opening} disabled={step !== null} onClick={() => onAsk(OPEN_PR_PROMPT)}>
               {opening ? `${STEP_WORKING.open}…` : 'Open a new PR'}
             </Button>
           )}
