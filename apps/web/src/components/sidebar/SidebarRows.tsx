@@ -6,7 +6,7 @@ import { duration, plural } from '../../format.ts';
 import { href, navigate } from '../../router.ts';
 import { readPref, useApp, useNow, writePref } from '../../store.tsx';
 import { HarnessLogo, Loader } from '../brand.tsx';
-import { DoneMark, Icon, StatusDot, threadStatusText, type IconName } from '../ui.tsx';
+import { DoneMark, Icon, StatusDot, threadGlyph, threadStatusText, type IconName } from '../ui.tsx';
 import { DelegateCount, DelegateCountSpace, delegatesHref, useDelegateSummary } from '../DelegateCount.tsx';
 import { showsRunning, type DelegateSummary } from '@omni/shared/delegate-count.ts';
 
@@ -106,7 +106,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, delega
         }`}
       >
         <span className="grid w-3 shrink-0 place-items-center">
-          {busy ? <Loader size={11} className="text-live-text" /> : t.done_at ? <DoneMark size={7} /> : <StatusDot status={t.status} size={7} />}
+          {busy ? <Loader size={11} className="text-live-text" /> : t.done_at ? <DoneMark size={7} /> : <StatusDot status={threadGlyph(t)} size={7} />}
         </span>
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {delegates ? (
@@ -199,7 +199,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, de
         }`}
       >
         <span className="grid w-[15px] shrink-0 place-items-center">
-          {busy ? <Loader size={11} className="text-live-text" /> : t.done_at ? <DoneMark size={7} /> : <StatusDot status={t.status} size={7} />}
+          {busy ? <Loader size={11} className="text-live-text" /> : t.done_at ? <DoneMark size={7} /> : <StatusDot status={threadGlyph(t)} size={7} />}
         </span>
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {/* A delegate count says it is a Conductor job, so the channel's name gives way to it. */}

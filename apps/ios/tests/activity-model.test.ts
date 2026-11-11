@@ -29,8 +29,8 @@ function thread(id: string, over: Partial<Thread> & { delegating?: boolean } = {
 
 /** Only the fields the channel and pinned lists send, so a stub never overrides a full row's branch or role. */
 function stub(id: string, over: Partial<ThreadStub> = {}): ThreadStub {
-  const { channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source } = thread(id, over);
-  return { id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source };
+  const { channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source, limit_state } = thread(id, over);
+  return { id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source, limit_state };
 }
 
 function item(t: Thread, over: Partial<NeedsYouItem> = {}): NeedsYouItem {
