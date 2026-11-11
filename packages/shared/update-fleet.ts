@@ -1,4 +1,5 @@
 import type { DesktopUpdateView } from './desktop-bridge.ts';
+import { relTime } from './format.ts';
 import type { Reachability } from './handoff.ts';
 
 // Update all machines (apps/server/update-fleet.ts): one action checks for, downloads or applies Omni's update on every
@@ -232,6 +233,35 @@ export function fleetSummary(machines: Pick<FleetMachine, 'state'>[]): string {
   if (failed) parts.push(`${failed} failed`);
   return parts.join(', ');
 }
+
+/** The states that last, so a row says since when. A `sent` ask has no status change yet: it dates from the ask. */
+const LASTING: ReadonlySet<FleetRowState> = new Set(['waiting', 'applying', 'restarting', 'sent']);
+
+/** "since 5m ago" or "just now" for a state that lasts, else null. */
+export function sinceLine(m: Pick<FleetMachine, 'state' | 'status' | 'ask'>, now = Date.now()): string | null {
+  const at = m.state === 'sent' ? m.ask?.at : LASTING.has(m.state) ? m.status?.since : null;
+  const t = at ? relTime(at, now) : '';
+  if (!t) return null;
+  return t === 'just now' ? t : `since ${t.replace(/^Yesterday/, 'yesterday')}`;
+}
+
+/** The note a row says about why Update leaves it out, where the state label alone would not. */
+export function leftOutNote(m: Pick<FleetMachine, 'state' | 'status'>): string | null {
+  return m.state === 'offline' || m.state === 'not-reporting' || m.status?.track === 'manual' ? skipReason(m, 'update') : null;
+}
+
+/** A row's own button. Retry sends this machine's last ask to it again, or a check when there was none, offline or not. */
+export function rowAction(m: Pick<FleetMachine, 'id' | 'state' | 'status' | 'ask'>): { label: 'Retry' | 'Update'; request: FleetRequest } | null {
+  if (m.state === 'failed' || m.state === 'expired' || m.state === 'offline') {
+    return { label: 'Retry', request: { action: m.ask?.action ?? 'check', machines: [m.id], force: true } };
+  }
+  if ((m.state === 'ready' || m.state === 'available') && skipReason(m, 'update') === null) {
+    return { label: 'Update', request: { action: 'update', machines: [m.id] } };
+  }
+  return null;
+}
+
+export const machineCount = (n: number) => `${n} ${n === 1 ? 'machine' : 'machines'}`;
 
 // ---------- the packaged desktop app and its server ----------
 

@@ -11,6 +11,7 @@ import { ListRow } from '../../ui/GroupedList';
 import { ConfigForm } from '../ConfigForm';
 import { Footnote, Group, ServerOptionsGroup, SettingsPage, StatusValue } from '../parts';
 import { syncLine } from '../sync-model';
+import { loadFleet, UpdateMachinesGroup } from '../UpdateMachines';
 import { Loading, useSetup } from './OmniSections';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -18,21 +19,23 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 const loadStatus = (api: OmniApi) => api.status();
 const loadSync = (api: OmniApi) => api.syncStatus();
 
-/** Machines: the machine the server runs on, as the Web UI's Machines section shows it, and its .env options. */
+/** Machines: the machine the server runs on, Update all machines, as the Web UI's Machines section shows them, and its .env options. */
 export function MachinesSection() {
   const status = useRemote(loadStatus);
   const sync = useRemote(loadSync);
+  const fleet = useRemote(loadFleet);
   const { activeServer } = usePairing();
   const link = useLink();
   const synced = syncLine(sync.data, Date.now());
   return (
-    <SettingsPage onRefresh={() => Promise.all([status.reload(), sync.reload()])}>
+    <SettingsPage onRefresh={() => Promise.all([status.reload(), sync.reload(), fleet.reload()])}>
       <Group title="Current machine" footer="The machine Omni runs on, as your other machines and the sync list name it.">
         <ListRow first title="Machine" value={status.data?.device?.name ?? '…'} />
         <ListRow title="Sync" trailing={<StatusValue glyph={synced.glyph} text={synced.text} />} />
         <ListRow title="Address" detail={activeServer?.origin} />
         <ListRow title="Feed" trailing={<StatusValue glyph={link.kind === 'live' ? 'done' : 'needs'} text={link.kind === 'live' ? 'Connected' : 'Reconnecting'} />} />
       </Group>
+      <UpdateMachinesGroup fleet={fleet} />
       <ServerOptionsGroup section="machines" />
     </SettingsPage>
   );
