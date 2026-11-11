@@ -293,8 +293,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
           )}
         </div>
 
-        {/* composer */}
-        <div className="relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
+        {/* composer, keeping clear of the quick card's column so it centres under the transcript */}
+        <div className={`relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4 ${panel.surface === 'card' ? 'md:pr-[19.5rem]' : ''}`}>
           <div className="mx-auto max-w-4xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             {/* The setup card above says why while the worktree is not ready. */}
