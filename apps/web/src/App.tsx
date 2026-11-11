@@ -131,21 +131,13 @@ function Shell() {
     };
   }, [layout]);
 
-  return layout === 'rail' ? (
+  const panes = layout === 'rail' ? (
     <div className="desktop-shell rail-shell flex h-full min-h-0 flex-row bg-bg">
       <ChannelRail selection={selection} />
       <ListPanel mode={listMode(selection, inboxOpen)} onSearch={openPalette} onInbox={showInbox} />
       <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg">
         <Page route={route} />
       </main>
-
-      <CommandPalette open={palette} onClose={closePalette} />
-      <Onboarding />
-      <ThreadNotifier />
-      <BrowserNotifier />
-      <ContextMenuHost />
-      <ContinueSheetHost />
-      <FolderDeleteDialog />
     </div>
   ) : (
     <div className="desktop-shell flex h-full min-h-0 flex-col md:flex-row md:bg-[var(--chrome)] md:py-2 md:pr-2">
@@ -157,7 +149,12 @@ function Shell() {
       <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg md:rounded-[22px] md:pb-0 md:shadow-[var(--shadow-card),inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))]">
         <Page route={route} />
       </main>
+    </div>
+  );
 
+  return (
+    <>
+      {panes}
       <CommandPalette open={palette} onClose={closePalette} />
       <Onboarding />
       <ThreadNotifier />
@@ -165,7 +162,7 @@ function Shell() {
       <ContextMenuHost />
       <ContinueSheetHost />
       <FolderDeleteDialog />
-    </div>
+    </>
   );
 }
 
