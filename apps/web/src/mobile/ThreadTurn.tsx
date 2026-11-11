@@ -46,7 +46,7 @@ export type TurnCtx = {
   crew: Thread[];
   ch: Channel | undefined;
   changes: ReturnType<typeof useBranchChanges>;
-  pr: ReturnType<typeof useThreadPR>;
+  pr: ReturnType<typeof useThreadPR>[0];
   now: number;
   shell: ReturnType<typeof useShell>;
   /** The running turn's latest status (`statusLabel`), null for the default. */

@@ -92,6 +92,7 @@ export function DetailsTab({
   next,
   step = null,
   onAsk = () => {},
+  onMerged = () => {},
   onTab = () => {},
 }: {
   thread: Thread;
@@ -112,6 +113,8 @@ export function DetailsTab({
   /** The step the agent is working on, so its button shows it. */
   step?: PRStep | null;
   onAsk?: (prompt: string) => void;
+  /** After a Merge button merged a PR, to read the PRs again. */
+  onMerged?: () => void;
   onTab?: (tab: PanelTab) => void;
 }) {
   const cwd = init?.cwd || thread.cwd;
@@ -126,8 +129,8 @@ export function DetailsTab({
   const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin flex h-full flex-col gap-3 overflow-y-auto px-2.5 pb-3 [&>*]:shrink-0">
-      <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} onAsk={onAsk} onTab={onTab} />
-      {prs && <CrewGlance crew={prs.crew} onTab={onTab} />}
+      <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} onAsk={onAsk} onMerged={onMerged} onTab={onTab} />
+      {prs && <CrewGlance crew={prs.crew} onMerged={onMerged} onTab={onTab} />}
       <AgentsSection parent={parent} links={links} children={children} agents={agents} onJump={onJump} />
       <dl className="divide-y divide-line rounded-[20px] bg-bg py-1">
         <Row k="Channel">

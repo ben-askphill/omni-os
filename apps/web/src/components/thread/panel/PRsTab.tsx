@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { relTime } from '@omni/shared/format.ts';
-import type { CrewPR, PRSummary, Thread } from '../../../api.ts';
+import { api, errorText, type CrewPR, type PRSummary, type Thread } from '../../../api.ts';
 import { plural } from '../../../format.ts';
 import { href } from '../../../router.ts';
 import { crewLine, OPEN_PR_PROMPT, prBadge, prLine, STEP_WORKING, type PRNext, type PRStep, type PRTone } from '@omni/shared/thread-glance.ts';
-import { Button, Chip, Empty, Icon, IconLink, LinkButton, Loading, StatusDot } from '../../ui.tsx';
+import { Button, Chip, Empty, ErrorNote, Icon, IconLink, Loading, StatusDot } from '../../ui.tsx';
+import { useToast } from '../../Toaster.tsx';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
 import type { PRWatchState } from '../PRWatch.tsx';
 import type { ThreadPRData } from '../ThreadPR.tsx';
@@ -13,17 +15,43 @@ export type ThreadPRs = ThreadPRData | undefined;
 const TONE_DOT: Record<PRTone, string> = { live: 'running', done: 'done', needs: 'needs', outline: 'idle' };
 
 /**
- * The step the branch's PR calls for, as one button: a prompt to the agent, or Merge on the PR page. While the agent
- * works on a step the button spins and says so, and every step button waits for it.
+ * Squash-merges the PR and deletes its branch, the phone PR screen's defaults, then reads the PRs again. The PR page
+ * keeps the other merge methods. A refusal from gh shows under the button.
  */
-export function PRNextButton({ next, thread, pr, step, onAsk, size = 'sm' }: { next: PRNext; thread: Thread; pr: PRSummary | null; step: PRStep | null; onAsk: (prompt: string) => void; size?: 'sm' | 'md' }) {
+export function MergeButton({ channelId, number, onMerged, size = 'sm' }: { channelId: string; number: number; onMerged: () => void; size?: 'sm' | 'md' }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const merge = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/channels/${encodeURIComponent(channelId)}/prs/${number}/merge`, { method: 'squash', delete_branch: true, confirm: true });
+      toast({ title: `Merged #${number}`, icon: 'pr' });
+      onMerged();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Button size={size} variant="primary" icon="pr" busy={busy} title="Squash and merge, then delete the branch" onClick={() => void merge()}>
+        {busy ? 'Merging…' : `Merge #${number}`}
+      </Button>
+      {error && <ErrorNote className="w-full">{error}</ErrorNote>}
+    </>
+  );
+}
+
+/**
+ * The step the branch's PR calls for, as one button: a prompt to the agent, or a merge. While the agent works on a step
+ * the button spins and says so, and every step button waits for it.
+ */
+export function PRNextButton({ next, thread, pr, step, onAsk, onMerged, size = 'sm' }: { next: PRNext; thread: Thread; pr: PRSummary | null; step: PRStep | null; onAsk: (prompt: string) => void; onMerged: () => void; size?: 'sm' | 'md' }) {
   if (!next) return null;
-  if (next.kind === 'merge')
-    return pr ? (
-      <LinkButton size={size} variant="primary" icon="pr" href={href.pr(thread.channel_id, pr.number)}>
-        Merge #{pr.number}
-      </LinkButton>
-    ) : null;
+  if (next.kind === 'merge') return pr ? <MergeButton channelId={thread.channel_id} number={pr.number} onMerged={onMerged} size={size} /> : null;
   return (
     <Button size={size} variant={next.kind === 'open' ? 'primary' : 'secondary'} icon={next.kind === 'open' ? 'pr' : 'zap'} busy={step !== null} title={next.prompt} onClick={() => onAsk(next.prompt)}>
       {step === next.kind ? `${STEP_WORKING[step]}…` : next.label}
@@ -36,7 +64,7 @@ export function PRNextButton({ next, thread, pr, step, onAsk, size = 'sm' }: { n
  * the watch that wakes the thread on a failed check or a review. Opening a PR asks the agent, like it always has. A
  * thread that delegated work lists the PRs its delegated threads opened below, with or without a branch of its own.
  */
-export function PRsTab({ thread, data, watch, next, step, onAsk }: { thread: Thread; data: ThreadPRs; watch: PRWatchState; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void }) {
+export function PRsTab({ thread, data, watch, next, step, onAsk, onMerged = () => {} }: { thread: Thread; data: ThreadPRs; watch: PRWatchState; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void; onMerged?: () => void }) {
   if (!data) return <Loading label="Loading PRs" />;
   const { pr, crew } = data;
   if (!thread.branch && !crew.length)
@@ -48,14 +76,14 @@ export function PRsTab({ thread, data, watch, next, step, onAsk }: { thread: Thr
   const open = (pr?.state ?? 'OPEN') === 'OPEN';
   return (
     <div className="scroll-thin h-full overflow-y-auto px-2.5 pb-3">
-      {thread.branch && <BranchPRs thread={thread} data={data} next={next} step={step} onAsk={onAsk} />}
+      {thread.branch && <BranchPRs thread={thread} data={data} next={next} step={step} onAsk={onAsk} onMerged={onMerged} />}
       {crew.length > 0 && <CrewPRs crew={crew} first={!thread.branch} />}
       {pr && <WatchCard w={watch} open={open} />}
     </div>
   );
 }
 
-function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk }: { thread: Thread; data: NonNullable<ThreadPRs>; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void }) {
+function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk, onMerged }: { thread: Thread; data: NonNullable<ThreadPRs>; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void; onMerged: () => void }) {
   const canOpen = !prs.some((p) => (p.state ?? 'OPEN') === 'OPEN');
   const opening = step === 'open';
   if (prs.length === 0)
@@ -114,7 +142,7 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk }: { thread: T
       </div>
       {(next || canOpen) && (
         <div className="mt-2.5 flex flex-wrap gap-1.5 px-1">
-          <PRNextButton next={next} thread={thread} pr={pr} step={step} onAsk={onAsk} />
+          <PRNextButton next={next} thread={thread} pr={pr} step={step} onAsk={onAsk} onMerged={onMerged} />
           {canOpen && next?.kind !== 'open' && (
             <Button size="sm" variant="ghost" icon="pr" busy={step !== null} title={OPEN_PR_PROMPT} onClick={() => onAsk(OPEN_PR_PROMPT)}>
               {opening ? `${STEP_WORKING.open}…` : 'Open a new PR'}

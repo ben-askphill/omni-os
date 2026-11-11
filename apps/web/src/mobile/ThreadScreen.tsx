@@ -52,7 +52,7 @@ export function ThreadScreen() {
   const edges = useMemo(() => historyEdges({ spans }, view?.turns.map((t) => t.key) ?? []), [spans, view]);
   const status = useMemo(() => (thread?.status === 'running' ? statusLabel(events) : null), [events, thread?.status]);
   const changes = useBranchChanges(thread, slotBusy);
-  const pr = useThreadPR(thread, slotBusy, true);
+  const [pr] = useThreadPR(thread, slotBusy, true);
   const agents = useMemo(() => runningSubagents(tasks, thread?.id ?? ''), [tasks, thread?.id]);
   const step = useMemo(() => stepUnderway(events, queued, slotBusy), [events, queued, slotBusy]);
   const artifactCount = files.length + shots.length + crewArtifacts.files.length + crewArtifacts.shots.length;

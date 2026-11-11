@@ -33,15 +33,21 @@ const thread = (over: Partial<Thread> = {}) =>
 let root: Root;
 let host: HTMLDivElement;
 let asked: string[];
+let posted: [string, unknown][];
 let answer: unknown;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   asked = [];
+  posted = [];
   answer = { pr: null, prs: [], crew: [] };
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        posted.push([url, JSON.parse(String(init.body))]);
+        return Response.json({ ok: true, output: '' });
+      }
       asked.push(url);
       return Response.json(answer);
     }),
@@ -59,7 +65,7 @@ afterEach(async () => {
 
 /** The PRs tab fed by the real hook, as Thread.tsx does. */
 function Tab({ t }: { t: Thread }) {
-  const data = useThreadPR(t, false);
+  const [data] = useThreadPR(t, false);
   const watch = { watch: null, watching: false, busy: false, error: null, start: async () => {}, stop: async () => {} };
   return createElement(PRsTab, { thread: t, data, watch, next: null, step: null, onAsk: () => {} });
 }
@@ -149,6 +155,7 @@ describe('the Details tab of a thread with no branch', () => {
 });
 
 describe('the Details tab of a thread that delegated work', () => {
+  let reloads = 0;
   const render = (crew: CrewPR[], over: Partial<Thread> = {}) =>
     act(() =>
       root.render(
@@ -164,21 +171,28 @@ describe('the Details tab of a thread that delegated work', () => {
           onJump: () => {},
           init: null,
           prs: { pr: null, prs: [], crew },
+          onMerged: () => reloads++,
         }),
       ),
     );
-  const merges = () => [...host.querySelectorAll('a')].filter((a) => a.textContent?.startsWith('Merge')).map((a) => [a.textContent, a.getAttribute('href')]);
+  const mergeButtons = () => [...host.querySelectorAll('button')].filter((b) => b.textContent?.startsWith('Merge'));
+  const merges = () => mergeButtons().map((b) => b.textContent);
 
-  it("offers Merge for each open crew PR, on the PR's own channel page, with or without a branch", () => {
+  it('offers Merge for each open crew PR, with or without a branch', () => {
     render([crewPR(), crewPR({ number: 13, url: 'https://github.com/o/r/pull/13', channel_id: 'shop' }), merged]);
-    expect(merges()).toEqual([
-      ['Merge #12', '#/c/omni/prs/12'],
-      ['Merge #13', '#/c/shop/prs/13'],
-    ]);
+    expect(merges()).toEqual(['Merge #12', 'Merge #13']);
     expect(host.textContent).not.toContain('Show PRs in Thread options');
 
     render([crewPR()], { branch: 'omni/own' });
-    expect(merges()).toEqual([['Merge #12', '#/c/omni/prs/12']]);
+    expect(merges()).toEqual(['Merge #12']);
+  });
+
+  it("squash-merges the PR in its own channel on click, then reads the PRs again", async () => {
+    reloads = 0;
+    render([crewPR(), crewPR({ number: 13, url: 'https://github.com/o/r/pull/13', channel_id: 'shop' })]);
+    await act(async () => mergeButtons()[1].click());
+    expect(posted).toEqual([['/api/channels/shop/prs/13/merge', { method: 'squash', delete_branch: true, confirm: true }]]);
+    expect(reloads).toBe(1);
   });
 
   it('lists a draft without Merge, and shows nothing once every crew PR merged', () => {

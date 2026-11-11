@@ -156,7 +156,7 @@ export function PRScreen() {
   const shell = useShell();
   const { thread, slotBusy, applyThread, events, queued } = useThread();
   const { channel } = useApp();
-  const mark = useThreadPR(thread, slotBusy, true);
+  const [mark] = useThreadPR(thread, slotBusy, true);
   const [asking, setAsking] = useState(false);
   const opening = asking || stepUnderway(events, queued, slotBusy) === 'open';
   const watch = usePRWatch(thread?.id, mark);
