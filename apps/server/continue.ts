@@ -21,7 +21,15 @@ import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { isHarnessId, isProviderHarness, providerWhere } from './harness/types.ts';
 import { userName } from './profile.ts';
 import { resumeRequests } from './runner/api.ts';
-import { saveStart, setUpThread } from './runner/setup.ts';
+import { failSetup, saveStart, setUpThread } from './runner/setup.ts';
+import { sendNewThread } from './handoff.ts';
+import { packTree } from './handoff/worktree.ts';
+import { assignRouted } from './ownership.ts';
+import { targetFor } from './run-on.ts';
+import type { Mac } from './runner/ports.ts';
+import { sendSaved } from './sync/files.ts';
+import { activeWorker } from './sync/worker.ts';
+import type { Attachment } from './uploads.ts';
 import { emitThread, hasBackground, lives, refusal, runsHere, waiting } from './runner/state.ts';
 import { invalid, runName } from './runner/switch.ts';
 import { plannedWorktree, prepareWorkdir } from './sandbox.ts';
@@ -277,6 +285,8 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   const again = startedBefore(sourceId, body.request_id, fingerprint);
   if (again) return again;
   const to = await targetRun(body);
+  // Where it runs: Settings > Threads' "Run new threads on", as for a thread started from the composer.
+  const route = await targetFor(undefined);
   const idle = sourceBlock(threads.get(sourceId) ?? first);
   if (idle) throw busy(idle);
   const cap = await capture(sourceId, to, body.attachments ?? []);
@@ -290,6 +300,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   const at = repo ? plannedWorktree(id) : wd;
   const discard = () => rmSync(threadDir(id), { recursive: true, force: true });
   let made: Thread | undefined;
+  let carried: Attachment[] = [];
   let lost: ContinueBlock | null = null;
   try {
     await continueHooks.captured(id);
@@ -307,13 +318,15 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
       // The picked files are copied here, before the thread is written: one that is no longer the file the preview
       // judged starts nothing. A failure from here on removes the new thread's folder, uploads included.
       const files = copyAttachments(sourceId, id, cap.plan);
+      if (files) carried = files;
       if (files) made = tx(() => {
         const t = threads.create({
           id,
           channel_id: now.channel_id,
           // A chain keeps one suffix: continuing a continued thread does not stack them.
           title: `${now.title.replace(/ \(continued\)$/, '')} (continued)`,
-          status: 'queued',
+          // One for another machine waits there, as a routed new thread does (runner/api.ts createThread).
+          status: route ? 'stopped' : 'queued',
           role: now.role,
           model: to.model || null,
           harness: to.harness,
@@ -326,7 +339,8 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
           source: 'manual',
           automation: null,
           folder_id: now.folder_id,
-          setup: at.branch ? 'preparing' : null,
+          // Its worktree is laid out on the machine that runs it.
+          setup: at.branch && !route ? 'preparing' : null,
         });
         continuations.link(id, sourceId);
         const carried = cap.preview.carryover;
@@ -334,7 +348,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
         events.add(id, 'carryover', { source: carried.source, goal: carried.goal, text: cap.body, ...carriedStats(carried) } satisfies CarryoverP);
         continuations.add({ thread_id: id, source_id: sourceId, request_id: body.request_id, fingerprint, head: repo?.head ?? null, tree: repo?.kind === 'snapshot' ? repo.tree : null });
         if (repo) threadBases.set(id, { sha: repo.base.sha, ref: repo.base.ref, how: repo.base.how });
-        saveStart(t, body.text, files.length ? files : undefined);
+        if (!route) saveStart(t, body.text, files.length ? files : undefined);
         return threads.get(id)!;
       });
     }
@@ -349,13 +363,41 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   }
 
   emitThread(id);
-  if (made.setup) void setUpThread(id);
+  if (route) await sendElsewhere(made, route, body.text, carried, repo);
+  else if (made.setup) void setUpThread(id);
   else {
     // As a worktree thread's setup sends its first message once ready: through Resume, in order, through the slots.
     for (const r of messageRequests.unstarted(id)) messageRequests.park(r.id);
     await resumeRequests(id).catch((err) => console.error(`[continue] ${id}: could not send the first message:`, (err as Error).message));
   }
   return { thread: threads.get(id)!, duplicate: false };
+}
+
+/**
+ * Send a fork made here to the machine Settings names, as a new thread's offer: its files in Storage and, for repo
+ * work, the source's checkout as a worktree bundle (the source's HEAD, its changes on top), which that machine lays out
+ * before its setup runs. Nothing is laid out here. When the send fails, the fork stays here with its first message
+ * kept, as a new thread the other machine could not take does (handoff.ts restoreFresh).
+ */
+async function sendElsewhere(t: Thread, route: { from: Mac; to: Mac }, text: string, files: Attachment[], repo: RepoCheckout | null) {
+  const offer = randomUUID();
+  try {
+    const worker = activeWorker();
+    if (!worker) throw new Error('sync is off');
+    const refs = await sendSaved(files);
+    const bundle = repo ? await packTree(repo.dir, { head: repo.head, tree: repo.tree }, t.id, offer, worker.transport) : null;
+    tx(() => {
+      assignRouted(t.id, route.to.id);
+      sendNewThread(t.id, text, route.from, route.to, refs, bundle, offer);
+    });
+  } catch (err) {
+    console.error(`[continue] ${t.id}: could not send it to ${route.to.name}:`, (err as Error).message);
+    saveStart(t, text, files.length ? files : undefined);
+    const why = `Omni could not send it to ${route.to.name}: ${(err as Error).message.replace(/\.$/, '')}. Retry runs it on this machine.`;
+    if (t.branch) failSetup(t.id, why);
+    else for (const r of messageRequests.unstarted(t.id)) messageRequests.park(r.id);
+  }
+  emitThread(t.id);
 }
 
 const statsOf = (threadId: string): CarriedStats | null => {

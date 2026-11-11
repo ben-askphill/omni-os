@@ -146,11 +146,12 @@ export async function handOff(threadId: string, to: string): Promise<HandoffResu
 /**
  * Send a thread that has not run anywhere to another machine, to run there from its first message (run-on.ts): the
  * offer goes out ready, since there is no turn to stop, session to upload or worktree to pack. That machine cuts the
- * worktree itself. `to` must be a synced machine; the caller checks it. `files` are in Storage already.
+ * worktree itself, or lays out `bundle` when the offer carries one (a fork's, continue.ts) and runs its setup in it.
+ * `to` must be a synced machine; the caller checks it. `files` and the bundle are in Storage already.
  */
-export function sendNewThread(threadId: string, prompt: string, from: Mac, to: Mac, files: UploadRef[] = []) {
+export function sendNewThread(threadId: string, prompt: string, from: Mac, to: Mac, files: UploadRef[] = [], bundle: WorktreeBundle | null = null, id: string = randomUUID()) {
   writeOffer({
-    id: randomUUID(), thread: threadId, from, to, at: iso(), idle: true, fresh: true, state: 'offered', queued: [prompt], bundle: null, leftBehind: null,
+    id, thread: threadId, from, to, at: iso(), idle: true, fresh: true, state: 'offered', queued: [prompt], bundle, leftBehind: null,
     ...(files.length && { files }),
   });
   void activeWorker()?.syncNow();
