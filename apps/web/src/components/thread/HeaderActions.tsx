@@ -17,6 +17,7 @@ export function HeaderActions({
   onRestore,
   restoring,
   panelOpen,
+  panelSurface,
   onPanel,
   artifactCount,
   asking = false,
@@ -28,6 +29,8 @@ export function HeaderActions({
   onRestore: () => void;
   restoring: boolean;
   panelOpen: boolean;
+  /** When the full inspector is open, the toggle title names it; otherwise the quick card. */
+  panelSurface?: 'collapsed' | 'card' | 'inspector';
   onPanel: () => void;
   artifactCount: number;
   /** The agent waits on a question card. */
@@ -69,7 +72,18 @@ export function HeaderActions({
         }}
       />
       <span className="relative">
-        <IconButton icon="panel" label="Artifacts, changes, browser, terminal, actions, details" active={panelOpen} onClick={onPanel} />
+        <IconButton
+          icon="panel"
+          label={
+            panelSurface === 'inspector'
+              ? 'Close full inspector'
+              : panelOpen
+                ? 'Hide quick actions'
+                : 'Show quick actions'
+          }
+          active={panelOpen}
+          onClick={onPanel}
+        />
         {artifactCount > 0 && (
           <span className="pointer-events-none absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-fg px-1 font-num text-[9.5px] text-on-ink">{artifactCount}</span>
         )}

@@ -18,6 +18,8 @@ import { prNext, stepOf, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
+import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
+import type { PanelTab } from './useThreadSession.ts';
 import { AGENTS_CARD_ID } from '../components/thread/panel/AgentsSection.tsx';
 import { Empty, ErrorNote, Icon, LinkButton, Loading } from '../components/ui.tsx';
 import { href, navigate, type ThreadView } from '../router.ts';
@@ -26,7 +28,7 @@ import { canSteer } from '../steer.ts';
 import { teamOf } from '../transcript/delegation.ts';
 import { runningSubagents } from '../subagents.ts';
 import { isAsking } from '@omni/shared/transcript-fold.ts';
-import { useApp } from '../store.tsx';
+import { useApp, useHereName } from '../store.tsx';
 import { useThreadActions } from './useThreadActions.ts';
 import { useThreadInterruptKey } from './useThreadInterruptKey.ts';
 import { useThreadPanel } from './useThreadPanel.ts';
@@ -113,6 +115,12 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     [setSelected, setPanelTab],
   );
   const panel = useThreadPanel({ artifactParam, files, ready, loaded: thread !== null, select: selectArtifact });
+  const hereName = useHereName();
+  const workCwd = init?.cwd || thread?.cwd || '';
+  const openFromCard = (tab: PanelTab) => {
+    setPanelTab(tab);
+    panel.show();
+  };
   // A delegate count links here as /details: the panel opens on Details at the agents card, and the address goes back
   // to the thread's own, so the next click on the count lands here again.
   const [toAgents, setToAgents] = useState(false);
@@ -193,71 +201,95 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             onRestore: () => void restore(),
             restoring,
             panelOpen: panel.open,
+            panelSurface: panel.surface,
             onPanel: panel.toggle,
             artifactCount,
             asking,
           }}
         />
 
-        {/* transcript */}
-        <div className="relative min-h-0 flex-1">
-          <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto [overflow-anchor:none]">
-            <div ref={contentRef} className="mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
-              {/* Queued means waiting for a slot: nothing is working yet. */}
-              <LinkChannel.Provider value={thread.channel_id}>
-                <ThreadIdCtx.Provider value={id}>
-                  <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} />
-                </ThreadIdCtx.Provider>
-              </LinkChannel.Provider>
-              <div className="mt-4 empty:hidden">
-                <CrewQuestions threadId={id} />
-              </div>
-              <SetupCard
-                thread={thread}
-                onRetried={(t, pending) => {
-                  // Retry keeps updated_at, so it must win a tie, like a rename.
-                  applyThread(t);
-                  setQueued(pending);
-                }}
-              />
-              <StaleSessionCard
-                thread={thread}
-                onChanged={(t, pending) => {
-                  // Keeps updated_at, so it must win a tie, like Retry.
-                  applyThread(t);
-                  setQueued(pending);
-                }}
-              />
-              <LimitCard
-                thread={thread}
-                onChanged={(t, pending) => {
-                  // Scheduling keeps updated_at, so it must win a tie, like Retry.
-                  applyThread(t);
-                  setQueued(pending);
-                }}
-              />
-              <HandoffCard thread={thread} handoff={handoff} onChanged={handedOff} />
-              <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} sessionBlocked={!!thread.resume_blocked} canSteer={canSteer(thread.harness, harnesses)} />
-              <SendingMessages threadId={id} pending={listed} />
-              {!queued.length && (
-                <NextThreadCard
+        {/* transcript, with the quick card in its own column so it never covers the conversation */}
+        <div className="relative flex min-h-0 flex-1">
+          <div className="relative min-h-0 min-w-0 flex-1">
+            <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto [overflow-anchor:none]">
+              <div ref={contentRef} className="mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
+                {/* Queued means waiting for a slot: nothing is working yet. */}
+                <LinkChannel.Provider value={thread.channel_id}>
+                  <ThreadIdCtx.Provider value={id}>
+                    <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} />
+                  </ThreadIdCtx.Provider>
+                </LinkChannel.Provider>
+                <div className="mt-4 empty:hidden">
+                  <CrewQuestions threadId={id} />
+                </div>
+                <SetupCard
                   thread={thread}
-                  onThread={(t, reply) => {
-                    applyThread(t, reply);
-                    if (reply) pin();
+                  onRetried={(t, pending) => {
+                    // Retry keeps updated_at, so it must win a tie, like a rename.
+                    applyThread(t);
+                    setQueued(pending);
                   }}
                 />
-              )}
+                <StaleSessionCard
+                  thread={thread}
+                  onChanged={(t, pending) => {
+                    // Keeps updated_at, so it must win a tie, like Retry.
+                    applyThread(t);
+                    setQueued(pending);
+                  }}
+                />
+                <LimitCard
+                  thread={thread}
+                  onChanged={(t, pending) => {
+                    // Scheduling keeps updated_at, so it must win a tie, like Retry.
+                    applyThread(t);
+                    setQueued(pending);
+                  }}
+                />
+                <HandoffCard thread={thread} handoff={handoff} onChanged={handedOff} />
+                <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} sessionBlocked={!!thread.resume_blocked} canSteer={canSteer(thread.harness, harnesses)} />
+                <SendingMessages threadId={id} pending={listed} />
+                {!queued.length && (
+                  <NextThreadCard
+                    thread={thread}
+                    onThread={(t, reply) => {
+                      applyThread(t, reply);
+                      if (reply) pin();
+                    }}
+                  />
+                )}
+              </div>
             </div>
+            {showJump && (
+              <button
+                type="button"
+                onClick={jump}
+                className="float pop-in press absolute bottom-4 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-medium"
+              >
+                <Icon name="chevronDown" size={13} /> New activity
+              </button>
+            )}
           </div>
-          {showJump && (
-            <button
-              type="button"
-              onClick={jump}
-              className="float pop-in press absolute bottom-4 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-medium"
-            >
-              <Icon name="chevronDown" size={13} /> New activity
-            </button>
+          {panel.surface === 'card' && (
+            <div className="absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)] md:static md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pl-1">
+              <ThreadQuickCard
+                thread={thread}
+                init={init}
+                warm={warm}
+                slotBusy={slotBusy}
+                agents={agents}
+                parent={parent}
+                children={children}
+                prs={prs}
+                step={step}
+                artifactCount={artifactCount}
+                machineName={hereName}
+                cwd={workCwd}
+                onOpen={openFromCard}
+                onOpenThread={(t) => navigate(href.thread(t))}
+                onJump={jumpTo}
+              />
+            </div>
           )}
         </div>
 
@@ -285,7 +317,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
       </div>
 
       {/* panel */}
-      {panel.open && (
+      {panel.surface === 'inspector' && (
         <aside className="relative shrink-0 py-2 pr-2" style={{ width: panel.width }}>
           <PanelResizeHandle width={panel.width} max={panel.max} onChange={panel.resize} onReset={panel.reset} />
           <div className="panel-in h-full overflow-hidden rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))]">
@@ -298,7 +330,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               onSelect={setSelected}
               tab={panelTab}
               onTab={setPanelTab}
-              onClose={panel.toggle}
+              onClose={panel.closeInspector}
               details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, onAsk: (p) => void ask(p), onTab: setPanelTab }}
               prs={{ data: prs, watch, next, step, onAsk: (p) => void ask(p) }}
             />

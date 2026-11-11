@@ -29,7 +29,7 @@ const render = (t: Thread) =>
 const buttons = (html: string) => [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/g)].map(([, attrs, body]) => /aria-label="([^"]*)"/.exec(attrs)?.[1] ?? body.replace(/<[^>]+>/g, '').trim());
 
 const MENU = 'Thread actions';
-const PANEL = 'Artifacts, changes, browser, terminal, actions, details';
+const PANEL = 'Hide quick actions';
 
 describe('the thread header', () => {
   it('shows the thread menu and the panel toggle, at any width, on any thread', () => {
