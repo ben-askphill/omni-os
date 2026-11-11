@@ -34,6 +34,8 @@ describe('channel form', () => {
       browser_headless: 0,
       notes: 'Be nice',
       icon: 'icon:hash',
+      avatar_bg: null,
+      avatar_bg_manual: 0,
       default_harness: 'claude-code',
       default_model: 'sonnet',
       default_effort: null,

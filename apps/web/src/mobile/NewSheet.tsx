@@ -108,7 +108,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
           </button>
           {listed.map((c) => (
             <button key={c.id} type="button" onClick={() => onTarget(c.id)} className={pill(target === c.id)} aria-pressed={target === c.id}>
-              <Avatar name={c.name} channelIcon={c.icon} size={24} />#{c.name}
+              <Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} size={24} />#{c.name}
             </button>
           ))}
         </div>

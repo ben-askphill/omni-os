@@ -15,6 +15,8 @@ export interface Channel {
   browser_headless: number;
   notes: string | null;
   icon: string | null;
+  avatar_bg?: string | null;
+  avatar_bg_manual?: number;
   default_harness: string | null;
   default_model: string | null;
   default_effort: string | null;

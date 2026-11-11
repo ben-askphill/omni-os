@@ -89,15 +89,26 @@ describe('channels', () => {
     a.db.channels.update('volero', { icon: svg });
     await exchange();
     expect(b.db.channels.get('volero')!.icon).toBe(svg);
+    expect(b.db.channels.get('volero')!.avatar_bg).toBe(a.db.channels.get('volero')!.avatar_bg);
     expect(b.feed).toContainEqual({ type: 'channel', id: 'volero' });
+  });
+
+  it('syncs a manual background and keeps it when the icon changes', async () => {
+    a.db.channels.update('volero', { avatar_bg: '#123456' });
+    await exchange();
+    expect(b.db.channels.get('volero')).toMatchObject({ avatar_bg: '#123456', avatar_bg_manual: 1 });
+    b.db.channels.update('volero', { icon: '🌻' });
+    await exchange();
+    expect(a.db.channels.get('volero')).toMatchObject({ icon: '🌻', avatar_bg: '#123456', avatar_bg_manual: 1 });
   });
 
   it('a change from a Mac on an older build, without the icon, keeps the icon this Mac has', async () => {
     const icon = a.db.channels.get('volero')!.icon;
-    const { icon: _drop, ...row } = relay.changes.findLast((c) => c.entity === 'channel' && c.entity_id === 'volero')!.data as any;
+    const bg = a.db.channels.get('volero')!.avatar_bg;
+    const { icon: _drop, avatar_bg: _bg, avatar_bg_manual: _manual, ...row } = relay.changes.findLast((c) => c.entity === 'channel' && c.entity_id === 'volero')!.data as any;
     await relay.push([{ machine_id: 'mac-old', entity: 'channel', entity_id: 'volero', op: 'upsert', ts: new Date(Date.now() + 1000).toISOString(), data: { ...row, notes: 'from an old Mac' } }]);
     await exchange();
-    for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'from an old Mac', icon });
+    for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'from an old Mac', icon, avatar_bg: bg });
   });
 });
 

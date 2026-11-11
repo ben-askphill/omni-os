@@ -64,7 +64,7 @@ export function InboxRowView({ row, last, actions, onPress }: { row: InboxRow; l
         onPress={onPress}
         style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
       >
-        <ChannelAvatar name={home?.name ?? row.channel} icon={home?.icon} conductor={row.channelId === 'conductor'} glyph={row.glyph} size={AVATAR} />
+        <ChannelAvatar name={home?.name ?? row.channel} icon={home?.icon} avatarBg={home?.avatar_bg} conductor={row.channelId === 'conductor'} glyph={row.glyph} size={AVATAR} />
         <View style={[styles.body, { paddingRight: actionsWidth(actions.length) }, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }]}>
           <View style={styles.line}>
             <Text numberOfLines={1} style={[styles.title, { color: row.receded ? colors.fg3 : colors.fg }]}>

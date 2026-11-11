@@ -83,7 +83,7 @@ export function ChannelsScreen() {
                 {list.map((c, i) => (
                   <MoListRow
                     key={c.id}
-                    icon={<Avatar name={c.name} channelIcon={c.icon} size={30} />}
+                    icon={<Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} size={30} />}
                     label={`#${c.name}`}
                     sub={c.store_domain || c.github_repo || undefined}
                     right={<Counts needs={needsIn(c.id)} running={c.running} />}

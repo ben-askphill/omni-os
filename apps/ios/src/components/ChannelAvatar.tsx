@@ -1,3 +1,4 @@
+import { avatarInk } from '@omni/shared/avatar-color.ts';
 import Svg, { Circle, G } from 'react-native-svg';
 import { MARK_TRANSFORM } from '@omni/shared/brand.ts';
 import { StyleSheet, View } from 'react-native';
@@ -21,6 +22,7 @@ export function ChannelAvatar({
   glyph,
   size = 36,
   disc,
+  avatarBg,
 }: {
   name: string;
   icon?: string | null;
@@ -29,12 +31,13 @@ export function ChannelAvatar({
   size?: number;
   /** The circle's colour, for an avatar that sits on surface-2 itself, such as a pill. */
   disc?: string;
+  avatarBg?: string | null;
 }) {
   const { colors } = useOmniTheme();
   return (
     <View style={{ width: size, height: size }} accessible={false} importantForAccessibility="no-hide-descendants">
-      <View style={[styles.disc, { width: size, height: size, borderRadius: size / 2, backgroundColor: disc ?? colors.surface2 }]}>
-        <Face face={channelFace(name, icon, conductor)} name={name} size={size} color={colors.fg2} />
+      <View style={[styles.disc, { width: size, height: size, borderRadius: size / 2, backgroundColor: avatarBg || disc || colors.surface2 }]}>
+        <Face face={channelFace(name, icon, conductor)} name={name} size={size} color={avatarBg ? avatarInk(avatarBg) : colors.fg2} />
       </View>
       {glyph ? (
         <View style={[styles.badge, { backgroundColor: colors.bg }]}>

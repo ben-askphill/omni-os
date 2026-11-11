@@ -10,6 +10,7 @@ export interface RowItem {
   channel: string;
   channelId: string;
   channelIcon: string | null;
+  avatarBg?: string | null;
   role: string | null;
   /** The thread's status, drawn as its glyph. */
   status: string;
@@ -23,6 +24,7 @@ export interface RowItem {
 export interface ChannelInfo {
   name: string;
   icon: string | null;
+  avatar_bg?: string | null;
 }
 
 /** Enough of a thread to list it: a full row, or the stub the pinned list types it as. */
@@ -40,6 +42,7 @@ export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: nu
     channel: channel?.name ?? t.channel_id,
     channelId: t.channel_id,
     channelIcon: channel?.icon ?? null,
+    avatarBg: channel?.avatar_bg,
     role: t.role ?? null,
     status: shownStatus(t),
     settled: !isWorking(t),

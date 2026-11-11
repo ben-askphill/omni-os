@@ -1,3 +1,5 @@
+import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
+import { autoAvatarColor } from '@omni/shared/avatar-color.ts';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
@@ -44,7 +46,7 @@ function AutoValue({ label, value, note, onEdit }: { label: string; value: strin
 /** Bigger than any SVG that could be kept once cleaned, so it is refused before being read. */
 const SVG_FILE_MAX = 512 * 1024;
 
-function IconPicker({ value, name, onChange }: { value: string; name: string; onChange: (v: string) => void }) {
+function IconPicker({ value, name, avatarBg, onChange }: { avatarBg?: string; value: string; name: string; onChange: (v: string) => void }) {
   const mark = parseChannelIcon(value);
   const fileRef = useRef<HTMLInputElement>(null);
   const [svgError, setSvgError] = useState<string | null>(null);
@@ -65,8 +67,8 @@ function IconPicker({ value, name, onChange }: { value: string; name: string; on
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <Avatar name={name} channelIcon={value} size={36} />
+      <div className="flex flex-wrap items-center gap-3">
+        <Avatar name={name} channelIcon={value} avatarBg={avatarBg} size={36} />
         <input
           id="ch-icon"
           className="field w-24 text-center !text-[18px] placeholder:!text-[13px]"
@@ -295,7 +297,12 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           <input id="ch-name" className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
         </Field>
         <Field label="Icon" htmlFor="ch-icon" hint="Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses the first letter.">
-          <IconPicker value={f.icon} name={f.name || f.id} onChange={(v) => set('icon', v)} />
+          <IconPicker avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
+        </Field>
+        <Field label="Avatar background" hint="Automatic follows the avatar. A custom color stays when you change the icon.">
+          <AvatarColorPicker icon={f.icon} name={f.name || f.id} value={f.avatar_bg} manual={!!f.avatar_bg_manual}
+            onChange={(color) => { setSaved(false); setF((prev) => ({ ...prev, avatar_bg: color, avatar_bg_manual: 1 })); }}
+            onAuto={() => { setSaved(false); setF((prev) => ({ ...prev, avatar_bg: autoAvatarColor(prev.icon) ?? '', avatar_bg_manual: 0 })); }} />
         </Field>
         {!isSystem && (
           <Field label="Kind">

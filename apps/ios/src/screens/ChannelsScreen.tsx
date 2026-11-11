@@ -113,7 +113,7 @@ function ChannelRow({ channel, needs, first, onPress, onLongPress }: { channel: 
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.wash }]}
     >
-      <ChannelAvatar name={channel.name} icon={channel.icon} conductor={conductor} size={34} />
+      <ChannelAvatar name={channel.name} icon={channel.icon} avatarBg={channel.avatar_bg} conductor={conductor} size={34} />
       <View style={[styles.text, !first && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
         <View style={styles.grow}>
           <Text numberOfLines={1} style={[styles.name, { color: colors.fg }]}>
