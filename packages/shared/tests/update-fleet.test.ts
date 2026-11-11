@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fleetSummary, rowLabel, rowState, skipReason, versionLine, type FleetMachine, type MachineUpdateStatus, type UpdateAsk } from '../update-fleet.ts';
+import { fleetSummary, leftOutNote, machineCount, rowAction, rowLabel, rowState, sinceLine, skipReason, versionLine, type FleetMachine, type MachineUpdateStatus, type UpdateAsk } from '../update-fleet.ts';
 
 const NOW = Date.parse('2026-11-10T12:00:00Z');
 const status = (over: Partial<MachineUpdateStatus> = {}): MachineUpdateStatus => ({
@@ -95,5 +95,34 @@ describe('labels', () => {
 
   it('sums up the fleet', () => {
     expect(fleetSummary([{ state: 'up-to-date' }, { state: 'downloading' }, { state: 'failed' }, { state: 'offline' }])).toBe('1 of 4 up to date, 1 in progress, 1 failed');
+  });
+});
+
+describe('row helpers both clients share', () => {
+  const m = (over: Partial<FleetMachine>): FleetMachine => ({ id: 'b', name: 'Box B', current: false, reach: 'online', status: status(), ask: null, state: 'ready', ...over });
+
+  it('gives a failed, expired or offline row Retry with its last ask, forced, and a ready row Update', () => {
+    expect(rowAction(m({ state: 'failed', ask: ask('2026-11-10T11:50:00Z', { action: 'download' }) }))).toEqual({ label: 'Retry', request: { action: 'download', machines: ['b'], force: true } });
+    expect(rowAction(m({ state: 'offline' }))).toEqual({ label: 'Retry', request: { action: 'check', machines: ['b'], force: true } });
+    expect(rowAction(m({ state: 'ready' }))).toEqual({ label: 'Update', request: { action: 'update', machines: ['b'] } });
+    expect(rowAction(m({ state: 'ready', status: status({ track: 'manual' }) }))).toBeNull();
+    expect(rowAction(m({ state: 'up-to-date' }))).toBeNull();
+  });
+
+  it('notes why Update leaves a row out only where the label does not say it', () => {
+    expect(leftOutNote(m({ state: 'offline' }))).toMatch(/^Offline\./);
+    expect(leftOutNote(m({ state: 'not-reporting', status: null }))).toMatch(/older Omni/);
+    expect(leftOutNote(m({ state: 'failed' }))).toBeNull();
+  });
+
+  it('dates a lasting state from its status, and a sent ask from the ask', () => {
+    expect(sinceLine(m({ state: 'waiting', status: status({ since: '2026-11-10T11:55:00Z' }) }), NOW)).toBe('since 5m ago');
+    expect(sinceLine(m({ state: 'sent', ask: ask('2026-11-10T11:59:50Z') }), NOW)).toBe('just now');
+    expect(sinceLine(m({ state: 'ready' }), NOW)).toBeNull();
+  });
+
+  it('counts machines', () => {
+    expect(machineCount(1)).toBe('1 machine');
+    expect(machineCount(3)).toBe('3 machines');
   });
 });

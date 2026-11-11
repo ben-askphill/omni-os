@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { relTime } from '@omni/shared/format.ts';
 import {
   fleetSummary,
+  leftOutNote,
+  machineCount,
+  rowAction,
   rowLabel,
   rowTone,
+  sinceLine,
   skipReason,
   TRACK_LABEL,
   versionLine,
   type FleetMachine,
   type FleetRequest,
   type FleetResult,
-  type FleetRowState,
   type FleetSkip,
   type FleetView,
 } from '@omni/shared/update-fleet.ts';
@@ -29,34 +31,6 @@ import { Card } from './settings-parts.tsx';
 
 const SKIPPED_SHOWN_MS = 10_000;
 const POLL_MS = 15_000;
-
-/** The states that last, so a row says since when. A `sent` ask has no status change yet: it dates from the ask. */
-const LASTING: ReadonlySet<FleetRowState> = new Set(['waiting', 'applying', 'restarting', 'sent']);
-
-function since(m: FleetMachine): string | null {
-  const at = m.state === 'sent' ? m.ask?.at : LASTING.has(m.state) ? m.status?.since : null;
-  const t = at ? relTime(at) : '';
-  if (!t) return null;
-  return t === 'just now' ? t : `since ${t.replace(/^Yesterday/, 'yesterday')}`;
-}
-
-/** The note a row says about why Update leaves it out, where the state label alone would not. */
-function leftOutNote(m: FleetMachine): string | null {
-  return m.state === 'offline' || m.state === 'not-reporting' || m.status?.track === 'manual' ? skipReason(m, 'update') : null;
-}
-
-/** A row's own button. Retry sends this machine's last ask to it again, or a check when there was none, offline or not. */
-function rowAction(m: FleetMachine): { label: 'Retry' | 'Update'; request: FleetRequest } | null {
-  if (m.state === 'failed' || m.state === 'expired' || m.state === 'offline') {
-    return { label: 'Retry', request: { action: m.ask?.action ?? 'check', machines: [m.id], force: true } };
-  }
-  if ((m.state === 'ready' || m.state === 'available') && skipReason(m, 'update') === null) {
-    return { label: 'Update', request: { action: 'update', machines: [m.id] } };
-  }
-  return null;
-}
-
-const machineCount = (n: number) => `${n} ${n === 1 ? 'machine' : 'machines'}`;
 
 export function UpdateMachinesCard() {
   const res = useApi<FleetView>('/update/fleet');
@@ -214,7 +188,7 @@ export function UpdateMachinesCard() {
 
 function FleetRow({ m, sending, onSend }: { m: FleetMachine; sending: string | null; onSend: (key: string, request: FleetRequest) => Promise<boolean> }) {
   const version = versionLine(m.status);
-  const lasting = since(m);
+  const lasting = sinceLine(m);
   const note = leftOutNote(m);
   const action = rowAction(m);
   const progress = m.state === 'downloading' ? m.status?.progress : null;
