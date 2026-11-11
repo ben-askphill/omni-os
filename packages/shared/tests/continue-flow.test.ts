@@ -376,6 +376,8 @@ describe("the preview's sections", () => {
     expect(workspaceText({ workspace: 'folder' })).toMatch(/channel's folder/);
     expect(workspaceText({ workspace: 'branch' })).toMatch(/not on this machine.*its branch's last commit/);
     expect(workspaceText({ workspace: 'fresh' })).toMatch(/branch is not here or on origin.*channel's folder/);
+    expect(workspaceText({ workspace: 'worktree', runs_on: null })).not.toMatch(/runs on/);
+    expect(workspaceText({ workspace: 'worktree', runs_on: { id: 'box-b', name: 'Box B' } })).toMatch(/new branch and worktree.* It runs on Box B, where Settings > Threads sends new threads\.$/);
   });
 });
 

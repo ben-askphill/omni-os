@@ -63,7 +63,16 @@ const ownCommits = (branch: string) => new Error(`this machine's copy of branch 
 
 /** Pack the worktree at dir and upload the bundle. Changes nothing in the checkout. */
 export async function packWorktree(dir: string, threadId: string, offerId: string, transport: SyncTransport): Promise<WorktreeBundle> {
-  const { tree, head: base } = await captureTree(dir, 'all', git);
+  const { tree, head } = await captureTree(dir, 'all', git);
+  return packTree(dir, { head, tree }, threadId, offerId, transport);
+}
+
+/**
+ * Pack a checkout that is not laid out anywhere yet: `head` with `tree` on top as its uncommitted changes, read from
+ * the repository at dir. A fork sent to another machine goes this way (continue.ts), from the source's snapshot.
+ */
+export async function packTree(dir: string, at: { head: string; tree: string }, threadId: string, offerId: string, transport: SyncTransport): Promise<WorktreeBundle> {
+  const { tree, head: base } = at;
   const ref = handoffRef(threadId, offerId);
   // Packing the same offer again moves its ref to the new commit.
   const wip = await commitCheckpoint(dir, { tree, parent: base, message: `Omni handoff ${offerId}: uncommitted changes`, ref, mode: 'replace' }, git);

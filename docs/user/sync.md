@@ -52,6 +52,7 @@ Pick where a new thread runs: this machine, or any other synced machine, such as
 - Take over brings the thread back to this machine; from then on it runs here.
 - If the other machine cannot start it, the thread stops here with why. A worktree thread's Retry runs it on this machine; any other keeps its first message for Resume.
 - Team members stay with their lead on the hub.
+- [Fork thread](harnesses.md#continuing-on-another-harness) follows the same default: the fork goes to that machine with the source's snapshot as its worktree.
 - The other machine needs its own harness logins. On a Linux box, use `claude setup-token` and save it as the global secret `CLAUDE_CODE_OAUTH_TOKEN`. For Codex, run `codex login --device-auth` there; never copy `~/.codex/auth.json` from a Mac, or the two keep logging each other out.
 
 ## Where a thread runs
