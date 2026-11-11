@@ -238,7 +238,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
               </NavLink>
               {conductor && (
                 <>
-                  {channelRow(conductor, 'Conductor', <span className="grid w-[15px] place-items-center">{conductor.avatar_bg ? <Avatar name="Conductor" omni avatarBg={conductor.avatar_bg} size={22} /> : <OmniMark size={17} />}</span>)}
+                  {channelRow(conductor, 'Conductor', <span className="grid min-w-[15px] place-items-center">{conductor.avatar_bg ? <Avatar name="Conductor" omni avatarBg={conductor.avatar_bg} size={22} /> : <OmniMark size={17} />}</span>)}
                   {threadLinks(conductor)}
                 </>
               )}
