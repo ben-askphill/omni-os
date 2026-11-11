@@ -68,7 +68,7 @@ Questions an agent asks the user with Omni's `ask_user_question` tool: one to fo
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
 **Inbox**:
-The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. On a phone, Activity shows the same list. It is a view over **Needs you** and related shelves, not another name for **Needs you**.
+The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. With Channel rail (Beta) on, the same list fills the panel beside the rail from the Inbox disc (Home's place). On a phone, Activity shows the same list. It is a view over **Needs you** and related shelves, not another name for **Needs you**.
 _Avoid_: Needs you (the reasons a thread waits), notifications
 
 **Needs you**:

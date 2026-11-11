@@ -69,8 +69,8 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 
 ## What you get
 
-- **Channels** per client or project, each with its own icon, default harness, model and effort, a design system file for the agent, and facts like the repo, Shopify store and Portal slug
-- **Threads** per task, dated, full-text searchable and resumable. Running and Pinned keep work reachable across channels; the sidebar Inbox (Activity on a phone) lists pinned, waiting, Working and Done; Mark done clears a thread from Needs you until something new happens. Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
+- **Channels** per client or project, each with its own icon and avatar background, default harness, model and effort, a design system file for the agent, and facts like the repo, Shopify store and Portal slug
+- **Threads** per task, dated, full-text searchable and resumable. Running and Pinned keep work reachable across channels; the sidebar Inbox (Activity on a phone, or the Channel rail Beta's Inbox disc) lists pinned, waiting, Working and Done; Mark done clears a thread from Needs you until something new happens. Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
 - **Composer**: `/` menu for skills, slash commands and MCP prompts per harness, `@` to mention artifacts and repo files, attachments, and chips for diff lines, terminal output, browser annotations and other threads, plus suggested next replies
 - **Sandbox per thread**: its own git worktree in repo channels, a choice of base commit, channel setup and named actions, a persistent browser shown live in the Browser panel, a real terminal, and secrets from the Keychain (or a 0600 file on Linux) as env. Hermes and Cursor Cloud run remotely without these local tools
 - **Artifacts** listed in each thread, an Artifacts page across channels (Files / claude.ai, with list or grid), cards for pages a thread published to claude.ai, and the same claude.ai list in the phone and iOS Library. With `html_render`, an agent shows a chart, diagram or mockup right in the transcript above its reply: sandboxed, interactive, sized to fit and drawn in Omni's theme
@@ -79,9 +79,10 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 - **Automations**: YAML on a cron schedule, GitHub PR event, published page or signed GitHub webhook; every run is its own thread
 - **Sync** between two Macs through a relay on your own Cloudflare account (optional), with handoff of a running thread to the other Mac
 - **Omni Connect**: open any synced machine from a phone through that relay, without Tailscale
-- **Update**: one button in the desktop sidebar and phone Activity when origin's `main` is ahead of a checkout; syncs, rebuilds and restarts. The packaged desktop app updates itself from its GitHub Releases
+- **Update**: one button in the desktop sidebar and phone Activity when origin's `main` is ahead of a checkout; syncs, rebuilds and restarts. The packaged desktop app updates itself from its GitHub Releases. With sync on, Settings > Machines > Update all machines (web, phone, desktop app and iOS) checks, downloads and updates every synced machine in one place
 - **Phone layout** with Activity, Channels, Library and PRs tabs, a new-thread sheet and full-screen thread panels. Save it to the iPhone home screen over Tailscale
-- **Native iOS app** that pairs with a server over HTTPS: Activity (the same Inbox list as phone web), Channels with emoji/icon/SVG avatars, Library (including claude.ai Artifacts), a New tab item, Settings and Channel Settings from the shared catalog, the thinking line while a turn runs, send, attachments, handoff, Changes and PR review (including PRs from delegated threads), and shared line icons. See [Remote access](docs/user/remote-access.md#pair-the-native-ios-app) and [apps/ios/README.md](apps/ios/README.md)
+- **Channel rail (Beta)** in Settings > Appearance on desktop web and the desktop app: a disc rail and list panel instead of the classic sidebar. Classic stays the default; phone and iOS keep their own layouts
+- **Native iOS app** that pairs with a server over HTTPS: Activity (the same Inbox list as phone web), Channels with emoji/icon/SVG avatars and avatar backgrounds, Library (including claude.ai Artifacts), a New tab item, Settings and Channel Settings from the shared catalog (including Update all machines), the thinking line while a turn runs, send, attachments, handoff, Changes and PR review (including PRs from delegated threads), and shared line icons. See [Remote access](docs/user/remote-access.md#pair-the-native-ios-app) and [apps/ios/README.md](apps/ios/README.md)
 
 ## Documentation
 
