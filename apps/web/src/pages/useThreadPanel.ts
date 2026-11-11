@@ -2,10 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { Artifact } from '../api.ts';
 import { PANEL_MIN, THREAD_MIN, defaultPanelWidth } from '../components/thread/panel/PanelResizeHandle.tsx';
 import { readPref, writePref } from '../store.tsx';
+import { readThreadPanelSurface, writeThreadPanelSurface, type ThreadPanelSurface } from './thread-panel-surface.ts';
 
 /**
- * The inspector's open state and width, both remembered. It opens for an artifact link and when a new HTML artifact
- * lands, and keeps a wide panel from squeezing the transcript below THREAD_MIN by measuring the page.
+ * The right side of a thread: a compact quick card by default, the full inspector on demand, or collapsed. Width applies
+ * to the inspector only. It opens to the inspector for an artifact link and when a new HTML artifact lands, and keeps a
+ * wide panel from squeezing the transcript below THREAD_MIN by measuring the page.
  */
 export function useThreadPanel({
   artifactParam,
@@ -22,7 +24,7 @@ export function useThreadPanel({
   /** Show the linked artifact in the panel. */
   select: (id: number) => void;
 }) {
-  const [open, setOpen] = useState<boolean>(() => readPref('threadPanel', true));
+  const [surface, setSurface] = useState<ThreadPanelSurface>(() => readThreadPanelSurface());
   const [width, setWidth] = useState<number | null>(() => {
     const v = readPref<unknown>('threadPanelWidth', null);
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -30,21 +32,26 @@ export function useThreadPanel({
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootWidth, setRootWidth] = useState(0);
 
+  const set = useCallback((next: ThreadPanelSurface) => {
+    setSurface(next);
+    writeThreadPanelSurface(next);
+  }, []);
+
   useEffect(() => {
     if (artifactParam) {
       select(artifactParam);
-      setOpen(true);
+      set('inspector');
     }
-  }, [artifactParam, select]);
+  }, [artifactParam, select, set]);
 
-  // Open the panel when a new HTML artifact lands.
+  // Open the inspector when a new HTML artifact lands.
   const prevFiles = useRef(0);
   useEffect(() => {
     if (ready && files.length > prevFiles.current && prevFiles.current > 0 && files[files.length - 1]?.kind === 'html') {
-      setOpen(true);
+      set('inspector');
     }
     prevFiles.current = files.length;
-  }, [files, ready]);
+  }, [files, ready, set]);
 
   // Track the thread view width so a wide panel never squeezes the transcript below THREAD_MIN.
   useLayoutEffect(() => {
@@ -57,16 +64,12 @@ export function useThreadPanel({
     return () => ro.disconnect();
   }, [loaded]);
 
-  /** Open it, as a delegate count's click does, and remember it open. */
-  const show = useCallback(() => {
-    setOpen(true);
-    writePref('threadPanel', true);
-  }, []);
-  const toggle = () =>
-    setOpen((v) => {
-      writePref('threadPanel', !v);
-      return !v;
-    });
+  const open = surface !== 'collapsed';
+  /** Opens the right side the way a delegate count's Details link does. */
+  const show = useCallback(() => set('inspector'), [set]);
+  /** The header button: card and collapsed swap; from the inspector it steps back to the card. */
+  const toggle = () => set(surface === 'card' ? 'collapsed' : 'card');
+  const closeInspector = () => set('card');
   const max = Math.max(PANEL_MIN, (rootWidth || window.innerWidth) - THREAD_MIN);
   const shown = Math.min(Math.max(width ?? defaultPanelWidth(), PANEL_MIN), max);
   const resize = (w: number, done: boolean) => {
@@ -77,5 +80,5 @@ export function useThreadPanel({
     setWidth(null);
     writePref('threadPanelWidth', null);
   };
-  return { open, show, toggle, rootRef, max, width: shown, resize, reset };
+  return { surface, open, show, toggle, closeInspector, rootRef, max, width: shown, resize, reset };
 }

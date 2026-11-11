@@ -15,8 +15,8 @@ import { MoContinueLinks } from '../components/ContinueLinks.tsx';
 import { ErrorNote, StatusPill } from '../components/ui.tsx';
 import { plural } from '../format.ts';
 import { reasonOf } from '../needs-you.ts';
-import { href } from '../router.ts';
-import { useApp, useNow } from '../store.tsx';
+import { href, type ThreadView } from '../router.ts';
+import { useApp, useHereName, useNow } from '../store.tsx';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsCardView } from './NeedsCard.tsx';
@@ -28,7 +28,10 @@ import { RunOnSheet } from './RunOnSheet.tsx';
 import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from '@omni/shared/thread-view.ts';
-import { crewLine, prLine } from '@omni/shared/thread-glance.ts';
+import { crewLine, prLine, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
+import type { PanelTab } from '../pages/useThreadSession.ts';
+import { runningSubagents } from '../subagents.ts';
 import { statusLabel } from '../status-line.ts';
 import { shownStatus } from '@omni/shared/delegate-count.ts';
 
@@ -36,8 +39,11 @@ import { shownStatus } from '@omni/shared/delegate-count.ts';
 export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
-  const { thread, parent, children, events, history, revealTarget, clearReveal, files, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover } = s;
-  const { needsYou, channel } = useApp();
+  const { thread, parent, children, events, history, revealTarget, clearReveal, files, shots, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover, init, warm, crew: crewArtifacts } = s;
+  const { needsYou, channel, tasks } = useApp();
+  const hereName = useHereName();
+  // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
+  const [quick, setQuick] = useState(false);
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
   const [machineSheet, setMachineSheet] = useState(false);
@@ -47,6 +53,10 @@ export function ThreadScreen() {
   const status = useMemo(() => (thread?.status === 'running' ? statusLabel(events) : null), [events, thread?.status]);
   const changes = useBranchChanges(thread, slotBusy);
   const pr = useThreadPR(thread, slotBusy, true);
+  const agents = useMemo(() => runningSubagents(tasks, thread?.id ?? ''), [tasks, thread?.id]);
+  const step = useMemo(() => stepUnderway(events, queued, slotBusy), [events, queued, slotBusy]);
+  const artifactCount = files.length + shots.length + crewArtifacts.files.length + crewArtifacts.shots.length;
+  const workCwd = init?.cwd || thread?.cwd || '';
   const { scroll, newest } = useOpenOnNewestTurn({ view, history, ready, revealTarget, clearReveal });
   const handedOff = (a: HandoffAnswer) => {
     applyThread(a.thread, true);
@@ -108,6 +118,21 @@ export function ThreadScreen() {
   const needs = card?.glyph === 'needs' || (conductor && !!needsYou?.items.some((i) => kidIds.has(i.thread.id) && reasonOf(i).glyph === 'needs'));
   const ctx: TurnCtx = { thread, view, history, conductor, crew, ch, changes, pr, now, shell, status };
 
+  const openFromCard = (tab: PanelTab) => {
+    setQuick(false);
+    const map: Record<PanelTab, ThreadView> = {
+      details: 'details',
+      prs: 'pr',
+      changes: 'changes',
+      browser: 'browser',
+      terminal: 'terminal',
+      actions: 'actions',
+      artifacts: 'details',
+      web: 'browser',
+    };
+    shell.open(href.threadView(thread.id, map[tab]));
+  };
+
   return (
     <>
       <MoHeader
@@ -117,58 +142,83 @@ export function ThreadScreen() {
         right={
           <>
             <StatusPill status={view.asking || needs ? 'needs' : shownStatus(thread)} label={view.asking ? ASKING_LABEL : needs ? 'Needs you' : undefined} />
+            <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
             <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
           </>
         }
       />
-      <div ref={scroll} className="mo-scroll min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-4 [overflow-anchor:none]">
-        <HistoryCtx.Provider value={history}>
-          <div className="flex flex-col gap-4">
-            <MoContinueLinks links={s.links} onOpen={(id) => shell.open(href.thread(id))} />
-            {view.turns.map((t, i) => {
-              const last = i === view.turns.length - 1;
-              const edge = edges.get(t.key);
-              return (
-                <Fragment key={t.key}>
-                  {edge && <HistoryEdgeRow edge={edge} history={history} touch />}
-                  <div data-key={t.key} ref={last ? newest : undefined} className="flex flex-col gap-4">
-                    <Turn t={t} first={i === 0} last={last} c={ctx} />
-                  </div>
-                </Fragment>
-              );
-            })}
-            {edges.get(-1) && <HistoryEdgeRow edge={edges.get(-1)!} history={history} touch />}
-            <CrewQuestions threadId={thread.id} touch onOpen={(id) => shell.open(href.thread(id))} />
-            <HandoffCard thread={thread} handoff={handoff} mobile onChanged={handedOff} />
-            {!view.turns.length && !thread.setup && <MoEmpty>Nothing here yet.</MoEmpty>}
-            <SetupCard
-              thread={thread}
-              mobile
-              onRetried={(t, pending) => {
-                // Retry keeps updated_at, so it must win a tie.
-                applyThread(t);
-                setQueued(pending);
-              }}
-            />
-            <StaleSessionCard
-              thread={thread}
-              mobile
-              onChanged={(t, pending) => {
-                // Keeps updated_at, so it must win a tie.
-                applyThread(t);
-                setQueued(pending);
-              }}
-            />
-            {/* A question's card above is where Ben answers it, and the setup card is where he retries setup. */}
-            {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} onRecovered={(r) => {
-                  applyThread(r.thread, true);
-                  setQueued(r.pending);
-                }} />}
-            {queued.length > 0 && <Pending thread={thread} items={queued} onPending={setQueued} />}
-            <Sending threadId={thread.id} pending={listed} />
-            {actionError && <ErrorNote>{actionError}</ErrorNote>}
-          </div>
-        </HistoryCtx.Provider>
+      <div className="relative min-h-0 flex-1">
+        {quick && (
+          <>
+            <button type="button" aria-label="Close quick actions" tabIndex={-1} className="absolute inset-0 z-10 cursor-default" onClick={() => setQuick(false)} />
+            <div className="pop-in absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)]">
+              <ThreadQuickCard
+                thread={thread}
+                channel={ch}
+                init={init}
+                warm={warm}
+                slotBusy={slotBusy}
+                agents={agents}
+                prs={pr}
+                changes={changes}
+                step={step}
+                artifactCount={artifactCount}
+                machineName={hereName}
+                cwd={workCwd}
+                onOpen={openFromCard}
+              />
+            </div>
+          </>
+        )}
+        <div ref={scroll} className="mo-scroll h-full min-h-0 overflow-y-auto px-4 pt-2 pb-4 [overflow-anchor:none]">
+          <HistoryCtx.Provider value={history}>
+            <div className="flex flex-col gap-4">
+              <MoContinueLinks links={s.links} onOpen={(id) => shell.open(href.thread(id))} />
+              {view.turns.map((t, i) => {
+                const last = i === view.turns.length - 1;
+                const edge = edges.get(t.key);
+                return (
+                  <Fragment key={t.key}>
+                    {edge && <HistoryEdgeRow edge={edge} history={history} touch />}
+                    <div data-key={t.key} ref={last ? newest : undefined} className="flex flex-col gap-4">
+                      <Turn t={t} first={i === 0} last={last} c={ctx} />
+                    </div>
+                  </Fragment>
+                );
+              })}
+              {edges.get(-1) && <HistoryEdgeRow edge={edges.get(-1)!} history={history} touch />}
+              <CrewQuestions threadId={thread.id} touch onOpen={(id) => shell.open(href.thread(id))} />
+              <HandoffCard thread={thread} handoff={handoff} mobile onChanged={handedOff} />
+              {!view.turns.length && !thread.setup && <MoEmpty>Nothing here yet.</MoEmpty>}
+              <SetupCard
+                thread={thread}
+                mobile
+                onRetried={(t, pending) => {
+                  // Retry keeps updated_at, so it must win a tie.
+                  applyThread(t);
+                  setQueued(pending);
+                }}
+              />
+              <StaleSessionCard
+                thread={thread}
+                mobile
+                onChanged={(t, pending) => {
+                  // Keeps updated_at, so it must win a tie.
+                  applyThread(t);
+                  setQueued(pending);
+                }}
+              />
+              {/* A question's card above is where Ben answers it, and the setup card is where he retries setup. */}
+              {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} onRecovered={(r) => {
+                    applyThread(r.thread, true);
+                    setQueued(r.pending);
+                  }} />}
+              {queued.length > 0 && <Pending thread={thread} items={queued} onPending={setQueued} />}
+              <Sending threadId={thread.id} pending={listed} />
+              {actionError && <ErrorNote>{actionError}</ErrorNote>}
+            </div>
+          </HistoryCtx.Provider>
+        </div>
       </div>
       <MoComposer
         thread={thread}
