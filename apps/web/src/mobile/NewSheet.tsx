@@ -4,6 +4,7 @@ import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { useBasePick, useBaseRows } from '../components/BasePicker.tsx';
 import { useRunOn } from '../components/RunOnPicker.tsx';
 import { AttachmentStrip, useAttachments } from '../components/Composer.tsx';
+import { keepLocalFiles } from '../sending.ts';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
 import { Avatar, ErrorNote } from '../components/ui.tsx';
 import { draftRun, draftRunRequest } from '@omni/shared/draft-run.ts';
@@ -82,6 +83,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
         },
         att.files,
       );
+      keepLocalFiles(t.id, att.files);
       shell.open(href.thread(t.id));
     } catch (e) {
       setError(errorText(e));

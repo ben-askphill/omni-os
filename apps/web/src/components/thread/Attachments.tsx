@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { bytes } from '@omni/shared/format.ts';
 import { uploadUrl, type Attachment } from '../../api.ts';
+import { localFile, localUrl } from '../../sending.ts';
 import { Icon, Modal } from '../ui.tsx';
-import { localFile } from '../../sending.ts';
 
 /**
  * What Ben attached to a message: images as thumbnails that open full size, everything else as a download.
- * `href` stands in for the server's copy while a message is still on its way (sending.ts).
+ * `href` stands in for the server's copy while a message is still on its way, and a file this window sent shows
+ * from its own copy (sending.ts).
  */
 export function Attachments({ threadId, items, href }: { threadId: string; items: Attachment[]; href?: (a: Attachment) => string }) {
   const [open, setOpen] = useState<Attachment | null>(null);
   if (!items.length) return null;
-  const src = (a: Attachment, download = false) => href?.(a) ?? localFile(a) ?? uploadUrl(threadId, a, download);
+  const src = (a: Attachment, download = false) => href?.(a) ?? localFile(a) ?? localUrl(threadId, a) ?? uploadUrl(threadId, a, download);
   return (
     <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
       {items.map((a) =>

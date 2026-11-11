@@ -13,7 +13,7 @@ import { replySlash } from '@omni/shared/composer-slash.ts';
 import { newThreadBody, sameSettings } from '../new-thread-preset.ts';
 import { draftRun, draftRunRequest, type DraftRun } from '@omni/shared/draft-run.ts';
 import { sendKey } from '../requests.ts';
-import { beginSend } from '../sending.ts';
+import { beginSend, keepLocalFiles } from '../sending.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { requestIdFor, type PendingRequest } from '@omni/shared/request-id.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
@@ -129,6 +129,7 @@ export function NewThreadComposer({
         },
         att.files,
       );
+      keepLocalFiles(t.id, att.files);
       drafts.delete(key);
       setText('');
       att.clear();
@@ -363,6 +364,7 @@ export function ReplyComposer({
     try {
       if (action.kind === 'new-thread') {
         const t = await api.send<Thread>('/threads', newThreadBody(thread, action.prompt), att.files);
+        keepLocalFiles(t.id, att.files);
         sent(raw);
         att.clear();
         navigate(`/t/${t.id}`);
