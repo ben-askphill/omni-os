@@ -28,7 +28,8 @@ import { canSteer } from '../steer.ts';
 import { teamOf } from '../transcript/delegation.ts';
 import { runningSubagents } from '../subagents.ts';
 import { isAsking } from '@omni/shared/transcript-fold.ts';
-import { useApp, useHereName } from '../store.tsx';
+import { useApp, useHereName, useNow } from '../store.tsx';
+import { limitLabel } from '../limits.ts';
 import { useThreadActions } from './useThreadActions.ts';
 import { useThreadInterruptKey } from './useThreadInterruptKey.ts';
 import { useThreadPanel } from './useThreadPanel.ts';
@@ -116,6 +117,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   );
   const panel = useThreadPanel({ artifactParam, files, ready, loaded: thread !== null, select: selectArtifact });
   const hereName = useHereName();
+  const now = useNow(60_000);
   const workCwd = init?.cwd || thread?.cwd || '';
   const openFromCard = (tab: PanelTab) => {
     setPanelTab(tab);
@@ -174,6 +176,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     );
   }
 
+  const reconnecting = !live && ready;
   const artifactCount = files.length + shots.length + crew.files.length + crew.shots.length;
 
   return (
@@ -197,7 +200,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 }}
               />
             ),
-            reconnecting: !live && ready,
+            reconnecting,
             onDone: () => void toggleDone(),
             onRestore: () => void restore(),
             restoring,
@@ -217,7 +220,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 {/* Queued means waiting for a slot: nothing is working yet. */}
                 <LinkChannel.Provider value={thread.channel_id}>
                   <ThreadIdCtx.Provider value={id}>
-                    <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} />
+                    <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} />
                   </ThreadIdCtx.Provider>
                 </LinkChannel.Provider>
                 <div className="mt-4 empty:hidden">
@@ -289,6 +292,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 onOpen={openFromCard}
                 onOpenThread={(t) => navigate(href.thread(t))}
                 onJump={jumpTo}
+                asking={asking}
+                reconnecting={reconnecting}
               />
             </div>
           )}
@@ -313,6 +318,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               // A rename keeps updated_at, so it has to win a tie.
               onChanged={(t) => applyThread(t)}
               machine={{ blocked, handoff, takeover, onChanged: handedOff }}
+              asking={asking}
             />
           </div>
         </div>

@@ -139,7 +139,7 @@ export function FileMenu({
       aria-label="Files"
       // Keep focus (and the phone keyboard) in the composer.
       onMouseDown={(e) => e.preventDefault()}
-      className={`fade-in scroll-thin absolute inset-x-0 z-20 max-h-[min(22rem,45vh)] overflow-y-auto rounded-[22px] bg-elev p-1.5 shadow-[var(--shadow-menu)] ${below ? 'top-full mt-2' : 'bottom-full mb-2'}`}
+      className={`fade-in scroll-thin absolute inset-x-0 z-20 max-h-[min(22rem,45vh)] overflow-y-auto rounded-[var(--r-2xl)] bg-elev p-1.5 shadow-[var(--shadow-menu)] ${below ? 'top-full mt-2' : 'bottom-full mb-2'}`}
     >
       {rows.map((r, k) => (
         <div

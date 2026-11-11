@@ -32,7 +32,8 @@ import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { runningSubagents } from '../subagents.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
-import { asksForYou, threadGlyph, type Glyph } from '@omni/shared/status.ts';
+import { STATUS, asksForYou, type Glyph } from '@omni/shared/status.ts';
+import { threadPill } from '../components/thread/thread-state.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
 export function ThreadScreen() {
@@ -115,6 +116,9 @@ export function ThreadScreen() {
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
+  const reconnecting = !s.live && ready;
+  const own = threadPill(thread, { asking: view.asking, reconnecting, now });
+  const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: STATUS[needs].label } : own;
   const ctx: TurnCtx = { thread, view, history, conductor, crew, ch, changes, pr, now, shell, status };
 
   const openFromCard = (tab: PanelTab) => {
@@ -140,7 +144,7 @@ export function ThreadScreen() {
         sub={parent ? <span>{sub} · <a href={href.thread(parent.id)} className="text-fg-2 hover:text-fg" title={`Delegated from ${parent.title}`}>Parent: {parent.title}</a></span> : sub}
         right={
           <>
-            <StatusPill status={view.asking ? 'needs' : (needs ?? threadGlyph(thread))} />
+            <StatusPill status={pill.glyph} label={pill.label} />
             <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
             <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
           </>
@@ -164,6 +168,8 @@ export function ThreadScreen() {
                 artifactCount={artifactCount}
                 machineName={hereName}
                 cwd={workCwd}
+                asking={view.asking}
+                reconnecting={reconnecting}
                 onOpen={openFromCard}
                 onOpenThread={(id) => {
                   setQuick(false);
@@ -230,9 +236,10 @@ export function ThreadScreen() {
       <MoComposer
         thread={thread}
         chips={chips}
-        // Nothing runs while the worktree is prepared, so there is nothing to stop.
-        stop={slotBusy && !thread.setup ? { busy: interrupting, run: () => void interrupt() } : null}
-        placeholder={(steers) => (conductor ? 'Reply to the Conductor' : !slotBusy ? 'Follow up' : steers ? `Steer ${theirs}` : 'Queue for after this turn')}
+        // Nothing runs while the worktree is prepared, so there is nothing to stop. A pending question waits on a reply,
+        // which steers in as the answer, so the box sends rather than stops.
+        stop={slotBusy && !thread.setup && !view.asking ? { busy: interrupting, run: () => void interrupt() } : null}
+        placeholder={(steers) => (conductor ? 'Reply to the Conductor' : !slotBusy ? 'Follow up' : view.asking && steers ? 'Reply' : steers ? `Steer ${theirs}` : 'Queue for after this turn')}
         onSent={(t) => applyThread(t, true)}
         onSwitched={(t) => applyThread(t)}
         onFork={() => shell.sheet({ name: 'continue', source: thread })}

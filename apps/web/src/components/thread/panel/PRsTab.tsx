@@ -88,7 +88,7 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk, onMerged }: {
   const opening = step === 'open';
   if (prs.length === 0)
     return (
-      <div className="rounded-[20px] bg-bg px-4 py-5 text-center" aria-live="polite">
+      <div className="rounded-[var(--r-xl)] bg-bg px-4 py-5 text-center" aria-live="polite">
         <div className="text-[13px] font-medium text-fg">{opening ? `${STEP_WORKING.open}…` : 'No PR yet'}</div>
         <p className="mx-auto mt-1 min-h-[2lh] max-w-[260px] text-[12.5px] leading-relaxed text-fg-3">
           {opening ? (
@@ -116,12 +116,12 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk, onMerged }: {
           {plural(prs.length, 'PR')} from <span className="font-mono">{thread.branch}</span>
         </span>
       </div>
-      <div className="rounded-[20px] bg-bg p-1">
+      <div className="rounded-[var(--r-xl)] bg-bg p-1">
         {prs.map((p) => {
           const b = prBadge(p);
           const line = prLine(p);
           return (
-            <a key={p.number} href={href.pr(thread.channel_id, p.number)} title={p.title} className="hov flex min-w-0 items-start gap-2.5 rounded-[16px] px-3 py-2.5 [--hov:var(--surface)]">
+            <a key={p.number} href={href.pr(thread.channel_id, p.number)} title={p.title} className="hov flex min-w-0 items-start gap-2.5 rounded-[var(--r-lg)] px-3 py-2.5 [--hov:var(--surface)]">
               <span className="w-9 shrink-0 pt-px font-num text-[12.5px] text-fg-3 tabular-nums">#{p.number}</span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[13px] font-medium text-fg">{p.title}</span>
@@ -130,8 +130,8 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, onAsk, onMerged }: {
                   <span className="truncate">{line.text}</span>
                 </span>
                 <span className="flex items-center gap-2 text-[11px] text-fg-3">
-                  <span className="font-num text-fg-3">+{p.additions}</span>
-                  <span className="font-num">−{p.deletions}</span>
+                  <span className="font-num text-[color:var(--diff-add-fg)]">+{p.additions}</span>
+                  <span className="font-num text-[color:var(--diff-del-fg)]">−{p.deletions}</span>
                   <span>{relTime(p.updatedAt)}</span>
                 </span>
               </span>
@@ -162,12 +162,12 @@ export function CrewPRs({ crew, first }: { crew: CrewPR[]; first: boolean }) {
         <span className="caption">From delegated threads</span>
         <span className="ml-auto truncate pl-2 text-[11px] text-fg-3">{crewLine(crew).text}</span>
       </div>
-      <div className="rounded-[20px] bg-bg p-1">
+      <div className="rounded-[var(--r-xl)] bg-bg p-1">
         {crew.map((p) => {
           const b = prBadge(p);
           return (
-            <div key={p.url} className="flex min-w-0 items-center gap-1 rounded-[16px] pr-1.5">
-              <a href={href.pr(p.channel_id, p.number)} title={p.title} className="hov flex min-w-0 flex-1 items-start gap-2.5 rounded-[16px] px-3 py-2.5 [--hov:var(--surface)]">
+            <div key={p.url} className="flex min-w-0 items-center gap-1 rounded-[var(--r-lg)] pr-1.5">
+              <a href={href.pr(p.channel_id, p.number)} title={p.title} className="hov flex min-w-0 flex-1 items-start gap-2.5 rounded-[var(--r-lg)] px-3 py-2.5 [--hov:var(--surface)]">
                 <span className="w-9 shrink-0 pt-px font-num text-[12.5px] text-fg-3 tabular-nums">#{p.number}</span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-[13px] font-medium text-fg">{p.title}</span>
@@ -194,7 +194,7 @@ function WatchCard({ w, open }: { w: PRWatchState; open: boolean }) {
       disabled={w.busy}
       aria-pressed={w.watching}
       onClick={() => void (w.watching ? w.stop() : w.start())}
-      className="hov mt-4 flex w-full items-start gap-2.5 rounded-[20px] bg-bg px-3.5 py-3 text-left [--hov:var(--surface-2)] disabled:opacity-60"
+      className="hov mt-4 flex w-full items-start gap-2.5 rounded-[var(--r-xl)] bg-bg px-3.5 py-3 text-left [--hov:var(--surface-2)] disabled:opacity-60"
     >
       <Icon name="bell" size={14} className={`mt-0.5 shrink-0 ${w.watching ? 'text-live-text' : 'text-fg-3'}`} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">

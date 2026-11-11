@@ -29,6 +29,7 @@ describe('config fields on the phone', () => {
       ['Workspace folder', false, '~/Omni'],
       ['Repos folder', false, '~/code'],
       ['GitHub owner', true, 'askphill'],
+      ['Central brain folder', false, '~/central-brain'],
     ]);
   });
 

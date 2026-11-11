@@ -1,5 +1,5 @@
 // What the app shows when the server cannot start or stops on its own: a small window with what went wrong and the
-// last lines of the log. The main window stays open behind it, and the Web UI reconnects by itself once Try Again
+// last lines of the log. The main window stays open behind it, and the Web UI reconnects by itself once Try again
 // brings the server back.
 import { app, BrowserWindow, nativeTheme, shell } from 'electron';
 import { existsSync } from 'node:fs';
@@ -31,42 +31,52 @@ export function escapeHtml(text: string): string {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 }
 
+// The Web UI's tokens (apps/web/src/index.css), since this page loads before it and cannot read them.
 const STYLE = `
-:root { color-scheme: light dark; --bg: #f7f7f5; --card: #ffffff; --fg: #1a1a1a; --fg2: #444; --fg3: #6b6b6b;
-  --line: rgba(0,0,0,.1); --well: #f2f2f0; --primary: #1a1a1a; --on-primary: #fff; }
-@media (prefers-color-scheme: dark) { :root { --bg: #141414; --card: #1d1d1d; --fg: #ededed; --fg2: #c8c8c8;
-  --fg3: #9a9a9a; --line: rgba(255,255,255,.12); --well: #161616; --primary: #ededed; --on-primary: #141414; } }
+:root { color-scheme: light dark; --bg: #ffffff; --surface: #f7f7f6; --surface-2: #f1f1f0; --surface-3: #ecebe7; --fg: #17181a;
+  --fg-2: #3c3b37; --fg-3: #62615c; --line: rgba(23,24,26,.08); --warn: #b45309; --ink: #17181a; --on-ink: #ffffff; }
+@media (prefers-color-scheme: dark) { :root { --bg: #121316; --surface: #191b1e; --surface-2: #222428; --surface-3: #2a2c31;
+  --fg: #eceae5; --fg-2: #b8b7b1; --fg-3: #a09f99; --line: rgba(236,235,231,.08); --warn: #f5b544; --ink: #eceae5; --on-ink: #101114; } }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
-body { font: 500 13.5px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
-  display: flex; align-items: center; justify-content: center; padding: 20px; -webkit-user-select: text; }
-main { width: 100%; max-width: 600px; max-height: 100%; overflow-y: auto; background: var(--card); border: 1px solid var(--line);
-  border-radius: 20px; padding: 24px 28px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+body { font: 400 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
+  display: flex; align-items: center; justify-content: center; padding: 32px 40px; -webkit-user-select: text; }
+/* The window is the surface: no card inside it. */
+main { width: 100%; max-width: 560px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
+  text-align: center; }
 main > * { flex-shrink: 0; }
-.glyph { width: 44px; height: 44px; border-radius: 50%; background: var(--well); display: grid; place-items: center;
-  color: #d97706; font-weight: 800; font-size: 18px; }
-h1 { margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -0.01em; }
-p { margin: 0; color: var(--fg2); text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* The log gives up height first, down to the caption and 48px of lines. Below that the card scrolls. */
-.log { width: 100%; min-height: 72px; flex: 0 1 auto; display: flex; flex-direction: column; }
+.alert { color: var(--warn); display: block; }
+h1 { margin: 16px 0 0; font-size: 26px; line-height: 1.15; font-weight: 500; letter-spacing: -0.01em; }
+p { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The log gives up height first, down to the caption and 48px of lines. Below that the page scrolls. */
+.log { width: 100%; margin-top: 24px; min-height: 72px; flex: 0 1 auto; display: flex; flex-direction: column; text-align: left; }
 main > .log { flex-shrink: 1; }
-.caption { font-size: 11.5px; color: var(--fg3); margin: 0 0 6px 4px; }
-pre { margin: 0; min-height: 48px; max-height: 220px; flex: 0 1 auto; overflow: auto; background: var(--well); border: 1px solid var(--line);
-  border-radius: 12px; padding: 10px; font: 11.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--fg2); white-space: pre-wrap; overflow-wrap: anywhere; }
-nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
-a { display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 17px; text-decoration: none;
-  border: 1px solid var(--line); color: var(--fg); font-weight: 600; }
-a.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; }
-a:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
-.spinner { width: 22px; height: 22px; border: 2px solid var(--line); border-top-color: var(--fg3); border-radius: 50%;
+.caption { font-size: 12px; color: var(--fg-3); margin: 0 0 6px 4px; }
+pre { margin: 0; min-height: 48px; max-height: 220px; flex: 0 1 auto; overflow: auto; background: var(--surface);
+  border-radius: 14px; padding: 12px 14px; font: 11.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 24px; }
+a { display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 999px; text-decoration: none;
+  font-weight: 500; font-size: 13px; }
+a.primary { background: var(--ink); color: var(--on-ink); }
+a.secondary { background: var(--surface-2); color: var(--fg); }
+a.secondary:hover { background: var(--surface-3); }
+a.ghost { color: var(--fg-2); }
+a.ghost:hover { color: var(--fg); background: var(--surface-2); }
+a:focus-visible { outline: 1.5px solid var(--fg); outline-offset: 2px; }
+.spinner { width: 22px; height: 22px; border: 2px solid var(--line); border-top-color: var(--fg-3); border-radius: 50%;
   animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.progress { color: var(--fg3); }
+.progress { color: var(--fg-3); }
 `;
 
-function button(action: ScreenAction, label: string, primary = false): string {
-  return `<a href="https://${ACTION_HOST}/${action}"${primary ? ' class="primary"' : ''}>${label}</a>`;
+/** The design system's alert icon (packages/shared/icons.ts), drawn in --warn. */
+const ALERT_ICON =
+  '<svg class="alert" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+
+function button(action: ScreenAction, label: string, variant: 'primary' | 'secondary' | 'ghost'): string {
+  return `<a href="https://${ACTION_HOST}/${action}" class="${variant}">${label}</a>`;
 }
 
 export function screenHtml(view: ScreenView): string {
@@ -75,10 +85,10 @@ export function screenHtml(view: ScreenView): string {
     body = `<main><div class="spinner"></div><p class="progress">Starting the server on port ${view.port}</p></main>`;
   } else {
     const log = view.logTail.trim()
-      ? `<section class="log"><div class="caption">Last lines of the log</div><pre id="tail">${escapeHtml(view.logTail.trim())}</pre></section>`
+      ? `<section class="log"><div class="caption">Last lines of the server log</div><pre id="tail">${escapeHtml(view.logTail.trim())}</pre></section>`
       : '';
-    const buttons = [button('try-again', 'Try Again', true), view.logExists ? button('open-log', 'Open Log') : '', button('quit', 'Quit')];
-    body = `<main><div class="glyph">!</div><h1>Server problem</h1><p>${escapeHtml(view.message)}</p>${log}<nav>${buttons.join('')}</nav></main>`;
+    const buttons = [button('try-again', 'Try again', 'primary'), view.logExists ? button('open-log', 'Show server log', 'secondary') : '', button('quit', 'Quit', 'ghost')];
+    body = `<main>${ALERT_ICON}<h1>Server problem</h1><p>${escapeHtml(view.message)}</p>${log}<nav>${buttons.join('')}</nav></main>`;
   }
   // The log scrolls from the bottom. The CSP allows only this one inline script.
   const script = `<script>const t=document.getElementById('tail');if(t)t.scrollTop=t.scrollHeight;</script>`;
@@ -142,7 +152,7 @@ function createScreen(ctx: AppContext): BrowserWindow {
     minHeight: 320,
     show: false,
     title: 'Omni',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#141414' : '#f7f7f5',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#121316' : '#ffffff',
     autoHideMenuBar: true,
     icon: ctx.paths.icon ?? undefined,
     // A plain page: no bridge and no Node.
@@ -161,7 +171,7 @@ function createScreen(ctx: AppContext): BrowserWindow {
   return win;
 }
 
-/** Server > Restart Server while the server is down: the screen's Try Again, in the screen, which it brings back. */
+/** Server > Restart Server while the server is down: the screen's Try again, in the screen, which it brings back. */
 export function retryFromMenu(ctx: AppContext): void {
   const state = ctx.backend.current;
   if (state.kind !== 'failed') return;
@@ -182,7 +192,7 @@ export function showServerFailure(ctx: AppContext, message: string): void {
   if (!reopenHooked) {
     reopenHooked = true;
     // A Mac app stays in the Dock with its windows closed: clicking it brings the screen back while the server is down.
-    // Hidden windows such as the Quick Prompt panel and the open main window do not count, since neither offers Try Again.
+    // Hidden windows such as the Quick Prompt panel and the open main window do not count, since neither offers Try again.
     app.on('activate', () => {
       const state = ctx.backend.current;
       if (state.kind !== 'failed') return;

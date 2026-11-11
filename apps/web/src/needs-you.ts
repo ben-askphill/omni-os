@@ -1,7 +1,7 @@
 // Needs you (apps/server/db/repos/needs-you.ts) from the Web UI's side: why each thread is there, and which result an
 // open thread has shown.
 import type { NeedsYou, NeedsYouItem } from './api.ts';
-import type { Glyph } from '@omni/shared/status.ts';
+import { asksForYou, type Glyph } from '@omni/shared/status.ts';
 import { resetLabel } from './limits.ts';
 
 export interface Reason {
@@ -34,6 +34,17 @@ export function reasonOf(item: NeedsYouItem): Reason {
     default:
       return { glyph: 'done', label: 'Finished', detail: preview };
   }
+}
+
+/**
+ * Needs you proper (a question, a failure, a usage limit: Ben has to act) apart from Unread (a result that finished
+ * and he has not opened). Each item lands in one of the two.
+ */
+export function splitNeeds(items: readonly NeedsYouItem[]): { needs: NeedsYouItem[]; unread: NeedsYouItem[] } {
+  const needs: NeedsYouItem[] = [];
+  const unread: NeedsYouItem[] = [];
+  for (const i of items) (asksForYou(reasonOf(i).glyph) ? needs : unread).push(i);
+  return { needs, unread };
 }
 
 /** One channel's part of the inbox, with its own counts. */

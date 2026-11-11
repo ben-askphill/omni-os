@@ -49,4 +49,9 @@ describe('the thread action menu', () => {
   it('waits for the row before the actions that need its state', () => {
     expect(ids({ row: false })).toEqual(['rename', 'archive', 'grok']);
   });
+
+  it('gives every action its own key', () => {
+    const keys = menu({ done: true }).flatMap((g) => g.items.map((i) => i.key));
+    expect(keys).toEqual(['P', 'D', 'R', 'M', 'E', 'F', '@', 'G']);
+  });
 });

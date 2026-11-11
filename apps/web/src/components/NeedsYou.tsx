@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import type { NeedsYou as Inbox, NeedsYouItem } from '../api.ts';
-import { canMarkDone, reasonOf } from '../needs-you.ts';
+import { canMarkDone, reasonOf, splitNeeds } from '../needs-you.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
-import { Avatar, Icon, StatusDot } from './ui.tsx';
+import { Avatar, Icon, StatusDot, type IconName } from './ui.tsx';
 
 /**
  * One thread that needs Ben: why, and the result's last words or Setup's reason. Opening it reads the result. On
@@ -62,28 +63,55 @@ function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: 
   );
 }
 
-/** The Needs you section of Home and of a channel. Hidden in a channel with nothing in it; Home says all clear. */
-export function NeedsYouSection({ inbox, showChannel, quiet }: { inbox: Inbox | null; showChannel?: boolean; quiet?: boolean }) {
-  if (!inbox || (quiet && !inbox.items.length)) return null;
-  const parts = [inbox.unread && `${inbox.unread} unread`, inbox.blocked && `${inbox.blocked} blocked`].filter(Boolean).join(' · ');
+/** A list's compact empty state: one line on a surface, with a glyph. Pages keep the big Empty for a whole empty page. */
+export function EmptyNote({ icon, children }: { icon: IconName; children: ReactNode }) {
   return (
-    <section aria-label="Needs you" className="mt-10">
-      <div className="mb-2 flex items-baseline justify-between gap-3 px-3 md:px-3.5">
-        <h2 className="flex items-center gap-2 font-display text-[17px]">
-          Needs you
-          {inbox.items.length > 0 && <span className="font-num text-[12px] text-fg-3 tabular-nums">{inbox.items.length}</span>}
-        </h2>
-        {parts && <span className="font-num text-[12px] text-fg-3 tabular-nums">{parts}</span>}
-      </div>
-      {inbox.items.length ? (
+    <p className="flex items-center gap-2.5 rounded-[var(--r-xl)] bg-surface px-4 py-3.5 text-[length:var(--fs-ui)] leading-[1.4] text-fg-3">
+      <Icon name={icon} size={15} className="shrink-0" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+function ItemsSection({ label, items, showChannel, empty }: { label: string; items: NeedsYouItem[]; showChannel?: boolean; empty?: ReactNode }) {
+  return (
+    <section aria-label={label} className="mt-10">
+      <h2 className="mb-2 flex items-center gap-2 px-3 font-display text-[length:var(--fs-heading)] md:px-3.5">
+        {label}
+        {items.length > 0 && <span className="font-num text-[12px] text-fg-3 tabular-nums">{items.length}</span>}
+      </h2>
+      {items.length ? (
         <div className="flex flex-col">
-          {inbox.items.map((i) => (
+          {items.map((i) => (
             <NeedsYouRow key={i.thread.id} item={i} showChannel={showChannel} />
           ))}
         </div>
       ) : (
-        <p className="px-3 text-[13px] text-fg-3 md:px-3.5">All caught up. Finished and failed threads you have not opened show up here.</p>
+        empty
       )}
     </section>
+  );
+}
+
+/**
+ * Needs you (blocked on Ben: a question, a failure, a usage limit), then Unread (finished, not opened yet). On Home
+ * both show and Needs you says when it is clear. In a channel (`quiet`) only Needs you shows, and only with something
+ * in it: the channel's own list already shows its finished threads.
+ */
+export function NeedsYouSection({ inbox, showChannel, quiet }: { inbox: Inbox | null; showChannel?: boolean; quiet?: boolean }) {
+  if (!inbox) return null;
+  const { needs, unread } = splitNeeds(inbox.items);
+  return (
+    <>
+      {(!quiet || needs.length > 0) && (
+        <ItemsSection
+          label="Needs you"
+          items={needs}
+          showChannel={showChannel}
+          empty={<EmptyNote icon="check">Nothing needs you. Questions, failures and usage limits show up here.</EmptyNote>}
+        />
+      )}
+      {!quiet && unread.length > 0 && <ItemsSection label="Unread" items={unread} showChannel={showChannel} />}
+    </>
   );
 }

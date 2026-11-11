@@ -18,10 +18,10 @@ export const FIX_CHECKS_PROMPT = 'The PR has failing checks. Read the failing ch
 export type PRTone = 'live' | 'done' | 'needs' | 'outline';
 
 /** open, draft, merged or closed, with the chip tone the PRs page uses. */
-export function prBadge(p: Pick<PRSummary, 'state' | 'isDraft'>): { label: string; tone: 'live' | 'done' | 'outline' } {
+export function prBadge(p: Pick<PRSummary, 'state' | 'isDraft'>): { label: string; tone: 'done' | 'outline' } {
   const state = p.state ?? 'OPEN';
   const label = state === 'MERGED' ? 'merged' : state === 'CLOSED' ? 'closed' : p.isDraft ? 'draft' : 'open';
-  return { label, tone: label === 'open' ? 'live' : label === 'merged' ? 'done' : 'outline' };
+  return { label, tone: label === 'merged' ? 'done' : 'outline' };
 }
 
 export type PRNext =
@@ -91,7 +91,7 @@ export function prLine(pr: PRSummary): { text: string; tone: PRTone } {
   if (c.pending) return { text: `${c.pending} of ${total} checks running`, tone: 'live' };
   if (pr.reviewDecision === 'CHANGES_REQUESTED') return { text: 'Changes requested', tone: 'needs' };
   const checks = total ? `${total} checks passed` : 'No checks';
-  return { text: pr.reviewDecision === 'APPROVED' ? `${checks} · approved` : checks, tone: pr.isDraft ? 'outline' : 'live' };
+  return { text: pr.reviewDecision === 'APPROVED' ? `${checks} · approved` : checks, tone: 'outline' };
 }
 
 /** A check run's state as a glyph tone: done, needs (failed) or running. */
@@ -105,5 +105,5 @@ export function checkTone(state: string): 'done' | 'needs' | 'running' {
 export function crewLine(crew: { state?: string }[]): { text: string; tone: PRTone } {
   const open = crew.filter((p) => p.state === 'OPEN').length;
   const merged = crew.length - open;
-  return { text: [open && `${open} open`, merged && `${merged} merged`].filter(Boolean).join(', '), tone: open ? 'live' : 'done' };
+  return { text: [open && `${open} open`, merged && `${merged} merged`].filter(Boolean).join(', '), tone: open ? 'outline' : 'done' };
 }

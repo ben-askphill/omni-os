@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, type ReactNode } from 'react';
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { ChannelWithRunning } from '../../api.ts';
@@ -8,6 +8,7 @@ import { monogram } from '@omni/shared/monogram.ts';
 import { needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
 import { OmniMark, StaticMark } from '../brand.tsx';
 import { ChannelMark, Icon, Monograms, StatusDot, type IconName } from '../ui.tsx';
+import { useScrollFade } from './useScrollFade.ts';
 
 /**
  * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights. From the top: the Omni mark, the Inbox and the Conductor, then
@@ -128,30 +129,4 @@ function Disc({ selected, icon, quiet, fill, children }: { selected: boolean; ic
       {icon ? <Icon name={icon} size={18} /> : children}
     </span>
   );
-}
-
-/** The scrolling discs fade at an edge only while discs hide past it. */
-function useScrollFade() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ top: false, bottom: false });
-  const measure = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const top = el.scrollTop > 1;
-    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-    setEdges((e) => (e.top === top && e.bottom === bottom ? e : { top, bottom }));
-  }, []);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    measure();
-    el.addEventListener('scroll', measure, { passive: true });
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    ro?.observe(el);
-    if (el.firstElementChild) ro?.observe(el.firstElementChild);
-    return () => (el.removeEventListener('scroll', measure), ro?.disconnect());
-  }, [measure]);
-  const top = edges.top ? 'transparent 0, black 28px' : 'black 0';
-  const bottom = edges.bottom ? 'black calc(100% - 28px), transparent 100%' : 'black 100%';
-  return { ref, fade: `linear-gradient(to bottom, ${top}, ${bottom})` };
 }

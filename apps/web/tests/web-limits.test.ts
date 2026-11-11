@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { NeedsYou, PendingMsg, Thread, ThreadDetail } from '../src/api.ts';
-import { limitView, resetLabel } from '../src/limits.ts';
+import { limitLabel, limitView, resetLabel } from '../src/limits.ts';
 import { reasonOf } from '../src/needs-you.ts';
 
 // The Web UI's side of a limit stop (apps/web/src/limits.ts, LimitCard), against the recorded server answers
@@ -91,5 +91,16 @@ describe('the card', () => {
     expect(scheduled).toContain('Cancel');
     expect(scheduled).not.toContain('Resume at reset');
     expect(html(fixture<Answer>('limit-resumed.json').thread)).toBe('');
+  });
+
+  it('says Limited with its time the same way on every surface', async () => {
+    expect(limitLabel({ limit_state: 'limited', limit_resets_at: at(16) }, NOW)).toBe('Limited · resets 16:00');
+    expect(limitLabel({ limit_state: 'scheduled', limit_resets_at: at(16) }, NOW)).toBe('Limited · resumes 16:00');
+    expect(limitLabel({ limit_state: 'limited', limit_resets_at: null }, NOW)).toBe('Limited');
+    expect(limitLabel({ limit_state: null, limit_resets_at: null }, NOW)).toBeNull();
+    const { threadPill } = await import('../src/components/thread/thread-state.ts');
+    const thread = { ...fixture<ThreadDetail>('thread-limited.json').thread, limit_resets_at: at(16) };
+    // The turn ended failed, but the header reads Limited, not Failed.
+    expect(threadPill(thread, { now: NOW })).toEqual({ glyph: 'limited', label: 'Limited · resets 16:00' });
   });
 });

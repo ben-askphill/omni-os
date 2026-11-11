@@ -8,7 +8,6 @@ import { AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from '../c
 import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from '../components/BrowserAnnotationOverlay.tsx';
 import { BrowserWatch, displayUrl, useChannelBrowser } from '../components/LiveBrowser.tsx';
 import { Markdown } from '../components/Markdown.tsx';
-import { modelOf } from '../components/ModelPicker.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
 import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
@@ -31,6 +30,7 @@ import { CrewPRList } from './CrewPRs.tsx';
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 import { threadView } from '@omni/shared/thread-view.ts';
+import { threadRunLabels } from '@omni/shared/thread-run.ts';
 import { holds } from '../thread-history.ts';
 import { hasLiveOutput, outputTarget } from '../tool-output.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
@@ -457,13 +457,13 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
 
 export function DetailsScreen() {
   const shell = useShell();
-  const { thread, init, lastResult, history, crew } = useThread();
+  const { thread, history, crew } = useThread();
   const { channel } = useApp();
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!thread) return <MoHeader onBack={shell.back} title="Details" />;
   const turns = turnCount(history.history);
-  const modelId = lastResult?.model || init?.model || thread.model || '';
-  const { model } = harnesses ? modelOf(harnesses, { harness: thread.harness, model: modelId }) : { model: undefined };
+  // The model pill's own names, as on desktop's Details.
+  const run = threadRunLabels(thread, harnesses);
   const rows: [string, ReactNode][] = [
     ['Channel', `#${channel(thread.channel_id)?.name ?? thread.channel_id}`],
     ['Crew role', thread.role || 'None'],
@@ -474,8 +474,8 @@ export function DetailsScreen() {
         {harnessLabel(thread.harness)}
       </span>,
     ],
-    ['Model', model?.label ?? (modelId || 'Default')],
-    ['Effort', thread.effort || (model?.defaultEffort ? `Default (${model.defaultEffort})` : 'Default')],
+    ['Model', run.model],
+    ['Effort', run.effort],
     ['Source', thread.automation ? `Automation ${thread.automation}` : (SOURCE[thread.source] ?? thread.source)],
     ['Started', fullDate(thread.created_at)],
     ['Turns', String(turns)],

@@ -1,7 +1,7 @@
 // The user config's one contract (data/omni.config.json, GET and PUT /api/setup): every field the person sets, with
 // its label, hint, default and checks, and the types the server and the web import. The server builds its schema from
 // SETTING_FIELDS (apps/server/user-config.ts) and checks a save with `settingProblem`; the web's Settings page draws its
-// General and Workspace forms from them (apps/web/src/pages/Settings.tsx).
+// General, Workspace, Hermes and Network access forms from them (apps/web/src/pages/Settings.tsx).
 //
 // A new text setting is one entry here and its line in omni.config.example.json.
 
@@ -48,16 +48,16 @@ export interface SettingField {
 }
 
 /** The Settings sections that show config fields (packages/shared/settings-catalog.ts). */
-export type SettingPage = 'general' | 'workspace' | 'integrations' | 'access';
+export type SettingPage = 'general' | 'workspace' | 'models' | 'access';
 
 /** How each Settings section frames its fields: the card's title and note, and the Advanced fold's summary and note. */
 export const SETTING_PAGES: Record<SettingPage, { title: string; note?: string; advanced?: { summary: string; note: string } }> = {
   general: { title: 'You' },
   workspace: { title: 'Folders' },
-  integrations: { title: 'Integrations', note: 'Optional. Leave a field empty to turn it off.' },
+  models: { title: 'Hermes', note: 'Runs threads through a Hermes server instead of a local CLI. Leave it empty to turn it off.' },
   access: {
     title: 'Network access',
-    note: 'Set in data/omni.config.json or its environment variable, so a page cannot open this Omni wider.',
+    note: 'Set only in files on this machine, so no page can open this Omni wider.',
     advanced: { summary: 'Clerk instance for Google sign-in', note: 'Empty uses the shared instance Omni ships with.' },
   },
 };
@@ -109,7 +109,7 @@ export const SETTING_FIELDS = [
     key: 'hermesUrl',
     label: 'Hermes URL',
     input: 'url',
-    page: 'integrations',
+    page: 'models',
     hint: 'A Hermes API server on your tailnet. Its token is the global secret HERMES_API_KEY.',
     placeholder: 'http://100.64.0.1:8642',
     default: '',
@@ -120,8 +120,8 @@ export const SETTING_FIELDS = [
     key: 'centralBrainDir',
     label: 'Central brain folder',
     input: 'folder',
-    page: 'integrations',
-    hint: 'A git repo of notes that the brain-nightly automation exports thread digests into.',
+    page: 'workspace',
+    hint: 'A git repo of notes. The brain-nightly automation exports thread digests into it. Leave it empty to turn that off.',
     placeholder: '~/central-brain',
     default: '',
     max: 1024,

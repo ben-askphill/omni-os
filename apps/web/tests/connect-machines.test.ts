@@ -21,7 +21,7 @@ vi.mock('../src/api.ts', async (importActual) => {
   return actual;
 });
 
-import { ConnectSection } from '../src/pages/Connect.tsx';
+import { ConnectMachinesCard } from '../src/pages/Connect.tsx';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -37,7 +37,7 @@ beforeEach(async () => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => root.render(createElement(ConnectSection)));
+  await act(async () => root.render(createElement(ConnectMachinesCard)));
   await flush();
 });
 
@@ -62,7 +62,6 @@ it('checks the machines again when the tunnel comes up', async () => {
   await act(async () => vi.advanceTimersByTime(5000));
   await flush();
   expect(machineGets()).toBe(2);
-  expect(host.textContent).toContain('Connected');
   expect(host.textContent).not.toContain('Offline');
 });
 

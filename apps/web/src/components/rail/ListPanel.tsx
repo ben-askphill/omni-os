@@ -10,6 +10,7 @@ import { FolderNameField, FolderRow } from '../sidebar/FolderRows.tsx';
 import { InboxView } from '../sidebar/InboxView.tsx';
 import { ChannelThreadEntry, NavLink } from '../sidebar/SidebarRows.tsx';
 import { UsageCard } from '../sidebar/UsageCard.tsx';
+import { useScrollFade } from './useScrollFade.ts';
 import { UpdateNotice } from '../UpdateNotice.tsx';
 import { DiskNotice } from '../DiskNotice.tsx';
 
@@ -34,6 +35,16 @@ function PanelHeader({ title, lead, right }: { title: ReactNode; lead?: ReactNod
       {lead}
       <h2 className={`min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] text-fg ${lead ? '' : 'pl-2.5'}`}>{title}</h2>
       {right}
+    </div>
+  );
+}
+
+/** The panel's scrolling list, fading at an edge while rows hide past it, as the rail does. */
+function PanelScroll({ children }: { children: ReactNode }) {
+  const { ref, fade } = useScrollFade();
+  return (
+    <div ref={ref} className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4" style={{ maskImage: fade, WebkitMaskImage: fade }}>
+      {children}
     </div>
   );
 }
@@ -69,9 +80,9 @@ function InboxList({ onSearch }: { onSearch: () => void }) {
         </button>
         <NewThreadButton />
       </div>
-      <div className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      <PanelScroll>
         <InboxView />
-      </div>
+      </PanelScroll>
       <div className="px-3 pt-1 pb-3">
         <UpdateNotice className="mb-2" />
         <DiskNotice className="mb-2" />
@@ -116,7 +127,7 @@ function ChannelList({ id }: { id: string }) {
       <div className="px-3 pt-2">
         <NewThreadButton />
       </div>
-      <div className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      <PanelScroll>
         <div ref={listRef} className="relative space-y-4">
           <Thumb box={box} />
           {(folderList.length > 0 || folders.editing === draftKey(c.id)) && (
@@ -140,24 +151,19 @@ function ChannelList({ id }: { id: string }) {
             <div className="caption px-3 pt-1 pb-2">Recent</div>
             <div className="space-y-px">
               {threads.length ? (
-                threads.map((t) => <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} handoffs={c.handoffs} flush />)
+                <>
+                  {threads.map((t) => <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} handoffs={c.handoffs} flush />)}
+                  <NavLink to={href.channel(c.id)} active={tab === 'threads' && !openId}>
+                    See all threads
+                  </NavLink>
+                </>
               ) : (
                 <div className="px-3 text-[12px] text-fg-3">No threads yet.</div>
               )}
-              <NavLink to={href.channel(c.id)} active={tab === 'threads' && !openId}>
-                <span className="text-fg-3">See all threads</span>
-              </NavLink>
             </div>
           </div>
         </div>
-      </div>
-      {c.id !== 'conductor' && (
-        <div className="border-t border-[var(--line)] px-3 pt-2 pb-3">
-          <NavLink to={href.settings(c.id)} icon="sliders" active={tab === 'settings'}>
-            Channel settings
-          </NavLink>
-        </div>
-      )}
+      </PanelScroll>
     </>
   );
 }

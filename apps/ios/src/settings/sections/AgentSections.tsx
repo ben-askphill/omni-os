@@ -18,6 +18,7 @@ import { ListRow } from '../../ui/GroupedList';
 import { Text } from '../../ui/Text';
 import { channelTitle, runLabel } from '../channel-settings-model';
 import { harnessRows } from '../harness-model';
+import { ConfigForm } from '../ConfigForm';
 import { ChoiceRow, Footnote, Group, ServerOptionsGroup, SettingsPage } from '../parts';
 import { Loading, useSetup } from './OmniSections';
 
@@ -27,16 +28,17 @@ const loadHarnesses = (api: OmniApi) => api.harnesses();
 const loadDevices = (api: OmniApi) => api.devices();
 const loadStatus = (api: OmniApi) => api.status();
 
-/** Harnesses & models: whether each harness can run, each channel's default model, and the .env options behind them. */
+/** Harnesses & models: whether each harness can run, Hermes, each channel's default model, and the .env options behind them. */
 export function ModelsSection() {
   const { colors } = useOmniTheme();
   const navigation = useNavigation<Nav>();
+  const setup = useSetup();
   const harnesses = useRemote(loadHarnesses);
   const { channels } = useChannels();
   const listed = (channels ?? []).filter((c) => !c.archived);
   const own = listed.filter((c) => setsRun(channelForm(c).run)).length;
   return (
-    <SettingsPage onRefresh={harnesses.reload}>
+    <SettingsPage onRefresh={() => Promise.all([harnesses.reload(), setup.reload()])}>
       {harnesses.data ? (
         <Group title="Harnesses" footer="The agents Omni can start a thread on. Install and log in on the server's machine.">
           {harnessRows(harnesses.data).map((h, i) => (
@@ -55,6 +57,7 @@ export function ModelsSection() {
       ) : (
         <Loading error={harnesses.error} retry={harnesses.reload} />
       )}
+      {setup.data ? <ConfigForm page="models" state={setup.data} onSaved={setup.setData} footer="HERMES_API_KEY is under Secrets." /> : <Loading error={setup.error} retry={setup.reload} />}
       <Group
         title="Default model for new threads"
         footer={`Without one, Auto picks from the prompt. A thread or crew role that picks its own wins. ${own ? `${own} of ${listed.length} channels set one.` : 'Auto everywhere.'}`}

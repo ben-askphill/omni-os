@@ -4,8 +4,8 @@ import { Icon } from './ui.tsx';
 
 export const LINE_CLASS: Record<DiffLine['kind'], string> = {
   hunk: 'bg-surface text-fg-3',
-  add: 'bg-[var(--diff-add-bg)]',
-  del: 'bg-[var(--diff-del-bg)]',
+  add: 'bg-[var(--diff-add-bg)] text-[var(--diff-add-fg)]',
+  del: 'bg-[var(--diff-del-bg)] text-[var(--diff-del-fg)]',
   note: 'text-fg-3',
   context: 'text-fg-2',
 };
@@ -20,6 +20,8 @@ export interface LineSelect {
 // The numbers go a step darker: fg-3 on the mark tint is too faint in dark mode.
 const PICKED = ' bg-[image:linear-gradient(var(--mark),var(--mark))] shadow-[inset_2px_0_0_var(--fg-3)] [&_[aria-hidden]]:text-fg-2';
 const pickable = (l: DiffLine) => l.kind === 'add' || l.kind === 'del' || l.kind === 'context';
+// An added or removed line's numbers take its colour; the rest stay quiet.
+const gutterTone = (l: DiffLine) => (l.kind === 'add' || l.kind === 'del' ? '' : 'text-fg-3');
 
 /**
  * One file of a diff: a header that opens and closes it, then its numbered lines. The PR page and a thread's
@@ -60,8 +62,8 @@ export const DiffFile = memo(function DiffFile({
         <Icon name="chevronRight" size={12} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
         {badge}
         <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{label ?? file.path}</span>
-        <span className="shrink-0 font-num text-[11px] text-fg-2">+{file.add}</span>
-        <span className="shrink-0 font-num text-[11px] text-fg-3">-{file.del}</span>
+        <span className="shrink-0 font-num text-[11px] text-[var(--diff-add-fg)]">+{file.add}</span>
+        <span className="shrink-0 font-num text-[11px] text-[var(--diff-del-fg)]">-{file.del}</span>
       </button>
       {open && (
         <div className="scroll-thin overflow-x-auto bg-bg">
@@ -71,10 +73,10 @@ export const DiffFile = memo(function DiffFile({
               {shown.map((l, i) => {
                 const gutters = numbered && (
                   <>
-                    <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-3 select-none" aria-hidden>
+                    <span className={`w-10 shrink-0 pr-2 text-right font-num select-none ${gutterTone(l)}`} aria-hidden>
                       {l.old ?? ''}
                     </span>
-                    <span className="w-10 shrink-0 pr-2 text-right font-num text-fg-3 select-none" aria-hidden>
+                    <span className={`w-10 shrink-0 pr-2 text-right font-num select-none ${gutterTone(l)}`} aria-hidden>
                       {l.new ?? ''}
                     </span>
                   </>

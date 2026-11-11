@@ -81,8 +81,8 @@ export function SendButton({ armed, busy, onClick, children }: { armed: boolean;
   );
 }
 
-/** A composer's placeholder, with the two keys that open a menu. */
-export const withKeys = (text: string) => `${text} · / commands, @ files`;
+/** A composer's placeholder, with the two keys that open a menu. A closing period would read ". ·", so it goes. */
+export const withKeys = (text: string) => `${text.replace(/\.$/, '')} · / commands, @ files`;
 
 /**
  * Enter sends, Shift+Cmd/Ctrl+Enter interrupts, Cmd/Ctrl+Enter inserts a newline (Shift+Enter keeps the

@@ -16,18 +16,18 @@ describe('server screen', () => {
     expect(actionOf('not a url')).toBeNull();
   });
 
-  it('shows the message and log tail as text, with Open Log only when there is a log', () => {
+  it('shows the message and log tail as text, with Show server log only when there is a log', () => {
     const html = screenHtml({ kind: 'failed', message: 'Port 1 <b>busy</b>', logTail: 'line <script>\n', logExists: true });
     expect(html).toContain('Server problem');
     expect(html).toContain('Port 1 &lt;b&gt;busy&lt;/b&gt;');
     expect(html).toContain('line &lt;script&gt;');
-    expect(html).toContain('Last lines of the log');
-    expect(html).toContain('>Try Again<');
-    expect(html).toContain('>Open Log<');
+    expect(html).toContain('Last lines of the server log');
+    expect(html).toContain('>Try again<');
+    expect(html).toContain('>Show server log<');
     expect(html).toContain('>Quit<');
     const bare = screenHtml({ kind: 'failed', message: 'x', logTail: '', logExists: false });
-    expect(bare).not.toContain('Open Log');
-    expect(bare).not.toContain('Last lines of the log');
+    expect(bare).not.toContain('Show server log');
+    expect(bare).not.toContain('Last lines of the server log');
     expect(screenHtml({ kind: 'starting', port: 4747 })).toContain('Starting the server on port 4747');
   });
 });

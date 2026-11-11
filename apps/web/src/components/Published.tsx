@@ -50,7 +50,7 @@ export function PublishedActions({ a }: { a: Artifact }) {
 export function PublishedCard({ p, threadId, artifact }: { p: Published; threadId: string; artifact?: Artifact }) {
   const check = useCheckComments(threadId, p.url);
   return (
-    <div className="rounded-[22px] bg-surface px-4 py-3">
+    <div className="rounded-[var(--r-xl)] bg-surface px-4 py-3">
       <div className="flex min-w-0 items-start gap-3">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
           <Icon name="globe" size={15} />

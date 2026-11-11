@@ -48,6 +48,8 @@ beforeEach(() => {
         posted.push([url, JSON.parse(String(init.body))]);
         return Response.json({ ok: true, output: '' });
       }
+      // The Details tab names the model from the harness catalog.
+      if (url === '/api/harnesses') return Response.json([]);
       asked.push(url);
       return Response.json(answer);
     }),
@@ -218,9 +220,9 @@ describe('the phone list', () => {
 });
 
 describe('the crew summary', () => {
-  it('counts open and merged, and is live while any is open', () => {
-    expect(crewLine([crewPR(), merged])).toEqual({ text: '1 open, 1 merged', tone: 'live' });
+  it('counts open and merged, and stays neutral while any is open', () => {
+    expect(crewLine([crewPR(), merged])).toEqual({ text: '1 open, 1 merged', tone: 'outline' });
     expect(crewLine([merged])).toEqual({ text: '1 merged', tone: 'done' });
-    expect(crewLine([crewPR(), crewPR({ isDraft: true })])).toEqual({ text: '2 open', tone: 'live' });
+    expect(crewLine([crewPR(), crewPR({ isDraft: true })])).toEqual({ text: '2 open', tone: 'outline' });
   });
 });

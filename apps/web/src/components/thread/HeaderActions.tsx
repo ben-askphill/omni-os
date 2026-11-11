@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { Thread } from '../../api.ts';
-import { threadGlyph } from '@omni/shared/status.ts';
 import { canMarkDone } from '../../needs-you.ts';
+import { useNow } from '../../store.tsx';
+import { threadPill } from './thread-state.ts';
 import { openMenu } from '../ContextMenu.tsx';
 import { Button, IconButton, StatusPill } from '../ui.tsx';
 
@@ -35,15 +36,12 @@ export function HeaderActions({
   /** The agent waits on a question card. */
   asking?: boolean;
 }) {
+  const now = useNow(60_000);
+  const pill = threadPill(thread, { asking, reconnecting, now });
   const archived = !!thread.archived;
   const doneable = !archived && (!!thread.done_at || canMarkDone(thread.status));
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {reconnecting && (
-        <span className="hidden items-center gap-1.5 font-num text-[11px] text-fg-3 sm:inline-flex" title="Reconnecting to the live stream">
-          <span className="pulse h-1.5 w-1.5 rounded-full bg-fg-4" /> Reconnecting
-        </span>
-      )}
       {meter}
       {doneable && (
         <IconButton
@@ -60,14 +58,16 @@ export function HeaderActions({
           Restore
         </Button>
       )}
-      <StatusPill status={asking ? 'needs' : threadGlyph(thread)} />
+      <span className="inline-flex" title={reconnecting ? 'Reconnecting to the live stream. The thread keeps running on the server.' : undefined}>
+        <StatusPill status={pill.glyph} label={pill.label} />
+      </span>
       <IconButton
         icon="more"
         label="Thread actions"
         aria-haspopup="menu"
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
-          openMenu({ kind: 'thread', id: thread.id }, r.left, r.bottom + 6);
+          openMenu({ kind: 'thread', id: thread.id }, r.right, r.bottom + 6, 'end');
         }}
       />
       <span className="relative">

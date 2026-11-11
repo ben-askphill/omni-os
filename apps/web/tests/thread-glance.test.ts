@@ -60,7 +60,7 @@ describe('the step a branch PR calls for', () => {
   });
 
   it('says what decides whether it can merge', () => {
-    expect(prLine(pr())).toEqual({ text: '3 checks passed', tone: 'live' });
+    expect(prLine(pr())).toEqual({ text: '3 checks passed', tone: 'outline' });
     expect(prLine(pr({ reviewDecision: 'APPROVED' })).text).toBe('3 checks passed · approved');
     expect(prLine(pr({ mergeable: 'CONFLICTING' }))).toEqual({ text: 'Conflicts with the base branch', tone: 'needs' });
     expect(prLine(pr({ checks: { passed: 1, failed: 1, pending: 1 } }))).toEqual({ text: '1 of 3 checks failing', tone: 'needs' });

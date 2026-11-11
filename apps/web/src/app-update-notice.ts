@@ -7,12 +7,16 @@ export const appUpdateWords = {
   download: 'Download',
   downloading: (view: { version: string; percent: number }) => `Downloading Omni ${view.version} (${Math.round(view.percent)}%)`,
   ready: (view: { version: string }) => `Omni ${view.version} is ready`,
-  relaunch: 'Relaunch to Update',
-  check: 'Check for Updates',
+  relaunch: 'Relaunch to update',
+  check: 'Check for updates',
+  /** The ready notice's line while turns run: Relaunch asks before it stops them (apps/desktop/src/quit.ts). */
+  running: (turns: number) => (turns === 1 ? '1 turn is running. Omni asks before it stops it.' : `${turns} turns are running. Omni asks before it stops them.`),
 } as const;
 
 export interface AppUpdateNotice {
   text: string;
+  /** Names this notice for its Dismiss: the same update in the same state stays dismissed. Null: it cannot be dismissed. */
+  key: string | null;
   /** The updater's own words, as the text's tooltip. */
   detail?: string;
   busy: boolean;
@@ -36,16 +40,17 @@ export function appUpdateNotice(view: DesktopUpdateView | null, afterDownload: b
   if (!view) return null;
   switch (view.state) {
     case 'available':
-      return { text: appUpdateWords.available(view), busy: false, failed: false, action: { kind: 'fetch', label: appUpdateWords.download } };
+      return { text: appUpdateWords.available(view), key: `available:${view.version}`, busy: false, failed: false, action: { kind: 'fetch', label: appUpdateWords.download } };
     case 'downloading':
-      return { text: appUpdateWords.downloading(view), busy: true, failed: false, action: null };
+      return { text: appUpdateWords.downloading(view), key: null, busy: true, failed: false, action: null };
     case 'ready':
-      return { text: appUpdateWords.ready(view), busy: false, failed: false, action: { kind: 'install', label: appUpdateWords.relaunch } };
+      return { text: appUpdateWords.ready(view), key: `ready:${view.version}`, busy: false, failed: false, action: { kind: 'install', label: appUpdateWords.relaunch } };
     case 'error':
-      if (afterDownload) return { text: 'The update did not download.', detail: view.message, busy: false, failed: true, action: { kind: 'retry', label: 'Retry' } };
+      if (afterDownload) return { text: 'The update did not download.', key: null, detail: view.message, busy: false, failed: true, action: { kind: 'retry', label: 'Retry' } };
       if (view.downloadUrl) {
         return {
           text: 'Omni could not check for updates.',
+          key: `error:${view.message}`,
           detail: view.message,
           busy: false,
           failed: true,

@@ -1,7 +1,7 @@
 import { Chip, ErrorNote } from '../components/ui.tsx';
 import { isNarrowed } from '@omni/shared/pr-query.ts';
 import type { ListedPR } from '../api.ts';
-import { allPRsEmpty, failedText, noMatchText, useAllPRs, usePRQuery } from '../pages/AllPRs.tsx';
+import { allPRsEmpty, failedText, noMatchText, sharedColumns, useAllPRs, usePRQuery } from '../pages/AllPRs.tsx';
 import { PRGroupHead, PRToolbar } from '../pages/PRToolbar.tsx';
 import { prBadge } from '@omni/shared/thread-glance.ts';
 import { useNow } from '../store.tsx';
@@ -19,12 +19,13 @@ export function PRsScreen() {
   const open = prs.filter((p) => (p.state ?? 'OPEN') === 'OPEN').length;
   const { q: query, set, groups } = usePRQuery(q.data);
   const repos = q.data?.repos.length ?? 0;
+  const oneRepo = prs.length ? sharedColumns(prs).repo : null;
 
   return (
     <>
       <MoHeader left={<span className="w-10" />} right={<HeaderActions />} />
       <MoScroll tabBar>
-        <MoTitle title="PRs" sub={repos ? `${open} open across ${repos} ${repos === 1 ? 'repo' : 'repos'}` : 'Pull requests from every channel'} />
+        <MoTitle title="PRs" sub={oneRepo ? `${open} open in ${oneRepo}` : repos ? `${open} open across ${repos} ${repos === 1 ? 'repo' : 'repos'}` : 'Pull requests from every channel'} />
         {empty?.kind === 'error' ? (
           <ErrorNote className="mx-4" onRetry={q.reload}>
             {empty.text}
@@ -50,7 +51,7 @@ export function PRsScreen() {
                 <section key={g.key} aria-label={g.label} className="flex flex-col px-4 pt-3">
                   <PRGroupHead g={g} className="px-1 pb-0.5" />
                   {g.prs.map((p, i) => (
-                    <PRRow key={`${p.repo}#${p.number}`} p={p} last={i === g.prs.length - 1} now={now} />
+                    <PRRow key={`${p.repo}#${p.number}`} p={p} last={i === g.prs.length - 1} now={now} showRepo={!oneRepo} />
                   ))}
                 </section>
               ))
@@ -63,7 +64,7 @@ export function PRsScreen() {
   );
 }
 
-function PRRow({ p, last, now }: { p: ListedPR; last: boolean; now: number }) {
+function PRRow({ p, last, now, showRepo }: { p: ListedPR; last: boolean; now: number; showRepo: boolean }) {
   const b = prBadge(p);
   return (
     <a href={p.url} target="_blank" rel="noreferrer" className="mo-row flex min-w-0 w-full flex-col gap-0.5 px-1 py-2.5 text-left">
@@ -74,7 +75,7 @@ function PRRow({ p, last, now }: { p: ListedPR; last: boolean; now: number }) {
         </span>
         <span className="flex items-baseline gap-2 text-[12.5px] leading-[1.35] text-fg-3">
           <span className="min-w-0 flex-1 truncate">
-            {p.repo} #{p.number} · {p.author?.login ?? 'unknown'}
+            {showRepo ? `${p.repo} ` : ''}#{p.number} · {p.author?.login ?? 'unknown'}
             {p.labels?.length ? ` · ${p.labels.join(', ')}` : ''}
           </span>
           <span className="shrink-0 text-[12px] tabular-nums">{shortTime(p.updatedAt, now)}</span>

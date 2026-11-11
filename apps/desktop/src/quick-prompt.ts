@@ -212,7 +212,8 @@ function createPanel(ctx: AppContext): BrowserWindow {
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
-    hasShadow: MAC,
+    // The page draws the panel's shadow in the window's clear margin, the same on every platform.
+    hasShadow: false,
     resizable: false,
     minimizable: false,
     maximizable: false,

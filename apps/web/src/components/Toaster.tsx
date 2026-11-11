@@ -15,7 +15,7 @@ export interface ToastInput {
   timeout?: number;
 }
 
-interface ToastItem extends ToastInput {
+export interface ToastItem extends ToastInput {
   id: number;
   leaving?: boolean;
 }
@@ -31,8 +31,15 @@ function ToastView({ t, dismiss }: { t: ToastItem; dismiss: (id: number) => void
     return () => clearTimeout(tm);
   }, [hover, t.leaving, t.id, t.timeout, dismiss]);
   return (
-    <div role={t.status && glyphFor(t.status) === 'failed' ? 'alert' : 'status'} className="toast float" data-leaving={t.leaving || undefined} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      {t.status ? <StatusDot status={t.status} /> : t.icon ? <Icon name={t.icon} size={15} className="text-fg-3" /> : null}
+    <div
+      role={t.status && glyphFor(t.status) === 'failed' ? 'alert' : 'status'}
+      className="toast float w-full md:max-w-none"
+      data-leaving={t.leaving || undefined}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      {/* One lead slot for every toast, so the titles line up down the stack. */}
+      <span className="grid w-4 shrink-0 place-items-center">{t.status ? <StatusDot status={t.status} /> : t.icon ? <Icon name={t.icon} size={15} className="text-fg-3" /> : null}</span>
       <div className="min-w-0 flex-1 py-1">
         <div className="truncate font-medium text-fg">{t.title}</div>
         {t.body && <div className="truncate text-[12px] text-fg-3">{t.body}</div>}
@@ -47,18 +54,35 @@ function ToastView({ t, dismiss }: { t: ToastItem; dismiss: (id: number) => void
   );
 }
 
+/** Toasts shown at once. Older ones go, and the stack counts them. */
+export const VISIBLE_TOASTS = 3;
+
+/** A new toast at the bottom; past VISIBLE_TOASTS the oldest leaves and `more` counts it, until the stack empties. */
+export function pushToast(stack: { items: ToastItem[]; more: number }, t: ToastItem): { items: ToastItem[]; more: number } {
+  const items = [...stack.items, t];
+  const over = Math.max(0, items.length - VISIBLE_TOASTS);
+  return { items: items.slice(over), more: stack.more + over };
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<ToastItem[]>([]);
+  const [stack, setStack] = useState<{ items: ToastItem[]; more: number }>({ items: [], more: 0 });
   const seq = useRef(0);
 
   const dismiss = useCallback((id: number) => {
-    setItems((l) => l.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
-    setTimeout(() => setItems((l) => l.filter((t) => t.id !== id)), 240);
+    setStack((s) => ({ ...s, items: s.items.map((t) => (t.id === id ? { ...t, leaving: true } : t)) }));
+    setTimeout(
+      () =>
+        setStack((s) => {
+          const items = s.items.filter((t) => t.id !== id);
+          return { items, more: items.length ? s.more : 0 };
+        }),
+      240,
+    );
   }, []);
 
   const push = useCallback((t: ToastInput) => {
     const id = ++seq.current;
-    setItems((l) => [...l.slice(-3), { ...t, id }]);
+    setStack((s) => pushToast(s, { ...t, id }));
   }, []);
 
   return (
@@ -66,9 +90,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-4 bottom-[calc(88px+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 md:inset-x-auto md:right-5 md:bottom-5 md:items-end"
+        className="pointer-events-none fixed inset-x-4 bottom-[calc(88px+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 md:inset-x-auto md:right-5 md:bottom-5 md:w-[360px]"
       >
-        {items.map((t) => (
+        {stack.more > 0 && <div className="float self-end rounded-full px-2.5 py-1 text-[12px] font-medium text-fg-3">+{stack.more} more</div>}
+        {stack.items.map((t) => (
           <ToastView key={t.id} t={t} dismiss={dismiss} />
         ))}
       </div>

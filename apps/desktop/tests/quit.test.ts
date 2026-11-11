@@ -16,7 +16,7 @@ describe('quit', () => {
     expect(decideQuit({ startedHere: true, runningTurns: null })).toEqual({ kind: 'ask', runningTurns: null });
     expect(decideQuit({ startedHere: false, runningTurns: null })).toEqual({ kind: 'quit', stopServer: false });
     expect(quitDialog(null).message).toBe('Turns may still be running');
-    expect(quitDialog(null).buttons).toEqual(quitDialog(1).buttons);
+    expect(quitDialog(null).buttons).toEqual(['Keep Server Running', 'Stop Turns and Quit', 'Cancel']);
   });
 
   it('does what each choice says', () => {
@@ -25,11 +25,12 @@ describe('quit', () => {
     expect(quitAction('cancel')).toEqual({ kind: 'stay-open' });
   });
 
-  it('words the dialog as the SwiftUI app did, buttons in choice order', () => {
+  it('words the dialog as the SwiftUI app did, buttons in choice order, the stop button naming what it stops', () => {
     expect(quitDialog(1).message).toBe('1 turn is still running');
     expect(quitDialog(4).message).toBe('4 turns are still running');
     expect(quitDialog(1).detail).toBe('Keep the server running in the background to let them finish, or stop them and quit.');
-    expect(quitDialog(1).buttons).toEqual(['Keep Server Running', 'Stop Them and Quit', 'Cancel']);
+    expect(quitDialog(1).buttons).toEqual(['Keep Server Running', 'Stop 1 Turn and Quit', 'Cancel']);
+    expect(quitDialog(2).buttons[1]).toBe('Stop 2 Turns and Quit');
     expect(QUIT_CHOICES).toEqual(['keep-server-running', 'stop-and-quit', 'cancel']);
   });
 });
@@ -37,19 +38,19 @@ describe('quit', () => {
 describe('Restart Server with turns running', () => {
   it('asks to wait for them, stop them, or cancel', () => {
     expect(RESTART_CHOICES).toEqual(['when-finished', 'stop-and-restart', 'cancel']);
-    expect(restartDialog(1)).toMatchObject({ message: '1 turn is still running', buttons: ['Restart When They Finish', 'Stop Them and Restart', 'Cancel'] });
+    expect(restartDialog(1)).toMatchObject({ message: '1 turn is still running', buttons: ['Restart When They Finish', 'Stop 1 Turn and Restart', 'Cancel'] });
     expect(restartDialog(3).message).toBe('3 turns are still running');
     expect(restartDialog(null).message).toBe('Turns may still be running');
-    expect(restartDialog(null).buttons).toEqual(restartDialog(2).buttons);
+    expect(restartDialog(null).buttons[1]).toBe('Stop Turns and Restart');
   });
 });
 
-describe('Relaunch to Update with turns running', () => {
+describe('Relaunch to update with turns running', () => {
   it('asks to wait for them, stop them, or cancel, and never offers to keep the server running', () => {
     expect(UPDATE_CHOICES).toEqual(['when-finished', 'stop-and-update', 'cancel']);
-    expect(updateDialog(2)).toMatchObject({ message: '2 turns are still running', buttons: ['Update When They Finish', 'Stop Them and Update', 'Cancel'] });
+    expect(updateDialog(2)).toMatchObject({ message: '2 turns are still running', buttons: ['Update When They Finish', 'Stop 2 Turns and Update', 'Cancel'] });
     expect(updateDialog(null).message).toBe('Turns may still be running');
-    expect(updateDialog(null).buttons).toEqual(updateDialog(1).buttons);
+    expect(updateDialog(null).buttons[1]).toBe('Stop Turns and Update');
   });
 
   it('stops the server for every choice that goes on to update', () => {

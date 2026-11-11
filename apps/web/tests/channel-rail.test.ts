@@ -27,4 +27,14 @@ describe('ChannelRail', () => {
     expect(disc(html, 'Plain')).not.toContain('background-color');
     expect(disc(html, 'Plain')).toContain('bg-surface-2');
   });
+
+  it('marks one item current: a channel named Inbox never shares the Inbox selection', () => {
+    state.channels = [{ id: 'inbox', name: 'Inbox', kind: 'internal', icon: null, avatar_bg: null, running: 0 }];
+    const current = (html: string) => html.match(/aria-current="page"/g)?.length ?? 0;
+    const onInbox = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'inbox' } }));
+    expect(current(onInbox)).toBe(1);
+    expect(disc(onInbox, 'Inbox')).toContain('aria-current="page"');
+    const onChannel = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'channel', id: 'inbox' } }));
+    expect(current(onChannel)).toBe(1);
+  });
 });

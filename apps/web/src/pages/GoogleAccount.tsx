@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { GoogleSignIn } from '../components/GoogleSignIn.tsx';
-import { Button, Chip, ErrorNote, InlineConfirm } from '../components/ui.tsx';
-import { Card, InfoRow } from './settings-parts.tsx';
+import { Chip, ErrorNote, InlineConfirm } from '../components/ui.tsx';
+import { Card, DangerRow, InfoList, InfoRow } from './settings-parts.tsx';
 
 // Settings, Sharing & access, Google sign-in: the Google account that owns this Omni and the devices that signed in with it
 // (apps/server/google-auth.ts). Linking and unlinking take a device paired with the token; one that signed in with
@@ -68,11 +68,23 @@ export function GoogleAccountSection() {
                 </div>
               </div>
               {d.current ? (
-                <Button size="sm" onClick={() => void api.post('/auth/signout').then(() => location.reload(), (err) => setError(errorText(err)))}>
-                  Sign out
-                </Button>
+                <InlineConfirm
+                  tone="danger"
+                  label="Sign out"
+                  confirmLabel="Sign out"
+                  busyLabel="Signing out"
+                  onConfirm={() =>
+                    api.post('/auth/signout').then(
+                      () => location.reload(),
+                      (err) => {
+                        setError(errorText(err));
+                        throw err;
+                      },
+                    )
+                  }
+                />
               ) : (
-                <InlineConfirm label="Revoke" confirmLabel="Revoke" busyLabel="Revoking" onConfirm={() => act(() => api.del(`/auth/devices/${encodeURIComponent(d.id)}`))} />
+                <InlineConfirm tone="danger" label="Revoke" confirmLabel="Revoke" busyLabel="Revoking" onConfirm={() => act(() => api.del(`/auth/devices/${encodeURIComponent(d.id)}`))} />
               )}
             </li>
           ))}
@@ -83,7 +95,7 @@ export function GoogleAccountSection() {
 
   if (!a.available) {
     return (
-      <Card title="Google account" subtitle="Sign in to new devices with Google instead of copying the token.">
+      <Card entry="google" title="Google account" subtitle="Sign in to new devices with Google instead of copying the token.">
         <p className="text-[13px] text-fg-3">Google sign-in is not set up on this Omni: its config names no Clerk OAuth app.</p>
         {deviceList}
         {error && <ErrorNote>{error}</ErrorNote>}
@@ -92,16 +104,16 @@ export function GoogleAccountSection() {
   }
 
   return (
-    <Card title="Google account" subtitle="Sign in to new devices with Google instead of copying the token. Only the account linked here gets in.">
+    <Card entry="google" title="Google account" subtitle="Sign in to new devices with Google instead of copying the token. Only this account gets in.">
       {a.owner ? (
-        <div className="space-y-2 text-[13px]">
+        <InfoList>
           <InfoRow label="Account">
             <span className="min-w-0 truncate">{a.owner.email ?? a.owner.name ?? 'Linked'}</span>
           </InfoRow>
           <InfoRow label="Linked">
             <span className="text-fg-2">{relTime(a.owner.linkedAt, Date.now())}</span>
           </InfoRow>
-        </div>
+        </InfoList>
       ) : byToken ? (
         <GoogleSignIn mode="link" label="Link Google account" onDone={() => void act(async () => {})} />
       ) : (
@@ -111,10 +123,13 @@ export function GoogleAccountSection() {
       {deviceList}
 
       {a.owner && byToken && (
-        <div className="flex flex-wrap items-center gap-3">
-          <InlineConfirm label="Unlink account" confirmLabel="Unlink and sign out all" busyLabel="Unlinking" onConfirm={() => act(() => api.del('/auth/google'))} />
-          <span className="text-[12px] text-fg-3">Every device signed in with Google loses access. Devices paired with the token or a code keep it.</span>
-        </div>
+        <DangerRow
+          action={
+            <InlineConfirm tone="danger" label="Unlink account" confirmLabel="Unlink and sign out all" busyLabel="Unlinking" onConfirm={() => act(() => api.del('/auth/google'))} />
+          }
+        >
+          Unlinking signs out every device that used Google. Devices paired with the token or a code keep access.
+        </DangerRow>
       )}
       {error && <ErrorNote>{error}</ErrorNote>}
     </Card>

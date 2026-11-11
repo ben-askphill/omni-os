@@ -202,7 +202,7 @@ export function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null
   const calls = task?.tool_uses ?? countCalls(c);
   const err = c.result?.is_error && !stopped;
   return (
-    <RailItem status={status}>
+    <RailItem>
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={ROW_CARD}>
         <BranchFace role={type} title={str(c.input.description) || 'Sub-agent'} status={status}>
           <span>{type || 'agent'}</span>

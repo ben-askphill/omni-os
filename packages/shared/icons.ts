@@ -63,7 +63,7 @@ export const ICON_PATHS = {
   browser: 'M3 5h18v14H3zM3 9h18',
   gauge: 'M4 18a8 8 0 0 1 16 0M12 18l4-5',
   pause: 'M9 5v14M15 5v14',
-  diff: 'M12 3v8M8 7h8M8 17h8M5 21h14',
+  diff: 'M12 4v8M8 8h8M8 17h8',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   folder: 'M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z',
   folderPlus: 'M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5zM12 11v6M9 14h6',
@@ -71,6 +71,7 @@ export const ICON_PATHS = {
   unfoldAll: 'm7 15 5 5 5-5M7 9l5-5 5 5',
   pin: 'M9 4h6M10 4v5.5L7 13v2h10v-2l-3-3.5V4M12 15v6',
   mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3',
+  user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
   share: 'M12 15V3M7 8l5-5 5 5M5 13v7h14v-7',
   // Annotation tools.
   pointer: 'M5 3l14 7-6 2-2 6z',

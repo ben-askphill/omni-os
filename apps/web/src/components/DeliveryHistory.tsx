@@ -98,7 +98,7 @@ function DeliveryRow({ d, onRow, onChanged }: { d: DeliveryView; onRow: (d: Deli
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="hov flex min-h-8 min-w-0 flex-1 basis-full flex-wrap items-center gap-x-2.5 gap-y-0.5 rounded-[18px] px-2 py-1.5 text-left text-[12.5px] [--hov:var(--surface-2)] md:basis-auto md:flex-nowrap md:rounded-full md:py-1"
+          className="hov flex min-h-8 min-w-0 flex-1 basis-full flex-wrap items-center gap-x-2.5 gap-y-0.5 rounded-[var(--r-lg)] px-2 py-1.5 text-left text-[12.5px] [--hov:var(--surface-2)] md:basis-auto md:flex-nowrap md:rounded-full md:py-1"
         >
           <Icon name="chevronRight" size={12} className={`shrink-0 text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
           <Chip tone={DELIVERY_TONE[d.state]}>{DELIVERY_STATE_LABELS[d.state]}</Chip>

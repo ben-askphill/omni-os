@@ -3,13 +3,27 @@ import { AVATAR_SWATCHES, svgColors } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon, svgDataUrl } from '@omni/shared/channel-icon.ts';
 import { Avatar, Button, ErrorNote } from './ui.tsx';
 
+const SWATCH_NAMES: Record<string, string> = {
+  '#e8d9f5': 'Lavender',
+  '#d4e9fa': 'Sky',
+  '#d3eee4': 'Mint',
+  '#f5e6ba': 'Sand',
+  '#f6d9cd': 'Peach',
+  '#f0d8e3': 'Rose',
+  '#283c62': 'Navy',
+  '#354f42': 'Forest',
+  '#573c65': 'Plum',
+  '#733e35': 'Rust',
+};
+
 /** Uses the same field and button primitives as channel settings. Sample coordinates use the image's actual contain box. */
 export function AvatarColorPicker({ icon, name, value, manual, onChange, onAuto }: { icon: string; name: string; value: string; manual: boolean; onChange: (color: string) => void; onAuto: () => void }) {
   const mark = parseChannelIcon(icon);
   const [error, setError] = useState('');
-  const [hex, setHex] = useState(value);
-  const [previous, setPrevious] = useState(value);
-  if (previous !== value) { setPrevious(value); setHex(value); }
+  const current = value.toLowerCase();
+  const [hex, setHex] = useState(current);
+  const [previous, setPrevious] = useState(current);
+  if (previous !== current) { setPrevious(current); setHex(current); }
   const sample = async (event: MouseEvent<HTMLImageElement>) => {
     const img = event.currentTarget;
     const bounds = img.getBoundingClientRect();
@@ -31,17 +45,21 @@ export function AvatarColorPicker({ icon, name, value, manual, onChange, onAuto 
       setError('');
     } catch { setError('Could not sample that SVG. Choose a palette color instead.'); }
   };
-  const swatches = [...new Set([...AVATAR_SWATCHES, ...(mark?.kind === 'svg' ? svgColors(mark.markup).palette : [])])];
+  const swatches = [...new Set([...AVATAR_SWATCHES, ...(mark?.kind === 'svg' ? svgColors(mark.markup).palette : [])].map((c) => c.toLowerCase()))];
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center gap-3">
       <Avatar name={name} channelIcon={icon} avatarBg={value} size={56} />
-      <input type="color" aria-label="Avatar background color" value={value || '#e8d9f5'} onChange={(e) => onChange(e.target.value)} className="h-9 w-10 cursor-pointer rounded-lg" />
-      <input aria-label="Avatar background hex" className="field !w-28 font-mono" placeholder="#e8d9f5" value={hex} maxLength={7} onChange={(e) => { setHex(e.target.value); if (/^#[\da-f]{6}$/i.test(e.target.value)) onChange(e.target.value); }} aria-invalid={!!hex && !/^#[\da-f]{6}$/i.test(hex)} />
-      <Button type="button" onClick={onAuto}>Reset to auto</Button>
+      <input type="color" aria-label="Avatar background color" value={current || '#e8d9f5'} onChange={(e) => onChange(e.target.value)} className="h-9 w-10 cursor-pointer rounded-lg" />
+      <input aria-label="Avatar background hex" className="field !w-28 font-mono" placeholder="#e8d9f5" value={hex} maxLength={7} onChange={(e) => { setHex(e.target.value); if (/^#[\da-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} aria-invalid={!!hex && !/^#[\da-f]{6}$/i.test(hex)} />
+      <Button type="button" onClick={onAuto} disabled={!manual} title={manual ? undefined : 'Already automatic'}>Reset to auto</Button>
       <span className="text-xs text-fg-3">{manual ? 'Custom color' : 'Automatic'}</span>
     </div>
     <div className="flex flex-wrap gap-2" role="group" aria-label="Background swatches">
-      {swatches.map((color) => <button key={color} type="button" title={color} aria-label={`Use ${color}`} aria-pressed={value === color} onClick={() => onChange(color)} className="h-8 w-8 rounded-full border border-line focus-visible:outline-2 focus-visible:outline-fg" style={{ backgroundColor: color, outline: value === color ? '2px solid var(--fg)' : undefined, outlineOffset: 2 }} />)}
+      {swatches.map((color) => {
+        const name = SWATCH_NAMES[color] ?? `From the SVG, ${color}`;
+        const on = current === color;
+        return <button key={color} type="button" title={name} aria-label={name} aria-pressed={on} onClick={() => onChange(color)} className="h-8 w-8 rounded-full border border-line focus-visible:outline-2 focus-visible:outline-fg" style={{ backgroundColor: color, outline: on ? '2px solid var(--fg)' : undefined, outlineOffset: 2 }} />;
+      })}
     </div>
     {mark?.kind === 'svg' && <div className="space-y-2"><p className="text-xs text-fg-3">Click a color in the SVG to sample it. You can also choose its colors from the swatches above.</p><img src={svgDataUrl(mark.markup)} alt="SVG color sampler" onClick={(e) => void sample(e)} className="h-32 w-32 cursor-crosshair rounded-xl border border-line object-contain" style={{ backgroundColor: value || 'var(--surface-2)' }} /></div>}
     {error && <ErrorNote>{error}</ErrorNote>}

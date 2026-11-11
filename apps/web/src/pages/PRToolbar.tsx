@@ -13,6 +13,7 @@ import {
   type PRQuery,
 } from '@omni/shared/pr-query.ts';
 import { Button, Chip, Icon, Picker, type IconName } from '../components/ui.tsx';
+import { PageToolbar, RefreshButton, SearchField } from '../components/ui/feedback.tsx';
 import { useDismissable } from '../components/ui/use-dismissable.ts';
 
 /** Takes the next query, or how to make it from the current one so presses in one frame all land. */
@@ -21,7 +22,7 @@ export type SetPRQuery = (next: PRQuery | ((q: PRQuery) => PRQuery)) => void;
 const pill =
   'press inline-flex h-8 shrink-0 items-center gap-2 rounded-full bg-surface-2 px-3 text-[12.5px] font-medium text-fg transition-colors hover:bg-surface-3';
 
-/** Search, sort, filters, the repo to list and, on desktop, refresh: one row, the search taking what is left. */
+/** Search, sort, filters and the repo to list, then refresh on the right. The repo picker shows only when there is a choice. */
 export function PRToolbar({
   q,
   set,
@@ -39,22 +40,8 @@ export function PRToolbar({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex h-8 min-w-[200px] flex-1 items-center gap-2 rounded-full bg-surface px-3 text-fg-3 shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] focus-within:bg-bg focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)]">
-          <Icon name="search" size={14} />
-          <input
-            type="search"
-            value={q.search}
-            onChange={(e) => {
-              const search = e.target.value;
-              set((q) => ({ ...q, search }));
-            }}
-            onKeyDown={(e) => e.key === 'Escape' && set((q) => ({ ...q, search: '' }))}
-            placeholder="Search pull requests, or label:bug"
-            aria-label="Search pull requests"
-            className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
-          />
-        </label>
+      <PageToolbar right={onRefresh && <RefreshButton onClick={onRefresh} busy={busy} label="Refresh pull requests" />}>
+        <SearchField value={q.search} onChange={(search) => set((q) => ({ ...q, search }))} placeholder="Search pull requests, or label:bug" label="Search pull requests" />
         <div className="relative flex min-w-0 max-w-full flex-wrap items-center gap-2">
           <Picker
             className="min-w-0"
@@ -65,18 +52,19 @@ export function PRToolbar({
             prefix={<Icon name="sort" size={14} />}
           />
           <FilterMenu q={q} set={set} prs={inScope(prs, q.repo)} />
-          <Picker
-            className="min-w-0 max-sm:static"
-            label="Repo"
-            value={q.repo ?? ''}
-            options={[{ value: '', label: 'All', sub: 'Every channel’s repo', avatar: false }, ...repos.map((r) => ({ value: r, label: r, avatar: false as const }))]}
-            onChange={(r) => set((q) => ({ ...q, repo: r || null }))}
-            prefix={<Icon name="plug" size={14} />}
-            align="right"
-          />
-          {onRefresh && <Button icon="refresh" aria-label="Refresh" title="Refresh" onClick={onRefresh} busy={busy} className="h-8 w-8 px-0" />}
+          {repos.length > 1 && (
+            <Picker
+              className="min-w-0 max-sm:static"
+              label="Repo"
+              value={q.repo ?? ''}
+              options={[{ value: '', label: 'All repos', sub: 'Every channel’s repo', avatar: false }, ...repos.map((r) => ({ value: r, label: r, avatar: false as const }))]}
+              onChange={(r) => set((q) => ({ ...q, repo: r || null }))}
+              prefix={<Icon name="plug" size={14} />}
+              align="right"
+            />
+          )}
         </div>
-      </div>
+      </PageToolbar>
       <PickedChips q={q} set={set} />
     </div>
   );

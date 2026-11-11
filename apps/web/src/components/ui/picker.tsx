@@ -31,6 +31,9 @@ export function Picker<T extends string>({
   disabled,
   className = '',
   align = 'left',
+  size = 'pill',
+  id,
+  describedBy,
 }: {
   value: T;
   options: PickerOption<T>[];
@@ -41,6 +44,10 @@ export function Picker<T extends string>({
   disabled?: boolean;
   className?: string;
   align?: 'left' | 'right';
+  /** `field`: as tall and wide as a text field, for a form; `pill`: a compact pill in a line of text or a toolbar. */
+  size?: 'pill' | 'field';
+  id?: string;
+  describedBy?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [up, setUp] = useState(false);
@@ -107,7 +114,9 @@ export function Picker<T extends string>({
     <div ref={wrap} className={`relative ${className}`}>
       <button
         ref={btn}
+        id={id}
         type="button"
+        aria-describedby={describedBy}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`${label}: ${current?.label ?? 'none'}`}
@@ -119,7 +128,11 @@ export function Picker<T extends string>({
             openMenu();
           }
         }}
-        className="press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] text-fg transition-colors hover:bg-surface-3 disabled:opacity-45"
+        className={
+          size === 'field'
+            ? 'press flex h-10 w-full min-w-0 items-center gap-2 rounded-[14px] bg-surface pr-3 pl-2 text-left text-[14px] text-fg shadow-[inset_0_0_0_1px_var(--line)] transition-shadow hover:shadow-[inset_0_0_0_1px_var(--line-strong)] disabled:opacity-45'
+            : 'press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] text-fg transition-colors hover:bg-surface-3 disabled:opacity-45'
+        }
       >
         {current?.lead ? (
           <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg">{current.lead}</span>
@@ -133,7 +146,7 @@ export function Picker<T extends string>({
           <span className="w-1.5" />
         )}
         {prefix && <span className="-mr-1 text-fg-3">{prefix}</span>}
-        <span className="min-w-0 truncate">{current?.label ?? 'Choose'}</span>
+        <span className={`min-w-0 truncate ${size === 'field' ? 'flex-1' : ''}`}>{current?.label ?? 'Choose'}</span>
         <Icon name="chevronDown" size={13} className="pik-chev text-fg-3" />
       </button>
       {open && (

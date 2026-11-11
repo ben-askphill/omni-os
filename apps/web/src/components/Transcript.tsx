@@ -175,25 +175,26 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
   );
 }
 
-function ResultLine({ p }: { p: ResultP }) {
-  const word = p.ok ? 'done' : p.stopped ? 'stopped' : 'ended';
-  const bits = [p.duration_ms != null ? `${word} in ${duration(p.duration_ms)}` : word];
-  if (p.turns) bits.push(plural(p.turns, 'turn'));
+/**
+ * How a turn ended, as a quiet divider: one glyph and one sentence-case line, the phone's Outcome words. `limit` is the
+ * thread's limit line (limits.ts `limitLabel`) on the turn the usage limit stopped.
+ */
+function ResultLine({ p, limit }: { p: ResultP; limit?: string | null }) {
+  const took = p.duration_ms != null ? duration(p.duration_ms) : null;
   const bad = !p.ok && !p.stopped;
-  const tokens = p.input_tokens != null ? `${p.input_tokens} in / ${p.output_tokens ?? 0} out` : null;
+  const glyph = limit ? 'limited' : p.ok ? 'done' : p.stopped ? 'settled' : 'failed';
+  const [word, after] = p.ok ? ['Done', 'Done in'] : p.stopped ? ['Stopped', 'Stopped after'] : ['Failed', 'Failed after'];
+  const bits = [limit ?? (took ? `${after} ${took}` : word)];
+  if (p.turns) bits.push(plural(p.turns, 'turn'));
+  if (p.model) bits.push(p.model);
+  if (p.input_tokens != null) bits.push(`${p.input_tokens} in / ${p.output_tokens ?? 0} out`);
+  if (bad && !limit && p.subtype && p.subtype !== 'success') bits.push(p.subtype.replace(/_/g, ' '));
   return (
     <div className="flex items-center gap-3 py-1 font-num text-[12px] font-medium text-fg-3">
       <div className="h-px flex-1 bg-line" />
-      <span className={`flex items-center gap-2 ${bad ? 'text-fg-2' : ''}`}>
-        {bad ? (
-          <StatusDot status="needs" size={8} />
-        ) : (
-          <span className={`inline-block h-1 w-1 rounded-full ${p.ok ? 'bg-done shadow-[inset_0_0_0_0.5px_var(--done-edge)]' : 'bg-fg-4'}`} />
-        )}
-        {bits.join(' · ')}
-        {p.model ? <span> · {p.model}</span> : null}
-        {tokens ? <span> · {tokens}</span> : null}
-        {bad && p.subtype && p.subtype !== 'success' ? ` · ${p.subtype.replace(/_/g, ' ')}` : ''}
+      <span className="flex min-w-0 items-center gap-2">
+        <StatusDot status={glyph} size={8} />
+        <span className="min-w-0">{bits.join(' · ')}</span>
       </span>
       <div className="h-px flex-1 bg-line" />
     </div>
@@ -342,6 +343,8 @@ interface ItemRowProps {
   pages?: Published[];
   /** The plan, on the group of the latest TodoWrite. */
   plan?: FoldPlan;
+  /** The thread's limit line, on the last result when the usage limit stopped that turn. */
+  limit?: string | null;
 }
 
 /**
@@ -350,7 +353,7 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, isLast, team, brief, reports, byId, artifacts, pages, plan }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, isLast, team, brief, reports, byId, artifacts, pages, plan, limit }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -390,7 +393,7 @@ const ItemRow = memo(
           return plan ? [...out, <PlanCard key="plan" todos={plan.todos} threadId={threadId} />] : out;
         }
         case 'result':
-          return <ResultLine key={it.key} p={it.p} />;
+          return <ResultLine key={it.key} p={it.p} limit={limit} />;
         case 'error':
           return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
         case 'report':
@@ -435,6 +438,7 @@ export const Transcript = memo(function Transcript({
   reports = NO_REPORTS,
   history = null,
   delegated = false,
+  limit = null,
 }: {
   threadId: string;
   /** Every row held, anchors included. */
@@ -453,6 +457,8 @@ export const Transcript = memo(function Transcript({
   history?: ThreadHistory | null;
   /** Another thread started this one: its first message is that thread's brief. */
   delegated?: boolean;
+  /** The thread's limit line (limits.ts `limitLabel`) while a usage limit holds it: the last result says it. */
+  limit?: string | null;
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
   const spans = history?.history.spans;
@@ -517,6 +523,7 @@ export const Transcript = memo(function Transcript({
               artifacts={artifacts}
               pages={pages.get(it.key)}
               plan={plan?.after === it.key ? plan : undefined}
+              limit={idx === lastIdx && it.type === 'result' ? limit : undefined}
             />,
           ])}
           {edgeRow(-1)}

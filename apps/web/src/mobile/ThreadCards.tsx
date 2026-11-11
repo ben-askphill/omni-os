@@ -29,13 +29,14 @@ export function MoProse({ text }: { text: string }) {
   return <Markdown text={text} className="text-[15px] leading-[1.6] text-pretty" />;
 }
 
-export function Outcome({ t, harness }: { t: TurnView; harness: string }) {
+/** `limit`: the thread's limit line (limits.ts `limitLabel`) on the turn the usage limit stopped. */
+export function Outcome({ t, harness, limit }: { t: TurnView; harness: string; limit?: string | null }) {
   const took = duration(t.result?.duration_ms);
   const [word, after] = ENDED[t.status] ?? ['Ended', 'Ended after'];
   return (
     <div className="flex items-center gap-2 text-[12.5px] leading-[1.3] text-fg-3 tabular-nums">
-      <StatusDot status={t.status} size={8} />
-      {[took ? `${after} ${took}` : word, t.steps ? plural(t.steps, 'step') : null, harnessLabel(harness)].filter(Boolean).join(' · ')}
+      <StatusDot status={limit ? 'limited' : t.status} size={8} />
+      {[limit ?? (took ? `${after} ${took}` : word), t.steps ? plural(t.steps, 'step') : null, harnessLabel(harness)].filter(Boolean).join(' · ')}
     </div>
   );
 }

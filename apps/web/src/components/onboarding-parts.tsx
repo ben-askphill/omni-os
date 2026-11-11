@@ -90,7 +90,7 @@ export function Steps({ step }: { step: number }) {
   return (
     <ol className="flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}>
       {STEPS.map((s, i) => (
-        <li key={s} title={s} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-6 bg-fg' : i < step ? 'w-1.5 bg-fg-2' : 'w-1.5 bg-line-strong'}`} />
+        <li key={s} title={s} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-6 bg-fg' : i < step ? 'w-1.5 bg-fg-2' : 'w-1.5 bg-fg-4'}`} />
       ))}
     </ol>
   );
@@ -100,7 +100,7 @@ export function Screen({ caption, title, body, children }: { caption: string; ti
   return (
     <div>
       <div className="caption mb-2">{caption}</div>
-      <h2 id="onboarding-title" className="font-display text-[24px] leading-[1.1]">
+      <h2 id="onboarding-title" className="font-display text-[length:var(--fs-title)] leading-[1.15]">
         {title}
       </h2>
       <p className="mt-2 text-[13px] leading-relaxed text-fg-3">{body}</p>

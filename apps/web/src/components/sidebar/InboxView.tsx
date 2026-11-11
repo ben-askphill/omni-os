@@ -126,8 +126,6 @@ function InboxCard({
   const delegates = useRowDelegates(t.id, delegated, onNavigate);
   const title = t.title || 'Untitled';
   const channelName = channel?.id === 'conductor' ? 'Conductor' : (channel?.name ?? t.channel_id);
-  // Work in progress recedes, as in T3: what waits on Ben stands out.
-  const receded = !active && status?.glyph === 'running';
   const harness = t.harness && !delegates && (
     <span className="shrink-0 text-fg-3">
       <HarnessLogo harness={t.harness} size={11} />
@@ -141,7 +139,7 @@ function InboxCard({
         title={`${title} · ${channelName}${status ? ` · ${status.label}` : ''}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`hov z-[1] block rounded-[14px] [grid-area:1/1] px-3 py-2 transition-colors ${active ? '[--hov:transparent]' : ''} ${receded ? 'opacity-70' : ''}`}
+        className={`hov z-[1] block rounded-[14px] [grid-area:1/1] px-3 py-2 transition-colors ${active ? '[--hov:transparent]' : ''}`}
       >
         <span className="flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3">
           <span className="grid min-w-3 shrink-0 place-items-center">
@@ -160,7 +158,7 @@ function InboxCard({
             )}
           </span>
         </span>
-        <span className={`mt-1 flex items-center gap-1.5 text-[13px] leading-5 ${active ? 'font-medium text-fg' : receded ? 'text-fg-3' : 'font-medium text-fg-2'}`}>
+        <span className={`mt-1 flex items-center gap-1.5 text-[13px] leading-5 ${active ? 'font-medium text-fg' : 'font-medium text-fg-2'}`}>
           <span className="min-w-0 flex-1 truncate">{title}</span>
           {!t.branch && harness}
           {!t.branch && delegates && <DelegateCountSpace summary={delegates.summary} />}

@@ -58,4 +58,10 @@ export function reopened(phase: QuickPromptPhase, channel: string): { phase: Qui
 
 export const sentLabel = (title: string) => (title.trim() ? `Started “${title.trim()}”` : 'Started a thread');
 
-export const editingHint = (mac: boolean) => `Return to send, ${mac ? '⌘Return' : 'Ctrl+Return'} to send and open, Esc to close`;
+/** The keys the panel answers to, for its keyboard footer. */
+export const quickPromptHints = (mac: boolean) =>
+  [
+    [['↵'], 'send'],
+    [[mac ? '⌘' : 'Ctrl', '↵'], 'send and open'],
+    [['esc'], 'close'],
+  ] as const;

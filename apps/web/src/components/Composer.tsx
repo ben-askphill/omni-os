@@ -250,8 +250,14 @@ export function ReplyComposer({
   onChanged,
   stop,
   machine,
+  asking = false,
 }: {
   thread: Thread;
+  /**
+   * The agent waits on a question card. A message steers in as the answer (the server dismisses the question), so the
+   * box reads as a reply: Send, no Stop.
+   */
+  asking?: boolean;
   /** When false (e.g. Cursor), a busy thread offers only Queue and Interrupt; Cmd+Enter queues. */
   canSteer?: boolean;
   /** The thread's handoff state, for the Machine chip next to the model pill. Without it the chip is left out. */
@@ -285,6 +291,7 @@ export function ReplyComposer({
   }, [key]);
 
   const busyThread = status === 'running' || status === 'queued';
+  const replying = asking && steers;
   // The server's guess at the next reply, shown in the empty box. Tab takes it.
   const suggestion = !busyThread && !text && thread.suggestion ? thread.suggestion : null;
   const latest = useRef(text);
@@ -406,7 +413,7 @@ export function ReplyComposer({
           void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
-        placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread ? 'Reply' : steers ? 'Steer the agent. It reads this at its next step.' : 'Queue a message. It runs after this turn.')}
+        placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread || replying ? 'Reply' : steers ? 'Steer the agent. It reads this at its next step' : 'Queue a message. It runs after this turn')}
         className="block max-h-[220px] min-h-[60px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none placeholder:text-fg-3"
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
@@ -418,6 +425,10 @@ export function ReplyComposer({
           {omni ? (
             <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>
               {slash.label ?? 'Send'}
+            </SendButton>
+          ) : replying ? (
+            <SendButton armed={canSend} busy={busy} onClick={() => void submit('steer')}>
+              Send
             </SendButton>
           ) : stop && !canSend && !att.files.length ? (
             <StopButton busy={stop.busy} onClick={stop.run} />

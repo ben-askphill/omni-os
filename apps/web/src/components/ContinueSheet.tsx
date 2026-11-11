@@ -29,6 +29,8 @@ import { api, errorText, useApi, type HarnessWithRunning, type Thread } from '..
 import { href, navigate } from '../router.ts';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
 import { Button, Chip, ErrorNote, Icon, IconButton, Label, Loading, Modal, Toggle, type ChipTone } from './ui.tsx';
+import { ModalFooter } from './ui/modal.tsx';
+import { MOD_KEY } from './ui/overlay.tsx';
 
 /**
  * One continue sheet's state, for the desktop and the phone: the picked run's preview, asked again whenever the run
@@ -148,79 +150,81 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
   const hint = slashHint(s.text);
   const files = shownPreview(s.preview)?.carryover ?? null;
   return (
-    <div className="grid gap-x-8 gap-y-6 px-6 pt-1 pb-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <div className="flex min-w-0 flex-col gap-4">
-        <p className="text-[13px] leading-relaxed text-fg-2">
-          A new thread picks up <span className="text-fg">{source.title || 'this thread'}</span> on the harness you pick, with its own branch and session. The two threads link to each other.
-        </p>
-        <div>
-          <Label hint={run ? undefined : 'No local harness is ready. The list says how to set one up.'}>Continue on</Label>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <ModelPicker
-              harnesses={targets.offered}
-              value={{ harness: run?.harness ?? '', model: run?.model ?? '' }}
-              offerAuto={false}
-              onOpen={onPickerOpen}
-              disabled={s.posting}
-              onChange={(c) => dispatch({ type: 'pick', run: { harness: c.harness, model: c.model, effort: '' } })}
-            />
-            {run && (
-              <EffortPicker
+    <>
+      <div className="grid gap-x-8 gap-y-6 px-6 pt-1 pb-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <p className="text-[13px] leading-relaxed text-fg-2">
+            A new thread picks up <span className="text-fg">{source.title || 'this thread'}</span> on the harness you pick, with its own branch and session. The two threads link to each other.
+          </p>
+          <div>
+            <Label hint={run ? undefined : 'No local harness is ready. The list says how to set one up.'}>Continue on</Label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <ModelPicker
                 harnesses={targets.offered}
-                choice={{ harness: run.harness, model: run.model }}
-                value={run.effort}
+                value={{ harness: run?.harness ?? '', model: run?.model ?? '' }}
+                offerAuto={false}
+                onOpen={onPickerOpen}
                 disabled={s.posting}
-                onChange={(effort) => dispatch({ type: 'pick', run: { ...run, effort } })}
+                onChange={(c) => dispatch({ type: 'pick', run: { harness: c.harness, model: c.model, effort: '' } })}
               />
+              {run && (
+                <EffortPicker
+                  harnesses={targets.offered}
+                  choice={{ harness: run.harness, model: run.model }}
+                  value={run.effort}
+                  disabled={s.posting}
+                  onChange={(effort) => dispatch({ type: 'pick', run: { ...run, effort } })}
+                />
+              )}
+            </div>
+            {targets.refused.length > 0 && (
+              <ul className="mt-2 space-y-1 px-1 text-[12px] leading-snug text-fg-3">
+                {targets.refused.map((r) => (
+                  <li key={r.id}>{r.reason}</li>
+                ))}
+              </ul>
             )}
           </div>
-          {targets.refused.length > 0 && (
-            <ul className="mt-2 space-y-1 px-1 text-[12px] leading-snug text-fg-3">
-              {targets.refused.map((r) => (
-                <li key={r.id}>{r.reason}</li>
-              ))}
-            </ul>
+          {files && files.attachments.length > 0 && (
+            <div>
+              <Label hint={attachmentsSummary(files)}>Attachments</Label>
+              <AttachmentList files={files} disabled={s.posting} onToggle={(id) => dispatch({ type: 'attach', id })} />
+            </div>
           )}
-        </div>
-        {files && files.attachments.length > 0 && (
           <div>
-            <Label hint={attachmentsSummary(files)}>Attachments</Label>
-            <AttachmentList files={files} disabled={s.posting} onToggle={(id) => dispatch({ type: 'attach', id })} />
+            <Label htmlFor="continue-message" hint="It reads this after the carryover, and it is never cut.">
+              Your message
+            </Label>
+            <textarea
+              id="continue-message"
+              autoFocus
+              rows={6}
+              value={s.text}
+              placeholder="What should it do next?"
+              className="field min-h-[132px] resize-y leading-relaxed"
+              onChange={(e) => dispatch({ type: 'text', text: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void start();
+                }
+              }}
+            />
+            {hint && <p className="mt-1.5 px-1 text-[12px] leading-snug text-fg-3">{hint}</p>}
           </div>
-        )}
-        <div>
-          <Label htmlFor="continue-message" hint="It reads this after the carryover, and it is never cut.">
-            Your message
-          </Label>
-          <textarea
-            id="continue-message"
-            autoFocus
-            rows={6}
-            value={s.text}
-            placeholder="What should it do next?"
-            className="field min-h-[132px] resize-y leading-relaxed"
-            onChange={(e) => dispatch({ type: 'text', text: e.target.value })}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                void start();
-              }
-            }}
-          />
-          {hint && <p className="mt-1.5 px-1 text-[12px] leading-snug text-fg-3">{hint}</p>}
+          {note && <ErrorNote>{note}</ErrorNote>}
         </div>
-        {note && <ErrorNote>{note}</ErrorNote>}
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" busy={s.posting} disabled={!canStart(s)} onClick={() => void start()}>
-            Start
-          </Button>
-        </div>
+        {run && <PreviewPane s={s} onRecheck={recheck} onCloseTerminal={() => void closeTerminal()} closing={closing} />}
       </div>
-      {run && <PreviewPane s={s} onRecheck={recheck} onCloseTerminal={() => void closeTerminal()} closing={closing} />}
-    </div>
+      <ModalFooter hint={{ keys: [MOD_KEY, '↵'], label: 'start' }}>
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button variant="primary" busy={s.posting} disabled={!canStart(s)} onClick={() => void start()}>
+          Start
+        </Button>
+      </ModalFooter>
+    </>
   );
 }
 

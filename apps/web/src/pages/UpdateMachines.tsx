@@ -25,7 +25,7 @@ import { useFeed } from '../store.tsx';
 import { markUpdateStarted } from '../update-notice.ts';
 import { Card } from './settings-parts.tsx';
 
-// Settings, Machines: Update all machines. Check, Download all and Update all ask every synced machine through
+// Settings, Machines: your machines and their updates. Check, Download all and Update all ask every synced machine through
 // POST /api/update/fleet (apps/server/update-fleet.ts); each row is that machine's own answer, so one failing or
 // offline machine never holds up the others. @omni/shared/update-fleet.ts words the states.
 
@@ -91,8 +91,8 @@ export function UpdateMachinesCard() {
   return (
     <Card
       entry="update-machines"
-      title="Update all machines"
-      subtitle="Download fetches the update on every machine without restarting anything. Update downloads what is missing, then restarts each machine once no turn runs there."
+      title="Your machines and updates"
+      subtitle="Download fetches a new version without restarting anything. Update installs it, restarting each machine once no turn runs there."
     >
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="ghost" icon="refresh" busy={sending === 'check'} disabled={!data || !!sending} onClick={() => void send('check', { action: 'check' })}>
@@ -192,13 +192,15 @@ function FleetRow({ m, sending, onSend }: { m: FleetMachine; sending: string | n
   const note = leftOutNote(m);
   const action = rowAction(m);
   const progress = m.state === 'downloading' ? m.status?.progress : null;
+  // A version waiting to install is the row to act on, so it reads in --warn, not the grey of an offline machine.
+  const waiting = m.state === 'available' || m.state === 'ready';
   return (
     <li className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3 text-[13px]">
       <div className="min-w-0 flex-1 basis-56">
         <div className="flex min-w-0 items-center gap-2">
-          <StatusDot status={rowTone(m.state)} size={7} className="shrink-0" />
+          {waiting ? <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full bg-warn" /> : <StatusDot status={rowTone(m.state)} size={7} className="shrink-0" />}
           <span className="min-w-0 flex-1 truncate font-medium">{m.name}</span>
-          <span className="shrink-0 text-right text-[12.5px] text-fg-2">{rowLabel(m)}</span>
+          <span className={`shrink-0 text-right text-[12.5px] whitespace-nowrap ${waiting ? 'text-warn' : 'text-fg-2'}`}>{rowLabel(m)}</span>
         </div>
         {(m.current || m.status || lasting) && (
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[15px] text-[12px] text-fg-3">

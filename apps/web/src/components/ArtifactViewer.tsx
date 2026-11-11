@@ -11,6 +11,16 @@ import { href } from '../router.ts';
 export const kindIcon = (kind: string): IconName =>
   kind === 'image' || kind === 'screenshot' ? 'image' : kind === 'html' || kind === 'svg' ? 'globe' : 'file';
 
+/** Trailing build stamps agents add to file names: a short hex hash, or a date and time. */
+const STAMP = /(?:[-_](?=[0-9a-f]*\d)[0-9a-f]{6,12}|[-_]\d{8}(?:[-_]\d{4,6})?)+$/i;
+
+/** A file name as a person would title it: no extension, no trailing hash or date, words for dashes. */
+export function artifactTitle(name: string): string {
+  const base = name.replace(/\.[a-z0-9]+$/i, '');
+  const words = (base.replace(STAMP, '') || base).replace(/[-_]+/g, ' ').trim();
+  return words ? words[0].toUpperCase() + words.slice(1) : name;
+}
+
 function useText(a: Artifact, enabled: boolean) {
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +95,9 @@ function TextBody({ a }: { a: Artifact }) {
       /* show raw */
     }
   }
-  return <pre className="scroll-thin h-full overflow-auto p-3 font-mono text-[12px] leading-[1.55] whitespace-pre-wrap break-words text-fg-2">{shown}</pre>;
+  // JSON keeps its indentation and scrolls sideways; prose-like text wraps.
+  const wrap = a.kind === 'json' ? 'whitespace-pre' : 'whitespace-pre-wrap break-words';
+  return <pre className={`scroll-thin h-full overflow-auto p-3 font-mono text-[12px] leading-[1.55] text-fg-2 ${wrap}`}>{shown}</pre>;
 }
 
 const isImage = (a: Artifact) => a.kind === 'image' || a.kind === 'screenshot';
@@ -159,14 +171,17 @@ export function ArtifactViewer({ a, from }: { a: Artifact; from?: { id: string; 
         onClose={() => setFull(false)}
         wide
         title={
-          <span className="flex items-center gap-2">
-            {a.name}
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0">
+              <span className="block truncate">{artifactTitle(a.name)}</span>
+              <span className="block truncate font-mono text-[length:var(--fs-code)] text-fg-3">{a.name}</span>
+            </span>
             {isImage(a) && <ZoomControls z={fullZoom} />}
             <ArtifactActions a={a} />
           </span>
         }
       >
-        <div className="h-[80vh]">
+        <div className="h-[80vh] border-t border-line">
           <ArtifactBody a={a} zoom={fullZoom} />
         </div>
       </Modal>

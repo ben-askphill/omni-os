@@ -73,7 +73,7 @@ Settings opens with Servers, then a search over every setting and the same group
 - Harnesses & models: each harness with whether it can run and how to fix it, each channel's default model, and the server's `.env` options.
 - Threads: the machine new threads run on, the session and usage-limit options from `.env`, and Automations.
 - Channels: every channel, New channel, and the archived ones with Unarchive.
-- Workspace and Integrations: the GitHub owner and the Hermes URL. Folders show their value, since they are paths on the server's machine.
+- Workspace: the GitHub owner. Folders, the central brain folder included, show their value, since they are paths on the server's machine. The Hermes URL is under Harnesses & models.
 - Worktrees: automatic cleanup and its idle days (`PUT /worktrees/retention`).
 - Machines: the server's machine, read-only, and Update all machines, which checks, downloads and updates every synced machine through `/update/fleet` as the Web UI's card does.
 - Sync, Sharing & access and About: what the server reports, read-only, with Devices under Sharing & access.

@@ -6,6 +6,7 @@ import { useApp } from '../store.tsx';
 import { OmniMark } from './brand.tsx';
 import { HarnessScreen, PronounsInput, Row, Screen, Steps, Summary, TimezoneInput, browserTimezone, createChannel } from './onboarding-parts.tsx';
 import { Button, ErrorNote } from './ui.tsx';
+import { ModalFooter, SCRIM } from './ui/modal.tsx';
 
 export { PronounsInput, TimezoneInput } from './onboarding-parts.tsx';
 
@@ -107,20 +108,20 @@ function Wizard() {
   };
 
   return (
-    <div className="scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+    <div className={`${SCRIM} items-end p-0 sm:items-center sm:p-6`} role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
       <form
         onSubmit={next}
-        className="modal-in flex max-h-[100dvh] w-full flex-col rounded-t-[28px] bg-elev shadow-[var(--shadow-menu)] sm:max-h-[min(720px,calc(100dvh-48px))] sm:max-w-lg sm:rounded-[28px]"
+        className="modal-in flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-[var(--r-3xl)] bg-elev shadow-[var(--shadow-menu)] sm:max-h-[min(720px,calc(100dvh-48px))] sm:max-w-lg sm:rounded-[var(--r-3xl)]"
       >
         <div className="flex items-center justify-between gap-3 px-6 pt-6 sm:px-8 sm:pt-8">
           <OmniMark size={32} state={busy ? 'thinking' : 'idle'} />
           <Steps step={step} />
         </div>
-        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 pt-5 sm:px-8">
+        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6 sm:px-8">
           {!state && !error && <p className="py-10 text-center text-[13px] text-fg-3">Loading…</p>}
           {state && step === 0 && (
             <Screen caption={rerun ? 'Setup' : 'Welcome to Omni'} title="Tell Omni about you" body="Your name and pronouns are told to every agent, so a thread knows who it works for. Automations use your timezone.">
-              <Row label="Name" htmlFor="ob-name">
+              <Row label="Name" htmlFor="ob-name" hint="Agents address you by this name.">
                 <input id="ob-name" className="field w-full" value={name} maxLength={NAME_MAX} autoComplete="name" placeholder="Your name" autoFocus onChange={(e) => setName(e.target.value)} />
               </Row>
               <Row label="Email" htmlFor="ob-email" hint="Optional. Agents use it to recognise your own commits, PRs and mail.">
@@ -130,7 +131,7 @@ function Wizard() {
                 <Row label="Timezone" htmlFor="ob-tz" hint="Prefilled from this device.">
                   <TimezoneInput id="ob-tz" value={timezone} onChange={setTimezone} />
                 </Row>
-                <Row label="Pronouns" htmlFor="ob-pronouns">
+                <Row label="Pronouns" htmlFor="ob-pronouns" hint="Used when agents mention you.">
                   <PronounsInput id="ob-pronouns" value={pronouns} onChange={setPronouns} />
                 </Row>
               </div>
@@ -195,7 +196,7 @@ function Wizard() {
           )}
           {error && <ErrorNote className="mt-4">{error}</ErrorNote>}
         </div>
-        <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-[calc(24px+env(safe-area-inset-bottom))] sm:px-8 sm:pb-8">
+        <ModalFooter hint={{ keys: ['↵'], label: step === 4 ? (rerun ? 'save' : 'open') : 'continue' }} className="pb-[calc(16px+env(safe-area-inset-bottom))] sm:px-8 sm:pb-5">
           {step === 0 ? (
             <Button variant="ghost" onClick={rerun ? closeSetup : skip} disabled={busy}>
               {rerun ? 'Cancel' : 'Skip setup'}
@@ -205,13 +206,11 @@ function Wizard() {
               Back
             </Button>
           )}
-          <div className="flex items-center gap-2">
-            {step === 3 && !createdChannel && !channelName.trim() && <span className="text-[12px] text-fg-3">Optional</span>}
-            <Button type="submit" variant="primary" busy={busy} disabled={!state}>
-              {step === 4 ? (rerun ? 'Save' : 'Open Conductor') : step === 3 && !channelName.trim() && !createdChannel ? 'Skip' : 'Continue'}
-            </Button>
-          </div>
-        </div>
+          {step === 3 && !createdChannel && !channelName.trim() && <span className="text-[12px] text-fg-3">Optional</span>}
+          <Button type="submit" variant="primary" busy={busy} disabled={!state}>
+            {step === 4 ? (rerun ? 'Save' : 'Open Conductor') : step === 3 && !channelName.trim() && !createdChannel ? 'Skip' : 'Continue'}
+          </Button>
+        </ModalFooter>
       </form>
     </div>
   );

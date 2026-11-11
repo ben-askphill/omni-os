@@ -46,20 +46,20 @@ export function PRMergePanel({ channel, p, n, onMerged }: { channel: Channel; p:
   return (
     <>
       {open && !merged && (
-        <section aria-label="Merge" className="mt-5 rounded-[24px] bg-surface p-4">
+        <section aria-label="Merge" className="mt-6 rounded-[var(--r-xl)] bg-surface px-5 pt-4 pb-5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-display text-[15px]">Merge</span>
+            <h3 className="font-display text-[length:var(--fs-heading)]">Merge</h3>
             <Picker label="Merge method" value={method} onChange={setMethod} options={MERGE_METHODS} className="ml-1" />
             <label className="flex items-center gap-2 pl-1 text-[13px] text-fg-2">
               <Toggle checked={deleteBranch} onChange={setDeleteBranch} label="Delete branch after merge" />
               Delete branch
             </label>
           </div>
-          <div className="mt-2 text-[12.5px] text-fg-3">
-            <span className="font-mono text-[11.5px] text-fg-2">{p.headRefName}</span> into <span className="font-mono text-[11.5px] text-fg-2">{p.baseRefName}</span> on{' '}
-            <span className="font-mono text-[11.5px] text-fg-2">{channel.github_repo}</span>
-            {deleteBranch ? ', then the branch is deleted.' : '.'} Runs gh pr merge and cannot be undone from here.
-          </div>
+          <p className="mt-2 text-[length:var(--fs-small)] leading-[1.5] text-fg-3">
+            Merges <span className="font-mono text-[length:var(--fs-code)] text-fg-2">{p.headRefName}</span> into <span className="font-mono text-[length:var(--fs-code)] text-fg-2">{p.baseRefName}</span> on{' '}
+            <span className="font-mono text-[length:var(--fs-code)] text-fg-2">{channel.github_repo}</span>
+            {deleteBranch ? ', then deletes the branch.' : '.'} This runs <span className="font-mono text-[length:var(--fs-code)] text-fg-2">gh pr merge</span> and can’t be undone from here.
+          </p>
           {(warnings.length > 0 || conflicting) && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {conflicting && <Chip tone="needs">Has conflicts</Chip>}
@@ -82,7 +82,7 @@ export function PRMergePanel({ channel, p, n, onMerged }: { channel: Channel; p:
         </section>
       )}
       {merged && (
-        <div className="pop-in mt-5 flex items-start gap-2.5 rounded-[20px] bg-surface px-4 py-3 text-[13px] text-fg">
+        <div className="pop-in mt-6 flex items-start gap-2.5 rounded-[var(--r-xl)] bg-surface px-4 py-3 text-[length:var(--fs-ui)] text-fg">
           <StatusDot status="done" size={9} className="mt-1 shrink-0" />
           <span className="whitespace-pre-wrap">{merged}</span>
         </div>
