@@ -8,11 +8,12 @@ import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
 import { PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
+import { setLayout, useLayout } from '../layout-pref.ts';
 import { desktop } from '../desktop.ts';
 import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
-import { useApp, useSecretStoreLabel } from '../store.tsx';
+import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
 import { ChannelSettingsForm, Section } from './ChannelSettings.tsx';
 import { GoogleAccountSection } from './GoogleAccount.tsx';
 import { ConnectSection } from './Connect.tsx';
@@ -581,6 +582,8 @@ function ConfigField({
 
 function AppearanceCard() {
   const [theme, setTheme] = useTheme();
+  const layout = useLayout();
+  const mobile = useIsMobile();
   return (
     <>
       <Card entry="theme" title="Theme" subtitle="Follows your system, or stays light or dark." origin={<Origin of="device" label="This browser only" />}>
@@ -596,6 +599,20 @@ function AppearanceCard() {
           ]}
         />
       </Card>
+      {!mobile && (
+      <Card entry="layout" title="Layout" subtitle="The channel rail with a list beside it, or the classic sidebar. The phone layout stays as it is." origin={<Origin of="device" label="This browser only" />}>
+        <Segmented
+          radio
+          label="Layout"
+          value={layout}
+          onChange={setLayout}
+          options={[
+            { id: 'rail', icon: 'sidebar', label: 'Channel rail' },
+            { id: 'classic', icon: 'menu', label: 'Classic' },
+          ]}
+        />
+      </Card>
+      )}
       {desktop ? (
         <Card
           entry="zoom"

@@ -14,6 +14,10 @@ import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
 import { MobileShell } from './mobile/MobileShell.tsx';
 import { desktop } from './desktop.ts';
 import { QuickPromptPage } from './pages/QuickPrompt.tsx';
+import { ChannelRail } from './components/rail/ChannelRail.tsx';
+import { ListPanel } from './components/rail/ListPanel.tsx';
+import { useLayout } from './layout-pref.ts';
+import { listMode, railSelection } from './rail-model.ts';
 
 const SIDEBAR_WIDTH = 252;
 const SIDEBAR_MIN = 200;
@@ -105,7 +109,28 @@ function Shell() {
   useSyncOnReturn();
   usePageTitle(route);
 
-  return (
+  const layout = useLayout();
+  const selection = railSelection(route, openThread);
+  const [inbox, setInbox] = useState(() => readPref('rail.inbox', false));
+  const showInbox = (open: boolean) => (setInbox(open), writePref('rail.inbox', open));
+
+  return layout === 'rail' ? (
+    <div className="desktop-shell rail-shell flex h-full min-h-0 flex-row bg-bg">
+      <ChannelRail selection={selection} />
+      <ListPanel mode={listMode(selection, inbox)} onSearch={openPalette} onInbox={showInbox} />
+      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg">
+        <Page route={route} />
+      </main>
+
+      <CommandPalette open={palette} onClose={closePalette} />
+      <Onboarding />
+      <ThreadNotifier />
+      <BrowserNotifier />
+      <ContextMenuHost />
+      <ContinueSheetHost />
+      <FolderDeleteDialog />
+    </div>
+  ) : (
     <div className="desktop-shell flex h-full min-h-0 flex-col md:flex-row md:bg-[var(--chrome)] md:py-2 md:pr-2">
       {/* Desktop sidebar */}
       <SidebarPane>
@@ -127,7 +152,10 @@ function Shell() {
   );
 }
 
-/** Below the md breakpoint the phone layout (apps/web/src/mobile) replaces the sidebar shell. */
+/**
+ * Below the md breakpoint the phone layout (apps/web/src/mobile) replaces the desktop shell, which is the channel rail
+ * with its list panel, or the classic sidebar when Settings, Appearance says so.
+ */
 function Shells() {
   const mobile = useIsMobile();
   return (
