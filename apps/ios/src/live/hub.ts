@@ -2,11 +2,8 @@ import {
   apiPath,
   createHttpClient,
   createOmniApi,
-  OmniHttpError,
   openFeed,
-  openThreadLive,
   parseBaseUrl,
-  ThreadHistory,
   type AnswerResult,
   type Artifact,
   type Channel,
@@ -18,26 +15,23 @@ import {
   type NeedsYou,
   type OmniApi,
   type PendingMsg,
-  type Recovered,
   type RawResponse,
   type SSEClient,
   type SSEState,
   type SSETransport,
   type Thread,
-  type ThreadOpen,
   type UploadTransport,
 } from '@omni/client-core';
 import type { ClaudeArtifactsSchedule } from '@omni/shared/claude-artifacts.ts';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
-import { earlierCursor, type HistoryPage, type Span } from '@omni/shared/history.ts';
+import type { Span } from '@omni/shared/history.ts';
 import type { Answer } from '@omni/shared/question.ts';
 import type { OutputChunk } from '@omni/shared/tool-output.ts';
 
 import { DEFAULT_MAX_MB } from '../attachments/model';
 import { settleDraftContext } from '../context/draft';
-import { latestUserRowId } from '../send/rules';
 import { createCatalog, createSenders, newRequestId, type ThreadSender } from '../send/sender';
-import { runNeedsAction, type NeedsAction } from '../needs/actions';
+import type { NeedsAction } from '../needs/actions';
 import { withoutResult } from '../needs/inbox';
 import { coalesced } from './coalesce';
 import { createActionsLive, type ActionsLive } from './actions';
@@ -48,6 +42,7 @@ import { createClaudeArtifactsLive, type ClaudeArtifactsLiveState } from './clau
 import { createLibraryLive, type LibraryState } from './library';
 import type { OmniSession } from './session';
 import { createStore, type Store } from './store';
+import { createThreadLive, isRecord, isStatus, messageOf, type ThreadLiveHandle } from './thread-live';
 
 /** Feed messages that change the channel list's counts and rows. Usage and mod lines do not. */
 const LIST_CHANGES = new Set(['thread', 'channel', 'tasks', 'folder']);
@@ -187,9 +182,9 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
 
   const channels = createStore<ChannelsState>({ channels: null, loading: false, error: null, loadedAt: null });
   const link = createStore<Link>(linkOf({ paired, foreground: true, feed: null, thread: null }));
-  const openThreads = new Set<ThreadLiveImpl>();
+  const openThreads = new Set<ThreadLiveHandle>();
   const openActions = new Set<ActionsLive>();
-  let activeThread: ThreadLiveImpl | null = null;
+  let activeThread: ThreadLiveHandle | null = null;
   let foreground = true;
   let feed: SSEClient | null = null;
   let feedState: SSEState | null = null;
@@ -342,232 +337,6 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     });
   }
 
-  class ThreadLiveImpl implements ThreadLive {
-    readonly view: Store<ThreadView>;
-    readonly send: ThreadSender;
-    readonly catalog = catalog.store;
-    private history: ThreadHistory<HistoryEvent> | null = null;
-    private stream: SSEClient | null = null;
-    private following = true;
-    private opening: Promise<void> | null = null;
-    private closed = false;
-    private readonly unwatch: () => void;
-
-    constructor(private readonly threadId: string) {
-      this.send = this.applying(senders.for(threadId));
-      this.view = createStore<ThreadView>({
-        threadId,
-        status: 'loading',
-        error: null,
-        thread: null,
-        channel: null,
-        parent: null,
-        children: [],
-        artifacts: [],
-        pending: [],
-        live: false,
-        blocked: null,
-        handoff: null,
-        takeover: null,
-        rows: [],
-        spans: [],
-        hasOlder: false,
-        loadingOlder: false,
-        link: null,
-      });
-      // What the stream shows decides whether a message this phone is still sending has already landed.
-      this.unwatch = this.view.subscribe(() => {
-        const { pending, rows } = this.view.get();
-        this.send.observe({ pending, userRowId: latestUserRowId(rows) });
-      });
-    }
-
-    private patch(next: Partial<ThreadView>) {
-      this.view.set((v) => ({ ...v, ...next }));
-    }
-
-    /** The sender, with what each answer says about the thread put on screen before the stream repeats it. */
-    private applying(sender: ThreadSender): ThreadSender {
-      const thread = (t: Thread | null) => {
-        if (t && !this.closed) this.patch({ thread: t });
-        return t;
-      };
-      return {
-        state: sender.state,
-        submit: async (t, text, files, context) => thread(await sender.submit(t, text, files, context)),
-        retry: async () => thread(await sender.retry()),
-        edit: () => sender.edit(),
-        cancelUpload: () => sender.cancelUpload(),
-        observe: (sight) => sender.observe(sight),
-        stop: async () => thread(await sender.stop()),
-      };
-    }
-
-    start(): Promise<void> {
-      if (this.closed) return Promise.resolve();
-      if (this.opening) return this.opening;
-      if (!api) {
-        this.patch({ status: 'error', error: 'Not paired' });
-        return Promise.resolve();
-      }
-      this.patch({ error: null, status: this.view.get().thread ? 'ready' : 'loading' });
-      void catalog.ensure();
-      this.opening = this.open().finally(() => {
-        this.opening = null;
-      });
-      return this.opening;
-    }
-
-    private async open(): Promise<void> {
-      const id = this.threadId;
-      try {
-        const live = await openThreadLive<HistoryEvent, ThreadOpen>({
-          load: () => withAuth(() => requireApi().thread(id)),
-          streamUrl: (after) => requireHttp().url(apiPath`/threads/${id}/stream`, { after }),
-          token: () => session.token(),
-          transport,
-          refreshAuth: () => session.refreshAuth(),
-          onDetail: (detail) => this.applyDetail(detail),
-          onHistory: (history) => {
-            this.history = history as ThreadHistory<HistoryEvent>;
-            this.publishRows();
-          },
-          onOther: (message) => this.applyOther(message),
-          onState: (state) => {
-            this.patch({ link: state });
-            if (activeThread === this) recomputeLink();
-          },
-          follows: () => this.following,
-        });
-        this.stream = live.stream;
-        if (this.closed) live.stream.close();
-      } catch (e) {
-        if (this.closed) return;
-        if (isStatus(e, 404)) this.patch({ status: 'missing', error: null });
-        else this.patch({ status: 'error', error: messageOf(e) });
-      }
-    }
-
-    private applyDetail(detail: Partial<ThreadOpen>) {
-      const prev = this.view.get();
-      this.patch({
-        status: 'ready',
-        error: null,
-        thread: detail.thread ?? prev.thread,
-        channel: detail.channel ?? null,
-        parent: detail.parent ?? null,
-        children: detail.children ?? prev.children,
-        artifacts: detail.artifacts ?? prev.artifacts,
-        pending: detail.pending ?? [],
-        live: detail.live ?? false,
-        blocked: detail.blocked ?? null,
-        handoff: detail.handoff ?? null,
-        takeover: detail.takeover ?? null,
-      });
-    }
-
-    /** A status change arrives as a `thread` message on the stream, not as rows. */
-    private applyOther(message: unknown) {
-      if (!isRecord(message) || message.kind !== 'thread' || !isRecord(message.thread)) return;
-      this.patch({
-        status: 'ready',
-        thread: message.thread as unknown as Thread,
-        pending: Array.isArray(message.pending) ? (message.pending as PendingMsg[]) : [],
-        live: message.live === true,
-        blocked: typeof message.blocked === 'string' ? message.blocked : null,
-        handoff: isRecord(message.handoff) ? (message.handoff as unknown as HandoffView) : null,
-        takeover: isRecord(message.takeover) ? (message.takeover as unknown as Takeover) : null,
-      });
-    }
-
-    async answerQuestion(questionId: string, answers: Answer[]): Promise<AnswerResult> {
-      try {
-        return await withAuth(() => requireApi().answerQuestion(this.threadId, questionId, answers));
-      } finally {
-        void refreshNeedsYou();
-      }
-    }
-
-    async act(action: NeedsAction): Promise<void> {
-      const recovered = await withAuth(() => runNeedsAction(requireApi(), this.threadId, action));
-      if (!this.closed) this.patch({ thread: recovered.thread, pending: recovered.pending });
-      void refreshNeedsYou();
-    }
-
-    private publishRows() {
-      if (!this.history) return;
-      const h = this.history.history;
-      this.patch({ rows: h.rows, spans: h.spans, hasOlder: earlierCursor(h) !== null });
-    }
-
-    async loadOlder(): Promise<void> {
-      if (!this.history || this.view.get().loadingOlder) return;
-      const cursor = earlierCursor(this.history.history);
-      if (!cursor) return;
-      const id = this.threadId;
-      this.patch({ loadingOlder: true });
-      try {
-        await this.history.page(cursor, (query) =>
-          withAuth(() => requireHttp().request<HistoryPage<HistoryEvent>>('GET', apiPath`/threads/${id}/history`, { query })),
-        );
-        this.publishRows();
-      } catch (e) {
-        this.patch({ error: messageOf(e) });
-      } finally {
-        this.patch({ loadingOlder: false });
-      }
-    }
-
-    async loadFullRow(eventId: number): Promise<void> {
-      if (!this.history) return;
-      const id = this.threadId;
-      await this.history.fullRow(eventId, (rowId) => withAuth(() => requireApi().event(id, rowId)));
-      this.publishRows();
-    }
-
-    loadOutput(eventId: number, offset: number): Promise<OutputChunk> {
-      const id = this.threadId;
-      return withAuth(() => requireHttp().request<OutputChunk>('GET', apiPath`/threads/${id}/events/${eventId}/output`, { query: { offset } }));
-    }
-
-    setFollowing(following: boolean) {
-      this.following = following;
-    }
-
-    applyThread(thread: Thread) {
-      if (thread.id === this.threadId) this.patch({ thread });
-    }
-
-    applyHandoff(thread: Thread, handoff: HandoffView | null) {
-      if (thread.id === this.threadId) this.patch({ thread, handoff, takeover: null });
-    }
-
-    pause() {
-      this.stream?.pause();
-    }
-
-    resume() {
-      if (this.stream) this.stream.resume();
-      else if (this.view.get().status === 'error') void this.start();
-    }
-
-    retry() {
-      void this.start();
-    }
-
-    close() {
-      if (this.closed) return;
-      this.closed = true;
-      this.unwatch();
-      this.stream?.close();
-      this.stream = null;
-      openThreads.delete(this);
-      if (activeThread === this) {
-        activeThread = null;
-        recomputeLink();
-      }
-    }
-  }
 
   if (http) {
     startFeed(http);
@@ -620,7 +389,31 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       };
     },
     openThread(threadId) {
-      const thread = new ThreadLiveImpl(threadId);
+      const thread = createThreadLive(
+        {
+          api,
+          withAuth,
+          requireApi,
+          requireHttp,
+          session,
+          transport,
+          catalog,
+          senders,
+          refreshNeedsYou,
+          recomputeLink,
+          onStreamState(live) {
+            if (activeThread === live) recomputeLink();
+          },
+          forget(live) {
+            openThreads.delete(live);
+            if (activeThread === live) {
+              activeThread = null;
+              recomputeLink();
+            }
+          },
+        },
+        threadId,
+      );
       openThreads.add(thread);
       activeThread = thread;
       recomputeLink();
@@ -668,14 +461,6 @@ function isUnauthorized(e: unknown): boolean {
   return isStatus(e, 401);
 }
 
-function isStatus(e: unknown, status: number): boolean {
-  return e instanceof OmniHttpError && e.failure.kind === 'http' && e.failure.status === status;
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === 'object' && !Array.isArray(v);
-}
-
 function isListChange(message: unknown): boolean {
   return isRecord(message) && typeof message.type === 'string' && LIST_CHANGES.has(message.type);
 }
@@ -685,9 +470,4 @@ function isNeedsYouChange(message: unknown): boolean {
   if (!isRecord(message)) return false;
   if (message.type === NEEDS_YOU) return true;
   return message.type === 'thread' && isRecord(message.thread) && typeof message.thread.id === 'string';
-}
-
-function messageOf(e: unknown): string {
-  if (e instanceof Error && e.message) return e.message;
-  return 'Something went wrong';
 }
