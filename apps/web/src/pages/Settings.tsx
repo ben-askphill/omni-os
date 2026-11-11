@@ -24,7 +24,7 @@ import { DesktopSection } from './SettingsDesktop.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
 import { StorageSection } from './Storage.tsx';
 import { PathMapEditor, SyncSection } from './Sync.tsx';
-import { Advanced, Card, InfoRow, Origin, Row, ScopeBar, ServerOptions, settingAnchor, SwitchRow, useScopedChannel } from './settings-parts.tsx';
+import { Advanced, Card, InfoRow, Origin, Row, rowHintId, ScopeBar, ServerOptions, settingAnchor, SwitchRow, useScopedChannel } from './settings-parts.tsx';
 
 // Settings: a searchable nav of grouped sections beside one section at a time (@omni/shared/settings-catalog.ts),
 // the same sections in the same order as the phone's Settings screen. A scoped
@@ -472,16 +472,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
       />
     );
   };
-  const rows = (list: readonly SettingField[]) =>
-    pairHalves(list).map((group) =>
-      group.length === 1 ? (
-        field(group[0])
-      ) : (
-        <div key={settingId(group[0])} className="grid gap-4 sm:grid-cols-2">
-          {group.map(field)}
-        </div>
-      ),
-    );
+  const rows = (list: readonly SettingField[]) => <div className="space-y-5">{list.map(field)}</div>;
   const advanced = fields.filter((f) => f.advanced);
   const entry = FORM_ENTRY[part];
 
@@ -525,19 +516,7 @@ function formPatch(fields: readonly SettingField[], values: Record<string, strin
   return patch;
 }
 
-/** Consecutive half-width fields share a row. */
-function pairHalves(fields: readonly SettingField[]): SettingField[][] {
-  const out: SettingField[][] = [];
-  for (const f of fields) {
-    const last = out.at(-1);
-    if (f.half && last?.[0]?.half && last.length < 2) last.push(f);
-    else out.push([f]);
-  }
-  return out;
-}
-
 const MONO = new Set<SettingField['input']>(['folder', 'url', 'owner']);
-const NARROW = new Set<SettingField['input']>(['text', 'email', 'owner']);
 
 function ConfigField({
   field: f,
@@ -553,16 +532,19 @@ function ConfigField({
   origin: ReactNode;
 }) {
   const id = `set-${f.key}`;
+  const hint = settingHint(f, fallbacks);
+  const describedBy = hint ? rowHintId(id) : undefined;
   const input = f.readonly ? (
-    <input id={id} className={`field w-full font-mono !text-[13px] text-fg-2`} value={value} placeholder={settingPlaceholder(f, fallbacks) || 'Not set'} readOnly aria-readonly />
+    <input id={id} className={`field w-full font-mono !text-[13px] text-fg-2`} value={value} placeholder={settingPlaceholder(f, fallbacks) || 'Not set'} readOnly aria-readonly aria-describedby={describedBy} />
   ) : f.input === 'pronouns' ? (
-    <PronounsInput id={id} value={value} onChange={onChange} />
+    <PronounsInput id={id} value={value} onChange={onChange} describedBy={describedBy} />
   ) : f.input === 'timezone' ? (
-    <TimezoneInput id={id} value={value} onChange={onChange} />
+    <TimezoneInput id={id} value={value} onChange={onChange} describedBy={describedBy} />
   ) : (
     <input
       id={id}
-      className={`field w-full${NARROW.has(f.input) ? ' max-w-sm' : ''}${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
+      aria-describedby={describedBy}
+      className={`field w-full${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
       type={f.input === 'email' ? 'email' : 'text'}
       value={value}
       maxLength={f.max}
@@ -574,7 +556,7 @@ function ConfigField({
     />
   );
   return (
-    <Row label={f.label} htmlFor={id} hint={settingHint(f, fallbacks)} origin={origin}>
+    <Row label={f.label} htmlFor={id} hint={hint} origin={origin}>
       {input}
     </Row>
   );
