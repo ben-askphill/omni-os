@@ -11,7 +11,7 @@ const home = mkdtempSync(join(tmpdir(), 'omni-home-'));
 const r = await startRunner({ HOME: home, OMNI_TZ: '' });
 delete process.env.OMNI_TZ;
 const { app } = await import('../app.ts');
-const { configPath, userConfig, resolved } = await import('../user-config.ts');
+const { configPath, userConfig, resolved, updateUserConfig } = await import('../user-config.ts');
 const { legacyConfig, migrateLegacyConfig } = await import('../config-migrate.ts');
 const { listCrew } = await import('../crew.ts');
 const { loadAutomations, setEnabled } = await import('../automations.ts');
@@ -54,6 +54,12 @@ describe('onboarding', () => {
     const s = await json(await send('PUT', '/api/setup', { user: { email: '' } }));
     expect(s.config.user).toMatchObject({ name: 'Ada', timezone: 'Europe/London', email: '' });
     expect(s.config.workspace.githubOwner).toBe('ada');
+  });
+
+  it('saving Integrations keeps the integrations fields Sharing & access shows read-only', async () => {
+    updateUserConfig({ integrations: { tailscaleLogin: 'ada@example.com' } });
+    const s = await json(await send('PUT', '/api/setup', { integrations: { hermesUrl: '', centralBrainDir: '' } }));
+    expect(s.config.integrations.tailscaleLogin).toBe('ada@example.com');
   });
 
   it('complete marks it done, makes the workspace and leaves one welcome thread in #conductor', async () => {
