@@ -272,6 +272,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               canSteer={canSteer(thread.harness, harnesses)}
               // Nothing runs while the worktree is prepared, so there is nothing to stop.
               stop={slotBusy && !thread.setup ? { busy: interrupting, run: () => void interrupt() } : null}
+              onSending={pin}
               onSent={(t) => {
                 applyThread(t, true);
                 pin();

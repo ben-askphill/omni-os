@@ -22,6 +22,8 @@ export interface PendingRow {
   source?: string;
   attachments?: UserP['attachments'];
   context?: unknown;
+  /** When it was sent, for a send the client still has in flight. The server's rows carry none. */
+  at?: string;
 }
 
 /** The stand-in row's id. Stored rows count up from 1, so it never meets one. */
@@ -67,6 +69,6 @@ export function withOpening<E extends TranscriptEvent, P extends PendingRow>(
   }
   const lead = betweenTurns(events) ? pending.find((p) => p.kind === 'user' && p.state === 'sent') : undefined;
   if (!lead) return { events, pending };
-  // A pending row has no send time. Sending set the thread running, which moved updated_at.
-  return { events: [...events, userRow<E>(LEAD_ID, thread.id, thread.updated_at, lead)], pending: pending.filter((p) => p !== lead) };
+  // The server's pending rows have no send time. Sending set the thread running, which moved updated_at.
+  return { events: [...events, userRow<E>(LEAD_ID, thread.id, lead.at ?? thread.updated_at, lead)], pending: pending.filter((p) => p !== lead) };
 }

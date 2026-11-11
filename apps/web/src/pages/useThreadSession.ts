@@ -7,6 +7,7 @@ import { withOpening, type Opening } from '@omni/shared/opening.ts';
 import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import { crewShown, withCrewArtifact } from '@omni/shared/crew-artifacts.ts';
 import { holds } from '../thread-history.ts';
+import { asPending, inFlight, useSending } from '../sending.ts';
 import { useInterrupt, useTurnState } from './threadTurn.ts';
 import { useThreadHistory } from './useThreadHistory.ts';
 
@@ -58,7 +59,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const [context, setContext] = useState<ContextUsage | null>(null);
 
   const toast = useToast();
-  const { prepare, open, append, snapshot, reveal } = history;
+  const { prepare, open, append, snapshot, reveal, withRows } = history;
   const atRef = useRef(at);
   atRef.current = at;
   // The `at` the first load or a later reveal already took, so each is scrolled to once.
@@ -166,8 +167,11 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
           break;
         case 'thread':
           setThread((prev) => newer(prev, m.thread));
-          if (m.pending) setQueued(m.pending);
-          if (m.opening !== undefined) setOpening(m.opening);
+          // With the rows that came before it: a replayed message leaves `pending` as its row arrives.
+          withRows(() => {
+            if (m.pending) setQueued(m.pending);
+            if (m.opening !== undefined) setOpening(m.opening);
+          });
           if (m.live !== undefined) setWarm(m.live);
           setBlocked(m.blocked ?? null);
           setHandoff(m.handoff ?? null);
@@ -209,7 +213,14 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setThread((prev) => newer(prev, next, reply));
   }, []);
 
-  const shown = useMemo(() => (thread ? withOpening(events, queued, opening, thread) : { events, pending: queued }), [events, queued, opening, thread]);
+  // Sends still on their way go last: one that starts a turn is drawn as its message at once, above Thinking.
+  const sends = useSending(id, queued);
+  const shown = useMemo(() => {
+    const pending = [...queued, ...sends.map(asPending)];
+    return thread ? withOpening(events, pending, opening, thread) : { events, pending };
+  }, [events, queued, sends, opening, thread]);
+  // The server's pending rows and the in-flight send drawn in the transcript: the Sending bubbles leave both out.
+  const listed = useMemo(() => [...queued, ...sends.map(asPending).filter((p) => !shown.pending.some((q) => q.uuid === p.uuid))], [queued, sends, shown.pending]);
   // The shown rows: once the opening message is drawn, its turn is under way and another sent message steers it.
   const { init, lastResult, betweenTurns } = useTurnState(shown.events);
 
@@ -242,9 +253,9 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setActionError,
     notFound,
     ready,
-    queued: shown.pending,
-    /** The server's whole pending list, the message drawn in the transcript included: a send it lists has arrived. */
-    listed: queued,
+    queued: shown.pending.filter((p) => !inFlight(p)),
+    /** The server's whole pending list, and the in-flight send drawn in the transcript: neither shows as Sending. */
+    listed,
     setQueued,
     warm,
     blocked,

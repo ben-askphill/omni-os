@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OPENING_ID, withOpening } from '../opening.ts';
+import { LEAD_ID, OPENING_ID, withOpening } from '../opening.ts';
 import { buildItems } from '../transcript-fold.ts';
 import { threadView } from '../thread-view.ts';
 
@@ -51,6 +51,13 @@ describe('a later turn started by a message the harness has not read yet', () =>
     expect(turn.status).toBe('running');
     expect(turn.at).toBe(thread.updated_at);
     expect(view.now).toEqual({ verb: 'Thinking', target: '' });
+  });
+
+  it('dates a send the client still has in flight from when it was sent, before the server lists it', () => {
+    const sending = { uuid: 'sending:r1', kind: 'user', text: 'Second', state: 'sent', at: '2026-11-03T10:07:00.000Z' };
+    const shown = withOpening(done, [sending], null, thread);
+    expect(shown.events.at(-1)).toMatchObject({ id: LEAD_ID, created_at: sending.at });
+    expect(shown.pending).toEqual([]);
   });
 
   it('leaves a message steered into a running turn in the pending list, where the agent reads it', () => {
