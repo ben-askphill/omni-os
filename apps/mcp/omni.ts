@@ -786,9 +786,30 @@ server.registerTool('note_tool_failure_recovery', {
   inputSchema: { id: z.string(), recovery: z.enum(['recovered', 'not_recovered', 'unknown']), retry_of: z.string().optional() },
 }, async ({ id, ...body }) => text(await call(`/tool-failures/occurrences/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) })));
 
+/** omni_update on this server alone, through its own Update (update.ts). */
+const UPDATE_HERE = { check: { path: '/update/check', method: 'POST' }, apply: { path: '/update', method: 'POST' }, status: { path: '/update', method: 'GET' } } as const;
+/** omni_update's actions as POST /api/update/fleet names them. */
+const FLEET_ACTION = { check: 'check', download: 'download', apply: 'update' } as const;
+
 server.registerTool('omni_update', {
-  description: `Omni's own update. check: fetch origin's main and say how many commits this server is behind, with their subjects. apply: the Update button. It waits until no turn runs (this one included, so it starts after your turn ends), updates the main checkout to main, rebuilds the Web UI and restarts the server. Only works when a supervisor started the server from a checkout: the desktop app run with --dev, or a service manager with OMNI_SUPERVISOR set. The packaged desktop app updates itself and offers to relaunch, so there check finds nothing and apply is refused. Apply only when ${USER} asks.`,
-  inputSchema: { action: z.enum(['check', 'apply']) },
-}, async ({ action }) => text(await call(action === 'check' ? '/update/check' : '/update', { method: 'POST' })));
+  description:
+    `Omni's own update, here or on every synced machine. check: find what is new (a checkout fetches origin's main and says how many commits it is behind, here with their subjects; the desktop app looks for a release). ` +
+    'download: bring it over without applying (a checkout fetches the commits; the desktop app downloads the release). apply: the Update button. On each machine it waits until no turn runs there (this one included, so here it starts after your turn ends), ' +
+    'then a checkout updates to main, rebuilds the Web UI and restarts the server, and the packaged desktop app relaunches itself into the downloaded release. status: where each machine stands. ' +
+    'machines: "here" (the default) acts on this server alone; "all" asks every synced machine; or name some (names or ids from list_devices, comma-separated). ' +
+    'The asks reach the others over sync and each machine runs on its own, so one that fails never holds up another. One that is offline, runs an older Omni, or whose server nothing restarts is skipped and the answer says why; ' +
+    `naming an offline machine asks it anyway, and it takes the ask when it next syncs, within 30 minutes. Apply only when ${USER} asks.`,
+  inputSchema: {
+    action: z.enum(['check', 'download', 'apply', 'status']),
+    machines: z.string().optional().describe('"here" (the default), "all", or machine names or ids, comma-separated.'),
+  },
+}, async ({ action, machines }) => {
+  const where = machines?.trim() || 'here';
+  const here = where.toLowerCase() === 'here';
+  if (here && action !== 'download') return text(await call(UPDATE_HERE[action].path, { method: UPDATE_HERE[action].method }));
+  if (action === 'status') return text(await call('/update/fleet'));
+  const named = here ? ['here'] : where.toLowerCase() === 'all' ? undefined : where.split(',').map((m) => m.trim()).filter(Boolean);
+  return text(await call('/update/fleet', { method: 'POST', body: JSON.stringify({ action: FLEET_ACTION[action], machines: named, force: !here && !!named }) }));
+});
 
 await server.connect(new StdioServerTransport());

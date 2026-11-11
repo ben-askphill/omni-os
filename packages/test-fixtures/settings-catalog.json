@@ -448,6 +448,22 @@
       ]
     },
     {
+      "id": "update-machines",
+      "section": "machines",
+      "title": "Update all machines",
+      "keywords": [
+        "update",
+        "upgrade",
+        "version",
+        "download",
+        "restart",
+        "devices",
+        "fleet",
+        "every machine",
+        "check for updates"
+      ]
+    },
+    {
       "id": "server",
       "section": "machines",
       "title": "Server port and host",

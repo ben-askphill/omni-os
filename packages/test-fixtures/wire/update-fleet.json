@@ -1,0 +1,127 @@
+{
+  "machines": [
+    {
+      "id": "mac-a",
+      "name": "Mac A",
+      "current": true,
+      "reach": "online",
+      "status": {
+        "id": "mac-a",
+        "name": "Mac A",
+        "track": "manual",
+        "version": "d6e2a30d",
+        "available": "07e9dbef",
+        "behind": 2,
+        "progress": null,
+        "waitingFor": 0,
+        "error": null,
+        "phase": "checking",
+        "taken": {
+          "mac-a": "00000000-0000-4000-8000-000000000001"
+        },
+        "since": "2026-01-05T09:00:00.000Z"
+      },
+      "ask": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "sender": "mac-a",
+        "target": "mac-a",
+        "action": "check",
+        "at": "2026-01-05T09:00:00.000Z",
+        "expiresAt": "2026-01-05T09:00:00.000Z"
+      },
+      "state": "checking"
+    },
+    {
+      "id": "box-b",
+      "name": "Box B",
+      "current": false,
+      "reach": "online",
+      "status": {
+        "id": "box-b",
+        "name": "Box B",
+        "track": "checkout",
+        "version": "d6e2a30d",
+        "available": "07e9dbef",
+        "behind": 2,
+        "progress": null,
+        "waitingFor": 0,
+        "error": null,
+        "phase": "restarting",
+        "taken": {
+          "mac-a": "00000000-0000-4000-8000-000000000002"
+        },
+        "since": "2026-01-05T09:00:00.000Z"
+      },
+      "ask": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "sender": "mac-a",
+        "target": "box-b",
+        "action": "update",
+        "at": "2026-01-05T09:00:00.000Z",
+        "expiresAt": "2026-01-05T09:00:00.000Z"
+      },
+      "state": "restarting"
+    },
+    {
+      "id": "box-d",
+      "name": "Box D",
+      "current": false,
+      "reach": "offline",
+      "status": {
+        "id": "box-d",
+        "name": "Box D",
+        "track": "checkout",
+        "version": "d6e2a30d",
+        "available": null,
+        "behind": 0,
+        "progress": null,
+        "waitingFor": 0,
+        "error": null,
+        "phase": "idle",
+        "taken": {},
+        "since": "2026-01-05T09:00:00.000Z"
+      },
+      "ask": {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "sender": "mac-a",
+        "target": "box-d",
+        "action": "check",
+        "at": "2026-01-05T09:00:00.000Z",
+        "expiresAt": "2026-01-05T09:00:00.000Z"
+      },
+      "state": "sent"
+    },
+    {
+      "id": "mac-c",
+      "name": "Mac C",
+      "current": false,
+      "reach": "online",
+      "status": {
+        "id": "mac-c",
+        "name": "Mac C",
+        "track": "checkout",
+        "version": "d6e2a30d",
+        "available": "07e9dbef",
+        "behind": 2,
+        "progress": null,
+        "waitingFor": 0,
+        "error": null,
+        "phase": "restarting",
+        "taken": {
+          "mac-a": "late"
+        },
+        "since": "2026-01-05T09:00:00.000Z"
+      },
+      "ask": {
+        "id": "late",
+        "sender": "mac-a",
+        "target": "mac-c",
+        "action": "update",
+        "at": "2026-01-05T09:00:00.000Z",
+        "expiresAt": "2026-01-05T09:00:00.000Z"
+      },
+      "state": "restarting"
+    }
+  ],
+  "synced": true
+}

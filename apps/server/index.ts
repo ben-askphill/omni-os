@@ -37,7 +37,7 @@ const { startTriggerDeliveries } = await import('./automation-triggers.ts');
 const { watchDelegating } = await import('./delegating.ts');
 const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
-const { startSync } = await import('./sync/worker.ts');
+const { flushSync, startSync } = await import('./sync/worker.ts');
 const { startConnect, stopConnect } = await import('./connect/service.ts');
 const { recoverHandoffs } = await import('./handoff.ts');
 const { startWorktreeRetention } = await import('./worktree-cleanup.ts');
@@ -122,7 +122,7 @@ holdIdleSockets(server as Server);
 // Close warm claude processes so none outlive the server. A second signal exits at once.
 let exiting = false;
 // Update exits with RESTART_EXIT_CODE, which tells the app that started the server to start it again.
-const shutdown = (sig: string, code = 0) => {
+const shutdown = (sig: string, code = 0, last?: Promise<void>) => {
   if (exiting) process.exit(1);
   exiting = true;
   console.log(`[omni] ${sig}, closing live sessions`);
@@ -131,11 +131,14 @@ const shutdown = (sig: string, code = 0) => {
   stopAllRuns();
   stopConnect();
   setTimeout(() => process.exit(code), 6000).unref();
-  void shutdownAll().finally(() => {
+  void Promise.allSettled([shutdownAll(), last]).finally(() => {
     closeAllBrowsers();
     process.exit(code);
   });
 };
-onRestart(() => shutdown('update', RESTART_EXIT_CODE));
+/** How long Update's restart waits for the push that tells the other machines it is restarting (update-fleet.ts). */
+const RESTART_PUSH_MS = 3_000;
+// The push runs beside the sessions closing, and only pushes: a pull could take an ask or start a turn on the way out.
+onRestart(() => shutdown('update', RESTART_EXIT_CODE, flushSync(RESTART_PUSH_MS)));
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));

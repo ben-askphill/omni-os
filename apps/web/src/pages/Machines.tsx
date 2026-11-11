@@ -7,10 +7,11 @@ import { RUN_ON_HINT, runOnOptions, useRunOnSetting } from '../components/RunOnP
 import { ErrorNote, Picker, StatusDot } from '../components/ui.tsx';
 import { useApp, useHereName } from '../store.tsx';
 import { Card, InfoRow, Origin, ServerOptions } from './settings-parts.tsx';
+import { UpdateMachinesCard } from './UpdateMachines.tsx';
 
 // Settings, Machines: this machine (its name, sync state, the address this browser uses, the feed and the thread
-// counts) and the server options from .env (port and host). Where new threads run is under Threads (RunOnCard);
-// Sync, Sharing & access and Worktrees are sections of their own.
+// counts), Update all machines (UpdateMachines.tsx) and the server options from .env (port and host). Where new
+// threads run is under Threads (RunOnCard); Sync, Sharing & access and Worktrees are sections of their own.
 
 function syncLine(s: SyncStatus | undefined, now: number): { dot: string; text: string } {
   if (!s) return { dot: 'settled', text: 'Reading sync' };
@@ -54,6 +55,7 @@ export function MachinesSection() {
           )}
         </div>
       </Card>
+      <UpdateMachinesCard />
       <ServerOptions section="machines" entry="server" title="Server port and host" />
     </>
   );

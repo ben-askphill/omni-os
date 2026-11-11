@@ -155,3 +155,9 @@ Restart=always
 ```
 
 The Conductor reaches the same button through its `omni_update` tool. `OMNI_UPDATE_CHECK=0` turns the check off. A fork merges cleanly as long as your settings stay in `data/`; see [FORKING.md](../../FORKING.md).
+
+### Every machine at once
+
+With [sync](sync.md) on, Settings > Machines > Update all machines lists every synced machine with what it runs and where its update stands. **Check**, **Download all** and **Update all** ask them all in one go, and Update all first lists who it will ask and who it leaves out. The asks travel over sync, and each machine runs its own updater when it next syncs: a checkout as above, the packaged desktop app by downloading the release and relaunching itself. Update waits on each machine until no turn runs there. Machines run on their own, so one that fails shows its error in its row while the others go on; Retry on that row asks it again.
+
+A machine that Omni Connect, or Tailscale without it, says is offline is skipped and says so. Retry on its row asks it anyway, and it takes the ask when it next syncs, within 30 minutes. A checkout that nothing restarts checks and downloads from here and says to apply its update there by hand. A machine that still runs an Omni from before this list shows as not reporting: update it there once, and it joins. The Conductor does the same with `omni_update` and its `machines`.

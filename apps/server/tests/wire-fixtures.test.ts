@@ -34,8 +34,9 @@ const HINT = `The server JSON the clients read changed shape. If that is on purp
 /**
  * Every fixture this test owns. A few come from elsewhere: sync-status.json is checked
  * by sync-setup.test.ts, and those that take two machines by their own tests: devices.json and thread-handoff.json by
- * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts, and
- * thread-undelivered.json by delivery-gap-run-on.test.ts.
+ * handoff-two-macs.test.ts, thread-takeover.json and thread-takeover-requested.json by takeover-two-macs.test.ts,
+ * thread-undelivered.json by delivery-gap-run-on.test.ts, update-fleet.json by update-fleet-two-macs.test.ts, and
+ * update-desktop.json and update-desktop-request.json by update-desktop.test.ts.
  */
 const NAMES = [
   'harnesses.json',
