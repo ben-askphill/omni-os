@@ -22,7 +22,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
   const badgeOf = (c: ChannelWithRunning) => railBadge(c.running, needs.get(c.id) ?? 0);
   const disc = (c: ChannelWithRunning) => (
     <RailItem key={c.id} to={href.channel(c.id)} label={c.name} selected={isChannel(c.id)} badge={badgeOf(c)}>
-      <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={18} /> : monogram(c.name)}</Disc>
+      <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={22} /> : monogram(c.name)}</Disc>
     </RailItem>
   );
   const { ref, fade } = useScrollFade();
