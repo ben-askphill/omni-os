@@ -1,18 +1,19 @@
 // /api/crew, /harnesses, /secrets, /automations, /profile, /devices.
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
+import { deleteAutomation, lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
 import { isPrTrigger } from './automation-events.ts';
 import { recentDeliveries } from './automation-deliveries.ts';
 import { webhookInfo } from './github-webhook-api.ts';
+import { webhookSecretName } from './github-webhook.ts';
 import { listCrew } from './crew.ts';
 import { channelCatalog, freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { HARNESS_INSTALL } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
 import { getProfile, profileInput, setProfile } from './profile.ts';
-import { deleteSecret, listSecrets, setSecret } from './secrets.ts';
+import { deleteSecret, hasSecret, listSecrets, setSecret } from './secrets.ts';
 import { listDevices } from './sync/devices.ts';
 import { checkSecret, secretDrop, secretDrops, sendSecret } from './secret-drop.ts';
 
@@ -100,6 +101,20 @@ metaApi.post('/automations/:id/run', async (c) => {
   if (!a) return c.json({ error: 'not found' }, 404);
   if (a.error) return c.json({ error: a.error }, 400);
   return c.json(await runAutomation(a, 'manual'));
+});
+// Delete one: the user's own YAML is removed, a shipped one is hidden on this machine (automations.ts deleteAutomation).
+// The id is matched against the listed automations, never joined into a path; one that looks like a path is refused first.
+metaApi.delete('/automations/:id', async (c) => {
+  const id = c.req.param('id');
+  if (!/^(?!\.)[^/\\\0]+$/.test(id)) return c.json({ error: 'invalid automation id' }, 400);
+  const a = loadAutomations().find((x) => x.id === id);
+  if (!a) return c.json({ error: 'not found' }, 404);
+  const removed = deleteAutomation(a);
+  // A webhook automation's signing secret has nothing left to sign for. The automation is gone either way.
+  const secret = webhookSecretName(id);
+  if (a.on?.event === 'github_webhook' && hasSecret('global', secret))
+    await deleteSecret('global', secret).catch((err) => console.error(`[automations] could not remove ${secret}:`, err));
+  return c.json({ ok: true, removed });
 });
 metaApi.post('/automations/:id/enabled', async (c) => {
   const { enabled } = z.object({ enabled: z.boolean() }).parse(await c.req.json());

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { summarize, type WorktreeItem } from '@omni/shared/worktree-inventory.ts';
 import { startRunner } from './runner-boot.ts';
@@ -36,8 +36,7 @@ function repo() {
   return dir;
 }
 
-async function worktreeThread() {
-  const dir = repo();
+async function worktreeThread(dir = repo()) {
   const channel = `inv-ch-${n}`;
   r.db.channels.create({ id: channel, name: channel, repo_path: dir, use_worktree: 1 });
   const t = await r.runner.createThread({ channel, prompt: 'work' });
@@ -101,6 +100,61 @@ describe('worktree inventory: verdicts', T, () => {
     expect(msg('unpushed')).toBe('1 commit no remote has.');
     expect(msg('ignored')).toContain('.env');
     expect(msg('ignored')).not.toContain('node_modules');
+  });
+
+  it('does not keep a worktree for SwiftPM, Expo, prebuild, release or Playwright output, or a server run\'s data folder', async () => {
+    // The app folders are tracked, as in Omni's repo, so git lists only the output inside them.
+    const main = repo();
+    for (const f of ['apps/mac/OmniKit/Package.swift', 'apps/ios/app.json', 'apps/desktop/package.json']) {
+      mkdirSync(join(main, f, '..'), { recursive: true });
+      writeFileSync(join(main, f), '{}');
+    }
+    git(main, 'add', '.');
+    git(main, 'commit', '-q', '-m', 'apps');
+    git(main, 'push', '-q', 'origin', 'main');
+    const { t, wt } = await worktreeThread(main);
+    r.db.threads.update(t.id, { archived: 1 });
+    appendFileSync(join(main, '.git', 'info', 'exclude'), 'data/\n.swiftpm/\n.expo/\n.playwright-mcp/\napps/ios/ios/\napps/desktop/release/\n');
+    for (const d of ['apps/mac/OmniKit/.swiftpm', 'apps/ios/.expo', 'apps/ios/ios', 'apps/desktop/release', '.playwright-mcp', 'data/threads', 'data/worktrees', 'data/browsers']) {
+      mkdirSync(join(wt, d), { recursive: true });
+    }
+    for (const f of ['apps/mac/OmniKit/.swiftpm/state.json', 'apps/ios/.expo/cache', 'apps/ios/ios/Podfile', 'apps/desktop/release/Omni.dmg', '.playwright-mcp/page.yml', 'data/omni.db', 'data/omni.db-wal']) {
+      writeFileSync(join(wt, f), 'x');
+    }
+    expect(await inspectWorktree(t.id)).toMatchObject({ verdict: 'eligible', reasons: [] });
+
+    // A data folder with a thread in it is not a server's leftovers.
+    mkdirSync(join(wt, 'data', 'threads', 'abc'));
+    const it = await inspectWorktree(t.id);
+    expect(codes(it)).toEqual(['ignored']);
+    expect(it.reasons[0].message).toBe('Ignored files that are not build output: data/.');
+  });
+
+  it('does not count untracked copies of harness config the default branch tracks, but counts the rest', async () => {
+    const { t, repo: main, wt } = await worktreeThread();
+    r.db.threads.update(t.id, { archived: 1 });
+    // main starts tracking harness config after the worktree was made; older copies were put in the worktree by hand.
+    mkdirSync(join(main, '.codex'));
+    mkdirSync(join(main, '.agents', 'skills', 'verify'), { recursive: true });
+    writeFileSync(join(main, '.codex', 'hooks.json'), '{"v":2}');
+    writeFileSync(join(main, '.agents', 'skills', 'verify', 'SKILL.md'), 'v2');
+    writeFileSync(join(main, 'AGENTS.md'), 'v2');
+    git(main, 'add', '.');
+    git(main, 'commit', '-q', '-m', 'harness config');
+    git(main, 'push', '-q', 'origin', 'main');
+    mkdirSync(join(wt, '.codex'));
+    mkdirSync(join(wt, '.agents', 'skills', 'verify'), { recursive: true });
+    writeFileSync(join(wt, '.codex', 'hooks.json'), '{"v":1}');
+    writeFileSync(join(wt, '.agents', 'skills', 'verify', 'SKILL.md'), 'v1');
+    writeFileSync(join(wt, 'AGENTS.md'), 'v1');
+    expect(await inspectWorktree(t.id)).toMatchObject({ verdict: 'eligible', reasons: [] });
+
+    // A skill main does not have is the thread's work.
+    mkdirSync(join(wt, '.agents', 'skills', 'mine'));
+    writeFileSync(join(wt, '.agents', 'skills', 'mine', 'SKILL.md'), 'new');
+    const it = await inspectWorktree(t.id);
+    expect(codes(it)).toEqual(['untracked']);
+    expect(it.reasons[0].message).toBe('1 untracked file.');
   });
 
   it('keeps a thread with queued work, or a worktree whose branch moved', async () => {

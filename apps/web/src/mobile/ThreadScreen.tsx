@@ -29,7 +29,7 @@ import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from '@omni/shared/thread-view.ts';
 import { crewLine, prLine } from '@omni/shared/thread-glance.ts';
-import { statusLabel } from '../status-line.ts';
+import { statusLabel } from '@omni/shared/status-line.ts';
 import { shownStatus } from '@omni/shared/delegate-count.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */

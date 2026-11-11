@@ -202,6 +202,8 @@ export const pageFields = (page: SettingPage): readonly SettingField[] => SETTIN
 export interface AutomationOverride {
   enabled?: boolean;
   channel?: string;
+  /** Deleted from the Automations page: a shared automation in automations/ that this machine no longer lists or runs. */
+  deleted?: boolean;
 }
 
 export interface UserConfig {
@@ -215,7 +217,7 @@ export interface UserConfig {
   runOn: { device: string };
   automations: Record<string, AutomationOverride>;
   /** This machine's worktree retention (apps/server/worktree-cleanup.ts). */
-  worktrees: { retention: { enabled: boolean; idleDays: number } };
+  worktrees: { retention: { enabled: boolean; idleDays: number }; slim: { enabled: boolean; idleDays: number } };
 }
 
 /** A partial update: any section, any subset of its fields. Null removes an automation override or onboardedAt. */

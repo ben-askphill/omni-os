@@ -10,6 +10,7 @@ import {
   type CleanupState,
   type RetentionPolicy,
 } from '@omni/shared/worktree-cleanup.ts';
+import { SLIM_DAYS, SLIM_NOTE, type SlimCandidate, type SlimOutcome, type SlimPolicy, type SlimResult, type SlimRun, type SlimState } from '@omni/shared/worktree-slim.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { Button, Chip, ConfirmDialog, ErrorNote, Icon, Loading, Picker, StatusDot, Toggle } from '../components/ui.tsx';
@@ -18,15 +19,19 @@ import { href } from '../router.ts';
 
 // Settings, Worktrees: the worktrees Omni made in data/worktrees, what each uses on disk, why each must stay
 // or may go, and the cleanup that removes the ones that may: reviewed here, or on a schedule with this Mac's
-// retention policy. The scan and a cleanup run on the server; this section starts them and polls while either runs.
+// retention policy. Stripping caches deletes the build output in idle worktrees and keeps them. The scan, a cleanup
+// and a strip run on the server; this section starts them and polls while any runs.
 
 interface Inventory {
   scan: WorktreeScan | null;
   summary: InventorySummary | null;
   cleanup: CleanupState;
+  slim: SlimState;
 }
 
 const OUTCOME_DOT: Record<CleanupOutcome, string> = { removed: 'done', kept: 'idle', failed: 'needs' };
+const SLIM_DOT: Record<SlimOutcome, string> = { slimmed: 'done', skipped: 'idle', failed: 'needs' };
+const SLIM_LABEL: Record<SlimOutcome, string> = { slimmed: 'Stripped', skipped: 'Skipped', failed: 'Failed' };
 const DAY_CHOICES = [3, 7, 14, 30, 60, 90];
 
 const DOT: Record<WorktreeVerdict, string> = { eligible: 'done', kept: 'idle', unknown: 'needs' };
@@ -39,7 +44,7 @@ const GROUPS: { verdict: WorktreeVerdict; title: string; note: string }[] = [
 export function StorageSection() {
   const res = useApi<Inventory>('/worktrees/scan');
   const { reload } = res;
-  const cleaning = !!res.data && Object.values(res.data.cleanup.runs).some((r) => r?.state === 'running');
+  const cleaning = !!res.data && [...Object.values(res.data.cleanup.runs), ...Object.values(res.data.slim.runs)].some((r) => r?.state === 'running');
   const running = res.data?.scan?.state === 'running' || cleaning;
 
   useEffect(() => {
@@ -68,6 +73,7 @@ export function StorageSection() {
         <>
           <ScanCard scan={scan} cleaning={cleaning} onChange={reload} />
           <CleanupCard cleanup={res.data.cleanup} scan={scan} onChange={reload} />
+          <SlimCard slim={res.data.slim} scan={scan} onChange={reload} />
           <RetentionCard cleanup={res.data.cleanup} scanning={scan?.state === 'running'} onChange={reload} />
           {scan && res.data.summary && <Summary summary={res.data.summary} />}
           {scan && <Items scan={scan} />}
@@ -277,6 +283,160 @@ function ResultRow({ r }: { r: CleanupResult }) {
   );
 }
 
+/** Strip caches: review the idle worktrees with build output in them and delete it, or do it daily. The worktrees stay. */
+function SlimCard({ slim, scan, onChange }: { slim: SlimState; scan: WorktreeScan | null; onChange: () => void }) {
+  const [reviewing, setReviewing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { policy } = slim;
+  const manual = slim.runs.manual;
+  const going = [manual, slim.runs.scheduled].find((r) => r?.state === 'running') ?? null;
+  const last = [manual, slim.runs.scheduled].filter((r): r is SlimRun => !!r && r.state !== 'running').sort((a, b) => (b.finishedAt ?? '').localeCompare(a.finishedAt ?? ''))[0];
+  const preview = slim.preview;
+  const n = preview?.candidates.length ?? 0;
+
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      return true;
+    } catch (err) {
+      setError(errorText(err));
+      return false;
+    } finally {
+      setBusy(false);
+      onChange();
+    }
+  };
+  const save = (patch: Partial<SlimPolicy>) => act(() => api.put('/worktrees/slim', patch));
+  const strip = async () => {
+    if (await act(() => api.post('/worktrees/slim', { ids: preview!.candidates.map((c) => c.id) }))) setReviewing(false);
+  };
+
+  const days = DAY_CHOICES.includes(policy.idleDays) ? DAY_CHOICES : [...DAY_CHOICES, policy.idleDays].sort((a, b) => a - b);
+  const note = going
+    ? `Stripping ${going.done} of ${going.total}. Each is checked again right before.`
+    : !scan
+      ? 'Scan to see what caches the idle worktrees hold.'
+      : scan.state === 'running'
+        ? 'Shown once the scan is done.'
+        : n
+          ? `${plural(n, 'worktree')} idle at least ${plural(policy.idleDays, 'day')} ${n === 1 ? 'holds' : 'hold'} ${formatBytes(preview!.bytes)} of caches.`
+          : `No worktree idle at least ${plural(policy.idleDays, 'day')} holds caches.`;
+  return (
+    <section className={CARD}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-[16px]">Strip caches</h2>
+          <p className="mt-0.5 text-[12.5px] text-fg-3" role="status">
+            {note}
+          </p>
+        </div>
+        {!going && n > 0 && (
+          <Button size="sm" icon="trash" onClick={() => (setError(null), setReviewing(true))}>
+            Review
+          </Button>
+        )}
+      </div>
+      {going && <Progress pct={going.total ? Math.round((going.done / going.total) * 100) : 0} />}
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-fg-2">
+        Idle
+        <Picker
+          label="Days idle"
+          value={String(policy.idleDays)}
+          options={days.filter((d) => d >= SLIM_DAYS.min && d <= SLIM_DAYS.max).map((d) => ({ value: String(d), label: plural(d, 'day'), avatar: false as const }))}
+          onChange={(v) => void save({ idleDays: Number(v) })}
+          disabled={busy}
+        />
+        without a turn or message, open threads too
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[13px] text-fg-2">Strip them daily</span>
+        <Toggle checked={policy.enabled} onChange={(on) => void save({ enabled: on })} disabled={busy} label="Strip caches from idle worktrees daily" />
+      </div>
+      <p className="text-[12.5px] leading-relaxed text-fg-3">
+        {SLIM_NOTE} Only this machine: the setting is not synced. A worktree in use (a turn, a terminal, an action) is skipped.
+      </p>
+      {last && <SlimRunResult run={last} />}
+      {error && !reviewing && <ErrorNote>{error}</ErrorNote>}
+      <ConfirmDialog
+        open={reviewing}
+        title={`Strip caches from ${plural(n, 'worktree')}?`}
+        confirmLabel={`Strip ${formatBytes(preview?.bytes ?? 0)}`}
+        busy={busy}
+        error={error}
+        onConfirm={strip}
+        onCancel={() => setReviewing(false)}
+      >
+        <p>{SLIM_NOTE}</p>
+        <ul className="scroll-thin max-h-[45vh] divide-y divide-[var(--line)] overflow-y-auto rounded-[16px] bg-surface">
+          {preview?.candidates.map((c) => <SlimRow key={c.id} c={c} />)}
+        </ul>
+      </ConfirmDialog>
+    </section>
+  );
+}
+
+function SlimRow({ c }: { c: SlimCandidate }) {
+  const place = [c.channelName, c.branch].filter(Boolean).join(' · ');
+  return (
+    <li className="flex items-start gap-3 px-4 py-2.5">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-medium text-fg">{c.threadTitle ?? c.id}</div>
+        {place && <div className="truncate text-[12px] text-fg-3">{place}</div>}
+        <div className="text-[12px] text-fg-2">{c.lastActiveAt ? `Last active ${relTime(c.lastActiveAt)}.` : 'Its thread was deleted.'}</div>
+      </div>
+      <span className="font-num shrink-0 text-[12.5px] text-fg-2">{formatBytes(c.bytes)}</span>
+    </li>
+  );
+}
+
+/** What a strip did: one line of totals, then each worktree that was skipped or failed, with why. */
+function SlimRunResult({ run }: { run: SlimRun }) {
+  const count = (o: SlimOutcome) => run.items.filter((i) => i.outcome === o).length;
+  const notable = run.items.filter((i) => i.outcome !== 'slimmed');
+  return (
+    <div className="space-y-2">
+      <p className="text-[12.5px] text-fg-2">
+        {run.trigger === 'manual' ? 'Last strip' : 'Last daily strip'} {relTime(run.finishedAt ?? run.startedAt)}: stripped {count('slimmed')} (
+        <span className="font-num">{formatBytes(run.freedBytes)}</span> freed), skipped {count('skipped')}, failed {count('failed')}.{run.error && ` It stopped: ${run.error}`}
+      </p>
+      {notable.length > 0 && (
+        <ul className="divide-y divide-[var(--line)] rounded-[20px] bg-surface">
+          {notable.map((r) => (
+            <SlimResultRow key={r.id} r={r} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function SlimResultRow({ r }: { r: SlimResult }) {
+  return (
+    <li className="flex items-start gap-3 px-4 py-3">
+      <StatusDot status={SLIM_DOT[r.outcome]} size={8} className="mt-[6px]" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="min-w-0 truncate text-[13.5px] font-medium">{r.threadTitle ?? r.id}</span>
+          <Chip tone={r.outcome === 'failed' ? 'needs' : 'outline'}>{SLIM_LABEL[r.outcome]}</Chip>
+        </div>
+        <ul className="mt-1.5 space-y-0.5 text-[12.5px] leading-snug break-words text-fg-2">
+          {r.reasons.map((x) => (
+            <li key={x.code + x.message}>{x.message}</li>
+          ))}
+          {r.errors.map((e) => (
+            <li key={e} className={r.outcome === 'failed' ? 'text-needs' : 'text-fg-3'}>
+              {e}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </li>
+  );
+}
+
 /** This Mac's policy: off by default; on, a pass a minute after startup and daily removes what it covers. */
 function RetentionCard({ cleanup, scanning, onChange }: { cleanup: CleanupState; scanning: boolean; onChange: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -425,6 +585,7 @@ function ItemRow({ it }: { it: WorktreeItem }) {
         {place && <div className="mt-0.5 truncate text-[12px] text-fg-3">{place}</div>}
         <ul className="mt-1.5 space-y-0.5 text-[12.5px] leading-snug break-words text-fg-2">
           {it.verdict === 'eligible' && it.eligibleBecause && <li>{ELIGIBLE_LABEL[it.eligibleBecause]}.</li>}
+          {!!it.cacheBytes && it.cacheBytes >= 1024 ** 2 && <li className="text-fg-3">{formatBytes(it.cacheBytes)} of it is build output and installs.</li>}
           {it.reasons.map((r) => (
             <li key={r.code + r.message}>{r.message}</li>
           ))}

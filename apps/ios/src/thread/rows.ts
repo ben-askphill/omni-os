@@ -3,6 +3,7 @@ import type { Span } from '@omni/shared/history.ts';
 import { same, type CloudAgentP, type Item, type ModLine, type ReportP, type SwitchItem, type ToolCall } from '@omni/shared/transcript-fold.ts';
 import { threadView, type NowDoing, type PlanView, type Prompt, type ThreadView, type TurnView } from '@omni/shared/thread-view.ts';
 import type { ThreadQuestion } from '@omni/shared/question.ts';
+import { statusLabel } from '@omni/shared/status-line.ts';
 
 import { harnessLabel } from './format';
 
@@ -34,6 +35,8 @@ export type ThreadRow =
   | { kind: 'mod'; key: string; lines: ModLine[] }
   | { kind: 'switch'; key: string; it: SwitchItem; running: boolean }
   | { kind: 'now'; key: string; now: NowDoing; meta: string | null }
+  /** The running turn's thinking line (web: ThinkingLine): the mark, the label shimmering and the time since `since`. */
+  | { kind: 'thinking'; key: string; label: string; since: string }
   | { kind: 'plan'; key: string; plan: PlanView };
 
 export type RowKind = ThreadRow['kind'];
@@ -96,11 +99,9 @@ function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, in
   const open = disclosure.turns.has(t.key);
   const steps = (): ThreadRow => ({ kind: 'steps', key: `s${t.key}`, turn: t.key, steps: t.steps, failed: t.failed, live, open });
   if (live) {
+    // As phone web: the thinking line stays up for the whole turn, tool calls included, and gives way to a question.
     if (t.status === 'queued') yield { kind: 'now', key: `now${t.key}`, now: { verb: 'Waiting for a free slot', target: '' }, meta: null };
-    else if (view.now) {
-      const meta = view.plan ? `step ${Math.min(view.plan.done + 1, view.plan.todos.length)}/${view.plan.todos.length}` : null;
-      yield { kind: 'now', key: `now${t.key}`, now: view.now, meta };
-    }
+    else if (!view.asking) yield { kind: 'thinking', key: `th${t.key}`, label: statusLabel(input.events) ?? 'Thinking', since: t.at || thread.created_at };
     if (view.plan) yield { kind: 'plan', key: `plan${t.key}`, plan: view.plan };
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };
     if (t.prose) yield { kind: 'prose', key: `a${t.key}`, text: t.prose, clipped: t.proseClipped?.key ?? null };

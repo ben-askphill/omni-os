@@ -496,7 +496,7 @@ server.registerTool(
       `Save a secret (an API key or token, as an environment variable for threads) on this machine or another synced one, only when ${USER} asks and gives the value. ` +
       'With machine left out or "here" it is saved here at once. With another machine it is sealed to that machine\'s own key, goes over sync as ciphertext only, ' +
       'and that machine saves it in its own secret store after its next sync; this waits briefly for the answer and otherwise says it is on its way (sent_secrets shows it later). ' +
-      'A secret already there under the same scope and name is replaced. Omni\'s own credentials (sync, Connect) are refused. Never repeat the value back.',
+      'A secret already there under the same scope and name is replaced. Omni\'s own credentials (sync, Connect) and names that change how programs start (PATH, NODE_OPTIONS, LD_*, DYLD_*, GIT_*, PYTHONPATH and similar) are refused: those are Settings only. Never repeat the value back.',
     inputSchema: {
       name: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/).describe('UPPER_SNAKE_CASE, the environment variable threads see.'),
       value: z.string().min(1).describe('The secret, one line.'),
@@ -712,8 +712,13 @@ server.registerTool(
     refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/skip`, { method: 'POST', body: JSON.stringify(attempt === undefined ? {} : { attempt }) })),
 );
 
+server.registerTool('disk_space', {
+  description: `Read-only: free space on the disk with Omni's data (worktrees, the database) and, when it is on another disk or under a Linux per-user /tmp quota, the temp folder the agent CLIs write command output to, as the server last checked it (every 10 minutes). level is ok, low (under 20 GB, or 15% of a small volume) or critical (under 5 GB, or 5%). When it fills, every shell command fails with ENOSPC or EDQUOT. On low or critical, tell ${USER}; worktree_storage shows what a cleanup could free, and only ${USER} removes anything.`,
+  inputSchema: {},
+}, async () => text(await call('/disk')));
+
 server.registerTool('worktree_storage', {
-  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this machine\'s retention policy would remove and the last cleanup runs. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees, in Settings > Worktrees.',
+  description: 'Read-only inventory of the worktrees in data/worktrees: size, owning thread and why each is kept or eligible for cleanup, plus what a cleanup or this machine\'s retention policy would remove and the last cleanup runs. slim: the idle worktrees whose caches (node_modules, build output) stripping would delete while keeping the worktree, its schedule on this machine and the last strip runs; cacheBytes on each item is that part of its size. With scan: true, starts a background scan first (it takes a minute); call again without it to read progress and the result. Deletes nothing: only Ben removes worktrees or strips caches, in Settings > Worktrees.',
   inputSchema: { scan: z.boolean().optional() },
 }, async ({ scan }) => text(await call('/worktrees/scan', scan ? { method: 'POST' } : undefined)));
 

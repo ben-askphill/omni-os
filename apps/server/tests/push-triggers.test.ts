@@ -7,7 +7,7 @@ import { startRunner } from './runner-boot.ts';
 const r = await startRunner();
 const { askQuestion } = await import('../runner/questions.ts');
 const { failSetup } = await import('../runner/setup.ts');
-const { installPushSender, noopPushSender, notifyCrewReport, notifyEnded } = await import('../push-sender.ts');
+const { alertFor, installPushSender, noopPushSender, notifyCrewReport, notifyEnded } = await import('../push-sender.ts');
 type PushEvent = import('../push-sender.ts').PushEvent;
 type ThreadStatus = import('../db.ts').ThreadStatus;
 
@@ -53,21 +53,32 @@ describe('a thread needs input', () => {
   it('alerts when the agent asks a question, with the thread and its channel', () => {
     const id = thread({ channel: 'scratch' });
     askQuestion(id, [Q]);
-    expect(sent).toEqual([{ kind: 'needsInput', threadId: id, channelId: 'scratch' }]);
+    expect(sent).toEqual([{ kind: 'needsInput', threadId: id, channelId: 'scratch', title: id, text: Q.question }]);
   });
 });
 
 describe('a turn ends', () => {
-  it('alerts when a thread finishes', () => {
+  it('alerts when a thread finishes, with its title and reply', () => {
     const id = thread();
-    notifyEnded(id, 'done');
-    expect(sent).toEqual([{ kind: 'finished', threadId: id, channelId: 'scratch' }]);
+    notifyEnded(id, 'done', 'All three surfaces pass.');
+    expect(sent).toEqual([{ kind: 'finished', threadId: id, channelId: 'scratch', title: id, text: 'All three surfaces pass.' }]);
   });
 
   it('alerts when a thread fails', () => {
     const id = thread();
     notifyEnded(id, 'failed');
-    expect(sent).toEqual([{ kind: 'failed', threadId: id, channelId: 'scratch' }]);
+    expect(sent).toEqual([{ kind: 'failed', threadId: id, channelId: 'scratch', title: id, text: null }]);
+  });
+
+  it('previews the last reply of the turn, not the narration before it', () => {
+    const id = thread();
+    r.db.events.add(id, 'user', { text: 'Fix it' });
+    r.db.events.add(id, 'assistant_text', { text: 'Let me look at the sender.' });
+    r.db.events.add(id, 'tool_use', { id: 'tu1', name: 'Read', input: {} });
+    r.db.events.add(id, 'assistant_text', { text: 'Fixed: alerts now show a preview.' });
+    expect(r.db.events.lastRunReply(id)).toBe('Fixed: alerts now show a preview.');
+    r.db.events.add(id, 'user', { text: 'Thanks' });
+    expect(r.db.events.lastRunReply(id)).toBe('');
   });
 
   it('stays quiet for a thread Ben stopped or one that is queued', () => {
@@ -82,7 +93,23 @@ describe('a turn ends', () => {
     notifyEnded(child, 'done');
     expect(sent).toEqual([]);
     notifyEnded(child, 'failed');
-    expect(sent).toEqual([{ kind: 'failed', threadId: child, channelId: 'scratch' }]);
+    expect(sent).toEqual([{ kind: 'failed', threadId: child, channelId: 'scratch', title: child, text: null }]);
+  });
+});
+
+describe('a live turn', () => {
+  it('alerts with the thread title and the reply the turn ended on, as plain text', async () => {
+    const t = await r.start('RICH and **bold** with a [link](https://example.com)');
+    await r.untilResults(t.id, 1);
+    const finished = sent.filter((e) => e.threadId === t.id && e.kind === 'finished');
+    expect(finished).toHaveLength(1);
+    const replies = r.texts(t.id, 'assistant_text');
+    expect(finished[0].text).toBe(replies.at(-1));
+    expect(alertFor(finished[0])).toEqual({
+      title: r.thread(t.id).title,
+      subtitle: 'Finished',
+      body: 'ack: RICH and bold with a link',
+    });
   });
 });
 
@@ -90,7 +117,9 @@ describe('a thread that could not be prepared', () => {
   it('alerts as failed when its worktree cannot be made', () => {
     const id = thread();
     failSetup(id, 'git worktree add failed');
-    expect(sent).toEqual([{ kind: 'failed', threadId: id, channelId: 'scratch' }]);
+    expect(sent).toEqual([
+      { kind: 'failed', threadId: id, channelId: 'scratch', title: id, text: "Omni could not prepare this thread's worktree: git worktree add failed" },
+    ]);
   });
 
   it('stays quiet when Ben stopped it while it was being prepared', () => {
@@ -102,8 +131,10 @@ describe('a thread that could not be prepared', () => {
 describe('a crew report', () => {
   it('alerts when it lands in the Conductor', () => {
     const conductorThread = thread({ channel: 'conductor' });
-    notifyCrewReport(conductorThread);
-    expect(sent).toEqual([{ kind: 'crewReport', threadId: conductorThread, channelId: 'conductor' }]);
+    notifyCrewReport(conductorThread, { text: 'PR opened.', title: 'Fix push previews', status: 'done' });
+    expect(sent).toEqual([
+      { kind: 'crewReport', threadId: conductorThread, channelId: 'conductor', title: conductorThread, text: 'PR opened.', from: 'Fix push previews' },
+    ]);
   });
 
   it('does not alert for a report that lands in another channel', () => {

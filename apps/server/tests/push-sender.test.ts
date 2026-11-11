@@ -1,12 +1,12 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { ApnsRequest, ApnsResponse, ApnsTransport } from '../push-apns.ts';
-import { createPushSender, loadPushConfig, noopPushSender, payloadFor, type PushEvent, type PushSenderDeps } from '../push-sender.ts';
+import { alertFor, createPushSender, loadPushConfig, noopPushSender, payloadFor, type PushEvent, type PushSenderDeps } from '../push-sender.ts';
 import type { PushTarget } from '../push-preferences.ts';
 
 const PEM = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
 const NOW = 1_700_000_000_000;
-const EVENT: PushEvent = { kind: 'needsInput', threadId: 'thread-1', channelId: 'conductor' };
+const EVENT: PushEvent = { kind: 'needsInput', threadId: 'thread-1', channelId: 'conductor', title: 'Plan Q4', text: 'Which goal first?' };
 const target = (n: number, extra: Partial<PushTarget> = {}): PushTarget => ({
   sessionId: `s${n}`,
   token: `token${n}`,
@@ -65,11 +65,42 @@ describe('sending an alert', () => {
     ]);
   });
 
-  it('carries only a generic title and body, plus the ids the app needs to deep link', () => {
-    const payload = JSON.parse(payloadFor({ kind: 'failed', threadId: 'thread-9', channelId: null }));
+  it('titles the alert with the thread, says what happened, and previews the reply as plain text', () => {
+    const payload = JSON.parse(
+      payloadFor({ kind: 'finished', threadId: 'thread-9', channelId: 'omni-os', title: 'Fix iOS push previews', text: '## Done\n\nOpened **PR #612**.' }),
+    );
     expect(Object.keys(payload).sort()).toEqual(['aps', 'omni']);
-    expect(Object.keys(payload.aps.alert).sort()).toEqual(['body', 'title']);
-    expect(payload.omni).toEqual({ kind: 'failed', threadId: 'thread-9', channelId: null });
+    expect(payload.aps.alert).toEqual({ title: 'Fix iOS push previews', subtitle: 'Finished', body: 'Done Opened PR #612.' });
+    expect(payload.omni).toEqual({ kind: 'finished', threadId: 'thread-9', channelId: 'omni-os' });
+  });
+
+  it('names the reporting thread in a crew report', () => {
+    expect(alertFor({ kind: 'crewReport', threadId: 't', channelId: 'conductor', title: 'Conductor', text: 'All green.', from: 'Run the suite' })).toEqual({
+      title: 'Conductor',
+      subtitle: 'Crew report: Run the suite',
+      body: 'All green.',
+    });
+  });
+
+  it('falls back to the generic line when the turn wrote no text', () => {
+    expect(alertFor({ kind: 'finished', threadId: 't', channelId: null, title: 'Tidy', text: '' }).body).toBe('Open Omni to see the result.');
+    expect(alertFor({ kind: 'failed', threadId: 't', channelId: null, title: 'Tidy', text: '```\nexit 1\n```' }).body).toBe(
+      'Open Omni to see what happened.',
+    );
+  });
+
+  it('keeps the generic title when the thread has none', () => {
+    expect(alertFor({ kind: 'needsInput', threadId: 't', channelId: null, title: '  ', text: 'Ship it?' })).toEqual({
+      title: 'Omni needs you',
+      body: 'Ship it?',
+    });
+  });
+
+  it('clips a long title and a long reply so the payload stays small', () => {
+    const alert = alertFor({ kind: 'finished', threadId: 't', channelId: null, title: 'T'.repeat(300), text: 'word '.repeat(2000) });
+    expect(Array.from(alert.title).length).toBeLessThanOrEqual(80);
+    expect(Array.from(alert.body).length).toBeLessThanOrEqual(150);
+    expect(Buffer.byteLength(payloadFor({ kind: 'finished', threadId: 't', channelId: null, title: '🎉'.repeat(300), text: '🎉'.repeat(3000) }))).toBeLessThan(4096);
   });
 
   it('asks Apple to stop trying after fifteen minutes', async () => {

@@ -60,7 +60,7 @@ export function askQuestion(threadId: string, raw: unknown): { id: string } {
   const home = threads.root(threadId);
   if (home !== threadId) threads.setDone(home, false);
   settled(threadId);
-  notifyNeedsInput(threadId);
+  notifyNeedsInput(threadId, parsed.value[0]?.question ?? null);
   return { id };
 }
 

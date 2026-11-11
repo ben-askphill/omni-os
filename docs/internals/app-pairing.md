@@ -62,7 +62,13 @@ Alerts go out on these events:
 
 A stopped turn, a queued turn and a turn cut short by Omni shutting down do not alert.
 
-The payload has a fixed title and body, plus `kind`, `threadId` and `channelId`. It never carries a prompt, a question, a thread title, a reply or a code.
+The alert's title is the thread's title, clipped to 80 characters. Its subtitle says what happened (`Needs your answer`, `Finished`, `Failed`, or `Crew report: <reporting thread>`). Its body previews the text as plain text (`apps/server/push-preview.ts`): markdown marks, code blocks, rules and HTML tags removed, whitespace collapsed to one line, and clipped to 150 characters at a word with an ellipsis. The text is:
+
+- `needsInput`: the first question.
+- `finished` and `failed`: the turn's last assistant text, not the narration before its tool calls. A worktree that cannot be prepared gives the reason.
+- `crewReport`: the report.
+
+When there is no readable text, such as a tool-only turn or a code-only reply, the body is a generic line, and a thread with no title gets a generic title and no subtitle. Under `omni` the payload carries `kind`, `threadId` and `channelId` only. It never carries the prompt or a code. The phone's own Show Previews setting decides whether the body shows on a locked screen.
 
 How each APNs answer is handled:
 
@@ -99,7 +105,7 @@ So revoke protects against a lost or stolen token that nobody has used yet. For 
 - Register the push token after pairing and again when APNs gives a new one. Registering again replaces the old one. Delete it on sign-out.
 - Send the native APNs device token as lowercase or uppercase hex, with `environment` matching the build (`sandbox` for development builds, `production` for TestFlight and the App Store). The server does not accept Expo push tokens.
 - Ask for notification permission before registering. Without it there is no token to send.
-- A push only tells the app to fetch. Read state over HTTP and SSE.
+- A push previews the news, but the app reads state over HTTP and SSE.
 - A tapped alert carries `omni.threadId` and `omni.channelId`. Open that thread, fetching it over HTTP first.
 - Show the choices from `GET /api/auth/push-preferences` and change them with `PUT`, sending only the keys that changed.
 - A code works once. If redeeming fails with 404, ask for a new code. If it fails with 429, wait for `Retry-After`.

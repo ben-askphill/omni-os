@@ -18,7 +18,8 @@ const PORT = Number(process.env.MONITOR_PORT ?? 4791);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HISTORY = 15 * 60; // seconds kept and backfilled
 const BACKFILL_BYTES = 4 << 20; // tail of each recent transcript read at start
-const CLAUDE_DIR = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'), 'projects');
+// Not CLAUDE_CONFIG_DIR: Omni strips it from Claude Code threads, so they always write to ~/.claude.
+const CLAUDE_DIR = join(homedir(), '.claude', 'projects');
 const CODEX_DIR = join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions');
 
 const nowSec = () => Math.floor(Date.now() / 1000);

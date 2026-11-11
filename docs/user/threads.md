@@ -17,7 +17,7 @@ On desktop web and in the desktop app, use the check on a Needs you row or an In
 - A new thread follows the channel and crew defaults until you pick a model or effort for that draft. Auto picks from the first prompt when no default is set. The Conductor role's charter is Auto; a saved #conductor channel default still wins. See [Harnesses](harnesses.md#auto).
 - `/` opens the menu of skills, slash commands and MCP prompts for the thread's harness. In a thread's reply box, `/model`, `/effort` and `/fast` open the model pill; what you pick runs from the next turn.
 - `@` mentions artifacts and repo files.
-- After a finished turn, Haiku suggests your likely next reply. Tab fills it in; `OMNI_SUGGESTIONS=0` in `.env` turns it off.
+- After a finished turn, Haiku suggests your likely next reply. Tab fills it in; `OMNI_SUGGESTIONS=0` in `.env` turns it off. That call, and the ones that title a new thread or propose a follow-up, run in a private folder under Omni's data dir, not the shared temp dir.
 
 ## Sending while a thread is busy
 
@@ -89,7 +89,7 @@ The chip holds the thread's title, channel and id as they were when you sent the
 
 A thread opens on its newest messages. Scroll up to load earlier pages; a search hit opens the page with that message. If two loaded pages have a gap, use Show earlier or Show later to fill it. A large message or tool input may say **Trimmed for loading**; Show all loads that row whole.
 
-A message that starts a turn shows in the transcript as soon as you send it, above the thinking line: the first message on a new thread, and a reply sent while the thread is idle or released after the turn it waited for. It does even while the harness is still starting (hooks, MCP servers) or the turn is handed to another machine. While a turn runs, a thinking line stays up for the whole turn, tool calls included: the Omni mark, the label ("Thinking" or the agent's status) with a vermilion shimmer, and the time since your last message, on desktop web, phone web and the desktop app. A delegated thread's brief (its first message) folds to the first 6 lines with Show more when it is longer than 8 lines; other long messages on desktop keep the character cut with Show all.
+A message that starts a turn shows in the transcript as soon as you send it, above the thinking line: the first message on a new thread, and a reply sent while the thread is idle or released after the turn it waited for. It does even while the harness is still starting (hooks, MCP servers) or the turn is handed to another machine. While a turn runs, a thinking line stays up for the whole turn, tool calls included: the Omni mark, the label ("Thinking" or the agent's status) with a vermilion shimmer, and the time since your last message, on desktop web, phone web, the desktop app and the iOS app. Reduce Motion stills the mark and the shimmer. A delegated thread's brief (its first message) folds to the first 6 lines with Show more when it is longer than 8 lines; other long messages on desktop keep the character cut with Show all.
 
 Replies render as Markdown on desktop web, phone web and the desktop app. A `mermaid` code fence draws as a diagram (light and dark); a fence that fails to parse keeps its source visible. Wide diagrams scroll sideways on a phone.
 

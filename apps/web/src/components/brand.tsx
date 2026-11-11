@@ -1,107 +1,17 @@
 import { MARK_TRANSFORM, HARNESS_LOGOS as LOGO, HARNESS, CREW } from '@omni/shared/brand.ts';
+import { angDiff, c01, easeWeights, MARK_DROPLETS, MARK_R, MARK_START, MARK_TARGETS, MARK_W, markFrame, type MarkDrop, type MarkState } from '@omni/shared/mark.ts';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { HarnessId } from '../api.ts';
 
 // ---------- the Omni mark ----------
 
-/* A ring that behaves like a liquid body: SVG plus a goo filter (blur, then an alpha threshold).
-   Units: ring centerline R=40, stroke W=20, the o of the wordmark. The mark leans 10° with the wordmark;
-   physics run unskewed and MARK_TRANSFORM fits the lean into the -64..64 viewBox. */
-const R = 40;
-/** Droplets the live mark sheds when delegating. */
-const DROPLETS = 3;
-const W = 20;
+/* The ring's physics live in @omni/shared/mark.ts, shared with the iOS thinking line. Here: SVG plus a goo filter
+   (blur, then an alpha threshold) and the pointer lean. */
+const R = MARK_R;
+const W = MARK_W;
+const DROPLETS = MARK_DROPLETS;
 export { MARK_TRANSFORM } from '@omni/shared/brand.ts';
-const N = 104;
-const TAU = Math.PI * 2;
-const SAT_A = -Math.PI / 4;
-const gauss = (x: number, s: number) => Math.exp(-(x * x) / (2 * s * s));
-const angDiff = (a: number, b: number) => {
-  let d = (a - b) % TAU;
-  if (d > Math.PI) d -= TAU;
-  if (d < -Math.PI) d += TAU;
-  return d;
-};
-const easeInOut = (p: number) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
-const c01 = (x: number) => Math.max(0, Math.min(1, x));
-
-export type MarkState = 'idle' | 'hover' | 'thinking' | 'delegating' | 'report' | 'attention';
-type Weights = { breath: number; sat: number; ripple: number; drops: number; report: number; tension: number };
-const KEYS = ['breath', 'sat', 'ripple', 'drops', 'report', 'tension'] as const;
-const TARGETS: Record<MarkState, Partial<Weights>> = {
-  idle: { breath: 1, sat: 1 },
-  hover: { breath: 1, sat: 1 },
-  thinking: { breath: 0.4, ripple: 1 },
-  delegating: { breath: 0.4, drops: 1 },
-  report: { breath: 0.4, report: 1 },
-  attention: { tension: 1, sat: 1 },
-};
-
-interface Drop {
-  x: number;
-  y: number;
-  r: number;
-}
-
-function markFrame(t: number, w: Weights, leanK: number, leanPhi: number, n: number) {
-  const drops: Drop[] = [];
-  const bumps: { a: number; amp: number; s: number }[] = [];
-  let after = 0;
-  const cx = Math.cos(leanPhi) * 3 * leanK;
-  const cy = Math.sin(leanPhi) * 3 * leanK;
-  if (w.sat > 0.001) {
-    const bob = 1.6 * Math.sin((TAU * t) / 4.8);
-    const dist = (70 + bob) * (1 - w.tension) + 58.5 * w.tension - 11 * leanK;
-    const a = SAT_A + angDiff(leanPhi, SAT_A) * 0.4 * leanK;
-    drops.push({ x: cx + Math.cos(a) * dist, y: cy + Math.sin(a) * dist, r: 12 * w.sat });
-  }
-  if (w.drops > 0.001) {
-    const T = 7.2;
-    const tc = t % T;
-    for (let i = 0; i < n; i++) {
-      const s = 0.4 + i * 1.15;
-      const a0 = -0.9 + i * (TAU / Math.max(n, 1)) * 0.92;
-      if (tc < s) continue;
-      const p = c01((tc - s) / 1.4);
-      const e = easeInOut(p);
-      const a = a0 + e * 0.15 + Math.max(0, tc - s - 1.4) * 0.2;
-      const rad = R + e * (68 - R) + (p >= 1 ? 2 * Math.sin(t * 1.3 + i) : 0);
-      const r = (11 - 2.5 * e) * c01((T - 0.4 - tc) / 0.7) * w.drops;
-      drops.push({ x: Math.cos(a) * rad, y: Math.sin(a) * rad, r });
-      if (p < 1) bumps.push({ a: a0 + e * 0.15, amp: 7 * Math.sin(Math.PI * p) * w.drops, s: 0.32 });
-    }
-  }
-  if (w.report > 0.001) {
-    const T = 3.8;
-    const tc = t % T;
-    const a = -0.75;
-    const p = c01(tc / 1.5);
-    const e = p * p;
-    const rad = 92 - e * (92 - R);
-    let r = 9.5;
-    if (p > 0.8) r *= 1 - ((p - 0.8) / 0.2) * 0.7;
-    if (p >= 1) r = 0;
-    drops.push({ x: Math.cos(a) * rad, y: Math.sin(a) * rad, r: r * w.report });
-    bumps.push({ a, amp: Math.sin(Math.PI * c01((tc - 1.1) / 1.2)) * 8 * w.report, s: 0.4 });
-    after = Math.sin(Math.PI * c01((tc - 1.6) / 1.6)) * 1.6 * w.report;
-  }
-  const br = Math.sin((TAU * t) / 4.8);
-  let d = '';
-  for (let j = 0; j < N; j++) {
-    const th = (j / N) * TAU;
-    let r = R + w.breath * (1.1 * br + 0.5 * Math.sin(2 * th + t * 0.7));
-    if (w.ripple > 0.001) r += w.ripple * (1.9 * Math.sin(6 * th - 4.6 * t) + 1.0 * Math.sin(10 * th + 3.1 * t));
-    if (leanK > 0.001) {
-      const dd = angDiff(th, leanPhi);
-      r += leanK * (9 * gauss(dd, 0.55) - 2.2 * gauss(Math.abs(dd) - Math.PI, 0.9));
-    }
-    if (w.tension > 0.001) r += w.tension * (3.6 * Math.cos(2 * (th - 0.4)) - 5 * gauss(angDiff(th, 2.5), 0.24) + 2.4 * gauss(angDiff(th, SAT_A), 0.28));
-    for (const b of bumps) r += b.amp * gauss(angDiff(th, b.a), b.s);
-    if (after) r += after * Math.sin(5 * th - 6 * t);
-    d += (j ? 'L' : 'M') + (cx + Math.cos(th) * r).toFixed(2) + ' ' + (cy + Math.sin(th) * r).toFixed(2);
-  }
-  return { d: d + 'Z', drops };
-}
+export type { MarkState } from '@omni/shared/mark.ts';
 
 export function useReducedMotion() {
   const [rm, setRm] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -136,7 +46,7 @@ export function OmniMark({ state = 'idle', size = 48, title = 'Omni' }: { state?
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
   const dropRefs = useRef<(SVGCircleElement | null)[]>([]);
-  const live = useRef({ w: { breath: 1, sat: 1, ripple: 0, drops: 0, report: 0, tension: 0 } as Weights, k: 0, phi: -2.4, pk: 0, pphi: -2.4, state, n: DROPLETS });
+  const live = useRef({ w: { ...MARK_START }, k: 0, phi: -2.4, pk: 0, pphi: -2.4, state, n: DROPLETS });
   live.current.state = state;
   const maxDrops = 2 + DROPLETS;
 
@@ -145,7 +55,7 @@ export function OmniMark({ state = 'idle', size = 48, title = 'Omni' }: { state?
     let raf = 0;
     let last = performance.now();
     const t0 = last;
-    const paint = (f: { d: string; drops: Drop[] }) => {
+    const paint = (f: { d: string; drops: MarkDrop[] }) => {
       pathRef.current?.setAttribute('d', f.d);
       for (let i = 0; i < maxDrops; i++) {
         const el = dropRefs.current[i];
@@ -177,9 +87,7 @@ export function OmniMark({ state = 'idle', size = 48, title = 'Omni' }: { state?
       const L = live.current;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const tgt = TARGETS[L.state] ?? TARGETS.idle;
-      const a = c01(dt * 5);
-      for (const k of KEYS) L.w[k] += ((tgt[k] ?? 0) - L.w[k]) * a;
+      easeWeights(L.w, MARK_TARGETS[L.state] ?? MARK_TARGETS.idle, dt);
       const wantK = L.state === 'attention' ? 0 : L.state === 'hover' ? Math.max(0.85, L.pk) : L.pk * (L.state === 'idle' ? 1 : 0.5);
       L.k += (wantK - L.k) * c01(dt * 7);
       if (L.pk > 0.01 || L.state === 'hover') L.phi += angDiff(L.state === 'hover' && L.pk < 0.01 ? -2.4 : L.pphi, L.phi) * c01(dt * 8);

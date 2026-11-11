@@ -4,7 +4,7 @@ import { runOnOptions } from '../components/RunOnPicker.tsx';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { api, errorText, useApi, type Automation, type Thread, type SyncStatus } from '../api.ts';
 import { DeliveryHistory } from '../components/DeliveryHistory.tsx';
-import { Button, Chip, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, Picker, StatusDot, Toggle } from '../components/ui.tsx';
+import { Button, Chip, ConfirmDialog, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, Picker, StatusDot, Toggle } from '../components/ui.tsx';
 import { describeCron } from '@omni/shared/cron.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
@@ -189,7 +189,7 @@ function WebhookPanel({ id, webhook, onChanged }: { id: string; webhook: NonNull
   );
 }
 
-function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void }) {
+function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: () => void; onDelete: () => void }) {
   const { channel } = useApp();
   const [enabled, setEnabled] = useState(a.enabled);
   const [toggling, setToggling] = useState(false);
@@ -305,9 +305,14 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
       {a.webhook && !a.error && <WebhookPanel id={a.id} webhook={a.webhook} onChanged={onChanged} />}
 
       <div className="px-2.5 pb-1">
-        <button type="button" onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt} className="hov flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-fg-3 [--hov:var(--surface-2)] hover:text-fg">
-          <Icon name="chevronRight" size={12} className={`transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${showPrompt ? 'rotate-90' : ''}`} /> Prompt
-        </button>
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt} className="hov flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-fg-3 [--hov:var(--surface-2)] hover:text-fg">
+            <Icon name="chevronRight" size={12} className={`transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${showPrompt ? 'rotate-90' : ''}`} /> Prompt
+          </button>
+          <Button size="sm" variant="ghost" icon="trash" className="[--hov:var(--surface-2)]" onClick={onDelete} aria-label={`Delete ${a.name}`}>
+            Delete
+          </Button>
+        </div>
         {showPrompt && <pre className="fade-in mx-2.5 mt-1 mb-2 rounded-2xl bg-bg px-3.5 py-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-fg-2">{a.prompt || '(empty)'}</pre>}
       </div>
 
@@ -357,7 +362,42 @@ function AutomationCard({ a, onChanged }: { a: Automation; onChanged: () => void
           </ul>
         )}
       </div>
+
     </div>
+  );
+}
+
+/** Asks before deleting, naming the automation. Rendered by the page, outside the animated list, so its scrim covers the window. */
+function DeleteAutomationDialog({ a, onClose, onDeleted }: { a: Automation | null; onClose: () => void; onDeleted: () => void }) {
+  const { channel } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const close = () => {
+    setError(null);
+    onClose();
+  };
+  const remove = async () => {
+    if (!a) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.del(`/automations/${encodeURIComponent(a.id)}`);
+      onDeleted();
+      close();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <ConfirmDialog open={!!a} title={`Delete “${a?.name ?? ''}”?`} confirmLabel="Delete automation" danger busy={busy} error={error} onConfirm={() => void remove()} onCancel={close}>
+      <p>
+        <span className="font-medium text-fg">{a?.name}</span> stops running and leaves this list on this machine. Threads it already started stay in #
+        {(a && channel(a.channel)?.name) ?? a?.channel}.
+      </p>
+      <p className="text-[12.5px] text-fg-3">You can’t undo this from Omni.</p>
+    </ConfirmDialog>
   );
 }
 
@@ -403,6 +443,7 @@ function AutomationMachine({ refreshing }: { refreshing: boolean }) {
 export function AutomationsPage() {
   const res = useApi<Automation[]>('/automations');
   const { reload } = res;
+  const [deleting, setDeleting] = useState<Automation | null>(null);
   // Keep run and delivery statuses fresh when an automation thread or delivery changes state (debounced, threads update often).
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useFeed((e) => {
@@ -439,11 +480,12 @@ export function AutomationsPage() {
         ) : (
           res.data.map((a, i) => (
             <div key={a.id} style={{ '--i': i } as CSSProperties}>
-              <AutomationCard a={a} onChanged={reload} />
+              <AutomationCard a={a} onChanged={reload} onDelete={() => setDeleting(a)} />
             </div>
           ))
         )}
       </div>
+      <DeleteAutomationDialog a={deleting} onClose={() => setDeleting(null)} onDeleted={reload} />
     </div>
   );
 }
