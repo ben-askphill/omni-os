@@ -9,11 +9,19 @@ import { Icon, type IconName } from './icons.tsx';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'needs';
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-fg text-on-ink hover:bg-fg/88 disabled:opacity-35',
-  secondary: 'bg-surface-2 text-fg hover:bg-surface-3 disabled:opacity-45',
-  ghost: 'hov text-fg-2 hover:text-fg disabled:opacity-40',
+  primary: 'bg-fg text-on-ink hover:enabled:bg-fg/88',
+  secondary: 'bg-surface-2 text-fg hover:enabled:bg-surface-3',
+  ghost: 'hov text-fg-2 hover:text-fg',
   // Destructive or blocking actions: vermilion fill with ink text, never vermilion text.
-  needs: 'bg-needs text-on-needs hover:bg-[color-mix(in_srgb,var(--needs)_90%,var(--fg))] disabled:opacity-40',
+  needs: 'bg-needs text-on-needs hover:enabled:bg-[color-mix(in_srgb,var(--needs)_90%,var(--fg))]',
+};
+
+// A busy button is working, not unavailable: it keeps its fill and shows the loader instead of fading out.
+const DISABLED: Record<Variant, string> = {
+  primary: 'disabled:opacity-35',
+  secondary: 'disabled:opacity-45',
+  ghost: 'disabled:opacity-40',
+  needs: 'disabled:opacity-40',
 };
 
 const SIZES = {
@@ -34,7 +42,13 @@ export function Button({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md' | 'lg'; icon?: IconName; busy?: boolean }) {
   return (
-    <button type="button" {...rest} disabled={rest.disabled || busy} className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}>
+    <button
+      type="button"
+      {...rest}
+      disabled={rest.disabled || busy}
+      aria-busy={busy || undefined}
+      className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${busy ? 'cursor-progress' : DISABLED[variant]} ${className}`}
+    >
       {busy ? <Loader size={size === 'sm' ? 12 : 14} /> : icon ? <Icon name={icon} size={size === 'sm' ? 14 : 15} /> : null}
       {children}
     </button>

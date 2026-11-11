@@ -228,7 +228,7 @@ export function PRScreen() {
                 ? `PR #${n} is open. Set this channel's GitHub repo on the desktop to read it here.`
                 : thread.branch
                   ? opening
-                    ? 'The agent is committing and pushing this branch. The PR shows here once it opens.'
+                    ? 'The agent is pushing this branch. The PR shows up here.'
                     : 'No pull request from this branch yet.'
                   : 'This thread works without a branch, so it has no pull request.'}
             </MoEmpty>
