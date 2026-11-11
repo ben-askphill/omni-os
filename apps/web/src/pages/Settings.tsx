@@ -600,17 +600,18 @@ function AppearanceCard() {
         />
       </Card>
       {!mobile && (
-      <Card entry="layout" title="Layout" subtitle="The channel rail with a list beside it, or the classic sidebar. The phone layout stays as it is." origin={<Origin of="device" label="This browser only" />}>
-        <Segmented
-          radio
-          label="Layout"
-          value={layout}
-          onChange={setLayout}
-          options={[
-            { id: 'rail', icon: 'sidebar', label: 'Channel rail' },
-            { id: 'classic', icon: 'menu', label: 'Classic' },
-          ]}
-        />
+      <Card
+        entry="layout"
+        title="New layout"
+        subtitle="Channels as a rail of discs, with a list of the selected channel's threads beside it. Still in progress: turn it off to go back to the classic sidebar. The phone layout stays as it is."
+        origin={<Origin of="device" label="This browser only" />}
+      >
+        <div className="flex items-center gap-3 rounded-[16px] bg-bg px-4 py-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium">
+            Channel rail <Chip tone="live">Beta</Chip>
+          </div>
+          <Toggle checked={layout === 'rail'} onChange={(on) => setLayout(on ? 'rail' : 'classic')} label="Use the new channel rail layout (Beta)" />
+        </div>
       </Card>
       )}
       {desktop ? (

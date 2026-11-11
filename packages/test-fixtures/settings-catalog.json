@@ -176,13 +176,16 @@
     {
       "id": "layout",
       "section": "appearance",
-      "title": "Layout",
+      "title": "New layout (Beta)",
       "keywords": [
+        "beta",
+        "layout",
         "rail",
         "sidebar",
         "channel rail",
         "classic",
-        "list"
+        "new ui",
+        "redesign"
       ]
     },
     {
