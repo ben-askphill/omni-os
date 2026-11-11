@@ -29,7 +29,7 @@ const cat: Catalog = { harnesses: [claudeHarness(4), codexHarness(codexProbe, 4)
 describe('claude catalog', () => {
   it('lists the fixed models with efforts and marks the default', () => {
     const models = claudeModels();
-    expect(models.map((m) => m.id)).toEqual(['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-1', 'claude-haiku-4-5']);
+    expect(models.map((m) => m.id)).toEqual(['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-2', 'claude-fable-5-1', 'claude-haiku-4-5']);
     expect(models.every((m) => m.efforts.includes('xhigh'))).toBe(true);
     expect(models.find((m) => m.default)?.id).toBe('claude-sonnet-5-5');
   });
@@ -40,6 +40,7 @@ describe('claude catalog', () => {
   });
 
   it('resolves aliases', () => {
+    expect(resolveModel(cat, 'claude-code', 'fable')?.id).toBe('claude-fable-5-2');
     expect(resolveModel(cat, 'claude-code', 'opus')?.id).toBe('claude-opus-5-5');
     expect(resolveModel(cat, 'claude-code', 'claude-haiku-4-5')?.id).toBe('claude-haiku-4-5');
     expect(resolveModel(cat, 'claude-code', 'nope')).toBeNull();
