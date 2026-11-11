@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type Channel, type Checks, type PRDetail as PRDetailT, type PRSummary } from '../api.ts';
-import { Button, Chip, StatusDot, Empty, ErrorNote, Icon, IconLink, LinkButton, Loading, Tabs } from '../components/ui.tsx';
+import { Button, Chip, StatusDot, Empty, ErrorNote, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, navigate } from '../router.ts';
 import { PRDetailTabBody, type DetailTab } from './PRDetailTabs.tsx';
 import { PRMergePanel } from './PRMergePanel.tsx';
@@ -144,47 +144,54 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
   return (
     <div className="mx-auto max-w-5xl px-4 pt-6 pb-16 md:px-8">
       {back}
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-display text-[22px] leading-[1.2]">
-            {p.title} <span className="font-num text-[15px] text-fg-4">#{p.number}</span>
+      {/* The actions sit beside the title when the page is wide enough, else after the related threads, review first. */}
+      <div className="@container mt-3">
+        <header className="grid grid-cols-1 gap-y-2.5 @3xl:grid-cols-[minmax(0,1fr)_auto] @3xl:gap-x-6">
+          <h2 className="font-display text-[22px] leading-[1.25] text-pretty @3xl:col-start-1 @3xl:row-start-1">
+            {p.title} <span className="font-num text-[15px] whitespace-nowrap text-fg-4">#{p.number}</span>
           </h2>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12.5px] text-fg-3">
-            {p.state && <Chip tone={p.state === 'OPEN' ? 'live' : p.state === 'MERGED' ? 'done' : 'outline'}>{p.state.toLowerCase()}</Chip>}
-            {p.isDraft && <Chip tone="outline">Draft</Chip>}
-            <ReviewChip d={p.reviewDecision} />
-            <span>{p.author?.login}</span>
-            <span className="rounded-full bg-surface-2 px-2 font-mono text-[11px] leading-5">
-              {p.headRefName} <span className="text-fg-4">into</span> {p.baseRefName}
+          <div className="order-last flex flex-row-reverse items-center justify-end gap-1.5 @3xl:order-none @3xl:col-start-2 @3xl:row-start-1 @3xl:flex-row @3xl:self-start">
+            <LinkButton size="sm" variant="ghost" icon="external" href={p.url} target="_blank">
+              GitHub
+            </LinkButton>
+            <Button size="sm" icon="layers" onClick={askReview} busy={reviewBusy}>
+              Ask builder to review
+            </Button>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-fg-3 @3xl:col-span-2">
+            {(p.state || p.isDraft || p.reviewDecision) && (
+              <span className="inline-flex items-center gap-1.5">
+                {p.state && <Chip tone={p.state === 'OPEN' ? 'live' : p.state === 'MERGED' ? 'done' : 'outline'}>{p.state.toLowerCase()}</Chip>}
+                {p.isDraft && <Chip tone="outline">Draft</Chip>}
+                <ReviewChip d={p.reviewDecision} />
+              </span>
+            )}
+            {p.author?.login && <span>{p.author.login}</span>}
+            <span className="min-w-0 truncate font-mono text-[11.5px]" title={`${p.headRefName} into ${p.baseRefName}`}>
+              {p.headRefName} <span className="text-fg-4">→</span> {p.baseRefName}
             </span>
             <ChecksSummary c={p.checks} />
             <span className="font-num text-[11.5px]">
-              <span className="text-fg-2">+{p.additions}</span> <span className="text-fg-3">-{p.deletions}</span>
+              <span className="text-fg-2">+{p.additions}</span> -{p.deletions}
             </span>
           </div>
           {p.thread && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5 @3xl:col-span-2">
               {p.thread.parent && (
-                <LinkButton size="sm" href={href.thread(p.thread.parent.id)} icon="arrowUpRight">
-                  <span className="max-w-[320px] truncate" title={`The thread that delegated this work: ${p.thread.parent.title}`}>
+                <LinkButton size="sm" href={href.thread(p.thread.parent.id)} icon="arrowUpRight" className="max-w-full min-w-0">
+                  <span className="truncate" title={`The thread that delegated this work: ${p.thread.parent.title}`}>
                     {p.thread.parent.title || 'Parent thread'}
                   </span>
                 </LinkButton>
               )}
-              <LinkButton size="sm" href={href.thread(p.thread.id)} icon="message">
-                <span className="max-w-[320px] truncate" title={`The thread that opened this PR: ${p.thread.title}`}>
+              <LinkButton size="sm" href={href.thread(p.thread.id)} icon="message" className="max-w-full min-w-0">
+                <span className="truncate" title={`The thread that opened this PR: ${p.thread.title}`}>
                   {p.thread.parent ? 'Delegated thread' : p.thread.title || 'Open thread'}
                 </span>
               </LinkButton>
             </div>
           )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <IconLink href={p.url} icon="external" label="Open on GitHub" newTab />
-          <Button icon="layers" onClick={askReview} busy={reviewBusy}>
-            Ask builder to review
-          </Button>
-        </div>
+        </header>
       </div>
       {reviewError && <ErrorNote className="mt-2">{reviewError}</ErrorNote>}
 
