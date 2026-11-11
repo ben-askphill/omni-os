@@ -22,7 +22,9 @@
     "running": 0,
     "active": [],
     "recent": [],
-    "folders": []
+    "folders": [],
+    "avatar_bg": null,
+    "avatar_bg_manual": 0
   },
   {
     "id": "acme",
@@ -79,7 +81,9 @@
         "delegating": false
       }
     ],
-    "folders": []
+    "folders": [],
+    "avatar_bg": null,
+    "avatar_bg_manual": 0
   },
   {
     "id": "inbox",
@@ -104,6 +108,8 @@
     "running": 0,
     "active": [],
     "recent": [],
-    "folders": []
+    "folders": [],
+    "avatar_bg": null,
+    "avatar_bg_manual": 0
   }
 ]

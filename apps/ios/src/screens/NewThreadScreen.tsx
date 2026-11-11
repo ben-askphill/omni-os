@@ -158,7 +158,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
             onPress={() => setPickingTarget(true)}
             style={({ pressed }) => [styles.chip, styles.target, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
           >
-            {current ? <ChannelAvatar name={current.name} icon={current.icon} conductor={current.id === CONDUCTOR} size={22} disc={colors.bg} /> : null}
+            {current ? <ChannelAvatar name={current.name} icon={current.icon} avatarBg={current.avatar_bg} conductor={current.id === CONDUCTOR} size={22} disc={colors.bg} /> : null}
             <Text numberOfLines={1} style={[styles.chipLabel, { color: colors.fg }]}>
               {targetLabel}
             </Text>
@@ -221,7 +221,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
               <OptionRow
                 key={t.id}
                 label={targetName(t)}
-                leading={<ChannelAvatar name={t.name} icon={t.icon} conductor={t.id === CONDUCTOR} size={24} disc={colors.surface2} />}
+                leading={<ChannelAvatar name={t.name} icon={t.icon} avatarBg={t.avatar_bg} conductor={t.id === CONDUCTOR} size={24} disc={colors.surface2} />}
                 selected={t.id === target}
                 onPress={() => {
                   onTarget(t.id);

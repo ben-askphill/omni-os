@@ -130,7 +130,7 @@ export function ScopeBar() {
         searchable={listed.length > 7}
         options={[
           { value: '', label: 'Every channel', sub: 'Machine-wide values', icon: 'monitor', avatar: false },
-          ...listed.map((c) => ({ value: c.id, label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`, channelIcon: c.icon })),
+          ...listed.map((c) => ({ value: c.id, label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`, avatarBg: c.avatar_bg, channelIcon: c.icon })),
         ]}
       />
       <span className="max-sm:basis-full">{channel ? 'Showing what this channel sets and what it inherits.' : "Showing this machine's values. Pick a channel to see its own."}</span>

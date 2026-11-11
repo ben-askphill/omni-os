@@ -1,3 +1,4 @@
+import { autoAvatarColor, AVATAR_SWATCHES } from '@omni/shared/avatar-color.ts';
 import type { Channel, HarnessInfo, OmniApi } from '@omni/client-core';
 import { portLabel, SETUP_MODE_LABEL } from '@omni/shared/channel-actions.ts';
 import { CHANNEL_GLYPHS, glyphIcon } from '@omni/shared/channel-icon.ts';
@@ -131,7 +132,7 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
   return (
     <SettingsPage>
       <View style={styles.hero}>
-        <ChannelAvatar name={form.name || form.id || '?'} icon={form.icon} conductor={channel?.id === 'conductor'} size={56} />
+        <ChannelAvatar name={form.name || form.id || '?'} icon={form.icon} avatarBg={form.avatar_bg} conductor={channel?.id === 'conductor'} size={56} />
         <Text style={[styles.heroName, { color: colors.fg }]} numberOfLines={1}>
           {form.name.trim() || 'New channel'}
         </Text>
@@ -169,7 +170,14 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         </View>
       ) : null}
 
-      <IconPicker icon={form.icon} onChange={(v) => set('icon', v)} />
+      <Group title="Avatar background">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 16 }}>
+          {AVATAR_SWATCHES.map((color) => <Pressable key={color} accessibilityRole="button" accessibilityLabel={`Use ${color}`} accessibilityState={{ selected: form.avatar_bg === color }} onPress={() => { set('avatar_bg', color); set('avatar_bg_manual', 1); }} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: color, borderWidth: form.avatar_bg === color ? 2 : 0, borderColor: colors.fg }} />)}
+        </View>
+        <InputRow first label="Hex color" value={form.avatar_bg} placeholder="#e8d9f5" autoCapitalize="none" onChangeText={(v) => { set('avatar_bg', v); set('avatar_bg_manual', 1); }} />
+        <ListRow title="Reset to auto" onPress={() => { set('avatar_bg', autoAvatarColor(form.icon) ?? ''); set('avatar_bg_manual', 0); }} />
+      </Group>
+      <IconPicker icon={form.icon} onChange={(v) => { set('icon', v); if (!form.avatar_bg_manual) set('avatar_bg', autoAvatarColor(v) ?? ''); }} />
 
       <Group footer="Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.">
         <InputRow first label="Notes" value={form.notes} multiline autoCapitalize="sentences" onChangeText={(t) => set('notes', t)} />

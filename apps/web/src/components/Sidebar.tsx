@@ -9,7 +9,7 @@ import { readPref, useApp, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { OmniMark } from './brand.tsx';
-import { ChannelMark, ErrorNote, Thumb, useSlidingThumb } from './ui.tsx';
+import { Avatar, ChannelMark, ErrorNote, Thumb, useSlidingThumb } from './ui.tsx';
 import { useUngroupDrop } from './sidebar/channel-lists.ts';
 import { SidebarTop, type SidebarView } from './sidebar/SidebarTop.tsx';
 import { InboxView } from './sidebar/InboxView.tsx';
@@ -209,9 +209,9 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
       {channelRow(
         c,
         c.name,
-        parseChannelIcon(c.icon) ? (
+        c.avatar_bg ? <Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} size={20} /> : parseChannelIcon(c.icon) ? (
           <span className={`grid w-[15px] place-items-center ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-3'}`}>
-            <ChannelMark icon={c.icon} size={14} />
+            <ChannelMark icon={c.icon} avatarBg={c.avatar_bg} size={14} />
           </span>
         ) : (
           <span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>
@@ -238,7 +238,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
               </NavLink>
               {conductor && (
                 <>
-                  {channelRow(conductor, 'Conductor', <span className="grid w-[15px] place-items-center"><OmniMark size={17} /></span>)}
+                  {channelRow(conductor, 'Conductor', <span className="grid w-[15px] place-items-center">{conductor.avatar_bg ? <Avatar name="Conductor" omni avatarBg={conductor.avatar_bg} size={22} /> : <OmniMark size={17} />}</span>)}
                   {threadLinks(conductor)}
                 </>
               )}

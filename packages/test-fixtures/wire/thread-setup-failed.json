@@ -58,7 +58,9 @@
     "default_harness": null,
     "default_model": null,
     "default_effort": null,
-    "design_system_size": 0
+    "design_system_size": 0,
+    "avatar_bg": null,
+    "avatar_bg_manual": 0
   },
   "events": [],
   "artifacts": [],

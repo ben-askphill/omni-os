@@ -27,8 +27,8 @@ export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>)
   const [menuId, setMenuId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (name) navigation.setOptions({ title: name, headerTitle: () => <ChannelTitle name={name} icon={icon} conductor={id === 'conductor'} /> });
-  }, [id, name, icon, navigation]);
+    if (name) navigation.setOptions({ title: name, headerTitle: () => <ChannelTitle name={name} icon={icon} avatarBg={channel?.avatar_bg} conductor={id === 'conductor'} /> });
+  }, [id, name, icon, channel?.avatar_bg, navigation]);
 
   const sections = useMemo(() => {
     if (!channel) return [];
@@ -103,11 +103,11 @@ function ChannelThreadRow({ row, onOpen, onMenu }: { row: ThreadRow; onOpen: (th
   return <HandoffRowView row={{ ...row, handoff: row.handoff }} open={open} onToggle={toggle} onOpenThread={onOpen} onMenu={() => onMenu(row.id)} />;
 }
 
-function ChannelTitle({ name, icon, conductor }: { name: string; icon: string | null; conductor: boolean }) {
+function ChannelTitle({ name, icon, conductor, avatarBg }: { avatarBg?: string | null; name: string; icon: string | null; conductor: boolean }) {
   const { colors } = useOmniTheme();
   return (
     <View style={styles.title} accessibilityRole="header" accessibilityLabel={name}>
-      <ChannelAvatar name={name} icon={icon} conductor={conductor} size={24} />
+      <ChannelAvatar name={name} icon={icon} avatarBg={avatarBg} conductor={conductor} size={24} />
       <Text numberOfLines={1} style={[styles.titleText, { color: colors.fg }]}>
         {name}
       </Text>

@@ -1,3 +1,4 @@
+import { avatarInk } from '@omni/shared/avatar-color.ts';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { CHANNEL_GLYPHS, parseChannelIcon, svgDataUrl } from '@omni/shared/channel-icon.ts';
 import { Loader, StaticMark } from '../brand.tsx';
@@ -110,8 +111,9 @@ const _channelGlyphsDrawn: readonly IconName[] = CHANNEL_GLYPHS;
 void _channelGlyphsDrawn;
 
 /** A channel's own icon (an emoji, a design system icon or an uploaded SVG), or nothing when it has none. */
-export function ChannelMark({ icon, size }: { icon: string | null | undefined; size: number }) {
+export function ChannelMark({ icon, size, avatarBg }: { avatarBg?: string | null; icon: string | null | undefined; size: number }) {
   const mark = parseChannelIcon(icon);
+  if (avatarBg) return <span className="inline-grid place-items-center rounded-full" style={{ backgroundColor: avatarBg, color: avatarInk(avatarBg), width: size + 6, height: size + 6 }}><ChannelMark icon={icon} size={size} /></span>;
   if (!mark) return null;
   if (mark.kind === 'glyph') return <Icon name={mark.name} size={size} />;
   // An image, never markup in the page: the SVG cannot run anything or load from elsewhere.
@@ -121,13 +123,13 @@ export function ChannelMark({ icon, size }: { icon: string | null | undefined; s
 
 /** Letter avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces the letter. */
 /** `omni` draws the Conductor's mark, the same one the sidebar shows. */
-export function Avatar({ name, size = 28, icon, omni, channelIcon, ink, className = '' }: { name: string; size?: number; icon?: IconName; omni?: boolean; channelIcon?: string | null; ink?: boolean; className?: string }) {
+export function Avatar({ name, size = 28, icon, omni, channelIcon, avatarBg, ink, className = '' }: { name: string; size?: number; icon?: IconName; omni?: boolean; channelIcon?: string | null; avatarBg?: string | null; ink?: boolean; className?: string }) {
   const mark = parseChannelIcon(channelIcon);
   return (
     <span
       aria-hidden="true"
       className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium uppercase leading-none ${ink ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg-2'} ${className}`}
-      style={{ width: size, height: size, fontSize: size * 0.42 }}
+      style={{ width: size, height: size, fontSize: size * 0.42, ...(avatarBg ? { backgroundColor: avatarBg, color: avatarInk(avatarBg) } : {}) }}
     >
       {omni ? (
         <StaticMark size={size * 0.56} title="" />

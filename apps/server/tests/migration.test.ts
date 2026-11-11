@@ -56,6 +56,7 @@ describe('threads harness migration', () => {
 
   it('gives existing channels an empty icon', () => {
     expect(db.channels.get('inbox')!.icon).toBeNull();
+    expect(db.channels.get('inbox')).toMatchObject({ avatar_bg: null, avatar_bg_manual: 0 });
   });
 
   it('adds the folders table and leaves existing threads ungrouped', () => {

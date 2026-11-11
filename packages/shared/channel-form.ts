@@ -24,6 +24,8 @@ export interface ChannelRecord {
   browser_headless: number;
   notes: string | null;
   icon: string | null;
+  avatar_bg?: string | null;
+  avatar_bg_manual?: number;
   default_harness: string | null;
   default_model: string | null;
   default_effort: string | null;
@@ -49,6 +51,8 @@ export interface ChannelForm {
   showBrowser: boolean;
   notes: string;
   icon: string;
+  avatar_bg: string;
+  avatar_bg_manual: number;
   run: ChannelRun;
 }
 
@@ -67,6 +71,8 @@ export function channelForm(c?: ChannelRecord): ChannelForm {
     showBrowser: c ? c.browser_headless === 0 : false,
     notes: c?.notes ?? '',
     icon: c?.icon ?? '',
+    avatar_bg: c?.avatar_bg ?? '',
+    avatar_bg_manual: c?.avatar_bg_manual ?? 0,
     run: { harness: c?.default_harness ?? '', model: c?.default_model ?? '', effort: c?.default_effort ?? '' },
   };
 }
@@ -99,6 +105,7 @@ export const storeDomain = (raw: string) => orNull(raw)?.replace(/^https?:\/\//,
 
 /** Why the form cannot be sent, or null. */
 export function channelFormProblem(f: ChannelForm, isNew: boolean): string | null {
+  if (f.avatar_bg && !/^#[0-9a-f]{6}$/i.test(f.avatar_bg)) return 'Use a six-digit hex color for the avatar background.';
   if (!f.name.trim()) return 'Give the channel a name.';
   if (isNew && !CHANNEL_ID.test(f.id)) return 'The id needs 2 to 40 lowercase letters, digits or dashes.';
   return null;
@@ -120,6 +127,8 @@ export function channelBody(f: ChannelForm, opts: { system: boolean; github: boo
     browser_headless: f.showBrowser ? 0 : 1,
     notes: orNull(f.notes),
     icon: orNull(f.icon),
+    avatar_bg: orNull(f.avatar_bg),
+    avatar_bg_manual: f.avatar_bg_manual,
     ...runBody(f.run),
   };
   if (!opts.system) body.kind = f.kind;

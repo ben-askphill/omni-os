@@ -101,7 +101,7 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
 
   const scopeOptions: PickerOption<string>[] = [
     { value: 'global', label: 'Global', sub: 'All channels', icon: 'globe' },
-    ...channels.map((c) => ({ value: `channel:${c.id}`, label: `#${c.name}`, sub: c.kind, avatar: c.name, channelIcon: c.icon, lead: c.id === 'conductor' ? <StaticMark size={13} title="" /> : undefined })),
+    ...channels.map((c) => ({ value: `channel:${c.id}`, label: `#${c.name}`, sub: c.kind, avatar: c.name, avatarBg: c.avatar_bg, channelIcon: c.icon, lead: c.id === 'conductor' ? <StaticMark size={13} title="" /> : undefined })),
   ];
 
   return (

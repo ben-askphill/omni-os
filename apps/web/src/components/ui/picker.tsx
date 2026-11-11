@@ -13,6 +13,7 @@ export interface PickerOption<T extends string> {
   /** Letter avatar seed; defaults to the label. Set `avatar: false` to hide it. */
   avatar?: string | false;
   /** A channel icon for the avatar in place of the letter. */
+  avatarBg?: string | null;
   channelIcon?: string | null;
   /** A mark to lead with instead of the avatar (a HarnessLogo or CrewMark). */
   lead?: ReactNode;
@@ -123,7 +124,7 @@ export function Picker<T extends string>({
         {current?.lead ? (
           <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg">{current.lead}</span>
         ) : current && current.avatar !== false ? (
-          <Avatar name={current.avatar || current.label} icon={current.icon} channelIcon={current.channelIcon} size={24} />
+          <Avatar name={current.avatar || current.label} icon={current.icon} channelIcon={current.channelIcon} avatarBg={current.avatarBg} size={24} />
         ) : current?.icon ? (
           <span className="grid h-6 w-6 place-items-center text-fg-3">
             <Icon name={current.icon} size={14} />
@@ -175,7 +176,7 @@ export function Picker<T extends string>({
                 {o.lead ? (
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">{o.lead}</span>
                 ) : o.avatar !== false ? (
-                  <Avatar name={o.avatar || o.label} icon={o.icon} channelIcon={o.channelIcon} size={28} />
+                  <Avatar name={o.avatar || o.label} icon={o.icon} channelIcon={o.channelIcon} avatarBg={o.avatarBg} size={28} />
                 ) : o.icon ? (
                   <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-2 text-fg-3">
                     <Icon name={o.icon} size={14} />

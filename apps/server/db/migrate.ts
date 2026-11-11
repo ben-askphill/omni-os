@@ -328,6 +328,8 @@ export function migrate() {
   for (const col of ['limit_state', 'limit_resets_at', 'limit_id', 'limit_machine']) ensureColumn('threads', col, 'TEXT');
   ensureColumn('threads', 'limit_elsewhere', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
+  ensureColumn('channels', 'avatar_bg', 'TEXT');
+  ensureColumn('channels', 'avatar_bg_manual', 'INTEGER NOT NULL DEFAULT 0');
   // The sidebar folder a thread sits in, null for ungrouped: every existing thread. Synced with the thread row.
   ensureColumn('threads', 'folder_id', 'TEXT REFERENCES folders(id) ON DELETE SET NULL');
   db.exec('CREATE INDEX IF NOT EXISTS threads_folder ON threads(folder_id) WHERE folder_id IS NOT NULL');
