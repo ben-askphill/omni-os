@@ -28,8 +28,6 @@ export interface SettingField {
   page: SettingPage | null;
   /** Folded under Advanced. */
   advanced?: boolean;
-  /** Shares its row with the next field that has it too. */
-  half?: boolean;
   /** Under the label. `{fallback}` is this machine's default. */
   hint?: string;
   placeholder?: string;
@@ -79,14 +77,13 @@ export const SETTING_FIELDS = [
     max: NAME_MAX,
     required: 'Enter a name.',
   },
-  { section: 'user', key: 'pronouns', label: 'Pronouns', input: 'pronouns', page: 'general', half: true, default: 'they/them', max: 40 },
+  { section: 'user', key: 'pronouns', label: 'Pronouns', input: 'pronouns', page: 'general', default: 'they/them', max: 40 },
   {
     section: 'user',
     key: 'timezone',
     label: 'Timezone',
     input: 'timezone',
     page: 'general',
-    half: true,
     hint: "Empty uses the server's: {fallback}.",
     fallback: 'timezone',
     default: '',

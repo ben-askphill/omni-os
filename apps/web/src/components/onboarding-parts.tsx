@@ -137,7 +137,7 @@ export function browserTimezone() {
   }
 }
 
-export function TimezoneInput({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+export function TimezoneInput({ id, value, onChange, describedBy }: { id: string; value: string; onChange: (v: string) => void; describedBy?: string }) {
   const zones = useMemo(() => {
     try {
       return (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
@@ -147,7 +147,7 @@ export function TimezoneInput({ id, value, onChange }: { id: string; value: stri
   }, []);
   return (
     <>
-      <input id={id} className="field w-full" list={`${id}-zones`} value={value} placeholder="Europe/Amsterdam" spellCheck={false} onChange={(e) => onChange(e.target.value)} />
+      <input id={id} aria-describedby={describedBy} className="field w-full" list={`${id}-zones`} value={value} placeholder="Europe/Amsterdam" spellCheck={false} onChange={(e) => onChange(e.target.value)} />
       <datalist id={`${id}-zones`}>
         {zones.map((z) => (
           <option key={z} value={z} />
@@ -157,13 +157,14 @@ export function TimezoneInput({ id, value, onChange }: { id: string; value: stri
   );
 }
 
-export function PronounsInput({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+export function PronounsInput({ id, value, onChange, describedBy }: { id: string; value: string; onChange: (v: string) => void; describedBy?: string }) {
   const custom = !PRONOUNS.includes(value);
   const [other, setOther] = useState(custom);
   return (
     <div className="flex gap-2">
       <select
         id={id}
+        aria-describedby={describedBy}
         className="field min-w-0 flex-1"
         value={other ? 'other' : value}
         onChange={(e) => {
