@@ -8,6 +8,8 @@ import { THEME, attachInteractive, attachReadOnly } from './terminal-session.ts'
 import { TerminalSelectionDock, useSelectedText, useTapToPick } from './TerminalSelection.tsx';
 import { Button, ErrorNote, Icon, IconButton } from './ui.tsx';
 
+const SYSTEM_MONO = '"SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
+
 /**
  * The thread's shell, in its working directory. The shell lives on the server: switching tabs or
  * reloading reattaches to it and replays its recent output. `readOnly` (the phone) only watches: no keys, and it
@@ -25,9 +27,13 @@ export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cw
   useEffect(() => {
     const el = host.current;
     if (!el) return;
+    // The page's mono face: the rail Beta's bundled JetBrains Mono (index.css), else Apple's. xterm measures its cells
+    // once, so until a bundled face has loaded it draws with the system mono and switches when the face arrives.
+    const face = getComputedStyle(document.documentElement).getPropertyValue('--face-mono').trim() || SYSTEM_MONO;
+    const loaded = document.fonts.check(`12px ${face}`);
     const term = new Terminal({
       theme: THEME,
-      fontFamily: '"SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+      fontFamily: loaded ? face : SYSTEM_MONO,
       fontSize: readOnly ? 11 : 12,
       lineHeight: 1.2,
       cursorBlink: !readOnly,
@@ -42,7 +48,19 @@ export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cw
     termRef.current = term;
     const base = `/threads/${encodeURIComponent(threadId)}/terminal`;
     const sink = { setState, setError };
-    return readOnly ? attachReadOnly(term, base, sink) : attachInteractive(term, fit, el, base, sink);
+    const detach = readOnly ? attachReadOnly(term, base, sink) : attachInteractive(term, fit, el, base, sink);
+    let live = true;
+    if (!loaded) {
+      void document.fonts.load(`12px ${face}`).then(() => {
+        if (!live) return;
+        term.options.fontFamily = face;
+        if (!readOnly) fit.fit();
+      }, () => {});
+    }
+    return () => {
+      live = false;
+      detach();
+    };
   }, [threadId, generation, readOnly]);
 
   // After the effect above, which makes the terminal: these watch it from the same render on.
