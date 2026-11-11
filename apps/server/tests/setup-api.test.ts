@@ -49,6 +49,13 @@ describe('onboarding', () => {
     expect(userConfig().automations['weekly-review']).toBeUndefined();
   });
 
+  it("saving one field, as Settings' Reset does, keeps the section's other fields", async () => {
+    await send('PUT', '/api/setup', { user: { name: 'Ada', timezone: 'Europe/London', email: 'ada@example.com' }, workspace: { githubOwner: 'ada' } });
+    const s = await json(await send('PUT', '/api/setup', { user: { email: '' } }));
+    expect(s.config.user).toMatchObject({ name: 'Ada', timezone: 'Europe/London', email: '' });
+    expect(s.config.workspace.githubOwner).toBe('ada');
+  });
+
   it('complete marks it done, makes the workspace and leaves one welcome thread in #conductor', async () => {
     const ws = join(home, 'Work');
     const done = await json(await send('POST', '/api/setup/complete', { workspace: { root: ws } }));

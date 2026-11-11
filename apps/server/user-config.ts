@@ -36,18 +36,25 @@ const dataDir = () => (process.env.OMNI_DATA_DIR ? resolve(ROOT, process.env.OMN
 export const configPath = () => (process.env.OMNI_CONFIG ? resolve(ROOT, process.env.OMNI_CONFIG) : join(dataDir(), 'omni.config.json'));
 
 /** The fields, their defaults and checks are @omni/shared/settings.ts; this builds the schema the file is read with. */
-const fieldSchema = (f: SettingField) =>
+const fieldCheck = (f: SettingField) =>
   z
     .string()
     .trim()
     .superRefine((v, ctx) => {
       const problem = settingProblem(f, v, 'file');
       if (problem) ctx.addIssue({ code: 'custom', message: problem });
-    })
-    .default(f.default);
+    });
 
 const sectionSchema = (section: SettingSection) =>
-  z.object(Object.fromEntries(sectionFields(section).map((f) => [f.key, fieldSchema(f)])) as Record<string, ReturnType<typeof fieldSchema>>);
+  z.object(Object.fromEntries(sectionFields(section).map((f) => [f.key, fieldCheck(f).default(f.default)])));
+
+/**
+ * A section of a patch: only the fields it names. Zod 4 fills a default even inside .partial(), so a patch built from
+ * sectionSchema would set every field it leaves out back to its default.
+ */
+const patchSectionSchema = (section: SettingSection) => z.object(Object.fromEntries(sectionFields(section).map((f) => [f.key, fieldCheck(f).optional()])));
+
+const runOnDevice = z.string().trim().max(100);
 
 const automationOverride = z.object({ enabled: z.boolean().optional(), channel: z.string().optional() });
 
@@ -58,7 +65,7 @@ const schema = z.object({
   workspace: sectionSchema('workspace').prefault({}),
   integrations: sectionSchema('integrations').prefault({}),
   /** Per machine, like the rest of this file (apps/server/run-on.ts). */
-  runOn: z.object({ device: z.string().trim().max(100).default('') }).prefault({}),
+  runOn: z.object({ device: runOnDevice.default('') }).prefault({}),
   automations: z.record(z.string(), automationOverride).default({}),
   /** Off until turned on in Settings > Worktrees. */
   worktrees: z
@@ -79,10 +86,10 @@ export const userConfigSchema = { parse: (v: unknown): UserConfig => schema.pars
 /** A partial update: any section, any subset of its fields. A client's save also goes through `checkSettingFields`. */
 export const userConfigPatch = z.object({
   onboardedAt: z.string().nullish(),
-  user: sectionSchema('user').partial().optional(),
-  workspace: sectionSchema('workspace').partial().optional(),
-  integrations: sectionSchema('integrations').partial().optional(),
-  runOn: schema.shape.runOn.unwrap().partial().optional(),
+  user: patchSectionSchema('user').optional(),
+  workspace: patchSectionSchema('workspace').optional(),
+  integrations: patchSectionSchema('integrations').optional(),
+  runOn: z.object({ device: runOnDevice.optional() }).optional(),
   automations: z.record(z.string(), automationOverride.nullable()).optional(),
 });
 
