@@ -2,7 +2,7 @@ import { watch, statSync, existsSync } from 'node:fs';
 import { join, sep, extname, basename } from 'node:path';
 import { paths } from './config.ts';
 import { artifacts, threads, type Artifact } from './db.ts';
-import { publishFeed, publishThread } from './bus.ts';
+import { bus, publishFeed, publishThread } from './bus.ts';
 
 const KINDS: Record<string, string> = {
   '.html': 'html', '.htm': 'html', '.md': 'markdown', '.svg': 'svg', '.png': 'image', '.jpg': 'image',
@@ -49,6 +49,8 @@ export function register(rel: string) {
   if (!st.isFile()) return;
   const row = artifacts.upsert({ thread_id: c.threadId, path: full, name: basename(full), kind: c.kind, size: st.size });
   announceArtifact(row);
+  // Written here, not synced in: sync/files.ts uploads it without waiting for the turn to end.
+  bus.emit('artifact-saved', c.threadId);
   return row;
 }
 

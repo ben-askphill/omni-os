@@ -3,6 +3,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync
 import { homedir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 import { threadDir, uploadsDir } from '../config.ts';
+import { bus } from '../bus.ts';
 import { db, kv, threads, type Thread } from '../db.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { safeName, uniqueName, type Attachment } from '../uploads.ts';
@@ -12,7 +13,8 @@ import { activeWorker, onSynced, type SyncWorker } from './worker.ts';
 
 // Files that go with a thread, next to the rows the worker syncs:
 // - what is in data/threads/<id>/{uploads,artifacts,browser}, content-addressed in Storage as blobs/<sha256>, listed
-//   per thread in manifests/<id>.json. Pulled lazily, when the thread is opened or before it runs here.
+//   per thread in manifests/<id>.json. Uploaded after each turn and a moment after an artifact is saved. Pulled
+//   lazily: when the thread is opened, when a missing artifact is asked for, or before it runs here.
 // - the harness's own session file, so a thread can resume on the other Mac: uploaded after each turn and downloaded
 //   before a process resumes it. Claude Code's lives in a folder named after the cwd, so the folder is worked out
 //   again for this machine's cwd.
@@ -488,10 +490,20 @@ function withCwd(body: Uint8Array, cwd: string): Uint8Array {
 // The runner and the API call these. Each one is a no-op while sync is off, never throws, and never blocks a
 // response: files move in the background, one job per thread at a time.
 
-const hookDefaults: { home?: string; env?: NodeJS.ProcessEnv; turnDelayMs: number; resumeTimeoutMs: number; openEveryMs: number } = {
+const hookDefaults: {
+  home?: string;
+  env?: NodeJS.ProcessEnv;
+  turnDelayMs: number;
+  resumeTimeoutMs: number;
+  openEveryMs: number;
+  fileWaitMs: number;
+  fileRetryMs: number;
+} = {
   turnDelayMs: 1_500,
   resumeTimeoutMs: 15_000,
   openEveryMs: 30_000,
+  fileWaitMs: 10_000,
+  fileRetryMs: 1_000,
 };
 
 /** For tests: the home dir the hooks use, and their timings. */
@@ -546,13 +558,52 @@ const turnTimers = new Map<string, NodeJS.Timeout>();
 const turnWaiters = new Map<string, (() => void)[]>();
 
 /**
- * A file of this thread is asked for and is not here: wait (up to timeoutMs) for the download that opening the
- * thread started, or start one. Resolves at once while sync is off.
+ * A file of this thread is asked for and is not here: wait (up to fileWaitMs) for the download that opening the
+ * thread started, or start one. Given the file, keep pulling until it lands. Resolves at once while sync is off.
  */
-export async function threadFilesReady(threadId: string, timeoutMs = 10_000): Promise<void> {
-  if (!hookOpts()) return;
-  await within(Promise.all([threadOpened(threadId), chains.get(threadId)]), timeoutMs);
+export async function threadFilesReady(threadId: string, file?: string): Promise<void> {
+  const opts = hookOpts();
+  if (!opts) return;
+  const deadline = Date.now() + hookDefaults.fileWaitMs;
+  await within(Promise.all([threadOpened(threadId), chains.get(threadId)]), hookDefaults.fileWaitMs);
+  // The row can arrive before the other Mac has uploaded its file: look again until the file lands.
+  while (file && !existsSync(file) && Date.now() + hookDefaults.fileRetryMs < deadline) {
+    await new Promise((res) => setTimeout(res, hookDefaults.fileRetryMs));
+    await within(refresh(threadId, opts), deadline - Date.now());
+  }
 }
+
+const refreshing = new Map<string, Promise<unknown>>();
+/** One pull at a time per thread for every request waiting on a file, so a page of images costs one manifest read. */
+function refresh(threadId: string, opts: FileSyncOptions): Promise<unknown> {
+  let run = refreshing.get(threadId);
+  if (!run) {
+    run = serial(threadId, () => pullThreadFiles(threadId, opts))
+      .catch(logFailure('file download', threadId))
+      .finally(() => refreshing.delete(threadId));
+    refreshing.set(threadId, run);
+  }
+  return run;
+}
+
+const savedTimers = new Map<string, NodeJS.Timeout>();
+
+/**
+ * An artifact was written: upload the thread's files shortly, without waiting for the turn to end, so the other Mac
+ * can open it now. Saves close together coalesce.
+ */
+function artifactSaved(threadId: string): void {
+  if (!hookOpts()) return;
+  clearTimeout(savedTimers.get(threadId));
+  const timer = setTimeout(() => {
+    savedTimers.delete(threadId);
+    const opts = hookOpts();
+    if (opts) void serial(threadId, () => pushThreadFiles(threadId, opts)).catch(logFailure('file upload', threadId));
+  }, hookDefaults.turnDelayMs);
+  timer.unref();
+  savedTimers.set(threadId, timer);
+}
+bus.on('artifact-saved', artifactSaved);
 
 /**
  * A turn ended: upload the thread's new files and its session file, shortly, so the CLI has flushed the session.
