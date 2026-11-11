@@ -50,6 +50,18 @@
         "defaultEffort": "high"
       },
       {
+        "id": "claude-fable-5-2",
+        "label": "Fable 5.2",
+        "efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "defaultEffort": "high"
+      },
+      {
         "id": "claude-fable-5-1",
         "label": "Fable 5.1",
         "efforts": [
