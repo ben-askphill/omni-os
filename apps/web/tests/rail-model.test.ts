@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { listMode, monogram, needsByChannel, railBadge, railGroups, railSelection } from '../src/rail-model.ts';
+import { inboxStaysOpen, listMode, monogram, needsByChannel, railBadge, railGroups, railSelection } from '../src/rail-model.ts';
 
 const ch = (id: string, name: string, kind: string, extra: { archived?: boolean; running?: number } = {}) => ({ id, name, kind, running: 0, ...extra });
 
@@ -34,6 +34,21 @@ describe('railSelection', () => {
   it('selects Settings and the add-channel control on their pages', () => {
     expect(railSelection({ name: 'settings' }, null)).toEqual({ kind: 'settings' });
     expect(railSelection({ name: 'new-channel' }, null)).toEqual({ kind: 'new-channel' });
+  });
+  it('keeps Home selected for a thread opened from the Inbox, so the panel stays on it', () => {
+    const sel = railSelection({ name: 'thread', id: 't1' }, { id: 't1', channel_id: 'volero' }, true);
+    expect(sel).toEqual({ kind: 'home' });
+    expect(listMode(sel, true)).toEqual({ kind: 'inbox' });
+  });
+});
+
+describe('inboxStaysOpen', () => {
+  it('holds through threads and workspace pages, and closes on a channel, Settings or Add channel', () => {
+    expect(inboxStaysOpen({ name: 'thread', id: 't1' })).toBe(true);
+    expect(inboxStaysOpen({ name: 'prs' })).toBe(true);
+    expect(inboxStaysOpen({ name: 'channel', id: 'acne', tab: 'threads' })).toBe(false);
+    expect(inboxStaysOpen({ name: 'settings' })).toBe(false);
+    expect(inboxStaysOpen({ name: 'new-channel' })).toBe(false);
   });
 });
 

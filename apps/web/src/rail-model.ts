@@ -35,13 +35,15 @@ export function railGroups<C extends RailChannel>(channels: readonly C[]): RailG
 
 /**
  * The selected disc for a route. A thread selects its channel once the open thread is known; before that, and for
- * the workspace pages (Inbox, Pull requests, Artifacts, Automations, Search), Home is selected.
+ * the workspace pages (Inbox, Pull requests, Artifacts, Automations, Search), Home is selected. With the Inbox open in
+ * the panel, a thread opened from it keeps Home selected, so the panel stays on the Inbox.
  */
-export function railSelection(route: Route, openThread: { id: string; channel_id: string } | null): RailSelection {
+export function railSelection(route: Route, openThread: { id: string; channel_id: string } | null, inbox = false): RailSelection {
   switch (route.name) {
     case 'channel':
       return { kind: 'channel', id: route.id };
     case 'thread':
+      if (inbox) return { kind: 'home' };
       return openThread && openThread.id === route.id ? { kind: 'channel', id: openThread.channel_id } : { kind: 'home' };
     case 'settings':
       return { kind: 'settings' };
@@ -85,4 +87,9 @@ export type ListMode = { kind: 'home' } | { kind: 'inbox' } | { kind: 'channel';
 export function listMode(selection: RailSelection, inbox: boolean): ListMode {
   if (selection.kind === 'channel') return { kind: 'channel', id: selection.id };
   return inbox ? { kind: 'inbox' } : { kind: 'home' };
+}
+
+/** The Inbox stays open in the panel through threads and workspace pages, and closes on a channel, Settings or Add channel. */
+export function inboxStaysOpen(route: Route): boolean {
+  return route.name !== 'channel' && route.name !== 'settings' && route.name !== 'new-channel';
 }

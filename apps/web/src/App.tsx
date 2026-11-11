@@ -17,7 +17,7 @@ import { QuickPromptPage } from './pages/QuickPrompt.tsx';
 import { ChannelRail } from './components/rail/ChannelRail.tsx';
 import { ListPanel } from './components/rail/ListPanel.tsx';
 import { useLayout } from './layout-pref.ts';
-import { listMode, railSelection } from './rail-model.ts';
+import { inboxStaysOpen, listMode, railSelection } from './rail-model.ts';
 
 const SIDEBAR_WIDTH = 252;
 const SIDEBAR_MIN = 200;
@@ -110,14 +110,26 @@ function Shell() {
   usePageTitle(route);
 
   const layout = useLayout();
-  const selection = railSelection(route, openThread);
   const [inbox, setInbox] = useState(() => readPref('rail.inbox', false));
   const showInbox = (open: boolean) => (setInbox(open), writePref('rail.inbox', open));
+  const inboxOpen = inbox && inboxStaysOpen(route);
+  // Leaving for a channel, Settings or Add channel closes the Inbox, so coming back to a thread shows its channel.
+  useEffect(() => {
+    if (inbox && !inboxStaysOpen(route)) {
+      setInbox(false);
+      writePref('rail.inbox', false);
+    }
+  }, [inbox, route]);
+  const selection = railSelection(route, openThread, inboxOpen);
+  // The desktop app puts its macOS traffic lights where this layout leaves room for them (apps/desktop windows.ts).
+  useEffect(() => {
+    desktop?.setLayout?.(layout);
+  }, [layout]);
 
   return layout === 'rail' ? (
     <div className="desktop-shell rail-shell flex h-full min-h-0 flex-row bg-bg">
       <ChannelRail selection={selection} />
-      <ListPanel mode={listMode(selection, inbox)} onSearch={openPalette} onInbox={showInbox} />
+      <ListPanel mode={listMode(selection, inboxOpen)} onSearch={openPalette} onInbox={showInbox} />
       <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg">
         <Page route={route} />
       </main>

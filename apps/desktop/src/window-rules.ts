@@ -1,4 +1,5 @@
 // Pure rules for Omni's windows (windows.ts): where a link goes, and where the main window opens again.
+import type { DesktopLayout } from '@omni/shared/desktop-bridge.ts';
 import { safeRoute } from './options.ts';
 
 export type LinkTarget =
@@ -149,10 +150,18 @@ export function restoreBounds(saved: Rect, workAreas: readonly Rect[], min: { wi
 /** Below this many CSS pixels the Web UI shows its phone layout (useIsMobile in apps/web/src/store.tsx). */
 export const PHONE_LAYOUT_BELOW = 768;
 
+/** The channel rail's width in CSS pixels (apps/web/src/components/rail/ChannelRail.tsx). */
+export const RAIL_WIDTH = 72;
+/** The three macOS traffic lights, edge to edge, in window points (about 60 on macOS 26). */
+const TRAFFIC_LIGHTS_WIDTH = 60;
+
 /**
- * Where the macOS traffic lights go: beside the wordmark in the sidebar's top row, or in the strip index.css puts
- * above the phone layout. The page's width in CSS pixels is the window's divided by the zoom.
+ * Where the macOS traffic lights go: beside the wordmark in the classic sidebar's top row, centred in the channel
+ * rail's top strip, or in the strip index.css puts above the phone layout. The page's width in CSS pixels is the
+ * window's divided by the zoom; the lights themselves never zoom.
  */
-export function trafficLights(contentWidth: number, zoom: number): { x: number; y: number } {
-  return contentWidth / zoom < PHONE_LAYOUT_BELOW ? { x: 12, y: 7 } : { x: 18, y: 29 };
+export function trafficLights(contentWidth: number, zoom: number, layout: DesktopLayout = 'classic'): { x: number; y: number } {
+  if (contentWidth / zoom < PHONE_LAYOUT_BELOW) return { x: 12, y: 7 };
+  if (layout === 'rail') return { x: Math.max(2, Math.round((RAIL_WIDTH * zoom - TRAFFIC_LIGHTS_WIDTH) / 2)), y: 29 };
+  return { x: 18, y: 29 };
 }

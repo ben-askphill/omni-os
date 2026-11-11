@@ -1,6 +1,7 @@
 // The IPC between the preload (the page's `window.omniDesktop`) and the main process. One table of channels, so
 // the preload and each feature that answers one agree on names and shapes.
 import type {
+  DesktopLayout,
   DesktopPlatform,
   DesktopServerInfo,
   DesktopSettings,
@@ -38,6 +39,7 @@ export interface SendChannels {
   'omni:open-window': [route: string];
   'omni:focus': [];
   'omni:appearance': [mode: 'system' | 'light' | 'dark'];
+  'omni:layout': [layout: DesktopLayout];
   'omni:quick-prompt:done': [route?: string];
   'omni:quick-prompt:open': [];
   'omni:quick-prompt:resize': [height: number];

@@ -26,6 +26,7 @@ const bridge: DesktopBridge = {
   openWindow: (route) => send('omni:open-window', route),
   focus: () => send('omni:focus'),
   setAppearance: (mode) => send('omni:appearance', mode),
+  setLayout: (layout) => send('omni:layout', layout),
   settings: {
     get: () => invoke('omni:settings:get'),
     set: (patch) => invoke('omni:settings:set', patch),

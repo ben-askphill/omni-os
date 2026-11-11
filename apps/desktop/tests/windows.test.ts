@@ -94,6 +94,13 @@ describe('trafficLights', () => {
     // 1000 window pixels at 160% are 625 CSS pixels: the phone layout.
     expect(trafficLights(1000, 1.6)).toEqual({ x: 12, y: 7 });
   });
+
+  it('centres them in the channel rail, which grows with the zoom', () => {
+    expect(trafficLights(1320, 1, 'rail')).toEqual({ x: 6, y: 29 });
+    expect(trafficLights(1320, 1.2, 'rail')).toEqual({ x: 13, y: 29 });
+    expect(trafficLights(1320, 0.8, 'rail')).toEqual({ x: 2, y: 29 });
+    expect(trafficLights(700, 1, 'rail')).toEqual({ x: 12, y: 7 });
+  });
 });
 
 describe('the app session', () => {
