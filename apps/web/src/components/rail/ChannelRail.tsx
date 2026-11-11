@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { ChannelWithRunning } from '../../api.ts';
 import { href } from '../../router.ts';
@@ -21,7 +22,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
   const badgeOf = (c: ChannelWithRunning) => railBadge(c.running, needs.get(c.id) ?? 0);
   const disc = (c: ChannelWithRunning) => (
     <RailItem key={c.id} to={href.channel(c.id)} label={c.name} selected={isChannel(c.id)} badge={badgeOf(c)}>
-      <Disc selected={isChannel(c.id)}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={18} /> : monogram(c.name)}</Disc>
+      <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={18} /> : monogram(c.name)}</Disc>
     </RailItem>
   );
   const { ref, fade } = useScrollFade();
@@ -46,7 +47,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
         </RailItem>
         {conductor && (
           <RailItem to={href.channel('conductor')} label="Conductor" selected={isChannel('conductor')} badge={badgeOf(conductor)}>
-            <Disc selected={isChannel('conductor')}>
+            <Disc selected={isChannel('conductor')} fill={conductor.avatar_bg}>
               <StaticMark size={20} title="" />
             </Disc>
           </RailItem>
@@ -107,13 +108,18 @@ function RailItem({ to, label, selected, badge, children }: { to: string; label:
   );
 }
 
-/** The 40px disc: letters, a channel's own icon or a glyph. Selected, it turns ink-on-light. `quiet`: the bottom controls, with no fill until selected. */
-function Disc({ selected, icon, quiet, children }: { selected: boolean; icon?: IconName; quiet?: boolean; children?: ReactNode }) {
+/**
+ * The 40px disc: letters, a channel's own icon or a glyph. Selected, it turns ink-on-light. `quiet`: the bottom
+ * controls, with no fill until selected. `fill`: the channel's avatar background, kept when selected, which adds a ring.
+ */
+function Disc({ selected, icon, quiet, fill, children }: { selected: boolean; icon?: IconName; quiet?: boolean; fill?: string | null; children?: ReactNode }) {
+  const look = fill
+    ? selected ? 'ring-2 ring-fg ring-offset-2 ring-offset-[var(--chrome)]' : ''
+    : selected ? 'bg-fg text-[var(--chrome)]' : quiet ? 'text-fg-3' : 'bg-surface-2 text-fg-2';
   return (
     <span
-      className={`grid h-10 w-10 place-items-center rounded-full font-rounded text-[14px] font-medium leading-none transition-colors ${
-        selected ? 'bg-fg text-[var(--chrome)]' : quiet ? 'text-fg-3' : 'bg-surface-2 text-fg-2'
-      }`}
+      className={`grid h-10 w-10 place-items-center rounded-full font-rounded text-[14px] font-medium leading-none transition-colors ${look}`}
+      style={fill ? { backgroundColor: fill, color: avatarInk(fill) } : undefined}
     >
       {icon ? <Icon name={icon} size={18} /> : children}
     </span>
