@@ -26,7 +26,7 @@ server.registerTool(
   async ({ title, html }, extra) => {
     if (!SELF) return refused('Omni did not say which thread this is (OMNI_THREAD_ID is not set), so the page has nowhere to go.');
     try {
-      const { artifact } = await call(`/threads/${SELF}/renders`, { method: 'POST', body: JSON.stringify({ title, html }), signal: extra.signal });
+      const { artifact } = await call<{ artifact: { id: number } }>(`/threads/${SELF}/renders`, { method: 'POST', body: JSON.stringify({ title, html }), signal: extra.signal });
       return text(renderedText({ artifact: artifact.id, title: title.trim() }));
     } catch (err) {
       return refused((err as Error).message);

@@ -34,7 +34,7 @@ export function registerReferencedThread(server: McpServer) {
       if (after !== undefined) q.set('after', String(after));
       if (limit !== undefined) q.set('limit', String(limit));
       try {
-        const page = await call(`/threads/${encodeURIComponent(SELF)}/references/${encodeURIComponent(thread_id)}/history?${q}`);
+        const page = await call<{ state: string }>(`/threads/${encodeURIComponent(SELF)}/references/${encodeURIComponent(thread_id)}/history?${q}`);
         return page.state === 'ok' ? text(page) : { ...text(page), isError: true };
       } catch (err) {
         // A 4xx says what is wrong with the call, which is the agent's to fix; anything else is Omni not answering.

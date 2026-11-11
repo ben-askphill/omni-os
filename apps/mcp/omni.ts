@@ -6,6 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { filterClaudeArtifacts, type ClaudeArtifact } from '@omni/shared/claude-artifacts.ts';
 import { ApiError, call, SELF, text } from './api.ts';
+import type { ApiArtifactRow, ApiChannel, ApiDevice, ApiFolder, ApiHarness, ApiRole, ApiThread, AccountBody, ConnectMachines, ConnectStatus, ContinuePreview, CrewQuestionItem, SentSecret, ServerOptionsBody, SetupBody, SignedInDevicesBody } from './responses.ts';
 import { prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
 
@@ -22,19 +23,19 @@ const basePick = (base?: string) => {
 };
 
 /** A channel's sidebar folders, with a few recent thread titles so you can tell what each one holds. */
-const folderSummary = (folders: any[] = []) =>
-  folders.map((f: any) => ({ id: f.id, name: f.name, threads: f.count, recent: (f.threads ?? []).slice(0, 3).map((t: any) => t.title) }));
+const folderSummary = (folders: ApiFolder[] = []) =>
+  folders.map((f) => ({ id: f.id, name: f.name, threads: f.count, recent: (f.threads ?? []).slice(0, 3).map((t) => t.title) }));
 
 /**
  * The folder `name` names in the channel, by id or name ignoring case. With `create` a name no folder has is fine:
  * the server makes it. Without it, an unknown name is refused, so a new folder only ever comes after the user agreed to it.
  */
 async function checkFolder(channel: string, name: string, create?: boolean) {
-  const ch = await call(`/channels/${encodeURIComponent(channel)}`);
+  const ch = await call<ApiChannel>(`/channels/${encodeURIComponent(channel)}`);
   const want = name.replace(/\s+/g, ' ').trim().toLowerCase();
-  const hit = (ch.folders ?? []).find((f: any) => f.id === name || f.name.toLowerCase() === want);
+  const hit = (ch.folders ?? []).find((f) => f.id === name || f.name.toLowerCase() === want);
   if (hit || create) return hit ?? null;
-  const have = (ch.folders ?? []).map((f: any) => `"${f.name}"`).join(', ') || 'none yet';
+  const have = (ch.folders ?? []).map((f) => `"${f.name}"`).join(', ') || 'none yet';
   throw new Error(
     `#${channel} has no folder "${name}" (folders: ${have}). Suggest the new folder to ${USER} and leave the thread unfiled for now; ` +
       `once ${USER} agrees, call file_thread with create: true. Pass create_folder: true on delegate only when ${USER} already asked for the folder.`,
@@ -49,9 +50,9 @@ server.registerTool(
       'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in.',
   },
   async () => {
-    const list = await call('/channels');
+    const list = await call<ApiChannel[]>('/channels');
     return text(
-      list.map((c: any) => ({
+      list.map((c) => ({
         id: c.id,
         name: c.name,
         kind: c.kind,
@@ -68,7 +69,7 @@ server.registerTool(
 server.registerTool(
   'list_crew',
   { description: 'List crew roles you can delegate to, with their charters summarized.' },
-  async () => text((await call('/crew')).filter((r: any) => r.id !== 'conductor').map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
+  async () => text((await call<ApiRole[]>('/crew')).filter((r) => r.id !== 'conductor').map((r) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
 );
 
 server.registerTool(
@@ -117,7 +118,7 @@ server.registerTool(
   },
   async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder, base, device }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
-    const t = await call('/threads', {
+    const t = await call<ApiThread>('/threads', {
       method: 'POST',
       body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device) }),
     });
@@ -158,11 +159,11 @@ server.registerTool(
   },
   async ({ channel, title, prompt, role, task_id, folder, create_folder, tasks }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
-    const { lead, members } = await call('/threads/team', {
+    const { lead, members } = await call<{ lead: ApiThread; members: ApiThread[] }>('/threads/team', {
       method: 'POST',
       body: JSON.stringify({ channel, title, prompt, role, task_id, folder, tasks, parent_id: SELF, source: 'conductor' }),
     });
-    const brief = (t: any) => ({ thread_id: t.id, task_id: t.task_id, title: t.title, channel: t.channel_id, role: t.role, harness: t.harness, status: t.status });
+    const brief = (t: ApiThread) => ({ thread_id: t.id, task_id: t.task_id, title: t.title, channel: t.channel_id, role: t.role, harness: t.harness, status: t.status });
     return text({ lead: brief(lead), members: members.map(brief) });
   },
 );
@@ -181,13 +182,13 @@ server.registerTool(
     },
   },
   async ({ thread_id, folder, create }) => {
-    const { thread } = await call(`/threads/${thread_id}`);
+    const { thread } = await call<{ thread: ApiThread }>(`/threads/${thread_id}`);
     let folder_id: string | null = null;
     if (folder.trim()) {
       const hit = await checkFolder(thread.channel_id, folder, create);
-      folder_id = hit?.id ?? (await call('/folders', { method: 'POST', body: JSON.stringify({ channel: thread.channel_id, name: folder }) })).id;
+      folder_id = hit?.id ?? (await call<{ id: string }>('/folders', { method: 'POST', body: JSON.stringify({ channel: thread.channel_id, name: folder }) })).id;
     }
-    const t = await call(`/threads/${thread_id}`, { method: 'PATCH', body: JSON.stringify({ folder_id }) });
+    const t = await call<ApiThread>(`/threads/${thread_id}`, { method: 'PATCH', body: JSON.stringify({ folder_id }) });
     return text({ thread_id: t.id, channel: t.channel_id, folder_id: t.folder_id });
   },
 );
@@ -204,7 +205,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, done }) => {
-    const t = await call(`/threads/${thread_id}`, { method: 'PATCH', body: JSON.stringify({ done: done ?? true }) });
+    const t = await call<ApiThread>(`/threads/${thread_id}`, { method: 'PATCH', body: JSON.stringify({ done: done ?? true }) });
     return text({ thread_id: t.id, channel: t.channel_id, status: t.status, done_at: t.done_at });
   },
 );
@@ -221,9 +222,9 @@ server.registerTool(
     },
   },
   async ({ channel }) => {
-    const list = await call(channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses');
+    const list = await call<ApiHarness[]>(channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses');
     return text(
-      list.map((h: any) => ({
+      list.map((h) => ({
         id: h.id,
         name: h.name,
         plan: h.plan,
@@ -231,7 +232,7 @@ server.registerTool(
         fix: h.available ? undefined : h.fix,
         cap: h.cap,
         running: h.running,
-        models: (h.models ?? []).map((m: any) => ({ id: m.id, label: m.label, efforts: m.efforts, default_effort: m.defaultEffort, default: m.default })),
+        models: (h.models ?? []).map((m) => ({ id: m.id, label: m.label, efforts: m.efforts, default_effort: m.defaultEffort, default: m.default })),
       })),
     );
   },
@@ -255,7 +256,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, message, mode, wake_cold }) => {
-    const t = await call(`/threads/${thread_id}/messages`, {
+    const t = await call<ApiThread>(`/threads/${thread_id}/messages`, {
       method: 'POST',
       body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer', ...(wake_cold && { wake_cold }) }),
     });
@@ -277,7 +278,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, action }) => {
-    const res = await call(`/threads/${thread_id}/session/${action}`, { method: 'POST', body: '{}' });
+    const res = await call<{ thread?: { status?: string; resume_blocked?: string | null }; pending?: unknown[] }>(`/threads/${thread_id}/session/${action}`, { method: 'POST', body: '{}' });
     return text({ thread_id, status: res.thread?.status, resume_blocked: res.thread?.resume_blocked ?? null, waiting: res.pending?.length ?? 0 });
   },
 );
@@ -298,7 +299,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, harness, model, effort }) => {
-    const t = await call(`/threads/${thread_id}/run`, { method: 'POST', body: JSON.stringify({ harness, model: model ?? '', effort: effort ?? '' }) });
+    const t = await call<ApiThread>(`/threads/${thread_id}/run`, { method: 'POST', body: JSON.stringify({ harness, model: model ?? '', effort: effort ?? '' }) });
     const queued = t.queued_harness ? { harness: t.queued_harness, model: t.queued_model, effort: t.queued_effort } : null;
     return text({ thread_id: t.id, harness: t.harness, model: t.model, effort: t.effort, queued });
   },
@@ -345,7 +346,7 @@ server.registerTool(
   async ({ thread_id }) => {
     const id = thread_id ?? SELF;
     if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
-    return text((await call(`/threads/${encodeURIComponent(id)}/pr`)).crew ?? []);
+    return text((await call<{ crew?: unknown[] }>(`/threads/${encodeURIComponent(id)}/pr`)).crew ?? []);
   },
 );
 
@@ -362,9 +363,9 @@ server.registerTool(
   async ({ thread_id }) => {
     const id = thread_id ?? SELF;
     if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
-    const { items } = await call(`/threads/${encodeURIComponent(id)}/crew-questions`);
+    const { items } = await call<{ items: CrewQuestionItem[] }>(`/threads/${encodeURIComponent(id)}/crew-questions`);
     return text(
-      items.map((c: any) => ({ thread_id: c.thread_id, thread_title: c.thread_title, task_id: c.task_id, questions: c.question.questions.map((q: any) => q.question) })),
+      items.map((c) => ({ thread_id: c.thread_id, thread_title: c.thread_title, task_id: c.task_id, questions: c.question.questions.map((q) => q.question) })),
     );
   },
 );
@@ -390,21 +391,21 @@ server.registerTool(
   },
   async ({ thread_id, harness, model, effort, message, attachments }) => {
     const run = { harness, model: model ?? '', effort: effort ?? '' };
-    const previewOf = (picked?: string[]) => call(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify({ ...run, attachments: picked }) });
+    const previewOf = (picked?: string[]) => call<ContinuePreview>(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify({ ...run, attachments: picked }) });
     let preview = await previewOf();
     if (attachments?.length) {
-      const has: { id: string; name: string }[] = preview.carryover.attachments;
+      const has = preview.carryover.attachments;
       const missing = attachments.filter((n) => !has.some((a) => a.name === n));
       if (missing.length) return text(`Not continued: this thread has no attachment named ${missing.join(', ')}. It has: ${has.map((a) => a.name).join(', ') || 'none'}.`);
       preview = await previewOf(has.filter((a) => attachments.includes(a.name)).map((a) => a.id));
     }
     if (preview.blocked) return text(`Not continued: ${preview.blocked.message}`);
-    const picked = (preview.carryover.attachments as { id: string; selected: boolean }[]).filter((a) => a.selected).map((a) => a.id);
-    const { thread } = await call(`/threads/${thread_id}/continue`, {
+    const picked = preview.carryover.attachments.filter((a) => a.selected).map((a) => a.id);
+    const { thread } = await call<{ thread: ApiThread }>(`/threads/${thread_id}/continue`, {
       method: 'POST',
       body: JSON.stringify({ ...run, text: message, attachments: picked, request_id: randomUUID(), revision: preview.revision }),
     });
-    const files = (preview.carryover.attachments as { name: string; selected: boolean; carried: boolean; reason: string | null }[])
+    const files = preview.carryover.attachments
       .filter((a) => a.selected)
       .map((a) => ({ name: a.name, carried: a.carried, ...(a.reason && { not_carried_because: a.reason }) }));
     return text({
@@ -443,8 +444,8 @@ server.registerTool(
     if (channel) q.set('channel', channel);
     if (status) q.set('status', status);
     q.set('limit', String(limit ?? 20));
-    const list = await call(`/threads?${q}`);
-    return text(list.map((t: any) => ({ id: t.id, title: t.title, channel: t.channel_id, role: t.role, status: t.status, delegating: t.delegating, task_id: t.task_id, updated_at: t.updated_at })));
+    const list = await call<ApiThread[]>(`/threads?${q}`);
+    return text(list.map((t) => ({ id: t.id, title: t.title, channel: t.channel_id, role: t.role, status: t.status, delegating: t.delegating, task_id: t.task_id, updated_at: t.updated_at })));
   },
 );
 
@@ -459,7 +460,7 @@ async function deviceId(device: string | undefined): Promise<string | undefined>
   const want = device?.trim();
   if (!want) return undefined;
   if (want.toLowerCase() === 'here') return 'here';
-  const devices: any[] = await call('/devices');
+  const devices = await call<ApiDevice[]>('/devices');
   const named = devices.filter((d) => d.name.toLowerCase() === want.toLowerCase());
   const hit = devices.find((d) => d.id === want) ?? (named.length === 1 ? named[0] : null);
   if (named.length > 1 && !hit) throw new Error(`${named.length} machines are called "${want}". Pass the id instead: ${named.map((d) => d.id).join(', ')}.`);
@@ -506,13 +507,13 @@ server.registerTool(
   },
   async ({ name, value, scope, machine }) => {
     const target = machine?.trim() && machine.trim().toLowerCase() !== 'here' ? machine.trim() : undefined;
-    const sent = await call('/secrets/send', { method: 'POST', body: JSON.stringify({ name, value, scope: scope ?? 'global', machine: target }) });
+    const sent = await call<SentSecret>('/secrets/send', { method: 'POST', body: JSON.stringify({ name, value, scope: scope ?? 'global', machine: target }) });
     if (!target) return text({ saved: 'here', scope: sent.scope, name: sent.name });
     const until = Date.now() + SECRET_WAIT_MS;
     let view = sent;
     while (view.state === 'sent' && Date.now() < until) {
       await new Promise((r) => setTimeout(r, 2_000));
-      view = await call(`/secrets/sent/${encodeURIComponent(sent.id)}`);
+      view = await call<SentSecret>(`/secrets/sent/${encodeURIComponent(sent.id)}`);
     }
     return text(view.state === 'sent' ? { ...view, note: `On its way: ${view.machine.name} saves it after its next sync. Check with sent_secrets.` } : view);
   },
@@ -541,16 +542,16 @@ server.registerTool(
   },
   async ({ thread_id, to }) => {
     if (to.trim().toLowerCase() === 'here') {
-      const res = await call(`/threads/${thread_id}/takeover`, { method: 'POST', body: '{}' });
+      const res = await call<{ handoff?: { state?: string } }>(`/threads/${thread_id}/takeover`, { method: 'POST', body: '{}' });
       return text({ thread_id, to: 'here', handoff: res.handoff?.state ?? null });
     }
-    const devices: any[] = await call('/devices');
+    const devices = await call<ApiDevice[]>('/devices');
     const want = to.trim().toLowerCase();
     const named = devices.filter((d) => d.name.toLowerCase() === want);
     const hit = devices.find((d) => d.id === to) ?? (named.length === 1 ? named[0] : null);
     if (named.length > 1 && !hit) throw new Error(`${named.length} machines are called "${to}". Pass the id instead: ${named.map((d) => d.id).join(', ')}.`);
     if (!hit) throw new Error(`No synced machine is called "${to}". Machines: ${devices.map((d) => `${d.name} (${d.id})`).join(', ') || 'none, sync is off or no other machine has synced'}.`);
-    const res = await call(`/threads/${thread_id}/handoff`, { method: 'POST', body: JSON.stringify({ to: hit.id }) });
+    const res = await call<{ handoff?: { state?: string } }>(`/threads/${thread_id}/handoff`, { method: 'POST', body: JSON.stringify({ to: hit.id }) });
     return text({ thread_id, to: { id: hit.id, name: hit.name }, handoff: res.handoff?.state ?? null });
   },
 );
@@ -566,8 +567,8 @@ server.registerTool(
   async ({ channel, limit }) => {
     const q = new URLSearchParams({ limit: String(limit ?? 50) });
     if (channel) q.set('channel', channel);
-    const list = await call(`/artifacts/published?${q}`);
-    return text(list.map((a: any) => ({ url: a.url, name: a.name, description: a.description, thread_id: a.thread_id, thread: a.thread_title, channel: a.channel_id, updated_at: a.updated_at })));
+    const list = await call<ApiArtifactRow[]>(`/artifacts/published?${q}`);
+    return text(list.map((a) => ({ url: a.url, name: a.name, description: a.description, thread_id: a.thread_id, thread: a.thread_title, channel: a.channel_id, updated_at: a.updated_at })));
   },
 );
 
@@ -580,7 +581,7 @@ server.registerTool(
     inputSchema: { thread_id: z.string(), url: z.string().describe('The page url from list_published_artifacts.') },
   },
   async ({ thread_id, url }) => {
-    const t = await call(`/threads/${thread_id}/published/comments`, { method: 'POST', body: JSON.stringify({ url }) });
+    const t = await call<ApiThread>(`/threads/${thread_id}/published/comments`, { method: 'POST', body: JSON.stringify({ url }) });
     return text({ thread_id: t.id, status: t.status });
   },
 );
@@ -607,8 +608,8 @@ server.registerTool(
     },
   },
   async ({ query, scope, type, limit }) => {
-    const res = await call('/claude-artifacts');
-    const items = filterClaudeArtifacts(res.items as ClaudeArtifact[], { q: query, scope, type });
+    const res = await call<{ items: ClaudeArtifact[]; state: string }>('/claude-artifacts');
+    const items = filterClaudeArtifacts(res.items, { q: query, scope, type });
     return text({
       state: res.state,
       count: items.length,
@@ -632,7 +633,7 @@ server.registerTool(
     inputSchema: {},
   },
   async () => {
-    const res = await call('/claude-artifacts/refresh', { method: 'POST', body: JSON.stringify({ force: true, wait: true }) });
+    const res = await call<{ state: string; items: unknown[] }>('/claude-artifacts/refresh', { method: 'POST', body: JSON.stringify({ force: true, wait: true }) });
     return text({ state: res.state, count: res.items.length });
   },
 );
@@ -730,7 +731,7 @@ server.registerTool('settings', {
     `Changes nothing: ${USER} edits these in Settings, and .env needs a server restart. Channel defaults are list_channels; secrets are names only in Settings > Secrets, and set_secret saves one here or on another synced machine.`,
   inputSchema: {},
 }, async () => {
-  const [setup, server] = await Promise.all([call('/setup'), call('/setup/server')]);
+  const [setup, server] = await Promise.all([call<SetupBody>('/setup'), call<ServerOptionsBody>('/setup/server')]);
   const { automations: _automations, ...config } = setup.config;
   return text({ path: setup.path, config, resolved: setup.resolved, env_overrides: setup.env, server_options: server.options });
 });
@@ -739,7 +740,7 @@ server.registerTool('signed_in_devices', {
   description: `The Google account linked to this Omni and the devices that signed in with it (browsers, phones, apps), most recently used first. Not the synced machines: those are list_devices. Linking or unlinking the account is ${USER}'s to do in Settings > Sharing & access.`,
   inputSchema: {},
 }, async () => {
-  const [account, devices] = await Promise.all([call('/auth/account'), call('/auth/devices')]);
+  const [account, devices] = await Promise.all([call<AccountBody>('/auth/account'), call<SignedInDevicesBody>('/auth/devices')]);
   return text({ account: account.owner, google_sign_in: account.available, devices: devices.devices });
 });
 
@@ -752,9 +753,9 @@ server.registerTool('omni_connect_status', {
   description: 'Read-only state of Omni Connect on this machine: whether it is on, its public hostname and URL, the relay\'s Connect page, the cloudflared tunnel state and the last error. While it is on, also the machines the relay knows with online state. Connect needs the sync relay sign-in first.',
   inputSchema: {},
 }, async () => {
-  const status = await call('/connect');
+  const status = await call<ConnectStatus>('/connect');
   if (!status.enabled) return text(status);
-  const machines = await call('/connect/machines').then((r) => r.machines, (err) => ({ error: err instanceof Error ? err.message : String(err) }));
+  const machines = await call<ConnectMachines>('/connect/machines').then((r) => r.machines, (err) => ({ error: err instanceof Error ? err.message : String(err) }));
   return text({ ...status, machines });
 });
 

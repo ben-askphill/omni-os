@@ -47,7 +47,7 @@ server.registerTool(
     if (!SELF) return refused('Omni did not say which thread this is (OMNI_THREAD_ID is not set), so the questions have nowhere to go.');
     let id: string;
     try {
-      ({ id } = await call(`/threads/${SELF}/questions`, { method: 'POST', body: JSON.stringify({ questions }), signal: extra.signal }));
+      ({ id } = await call<{ id: string }>(`/threads/${SELF}/questions`, { method: 'POST', body: JSON.stringify({ questions }), signal: extra.signal }));
     } catch (err) {
       // A 400 says what to fix in the call.
       return refused((err as Error).message);
@@ -62,7 +62,7 @@ const refused = (message: string) => ({ ...text(message), isError: true });
 async function answerTo(id: string, signal: AbortSignal): Promise<string> {
   for (;;) {
     try {
-      const r = await call(`/threads/${SELF}/questions/${id}?wait=${WAIT}`, { signal });
+      const r = await call<{ state: string; text: string }>(`/threads/${SELF}/questions/${id}?wait=${WAIT}`, { signal });
       if (r.state !== 'pending') return r.text;
     } catch (err) {
       if (signal.aborted || (err instanceof ApiError && err.status < 500)) throw err;
