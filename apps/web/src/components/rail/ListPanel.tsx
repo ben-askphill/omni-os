@@ -1,17 +1,14 @@
 import { useRef, type ReactNode } from 'react';
-import { delegatesByParent } from '@omni/shared/delegate-count.ts';
-import { taskHost, type ThreadStub } from '../../api.ts';
-import { pinnedRows } from '../../pins.ts';
-import { runningThreadGroups } from '../../sidebar-lists.ts';
+import { taskHost } from '../../api.ts';
 import { href, startNewThread, useHash, useRoute } from '../../router.ts';
 import { useApp } from '../../store.tsx';
 import type { ListMode } from '../../rail-model.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../../folders.tsx';
-import { Icon, IconButton, Kbd, Thumb, useSlidingThumb, type IconName } from '../ui.tsx';
+import { Icon, IconButton, Kbd, Thumb, useSlidingThumb } from '../ui.tsx';
 import { channelFolders, channelThreads } from '../sidebar/channel-lists.ts';
 import { FolderNameField, FolderRow } from '../sidebar/FolderRows.tsx';
 import { InboxView } from '../sidebar/InboxView.tsx';
-import { ChannelThreadEntry, NavLink, SectionLink, ThreadSection, useRowDelegates, useSectionFold } from '../sidebar/SidebarRows.tsx';
+import { ChannelThreadEntry, NavLink } from '../sidebar/SidebarRows.tsx';
 import { UsageCard } from '../sidebar/UsageCard.tsx';
 import { UpdateNotice } from '../UpdateNotice.tsx';
 import { DiskNotice } from '../DiskNotice.tsx';
@@ -19,24 +16,13 @@ import { DiskNotice } from '../DiskNotice.tsx';
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /**
- * The list beside the rail: Home's workspace list (Search, New thread, Inbox, Pull requests, Artifacts, Automations,
- * Running, Pinned), the Inbox, or the selected channel's threads and folders. 264px of surface.
+ * The list beside the rail: the selected channel's threads and folders, else the Inbox with Search and New thread
+ * above it. 264px of surface.
  */
-export function ListPanel({ mode, onSearch, onInbox }: { mode: ListMode; onSearch: () => void; onInbox: (open: boolean) => void }) {
+export function ListPanel({ mode, onSearch }: { mode: ListMode; onSearch: () => void }) {
   return (
     <aside className="flex h-full w-[264px] shrink-0 flex-col border-r border-[var(--line)] bg-surface">
-      {mode.kind === 'channel' ? (
-        <ChannelList id={mode.id} />
-      ) : mode.kind === 'inbox' ? (
-        <>
-          <PanelHeader title="Inbox" lead={<IconButton icon="chevronLeft" label="Back to Home" size={15} onClick={() => onInbox(false)} />} />
-          <div className="scroll-thin mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-            <InboxView />
-          </div>
-        </>
-      ) : (
-        <HomeList onSearch={onSearch} onInbox={() => onInbox(true)} />
-      )}
+      {mode.kind === 'channel' ? <ChannelList id={mode.id} /> : <InboxList onSearch={onSearch} />}
     </aside>
   );
 }
@@ -66,37 +52,11 @@ function NewThreadButton() {
   );
 }
 
-function HomeList({ onSearch, onInbox }: { onSearch: () => void; onInbox: () => void }) {
-  const route = useRoute();
-  const hash = useHash();
-  const { channels, openThread, tasks, pinned, needsYou } = useApp();
-  const listRef = useRef<HTMLDivElement>(null);
-  const [runningClosed, toggleRunning] = useSectionFold('sidebar.runningCollapsed');
-  const [pinsClosed, togglePins] = useSectionFold('sidebar.pinnedCollapsed');
-  const openId = route.name === 'thread' ? route.id : null;
-  const openCopy = openThread && openThread.id === openId ? openThread : null;
-  const running = runningThreadGroups(channels, openCopy).map((g) => g.thread);
-  const pins = pinnedRows(pinned, openCopy);
-  const delegates = delegatesByParent(channels.find((c) => c.id === 'conductor')?.handoffs);
-  const nameOf = (t: ThreadStub) => (t.channel_id === 'conductor' ? 'Conductor' : (channels.find((c) => c.id === t.channel_id)?.name ?? t.channel_id));
-  const inboxCount = needsYou?.items.length ?? 0;
-  const box = useSlidingThumb(listRef, `${hash}:${running.map((t) => t.id).join()}:${runningClosed}:${pins.length}:${pinsClosed}`, true, '[data-active="true"]');
-  const row = (t: ThreadStub, unpin = false) => (
-    <SectionEntry
-      key={t.id}
-      t={t}
-      channel={nameOf(t)}
-      active={t.id === openId}
-      home={!unpin}
-      tasks={tasks.filter((k) => taskHost(k) === t.id)}
-      unpin={unpin}
-      delegated={unpin ? undefined : delegates.get(t.id)}
-    />
-  );
-
+/** The Inbox (its pinned cards, what waits on Ben, Working, Done and the Workspace links), under Search and New thread. */
+function InboxList({ onSearch }: { onSearch: () => void }) {
   return (
     <>
-      <PanelHeader title="Home" />
+      <PanelHeader title="Inbox" />
       <div className="space-y-2 px-3 pt-2">
         <button
           type="button"
@@ -110,23 +70,7 @@ function HomeList({ onSearch, onInbox }: { onSearch: () => void; onInbox: () => 
         <NewThreadButton />
       </div>
       <div className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        <div ref={listRef} className="relative space-y-4">
-          <Thumb box={box} />
-          <div className="space-y-px">
-            <PanelButton icon="inbox" label="Inbox" count={inboxCount} onClick={onInbox} />
-            <NavLink to={href.pullRequests()} icon="pr" active={route.name === 'prs'}>Pull requests</NavLink>
-            <NavLink to={href.artifacts()} icon="layers" active={route.name === 'artifacts'}>Artifacts</NavLink>
-            <NavLink to={href.automations()} icon="clock" active={route.name === 'automations'}>Automations</NavLink>
-          </div>
-          {running.length > 0 && (
-            <ThreadSection label="Running" closed={runningClosed} onToggle={toggleRunning} count={running.length}>
-              {running.map((t) => row(t))}
-            </ThreadSection>
-          )}
-          <ThreadSection label="Pinned" closed={pinsClosed} onToggle={togglePins} count={pins.length}>
-            {pins.length ? pins.map((t) => row(t, true)) : <div className="px-3 pb-1 text-[12px] text-fg-4">Pin a thread from its menu to keep it here.</div>}
-          </ThreadSection>
-        </div>
+        <InboxView />
       </div>
       <div className="px-3 pt-1 pb-3">
         <UpdateNotice className="mb-2" />
@@ -134,17 +78,6 @@ function HomeList({ onSearch, onInbox }: { onSearch: () => void; onInbox: () => 
         <UsageCard />
       </div>
     </>
-  );
-}
-
-/** A Home row that opens a view in the panel itself (the Inbox) rather than a page. */
-function PanelButton({ icon, label, count, onClick }: { icon: IconName; label: string; count?: number; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="hov z-[1] flex h-8 w-full items-center gap-2.5 rounded-full px-3 text-left text-[13px] text-fg-2 transition-colors hover:text-fg">
-      <Icon name={icon} size={15} className="text-fg-3" />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {!!count && <span className="font-num text-[11px] text-fg-3 tabular-nums">{count}</span>}
-    </button>
   );
 }
 
@@ -227,10 +160,4 @@ function ChannelList({ id }: { id: string }) {
       )}
     </>
   );
-}
-
-/** A Running or Pinned row; a Conductor thread in Running carries its delegate count. */
-function SectionEntry({ delegated, ...props }: Omit<Parameters<typeof SectionLink>[0], 'delegates'> & { delegated?: readonly ThreadStub[] }) {
-  const delegates = useRowDelegates(props.t.id, delegated);
-  return <SectionLink {...props} delegates={delegates} />;
 }

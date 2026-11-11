@@ -13,8 +13,8 @@ export interface RailChannel {
   running: number;
 }
 
-/** What the rail highlights: Home, a channel (the Conductor is one), Settings or the add-channel page. */
-export type RailSelection = { kind: 'home' } | { kind: 'channel'; id: string } | { kind: 'settings' } | { kind: 'new-channel' };
+/** What the rail highlights: the Inbox, a channel (the Conductor is one), Settings or the add-channel page. */
+export type RailSelection = { kind: 'inbox' } | { kind: 'channel'; id: string } | { kind: 'settings' } | { kind: 'new-channel' };
 
 /** The rail's groups below the first hairline: clients, then internal and personal (and any other kind), A to Z. */
 export interface RailGroups<C extends RailChannel = RailChannel> {
@@ -35,22 +35,22 @@ export function railGroups<C extends RailChannel>(channels: readonly C[]): RailG
 
 /**
  * The selected disc for a route. A thread selects its channel once the open thread is known; before that, and for
- * the workspace pages (Inbox, Pull requests, Artifacts, Automations, Search), Home is selected. With the Inbox open in
- * the panel, a thread opened from it keeps Home selected, so the panel stays on the Inbox.
+ * the landing page and the workspace pages (Pull requests, Artifacts, Automations, Search), the Inbox is selected. A
+ * thread opened from the Inbox (`fromInbox`) keeps the Inbox selected, so the panel stays on it.
  */
-export function railSelection(route: Route, openThread: { id: string; channel_id: string } | null, inbox = false): RailSelection {
+export function railSelection(route: Route, openThread: { id: string; channel_id: string } | null, fromInbox = false): RailSelection {
   switch (route.name) {
     case 'channel':
       return { kind: 'channel', id: route.id };
     case 'thread':
-      if (inbox) return { kind: 'home' };
-      return openThread && openThread.id === route.id ? { kind: 'channel', id: openThread.channel_id } : { kind: 'home' };
+      if (fromInbox) return { kind: 'inbox' };
+      return openThread && openThread.id === route.id ? { kind: 'channel', id: openThread.channel_id } : { kind: 'inbox' };
     case 'settings':
       return { kind: 'settings' };
     case 'new-channel':
       return { kind: 'new-channel' };
     default:
-      return { kind: 'home' };
+      return { kind: 'inbox' };
   }
 }
 
@@ -81,15 +81,18 @@ export function needsByChannel(items: readonly { thread: { channel_id: string };
   return out;
 }
 
-/** The list panel beside the rail: Home's workspace list, the Inbox, or one channel's threads. */
-export type ListMode = { kind: 'home' } | { kind: 'inbox' } | { kind: 'channel'; id: string };
+/** The list panel beside the rail: one channel's threads, else the Inbox. */
+export type ListMode = { kind: 'inbox' } | { kind: 'channel'; id: string };
 
-export function listMode(selection: RailSelection, inbox: boolean): ListMode {
-  if (selection.kind === 'channel') return { kind: 'channel', id: selection.id };
-  return inbox ? { kind: 'inbox' } : { kind: 'home' };
+export function listMode(selection: RailSelection): ListMode {
+  return selection.kind === 'channel' ? { kind: 'channel', id: selection.id } : { kind: 'inbox' };
 }
 
-/** The Inbox stays open in the panel through threads and workspace pages, and closes on a channel, Settings or Add channel. */
-export function inboxStaysOpen(route: Route): boolean {
-  return route.name !== 'channel' && route.name !== 'settings' && route.name !== 'new-channel';
+/**
+ * Whether the thread on screen came from the Inbox. Every page but a channel's shows the Inbox in the panel, so
+ * leaving one of them for a thread keeps it; a channel's page hands the thread its channel. A thread keeps what it had.
+ */
+export function cameFromInbox(route: Route, prev: boolean): boolean {
+  if (route.name === 'thread') return prev;
+  return route.name !== 'channel';
 }
