@@ -1356,6 +1356,19 @@ html:has(.mo-app) body {
 [data-desktop="darwin"] .desktop-titlebar :is(a, button, input, select, textarea, [role="button"]) {
   -webkit-app-region: no-drag;
 }
+/* The channel rail layout: the native traffic lights sit at the rail's top (18px in, 29px down: window-rules.ts
+   trafficLights), so the rail's top strip grows to hold them above the Omni mark, and it and the list panel's title
+   row drag the window. Linux draws its own frame, so neither changes there. */
+[data-desktop="darwin"] .rail-shell .rail-top {
+  -webkit-app-region: drag;
+  padding-top: 44px;
+}
+[data-desktop="darwin"] .rail-shell .rail-panel-top {
+  -webkit-app-region: drag;
+}
+[data-desktop="darwin"] .rail-shell :is(.rail-top, .rail-panel-top) :is(a, button, input, select, textarea, [role="button"]) {
+  -webkit-app-region: no-drag;
+}
 /* The phone layout, in a narrow window: a strip above it for the traffic lights, to drag the window by
    (apps/web/src/desktop.ts adds it). */
 .desktop-drag-strip {

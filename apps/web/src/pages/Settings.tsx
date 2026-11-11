@@ -8,11 +8,12 @@ import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
 import { PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
+import { setLayout, useLayout } from '../layout-pref.ts';
 import { desktop } from '../desktop.ts';
 import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
-import { useApp, useSecretStoreLabel } from '../store.tsx';
+import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
 import { ChannelSettingsForm, Section } from './ChannelSettings.tsx';
 import { GoogleAccountSection } from './GoogleAccount.tsx';
 import { ConnectSection } from './Connect.tsx';
@@ -581,6 +582,8 @@ function ConfigField({
 
 function AppearanceCard() {
   const [theme, setTheme] = useTheme();
+  const layout = useLayout();
+  const mobile = useIsMobile();
   return (
     <>
       <Card entry="theme" title="Theme" subtitle="Follows your system, or stays light or dark." origin={<Origin of="device" label="This browser only" />}>
@@ -596,6 +599,21 @@ function AppearanceCard() {
           ]}
         />
       </Card>
+      {!mobile && (
+      <Card
+        entry="layout"
+        title="New layout"
+        subtitle="Channels as a rail of discs, with a list of the selected channel's threads beside it. Still in progress: turn it off to go back to the classic sidebar. The phone layout stays as it is."
+        origin={<Origin of="device" label="This browser only" />}
+      >
+        <div className="flex items-center gap-3 rounded-[16px] bg-bg px-4 py-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium">
+            Channel rail <Chip tone="live">Beta</Chip>
+          </div>
+          <Toggle checked={layout === 'rail'} onChange={(on) => setLayout(on ? 'rail' : 'classic')} label="Use the new channel rail layout (Beta)" />
+        </div>
+      </Card>
+      )}
       {desktop ? (
         <Card
           entry="zoom"
