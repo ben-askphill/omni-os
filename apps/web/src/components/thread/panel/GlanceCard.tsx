@@ -3,9 +3,8 @@ import type { CrewPR, PRSummary, Thread } from '../../../api.ts';
 import type { PanelTab } from '../../../pages/useThreadSession.ts';
 import { plural } from '../../../format.ts';
 import { prBadge, prLine, STEP_WORKING, type PRNext, type PRStep } from '@omni/shared/thread-glance.ts';
-import { href } from '../../../router.ts';
-import { Chip, copyText, Icon, IconButton, LinkButton, type IconName } from '../../ui.tsx';
-import { PRNextButton, type ThreadPRs } from './PRsTab.tsx';
+import { Chip, copyText, Icon, IconButton, type IconName } from '../../ui.tsx';
+import { MergeButton, PRNextButton, type ThreadPRs } from './PRsTab.tsx';
 
 export type BranchChanges = { files: unknown[]; add: number; del: number } | null;
 
@@ -50,7 +49,7 @@ function CopyBranch({ name }: { name: string }) {
  * for (open it, fix conflicts or checks, merge). Ben's threads mostly end as a merged PR, so this is what he checks first.
  * Nothing for a thread without a branch.
  */
-export function GlanceCard({ thread, prs, changes, next, step, onAsk, onTab }: { thread: Thread; prs: ThreadPRs; changes: BranchChanges; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void; onTab: (tab: PanelTab) => void }) {
+export function GlanceCard({ thread, prs, changes, next, step, onAsk, onMerged, onTab }: { thread: Thread; prs: ThreadPRs; changes: BranchChanges; next: PRNext; step: PRStep | null; onAsk: (prompt: string) => void; onMerged: () => void; onTab: (tab: PanelTab) => void }) {
   if (!thread.branch) return null;
   const pr: PRSummary | null = prs?.pr ?? null;
   const badge = pr ? prBadge(pr) : null;
@@ -97,8 +96,8 @@ export function GlanceCard({ thread, prs, changes, next, step, onAsk, onTab }: {
         )}
       </GlanceRow>
       {next && (
-        <div className="mt-1 flex border-t border-line px-1 pt-2 pb-1 [&>*]:flex-1">
-          <PRNextButton next={next} thread={thread} pr={pr} step={step} onAsk={onAsk} />
+        <div className="mt-1 flex flex-col gap-1.5 border-t border-line px-1 pt-2 pb-1 [&>*]:w-full">
+          <PRNextButton next={next} thread={thread} pr={pr} step={step} onAsk={onAsk} onMerged={onMerged} />
         </div>
       )}
     </section>
@@ -106,10 +105,10 @@ export function GlanceCard({ thread, prs, changes, next, step, onAsk, onTab }: {
 }
 
 /**
- * The open PRs from the threads this one delegated to, under the branch card, each with Merge on its PR page. A Conductor
+ * The open PRs from the threads this one delegated to, under the branch card, each with a button that merges it. A Conductor
  * thread has no branch of its own, so this is where its delegates' work gets merged from. Merged ones stay in the PRs tab.
  */
-export function CrewGlance({ crew, onTab }: { crew: CrewPR[]; onTab: (tab: PanelTab) => void }) {
+export function CrewGlance({ crew, onMerged, onTab }: { crew: CrewPR[]; onMerged: () => void; onTab: (tab: PanelTab) => void }) {
   const open = crew.filter((p) => p.state === 'OPEN');
   if (!open.length) return null;
   const ready = open.filter((p) => !p.isDraft);
@@ -130,9 +129,7 @@ export function CrewGlance({ crew, onTab }: { crew: CrewPR[]; onTab: (tab: Panel
       {ready.length > 0 && (
         <div className="mt-1 flex flex-col gap-1.5 border-t border-line px-1 pt-2 pb-1 [&>*]:w-full">
           {ready.map((p) => (
-            <LinkButton key={p.url} size="sm" variant="primary" icon="pr" href={href.pr(p.channel_id, p.number)}>
-              Merge #{p.number}
-            </LinkButton>
+            <MergeButton key={p.url} channelId={p.channel_id} number={p.number} onMerged={onMerged} />
           ))}
         </div>
       )}

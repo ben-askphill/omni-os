@@ -141,7 +141,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   }, [toAgents, panelTab, children, panel.open]);
   const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, applyThread, setActionError, pin });
   // The branch's PRs and changes: the PRs tab and the Details tab's branch card read them, and the PRs tab's badge.
-  const prs = useThreadPR(thread, slotBusy);
+  const [prs, reloadPRs] = useThreadPR(thread, slotBusy);
   const watch = usePRWatch(thread?.id, prs);
   const changes = useBranchChanges(thread, slotBusy);
   const next = prNext(prs?.pr ?? null, !!changes?.files.length);
@@ -332,8 +332,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               tab={panelTab}
               onTab={setPanelTab}
               onClose={panel.closeInspector}
-              details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, onAsk: (p) => void ask(p), onTab: setPanelTab }}
-              prs={{ data: prs, watch, next, step, onAsk: (p) => void ask(p) }}
+              details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs(), onTab: setPanelTab }}
+              prs={{ data: prs, watch, next, step, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs() }}
             />
           </div>
         </aside>

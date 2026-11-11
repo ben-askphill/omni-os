@@ -102,7 +102,8 @@ if (has('api')) {
   console.log(JSON.stringify({ nameWithOwner: 'acme/shop' }));
 } else if (has('pr', 'list')) {
   const state = arg('--state');
-  console.log(JSON.stringify(state === 'open' || state === 'all' ? PRS : []));
+  const head = args.includes('--head') ? arg('--head') : null;
+  console.log(JSON.stringify(state === 'open' || state === 'all' ? PRS.filter((p) => !head || p.headRefName === head) : []));
 } else if (has('pr', 'view')) {
   const p = PRS.find((x) => String(x.number) === args[2]);
   if (!p) { console.error('no pull request found'); process.exit(1); }
