@@ -4,7 +4,7 @@
 import { app, BrowserWindow, Menu, screen, session, type WebContents } from 'electron';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { clampZoom, ZOOM_STEP } from '@omni/shared/desktop-bridge.ts';
+import { clampZoom, ZOOM_STEP, type DesktopLayout } from '@omni/shared/desktop-bridge.ts';
 import type { AppContext } from './context.ts';
 import { editMenuTemplate } from './menu-template.ts';
 import { openExternal } from './open-external.ts';
@@ -64,9 +64,19 @@ export function applyZoom(factor: number): void {
   }
 }
 
+/** The desktop layout each window's page last reported (DesktopBridge.setLayout). Classic until it says. */
+const layouts = new WeakMap<BrowserWindow, DesktopLayout>();
+
 /** Keeps the traffic lights where the page leaves room for them, which moves when the layout does. */
 function placeTrafficLights(win: BrowserWindow, zoom: number): void {
-  if (MAC) win.setWindowButtonPosition(trafficLights(win.getContentBounds().width, zoom));
+  if (MAC) win.setWindowButtonPosition(trafficLights(win.getContentBounds().width, zoom, layouts.get(win)));
+}
+
+/** The page switched between the classic sidebar and the channel rail: move its window's traffic lights to match. */
+export function setWindowLayout(ctx: AppContext, win: BrowserWindow, layout: DesktopLayout): void {
+  if (layout !== 'classic' && layout !== 'rail') return;
+  layouts.set(win, layout);
+  placeTrafficLights(win, ctx.settings.get().zoom);
 }
 
 export function routeUrl(appUrl: string, route: string | null | undefined): string {

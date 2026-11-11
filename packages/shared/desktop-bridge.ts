@@ -4,6 +4,9 @@
 
 export type DesktopPlatform = 'darwin' | 'linux' | 'win32';
 
+/** The Web UI's desktop shell: the classic sidebar, or the channel rail with a list panel (apps/web/src/layout-pref.ts). */
+export type DesktopLayout = 'classic' | 'rail';
+
 /** A menu item or global shortcut that the page carries out, because only the page knows how. */
 export type DesktopCommand = 'new-thread' | 'go-to' | 'search' | 'home' | 'settings';
 
@@ -162,6 +165,11 @@ export interface DesktopBridge {
   focus(): void;
   /** Keeps the native window chrome and menus on the theme the Web UI picked. */
   setAppearance(mode: 'system' | 'light' | 'dark'): void;
+  /**
+   * Tells the window which desktop layout the page shows, so the macOS traffic lights sit where it leaves room:
+   * beside the wordmark in the classic sidebar, or inside the channel rail. Older app builds lack it.
+   */
+  setLayout?(layout: DesktopLayout): void;
   settings: {
     get(): Promise<DesktopSettings>;
     set(patch: DesktopSettingsPatch): Promise<DesktopSettings>;
