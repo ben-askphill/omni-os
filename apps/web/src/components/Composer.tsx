@@ -229,9 +229,12 @@ export function useReplySend(threadId: string) {
         const t = await api.send<Thread>(`/threads/${encodeURIComponent(threadId)}/messages`, body, files);
         lastRequest.current = null;
         settleDraftContext(threadId, ids);
+        // The stream's pending list that takes over lands with the next frame's rows (useThreadHistory's withRows).
+        requestAnimationFrame(done);
         return t;
-      } finally {
+      } catch (e) {
         done();
+        throw e;
       }
     },
     [threadId],
@@ -242,6 +245,7 @@ export function ReplyComposer({
   thread,
   canSteer = true,
   onSent,
+  onSending,
   onChanged,
   stop,
   machine,
@@ -254,6 +258,8 @@ export function ReplyComposer({
   /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
   stop?: { busy: boolean; run: () => void } | null;
   onSent?: (t: Thread, mode?: SendMode) => void;
+  /** Called as a message leaves the box, before the server has it: it shows in the thread from now on. */
+  onSending?: () => void;
   /** The thread after `/rename` or a run switch. */
   onChanged?: (t: Thread) => void;
 }) {
@@ -307,6 +313,7 @@ export function ReplyComposer({
     drafts.delete(key);
     setText('');
     att.clear();
+    onSending?.();
     try {
       const t = await sendReply(prompt, mode, files, context);
       onSent?.(t, mode);

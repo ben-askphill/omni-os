@@ -60,10 +60,21 @@ export function useThreadHistory(threadId: string) {
         const batch = pending.current;
         pending.current = [];
         update((h) => boundHistory(appendLive(h, batch), follows.current()));
+        runAfter();
       });
     },
     [update],
   );
+  const after = useRef<(() => void)[]>([]);
+  const runAfter = () => after.current.splice(0).forEach((fn) => fn());
+  /**
+   * Run `fn` in the same render as the rows still waiting for their frame. The thread's pending list drops a message
+   * as its replay is recorded, and the row that replaces it must land with it, or the message is gone for a frame.
+   */
+  const withRows = useCallback((fn: () => void) => {
+    if (frame.current === undefined) fn();
+    else after.current.push(fn);
+  }, []);
   /** A sync with the newest page in place of a replay. Rows still waiting for their frame join the old head first. */
   const snapshot = useCallback(
     (d: ThreadOpen) => {
@@ -73,20 +84,22 @@ export function useThreadHistory(threadId: string) {
       pending.current = [];
       lastId.current = tailId({ rows: d.events });
       update((h) => joinSnapshot(h, batch, d.events, headOf(d)));
+      runAfter();
     },
     [update],
   );
   useEffect(
     () => () => {
       if (frame.current !== undefined) cancelAnimationFrame(frame.current);
+      after.current = [];
     },
     [],
   );
 
   return useMemo(
-    () => ({ history, lastId, follows, prepare, open, append, snapshot, ...loader }),
+    () => ({ history, lastId, follows, prepare, open, append, snapshot, withRows, ...loader }),
     // `version` re-renders the controls when a load starts, lands or fails.
-    [history, version, prepare, open, append, snapshot, loader], // eslint-disable-line react-hooks/exhaustive-deps
+    [history, version, prepare, open, append, snapshot, withRows, loader], // eslint-disable-line react-hooks/exhaustive-deps
   );
 }
 
