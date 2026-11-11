@@ -172,6 +172,23 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
   );
 }
 
+type SectionLinkProps = {
+  t: ThreadStub;
+  channel: string;
+  active: boolean;
+  home?: boolean;
+  tasks: BackgroundTask[];
+  unpin?: boolean;
+  delegates?: RowDelegates;
+  onNavigate?: () => void;
+};
+
+/** A Running or Pinned row. A Conductor thread in Running carries its delegate count. */
+export function SectionEntry({ delegated, ...props }: Omit<SectionLinkProps, 'delegates'> & { delegated?: readonly ThreadStub[] }) {
+  const delegates = useRowDelegates(props.t.id, delegated, props.onNavigate);
+  return <SectionLink {...props} delegates={delegates} />;
+}
+
 /**
  * A thread in the Running or Pinned section, flush with the channels: its status, its title and its
  * channel's name. In Pinned the name gives way on hover to the button that unpins it. It opens the thread as its row
@@ -179,7 +196,7 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
  * the thumb while open and nests its running sub-agents. Otherwise (Pinned), open, it reads bold and the thumb stays
  * on the thread's own row.
  */
-export function SectionLink({ t, channel, active, home = false, tasks, unpin, delegates, onNavigate }: { t: ThreadStub; channel: string; active: boolean; home?: boolean; tasks: BackgroundTask[]; unpin?: boolean; delegates?: RowDelegates; onNavigate?: () => void }) {
+export function SectionLink({ t, channel, active, home = false, tasks, unpin, delegates, onNavigate }: SectionLinkProps) {
   const { setPinned } = useApp();
   const title = t.title || 'Untitled';
   const agents = tasks.length;

@@ -11,7 +11,7 @@ import { Icon, IconButton, Kbd, Thumb, useSlidingThumb, type IconName } from '..
 import { channelFolders, channelThreads } from '../sidebar/channel-lists.ts';
 import { FolderNameField, FolderRow } from '../sidebar/FolderRows.tsx';
 import { InboxView } from '../sidebar/InboxView.tsx';
-import { ChannelThreadEntry, NavLink, SectionLink, ThreadSection, useRowDelegates, useSectionFold } from '../sidebar/SidebarRows.tsx';
+import { ChannelThreadEntry, NavLink, SectionEntry, ThreadSection, useSectionFold } from '../sidebar/SidebarRows.tsx';
 import { UsageCard } from '../sidebar/UsageCard.tsx';
 import { UpdateNotice } from '../UpdateNotice.tsx';
 import { DiskNotice } from '../DiskNotice.tsx';
@@ -229,8 +229,3 @@ function ChannelList({ id }: { id: string }) {
   );
 }
 
-/** A Running or Pinned row; a Conductor thread in Running carries its delegate count. */
-function SectionEntry({ delegated, ...props }: Omit<Parameters<typeof SectionLink>[0], 'delegates'> & { delegated?: readonly ThreadStub[] }) {
-  const delegates = useRowDelegates(props.t.id, delegated);
-  return <SectionLink {...props} delegates={delegates} />;
-}

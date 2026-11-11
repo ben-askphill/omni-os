@@ -15,7 +15,7 @@ import { SidebarTop, type SidebarView } from './sidebar/SidebarTop.tsx';
 import { InboxView } from './sidebar/InboxView.tsx';
 import { channelFolders, channelThreads, useChannelFold } from './sidebar/channel-lists.ts';
 import { FolderNameField, FolderRow, AddFolderButton } from './sidebar/FolderRows.tsx';
-import { ChannelThreadEntry, NavLink, RunningBadge, SectionLink, ThreadSection, useRowDelegates, useSectionFold } from './sidebar/SidebarRows.tsx';
+import { ChannelThreadEntry, NavLink, RunningBadge, SectionEntry, ThreadSection, useSectionFold } from './sidebar/SidebarRows.tsx';
 import { ChannelListLink, WorkspaceLinks } from './sidebar/SidebarLinks.tsx';
 import { UsageCard } from './sidebar/UsageCard.tsx';
 import { UpdateNotice } from './UpdateNotice.tsx';
@@ -289,8 +289,3 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   );
 }
 
-/** A Running or Pinned row. A Conductor thread in Running carries its delegate count, in place of the threads it delegated. */
-function SectionEntry({ delegated, ...props }: Omit<Parameters<typeof SectionLink>[0], 'delegates'> & { delegated?: readonly ThreadStub[] }) {
-  const delegates = useRowDelegates(props.t.id, delegated, props.onNavigate);
-  return <SectionLink {...props} delegates={delegates} />;
-}
