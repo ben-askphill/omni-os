@@ -44,6 +44,8 @@ Get yourself into a loop: change, run, look, fix, until the change provably work
 If something stopped you (a missing env var, a crash on boot, a step here that is wrong), solve it, then edit this file so the next run does not hit it. Keep the fix short and in the right section. Commit it with your change.
 
 Known blockers:
+- An Omni thread's shell sets `OMNI_DATA_DIR` to the live `data/`, so `npx vitest run` there writes test threads into the live workspace and reads its config (`OMNI_USER` comes out as Ben and `toEqual` checks fail). Run tests with `env -u OMNI_DATA_DIR -u OMNI_URL -u OMNI_THREAD_ID -u OMNI_TOKEN -u OMNI_TOKEN_FILE`.
+- A worktree whose `node_modules` was stripped has no `node_modules/.bin/tsx`, so every test that spawns an MCP server (`questions`, `crew-questions`, `referenced-thread-mcp`) times out. `npm ci --include=dev` restores it.
 - The server crashes on boot if `OMNI_AUTOMATIONS_DIR` points at a missing dir. `qa-stack.sh` creates it.
 - macOS has no `setsid`; `qa-stack.sh` falls back to perl's `setpgrp`. The PID file holds the subshell, so `down` stops the group its child leads.
 - A Linux box may have no `lsof`: `qa-stack.sh` reads a process's cwd from `/proc` instead, and `ss -ltnp | grep :<port>` stands in for `lsof -iTCP:<port>` in the checks below.
