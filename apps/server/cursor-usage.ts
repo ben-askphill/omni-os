@@ -53,6 +53,11 @@ export async function refreshCursorPlan(now = new Date()): Promise<void> {
   if (last && (!last.updated_at || now.getTime() - Date.parse(last.updated_at) > STALE_MS)) clearUsage('cursor');
 }
 
+/** Every Cursor billing event from `since` (epoch ms), for the Inbox dashboard. Null when the dashboard cannot be read. */
+export function cursorUsageEvents(since: number): Promise<CursorUsageEvent[] | null> {
+  return dashboard ? dashboard.usageEvents(since).catch(() => null) : Promise.resolve(null);
+}
+
 // ---------- per-thread tokens and cost ----------
 
 /** Add one turn's tokens to the thread's totals. The cost stays as last read until the next read. */

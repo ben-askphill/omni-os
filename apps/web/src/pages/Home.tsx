@@ -1,25 +1,21 @@
-import { useState } from 'react';
-import type { Thread } from '../api.ts';
-import { NewThreadComposer } from '../components/Composer.tsx';
-import { EmptyNote, NeedsYouSection } from '../components/NeedsYou.tsx';
-import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
-import { OmniMark } from '../components/brand.tsx';
-import { Segmented, StatusDot, asksForYou } from '../components/ui.tsx';
-import { threadGlyph } from '@omni/shared/status.ts';
-import { pageColumn } from '../components/ui/feedback.tsx';
-import { greeting } from '../greeting.ts';
-import { useApp } from '../store.tsx';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { dayKey, isInsightRange, type InsightRange, type Insights } from '@omni/shared/insights.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
+import { useApi, type Thread } from '../api.ts';
+import { NewThreadComposer } from '../components/Composer.tsx';
+import { EmptyNote, NeedsYouRow } from '../components/NeedsYou.tsx';
+import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
+import { OmniWordmark } from '../components/brand.tsx';
+import { AutomationsCard, BusiestCard, ChannelAvatar, KpiTiles, LIST_TITLE, NeedsYouCard, PRsCard, type ListKind } from '../components/dashboard/Cards.tsx';
+import { UsageSection } from '../components/dashboard/UsageSection.tsx';
+import { Segmented, StatusDot } from '../components/ui.tsx';
+import { greeting } from '../greeting.ts';
+import { splitNeeds } from '../needs-you.ts';
+import { readPref, useApp, useFeed, writePref } from '../store.tsx';
 
 const acceptAll = () => true;
-
-type Filter = 'all' | 'active' | 'needs';
-const FILTERS: Record<Filter, (t: Thread) => boolean> = {
-  all: () => true,
-  active: isWorking,
-  // A thread Ben marked done has had its look.
-  needs: (t) => asksForYou(threadGlyph(t)) && !t.done_at,
-};
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const LISTS: ListKind[] = ['needs', 'running', 'unread', 'done'];
 
 function Pulse() {
   const { status } = useApp();
@@ -34,64 +30,161 @@ function Pulse() {
   );
 }
 
+/** The list a KPI tile opened, from `#/?list=`: a link Ben can share or go back to. */
+function useOpenList(): ListKind | null {
+  const hash = useSyncExternalStore(
+    (cb) => {
+      window.addEventListener('hashchange', cb);
+      return () => window.removeEventListener('hashchange', cb);
+    },
+    () => window.location.hash,
+  );
+  const v = new URLSearchParams(hash.split('?')[1] ?? '').get('list');
+  return (LISTS as string[]).includes(v ?? '') ? (v as ListKind) : null;
+}
+
+/** Re-asks while the server is still reading the logs or GitHub, so the partial numbers fill in without a reload. */
+function useInsights(range: InsightRange) {
+  const q = useApi<Insights>(`/insights?range=${range}&tz=${encodeURIComponent(TZ)}`);
+  const partial = !!q.data && (!q.data.usage.complete || q.data.prs === null);
+  const { reload } = q;
+  useEffect(() => {
+    if (!partial) return;
+    const t = setTimeout(reload, 3000);
+    return () => clearTimeout(t);
+  }, [partial, q.data, reload]);
+  useEffect(() => {
+    const t = setInterval(reload, 60_000);
+    return () => clearInterval(t);
+  }, [reload]);
+  // A thread started or marked done moves Done and Busiest channels: ask again once the burst settles.
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useFeed((e) => {
+    if (e.type !== 'thread') return;
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(reload, 11_000);
+  });
+  useEffect(() => () => void (settle.current && clearTimeout(settle.current)), []);
+  return q;
+}
+
+function OpenList({ kind, insights }: { kind: ListKind; insights: Insights | undefined }) {
+  const { needsYou } = useApp();
+  const recent = useLiveThreads('/recent?limit=200', acceptAll, 200);
+  const { needs, unread } = splitNeeds(needsYou?.items ?? []);
+  const meta = LIST_TITLE[kind];
+  const doneInRange = (t: Thread) => {
+    if (!t.done_at || !insights) return false;
+    const day = dayKey(Date.parse(t.done_at), TZ);
+    return day >= insights.from && day <= insights.to;
+  };
+  const items = kind === 'needs' ? needs : kind === 'unread' ? unread : null;
+  return (
+    <section aria-label={meta.title} className="mt-4">
+      <div className="mb-1 flex items-center justify-between px-1">
+        <h2 className="font-display text-[length:var(--fs-heading)]">{meta.title}</h2>
+        <a href="#/" className="text-[12px] text-fg-3 hover:text-fg">
+          Close
+        </a>
+      </div>
+      {items ? (
+        items.length ? (
+          <div className="flex flex-col">
+            {items.map((i) => (
+              <NeedsYouRow key={i.thread.id} item={i} showChannel />
+            ))}
+          </div>
+        ) : (
+          <EmptyNote icon={meta.icon}>{meta.empty}</EmptyNote>
+        )
+      ) : (
+        <ThreadGroups
+          threads={recent.data?.filter(kind === 'running' ? isWorking : doneInRange)}
+          loading={recent.loading}
+          error={recent.error}
+          onRetry={recent.reload}
+          showChannel
+          empty={<EmptyNote icon={meta.icon}>{meta.empty}</EmptyNote>}
+        />
+      )}
+    </section>
+  );
+}
+
 export function HomePage() {
-  const recent = useLiveThreads('/recent?limit=60', acceptAll, 60);
-  const [filter, setFilter] = useState<Filter>('all');
-  const all = recent.data;
-  const { status, needsYou, profile } = useApp();
-  // Needs you and Unread list these above, so the unfiltered list leaves them out: one row per thread on the page.
-  const above = new Set(needsYou?.items.map((i) => i.thread.id));
-  const shown = all?.filter((t) => FILTERS[filter](t) && (filter !== 'all' || !above.has(t.id)));
-  const count = (f: Filter) => all?.filter(FILTERS[f]).length ?? 0;
-  const markState = needsYou?.items.length || all?.some(FILTERS.needs) ? 'attention' : status && status.running > 0 ? 'thinking' : 'idle';
-  const badge = (n: number) => (n ? <span className="font-num text-[10.5px] text-fg-3 tabular-nums">{n}</span> : null);
+  const { needsYou, profile } = useApp();
+  const [range, setRangeState] = useState<InsightRange>(() => {
+    const saved = readPref<string>('home.range', '30d');
+    return isInsightRange(saved) ? saved : '30d';
+  });
+  const setRange = (r: InsightRange) => {
+    writePref('home.range', r);
+    setRangeState(r);
+  };
+  const [startIn, setStartIn] = useState<string | null>(null);
+  const open = useOpenList();
+  const insights = useInsights(range);
+  const data = insights.data?.range === range ? insights.data : undefined;
+  const split = needsYou ? splitNeeds(needsYou.items) : null;
+  const chips = data?.channels.slice(0, 4) ?? [];
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <div className={`${pageColumn('measure')} pt-8 pb-16 md:pt-16`}>
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3 px-1">
-          <div>
-            <OmniMark size={40} state={markState} />
+      <div className="@container mx-auto box-content max-w-[1120px] px-4 pt-8 pb-16 md:px-10 md:pt-14">
+        <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <OmniWordmark height={24} />
             <div className="caption mt-4 mb-2.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
             <h1 className="font-display text-[length:var(--fs-title)] leading-[1.1] md:text-[length:var(--fs-title-lg)]">{greeting(new Date().getHours(), profile?.name ?? '')}</h1>
           </div>
-          <Pulse />
-        </div>
-        <NewThreadComposer big />
-        <NeedsYouSection inbox={needsYou} showChannel />
-        <div className="mt-10">
-          <div className="mb-2 flex items-center justify-between gap-3 px-3 md:px-3.5">
-            <h2 className="font-display text-[length:var(--fs-heading)]">Recent</h2>
+          <div className="flex flex-wrap items-center gap-2">
             <Segmented
               size="sm"
-              label="Filter threads"
-              value={filter}
-              onChange={setFilter}
+              label="Range"
+              value={range}
+              onChange={setRange}
               options={[
-                { id: 'all', label: 'All' },
-                { id: 'active', label: 'Active', badge: badge(count('active')) },
-                { id: 'needs', label: 'Needs you', badge: badge(count('needs')) },
+                { id: 'today', label: 'Today' },
+                { id: '7d', label: '7 days' },
+                { id: '30d', label: '30 days' },
               ]}
             />
+            <Pulse />
           </div>
-          <ThreadGroups
-            threads={shown}
-            loading={recent.loading}
-            error={recent.error}
-            onRetry={recent.reload}
-            showChannel
-            empty={
-              filter === 'all' ? (
-                <EmptyNote icon="message">
-                  {all?.length ? 'Every recent thread is listed above.' : 'Nothing here yet. Start a thread above. Every task gets its own thread in a channel, so it stays findable.'}
-                </EmptyNote>
-              ) : filter === 'active' ? (
-                <EmptyNote icon="clock">Nothing running. Threads that are running or queued show up here.</EmptyNote>
-              ) : (
-                <EmptyNote icon="check">Nothing needs you. Recent threads that failed, wait on you or hit a usage limit show up here.</EmptyNote>
-              )
-            }
-          />
+        </header>
+
+        <NewThreadComposer key={startIn ?? 'default'} defaultChannel={startIn ?? undefined} big />
+        {chips.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 px-1">
+            <span className="caption">Start in</span>
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setStartIn(c.id)}
+                aria-pressed={startIn === c.id}
+                className={`press inline-flex h-7 items-center gap-1.5 rounded-full pr-3 pl-1 text-[12px] ${startIn === c.id ? 'bg-fg text-on-ink' : 'bg-surface text-fg-2 hover:text-fg'}`}
+              >
+                <ChannelAvatar id={c.id} name={c.name} icon={c.icon} size={20} />#{c.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-8">
+          <KpiTiles needs={split?.needs ?? null} unread={split?.unread.length ?? null} done={data?.done ?? null} open={open} />
+          {open && <OpenList kind={open} insights={data} />}
+        </div>
+
+        <div className="mt-8">
+          <UsageSection usage={data?.usage} range={range} from={data?.from} to={data?.to} loading={insights.loading || !insights.error} />
+        </div>
+
+        <div className="mt-8 grid gap-4 @3xl:grid-cols-2">
+          <NeedsYouCard needs={split?.needs ?? null} />
+          <BusiestCard list={data?.channels} />
+          <PRsCard prs={data ? data.prs : undefined} loading={!insights.error} />
+          <AutomationsCard automations={data?.automations} />
         </div>
       </div>
     </div>

@@ -46,6 +46,12 @@ export async function listPRs(repo: string, state = 'open') {
   }));
 }
 
+/** The head branches of a repo's PRs merged on or after `since` (YYYY-MM-DD), up to 500 of them. */
+export async function mergedSince(repo: string, since: string): Promise<{ number: number; headRefName: string; mergedAt: string }[]> {
+  const out = await gh(['pr', 'list', '--repo', repo, '--state', 'merged', '--search', `merged:>=${since}`, '--limit', '500', '--json', 'number,headRefName,mergedAt'], undefined, CHECK_TIMEOUT);
+  return JSON.parse(out);
+}
+
 type Listed = Awaited<ReturnType<typeof listPRs>>[number];
 
 /**

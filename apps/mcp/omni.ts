@@ -776,6 +776,11 @@ server.registerTool('tool_failures', {
   ? `/tool-failures/${encodeURIComponent(group_id)}/occurrences${before ? `?before=${before}` : ''}`
   : `/tool-failures${status ? `?status=${status}` : ''}`)));
 
+server.registerTool('insights', {
+  description: "The Inbox dashboard's numbers for a range: tokens and cost per harness, model and day from the local session logs (and Cursor's billing), threads marked done, busiest channels, open PRs and today's automation runs. usage.complete is false while the first log scan still runs.",
+  inputSchema: { range: z.enum(['today', '7d', '30d']).default('30d') },
+}, async ({ range }) => text(await call(`/insights?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`)));
+
 server.registerTool('triage_tool_failure', {
   description: 'Record tool failure remediation status and safe human-written fix/replacement/avoidance guidance. Never include raw errors, arguments, private data or credentials. Does not disable tools. A later failure reopens a fixed group.',
   inputSchema: { group_id: z.string(), status: z.enum(['open', 'investigating', 'fixed', 'avoid', 'replacement']), guidance: z.string().max(1000) },

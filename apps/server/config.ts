@@ -86,6 +86,8 @@ export const config = {
   maxUploadMb: Number(env.OMNI_MAX_UPLOAD_MB ?? 25),
   /** Read Cursor's plan usage and thread costs from its dashboard (harness/cursor/dashboard.ts). Off in tests. */
   cursorDashboard: (env.OMNI_CURSOR_DASHBOARD ?? '1') !== '0',
+  /** Fetch LiteLLM's list prices for the Inbox dashboard's usage (usage-pricing.ts). Off in tests. */
+  usagePrices: (env.OMNI_USAGE_PRICES ?? '1') !== '0',
   /** Load the repo's Claude Code mods (mods/) into every Claude thread with --plugin-dir. Off until '1'. */
   mods: env.OMNI_MODS === '1',
   /** The user's timezone (user config), OMNI_TZ still wins, else the system's. Automations default to it. */
