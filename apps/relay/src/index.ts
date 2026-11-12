@@ -10,7 +10,7 @@ import { CloudflareApi } from './cloudflare.ts';
 import { CLIENT_DAYS, ConnectStore, notConfigured } from './connect.ts';
 import { connectPage, errorPage, PAGE_HEADERS } from './page.ts';
 import { SIGNIN_OBJECT, SigninStore } from './signin.ts';
-import { Maintenance } from './maintain.ts';
+import { Maintenance, SLICE_GAP_MS } from './maintain.ts';
 import { objectPath, RelayStore } from './store.ts';
 
 interface Env {
@@ -251,7 +251,7 @@ export class Relay extends DurableObject<Env> {
     const storage = this.ctx.storage;
     const user = await storage.get<string>('user');
     if (!user) return;
-    let wait = 0;
+    let wait = SLICE_GAP_MS;
     try {
       if (!(await this.upkeepFor(this.open(user)).slice())) return;
     } catch (err) {

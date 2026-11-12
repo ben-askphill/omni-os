@@ -13,8 +13,14 @@ export interface Kv {
   delete(key: string): Promise<unknown>;
 }
 
-/** Compaction steps per slice: 50,000 rows, a second or two of CPU. */
-export const SLICE_STEPS = 10;
+/**
+ * Compaction steps per slice: 5,000 rows, under a second. Every request to the object waits for the slice running,
+ * and ten steps took 6 to 8 seconds of wall time on the live relay, which hung sync and the Connect page.
+ */
+export const SLICE_STEPS = 1;
+
+/** The pause between slices, so requests that queued behind one run before the next starts. */
+export const SLICE_GAP_MS = 250;
 
 export class Maintenance {
   /** Items with a newer row, kept between slices. Null after a restart: rebuilt from the saved cursor. */

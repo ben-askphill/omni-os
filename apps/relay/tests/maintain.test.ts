@@ -101,6 +101,7 @@ describe('change log upkeep in slices', () => {
     await t.store.push({ changes: [change('air', 'x'), change('air', 'y')] });
     t.db.exec(`UPDATE changes SET data = '{"old":true}', blob = NULL`);
     const upkeep = t.upkeep();
+    expect(await upkeep.slice()).toBe(true); // scanned both rows
     expect(await upkeep.slice()).toBe(true); // compacted, one batch moved
     expect(await upkeep.slice()).toBe(false);
     expect(t.sql.exec('SELECT COUNT(*) AS n FROM changes WHERE data IS NOT NULL').toArray()).toEqual([{ n: 0 }]);
