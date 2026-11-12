@@ -7,6 +7,7 @@ import { ContextMenuHost } from '../components/ContextMenu.tsx';
 import { Onboarding } from '../components/Onboarding.tsx';
 import { ThreadNotifier } from '../components/Toaster.tsx';
 import { FolderDeleteDialog } from '../folders.tsx';
+import { useInboxKey } from '../inbox-key.ts';
 import { navigate, parseHash, useHash, type Route } from '../router.ts';
 import { usePageTitle, useSyncOnReturn } from '../store.tsx';
 import { MoToast } from './parts.tsx';
@@ -115,6 +116,7 @@ export function MobileShell() {
 
   useEffect(() => setSheet(null), [hash]);
   useSyncOnReturn();
+  useInboxKey(() => navigate(TAB_PATH.activity));
   useDesktopLayoutActions({
     newThread: () => setSheet({ name: 'new', channel: route.name === 'channel' ? route.id : undefined }),
     goTo: () => setSheet((s) => (s?.name === 'search' ? null : { name: 'search' })),

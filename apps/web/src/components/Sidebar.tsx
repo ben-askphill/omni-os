@@ -20,6 +20,7 @@ import { ChannelListLink, WorkspaceLinks } from './sidebar/SidebarLinks.tsx';
 import { UsageCard } from './sidebar/UsageCard.tsx';
 import { UpdateNotice } from './UpdateNotice.tsx';
 import { DiskNotice } from './DiskNotice.tsx';
+import { useInboxKey } from '../inbox-key.ts';
 
 /** Past this many threads a channel shows "N more" (or "See all threads" when highlighted) and links to its full list. */
 const MAX_THREADS = 5;
@@ -42,6 +43,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     writePref('sidebar.view', next);
     setView(next);
   };
+  useInboxKey(() => switchView('inbox'));
 
   // Running and Pinned each fold on their own.
   const [runningClosed, toggleRunning] = useSectionFold('sidebar.runningCollapsed');
