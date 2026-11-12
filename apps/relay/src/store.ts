@@ -1,9 +1,10 @@
-// One user's relay: the append-only change log and the machines' tokens, in the SQLite of that user's Durable
+// One user's relay: the change log and the machines' tokens, in the SQLite of that user's Durable
 // Object. A Durable Object runs one request at a time, so seq order is commit order and a pull of "seq > cursor"
 // never skips a row that committed late. Plain over an Sql interface, so the tests run it on node:sqlite.
-// The log keeps every change for good. A Durable Object's SQLite has a hard size cap, so SQLite holds only the index
+// The log keeps the newest change per item per machine (compact.ts). A Durable Object's SQLite has a hard size cap, so SQLite holds only the index
 // and each push's change data goes to Blobs (R2) as one JSON array, the row pointing at "<key>#<index>".
 import { RelayError, sha256 } from './auth.ts';
+import { key } from './compact.ts';
 
 /** The part of a Durable Object's SqlStorage this uses. */
 export interface Sql {
@@ -70,6 +71,9 @@ export function checkChange(v: unknown): Change {
 }
 
 export class RelayStore {
+  /** Delete superseded rows on push. Set once compaction is done and the key index exists (compact.ts). */
+  prune = false;
+
   constructor(
     private readonly sql: Sql,
     private readonly blobs: Blobs,
@@ -137,6 +141,15 @@ export class RelayStore {
         const at = data[i] === null ? null : `${blob}#${part++}`;
         this.sql.exec('INSERT INTO changes (machine_id, entity, entity_id, op, data, blob, ts) VALUES (?, ?, ?, ?, NULL, ?, ?)', c.machine_id, c.entity, c.entity_id, c.op, at, c.ts);
       });
+      if (this.prune) {
+        // Only the newest row per item per machine matters (compact.ts): drop the ones this push superseded.
+        const keys = new Map(changes.map((c) => [key(c.machine_id, c.entity, c.entity_id), c]));
+        for (const c of keys.values())
+          this.sql.exec(
+            'DELETE FROM changes WHERE machine_id = ? AND entity = ? AND entity_id = ? AND seq < (SELECT MAX(seq) FROM changes WHERE machine_id = ? AND entity = ? AND entity_id = ?)',
+            c.machine_id, c.entity, c.entity_id, c.machine_id, c.entity, c.entity_id,
+          );
+      }
     });
     return new Set(changes.map((c) => c.machine_id));
   }
