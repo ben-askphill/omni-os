@@ -110,6 +110,26 @@ describe('channels', () => {
     await exchange();
     for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'from an old Mac', icon, avatar_bg: bg });
   });
+
+  it('a color a Mac on an older build dropped reaches it once it updates', async () => {
+    a.db.channels.create({ id: 'tinted', name: 'Tinted' });
+    a.db.channels.create({ id: 'plain', name: 'Plain' });
+    a.db.channels.update('tinted', { avatar_bg: '#e6a491' });
+    b.db.channels.create({ id: 'b-only', name: 'B only' });
+    await exchange();
+    b.db.channels.update('plain', { avatar_bg: '#123456' });
+    await exchange();
+    // What the older build did: applied the change and its claim, without the column it did not know.
+    b.db.db.prepare(`UPDATE channels SET avatar_bg = NULL, avatar_bg_manual = 0 WHERE id = 'tinted'`).run();
+    for (const m of [a, b]) m.db.kv.set('sync.channel_colors_resent', null);
+    await exchange();
+    expect(b.db.channels.get('tinted')).toMatchObject({ avatar_bg: '#e6a491', avatar_bg_manual: 1 });
+    // B wrote plain last: A, without a color of its own there, does not send its row back over B's.
+    expect(a.db.channels.get('plain')).toMatchObject({ avatar_bg: '#123456' });
+    const sent = relay.changes.length;
+    await exchange();
+    expect(relay.changes.length).toBe(sent);
+  });
 });
 
 describe('kv', () => {
