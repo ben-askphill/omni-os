@@ -56,8 +56,12 @@ How a **Turn** ended: `done`, `failed` or `stopped`. Each one is saved with an i
 _Avoid_: Completion (in UI text), outcome
 
 **Limit stop**:
-A **Turn** its **Harness** ended because the plan's usage limit refused it, as Claude Code or Codex reports it. A full usage meter is not one, and neither is any other failure or Hermes being at its run cap. The thread fails as usual and keeps the stop, with the reset time the harness gave if it gave one. The stop syncs, so both Macs list it in Needs you, but only the Mac that ran the turn resumes or schedules it. The user resumes it now, or, with a reset time, picks Resume at reset: one **Continuation** then, never automatic. A message, Stop or archiving the thread clears it.
+A **Turn** its **Harness** ended because the plan's usage limit refused it, as Claude Code or Codex reports it. A full usage meter is not one, and neither is any other failure or Hermes being at its run cap. The thread fails as usual and keeps the stop, with the reset time the harness gave if it gave one. The stop syncs, so both Macs list it in Needs you, but only the Mac that ran the turn resumes or schedules it. The user resumes it now, or, with a reset time, picks Resume at reset: one **Continuation** then, never automatic. A message, Stop or archiving the thread clears it. In the UI the shared status label is **Limited** (for example "Limited · resets 13:00"), not a separate kind of stop.
 _Avoid_: Rate limit (the meter), quota error
+
+**Quick-actions card**:
+The compact card a **Thread** opens on beside the transcript on desktop web and in the **Desktop app** (a header popover on phone web): machine, path, harness, model, run state, branch and PR, plus **Lineage** when the thread has a parent or agents still run. Rows and **All details** open the full inspector; the header toggle hides the card. Not on iOS.
+_Avoid_: Side panel (the full inspector), Details tab
 
 **Continuation**:
 What resuming a **Limit stop** sends: Omni's "continue where you left off", saved as a **Request** keyed by the stop before the thread is woken, so it goes once, through the slots, even when it came due while Omni was down.
@@ -68,8 +72,8 @@ Questions an agent asks the user with Omni's `ask_user_question` tool: one to fo
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
 **Inbox**:
-The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. With Channel rail (Beta) on, the same list fills the panel beside the rail from the Inbox disc (Home's place). On a phone, Activity shows the same list. It is a view over **Needs you** and related shelves, not another name for **Needs you**.
-_Avoid_: Needs you (the reasons a thread waits), notifications
+The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. With Channel rail (Beta) on, the same list fills the panel beside the rail from the Inbox disc (Home's place). On a phone, Activity shows the same list. Press `i` outside a text field opens it when Appearance's **Press I for the Inbox** is on. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Home (and the rail's Inbox landing) is the usage dashboard, not this list.
+_Avoid_: Needs you (the reasons a thread waits), notifications, Home (the dashboard)
 
 **Needs you**:
 One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock. The **Inbox** view and phone Activity list these threads among others.
