@@ -15,11 +15,15 @@ import { ThreadFooter } from '../components/thread/ThreadFooter';
 import { TakeoverSheet } from '../components/thread/TakeoverSheet';
 import { ThreadHeader } from '../components/thread/ThreadHeader';
 import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
+import { StepChip } from '../components/thread/StepChip';
 import { ThreadTitle } from '../components/thread/ThreadTitle';
 import { useChannels, useThreadLive, useThreadView } from '../live/react';
 import { useRemote } from '../live/use-remote';
 import { useThreadMachine } from '../machine/hooks';
 import type { RootScreenProps } from '../navigation/types';
+import { useThreadPR } from '../pr/hooks';
+import { agentOffersPR, stepChip } from '../pr/step';
+import { usePRStep } from '../pr/use-step';
 import { useOmniTheme } from '../theme';
 import { useHarnessCatalog } from '../thread/hooks';
 import { targetOfThread } from '../thread/target';
@@ -50,6 +54,13 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const listed = useMemo(() => channels?.find((c) => c.id === thread?.channel_id) ?? null, [channels, thread?.channel_id]);
   const folders = useMemo(() => listed?.folders ?? [], [listed]);
   const server = useRemote(loadStatus);
+  const prStep = usePRStep(live, view ?? null);
+  const busy = thread?.status === 'running' || thread?.status === 'queued';
+  // Open PR as a one-tap answer when the agent just asked whether to open one. The PR list is read only then, to see the branch has none.
+  const offers = view ? agentOffersPR({ rows: view.rows, pending: view.pending, busy }) : false;
+  const offerPR = useThreadPR(offers ? thread : null);
+  const offered = offers && offerPR.page.kind === 'empty' && offerPR.page.canOpen;
+  const chip = stepChip(prStep.working, prStep.parked, offered);
 
   const title = thread?.title || 'Thread';
   const hasThread = thread !== null;
@@ -118,6 +129,13 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
     [],
   );
 
+  const askStep = (prompt: string) => {
+    void prStep.ask(prompt).then((out) => {
+      if (out.kind === 'busy') say('Another message is still sending. Try again in a moment.');
+      else if (out.kind === 'failed') say(out.message);
+    });
+  };
+
   if (!view || view.status === 'loading') return <Notice title="Loading thread" />;
   if (view.status === 'missing') return <Notice title="Thread not found" body="It may have been archived or removed on the server." />;
   if (view.status === 'error' && !view.thread) {
@@ -131,7 +149,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
       <ThreadBody view={view} live={live} />
       {live && view.thread ? (
         <ThreadFooter>
-          <ThreadComposer live={live} thread={view.thread} harnesses={catalog.harnesses} onOpenRun={() => setRunOpen(true)} />
+          <ThreadComposer live={live} thread={view.thread} harnesses={catalog.harnesses} onOpenRun={() => setRunOpen(true)} step={<StepChip chip={chip} onAsk={askStep} />} />
         </ThreadFooter>
       ) : null}
       <ThreadMenuSheet

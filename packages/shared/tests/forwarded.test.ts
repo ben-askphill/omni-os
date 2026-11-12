@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { FIX_CONFLICTS_PROMPT, stepUnderway } from '@omni/shared/thread-glance.ts';
-import type { PendingMsg, SyncStatus } from '../src/api.ts';
-import { forwardedLabel, SLOW_MS, syncTrouble } from '../src/forwarded.ts';
+import { FIX_CONFLICTS_PROMPT, stepUnderway } from '../thread-glance.ts';
+import { forwardedLabel, SLOW_MS, syncTrouble, type SyncTroubleInput } from '../forwarded.ts';
 
 // Fix conflicts on a thread another machine holds goes out as a remote command. On 2026-11-12 the relay failed every
 // push for two hours, and the Air listed nothing while its clicks waited: the button went back to "Fix conflicts"
 // and Ben clicked four times. The sender now lists the message until the holder answers, and says what holds it up.
 
 const sentAt = '2026-11-12T07:00:00.000Z';
-const row: PendingMsg = { uuid: 'command:c1', kind: 'user', text: FIX_CONFLICTS_PROMPT, mode: 'steer', state: 'sent', request_id: 'c1', forwarded_to: 'omarchy', sent_at: sentAt };
-const status = (s: Partial<SyncStatus>) => ({ configured: true, enabled: true, signedOut: false, failures: 0, lastError: null, ...s }) as SyncStatus;
+const row = { uuid: 'command:c1', kind: 'user', text: FIX_CONFLICTS_PROMPT, mode: 'steer', state: 'sent', request_id: 'c1', forwarded_to: 'omarchy', sent_at: sentAt };
+const status = (s: Partial<SyncTroubleInput>): SyncTroubleInput => ({ configured: true, enabled: true, signedOut: false, failures: 0, lastError: null, ...s });
 const at = (ms: number) => Date.parse(sentAt) + ms;
 
 describe('a message on its way to the machine that holds the thread', () => {
