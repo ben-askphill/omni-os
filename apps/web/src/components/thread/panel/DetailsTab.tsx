@@ -92,6 +92,7 @@ export function DetailsTab({
   changes,
   next,
   step = null,
+  parked = null,
   onAsk = () => {},
   onMerged = () => {},
   onTab = () => {},
@@ -113,6 +114,8 @@ export function DetailsTab({
   next?: PRNext;
   /** The step the agent is working on, so its button shows it. */
   step?: PRStep | null;
+  /** A step whose message was parked and never reached the agent, so its button says why. */
+  parked?: PRStep | null;
   onAsk?: (prompt: string) => void;
   /** After a Merge button merged a PR, to read the PRs again. */
   onMerged?: () => void;
@@ -134,7 +137,7 @@ export function DetailsTab({
   const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin flex h-full flex-col gap-3 overflow-y-auto px-2.5 pb-3 [&>*]:shrink-0">
-      <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} onAsk={onAsk} onMerged={onMerged} onTab={onTab} />
+      <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} parked={parked} onAsk={onAsk} onMerged={onMerged} onTab={onTab} />
       {prs && <CrewGlance crew={prs.crew} onMerged={onMerged} onTab={onTab} />}
       <AgentsSection parent={parent} links={links} children={children} agents={agents} onJump={onJump} />
       <dl className="divide-y divide-line rounded-[20px] bg-bg py-1">

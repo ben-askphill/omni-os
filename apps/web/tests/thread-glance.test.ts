@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { PRSummary, Thread } from '../src/api.ts';
 import { AgentsSection } from '../src/components/thread/panel/AgentsSection.tsx';
 import { DetailsTab } from '../src/components/thread/panel/DetailsTab.tsx';
-import { FIX_CHECKS_PROMPT, FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, prLine, prNext, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { FIX_CHECKS_PROMPT, FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, prLine, prNext, stepParked, stepUnderway } from '@omni/shared/thread-glance.ts';
 
 // The thread panel's Details tab: the branch card on top (thread-glance.ts, GlanceCard.tsx), the agents card and the
 // session rows with MCP folded to one line.
@@ -57,6 +57,19 @@ describe('the step a branch PR calls for', () => {
     expect(stepUnderway([said(OPEN_PR_PROMPT), said('Also fix the typo')], [], true)).toBeNull();
     expect(stepUnderway([said('Build it')], [{ kind: 'user', text: FIX_CHECKS_PROMPT }], true)).toBe('checks');
     expect(stepUnderway([], [{ kind: 'user', text: FIX_CONFLICTS_PROMPT }], false)).toBe('conflicts');
+  });
+
+  it('does not count a parked step as underway, and offers to resume it', () => {
+    // Thread dcaf86b3 on 2026-11-12: Fix conflicts from another machine landed, the session download timed out and the
+    // runner parked it. The button spun "Fixing conflicts…" with nothing running.
+    const parked = (uuid: string, text: string, delivery = 'recovered') => ({ kind: 'user', text, uuid, delivery });
+    const queued = [parked('a', FIX_CONFLICTS_PROMPT), parked('b', 'fix merge conflicts'), parked('c', FIX_CONFLICTS_PROMPT)];
+    expect(stepUnderway([], queued, false)).toBeNull();
+    expect(stepParked(queued)).toEqual({ step: 'conflicts', uuid: 'c' });
+    expect(stepParked([parked('u', FIX_CHECKS_PROMPT, 'uncertain')])).toEqual({ step: 'checks', uuid: 'u' });
+    // A message the runner holds for after this turn is on its way, not parked.
+    expect(stepUnderway([], [{ kind: 'user', text: FIX_CONFLICTS_PROMPT, uuid: 'h', delivery: 'held' }], true)).toBe('conflicts');
+    expect(stepParked([{ kind: 'user', text: FIX_CONFLICTS_PROMPT, uuid: 'h', delivery: 'held' }])).toBeNull();
   });
 
   it('says what decides whether it can merge', () => {
@@ -136,6 +149,22 @@ describe('the Details tab', () => {
     expect(html).toContain('Opening PR…');
     expect(html).not.toContain('No PR yet');
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>.*Opening PR…<\/button>/);
+  });
+
+  it('says why a parked step did not start, with its button ready to try again', () => {
+    const html = renderToStaticMarkup(
+      createElement(DetailsTab, {
+        ...details,
+        thread: thread({ branch: 't3/x', status: 'failed', resume_blocked: 'download timed out' }),
+        init: null,
+        prs: { pr: { ...pr({ mergeable: 'CONFLICTING' }), number: 7, url: 'u', title: 'x' } as never, prs: [], crew: [] },
+        next: prNext(pr({ mergeable: 'CONFLICTING' }), true),
+        step: null,
+        parked: 'conflicts',
+      }),
+    );
+    expect(html).toContain('Fix conflicts did not start: Omni could not bring the latest session to this machine. Press it to try again.');
+    expect(html).toMatch(/<button(?![^>]*disabled)[^>]*>.*Fix conflicts<\/button>/);
   });
 
   it('has no branch card for a thread in the channel folder', () => {

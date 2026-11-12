@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { stepOf, type PRStep } from '@omni/shared/thread-glance.ts';
-import { api, errorText, type SendMode, type Thread } from '../api.ts';
+import { api, errorText, type PendingMsg, type SendMode, type Thread } from '../api.ts';
 import { OPEN_PR_PROMPT } from '../components/thread/ThreadPR.tsx';
 import { useApp } from '../store.tsx';
 
@@ -13,7 +13,9 @@ export function useThreadActions({
   thread,
   slotBusy,
   underway,
+  parked,
   applyThread,
+  setQueued,
   setActionError,
   pin,
 }: {
@@ -22,7 +24,10 @@ export function useThreadActions({
   slotBusy: boolean;
   /** The step the thread itself shows underway (`stepUnderway`), which takes over from `sending` once it catches up. */
   underway: PRStep | null;
+  /** A step prompt that was parked before the agent got it (`stepParked`). Asking for that step again resumes it. */
+  parked: { step: PRStep; uuid: string } | null;
   applyThread: (t: Thread, replace?: boolean) => void;
+  setQueued: (pending: PendingMsg[]) => void;
   setActionError: (e: string | null) => void;
   pin: () => void;
 }) {
@@ -56,10 +61,16 @@ export function useThreadActions({
     setSent(false);
     setActionError(null);
     try {
-      // Mid-turn, wait for the work to finish instead of steering it to commit halfway.
-      const mode: SendMode | undefined = slotBusy ? 'queue' : undefined;
-      const t = await api.post<Thread>(`/threads/${encodeURIComponent(id)}/messages`, { prompt, mode });
-      applyThread(t, true);
+      if (parked && parked.step === stepOf(prompt)) {
+        // The same prompt waits parked: send that one, so the thread does not end up asking twice.
+        const res = await api.post<{ thread: Thread; pending: PendingMsg[] }>(`/threads/${encodeURIComponent(id)}/requests/resume`, { ids: [parked.uuid] });
+        applyThread(res.thread);
+        setQueued(res.pending);
+      } else {
+        // Mid-turn, wait for the work to finish instead of steering it to commit halfway.
+        const mode: SendMode | undefined = slotBusy ? 'queue' : undefined;
+        applyThread(await api.post<Thread>(`/threads/${encodeURIComponent(id)}/messages`, { prompt, mode }), true);
+      }
       pin();
       setSent(true);
     } catch (e) {

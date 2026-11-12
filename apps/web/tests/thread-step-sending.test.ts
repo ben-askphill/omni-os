@@ -9,8 +9,14 @@ import { FIX_CONFLICTS_PROMPT, type PRStep } from '@omni/shared/thread-glance.ts
 // where the stream has dropped the pending row but not yet sent the recorded message: a flicker.
 
 let reply: { resolve: (v: unknown) => void; reject: (e: unknown) => void };
+const posts: { path: string; body: unknown }[] = [];
 vi.mock('../src/api.ts', () => ({
-  api: { post: () => new Promise((resolve, reject) => (reply = { resolve, reject })) },
+  api: {
+    post: (path: string, body: unknown) => {
+      posts.push({ path, body });
+      return new Promise((resolve, reject) => (reply = { resolve, reject }));
+    },
+  },
   errorText: (e: unknown) => String(e),
 }));
 vi.mock('../src/store.tsx', () => ({ useApp: () => ({ reloadChannels: () => {}, setDone: () => {} }) }));
@@ -21,17 +27,31 @@ let root: Root;
 let host: HTMLElement;
 let actions: ReturnType<typeof useThreadActions>;
 const errors: (string | null)[] = [];
+const queuedSets: unknown[] = [];
+type Parked = { step: PRStep; uuid: string } | null;
 
-function Probe({ underway, busy }: { underway: PRStep | null; busy: boolean }) {
-  actions = useThreadActions({ id: 't1', thread: null, slotBusy: busy, underway, applyThread: () => {}, setActionError: (e) => errors.push(e), pin: () => {} });
+function Probe({ underway, busy, parked }: { underway: PRStep | null; busy: boolean; parked: Parked }) {
+  actions = useThreadActions({
+    id: 't1',
+    thread: null,
+    slotBusy: busy,
+    underway,
+    parked,
+    applyThread: () => {},
+    setQueued: (p) => queuedSets.push(p),
+    setActionError: (e) => errors.push(e),
+    pin: () => {},
+  });
   return null;
 }
-const render = (underway: PRStep | null, busy = false) => act(() => root.render(createElement(Probe, { underway, busy })));
+const render = (underway: PRStep | null, busy = false, parked: Parked = null) => act(() => root.render(createElement(Probe, { underway, busy, parked })));
 
 beforeEach(() => {
   host = document.createElement('div');
   root = createRoot(host);
   errors.length = 0;
+  posts.length = 0;
+  queuedSets.length = 0;
 });
 afterEach(() => act(() => root.unmount()));
 
@@ -91,5 +111,24 @@ describe('useThreadActions sending', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('resumes the parked copy of the same step instead of sending it again', async () => {
+    await render(null, false, { step: 'conflicts', uuid: 'r1' });
+    let done!: Promise<void>;
+    await act(async () => void (done = actions.ask(FIX_CONFLICTS_PROMPT)));
+    expect(posts.at(-1)).toEqual({ path: '/threads/t1/requests/resume', body: { ids: ['r1'] } });
+    await act(async () => {
+      reply.resolve({ thread: {}, pending: [{ uuid: 'r1', state: 'sent' }] });
+      await done;
+    });
+    expect(queuedSets.at(-1)).toEqual([{ uuid: 'r1', state: 'sent' }]);
+    expect(actions.sending).toBe(FIX_CONFLICTS_PROMPT);
+  });
+
+  it('sends a new message when a different step is parked', async () => {
+    await render(null, false, { step: 'checks', uuid: 'r1' });
+    await act(async () => void actions.ask(FIX_CONFLICTS_PROMPT));
+    expect(posts.at(-1)?.path).toBe('/threads/t1/messages');
   });
 });
