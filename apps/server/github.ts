@@ -114,7 +114,9 @@ export async function getPR(repo: string, n: number) {
 export async function mergePR(repo: string, n: number, method: 'squash' | 'merge' | 'rebase', deleteBranch: boolean) {
   const args = ['pr', 'merge', String(n), '--repo', repo, `--${method}`];
   if (deleteBranch) args.push('--delete-branch');
-  return gh(args);
+  const out = await gh(args);
+  markMerged(repo, n);
+  return out;
 }
 
 export interface BranchPRMark {
@@ -138,6 +140,16 @@ export function markBranches(prs: (BranchPRMark & { headRefName: string })[]): R
 }
 
 const markCache = new Map<string, { at: number; marks: Record<string, BranchPRMark> }>();
+
+/**
+ * Marks a PR Omni just merged as merged in the cached marks, so the read straight after a merge (a Conductor's crew
+ * card) does not show it open for up to 30s more.
+ */
+function markMerged(repo: string, n: number) {
+  const hit = markCache.get(repo);
+  if (!hit) return;
+  for (const [branch, mark] of Object.entries(hit.marks)) if (mark.number === n) hit.marks[branch] = { ...mark, state: 'MERGED' };
+}
 
 /** Branch to PR for a whole repo in one gh call, so a thread list does not ask per thread. Cached for 30s. */
 export async function threadPRMarks(repo: string) {
