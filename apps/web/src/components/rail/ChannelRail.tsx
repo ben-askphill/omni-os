@@ -101,7 +101,7 @@ function RailItem({ to, label, selected, badge, children }: { to: string; label:
       aria-label={what}
       title={what}
       aria-current={selected ? 'page' : undefined}
-      className="press relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-colors hover:bg-[var(--wash)]"
+      className="rail-item press relative grid h-12 w-12 shrink-0 place-items-center"
     >
       {children}
       {badge && (
@@ -123,7 +123,7 @@ function Disc({ selected, icon, quiet, fill, children }: { selected: boolean; ic
     : selected ? 'bg-fg text-[var(--chrome)]' : quiet ? 'text-fg-3' : 'bg-surface-2 text-fg-2';
   return (
     <span
-      className={`grid h-10 w-10 place-items-center rounded-full font-rounded text-[14px] font-medium leading-none transition-colors ${look}`}
+      className={`rail-disc grid h-10 w-10 place-items-center rounded-full font-rounded text-[14px] font-medium leading-none ${look}`}
       style={fill ? { backgroundColor: fill, color: avatarInk(fill) } : undefined}
     >
       {icon ? <Icon name={icon} size={18} /> : children}
