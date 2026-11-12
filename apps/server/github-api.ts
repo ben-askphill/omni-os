@@ -3,7 +3,9 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { ghLogin } from './automation-watch.ts';
 import { crewPRs, prThread } from './crew-prs.ts';
+import { followBranch } from './branch-follow.ts';
 import { channels, threads } from './db.ts';
+import { emitThread } from './runner/state.ts';
 import { allPRs, branchPRs, getPR, listPRs, mergePR, threadPRMarks } from './github.ts';
 import { requestPRReview } from './pr-review.ts';
 import { fetchPRImage, githubImage, proxyPRImages } from './github-images.ts';
@@ -64,8 +66,13 @@ githubApi.get('/channels/:id/prs/:n/image', async (c) => {
 // else the newest. null and [] when there is none or no repo to ask. `crew`: the PRs of the threads it delegated
 // to, at any depth, less any it lists itself (crew-prs.ts).
 githubApi.get('/threads/:id/pr', async (c) => {
-  const t = threads.get(c.req.param('id'));
-  if (!t) return c.json({ error: 'not found' }, 404);
+  const id = c.req.param('id');
+  if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  // A thread whose agent switched branches before this rule existed still finds the PR it opened. Not mid-turn: the
+  // agent may be on another branch only for a moment.
+  const busy = ['running', 'queued'].includes(threads.get(id)!.status);
+  if (!busy && (await followBranch(id).catch(() => false))) emitThread(id);
+  const t = threads.get(id)!;
   const repo = channels.get(t.channel_id)?.github_repo;
   const [own, crew] = await Promise.all([t.branch && repo ? branchPRs(repo, t.branch) : { pr: null, prs: [] }, crewPRs(t.id)]);
   const mine = new Set(own.prs.map((p: { url: string }) => p.url));

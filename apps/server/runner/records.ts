@@ -4,6 +4,7 @@ import { events, messageRequests, outbox, threads, type ThreadStatus } from '../
 import { publishFeed, publishThread } from '../bus.ts';
 import { runnerPorts } from './ports.ts';
 import { turnFinished } from '../sync/files.ts';
+import { followBranch } from '../branch-follow.ts';
 import { notifyEnded } from '../push-sender.ts';
 import { observeToolResult } from '../tool-failures.ts';
 import { toolTails } from '../tool-tail.ts';
@@ -267,7 +268,10 @@ export function onExit(live: Live, code: number | null, signal: NodeJS.Signals |
   applyQueued(id);
   // After the status write, so the turn's Result is there to link.
   finishTurnSnapshot(live);
-  if (thread && (wasTurn || live.resultSeen)) void turnFinished(id);
+  if (thread && (wasTurn || live.resultSeen)) {
+    void turnFinished(id);
+    void followBranch(id).then((moved) => moved && emitThread(id), () => {});
+  }
   emitThread(id);
   pump();
 }

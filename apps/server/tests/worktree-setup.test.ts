@@ -192,7 +192,7 @@ describe('a worktree thread', () => {
 });
 
 describe('a worktree its agent moved to another branch', () => {
-  /** A thread that ran in its worktree, whose agent then ran `git checkout` there; its next message is refused. */
+  /** A thread that ran in its worktree; each test then moves it the way an agent's `git checkout` would. */
   const moved = async (prompt: string) => {
     const dir = repo();
     const id = `moved-${++n}`;
@@ -205,56 +205,79 @@ describe('a worktree its agent moved to another branch', () => {
     });
     return { dir, t };
   };
-  const send = async (id: string, prompt: string) => {
-    expect((await request('POST', `/threads/${id}/messages`, { prompt })).status).toBe(200);
-    return failed(id);
-  };
+  const send = async (id: string, prompt: string) => expect((await request('POST', `/threads/${id}/messages`, { prompt })).status).toBe(200);
 
-  it('switches a clean worktree back to its branch on Retry and sends the message', async () => {
+  it('takes the branch its agent checked out as its own and sends the next message there', async () => {
     const { t } = await moved('start');
-    git(t.cwd, 'checkout', '-q', '-b', 'chore/other');
-    expect((await send(t.id, 'carry on')).setup_error).toMatch(/is on branch chore\/other, not omni\//);
-    await retry(t.id);
+    git(t.cwd, 'checkout', '-q', '-b', 'feat/rail-hover');
+    await send(t.id, 'carry on');
     await r.untilResults(t.id, 1);
-    expect(git(t.cwd, 'branch', '--show-current')).toBe(t.branch);
-    // The branch it was moved to is kept.
-    expect(git(t.cwd, 'branch', '--list', 'chore/other')).toMatch(/chore\/other/);
-    expect(r.thread(t.id).setup).toBeNull();
+    expect(r.thread(t.id)).toMatchObject({ branch: 'feat/rail-hover', setup: null });
+    expect(git(t.cwd, 'branch', '--show-current')).toBe('feat/rail-hover');
   });
 
-  it('switches a clean detached HEAD back to its branch', async () => {
-    const { t } = await moved('start');
-    git(t.cwd, 'checkout', '-q', '--detach');
-    expect((await send(t.id, 'carry on')).setup_error).toMatch(/detached HEAD/);
-    await retry(t.id);
-    await r.untilResults(t.id, 1);
-    expect(git(t.cwd, 'branch', '--show-current')).toBe(t.branch);
-  });
-
-  it('leaves a dirty worktree alone and says what to do', async () => {
+  it('takes the new branch even with uncommitted changes, touching nothing', async () => {
     const { t } = await moved('start');
     git(t.cwd, 'checkout', '-q', '-b', 'chore/dirty');
     writeFileSync(join(t.cwd, 'README.md'), 'edited\n');
+    await send(t.id, 'carry on');
+    await r.untilResults(t.id, 1);
+    expect(r.thread(t.id).branch).toBe('chore/dirty');
+    expect(git(t.cwd, 'status', '--porcelain')).toBe('M README.md');
+  });
+
+  it('finds the PR its agent opened from the new branch when the PRs tab asks, idle', async () => {
+    const { t } = await moved('start');
+    git(t.cwd, 'checkout', '-q', '-b', 'feat/from-pr-tab');
+    expect((await request('GET', `/threads/${t.id}/pr`)).status).toBe(200);
+    expect(r.thread(t.id).branch).toBe('feat/from-pr-tab');
+  });
+
+  it('leaves the branch alone while a turn runs', async () => {
+    const { t } = await moved('start');
+    r.db.threads.update(t.id, { status: 'running' });
+    git(t.cwd, 'checkout', '-q', '-b', 'feat/mid-turn');
+    await request('GET', `/threads/${t.id}/pr`);
+    expect(r.thread(t.id).branch).toBe(t.branch);
+    r.db.threads.update(t.id, { status: 'done' });
+  });
+
+  it('switches a clean detached HEAD back to its branch on Retry', async () => {
+    const { t } = await moved('start');
+    git(t.cwd, 'checkout', '-q', '--detach');
+    await send(t.id, 'carry on');
+    expect((await failed(t.id)).setup_error).toMatch(/detached HEAD/);
+    await retry(t.id);
+    await r.untilResults(t.id, 1);
+    expect(git(t.cwd, 'branch', '--show-current')).toBe(t.branch);
+  });
+
+  it('leaves a dirty detached HEAD alone and says what to do', async () => {
+    const { t } = await moved('start');
+    git(t.cwd, 'checkout', '-q', '--detach');
+    writeFileSync(join(t.cwd, 'README.md'), 'edited\n');
     for (let i = 0; i < 12; i++) writeFileSync(join(t.cwd, `new-${i}.txt`), 'x\n');
     await send(t.id, 'carry on');
+    await failed(t.id);
     await retry(t.id);
     await r.until('the retry to fail', () => r.thread(t.id).setup === 'failed' && /uncommitted/.test(r.thread(t.id).setup_error ?? ''));
     const error = r.thread(t.id).setup_error!;
-    expect(error).toContain(`is on branch chore/dirty, not ${t.branch}`);
+    expect(error).toContain(`is on a detached HEAD, not ${t.branch}`);
     expect(error).toContain('README.md');
     expect(error).toContain('and 3 more');
     expect(error).toContain(`git -C ${t.cwd} checkout ${t.branch}`);
-    // Nothing touched: same branch, same edits, nothing run.
-    expect(git(t.cwd, 'branch', '--show-current')).toBe('chore/dirty');
+    // Nothing touched: same HEAD, same edits, nothing run.
+    expect(git(t.cwd, 'branch', '--show-current')).toBe('');
     expect(git(t.cwd, 'status', '--porcelain', '--untracked-files=all').split('\n')).toHaveLength(13);
     expect(r.spawns(t.id)).toEqual([]);
   });
 
-  it('recreates its branch from HEAD when the branch was deleted', async () => {
+  it('recreates its branch from HEAD when it was deleted under a detached HEAD', async () => {
     const { t } = await moved('start');
-    git(t.cwd, 'checkout', '-q', '-b', 'chore/gone');
+    git(t.cwd, 'checkout', '-q', '--detach');
     git(t.cwd, 'branch', '-q', '-D', t.branch!);
     await send(t.id, 'carry on');
+    await failed(t.id);
     await retry(t.id);
     await r.untilResults(t.id, 1);
     expect(git(t.cwd, 'branch', '--show-current')).toBe(t.branch);

@@ -4,6 +4,7 @@ import { channels, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
 import { inWorkspace } from '../workspace.ts';
+import { followBranch } from '../branch-follow.ts';
 import { attachThread, detachThread } from '../browser.ts';
 import { globalSecret, secretsEnv } from '../secrets.ts';
 import { recordUsage } from '../usage.ts';
@@ -92,6 +93,11 @@ async function spawnLive(live: Live, thread: Thread) {
 
   // Hermes and Cursor Cloud are not on this Mac: they must not take the channel's browser profile or see local MCP config.
   const remote = isProviderHarness(thread.harness);
+  // A branch its agent switched to in the last turn is the thread's branch now, not a fault (branch-follow.ts).
+  if (!remote && (await followBranch(thread.id).catch(() => false))) {
+    thread = threads.get(thread.id) ?? thread;
+    emitThread(thread.id);
+  }
   // Every local harness starts here, so this is the one check that a worktree thread never runs anywhere else. It waits
   // out a cleanup of the folder, and checks the branch out again if one removed it (apps/server/workspace.ts).
   const problem = remote ? null : await inWorkspace(thread, (missing) => missing ?? workdirProblem(thread, channel.repo_path));

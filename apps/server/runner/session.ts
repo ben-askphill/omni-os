@@ -7,6 +7,7 @@ import { lostTo } from '../ownership.ts';
 import { machineName } from '../sync/guard.ts';
 import { detachThread } from '../browser.ts';
 import { turnFinished } from '../sync/files.ts';
+import { followBranch } from '../branch-follow.ts';
 import { notifyEnded } from '../push-sender.ts';
 import { suggestNextThread, suggestReply } from './aux.ts';
 import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
@@ -143,6 +144,8 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
     suggestNextThread(id, runText);
   }
   void turnFinished(id);
+  // The agent may have switched to a branch of its own and opened its PR from it.
+  void followBranch(id).then((moved) => moved && emitThread(id), () => {});
   armIdle(live);
   pump();
 }
