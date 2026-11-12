@@ -1,15 +1,15 @@
-import { Fragment, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { taskHost, type ChannelWithRunning, type FolderWithThreads, type ThreadStub } from '../api.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../folders.tsx';
 import { pinnedRows } from '../pins.ts';
 import { opensOnVisit } from '../sidebar-fold.ts';
 import { rowsElsewhere, runningThreadGroups } from '../sidebar-lists.ts';
-import { href, useHash, useRoute } from '../router.ts';
+import { href, useRoute } from '../router.ts';
 import { readPref, useApp, writePref } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { OmniMark } from './brand.tsx';
-import { Avatar, ChannelMark, ErrorNote, Thumb, useSlidingThumb } from './ui.tsx';
+import { Avatar, ChannelMark, ErrorNote } from './ui.tsx';
 import { useUngroupDrop } from './sidebar/channel-lists.ts';
 import { SidebarTop, type SidebarView } from './sidebar/SidebarTop.tsx';
 import { InboxView } from './sidebar/InboxView.tsx';
@@ -33,10 +33,8 @@ const GROUPS: { kind: string; label: string }[] = [
 // onClose is the mobile drawer's: its X sits in the header beside collapse-all, both at a 44px touch size.
 export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => void; onSearch: () => void; onClose?: () => void }) {
   const route = useRoute();
-  const hash = useHash();
   const { channels, channelsError, openThread, tasks, pinned } = useApp();
   const folders = useFolders();
-  const listRef = useRef<HTMLDivElement>(null);
   const { dropOn, ungroupDrop } = useUngroupDrop(folders);
   const { collapsed, setChannelOpen, foldAll, toggleAll } = useChannelFold(channels, folders);
   const [view, setView] = useState<SidebarView>(() => (readPref<SidebarView>('sidebar.view', 'projects') === 'inbox' ? 'inbox' : 'projects'));
@@ -76,20 +74,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   const threadsOf = (c: ChannelWithRunning) => channelThreads(c, openIn(c), focused).filter((t) => !elsewhere(t));
   /** The channel's folders, with the open thread under its own even past the listed ones. */
   const foldersOf = (c: ChannelWithRunning) => channelFolders(c, openIn(c)).map(listed);
-  // Rows appearing or leaving above the highlighted one move it, so they re-measure the thumb too.
   const pins = pinnedRows(pinned, openCopy);
-  const sectionKey = (closed: boolean, list: ThreadStub[]) => (closed ? 'closed' : list.map((t) => t.id).join());
-  const sectionsKey = [sectionKey(runningClosed, running), sectionKey(pinsClosed, pins)].join('|');
-  const rowsKey = channels
-    .flatMap((c) =>
-      collapsed.has(c.id)
-        ? [`${c.id}:closed`]
-        : [...foldersOf(c).flatMap((f) => [f.id, f.collapsed, ...f.threads.map((t) => t.id)]), ...threadsOf(c).map((t) => t.id)],
-    )
-    .join();
-  // Agent rows nest under threads, so they move the rows below them too.
-  const agentsKey = tasks.map((k) => k.task_id).join();
-  const box = useSlidingThumb(listRef, `${hash}:${channels.length}:${sectionsKey}:${rowsKey}:${agentsKey}:${folders.editing}`, true, '[data-active="true"]');
 
   const threadLinks = (c: ChannelWithRunning) => {
     const closed = collapsed.has(c.id);
@@ -230,8 +215,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
         {view === 'inbox' ? (
           <InboxView onNavigate={onNavigate} />
         ) : (
-          <div ref={listRef} className="relative space-y-4">
-            <Thumb box={box} />
+          <div className="space-y-4">
             <div className="space-y-px">
               <NavLink to={href.home()} icon="home" active={route.name === 'home'} onNavigate={onNavigate}>
                 Home

@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { Thread, ThreadStub } from '../../api.ts';
@@ -6,10 +6,10 @@ import { useInbox } from '../../app/useInbox.ts';
 import type { RowStatus } from '@omni/shared/status.ts';
 import type { InboxThread } from '../../inbox.ts';
 import { canMarkDone } from '../../needs-you.ts';
-import { href, useHash } from '../../router.ts';
+import { href } from '../../router.ts';
 import { useApp, useNow } from '../../store.tsx';
 import { HarnessLogo, Loader, OmniMark } from '../brand.tsx';
-import { Avatar, ChannelMark, DoneMark, Icon, StatusDot, Thumb, useSlidingThumb } from '../ui.tsx';
+import { Avatar, ChannelMark, DoneMark, Icon, StatusDot } from '../ui.tsx';
 import { DelegateCount, DelegateCountSpace } from '../DelegateCount.tsx';
 import { useRowDelegates } from './SidebarRows.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
@@ -20,14 +20,10 @@ import { WorkspaceLinks } from './SidebarLinks.tsx';
  * bottom. Marking a thread done (the check on hover) moves it to Done, as Settle does in T3.
  */
 export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
-  const hash = useHash();
   const { channels } = useApp();
   const { pinned, inbox, working, done, loaded, openId, status, delegates } = useInbox();
-  const listRef = useRef<HTMLDivElement>(null);
   const channelOf = (id: string) => channels.find((c) => c.id === id);
 
-  const rowsKey = [pinned, inbox, working.rows, done.rows].map((l) => l.map((t) => t.id).join()).join('|');
-  const box = useSlidingThumb(listRef, `${hash}:${rowsKey}`, true, '[data-active="true"]');
 
   const card = (t: InboxThread, pinnedRow = false) => (
     <InboxCard
@@ -43,8 +39,7 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
   );
 
   return (
-    <div ref={listRef} className="relative flex min-h-full flex-col">
-      <Thumb box={box} />
+    <div className="flex min-h-full flex-col">
       <div className="space-y-px">
         {pinned.map((t) => card(t, true))}
         {inbox.map((t) => card(t))}
@@ -67,7 +62,7 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
           <button
             type="button"
             onClick={done.showMore}
-            className="hov z-[1] flex h-8 w-full items-center gap-2 rounded-full px-3 text-[12.5px] text-fg-3 transition-colors hover:text-fg-2"
+            className="item flex h-8 w-full items-center gap-2 px-3 text-[12.5px] text-fg-3 hover:text-fg-2"
           >
             <Icon name="chevronDown" size={12} />
             Show {done.more} more
@@ -141,7 +136,7 @@ function InboxCard({
         title={`${title} · ${channelName}${status ? ` · ${status.label}` : ''}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`hov z-[1] block rounded-[14px] [grid-area:1/1] px-3 py-2 transition-colors ${active ? '[--hov:transparent]' : ''}`}
+        className="item block [grid-area:1/1] px-3 py-2"
       >
         <span className="flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3">
           <span className="grid min-w-3 shrink-0 place-items-center">
@@ -196,7 +191,7 @@ function DoneRow({ t, active, onNavigate }: { t: InboxThread; active: boolean; o
         title={`${title} · Marked done`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`hov z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[12.5px] [grid-area:1/1] transition-colors ${active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-3 hover:text-fg'}`}
+        className={`item flex h-8 items-center gap-2 px-3 text-[12.5px] [grid-area:1/1] ${active ? 'font-medium text-fg' : 'text-fg-3 hover:text-fg'}`}
       >
         <span className="grid w-3 shrink-0 place-items-center">
           <DoneMark size={7} />

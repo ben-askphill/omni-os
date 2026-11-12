@@ -19,9 +19,7 @@ export function NavLink({ to, icon, lead, active, children, right, onNavigate, c
       aria-current={active ? 'page' : undefined}
       aria-expanded={expanded}
       data-active={active || undefined}
-      className={`hov z-[1] flex h-9 items-center gap-2.5 rounded-full px-3 text-[13.5px] transition-colors md:h-8 md:text-[13px] ${
-        active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-2 hover:text-fg'
-      }`}
+      className={`item flex h-9 items-center gap-2.5 px-3 text-[13.5px] md:h-8 md:text-[13px] ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
     >
       {icon && <Icon name={icon} size={15} className={active ? 'text-fg' : 'text-fg-3'} />}
       {lead}
@@ -66,10 +64,7 @@ export function useRowDelegates(parentId: string, children: readonly ThreadStub[
     : undefined;
 }
 
-/**
- * The count laid over the right end of a row's link, in the same grid cell so it never nests inside the link. Not a
- * positioned box: the sliding thumb reads the link's offsetTop, which a positioned parent would reset.
- */
+/** The count laid over the right end of a row's link, in the same grid cell so it never nests inside the link. */
 function WithDelegates({ delegates, children }: { delegates: RowDelegates | undefined; children: ReactNode }) {
   if (!delegates) return <>{children}</>;
   return (
@@ -101,8 +96,8 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, delega
         title={`${title} · ${agents ? plural(agents, 'agent') + ' running' : t.done_at ? 'Marked done' : threadStatusText(t)}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`hov group/row z-[1] flex h-8 items-center gap-2 rounded-full px-3 text-[13px] transition-colors md:h-7 md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
-          active ? 'font-medium text-fg [--hov:transparent]' : t.done_at ? 'text-fg-3 hover:text-fg' : 'text-fg-3 hover:text-fg'
+        className={`item group/row flex h-8 items-center gap-2 px-3 text-[13px] md:h-7 md:text-[12.5px] ${indent === 'flush' ? 'ml-1' : indent ? 'ml-[25px]' : ''} ${
+          active ? 'font-medium text-fg' : 'text-fg-3 hover:text-fg'
         }`}
       >
         <span className="grid w-3 shrink-0 place-items-center">
@@ -159,7 +154,7 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
       href={href.thread(t.thread_id)}
       onClick={onNavigate}
       title={tip}
-      className={`hov relative z-[1] flex h-8 items-center gap-2 rounded-full pr-3 pl-4 text-[12.5px] text-fg-3 transition-colors hover:text-fg md:h-7 md:text-[12px] ${flush ? 'ml-[19px]' : 'ml-[43px]'}`}
+      className={`item relative flex h-8 items-center gap-2 pr-3 pl-4 text-[12.5px] text-fg-3 hover:text-fg md:h-7 md:text-[12px] ${flush ? 'ml-[19px]' : 'ml-[43px]'}`}
     >
       <span
         aria-hidden
@@ -187,16 +182,14 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, de
   return (
     <>
     <WithDelegates delegates={delegates}>
-    <div className="group/pin flex items-center rounded-full">
+    <div className="group/pin flex items-center">
       <a
         href={href.thread(t.id)}
         onClick={onNavigate}
         title={`${title} · ${channel} · ${agents ? plural(agents, 'agent') + ' running' : threadStatusText(t)}`}
         aria-current={active && home ? 'page' : undefined}
         data-active={(active && home) || undefined}
-        className={`hov z-[1] flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 text-[13.5px] transition-colors md:h-8 md:text-[13px] ${
-          active ? 'font-medium text-fg [--hov:transparent]' : 'text-fg-2 hover:text-fg'
-        }`}
+        className={`item flex h-9 min-w-0 flex-1 items-center gap-2.5 px-3 text-[13.5px] md:h-8 md:text-[13px] ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
       >
         <span className="grid w-[15px] shrink-0 place-items-center">
           {busy ? <Loader size={11} className="text-live-text" /> : t.done_at ? <DoneMark size={7} /> : <StatusDot status={threadGlyph(t)} size={7} />}

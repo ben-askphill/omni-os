@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // web: --shadow-thumb
+  // A slight lift for the selected segment.
   thumb: {
     shadowColor: '#17181a',
     shadowOpacity: 0.09,

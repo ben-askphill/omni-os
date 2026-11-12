@@ -68,7 +68,7 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
   const mod = mods.findLast((m) => m.thread_id === t.id);
   const preview = t.last_text ? t.last_text.replace(/\s+/g, ' ').slice(0, 240) : showsRunning(t) ? 'Working' : t.status === 'queued' ? 'Waiting for a slot' : '';
   return (
-    <a href={href.thread(t.id)} className="hov group flex items-start gap-3 rounded-[18px] px-3 py-2.5 [--hov:var(--surface)] md:px-3.5">
+    <a href={href.thread(t.id)} className="item group flex items-start gap-3 rounded-[var(--r-sm)] px-3 py-2.5 md:px-3.5">
       {showChannel ? (
         <span className="relative mt-0.5 shrink-0">
           <Avatar name={t.channel_id} omni={t.channel_id === 'conductor'} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} avatarBg={channels.find((c) => c.id === t.channel_id)?.avatar_bg} size={32} />

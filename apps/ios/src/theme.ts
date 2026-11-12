@@ -13,9 +13,11 @@ const light = {
   line: 'rgba(23, 24, 26, 0.08)',
   lineStrong: 'rgba(23, 24, 26, 0.16)',
   elev: '#ffffff',
-  /** A segmented control's selected thumb (web: --thumb). */
+  /** The selected segment of the iOS segmented control. The web has no thumb: its items take --wash-selected. */
   thumb: '#ffffff',
   wash: 'rgba(23, 24, 26, 0.06)',
+  /** A selected or pressed item (web: --wash-selected). */
+  washSelected: 'rgba(23, 24, 26, 0.09)',
   scrim: 'rgba(23, 24, 26, 0.22)',
   // Status is the only colour (web: --live, --needs, --done in apps/web/src/index.css). Full saturation, never tinted.
   // Needs and done fills carry ink text, and vermilion is never text on white.
@@ -59,6 +61,7 @@ const dark: ColorTokens = {
   elev: '#212429',
   thumb: 'rgba(255, 255, 255, 0.14)',
   wash: 'rgba(236, 234, 229, 0.06)',
+  washSelected: 'rgba(236, 234, 229, 0.14)',
   scrim: 'rgba(0, 0, 0, 0.5)',
   live: '#7280ff',
   onLive: '#101114',
@@ -100,6 +103,8 @@ export const rounded = Platform.select({ ios: 'ui-rounded', default: undefined }
 /** Radii from the Claude Design system (tokens/space.css; web: --r-*). */
 export const radius = {
   xs: 6,
+  /** A selectable item: nav rows, tabs and menu rows (web: --r-item). */
+  item: 8,
   sm: 12,
   md: 14,
   lg: 18,

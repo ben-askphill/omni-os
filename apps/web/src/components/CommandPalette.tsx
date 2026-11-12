@@ -3,7 +3,7 @@ import { Marked, paletteItems, queryWords, type Item } from './command-palette/i
 import { useApi, type Thread } from '../api.ts';
 import { useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { Icon, Kbd, Thumb, useSlidingThumb } from './ui.tsx';
+import { Icon, Kbd } from './ui.tsx';
 import { SCRIM } from './ui/modal.tsx';
 import { KbdFooter, overlayRow } from './ui/overlay.tsx';
 
@@ -29,7 +29,6 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   useEffect(() => setCursor(0), [q]);
   const safeCursor = Math.min(cursor, Math.max(0, items.length - 1));
-  const box = useSlidingThumb(listRef, `${open}:${safeCursor}:${items.length}`, true, '[data-active="true"]');
 
   useEffect(() => {
     listRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: 'nearest' });
@@ -88,8 +87,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           />
           <Kbd>Esc</Kbd>
         </div>
-        <div ref={listRef} id="omni-cmdk-list" role="listbox" className="scroll-thin relative min-h-0 flex-1 overflow-y-auto px-2 py-2">
-          <Thumb box={box} tone="wash" className="!rounded-[var(--r-md)]" />
+        <div ref={listRef} id="omni-cmdk-list" role="listbox" className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2 py-2">
           {groups.map((g) => (
             <div key={g.name} role="group" aria-label={g.name}>
               <div className="caption px-4 pt-3 pb-2">{g.name}</div>
@@ -103,7 +101,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   data-active={index === safeCursor}
                   onMouseMove={() => index !== safeCursor && setCursor(index)}
                   onClick={() => run(item)}
-                  className={`relative z-[1] ${overlayRow('lg', false)}`}
+                  className={overlayRow('lg')}
                 >
                   {item.lead}
                   {/* The sub gives up its width first, so a long label is cut once, not twice. */}

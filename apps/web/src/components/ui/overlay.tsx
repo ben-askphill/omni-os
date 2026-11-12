@@ -9,13 +9,12 @@ export const MENU_SURFACE = 'rounded-[var(--r-2xl)] bg-elev shadow-[var(--shadow
 
 /**
  * A row in an overlay. `lg`: the palette and slash menu, 48px with a lead or two lines. `sm`: context menus, 32px.
- * The cursor (`data-active="true"`), a hover and keyboard focus all take the one selected fill, --wash. `fill: false`
- * for a list whose sliding thumb draws that fill (the palette), or a row that cannot run.
+ * It is an `.item` (index.css): a hover takes --wash, the keyboard cursor (`data-active="true"`) and a press take
+ * --wash-selected, keyboard focus draws the ring. `fill: false` for a row that cannot run.
  */
 export function overlayRow(density: 'lg' | 'sm', fill = true): string {
-  const size = density === 'lg' ? 'min-h-12 gap-3 rounded-[var(--r-md)] px-3' : 'min-h-8 gap-2.5 rounded-[var(--r-sm)] px-2.5';
-  const wash = fill ? 'hover:bg-[var(--wash)] focus-visible:bg-[var(--wash)] data-[active=true]:bg-[var(--wash)]' : '';
-  return `flex w-full items-center text-left text-[13px] text-fg outline-none ${wash} ${size}`;
+  const size = density === 'lg' ? 'min-h-12 gap-3 px-3' : 'min-h-8 gap-2.5 px-2.5';
+  return `flex w-full items-center text-left text-[13px] text-fg ${fill ? 'item' : 'rounded-[var(--r-item)] outline-none'} ${size}`;
 }
 
 const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);

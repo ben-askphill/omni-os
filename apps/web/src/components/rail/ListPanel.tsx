@@ -1,10 +1,10 @@
-import { useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { taskHost } from '../../api.ts';
-import { href, startNewThread, useHash, useRoute } from '../../router.ts';
+import { href, startNewThread, useRoute } from '../../router.ts';
 import { useApp } from '../../store.tsx';
 import type { ListMode } from '../../rail-model.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../../folders.tsx';
-import { Icon, IconButton, Kbd, Thumb, useSlidingThumb } from '../ui.tsx';
+import { Icon, IconButton, Kbd } from '../ui.tsx';
 import { channelFolders, channelThreads } from '../sidebar/channel-lists.ts';
 import { FolderNameField, FolderRow } from '../sidebar/FolderRows.tsx';
 import { InboxView } from '../sidebar/InboxView.tsx';
@@ -94,21 +94,13 @@ function InboxList({ onSearch }: { onSearch: () => void }) {
 
 function ChannelList({ id }: { id: string }) {
   const route = useRoute();
-  const hash = useHash();
   const { channel, openThread, tasks } = useApp();
   const folders = useFolders();
-  const listRef = useRef<HTMLDivElement>(null);
   const c = channel(id);
   const openId = route.name === 'thread' ? route.id : null;
   const open = c && openThread && openThread.id === openId && openThread.channel_id === c.id ? openThread : null;
   const threads = c ? channelThreads(c, open, c.id) : [];
   const folderList = c ? channelFolders(c, open) : [];
-  const box = useSlidingThumb(
-    listRef,
-    `${hash}:${threads.map((t) => t.id).join()}:${folderList.map((f) => [f.id, f.collapsed, ...f.threads.map((t) => t.id)].join()).join('|')}:${folders.editing}`,
-    true,
-    '[data-active="true"]',
-  );
   if (!c) return <PanelHeader title={id === 'conductor' ? 'Conductor' : id} />;
   const name = c.id === 'conductor' ? 'Conductor' : c.name;
   const agents = (tid: string) => tasks.filter((k) => taskHost(k) === tid);
@@ -128,8 +120,7 @@ function ChannelList({ id }: { id: string }) {
         <NewThreadButton />
       </div>
       <PanelScroll>
-        <div ref={listRef} className="relative space-y-4">
-          <Thumb box={box} />
+        <div className="space-y-4">
           {(folderList.length > 0 || folders.editing === draftKey(c.id)) && (
             <div>
               <div className="caption px-3 pt-1 pb-2">Folders</div>
