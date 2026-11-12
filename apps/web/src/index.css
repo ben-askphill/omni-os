@@ -480,6 +480,48 @@
     }
   }
 
+  /* ---- channel rail items (ChannelRail.tsx) ----
+     Discs rest in greyscale and take their colour back on hover or keyboard focus. The selected disc and the status
+     badges (outside the disc) always keep theirs. Hover and focus grow the 48px item to 110% about its centre, which
+     the rail's width (72px, 98px on a Mac) and the scroll area's 6px padding leave room for, and round its wash and
+     focus ring into a circle. Reduced motion keeps the colour and drops the growth and every transition. */
+  .rail-item {
+    border-radius: var(--radius-2xl);
+    transition:
+      scale 0.38s var(--ease-out),
+      border-radius 0.38s var(--ease-out),
+      background-color 0.3s var(--ease-out),
+      transform 220ms var(--ease-settle);
+  }
+  .rail-item:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--fg);
+  }
+  .rail-item:is(:hover, :focus-visible) {
+    scale: 1.1;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--fg) 11%, transparent);
+  }
+  .rail-disc {
+    filter: grayscale(1);
+    transition:
+      filter 0.38s var(--ease-out),
+      color 150ms var(--ease-out),
+      background-color 150ms var(--ease-out);
+  }
+  .rail-item:is(:hover, :focus-visible, [aria-current="page"]) .rail-disc {
+    filter: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail-item,
+    .rail-disc {
+      transition: none;
+    }
+    .rail-item:is(:hover, :focus-visible) {
+      scale: none;
+    }
+  }
+
   /* ---- tabs and segmented choices: a row of items, no track ---- */
   .seg {
     display: inline-flex;
