@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { ErrorNote, Icon, Picker } from './ui.tsx';
+import { Button, ErrorNote, Icon, Picker } from './ui.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
 import { BasePicker, useBasePick } from './BasePicker.tsx';
 import { RunOnPicker, useRunOn } from './RunOnPicker.tsx';
@@ -10,6 +10,7 @@ import { baseRequest } from '../worktree-base.ts';
 import { SlashMenu, useCommands } from './SlashMenu.tsx';
 import { FileMenu, useFileMenu } from './FileMenu.tsx';
 import { replySlash } from '@omni/shared/composer-slash.ts';
+import { OPEN_PR_PROMPT, STEP_WORKING } from '@omni/shared/thread-glance.ts';
 import { newThreadBody, sameSettings } from '../new-thread-preset.ts';
 import { draftRun, draftRunRequest, type DraftRun } from '@omni/shared/draft-run.ts';
 import { sendKey } from '../requests.ts';
@@ -251,6 +252,7 @@ export function ReplyComposer({
   stop,
   machine,
   asking = false,
+  openPR,
 }: {
   thread: Thread;
   /**
@@ -264,6 +266,8 @@ export function ReplyComposer({
   machine?: MachineHeld;
   /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
   stop?: { busy: boolean; run: () => void } | null;
+  /** Set when the agent's last reply asks whether to open a PR: Open PR beside the Machine chip answers yes. */
+  openPR?: { busy: boolean; run: () => void } | null;
   onSent?: (t: Thread, mode?: SendMode) => void;
   /** Called as a message leaves the box, before the server has it: it shows in the thread from now on. */
   onSending?: () => void;
@@ -421,6 +425,11 @@ export function ReplyComposer({
         <ForkThreadButton thread={thread} disabled={busy} />
         <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />
         {machine && <ThreadMachineChip thread={thread} held={machine} disabled={busy} onError={setError} />}
+        {openPR && (
+          <Button size="sm" variant="primary" icon="pr" busy={openPR.busy} title={OPEN_PR_PROMPT} onClick={openPR.run}>
+            {openPR.busy ? STEP_WORKING.open : 'Open PR'}
+          </Button>
+        )}
         <div className="ml-auto flex items-center gap-2.5">
           {omni ? (
             <SendButton armed={slash.armed} busy={busy} onClick={() => void runOmni()}>

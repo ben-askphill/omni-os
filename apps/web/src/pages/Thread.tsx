@@ -14,7 +14,7 @@ import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.ts
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { useBranchChanges } from '../mobile/ThreadTurn.tsx';
-import { prNext, stepOf, stepParked, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { OPEN_PR_PROMPT, prNext, prOffered, stepOf, stepParked, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
@@ -152,6 +152,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   const changes = useBranchChanges(thread, slotBusy);
   const next = prNext(prs?.pr ?? null, !!changes?.files.length);
   const step = stepOf(sending) ?? underway;
+  const offered = useMemo(() => prOffered(events, !slotBusy && !queued.length, prs?.pr), [events, slotBusy, queued, prs?.pr]);
 
   useThreadPresence(id, thread);
   useThreadInterruptKey({ slotBusy, interrupting, interrupt });
@@ -322,6 +323,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               onChanged={(t) => applyThread(t)}
               machine={{ blocked, handoff, takeover, onChanged: handedOff }}
               asking={asking}
+              openPR={offered || step === 'open' ? { busy: step === 'open', run: () => void ask(OPEN_PR_PROMPT) } : null}
             />
           </div>
         </div>

@@ -27,7 +27,7 @@ import { RunOnSheet } from './RunOnSheet.tsx';
 import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from '@omni/shared/thread-view.ts';
-import { crewLine, prLine, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { crewLine, prLine, prOffered, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { runningSubagents } from '../subagents.ts';
@@ -103,11 +103,15 @@ export function ThreadScreen() {
   const chips: ComposerChip[] = [];
   const held = machine.machine;
   if (held) chips.push({ label: `On ${held.rows.find((r) => r.value === held.value)?.label ?? ''}`, icon: 'monitor', onClick: () => setMachineSheet(true), disabled: machine.sending });
+  const openChip: ComposerChip = { label: 'Open PR', icon: 'pr', onClick: () => void openPR() };
+  // The agent just asked whether to open a PR: answering yes sits next to the Machine chip.
+  const offered = prOffered(events, !slotBusy && !queued.length, pr?.pr);
+  if (offered) chips.push(openChip);
   if (report) chips.push({ label: 'Open report', icon: 'file', onClick: () => viewer(report) });
   if (pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
   else if (changes?.files.length) {
     chips.push({ label: slotBusy ? 'Changes so far' : 'Review changes', icon: 'diff', diff: [changes.add, changes.del], onClick: () => shell.open(href.threadView(thread.id, 'changes')) });
-    if (!slotBusy) chips.push({ label: 'Open PR', icon: 'pr', onClick: () => void openPR() });
+    if (!slotBusy && !offered) chips.push(openChip);
   }
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
