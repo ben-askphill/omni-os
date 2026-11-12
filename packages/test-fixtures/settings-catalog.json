@@ -34,7 +34,7 @@
       "group": "omni",
       "title": "Appearance",
       "icon": "sun",
-      "blurb": "How Omni looks on this device."
+      "blurb": "How Omni looks and which keys it answers on this device."
     },
     {
       "id": "notifications",
@@ -176,6 +176,19 @@
         "classic",
         "new ui",
         "redesign"
+      ]
+    },
+    {
+      "id": "inbox-key",
+      "section": "appearance",
+      "title": "Press I for the Inbox",
+      "keywords": [
+        "keyboard",
+        "shortcut",
+        "key",
+        "inbox",
+        "i key",
+        "quick command"
       ]
     },
     {

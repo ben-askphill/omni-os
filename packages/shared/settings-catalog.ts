@@ -32,7 +32,7 @@ export interface SettingsSectionDef {
 /** In nav order. */
 export const SETTINGS_SECTION_DEFS = [
   { id: 'general', group: 'omni', title: 'General', icon: 'sliders', blurb: 'Your name, pronouns, timezone and email, and the setup walkthrough.' },
-  { id: 'appearance', group: 'omni', title: 'Appearance', icon: 'sun', blurb: 'How Omni looks on this device.' },
+  { id: 'appearance', group: 'omni', title: 'Appearance', icon: 'sun', blurb: 'How Omni looks and which keys it answers on this device.' },
   { id: 'notifications', group: 'omni', title: 'Notifications', icon: 'bell', blurb: 'What tells you a thread finished or failed.', scoped: true },
   { id: 'models', group: 'agents', title: 'Harnesses & models', icon: 'layers', blurb: 'Which agents can run, their models, and the model a new thread starts on.', scoped: true },
   { id: 'threads', group: 'agents', title: 'Threads', icon: 'message', blurb: 'Where new threads run and how they recover from a usage limit.' },
@@ -100,6 +100,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'setup', section: 'general', title: 'Run setup again', keywords: ['onboarding', 'wizard', 'harness check', 'first run'] },
   { id: 'theme', section: 'appearance', title: 'Theme', keywords: ['dark', 'light', 'system', 'mode', 'colors'] },
   { id: 'layout', section: 'appearance', title: 'New layout (Beta)', keywords: ['beta', 'layout', 'rail', 'sidebar', 'channel rail', 'classic', 'new ui', 'redesign'] },
+  { id: 'inbox-key', section: 'appearance', title: 'Press I for the Inbox', keywords: ['keyboard', 'shortcut', 'key', 'inbox', 'i key', 'quick command'] },
   { id: 'zoom', section: 'appearance', title: 'Text size and zoom', keywords: ['zoom', 'scale', 'font size', 'text size', 'bigger', 'smaller'] },
   { id: 'notify', section: 'notifications', title: 'Notify on this device', keywords: ['alerts', 'finished', 'failed', 'desktop', 'permission', 'needs you'] },
   { id: 'notify-channels', section: 'notifications', title: 'Notifications per channel', keywords: ['mute', 'silence', 'channel'] },

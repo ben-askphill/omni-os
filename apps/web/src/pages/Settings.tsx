@@ -9,6 +9,7 @@ import { PRONOUNS } from '../components/onboarding-parts.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { setLayout, useLayout } from '../layout-pref.ts';
+import { setInboxKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
 import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
@@ -661,6 +662,7 @@ function PronounsField({
 function AppearanceCard() {
   const [theme, setTheme] = useTheme();
   const layout = useLayout();
+  const inboxKey = useInboxKeyOn();
   const mobile = useIsMobile();
   const thisBrowser = <Origin of="device" label="This browser" />;
   return (
@@ -700,6 +702,15 @@ function AppearanceCard() {
             />
           </div>
         )}
+      </Card>
+      <Card entry="inbox-key" title="Keyboard">
+        <SwitchRow
+          title="Press I for the Inbox"
+          origin={thisBrowser}
+          detail="Opens the Inbox from anywhere outside a text field, in every layout. Turn it off if you type I by accident."
+          checked={inboxKey}
+          onChange={setInboxKeyOn}
+        />
       </Card>
       <Card entry="zoom" title="Text size">
         {desktop ? (
