@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { BackgroundTask, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { HarnessMark, Loader } from '../brand.tsx';
-import { Chip, copyText, Icon, IconButton, StatusDot, type IconName } from '../ui.tsx';
+import { Chip, copyText, Icon, IconButton, StatusDot, type Glyph, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
@@ -196,7 +196,7 @@ export function ThreadQuickCard({
           <span className="font-medium">All details</span>
         </QuickRow>
       </div>
-      <Lineage thread={thread} parent={parent} delegated={children.filter(isWorking)} agents={agents} onOpenThread={onOpenThread} onJump={onJump} />
+      <Lineage thread={thread} glyph={run.glyph} parent={parent} delegated={children.filter(isWorking)} agents={agents} onOpenThread={onOpenThread} onJump={onJump} />
     </section>
   );
 }
@@ -257,11 +257,13 @@ function SubagentLeaf({ t, last, indent, onJump }: { t: BackgroundTask; last: bo
 }
 
 /**
- * Where the thread sits while agents run under it: the thread that delegated it, the thread itself, and what runs
- * inside it now (delegated threads, then its own sub-agents), drawn as a tree. Nothing while nothing runs.
+ * Where the thread sits: the thread that delegated it, the thread itself, and what runs inside it now (delegated
+ * threads, then its own sub-agents), drawn as a tree. A delegated thread always shows its parent, so one click goes back
+ * up a level. Nothing for a top-level thread with nothing running.
  */
 function Lineage({
   thread,
+  glyph,
   parent,
   delegated,
   agents,
@@ -269,6 +271,8 @@ function Lineage({
   onJump,
 }: {
   thread: Thread;
+  /** The thread's own state, as the run row shows it. */
+  glyph: Glyph;
   parent: Thread | null;
   delegated: Thread[];
   agents: BackgroundTask[];
@@ -276,19 +280,21 @@ function Lineage({
   onJump: (eventId: number) => void;
 }) {
   const total = delegated.length + agents.length;
-  if (!total) return null;
+  if (!total && !parent) return null;
   // What runs hangs from the thread's own dot, one step further in when the thread hangs from its parent.
   const indent = parent ? 'pl-[30px]' : 'pl-[11px]';
   return (
     <section aria-label="Lineage" className="mt-0.5 border-t border-line pt-1">
       <div className="flex items-center px-2 pt-1 pb-0.5 text-[11px] text-fg-3">
         Lineage
-        <span className="ml-auto font-num tabular-nums" title={`${plural(total, 'agent')} running`}>
-          {total} running
-        </span>
+        {total > 0 && (
+          <span className="ml-auto font-num tabular-nums" title={`${plural(total, 'agent')} running`}>
+            {total} running
+          </span>
+        )}
       </div>
       {parent && (
-        <button type="button" title={`From: ${parent.title}`} onClick={() => onOpenThread(parent.id)} className={treeButton}>
+        <button type="button" title={`Back to the thread that delegated this one: ${parent.title}`} onClick={() => onOpenThread(parent.id)} className={treeButton}>
           <Icon name="arrowUpRight" size={13} className="shrink-0 text-fg-3" />
           <span className="min-w-0 flex-1 truncate text-fg-2">{parent.title || 'Untitled'}</span>
           <StatusDot status={parent.status} size={6} />
@@ -296,7 +302,7 @@ function Lineage({
       )}
       <div className={`${treeRow} font-medium`}>
         {parent && <Branch last />}
-        <StatusDot status="running" size={7} />
+        <StatusDot status={glyph} size={7} />
         <span className="min-w-0 flex-1 truncate">{thread.title || 'This thread'}</span>
       </div>
       {delegated.map((c, i) => (
