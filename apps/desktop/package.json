@@ -1,6 +1,6 @@
 {
   "name": "@omni/desktop",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "type": "module",
   "description": "Omni's desktop app: an Electron window on the Web UI that runs the server itself.",
