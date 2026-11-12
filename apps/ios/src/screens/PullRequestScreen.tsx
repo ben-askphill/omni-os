@@ -1,5 +1,5 @@
 import { LinkBrand } from '../ui/Brand';
-import { FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT } from '@omni/shared/thread-glance.ts';
+import { FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, stepParkedText, type PRStep } from '@omni/shared/thread-glance.ts';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -14,6 +14,8 @@ import { MERGE_ADVICE, prContent, type PRContent } from '../pr/model';
 import { useMerge, usePRWatch, useThreadPR } from '../pr/hooks';
 import type { MergeOutcome } from '../pr/actions';
 import { CheckDot } from '../pr/CheckDot';
+import { stepWorking } from '../pr/step';
+import { usePRStep } from '../pr/use-step';
 import { CrewPRList } from '../pr/CrewPRs';
 import { DiffCount, Loading, Section } from '../review/parts';
 import { Chip } from '../ui/Chip';
@@ -51,17 +53,19 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
     });
   }, [navigation, content?.number, url, crewOnly]);
 
+  const step = usePRStep(live, view);
   const ask = useCallback(
     async (prompt: string) => {
-      if (!live || !thread) return;
       setAsked(null);
-      if (live.send.state.get().outbox.item) return setAsked('Another message is still sending. Try again in a moment.');
-      const sent = await live.send.submit(thread, prompt);
-      if (sent) navigation.goBack();
-      else setAsked(live.send.state.get().outbox.item?.phase === 'failed' ? 'The message did not send. It is kept in the thread.' : 'Could not send the message.');
+      const out = await step.ask(prompt);
+      if (out.kind === 'sent') navigation.goBack();
+      else setAsked(out.kind === 'busy' ? 'Another message is still sending. Try again in a moment.' : out.message);
     },
-    [live, thread, navigation],
+    [step.ask, navigation],
   );
+  // A step's button reads as working while the agent is on it, and a step that never reached the agent says why.
+  const stepButton = (kind: PRStep, label: string) => ({ label: stepWorking(step.working, kind) ?? label, busy: step.working === kind });
+  const parkedNote = (kind: PRStep) => (step.parked?.step === kind && thread ? stepParkedText(kind, thread) : null);
 
   const from = pr.from;
   const openCrew = useCallback((p: { url: string }) => {
@@ -98,7 +102,10 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
             <Text style={[styles.emptyBody, { color: colors.fg3 }]}>{page.text}</Text>
           </>
         ) : null}
-        {page.canOpen ? <Button label="Open PR" accessibilityHint="Asks the agent to push the branch and open a pull request" onPress={() => void ask(OPEN_PR_PROMPT)} /> : null}
+        {page.canOpen ? (
+          <Button {...stepButton('open', 'Open PR')} disabled={step.working !== null} accessibilityHint="Asks the agent to push the branch and open a pull request" onPress={() => void ask(OPEN_PR_PROMPT)} />
+        ) : null}
+        {parkedNote('open') ? <Text style={[styles.meta, { color: colors.fg3 }]}>{parkedNote('open')}</Text> : null}
         {asked ? <Text style={[styles.meta, { color: colors.fg3 }]}>{asked}</Text> : null}
         {page.crew.length > 0 ? <CrewPRList crew={page.crew} shown={null} onOpen={openCrew} /> : null}
       </ScrollView>
@@ -127,9 +134,10 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
           <Text style={[styles.status, { color: c.status.tone === 'needs' ? colors.needs : colors.fg2 }]}>{c.status.text}</Text>
           {fix ? (
             <View style={styles.inline}>
-              <Button variant="secondary" label={fix.label} onPress={() => void ask(fix.prompt)} />
+              <Button variant="secondary" {...stepButton(fix.kind, fix.label)} disabled={step.working !== null} onPress={() => void ask(fix.prompt)} />
             </View>
           ) : null}
+          {fix && parkedNote(fix.kind) ? <Text style={[styles.meta, { color: colors.fg3 }]}>{parkedNote(fix.kind)}</Text> : null}
           {asked ? <Text style={[styles.meta, { color: colors.fg3 }]}>{asked}</Text> : null}
         </View>
 

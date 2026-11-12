@@ -33,12 +33,15 @@ export function ThreadComposer({
   thread,
   harnesses,
   onOpenRun,
+  step,
 }: {
   live: ThreadLive;
   thread: Thread;
   /** From `/harnesses`; null until it loads. */
   harnesses: HarnessInfo[] | null;
   onOpenRun: () => void;
+  /** The branch step chip (StepChip), beside the next-turn chip. */
+  step?: ReactNode;
 }) {
   const { colors } = useOmniTheme();
   const catalog = useStore(live.catalog);
@@ -76,6 +79,7 @@ export function ThreadComposer({
     <View style={styles.composer}>
       <View style={styles.nextTurn}>
         <NextTurnChip thread={thread} harnesses={harnesses} onPress={onOpenRun} />
+        {step}
       </View>
       {notice ? (
         <Text accessibilityRole="alert" style={[styles.notice, { color: colors.fg2 }]}>
@@ -173,6 +177,8 @@ const styles = StyleSheet.create({
   },
   nextTurn: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.s2,
   },
   chips: {
     paddingHorizontal: space.s2,
