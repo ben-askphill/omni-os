@@ -31,6 +31,9 @@ export interface PendingMsg {
   context?: unknown;
   request_id?: string;
   delivery?: DeliveryState;
+  /** Sent to the machine that holds the thread, which has not taken it yet (apps/server/run-on.ts): its name, and when. */
+  forwarded_to?: string;
+  sent_at?: string;
 }
 
 /** What the server says once a message is saved. A retry with the same `request_id` gets the same answer back. */

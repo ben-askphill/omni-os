@@ -49,7 +49,7 @@ import {
 } from './runner.ts';
 import { takeoverOf, type HandoffResult } from './handoff.ts';
 import { freshPrompt, handoffView } from './handoff/records.ts';
-import type { Opening } from '@omni/shared/opening.ts';
+import { leadOf, type Opening } from '@omni/shared/opening.ts';
 import { cancelRelocation, createTransition, type ThreadTransition } from './transition.ts';
 import { headPage } from './history.ts';
 import { liveMessage, openingMessages, parseAfter, STREAM_QUEUE_MAX, type DetailOf } from './stream-catch-up.ts';
@@ -165,7 +165,7 @@ threadRoutesApi.get('/:id', (c) => {
  */
 function openingOf(id: string, pending: PendingMsg[]): Opening | null {
   if (events.firstUserText(id) !== null) return null;
-  const lead = pending.find((m) => m.kind === 'user' && m.state === 'sent');
+  const lead = leadOf(pending);
   if (lead) return { text: lead.text, uuid: lead.uuid, ...(lead.attachments?.length && { attachments: lead.attachments }), ...(lead.context && { context: lead.context }) };
   const prompt = freshPrompt(id);
   return prompt ? { text: prompt } : null;

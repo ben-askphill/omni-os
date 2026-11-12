@@ -174,6 +174,9 @@ export interface PendingMsg {
   request_id?: string;
   /** `recovered` and `uncertain` (shown with `state: 'held'`) wait on Ben after a restart. */
   delivery?: DeliveryState;
+  /** Sent to the machine that holds the thread, which has not taken it yet (apps/server/run-on.ts): its name, and when. */
+  forwarded_to?: string;
+  sent_at?: string;
 }
 
 export interface CrewRole {

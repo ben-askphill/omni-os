@@ -29,7 +29,7 @@ export function useInterrupt(id: string, slotBusy: boolean, queued: readonly Pen
   const [stopping, setStopping] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   // Also covers "Interrupt and send" while the server really interrupts: that message stays sent until the agent reads it.
-  const interrupting = stopping || queued.some((m) => m.state === 'sent' && m.mode === 'interrupt');
+  const interrupting = stopping || queued.some((m) => m.state === 'sent' && m.mode === 'interrupt' && !m.forwarded_to);
 
   const interrupt = useCallback(async () => {
     setStopping(true);

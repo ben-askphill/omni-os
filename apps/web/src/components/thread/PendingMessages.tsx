@@ -9,6 +9,7 @@ import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf } from '../../r
 import { useSending } from '../../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../../pending-edits.ts';
 import { ContextChips, hasContext } from '../../message-context/ContextChips.tsx';
+import { forwardedLabel, isForwarded, useSyncTrouble } from '../../forwarded.ts';
 
 /** A message that waits for the thread's worktree (SetupCard). */
 const SETUP_LABEL = 'Sends once the worktree is ready';
@@ -55,11 +56,12 @@ export function QueuedMessages({
   const [error, setError] = useState<string | null>(null);
   // Every new pending list: an open edit whose message was sent meanwhile turns stale and keeps its text.
   useEffect(() => setDrafts((d) => reconcileEdits(d, items)), [items]);
+  const trouble = useSyncTrouble(items.some(isForwarded));
   const stale = drafts.filter((d) => d.status === 'stale');
   if (!items.length && !stale.length) return null;
   const live = items.filter((m) => !isParked(m));
   const parked = items.filter(isParked);
-  const lead = starting ? live.find((m) => m.state === 'sent') : undefined;
+  const lead = starting ? live.find((m) => m.state === 'sent' && !isForwarded(m)) : undefined;
   const path = (rest: string) => `/threads/${encodeURIComponent(threadId ?? '')}/requests${rest}`;
   const update = (uuid: string, fn: (d: EditDraft) => EditDraft | null) =>
     setDrafts((all) => all.flatMap((d) => (d.uuid === uuid ? (fn(d) ?? []) : [d])));
@@ -126,6 +128,8 @@ export function QueuedMessages({
               {m.task_id ? ` · ${m.task_id}` : ''}
             </span>
           </div>
+        ) : isForwarded(m) ? (
+          <PendingBubble key={m.uuid} m={m} label={forwardedLabel(m, trouble)} icon={trouble ? 'alert' : 'send'} threadId={threadId} />
         ) : threadId && isEditable(m) ? (
           ownRow(m, setup ? SETUP_LABEL : pendingLabel(m, false), 'clock')
         ) : (

@@ -24,7 +24,12 @@ export interface PendingRow {
   context?: unknown;
   /** When it was sent, for a send the client still has in flight. The server's rows carry none. */
   at?: string;
+  /** Sent to the machine that holds the thread, which has not taken it: it starts no turn yet. */
+  forwarded_to?: string;
 }
+
+/** The message that starts the next turn: the first one sent here. One still on its way to another machine has not started anything. */
+export const leadOf = <P extends PendingRow>(pending: readonly P[]) => pending.find((p) => p.kind === 'user' && p.state === 'sent' && !p.forwarded_to);
 
 /** The stand-in row's id. Stored rows count up from 1, so it never meets one. */
 export const OPENING_ID = 0;
@@ -67,7 +72,7 @@ export function withOpening<E extends TranscriptEvent, P extends PendingRow>(
   if (opening && !events.some((e) => e.kind === 'user')) {
     return { events: [userRow<E>(OPENING_ID, thread.id, thread.created_at, opening), ...events], pending: opening.uuid ? pending.filter((p) => p.uuid !== opening.uuid) : pending };
   }
-  const lead = betweenTurns(events) ? pending.find((p) => p.kind === 'user' && p.state === 'sent') : undefined;
+  const lead = betweenTurns(events) ? leadOf(pending) : undefined;
   if (!lead) return { events, pending };
   // The server's pending rows have no send time. Sending set the thread running, which moved updated_at.
   return { events: [...events, userRow<E>(LEAD_ID, thread.id, lead.at ?? thread.updated_at, lead)], pending: pending.filter((p) => p !== lead) };
