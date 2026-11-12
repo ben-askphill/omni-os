@@ -109,7 +109,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
 
   return (
     <div className="scroll-thin h-full overflow-y-auto [scrollbar-gutter:stable]">
-      <div className={`${pageColumn(tab === 'prs' ? 'page' : 'measure')} pt-6 md:pt-10`}>
+      <div className={`${pageColumn(pr ? 'page' : 'measure')} pt-6 md:pt-10`}>
         <div className="flex items-center gap-3.5">
           <Avatar name={ch.name} channelIcon={ch.icon} avatarBg={ch.avatar_bg} omni={isConductor} size={44} />
           <div className="min-w-0 flex-1">

@@ -49,7 +49,7 @@ export function PRList({ channel }: { channel: Channel }) {
   const noRepo = q.error && /no github repo/i.test(q.error);
 
   return (
-    <div className={`${pageColumn('page')} pt-6 pb-16`}>
+    <div className={`${pageColumn('measure')} pt-6 pb-16`}>
       <PageToolbar
         className="mb-3"
         right={
