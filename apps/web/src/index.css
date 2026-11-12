@@ -292,6 +292,13 @@
     scrollbar-width: thin;
     scrollbar-color: var(--line-strong) transparent;
   }
+  /* Scrolls without a visible bar: the thread transcript. */
+  .scroll-none {
+    scrollbar-width: none;
+  }
+  .scroll-none::-webkit-scrollbar {
+    display: none;
+  }
 
   /* Headline type: SF Pro, tight. */
   .font-display {

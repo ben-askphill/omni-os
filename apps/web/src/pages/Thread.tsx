@@ -218,7 +218,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
         {/* transcript, with the quick card in its own column so it never covers the conversation */}
         <div className="relative flex min-h-0 flex-1">
           <div className="relative min-h-0 min-w-0 flex-1">
-            <div ref={scrollRef} onScroll={onScroll} className="scroll-thin h-full overflow-y-auto [overflow-anchor:none]">
+            <div ref={scrollRef} onScroll={onScroll} className="scroll-none h-full overflow-y-auto [overflow-anchor:none]">
               <div ref={contentRef} className="mx-auto max-w-4xl px-4 pt-4 pb-10 md:px-6">
                 {/* Queued means waiting for a slot: nothing is working yet. */}
                 <LinkChannel.Provider value={thread.channel_id}>
