@@ -14,7 +14,7 @@ import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.ts
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { useBranchChanges } from '../mobile/ThreadTurn.tsx';
-import { prNext, stepOf, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { prNext, stepOf, stepParked, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
@@ -142,7 +142,10 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     setToAgents(false);
   }, [toAgents, panelTab, children, panel.open]);
   const underway = useMemo(() => stepUnderway(events, queued, slotBusy), [events, queued, slotBusy]);
-  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, underway, applyThread, setActionError, pin });
+  // A step prompt that never reached the agent (a restart, or a session download that failed): its button says why, and
+  // pressing it again resumes that message rather than sending a second copy.
+  const parked = useMemo(() => (underway ? null : stepParked(queued)), [underway, queued]);
+  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, underway, parked, applyThread, setQueued, setActionError, pin });
   // The branch's PRs and changes: the PRs tab and the Details tab's branch card read them, and the PRs tab's badge.
   const [prs, reloadPRs] = useThreadPR(thread, slotBusy);
   const watch = usePRWatch(thread?.id, prs);
@@ -339,8 +342,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               tab={panelTab}
               onTab={setPanelTab}
               onClose={panel.closeInspector}
-              details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs(), onTab: setPanelTab }}
-              prs={{ data: prs, watch, next, step, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs() }}
+              details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, parked: parked?.step ?? null, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs(), onTab: setPanelTab }}
+              prs={{ data: prs, watch, next, step, parked: parked?.step ?? null, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs() }}
             />
           </div>
         </aside>

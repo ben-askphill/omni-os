@@ -56,16 +56,28 @@ export function stepOf(text: string | null | undefined): PRStep | null {
 /** What a step's button says while the agent works on it. */
 export const STEP_WORKING: Record<PRStep, string> = { open: 'Opening PR', conflicts: 'Fixing conflicts', checks: 'Fixing checks' };
 
+/** A message the thread lists as not yet read by the agent (GET /api/threads/:id `pending`). */
+export interface QueuedStep {
+  kind: string;
+  text: string;
+  uuid?: string;
+  /** `recovered` and `uncertain`: parked, waiting on Ben (a restart, or a session download that failed), not queued. */
+  delivery?: string;
+}
+
+const isParked = (q: QueuedStep) => q.delivery === 'recovered' || q.delivery === 'uncertain';
+
 /**
  * The branch step the agent is on: Ben's newest message is one of the step prompts, and it is still queued or its turn
- * has not ended. It reads the thread, so a reload or another client shows the same thing.
+ * has not ended. A parked message is not on its way to the agent, so it does not count. It reads the thread, so a
+ * reload or another client shows the same thing.
  */
 export function stepUnderway(
   events: readonly { kind: string; payload: string | null }[],
-  queued: readonly { kind: string; text: string }[],
+  queued: readonly QueuedStep[],
   busy: boolean,
 ): PRStep | null {
-  const waiting = queued.filter((q) => q.kind === 'user');
+  const waiting = queued.filter((q) => q.kind === 'user' && !isParked(q));
   if (waiting.length) return stepOf(waiting[waiting.length - 1].text);
   if (!busy) return null;
   for (let k = events.length - 1; k >= 0; k--) {
@@ -77,6 +89,32 @@ export function stepUnderway(
     }
   }
   return null;
+}
+
+/**
+ * A step that never started: Ben's newest parked message asks for it. Its `uuid` lets the step's button resume that
+ * message instead of sending the same prompt again.
+ */
+export function stepParked(queued: readonly QueuedStep[]): { step: PRStep; uuid: string } | null {
+  for (let k = queued.length - 1; k >= 0; k--) {
+    const q = queued[k];
+    if (q.kind !== 'user' || !isParked(q) || !q.uuid) continue;
+    const step = stepOf(q.text);
+    if (step) return { step, uuid: q.uuid };
+  }
+  return null;
+}
+
+const STEP_LABEL: Record<PRStep, string> = { open: 'Open PR', conflicts: 'Fix conflicts', checks: 'Fix checks' };
+
+/** Why a parked step did not start, for the line under its button. */
+export function stepParkedText(step: PRStep, t: { resume_blocked?: string | null; setup?: string | null }): string {
+  const why = t.resume_blocked
+    ? 'Omni could not bring the latest session to this machine'
+    : t.setup
+      ? 'the worktree is not ready'
+      : 'Omni stopped before the agent got it';
+  return `${STEP_LABEL[step]} did not start: ${why}. Press it to try again.`;
 }
 
 /** The PR's line under its number: checks, conflicts and review, the parts that decide whether it can merge. */
