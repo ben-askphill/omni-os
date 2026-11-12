@@ -111,7 +111,7 @@ describe('tool failure capture and triage', () => {
     }
   });
 
-  it('heads off the recurring zsh, file: URL, preview-server, browser_find and member-thread slips', async () => {
+  it('heads off the recurring zsh, file: URL, preview-server, browser_find, browser_click and member-thread slips', async () => {
     const t = await h.start('hello');
     await h.untilResults(t.id, 1);
     const channel = h.db.channels.get('scratch')!;
@@ -129,6 +129,7 @@ describe('tool failure capture and triage', () => {
     config.browser = true;
     try {
       expect(prompt('claude-code')).toContain('browser_find searches for a `text` substring or a `regex`');
+      for (const harness of ['claude-code', 'cursor']) expect(prompt(harness)).toContain('take the snapshot ref as `target`, not `ref`');
       expect(prompt('claude-code')).toContain('stop it by its PID: `pkill -f` with its command line also matches your own shell');
     } finally {
       config.browser = browser;
