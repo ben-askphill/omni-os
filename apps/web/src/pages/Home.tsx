@@ -1,17 +1,19 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { dayKey, isInsightRange, type InsightRange, type Insights } from '@omni/shared/insights.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
-import { useApi, type Thread } from '../api.ts';
+import { relTime } from '@omni/shared/format.ts';
+import { api, errorText, type Thread } from '../api.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
 import { EmptyNote, NeedsYouRow } from '../components/NeedsYou.tsx';
 import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
 import { OmniWordmark } from '../components/brand.tsx';
 import { AutomationsCard, BusiestCard, ChannelAvatar, KpiTiles, LIST_TITLE, NeedsYouCard, PRsCard, type ListKind } from '../components/dashboard/Cards.tsx';
 import { UsageSection } from '../components/dashboard/UsageSection.tsx';
-import { Segmented, StatusDot } from '../components/ui.tsx';
+import { Button, ErrorNote, Segmented, StatusDot } from '../components/ui.tsx';
 import { greeting } from '../greeting.ts';
+import { isFresh, keepInsights, keptInsights } from '../insights-cache.ts';
 import { splitNeeds } from '../needs-you.ts';
-import { readPref, useApp, useFeed, writePref } from '../store.tsx';
+import { readPref, useApp, useFeed, useNow, writePref } from '../store.tsx';
 
 const acceptAll = () => true;
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -43,16 +45,52 @@ function useOpenList(): ListKind | null {
   return (LISTS as string[]).includes(v ?? '') ? (v as ListKind) : null;
 }
 
-/** Re-asks while the server is still reading the logs or GitHub, so the partial numbers fill in without a reload. */
+/**
+ * The dashboard's numbers. Opening the Inbox draws the last answer at once and asks again only when it is older than
+ * FRESH_MS or partial. While open it re-asks until a partial answer fills in, every minute, and after threads change.
+ * A failed ask keeps the answer on screen and reports the error beside it.
+ */
 function useInsights(range: InsightRange) {
-  const q = useApi<Insights>(`/insights?range=${range}&tz=${encodeURIComponent(TZ)}`);
-  const partial = !!q.data && (!q.data.usage.complete || q.data.prs === null);
-  const { reload } = q;
+  const path = `/insights?range=${range}&tz=${encodeURIComponent(TZ)}`;
+  const [entry, setEntry] = useState(() => keptInsights(path));
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Only the newest ask may set state, so a slow answer for a range left behind never lands on the one now picked.
+  const asked = useRef(0);
+  const reload = useCallback(() => {
+    const n = ++asked.current;
+    setRefreshing(true);
+    api
+      .get<Insights>(path)
+      .then(
+        (d) => {
+          const kept = keepInsights(path, d);
+          if (asked.current === n) {
+            setEntry(kept);
+            setError(null);
+          }
+        },
+        (e) => asked.current === n && setError(errorText(e)),
+      )
+      .finally(() => asked.current === n && setRefreshing(false));
+  }, [path]);
+  useEffect(() => {
+    const kept = keptInsights(path);
+    setEntry(kept);
+    setError(null);
+    if (!isFresh(kept)) {
+      reload();
+      return;
+    }
+    asked.current++;
+    setRefreshing(false);
+  }, [path, reload]);
+  const partial = !!entry && (!entry.data.usage.complete || entry.data.prs === null);
   useEffect(() => {
     if (!partial) return;
     const t = setTimeout(reload, 3000);
     return () => clearTimeout(t);
-  }, [partial, q.data, reload]);
+  }, [partial, entry, reload]);
   useEffect(() => {
     const t = setInterval(reload, 60_000);
     return () => clearInterval(t);
@@ -65,7 +103,24 @@ function useInsights(range: InsightRange) {
     settle.current = setTimeout(reload, 11_000);
   });
   useEffect(() => () => void (settle.current && clearTimeout(settle.current)), []);
-  return q;
+  return { data: entry?.data, at: entry?.at, refreshing, error, reload };
+}
+
+/** When the numbers on screen arrived, and Refresh to ask for them now. */
+function Freshness({ at, refreshing, onRefresh }: { at: number | undefined; refreshing: boolean; onRefresh: () => void }) {
+  const now = useNow(30_000);
+  return (
+    <span className="inline-flex items-center gap-1">
+      {at !== undefined && (
+        <span className="font-num text-[11.5px] text-fg-3 tabular-nums" title={new Date(at).toLocaleString()}>
+          Updated {relTime(new Date(at).toISOString(), now)}
+        </span>
+      )}
+      <Button size="sm" variant="ghost" icon="refresh" busy={refreshing} onClick={onRefresh}>
+        Refresh
+      </Button>
+    </span>
+  );
 }
 
 function OpenList({ kind, insights }: { kind: ListKind; insights: Insights | undefined }) {
@@ -150,8 +205,14 @@ export function HomePage() {
               ]}
             />
             <Pulse />
+            <Freshness at={insights.at} refreshing={insights.refreshing} onRefresh={insights.reload} />
           </div>
         </header>
+        {insights.error && (
+          <ErrorNote onRetry={insights.reload} className="mb-4">
+            {insights.at !== undefined ? `Could not refresh. Showing the numbers read at ${new Date(insights.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.` : 'Could not load the dashboard.'} {insights.error}
+          </ErrorNote>
+        )}
 
         <NewThreadComposer key={startIn ?? 'default'} defaultChannel={startIn ?? undefined} big />
         {chips.length > 0 && (
@@ -177,7 +238,7 @@ export function HomePage() {
         </div>
 
         <div className="mt-8">
-          <UsageSection usage={data?.usage} range={range} from={data?.from} to={data?.to} loading={insights.loading || !insights.error} />
+          <UsageSection usage={data?.usage} range={range} from={data?.from} to={data?.to} loading={!insights.error} />
         </div>
 
         <div className="mt-8 grid gap-4 @3xl:grid-cols-2">
