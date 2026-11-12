@@ -24,5 +24,5 @@ The relay is a Worker in `apps/relay/` that Ben deploys to his own Cloudflare ac
 - Every machine that syncs, the Linux box included, must use the Clerk app the relay trusts. Setup checks this against `/v1/info` before Clerk is asked. A Clerk user who is not on `ALLOWED_USERS` gets a refusal that names their user id, so letting a user in is one `wrangler secret put`.
 - Signing out on a machine revokes its token on the relay. Taking a user off `ALLOWED_USERS` signs out all of that user's machines at once. There is no list of machine tokens in the UI yet.
 - Free-plan limits apply: 100 MB per request (Omni caps files at 50 MB), and 100,000 Worker and Durable Object requests a day. At a sync a minute per machine, plus nudged syncs, two machines use a few thousand a day.
-- The relay only grows, as before: nothing prunes `changes`.
+- The change log keeps only the newest row per item per machine (Decision above). Older superseded rows are removed on push and by the alarm compaction, so the Durable Object's SQLite no longer grows without bound from repeated re-saves of the same items.
 - Tests cover the Worker's token checks and store on node:sqlite (`apps/relay/tests/`), and the server's transport against a fake fetch and WebSocket. The Worker itself runs only under `wrangler dev` or on Cloudflare.
