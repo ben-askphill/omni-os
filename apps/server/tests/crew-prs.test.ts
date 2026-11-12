@@ -26,6 +26,7 @@ beforeAll(async () => {
   // `gh pr list --repo R [--head B]`, newest first, from the file above. The startRunner bin is first on PATH.
   const gh = `#!/usr/bin/env node
 const a = process.argv.slice(2), arg = (n) => a[a.indexOf(n) + 1];
+if (a[0] === 'pr' && a[1] === 'merge') { console.log('Merged'); process.exit(0); }
 if (a[0] !== 'pr' || a[1] !== 'list') { console.error('fake gh: ' + a.join(' ')); process.exit(1); }
 const all = JSON.parse(require('fs').readFileSync(${JSON.stringify(prsFile)}, 'utf8'))[arg('--repo')] ?? [];
 const head = a.includes('--head') ? arg('--head') : null;
@@ -99,6 +100,20 @@ describe('crew PRs', () => {
     github({ 'acme/shop': [{ number: 21, branch: 'omni/sync-a', state: 'MERGED' }, { number: 22, branch: 'omni/sync-b', state: 'CLOSED' }] });
     later();
     expect((await prsOf(conductor.id)).crew.map((p) => [p.number, p.state, p.thread_id])).toEqual([[21, 'MERGED', a.id]]);
+  });
+
+  it('shows a crew PR merged from the Merge button as merged on the next read, inside the 30s cache', T, async () => {
+    const conductor = await H.start('be the conductor');
+    await H.untilResults(conductor.id, 1);
+    await delegate(conductor.id, 'shop', 'omni/merge-now');
+    github({ 'acme/shop': [{ number: 61, branch: 'omni/merge-now' }] });
+    later();
+    expect((await prsOf(conductor.id)).crew.map((p) => [p.number, p.state])).toEqual([[61, 'OPEN']]);
+
+    const res = await githubApi.request('/channels/shop/prs/61/merge', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
+    expect(res.status).toBe(200);
+    // The clock has not moved and gh's list still says open: the merge itself marks it.
+    expect((await prsOf(conductor.id)).crew.map((p) => [p.number, p.state])).toEqual([[61, 'MERGED']]);
   });
 
   it('lists a PR two delegated threads share once, and leaves out threads without a branch or a repo', T, async () => {
