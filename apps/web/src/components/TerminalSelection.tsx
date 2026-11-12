@@ -110,7 +110,7 @@ export function TerminalSelectionDock({ threadId, cwd, term, text }: { threadId:
       <div className="flex items-center gap-2 px-1 text-[12px]">
         <Icon name="terminal" size={13} className="shrink-0 text-fg-3" />
         <span className="min-w-0 flex-1 truncate text-fg-2">{lines ? `${plural(lines, 'line')} selected` : 'Nothing selected'}</span>
-        {error ? null : <span className="hidden shrink-0 text-[11.5px] text-fg-4 sm:inline">{isMac ? '⌘C' : 'Ctrl C'} still copies</span>}
+        {error ? null : <span className="hidden shrink-0 text-[11.5px] text-fg-3 sm:inline">{isMac ? '⌘C' : 'Ctrl C'} still copies</span>}
       </div>
       <textarea
         value={note}

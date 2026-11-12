@@ -2,14 +2,16 @@ import { useCallback, useState } from 'react';
 import { api, errorText, useApi, type ChannelWithRunning, type Thread } from '../api.ts';
 import { CHANNEL_KIND } from '../format.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
-import { NeedsYouSection } from '../components/NeedsYou.tsx';
+import { EmptyNote, NeedsYouSection } from '../components/NeedsYou.tsx';
 import { inChannel } from '../needs-you.ts';
 import { ArchivedThreads, ThreadGroups, useLiveThreads, useThreadPRs } from '../components/ThreadList.tsx';
 import { Avatar, Button, Empty, StatusDot, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, usePresetSeq, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
-import { ChannelSettingsForm, Section } from './ChannelSettings.tsx';
+import { ChannelSettingsForm } from './ChannelSettings.tsx';
+import { Card } from './settings-parts.tsx';
+import { pageColumn } from '../components/ui/feedback.tsx';
 import { PRDetail, PRList } from './PRs.tsx';
 
 function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
@@ -19,7 +21,7 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
   const presetSeq = usePresetSeq();
   const { channel, needsYou } = useApp();
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-8">
+    <div className={`${pageColumn('measure')} pt-6 pb-16`}>
       <NewThreadComposer key={`${id}:${presetSeq}`} channelId={id} placeholder={isConductor ? 'Ask the Conductor. It delegates to the crew.' : undefined} />
       <NeedsYouSection inbox={inChannel(needsYou, id)} quiet />
       <div className="mt-8">
@@ -30,11 +32,7 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
           onRetry={list.reload}
           prs={prs}
           channel={channel(id)}
-          empty={
-            <Empty icon="message" title="No threads in this channel yet">
-              Start one above. Crew threads delegated by the Conductor land here too.
-            </Empty>
-          }
+          empty={<EmptyNote icon="message">No threads in this channel yet. Start one above. Crew threads that the Conductor delegates land here too.</EmptyNote>}
         />
         <ArchivedThreads channelId={id} />
       </div>
@@ -107,11 +105,11 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
     { id: 'settings' as const, label: 'Settings', href: href.settings(id) },
   ];
 
-  const linkCls = 'hov inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-surface px-2.5 text-[12px] text-fg-2 [--hov:var(--surface-2)]';
+  const linkCls = 'hov inline-flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-full bg-surface px-2.5 text-[12px] text-fg-2 [--hov:var(--surface-2)]';
 
   return (
     <div className="scroll-thin h-full overflow-y-auto [scrollbar-gutter:stable]">
-      <div className={`mx-auto px-4 pt-6 md:px-8 md:pt-10 ${tab === 'prs' ? (pr ? 'max-w-5xl' : 'max-w-4xl') : 'max-w-3xl'}`}>
+      <div className={`${pageColumn(tab === 'prs' ? 'page' : 'measure')} pt-6 md:pt-10`}>
         <div className="flex items-center gap-3.5">
           <Avatar name={ch.name} channelIcon={ch.icon} avatarBg={ch.avatar_bg} omni={isConductor} size={44} />
           <div className="min-w-0 flex-1">
@@ -125,44 +123,41 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
               )}
             </div>
             <h1 className="flex min-w-0 items-baseline gap-1 font-display text-[26px] leading-[1.1] md:text-[30px]">
-              {!isConductor && <span className="text-fg-4">#</span>}
+              {!isConductor && <span className="text-fg-3">#</span>}
               <span className="truncate">{ch.name}</span>
             </h1>
           </div>
         </div>
-        {(ch.store_domain || ch.github_repo || ch.repo_path || (ch.notes && isConductor)) && (
-          <div className="mt-4 flex flex-wrap items-center gap-1.5">
-            {ch.store_domain && (
-              <a href={`https://${ch.store_domain}/admin`} target="_blank" rel="noopener noreferrer" className={linkCls}>
-                <Icon name="globe" size={13} className="text-fg-3" /> <span className="truncate">{ch.store_domain}</span>
-              </a>
-            )}
-            {ch.github_repo && (
-              <a href={`https://github.com/${ch.github_repo}`} target="_blank" rel="noopener noreferrer" className={linkCls}>
-                <Icon name="branch" size={13} className="text-fg-3" /> <span className="truncate">{ch.github_repo}</span>
-              </a>
-            )}
-            {ch.repo_path && (
-              <span className="inline-flex h-7 max-w-full items-center rounded-full px-2.5 font-mono text-[11px] text-fg-4 shadow-[inset_0_0_0_1px_var(--line)]" title={ch.repo_path}>
-                <span className="truncate">{ch.repo_path}</span>
-              </span>
-            )}
-            {ch.notes && isConductor && <span className="truncate px-1 text-[12.5px] text-fg-3">{ch.notes}</span>}
-          </div>
-        )}
-        <Tabs className="mt-5" tabs={tabs} value={tab} />
+        {/* One fixed row, filled or not, so the tabs sit at the same height on every channel. */}
+        <div className="mt-3 flex h-7 min-w-0 items-center gap-1.5 overflow-hidden">
+          {ch.store_domain && (
+            <a href={`https://${ch.store_domain}/admin`} target="_blank" rel="noopener noreferrer" className={linkCls}>
+              <Icon name="globe" size={13} className="text-fg-3" /> <span className="truncate">{ch.store_domain}</span>
+            </a>
+          )}
+          {ch.github_repo && (
+            <a href={`https://github.com/${ch.github_repo}`} target="_blank" rel="noopener noreferrer" className={linkCls}>
+              <Icon name="branch" size={13} className="text-fg-3" /> <span className="truncate">{ch.github_repo}</span>
+            </a>
+          )}
+          {ch.repo_path && (
+            <span className="inline-flex h-7 min-w-0 max-w-full items-center rounded-full px-2.5 font-mono text-[11px] text-fg-3 shadow-[inset_0_0_0_1px_var(--line)]" title={ch.repo_path}>
+              <span className="truncate">{ch.repo_path}</span>
+            </span>
+          )}
+          {ch.notes && isConductor && <span className="truncate px-1 text-[length:var(--fs-body)] text-fg-3">{ch.notes}</span>}
+        </div>
+        <Tabs className="mt-4" tabs={tabs} value={tab} />
       </div>
 
       {tab === 'threads' && <ThreadsTab id={id} isConductor={isConductor} />}
       {tab === 'prs' && (pr ? <PRDetail channel={ch} n={pr} /> : <PRList channel={ch} />)}
       {tab === 'settings' && (
-        <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-8">
-          <div className="max-w-2xl space-y-4">
-            <ChannelSettingsForm existing={ch} />
-            <Section title="Actions">
-              <ChannelActionsEditor channelId={ch.id} />
-            </Section>
-          </div>
+        <div className={`${pageColumn('measure')} space-y-4 pt-6 pb-16`}>
+          <ChannelSettingsForm existing={ch} />
+          <Card title="Actions">
+            <ChannelActionsEditor channelId={ch.id} />
+          </Card>
         </div>
       )}
     </div>

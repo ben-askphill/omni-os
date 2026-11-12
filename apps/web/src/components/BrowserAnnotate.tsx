@@ -394,7 +394,7 @@ function Draw({ capture, channelId, threadId, onAdded, from }: { capture: Browse
           <>
             {error && <ErrorNote>{error}</ErrorNote>}
             {notice && <div className="mt-1 text-[11.5px] text-fg-3">{notice}</div>}
-            <div className="mt-1 text-[11.5px] text-fg-4">
+            <div className="mt-1 text-[11.5px] text-fg-3">
               {error ? '' : picking ? 'Looking at the page…' : tool === 'select' ? `Tap an element to pick it, or drag an area of at least ${RECT_MIN} by ${RECT_MIN} page pixels, or draw with a tool above. The page itself is not touched.` : tool === 'text' ? 'Tap where the text goes, type, and press Enter.' : 'Draw on the screenshot. The page itself is not touched.'}
             </div>
           </>

@@ -1,3 +1,4 @@
+import { asksForYou } from '@omni/shared/status.ts';
 import { useInbox } from '../app/useInbox.ts';
 import { OmniMark } from '../components/brand.tsx';
 import { UpdateNotice } from '../components/UpdateNotice.tsx';
@@ -18,7 +19,7 @@ export function ActivityScreen() {
   const now = useNow(60_000);
   const { pinned, inbox, working, done, loaded, status, delegates } = useInbox();
   const waiting = [...pinned, ...inbox];
-  const mark = waiting.some((t) => status(t)?.glyph === 'needs') ? 'attention' : working.count ? 'delegating' : 'idle';
+  const mark = waiting.some((t) => asksForYou(status(t)?.glyph ?? 'idle')) ? 'attention' : working.count ? 'delegating' : 'idle';
   const date = new Date(now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (

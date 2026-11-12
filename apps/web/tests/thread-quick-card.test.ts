@@ -109,4 +109,18 @@ describe('the thread quick card', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(html).not.toContain('Finished one');
   });
+
+  it('says the turn waits on Ben while a question is open, not that it runs', () => {
+    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread(), agents: [], parent: null, children: [], asking: true }));
+    expect(html).toContain('Waiting on you');
+    expect(html).not.toContain('Turn running');
+  });
+
+  it('puts Copy on the working directory row, beside its button rather than inside it', () => {
+    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread(), agents: [], parent: null, children: [] }));
+    const row = html.indexOf('Show working directory in details');
+    const copy = html.indexOf('Copy the working directory path');
+    expect(copy).toBeGreaterThan(html.indexOf('</button>', row));
+    expect(copy).toBeLessThan(html.indexOf('Turn running'));
+  });
 });

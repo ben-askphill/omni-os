@@ -3,14 +3,15 @@ import type { DesktopBridge } from '@omni/shared/desktop-bridge.ts';
 import { api, errorText, type ChannelWithRunning, type Thread } from '../api.ts';
 import { useAutosize } from '../components/composer/controls.tsx';
 import { pickerOptions } from '../components/composer/pickerOptions.tsx';
-import { Icon, Loader, Picker } from '../components/ui.tsx';
+import { Button, Icon, Loader, Picker } from '../components/ui.tsx';
+import { KbdFooter } from '../components/ui/overlay.tsx';
 import { StaticMark } from '../components/brand.tsx';
 import { href } from '../router.ts';
 import {
   canSend,
   CONDUCTOR,
   dictationSettled,
-  editingHint,
+  quickPromptHints,
   quickPromptKey,
   quickPromptThread,
   reopened,
@@ -41,7 +42,7 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
   const closing = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Counts showings. Hiding bumps it too, so an open that resolves after the panel hid starts nothing.
   const shown = useRef(0);
-  useAutosize(field, text, 19 * 1.45 * 10);
+  useAutosize(field, text, 16 * 1.5 * 10);
 
   const setText = useCallback((v: string) => {
     if (v !== live.current.text) live.current.lastEdit = Date.now();
@@ -209,55 +210,58 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
   if (!channelOptions.some((o) => o.value === CONDUCTOR)) channelOptions.unshift({ value: CONDUCTOR, label: 'Conductor', avatar: 'Conductor', lead: <StaticMark size={13} title="" /> });
 
   return (
-    <div ref={root} className="w-full">
-      <div className="space-y-3 rounded-[18px] border border-[var(--line-strong)] bg-bg px-[18px] pt-3 pb-3.5 text-fg">
-        <div className="flex items-center gap-2.5">
-          <Picker label="Send to" value={channel} options={channelOptions} onChange={setChannel} searchable={channelOptions.length > 7} />
-          <span className="flex-1" />
-          {wispr && (
-            <button
-              type="button"
-              aria-label={listening ? 'Stop Wispr Flow' : 'Dictate with Wispr Flow'}
-              title={listening ? 'Stop Wispr Flow' : 'Dictate with Wispr Flow'}
-              data-on={listening || undefined}
-              onClick={() => {
-                field.current?.focus();
-                setListening(!listening);
-              }}
-              className={`hov press grid h-7 w-7 place-items-center rounded-full transition-colors ${listening ? 'bg-surface-2 text-needs' : 'text-fg-3 hover:text-fg'}`}
-            >
-              <Icon name="mic" size={15} className={listening ? 'animate-pulse' : ''} />
-            </button>
-          )}
+    // A clear margin around the panel for its shadow: the window draws none (apps/desktop/src/quick-prompt.ts).
+    <div ref={root} className="w-full px-6 pt-4 pb-12">
+      <div className="rounded-[var(--r-3xl)] bg-elev text-fg shadow-[var(--shadow-menu)]">
+        <div className="space-y-3 px-[18px] pt-3.5 pb-3">
+          <div className="flex items-center gap-2.5">
+            <Picker label="Send to" value={channel} options={channelOptions} onChange={setChannel} searchable={channelOptions.length > 7} />
+            <span className="flex-1" />
+            {wispr && (
+              <button
+                type="button"
+                aria-label={listening ? 'Stop Wispr Flow' : 'Dictate with Wispr Flow'}
+                title={listening ? 'Stop Wispr Flow' : 'Dictate with Wispr Flow'}
+                data-on={listening || undefined}
+                onClick={() => {
+                  field.current?.focus();
+                  setListening(!listening);
+                }}
+                className={`hov press grid h-7 w-7 place-items-center rounded-full transition-colors ${listening ? 'bg-surface-2 text-needs' : 'text-fg-3 hover:text-fg'}`}
+              >
+                <Icon name="mic" size={15} className={listening ? 'animate-pulse' : ''} />
+              </button>
+            )}
+          </div>
+          <textarea
+            ref={field}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
+            rows={1}
+            autoFocus
+            aria-label="Prompt"
+            placeholder={channel === CONDUCTOR ? 'Ask the Conductor anything' : 'Describe the task'}
+            className="block w-full resize-none bg-transparent text-[length:var(--fs-input)] leading-[1.5] text-fg outline-none placeholder:text-fg-4"
+          />
+          <StatusLine phase={phase} listening={listening} onOpen={(id) => done(href.thread(id))} />
         </div>
-        <textarea
-          ref={field}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={onKeyDown}
-          rows={1}
-          autoFocus
-          aria-label="Prompt"
-          placeholder={channel === CONDUCTOR ? 'Ask the Conductor anything' : 'Describe the task'}
-          className="block w-full resize-none bg-transparent text-[19px] leading-[1.45] text-fg outline-none placeholder:text-fg-4"
-        />
-        <Footer phase={phase} listening={listening} mac={mac} onOpen={(id) => done(href.thread(id))} />
+        <KbdFooter className="!flex px-[18px]" hints={quickPromptHints(mac)} />
       </div>
     </div>
   );
 }
 
-function Footer({ phase, listening, mac, onOpen }: { phase: QuickPromptPhase; listening: boolean; mac: boolean; onOpen: (id: string) => void }) {
+/** What the panel is doing: listening, sending, started, or why it failed. Empty while Ben types; the keys are below. */
+function StatusLine({ phase, listening, onOpen }: { phase: QuickPromptPhase; listening: boolean; onOpen: (id: string) => void }) {
   return (
-    <div className="flex min-h-[18px] items-center gap-2 text-[12px] text-fg-3" aria-live="polite">
+    <div className="flex items-center gap-2 text-[12.5px] text-fg-2 empty:hidden" aria-live="polite">
       {phase.kind === 'editing' && listening ? (
         <>
           <Icon name="mic" size={13} className="text-needs" />
           <span>Listening. Speak, then press Return to send.</span>
         </>
-      ) : phase.kind === 'editing' ? (
-        <span>{editingHint(mac)}</span>
-      ) : phase.kind === 'finishing' ? (
+      ) : phase.kind === 'editing' ? null : phase.kind === 'finishing' ? (
         <>
           <Loader size={13} />
           <span>Waiting for Wispr Flow…</span>
@@ -269,11 +273,11 @@ function Footer({ phase, listening, mac, onOpen }: { phase: QuickPromptPhase; li
         </>
       ) : phase.kind === 'sent' ? (
         <>
-          <Icon name="check" size={13} className="text-fg" />
+          <Icon name="check" size={13} className="shrink-0 text-fg-3" />
           <span className="min-w-0 truncate">{sentLabel(phase.thread.title)}</span>
-          <button type="button" onClick={() => onOpen(phase.thread.id)} className="shrink-0 font-medium text-fg underline-offset-2 hover:underline">
+          <Button size="sm" variant="secondary" className="ml-auto shrink-0" onClick={() => onOpen(phase.thread.id)}>
             Open
-          </button>
+          </Button>
         </>
       ) : (
         <>

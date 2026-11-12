@@ -8,6 +8,8 @@ import { useNeedsYou } from './app/useNeedsYou.ts';
 import { useStatusAndProfile } from './app/useStatusAndProfile.ts';
 import { createSyncNudge } from './sync-nudge.ts';
 import { secretStoreLabel, type SecretStoreKind } from '@omni/shared/secret-store.ts';
+import { monograms } from '@omni/shared/monogram.ts';
+import { Monograms } from './components/ui/primitives.tsx';
 
 interface AppState {
   channels: ChannelWithRunning[];
@@ -188,7 +190,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [channels, channelsLoaded, channelsError, reloadChannels, pinned, setPinned, crew, usage, status, reloadStatus, profile, saveProfile, reloadProfile, setupOpen, openSetup, closeSetup, feedLive, tasks, mods, subscribe, needsYou, readResult, setDone, openThread],
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  const marks = useMemo(() => monograms(channels), [channels]);
+  return (
+    <Ctx.Provider value={value}>
+      <Monograms.Provider value={marks}>{children}</Monograms.Provider>
+    </Ctx.Provider>
+  );
 }
 
 export function useApp() {

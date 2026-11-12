@@ -12,7 +12,7 @@ const post = vi.fn(async (_path: string) => ({}));
 vi.mock('../src/api.ts', () => ({ api: { post: (path: string) => post(path) } }));
 
 let emit: (event: DesktopEvent) => void = () => {};
-const bridge = { platform: 'darwin', onEvent: (fn: (e: DesktopEvent) => void) => ((emit = fn), () => (emit = () => {})) } as unknown as DesktopBridge;
+const bridge = { platform: 'darwin', settings: { get: async () => ({ zoom: 1 }) }, onEvent: (fn: (e: DesktopEvent) => void) => ((emit = fn), () => (emit = () => {})) } as unknown as DesktopBridge;
 window.omniDesktop = bridge;
 
 const { DesktopHooks, useDesktopLayoutActions } = await import('../src/components/DesktopHooks.tsx');

@@ -122,7 +122,7 @@ export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disab
                     </span>
                   )}
                 </span>
-                <span className="block text-[11.5px] text-fg-4">{o.hint}</span>
+                <span className="block text-[11.5px] text-fg-3">{o.hint}</span>
               </span>
             </button>
           ))}
@@ -189,7 +189,7 @@ export function ThreadRunPills({
         >
           <Icon name="clock" size={13} />
           Next turn
-          <Icon name="x" size={12} className="text-fg-4" />
+          <Icon name="x" size={12} className="text-fg-3" />
         </button>
       )}
       <ModelPicker

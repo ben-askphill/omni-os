@@ -76,7 +76,7 @@ export function MoSection({ title, count, right, children, pad = true }: { title
     <section className={`flex flex-col gap-2 ${pad ? 'px-4' : ''}`}>
       <div className="flex items-baseline gap-1.5 px-1">
         <span className="text-[12px] leading-[1.3] font-medium text-fg-3">{title}</span>
-        {count != null && <span className="text-[12px] leading-[1.3] text-fg-4 tabular-nums">{count}</span>}
+        {count != null && <span className="text-[12px] leading-[1.3] text-fg-3 tabular-nums">{count}</span>}
         <span className="flex-1" />
         {right}
       </div>
@@ -203,7 +203,7 @@ export function MoListRow({
         </span>
         {right && <span className="flex items-center gap-1.5 text-[13px] leading-none text-fg-3 tabular-nums">{right}</span>}
         {chevron && onClick && (
-          <span className="grid text-fg-4">
+          <span className="grid text-fg-3">
             <Icon name="chevronRight" size={16} />
           </span>
         )}

@@ -85,8 +85,8 @@ const RECENT_PER_CHANNEL = 5;
 const THREADS_PER_FOLDER = 50;
 
 /** A thread as the sidebar lists it. `delegating`: a thread it delegated still works (apps/server/delegating.ts). */
-const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source }: Thread, delegating: ReadonlySet<string>) => ({
-  id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source, delegating: delegating.has(id),
+const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source, limit_state }: Thread, delegating: ReadonlySet<string>) => ({
+  id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source, limit_state, delegating: delegating.has(id),
 });
 
 /** Conductor jobs with their delegated child threads, including children in other channels. */

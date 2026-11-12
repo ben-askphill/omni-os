@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameFromInbox, listMode, monogram, needsByChannel, railBadge, railGroups, railSelection } from '../src/rail-model.ts';
+import { cameFromInbox, listMode, needsByChannel, railBadge, railGroups, railSelection } from '../src/rail-model.ts';
 
 const ch = (id: string, name: string, kind: string, extra: { archived?: boolean; running?: number } = {}) => ({ id, name, kind, running: 0, ...extra });
 
@@ -51,18 +51,6 @@ describe('cameFromInbox', () => {
     expect(cameFromInbox({ name: 'channel', id: 'acne', tab: 'threads' }, true)).toBe(false);
     expect(cameFromInbox({ name: 'thread', id: 't1' }, true)).toBe(true);
     expect(cameFromInbox({ name: 'thread', id: 't1' }, false)).toBe(false);
-  });
-});
-
-describe('monogram', () => {
-  it('takes two initials from two words, else the first two letters', () => {
-    expect(monogram('Acne Studios')).toBe('AS');
-    expect(monogram('Kamera Express')).toBe('KE');
-    expect(monogram('Patta')).toBe('Pa');
-    expect(monogram('omni-os')).toBe('OO');
-    expect(monogram('Omni OS')).toBe('OS');
-    expect(monogram('X')).toBe('X');
-    expect(monogram('  ')).toBe('?');
   });
 });
 

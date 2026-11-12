@@ -4,7 +4,7 @@ import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { plural } from '../../format.ts';
 import { crewLine, prLine } from '@omni/shared/thread-glance.ts';
 import { desktop } from '../../desktop.ts';
-import { IconButton, Loading, Segmented, StatusDot } from '../ui.tsx';
+import { IconButton, Loading, Segmented, StatusDot, type IconName } from '../ui.tsx';
 import { ActionsTab } from './panel/ActionsTab.tsx';
 import { ArtifactsTab } from './panel/ArtifactsTab.tsx';
 import { BrowserTab } from './panel/BrowserTab.tsx';
@@ -21,6 +21,21 @@ type Details = ComponentProps<typeof DetailsTab>;
 type PRs = ComponentProps<typeof PRsTab>;
 
 const PR_DOT = { live: 'running', done: 'done', needs: 'needs', outline: 'idle' } as const;
+
+/**
+ * The tabs, in order. The open one shows its name beside the icon. Browser is the agent's browser; Web is Ben's own, a
+ * desktop-app page the agent cannot see, and each title says whose it is.
+ */
+const TABS: { id: PanelTab; icon: IconName; name: string; title: string }[] = [
+  { id: 'details', icon: 'info', name: 'Details', title: 'Details' },
+  { id: 'prs', icon: 'pr', name: 'PRs', title: 'PRs' },
+  { id: 'artifacts', icon: 'layers', name: 'Artifacts', title: 'Artifacts' },
+  { id: 'changes', icon: 'diff', name: 'Changes', title: 'Changes' },
+  { id: 'browser', icon: 'browser', name: 'Browser', title: "Browser: the agent's browser and what it saw" },
+  { id: 'web', icon: 'globe', name: 'Web', title: 'Web: your own browser on this Mac. The agent cannot see it' },
+  { id: 'terminal', icon: 'terminal', name: 'Terminal', title: 'Terminal' },
+  { id: 'actions', icon: 'play', name: 'Actions', title: 'Actions' },
+];
 
 /**
  * The thread's inspector: a tab strip over Details, PRs, Artifacts, Changes, Browser, Terminal and Actions. Details
@@ -71,33 +86,26 @@ export function ThreadPanel({
         <div className="scroll-thin min-w-0 flex-1 overflow-x-auto">
           <Segmented
             label="Thread inspector"
-            size="sm"
+            className="inspector-tabs"
             value={tab}
             onChange={onTab}
-            options={[
-              {
-                id: 'details',
-                icon: 'info',
-                title: 'Details',
-                badge: agents.length ? (
-                  <span className="font-num text-[10.5px] text-fg-4" title={`${plural(agents.length, 'subagent')} running`}>
+            options={TABS.filter((t) => desktop || t.id !== 'web').map((t) => ({
+              ...t,
+              label: t.id === tab ? t.name : undefined,
+              title: t.id === 'prs' && prTab ? prTab.title : t.title,
+              badge:
+                t.id === 'details' && agents.length ? (
+                  <span className="font-num text-[10.5px] text-fg-3" title={`${plural(agents.length, 'subagent')} running`}>
                     {agents.length}
                   </span>
+                ) : t.id === 'prs' && prTab ? (
+                  <StatusDot status={PR_DOT[prTab.tone]} size={6} />
+                ) : t.id === 'artifacts' && fileCount ? (
+                  <span className="font-num text-[10.5px] text-fg-3">{fileCount}</span>
+                ) : t.id === 'browser' && shotCount ? (
+                  <span className="font-num text-[10.5px] text-fg-3">{shotCount}</span>
                 ) : undefined,
-              },
-              {
-                id: 'prs',
-                icon: 'pr',
-                title: prTab?.title ?? 'PRs',
-                badge: prTab ? <StatusDot status={PR_DOT[prTab.tone]} size={6} /> : undefined,
-              },
-              { id: 'artifacts', icon: 'layers', title: 'Artifacts', badge: fileCount ? <span className="font-num text-[10.5px] text-fg-4">{fileCount}</span> : undefined },
-              { id: 'changes', icon: 'diff', title: 'Changes' },
-              { id: 'browser', icon: 'browser', title: 'Browser', badge: shotCount ? <span className="font-num text-[10.5px] text-fg-4">{shotCount}</span> : undefined },
-              ...(desktop ? [{ id: 'web' as const, icon: 'globe' as const, title: 'Web' }] : []),
-              { id: 'terminal', icon: 'terminal', title: 'Terminal' },
-              { id: 'actions', icon: 'play', title: 'Actions' },
-            ]}
+            }))}
           />
         </div>
         <IconButton icon="x" label="Close panel" onClick={onClose} />

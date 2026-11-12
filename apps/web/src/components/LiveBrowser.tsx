@@ -238,7 +238,7 @@ function usePaint(b: Browser, box: RefObject<HTMLDivElement | null>, canvas: Ref
 function Favicon({ tab, loading }: { tab: BrowserTabInfo; loading?: boolean }) {
   const [failed, setFailed] = useState<string | null>(null);
   if (loading) return <span className="spin h-3 w-3 shrink-0 rounded-full border-[1.5px] border-fg-4 border-t-transparent" />;
-  if (!tab.favicon || failed === tab.favicon) return <Icon name="globe" size={13} className="shrink-0 text-fg-4" />;
+  if (!tab.favicon || failed === tab.favicon) return <Icon name="globe" size={13} className="shrink-0 text-fg-3" />;
   return <img src={tab.favicon} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setFailed(tab.favicon!)} className="h-4 w-4 shrink-0 rounded-[3px] object-contain" />;
 }
 
@@ -281,7 +281,7 @@ function TabStrip({ b }: { b: Browser }) {
                   e.stopPropagation();
                   void b.action({ action: 'closeTab', id: t.id });
                 }}
-                className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-fg-4 opacity-0 group-hover:opacity-100 group-data-[on=true]:opacity-100 hover:bg-surface-3 hover:text-fg"
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-fg-3 opacity-0 group-hover:opacity-100 group-data-[on=true]:opacity-100 hover:bg-surface-3 hover:text-fg"
               >
                 <Icon name="x" size={11} />
               </button>
@@ -323,7 +323,7 @@ function Toolbar({ b, extra, address, page }: { b: Browser; extra?: ReactNode; a
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center truncate px-4 text-[13px]" aria-hidden>
             <span className="truncate">
               <span className="text-fg">{host}</span>
-              <span className="text-fg-4">{path}</span>
+              <span className="text-fg-3">{path}</span>
             </span>
           </span>
         )}

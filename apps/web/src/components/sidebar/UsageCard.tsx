@@ -8,7 +8,7 @@ import { Icon, Ticks } from '../ui.tsx';
 /** One window's tick bar and percentage, with the reset time on hover. */
 function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
   const pct = windowPct(w);
-  if (pct === null) return <span className="flex-1 text-center font-num text-[10px] text-fg-4">—</span>;
+  if (pct === null) return <span className="flex-1 text-center font-num text-[10px] text-fg-3">—</span>;
   const tone = pct >= 0.9 ? 'needs' : undefined;
   return (
     <div
@@ -28,7 +28,7 @@ function MonthCell({ m, name }: { m: MonthlyUsage; name: string }) {
     <div className="flex min-w-0 flex-1 items-center gap-1.5" title={monthlyTitle(name, m)}>
       <Ticks responsive value={pct} count={20} height={10} tone={pct >= 0.9 ? 'needs' : undefined} className="min-w-0 flex-1" label={`${name} month usage`} />
       <span className="w-[26px] shrink-0 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
-      <span className="text-[10px] text-fg-4">mo</span>
+      <span className="text-[10px] text-fg-3">mo</span>
     </div>
   );
 }
@@ -45,7 +45,7 @@ function HarnessUsageRow({ id, name, usage }: { id: HarnessId; name: string; usa
         {name}
       </span>
       {noData ? (
-        <span className="flex-1 text-[10.5px] text-fg-4">no data</span>
+        <span className="flex-1 text-[10.5px] text-fg-3">no data</span>
       ) : !windows ? (
         <MonthCell m={usage!.monthly!} name={name} />
       ) : (
@@ -91,11 +91,11 @@ export function UsageCard() {
             {Math.round(peak * 100)}%
           </span>
         )}
-        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={13} className="shrink-0 text-fg-4" />
+        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={13} className="shrink-0 text-fg-3" />
       </button>
       {open && (
         <div className="space-y-2 px-3 pb-3">
-          <div className="flex items-center gap-2 pb-0.5 text-[11px] font-medium text-fg-4">
+          <div className="flex items-center gap-2 pb-0.5 text-[11px] font-medium text-fg-3">
             <span className="w-[66px] shrink-0" />
             <span className="flex-1">5h</span>
             <span className="flex-1">Week</span>

@@ -9,7 +9,7 @@ import { ClippedNote } from './HistoryEdgeRow.tsx';
 /** The thread a tool row belongs to, for the requests behind its output. */
 export const ThreadIdCtx = createContext('');
 
-const Truncated = () => <div className="text-[11px] text-fg-4">Output truncated</div>;
+const Truncated = () => <div className="text-[11px] text-fg-3">Output truncated</div>;
 
 /**
  * The body of an open tool row under its input: the call's output, or what it has printed so far. A compact result
@@ -37,7 +37,7 @@ export function ToolOutput({ call, running, touch = false, box }: { call: ToolCa
             {box(out.tail)}
           </div>
         )}
-        <div className="text-[11.5px] text-fg-4">
+        <div className="text-[11.5px] text-fg-3">
           {running ? 'Waiting for result' : 'No result recorded'}
           {out.skipped && ' · older output not shown'}
         </div>
@@ -69,7 +69,7 @@ export function ToolOutput({ call, running, touch = false, box }: { call: ToolCa
           </Button>
         </div>
       ) : out.busy ? (
-        <div className="flex items-center gap-1.5 text-[11.5px] text-fg-4">
+        <div className="flex items-center gap-1.5 text-[11.5px] text-fg-3">
           <Loader size={11} /> Loading output
         </div>
       ) : (

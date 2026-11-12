@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, type ReactNode } from 'react';
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { ChannelWithRunning } from '../../api.ts';
 import { href } from '../../router.ts';
 import { useApp } from '../../store.tsx';
-import { monogram, needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
+import { monogram } from '@omni/shared/monogram.ts';
+import { needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
 import { OmniMark, StaticMark } from '../brand.tsx';
-import { ChannelMark, Icon, StatusDot, type IconName } from '../ui.tsx';
+import { ChannelMark, Icon, Monograms, StatusDot, type IconName } from '../ui.tsx';
+import { useScrollFade } from './useScrollFade.ts';
 
 /**
  * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights. From the top: the Omni mark, the Inbox and the Conductor, then
@@ -15,6 +17,7 @@ import { ChannelMark, Icon, StatusDot, type IconName } from '../ui.tsx';
  */
 export function ChannelRail({ selection }: { selection: RailSelection }) {
   const { channels, needsYou, profile } = useApp();
+  const marks = useContext(Monograms);
   const needs = needsByChannel(needsYou?.items);
   const { clients, rest } = railGroups(channels);
   const conductor = channels.find((c) => c.id === 'conductor');
@@ -22,7 +25,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
   const badgeOf = (c: ChannelWithRunning) => railBadge(c.running, needs.get(c.id) ?? 0);
   const disc = (c: ChannelWithRunning) => (
     <RailItem key={c.id} to={href.channel(c.id)} label={c.name} selected={isChannel(c.id)} badge={badgeOf(c)}>
-      <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={22} /> : monogram(c.name)}</Disc>
+      <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={22} /> : (marks.get(c.id) ?? monogram(c.name))}</Disc>
     </RailItem>
   );
   const { ref, fade } = useScrollFade();
@@ -126,30 +129,4 @@ function Disc({ selected, icon, quiet, fill, children }: { selected: boolean; ic
       {icon ? <Icon name={icon} size={18} /> : children}
     </span>
   );
-}
-
-/** The scrolling discs fade at an edge only while discs hide past it. */
-function useScrollFade() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ top: false, bottom: false });
-  const measure = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const top = el.scrollTop > 1;
-    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-    setEdges((e) => (e.top === top && e.bottom === bottom ? e : { top, bottom }));
-  }, []);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    measure();
-    el.addEventListener('scroll', measure, { passive: true });
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    ro?.observe(el);
-    if (el.firstElementChild) ro?.observe(el.firstElementChild);
-    return () => (el.removeEventListener('scroll', measure), ro?.disconnect());
-  }, [measure]);
-  const top = edges.top ? 'transparent 0, black 28px' : 'black 0';
-  const bottom = edges.bottom ? 'black calc(100% - 28px), transparent 100%' : 'black 100%';
-  return { ref, fade: `linear-gradient(to bottom, ${top}, ${bottom})` };
 }

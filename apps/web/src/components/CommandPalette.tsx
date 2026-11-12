@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { paletteItems, type Item } from './command-palette/items.tsx';
+import { Marked, paletteItems, queryWords, type Item } from './command-palette/items.tsx';
 import { useApi, type Thread } from '../api.ts';
 import { useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { Icon, Kbd, Thumb, useSlidingThumb } from './ui.tsx';
+import { SCRIM } from './ui/modal.tsx';
+import { KbdFooter, overlayRow } from './ui/overlay.tsx';
 
 /** ⌘K: jump to a page, channel or recent thread, or search everything. */
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -23,6 +25,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }, [open]);
 
   const items = useMemo<Item[]>(() => paletteItems(q, channels, recent.data, route, openThread), [q, channels, recent.data, route, openThread]);
+  const words = useMemo(() => queryWords(q), [q]);
 
   useEffect(() => setCursor(0), [q]);
   const safeCursor = Math.min(cursor, Math.max(0, items.length - 1));
@@ -55,10 +58,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   });
 
   return (
-    <div className="scrim fixed inset-0 z-50 flex items-start justify-center px-3 pt-[max(12px,10vh)]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="Command menu" className="pop-in flex max-h-[min(640px,80vh)] w-full max-w-[620px] flex-col overflow-hidden rounded-[28px] bg-elev shadow-[var(--shadow-menu)]">
+    <div className={`${SCRIM} items-start px-3 pt-[max(12px,10vh)]`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label="Command menu" className="pop-in flex max-h-[min(640px,80vh)] w-full max-w-[620px] flex-col overflow-hidden rounded-[var(--r-3xl)] bg-elev shadow-[var(--shadow-menu)]">
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line pr-4 pl-6">
-          <Icon name="search" size={18} className="text-fg-4" />
+          <Icon name="search" size={18} className="text-fg-3" />
           <input
             ref={input}
             value={q}
@@ -86,7 +89,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <Kbd>Esc</Kbd>
         </div>
         <div ref={listRef} id="omni-cmdk-list" role="listbox" className="scroll-thin relative min-h-0 flex-1 overflow-y-auto px-2 py-2">
-          <Thumb box={box} tone="wash" className="!rounded-2xl" />
+          <Thumb box={box} tone="wash" className="!rounded-[var(--r-md)]" />
           {groups.map((g) => (
             <div key={g.name} role="group" aria-label={g.name}>
               <div className="caption px-4 pt-3 pb-2">{g.name}</div>
@@ -100,12 +103,19 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   data-active={index === safeCursor}
                   onMouseMove={() => index !== safeCursor && setCursor(index)}
                   onClick={() => run(item)}
-                  className="relative z-[1] flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-left"
+                  className={`relative z-[1] ${overlayRow('lg', false)}`}
                 >
                   {item.lead}
+                  {/* The sub gives up its width first, so a long label is cut once, not twice. */}
                   <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                    <span className="truncate text-[13.5px] text-fg">{item.label}</span>
-                    {item.sub && <span className="truncate text-[12px] text-fg-4">{item.sub}</span>}
+                    <span className="min-w-0 truncate text-[13.5px] text-fg">
+                      <Marked text={item.label} words={words} />
+                    </span>
+                    {item.sub && (
+                      <span className="min-w-[4ch] shrink-[100] truncate text-[12px] text-fg-3">
+                        <Marked text={item.sub} words={words} />
+                      </span>
+                    )}
                   </span>
                   {item.right}
                   {index === safeCursor && <Icon name="arrowRight" size={14} className="text-fg-3" />}
@@ -115,15 +125,14 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           ))}
           {!items.length && <div className="px-4 py-10 text-center text-[13px] text-fg-3">{recent.loading ? 'Loading' : 'Nothing matches'}</div>}
         </div>
-        <div className="hidden shrink-0 items-center gap-4 border-t border-line px-6 py-2.5 text-[11.5px] text-fg-4 sm:flex">
-          <span className="flex items-center gap-1.5">
-            <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd> move
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Kbd>↵</Kbd> open
-          </span>
-        </div>
+        <KbdFooter
+          className="px-6"
+          hints={[
+            [['↑', '↓'], 'move'],
+            [['↵'], 'open'],
+            [['esc'], 'close'],
+          ]}
+        />
       </div>
     </div>
   );

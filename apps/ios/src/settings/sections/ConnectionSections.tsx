@@ -76,13 +76,3 @@ export function AccessSection() {
     </SettingsPage>
   );
 }
-
-export function IntegrationsSection() {
-  const setup = useSetup();
-  return (
-    <SettingsPage onRefresh={setup.reload}>
-      {setup.data ? <ConfigForm page="integrations" state={setup.data} onSaved={setup.setData} /> : <Loading error={setup.error} retry={setup.reload} />}
-      <Footnote>The central brain folder is a path on the server's machine, so it changes on that computer. HERMES_API_KEY is under Secrets.</Footnote>
-    </SettingsPage>
-  );
-}

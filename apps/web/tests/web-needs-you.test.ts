@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { NeedsYou, NeedsYouItem } from '../src/api.ts';
-import { canMarkDone, coalesced, inChannel, reasonOf, shownResult, withoutResult, withoutThread } from '../src/needs-you.ts';
+import { canMarkDone, coalesced, inChannel, reasonOf, shownResult, splitNeeds, withoutResult, withoutThread } from '../src/needs-you.ts';
 
 // The Web UI's side of Needs you (apps/web/src/needs-you.ts), against the recorded server answers
 // (apps/server/tests/wire-fixtures.test.ts records them): every kind of result and blocker, then a read.
@@ -15,10 +15,10 @@ const byTitle = (n: NeedsYou, title: string) => n.items.find((i) => i.thread.tit
 describe('Needs you reasons', () => {
   it('says why each thread is there, a blocker before its result', () => {
     const n = inbox();
-    expect(reasonOf(byTitle(n, 'Fix the widget'))).toMatchObject({ glyph: 'needs', label: 'Worktree could not be prepared' });
+    expect(reasonOf(byTitle(n, 'Fix the widget'))).toMatchObject({ glyph: 'failed', label: 'Worktree could not be prepared' });
     expect(reasonOf(byTitle(n, 'Fix the widget')).detail).toBe(byTitle(n, 'Fix the widget').thread.setup_error);
     expect(reasonOf(byTitle(n, 'Plan the launch'))).toMatchObject({ glyph: 'needs', label: 'A message waits for Resume' });
-    expect(reasonOf(byTitle(n, 'Fix the cart total'))).toMatchObject({ glyph: 'needs', label: 'Failed' });
+    expect(reasonOf(byTitle(n, 'Fix the cart total'))).toMatchObject({ glyph: 'failed', label: 'Failed' });
     expect(reasonOf(byTitle(n, 'Audit the checkout'))).toMatchObject({ glyph: 'done', label: 'Finished' });
   });
 
@@ -28,6 +28,17 @@ describe('Needs you reasons', () => {
     expect(reasonOf(two).label).toBe('2 messages may not have been sent');
     const stopped: NeedsYouItem = { ...base, blockers: [], result: { uid: 'u', status: 'stopped', event_uid: null, at: base.at } };
     expect(reasonOf(stopped)).toMatchObject({ glyph: 'settled', label: 'Stopped' });
+  });
+});
+
+describe('Needs you and Unread', () => {
+  it('puts what Ben must act on under Needs you and a finished result under Unread, each item once', () => {
+    const n = inbox();
+    const { needs, unread } = splitNeeds(n.items);
+    expect(needs.length + unread.length).toBe(n.items.length);
+    expect(needs.map((i) => i.thread.title)).toEqual(expect.arrayContaining(['Fix the widget', 'Plan the launch', 'Fix the cart total']));
+    expect(unread.map((i) => i.thread.title)).toContain('Audit the checkout');
+    expect(unread.every((i) => i.blockers.length === 0 && i.result?.status !== 'failed')).toBe(true);
   });
 });
 

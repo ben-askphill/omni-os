@@ -71,7 +71,7 @@ export function SelectionDock({
         <span className="min-w-0 flex-1 truncate font-mono text-fg-2" title={body.ok ? diffSelection.label(body.value) : undefined}>
           {name ?? 'No lines'}
         </span>
-        {body.ok && <span className="shrink-0 font-num text-[11px] text-fg-4">{plural(body.value.rows.length, 'line')}</span>}
+        {body.ok && <span className="shrink-0 font-num text-[11px] text-fg-3">{plural(body.value.rows.length, 'line')}</span>}
       </div>
       <textarea
         value={note}
@@ -93,7 +93,7 @@ export function SelectionDock({
       />
       {(error || !body.ok) && <ErrorNote className="mt-2">{error ?? (!body.ok && body.error)}</ErrorNote>}
       <div className="mt-2 flex items-center justify-end gap-1.5">
-        <span className="mr-auto hidden pl-1 text-[11.5px] text-fg-4 sm:inline">{isMac ? '⌘↵' : 'Ctrl ↵'} add · Esc cancel</span>
+        <span className="mr-auto hidden pl-1 text-[11.5px] text-fg-3 sm:inline">{isMac ? '⌘↵' : 'Ctrl ↵'} add · Esc cancel</span>
         <Button size="sm" variant="ghost" onClick={onClose}>
           Cancel
         </Button>

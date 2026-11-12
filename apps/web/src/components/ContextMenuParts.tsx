@@ -3,6 +3,7 @@ import { api, type Thread, type ThreadDetail } from '../api.ts';
 import { draftKey, type useFolders } from '../folders.tsx';
 import { navigate, href, openNewThread } from '../router.ts';
 import { Icon, type IconName } from './ui.tsx';
+import { overlayRow, RowKeys } from './ui/overlay.tsx';
 
 /** A thread's row and the state that decides its menu, asked for once the menu opens so "Unarchive" reads right. */
 export function useThreadRow(kind: string, id: string) {
@@ -28,21 +29,25 @@ export function useThreadRow(kind: string, id: string) {
   return { archived, current, row };
 }
 
-/** Keep the menu inside the window, also as the reference picker's list comes in and grows it. */
-export function useMenuPlacement(ref: RefObject<HTMLDivElement | null>, x: number, y: number) {
+/**
+ * Keep the menu inside the window, also as the reference picker's list comes in and grows it. `align: 'end'`: `x` is
+ * where the menu's right edge goes, as under a button at the right of a header.
+ */
+export function useMenuPlacement(ref: RefObject<HTMLDivElement | null>, x: number, y: number, align: 'start' | 'end' = 'start') {
   const [pos, setPos] = useState({ x, y });
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const place = () => {
       const r = el.getBoundingClientRect();
-      setPos({ x: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)), y: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
+      const left = align === 'end' ? x - r.width : x;
+      setPos({ x: Math.max(8, Math.min(left, window.innerWidth - r.width - 8)), y: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
     };
     place();
     const watch = new ResizeObserver(place);
     watch.observe(el);
     return () => watch.disconnect();
-  }, [ref, x, y]);
+  }, [ref, x, y, align]);
   return pos;
 }
 
@@ -82,7 +87,7 @@ export function moveFocus(ref: RefObject<HTMLDivElement | null>, key: 'ArrowDown
   items[(i + (key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
 }
 
-const CAPTION = 'caption truncate px-2.5 pt-1 pb-1.5 text-fg-4';
+const CAPTION = 'caption truncate px-2.5 pt-1.5 pb-1 text-fg-3';
 
 export function MenuCaption({ children }: { children: string }) {
   return <div className={CAPTION}>{children}</div>;
@@ -101,52 +106,64 @@ export function FolderChoices({ current, choices, onPick }: { current: string | 
             role="menuitemradio"
             aria-checked={on}
             onClick={() => onPick(f.id)}
-            className="hov flex h-8 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] text-fg-2 hover:text-fg"
+            className={overlayRow('sm')}
           >
             <Icon name={f.id ? 'folder' : 'minus'} size={14} className="text-fg-3" />
             <span className="min-w-0 flex-1 truncate">{f.name}</span>
-            {on && <Icon name="check" size={14} className="text-fg-2" />}
+            {on && <Icon name="check" size={14} className="text-fg-3" />}
           </button>
         );
       })}
-      {!choices.length && <div className="px-2.5 py-1.5 text-[12px] text-fg-4">This channel has no folders yet. Add one with the + beside its name.</div>}
+      {!choices.length && <div className="px-2.5 py-1.5 text-[12px] text-fg-3">This channel has no folders yet. Add one with the + beside its name.</div>}
     </>
   );
 }
 
-export type MenuItem = { id?: string; label: string; icon: IconName; run: () => void; hint?: string; off?: string | null };
+/** `keys`: what runs it while the menu is open, drawn on its right edge. */
+export type MenuItem = { id?: string; label: string; icon: IconName; run: () => void; hint?: string; off?: string | null; keys?: readonly string[] };
 
-/** The menu's items, in titled groups; one that cannot run here says why under its label. */
+/** The menu's items, in groups split by a line, a group's title over it; one that cannot run here says why under its label. */
 export function MenuGroups({ groups }: { groups: { title?: string; items: MenuItem[] }[] }) {
   return (
     <>
       {groups.map((g, gi) => (
         <div key={g.title ?? gi} role={g.title ? 'group' : undefined} aria-label={g.title}>
-          {g.title && <div className={`caption truncate px-2.5 pb-1 text-fg-4 ${gi ? 'mt-1 border-t border-line pt-2' : 'pt-1'}`}>{g.title}</div>}
+          {gi > 0 && <div role="separator" className="mx-2 my-1.5 h-px bg-line" />}
+          {g.title && <MenuCaption>{g.title}</MenuCaption>}
           {g.items.map((it) => (
             <button
               key={it.label}
               role="menuitem"
               aria-disabled={!!it.off || undefined}
+              aria-keyshortcuts={it.keys?.length === 1 && !it.off ? it.keys[0] : undefined}
               title={it.off ? undefined : it.hint}
               onClick={it.off ? undefined : it.run}
-              className={`${it.off ? 'opacity-45' : 'hov hover:text-fg'} flex min-h-8 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] text-fg-2`}
+              className={overlayRow('sm', !it.off)}
             >
-              <Icon name={it.icon} size={14} className="text-fg-3" />
+              <Icon name={it.icon} size={14} className="shrink-0 text-fg-3" />
               {it.off ? (
                 <span className="flex min-w-0 flex-col py-1.5">
-                  <span>{it.label}</span>
-                  <span className="text-[11.5px] leading-snug text-fg-4">{it.off}</span>
+                  <span className="text-fg-disabled">{it.label}</span>
+                  <span className="text-[11.5px] leading-snug text-fg-3">{it.off}</span>
                 </span>
               ) : (
-                it.label
+                <span className="min-w-0 truncate">{it.label}</span>
               )}
+              {it.keys && !it.off && <RowKeys keys={it.keys} />}
             </button>
           ))}
         </div>
       ))}
     </>
   );
+}
+
+/** The item a key press runs: a single key, or the platform's command key with Return (`mod`, as its keycap). */
+export function itemForKey(groups: { items: MenuItem[] }[], e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean }, mod: string): MenuItem | undefined {
+  if (e.altKey) return undefined;
+  const pressed = e.metaKey || e.ctrlKey ? (e.key === 'Enter' ? `${mod}+↵` : null) : e.key.length === 1 ? e.key.toUpperCase() : null;
+  if (!pressed) return undefined;
+  return groups.flatMap((g) => g.items).find((it) => !it.off && it.keys?.join('+') === pressed);
 }
 
 /** The folder menu (new thread here, rename, duplicate, delete) or the channel menu (new folder, settings). */

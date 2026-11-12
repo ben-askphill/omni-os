@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { ChannelWithRunning, ConductorHandoffGroup, Thread } from '../api.ts';
 import { OmniMark } from '../components/brand.tsx';
 import { useLiveThreads } from '../components/ThreadList.tsx';
-import { Avatar, Icon, Segmented, StatusDot } from '../components/ui.tsx';
+import { Avatar, Icon, Segmented, StatusDot, asksForYou } from '../components/ui.tsx';
 import { inChannel, reasonOf } from '../needs-you.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
@@ -110,10 +110,10 @@ function MoFolderHeader({ folder, onToggle }: { folder: FolderRows; onToggle: ()
       onClick={onToggle}
       className="flex items-center gap-2.5 px-4 py-3 text-left text-[14px] leading-[1.4] font-medium text-fg-2 hover:text-fg active:bg-[var(--wash)]"
     >
-      <Icon name={folder.collapsed ? 'chevronRight' : 'chevronDown'} size={14} className="shrink-0 text-fg-4" />
+      <Icon name={folder.collapsed ? 'chevronRight' : 'chevronDown'} size={14} className="shrink-0 text-fg-3" />
       <span className="flex-1 truncate">{folder.name}</span>
-      <span className="shrink-0 text-[12px] text-fg-4 tabular-nums">{folder.count}</span>
-      {folder.running > 0 && <span className="shrink-0 text-[12px] text-fg-4 tabular-nums">{folder.running} running</span>}
+      <span className="shrink-0 text-[12px] text-fg-3 tabular-nums">{folder.count}</span>
+      {folder.running > 0 && <span className="shrink-0 text-[12px] text-fg-3 tabular-nums">{folder.running} running</span>}
     </button>
   );
 }
@@ -151,7 +151,7 @@ export function ChannelScreen({ id }: { id: string }) {
     for (const t of (list.data ?? []).filter((x) => x.source !== 'team' && !handoffChildren.has(x.id))) {
       const item = needs.get(t.id);
       const row = rowOf(t, info, now);
-      const finalRow = item ? { ...row, meta: reasonOf(item).label, status: reasonOf(item).glyph === 'needs' ? 'needs' : row.status } : row;
+      const finalRow = item ? { ...row, meta: reasonOf(item).label, status: asksForYou(reasonOf(item).glyph) ? reasonOf(item).glyph : row.status } : row;
       const isActive = !!item || busy(t);
 
       if (t.folder_id) {
@@ -224,8 +224,8 @@ export function ChannelScreen({ id }: { id: string }) {
             value={tab}
             onChange={setTab}
             options={[
-              { id: 'active', label: 'Active', badge: <span className="text-[11px] text-fg-4 tabular-nums">{activeCount}</span> },
-              { id: 'recent', label: 'Recent', badge: <span className="text-[11px] text-fg-4 tabular-nums">{recentCount}</span> },
+              { id: 'active', label: 'Active', badge: <span className="text-[11px] text-fg-3 tabular-nums">{activeCount}</span> },
+              { id: 'recent', label: 'Recent', badge: <span className="text-[11px] text-fg-3 tabular-nums">{recentCount}</span> },
             ]}
           />
         </div>
@@ -244,7 +244,7 @@ export function ChannelScreen({ id }: { id: string }) {
               ))}
               {rows.length > 0 && (
                 <>
-                  {tabFolders.length > 0 && <div className="px-4 py-2 text-[12px] text-fg-4">Ungrouped</div>}
+                  {tabFolders.length > 0 && <div className="px-4 py-2 text-[12px] text-fg-3">Ungrouped</div>}
                   <MobileThreadRows items={rows} handoffs={id === 'conductor' ? ch?.handoffs ?? [] : []} onOpen={(r) => shell.open(href.thread(r.id))} />
                 </>
               )}

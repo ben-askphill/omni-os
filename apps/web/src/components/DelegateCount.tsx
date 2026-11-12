@@ -29,7 +29,7 @@ const TONE: Record<DelegateSummary['state'], string> = {
   needs: 'text-fg',
   failed: 'text-fg-3',
   working: 'text-live-text',
-  settled: 'text-fg-4',
+  settled: 'text-fg-3',
 };
 
 /** The count's face: the diamond when flagged, the delegate icon and the number. */

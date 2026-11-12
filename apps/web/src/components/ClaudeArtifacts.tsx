@@ -4,6 +4,7 @@ import {
   CLAUDE_ARTIFACT_LAYOUTS,
   CLAUDE_ARTIFACT_SCOPES,
   CLAUDE_ARTIFACTS_SCHEDULES,
+  DEFAULT_LAYOUT,
   ERROR_TEXT,
   filterClaudeArtifacts,
   freshness,
@@ -27,6 +28,7 @@ import { readPref, useFeed, useNow, writePref } from '../store.tsx';
 import { ArtifactThumb } from './ArtifactThumb.tsx';
 import { Loader } from './brand.tsx';
 import { Button, Empty, ErrorNote, Icon, Loading, Picker, Segmented, type IconName } from './ui.tsx';
+import { PageToolbar, RefreshButton, SearchField } from './ui/feedback.tsx';
 
 // Ben's claude.ai Artifacts (apps/server/claude-artifacts.ts): the list on the Artifacts page's claude.ai switch and the
 // phone Library's, as rows or a grid of cards. Opening one leaves Omni on its https link: a new tab in a browser,
@@ -99,15 +101,18 @@ export function ArtifactTypeBadge({ type }: { type: string | null }) {
   );
 }
 
-/** When the list was fetched, with Refresh. Warns once it is a day old; says so while a run is going. */
-export function FreshnessLine({ state, onRefresh, compact }: { state: ClaudeArtifactsState; onRefresh: () => void; compact?: boolean }) {
+/** When the list was fetched and how many it found, or that a run is going. */
+function freshnessText(state: ClaudeArtifactsState, now: number) {
+  if (state.refreshing) return 'Refreshing from claude.ai';
+  if (freshness(state, now) === 'never') return 'Not fetched yet';
+  return `Fetched ${relTime(state.last_success_at!, now)}${state.total != null ? ` · ${state.total} artifacts` : ''}`;
+}
+
+/** When the list was fetched, with Refresh when `onRefresh` is given. Warns once it is a day old; says so while a run is going. */
+export function FreshnessLine({ state, onRefresh, compact }: { state: ClaudeArtifactsState; onRefresh?: () => void; compact?: boolean }) {
   const now = useNow(60_000);
   const fresh = freshness(state, now);
-  const text = state.refreshing
-    ? 'Refreshing from claude.ai'
-    : fresh === 'never'
-      ? 'Not fetched yet'
-      : `Fetched ${relTime(state.last_success_at!, now)}${state.total != null ? ` · ${state.total} artifacts` : ''}`;
+  const text = freshnessText(state, now);
   return (
     <div className="flex min-w-0 items-center gap-2 text-[12px] text-fg-3" aria-live="polite">
       {state.refreshing ? <Loader size={12} /> : fresh === 'stale' ? <Icon name="alert" size={13} className="text-needs" /> : <Icon name="clock" size={13} />}
@@ -115,9 +120,11 @@ export function FreshnessLine({ state, onRefresh, compact }: { state: ClaudeArti
         {text}
         {fresh === 'stale' && !state.refreshing && ', over a day ago'}
       </span>
-      <Button size="sm" variant="ghost" icon="refresh" busy={state.refreshing} onClick={onRefresh} className={compact ? 'ml-auto' : ''}>
-        Refresh
-      </Button>
+      {onRefresh && (
+        <Button size="sm" variant="ghost" icon="refresh" busy={state.refreshing} onClick={onRefresh} className={compact ? 'ml-auto' : ''}>
+          Refresh
+        </Button>
+      )}
     </div>
   );
 }
@@ -154,7 +161,7 @@ export function ClaudeArtifactRow({ a, now }: { a: ClaudeArtifact; now: number }
           )}
         </div>
       </div>
-      <Icon name="arrowUpRight" size={15} className="shrink-0 text-fg-4 transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2" />
+      <Icon name="arrowUpRight" size={15} className="shrink-0 text-fg-3 transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2" />
     </li>
   );
 }
@@ -170,7 +177,7 @@ function PreviewTile({ a, compact }: { a: ClaudeArtifact; compact?: boolean }) {
     return <ArtifactThumb a={{ id: p.artifact_id, kind: p.file_kind as Artifact['kind'], updated_at: p.updated_at }} />;
   }
   return (
-    <div className="flex h-full w-full items-center justify-center text-fg-4">
+    <div className="flex h-full w-full items-center justify-center text-fg-3">
       <Icon name={typeIcon(p.type)} size={compact ? 24 : 28} strokeWidth={1.25} />
     </div>
   );
@@ -179,10 +186,10 @@ function PreviewTile({ a, compact }: { a: ClaudeArtifact; compact?: boolean }) {
 /** One page as a grid card: its preview, title, badges, and the thread that published it. Opens like a row. */
 export function ClaudeArtifactCard({ a, now, compact }: { a: ClaudeArtifact; now: number; compact?: boolean }) {
   return (
-    <li className={`group relative flex min-w-0 flex-col rounded-[22px] bg-surface p-1.5 ${PRESSABLE}`}>
-      <div className="relative aspect-[16/10] overflow-hidden rounded-[16px] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]">
+    <li className={`group relative flex min-w-0 flex-col rounded-[var(--r-xl)] bg-surface p-1.5 ${PRESSABLE}`}>
+      <div className="relative aspect-[16/10] overflow-hidden rounded-[var(--r-lg)] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]">
         <PreviewTile a={a} compact={compact} />
-        <span className="absolute top-2 right-2 grid h-6 w-6 place-items-center rounded-full bg-elev text-fg-4 shadow-[var(--shadow-card)] transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2">
+        <span className="absolute top-2 right-2 grid h-6 w-6 place-items-center rounded-full bg-elev text-fg-3 shadow-[var(--shadow-card)] transition-colors group-hover:text-fg-2 group-has-[a:focus-visible]:text-fg-2">
           <Icon name="arrowUpRight" size={13} />
         </span>
       </div>
@@ -215,16 +222,24 @@ export function ClaudeArtifactCard({ a, now, compact }: { a: ClaudeArtifact; now
   );
 }
 
-/** The saved choice between rows and cards, the same on every page that shows the list in this browser. */
-function useLayout(): [ClaudeArtifactsLayout, (l: ClaudeArtifactsLayout) => void] {
-  const [layout, setLayout] = useState(() => parseLayout(readPref<unknown>(LAYOUT_PREF, null)));
+/** A saved choice between rows and cards, the same on every page that reads `key` in this browser. */
+export function useLayoutPref(key: string, fallback: ClaudeArtifactsLayout): [ClaudeArtifactsLayout, (l: ClaudeArtifactsLayout) => void] {
+  const [layout, setLayout] = useState(() => {
+    const saved = readPref<unknown>(key, null);
+    return saved == null ? fallback : parseLayout(saved);
+  });
   return [
     layout,
     (l) => {
       setLayout(l);
-      writePref(LAYOUT_PREF, l);
+      writePref(key, l);
     },
   ];
+}
+
+/** Rows or cards, for a toolbar's right slot. */
+export function LayoutSwitch({ value, onChange }: { value: ClaudeArtifactsLayout; onChange: (l: ClaudeArtifactsLayout) => void }) {
+  return <Segmented label="Layout" value={value} onChange={onChange} size="sm" radio options={CLAUDE_ARTIFACT_LAYOUTS.map((l) => ({ id: l.id, icon: LAYOUT_ICON[l.id], title: l.label }))} />;
 }
 
 function ErrorState({ state, onRetry }: { state: ClaudeArtifactsState; onRetry: () => void }) {
@@ -248,7 +263,7 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<ClaudeArtifactScopeFilter>('all');
   const [type, setType] = useState('all');
-  const [layout, setLayout] = useLayout();
+  const [layout, setLayout] = useLayoutPref(LAYOUT_PREF, DEFAULT_LAYOUT);
   const items = res.data?.items ?? [];
   const state = res.data?.state;
   const types = useMemo(() => typesIn(items), [items]);
@@ -261,58 +276,45 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
   if (res.error && !res.data) return <ErrorNote onRetry={res.reload}>{res.error}</ErrorNote>;
   if (!state) return <Loading />;
 
-  const filters = (
-    <div className={`flex min-w-0 flex-wrap items-center gap-2 ${compact ? '' : 'md:gap-3'}`}>
-      <label className={`flex h-9 min-w-0 items-center gap-2 rounded-full bg-surface px-3 text-fg-3 focus-within:shadow-[inset_0_0_0_1px_var(--line-strong)] ${compact ? 'w-full' : 'w-full sm:w-64'}`}>
-        <Icon name="search" size={14} />
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && setQ('')}
-          placeholder="Search claude.ai artifacts"
-          aria-label="Search claude.ai artifacts"
-          className="min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-3"
-        />
-      </label>
-      <Segmented
-        label="Whose"
-        value={scope}
-        onChange={setScope}
-        size="sm"
-        options={CLAUDE_ARTIFACT_SCOPES.map((s) => ({
-          id: s.id,
-          label: s.label,
-          badge: counts[s.id] ? <span className="font-num text-[10.5px] text-fg-4 tabular-nums">{counts[s.id]}</span> : undefined,
-        }))}
-      />
-      {types.length > 0 && (
-        <Picker
-          label="Type"
-          value={type}
-          onChange={setType}
-          options={[{ value: 'all', label: 'All types', avatar: false }, ...types.map((t) => ({ value: t, label: typeLabel(t), icon: typeIcon(t), avatar: false as const }))]}
-        />
-      )}
-      <Segmented
-        label="Layout"
-        value={layout}
-        onChange={setLayout}
-        size="sm"
-        radio
-        className="ml-auto"
-        options={CLAUDE_ARTIFACT_LAYOUTS.map((l) => ({ id: l.id, icon: LAYOUT_ICON[l.id], title: l.label }))}
-      />
-    </div>
-  );
-
+  const fresh = freshness(state, now);
   const never = !state.last_success_at;
   return (
     <div className="min-w-0">
-      <div className="mb-3 flex min-w-0 flex-col gap-3">
-        {filters}
-        <FreshnessLine state={state} onRefresh={res.refresh} compact={compact} />
-      </div>
+      <PageToolbar
+        className="mb-3"
+        right={
+          <>
+            <LayoutSwitch value={layout} onChange={setLayout} />
+            <RefreshButton onClick={res.refresh} busy={state.refreshing} status={freshnessText(state, now)} label="Refresh from claude.ai" />
+          </>
+        }
+      >
+        <SearchField value={q} onChange={setQ} placeholder="Search claude.ai artifacts" label="Search claude.ai artifacts" />
+        <Segmented
+          label="Whose"
+          value={scope}
+          onChange={setScope}
+          size="sm"
+          options={CLAUDE_ARTIFACT_SCOPES.map((s) => ({
+            id: s.id,
+            label: s.label,
+            badge: counts[s.id] ? <span className="font-num text-[10.5px] text-fg-3 tabular-nums">{counts[s.id]}</span> : undefined,
+          }))}
+        />
+        {types.length > 0 && (
+          <Picker
+            label="Type"
+            value={type}
+            onChange={setType}
+            options={[{ value: 'all', label: 'All types', avatar: false }, ...types.map((t) => ({ value: t, label: typeLabel(t), icon: typeIcon(t), avatar: false as const }))]}
+          />
+        )}
+      </PageToolbar>
+      {fresh === 'stale' && !state.refreshing && (
+        <div className="mb-3">
+          <FreshnessLine state={state} />
+        </div>
+      )}
       <ErrorState state={state} onRetry={res.refresh} />
       {res.actionError && <ErrorNote className="mb-3">{res.actionError}</ErrorNote>}
       {never && state.refreshing ? (
@@ -332,21 +334,21 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
           ))}
         </ul>
       ) : (
-        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-[22px] bg-surface" aria-label="claude.ai artifacts">
+        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-[var(--r-xl)] bg-surface" aria-label="claude.ai artifacts">
           {list.map((a) => (
             <ClaudeArtifactRow key={a.id} a={a} now={now} />
           ))}
         </ul>
       )}
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-[12px] text-fg-3">
-        <span>Auto refresh</span>
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-[length:var(--fs-12)] text-fg-3">
+        <span>Refresh automatically</span>
         <Picker
-          label="Auto refresh"
+          label="Refresh automatically"
           value={state.schedule}
           onChange={res.setSchedule}
           options={CLAUDE_ARTIFACTS_SCHEDULES.map((s) => ({ value: s.id, label: s.label, avatar: false as const }))}
         />
-        <span className="basis-full text-fg-4 sm:basis-auto">Listed by Claude Code under your own login, about a tenth of a cent of usage per run.</span>
+        <span className="basis-full sm:basis-auto">Claude Code lists these under your own login. Each refresh costs about a tenth of a cent of usage.</span>
       </div>
     </div>
   );

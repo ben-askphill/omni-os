@@ -58,7 +58,10 @@ export function SettingsNav({ section }: { section: SettingsSectionId }) {
                       aria-current={current ? 'page' : undefined}
                       className={`flex h-8 items-center gap-2.5 rounded-[12px] px-3 text-[13px] ${current ? 'bg-surface-2 text-fg' : 'text-fg-2 hover:bg-surface hover:text-fg'}`}
                     >
-                      <Icon name={d.icon as IconName} size={15} className={current ? 'text-fg' : 'text-fg-3'} />
+                      {/* A fixed slot, so every label starts on one line whatever its icon draws. */}
+                      <span className="grid w-4 shrink-0 place-items-center">
+                        <Icon name={d.icon as IconName} size={15} className={current ? 'text-fg' : 'text-fg-3'} />
+                      </span>
                       <span className="truncate">{d.title}</span>
                     </a>
                   </li>

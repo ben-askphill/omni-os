@@ -247,7 +247,7 @@ function FileChip({ name, size, disabled, onRemove }: { name: string; size: numb
     <span className="flex h-8 max-w-[15rem] items-center gap-1.5 rounded-full bg-surface-2 pr-0.5 pl-2.5 text-[12px]">
       <Icon name="file" size={13} className="text-fg-3" />
       <span className="min-w-0 truncate font-medium text-fg-2">{name}</span>
-      <span className="font-num text-[10.5px] text-fg-4">{bytes(size)}</span>
+      <span className="font-num text-[10.5px] text-fg-3">{bytes(size)}</span>
       <IconButton icon="x" label={`Remove ${name}`} size={12} className="h-6 w-6" disabled={disabled} onClick={onRemove} />
     </span>
   );
@@ -349,7 +349,7 @@ export function PendingBubble({
       <div className="flex w-full flex-col items-end opacity-70">
         <div className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-fg-3">
           <Icon name={icon} size={12} /> {label}
-          {files.length && !threadId ? <span className="text-fg-4">· {plural(files.length, 'file')}</span> : null}
+          {files.length && !threadId ? <span className="text-fg-3">· {plural(files.length, 'file')}</span> : null}
         </div>
         {threadId && files.length ? <Attachments threadId={threadId} items={files} href={href} /> : null}
         <ContextChips records={m.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />

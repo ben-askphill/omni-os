@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SecretRow } from '../api.ts';
 import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
 import { StaticMark } from '../components/brand.tsx';
 import { href } from '../router.ts';
 import { useApp, useSecretStoreLabel } from '../store.tsx';
-import { Origin } from './settings-parts.tsx';
+import { Card, FootNote } from './settings-parts.tsx';
 
 const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
 
@@ -22,21 +22,20 @@ function scopeLabel(scope: string, name: (id: string) => string | undefined) {
   return `#${name(id) ?? id}`;
 }
 
-// Settings, Secrets: the names by scope, a form that adds or replaces one, and the known global ones. With a channel
-// in Settings' scope (`scoped`), the list is what that channel's threads get: its own secrets, each marked where it
-// overrides a global one, then the global ones it inherits; the form saves to that channel.
-export function SecretsSection({ scoped }: { scoped?: string }) {
+// Settings, Secrets: a form that adds or replaces one, the known ones Omni itself uses, then the names by scope, each
+// with Delete behind a confirm and an undo. A channel's secret overrides a global one with the same name.
+export function SecretsSection() {
   const { channels, channel, status, reloadStatus } = useApp();
   const res = useApi<SecretRow[]>('/secrets');
   const store = useSecretStoreLabel();
 
-  const [scope, setScope] = useState(scoped ? `channel:${scoped}` : 'global');
-  useEffect(() => setScope(scoped ? `channel:${scoped}` : 'global'), [scoped]);
+  const [scope, setScope] = useState('global');
   const [name, setName] = useState('');
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
 
   const [deleteError, setDeleteError] = useState<{ key: string; msg: string } | null>(null);
 
@@ -44,21 +43,14 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
 
   const groups = useMemo(() => {
     const m = new Map<string, SecretRow[]>();
-    // A channel in scope: its own rows, then the global ones whose names it does not set.
-    const all = res.data ?? [];
-    const own = scoped ? all.filter((s) => s.scope === `channel:${scoped}`) : null;
-    const rowsShown = own ? [...own, ...all.filter((s) => s.scope === 'global' && !own.some((o) => o.name === s.name))] : all;
-    for (const s of rowsShown) {
+    for (const s of res.data ?? []) {
       const list = m.get(s.scope) ?? [];
       list.push(s);
       m.set(s.scope, list);
     }
     // Global first, then channels alphabetically.
-    const sorted = [...m.entries()].sort(([a], [b]) => (a === 'global' ? -1 : b === 'global' ? 1 : a.localeCompare(b)));
-    // In a channel's scope its own come first.
-    return own ? sorted.reverse() : sorted;
-  }, [res.data, scoped]);
-  const globalNames = useMemo(() => new Set((res.data ?? []).filter((s) => s.scope === 'global').map((s) => s.name)), [res.data]);
+    return [...m.entries()].sort(([a], [b]) => (a === 'global' ? -1 : b === 'global' ? 1 : a.localeCompare(b)));
+  }, [res.data]);
 
   const nameValid = NAME_RE.test(name);
   const exists = (res.data ?? []).some((s) => s.scope === scope && s.name === name);
@@ -74,7 +66,7 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
     try {
       await api.post('/secrets', { scope, name, value });
       setValue('');
-      setSavedMsg(`${exists ? 'Updated' : 'Saved'} ${name} (${scopeLabel(scope, channelName)})`);
+      setSavedMsg(`${exists ? 'Replaced' : 'Added'} ${name} (${scopeLabel(scope, channelName)})`);
       setName('');
       res.reload();
       void reloadStatus();
@@ -106,27 +98,63 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
 
   return (
     <>
-      <div className="flex gap-3 rounded-[20px] bg-surface p-4 text-[12.5px] leading-relaxed text-fg-2">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
-          <Icon name="lock" size={15} />
-        </span>
-        <div>
-          Values live in {store}
-          {status?.secretStore !== 'file' && (
-            <>
-              {' '}
-              under the service <span className="font-mono text-[12px]">omni-os</span>
-            </>
-          )}
-          . A thread gets them as environment variables when it
-          runs. A channel secret overrides a global one with the same name. Sync credentials{status?.grokBot ? ' and the Grok Bot webhook' : ''} stay on the server, so a thread never sees them.
-          Omni never shows a value again after you save it. To change one, save it again with the same name.
-        </div>
-      </div>
+      <form onSubmit={save} autoComplete="off">
+        <Card title="Add or replace" subtitle="A channel secret overrides a global one with the same name. Omni never shows a value again after you add it.">
+          <div className="grid gap-3 sm:grid-cols-[1fr_1.2fr]">
+            <div>
+              <Label htmlFor="sec-scope">Scope</Label>
+              <Picker id="sec-scope" label="Scope" size="field" value={scope} onChange={setScope} options={scopeOptions} searchable={scopeOptions.length > 7} />
+            </div>
+            <div>
+              <Label htmlFor="sec-name">Name</Label>
+              <input
+                id="sec-name"
+                ref={nameInput}
+                className="field h-10 font-mono !text-[13px]"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_'));
+                  setSavedMsg(null);
+                }}
+                placeholder="SHOPIFY_ADMIN_TOKEN"
+                spellCheck={false}
+                autoCapitalize="characters"
+                autoComplete="off"
+                aria-invalid={!!name && !nameValid}
+              />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="sec-value" hint={exists ? 'A secret with this name exists in this scope. Saving replaces it.' : undefined}>
+              Value
+            </Label>
+            <input
+              id="sec-value"
+              type="password"
+              autoComplete="new-password"
+              className="field h-10 font-mono !text-[13px]"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Paste the value"
+              spellCheck={false}
+              data-1p-ignore
+              data-lpignore="true"
+            />
+          </div>
+          {formError && <ErrorNote>{formError}</ErrorNote>}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <span className="min-w-0 flex-1 text-[12.5px] text-fg-3" role="status">
+              {savedMsg ?? 'Saving the same name again replaces the value.'}
+            </span>
+            <Button type="submit" variant="primary" size="sm" icon="key" busy={saving} disabled={!name || !value}>
+              {exists ? 'Replace secret' : 'Add secret'}
+            </Button>
+          </div>
+        </Card>
+      </form>
 
-      <div className="space-y-2">
-        <div className="caption px-1">Known global secrets</div>
-        <ul className="space-y-2">
+      <Card title="Known secrets" subtitle="Secrets Omni itself uses. Pick one to fill in the form.">
+        <ul className="divide-y divide-line">
           {KNOWN_GLOBALS.filter((k) => !k.grok || status?.grokBot).map((k) => {
             const saved = (res.data ?? []).some((s) => s.scope === 'global' && s.name === k.name);
             return (
@@ -138,126 +166,97 @@ export function SecretsSection({ scoped }: { scoped?: string }) {
                     setName(k.name);
                     setSavedMsg(null);
                     setFormError(null);
+                    nameInput.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
                   }}
-                  className="press flex w-full items-center gap-3 rounded-[18px] bg-surface px-3 py-2.5 text-left"
+                  className="group flex w-full items-center gap-3 py-2.5 text-left"
                 >
-                  <span className="font-mono text-[12.5px]">{k.name}</span>
-                  {saved && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-fg-2"><StatusDot status="done" size={7} /> saved</span>}
-                  <span className="min-w-0 flex-1 text-[12px] leading-snug text-fg-3">{k.blurb}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-mono text-[12.5px] group-hover:underline group-hover:underline-offset-2">{k.name}</span>
+                    <span className="mt-0.5 block text-[12.5px] leading-snug text-fg-3">{k.blurb}</span>
+                  </span>
+                  <span className="inline-flex w-20 shrink-0 items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">
+                    {saved ? (
+                      <>
+                        <StatusDot status="done" size={7} /> Saved
+                      </>
+                    ) : (
+                      <span className="text-fg-3">Not set</span>
+                    )}
+                  </span>
+                  <Icon name="chevronRight" size={14} className="shrink-0 text-fg-3" />
                 </button>
               </li>
             );
           })}
         </ul>
-      </div>
-
-      <form onSubmit={save} className="space-y-4 rounded-[24px] p-5 shadow-[inset_0_0_0_1px_var(--line)]" autoComplete="off">
-        <h2 className="font-display text-[16px]">Add or replace</h2>
-        <div className="grid gap-3 sm:grid-cols-[1fr_1.2fr]">
-          <div>
-            <Label>Scope</Label>
-            <Picker label="Scope" value={scope} onChange={setScope} options={scopeOptions} searchable={scopeOptions.length > 7} className="w-full" />
-          </div>
-          <div>
-            <Label htmlFor="sec-name">Name</Label>
-            <input
-              id="sec-name"
-              className="field font-mono !text-[13px]"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_'));
-                setSavedMsg(null);
-              }}
-              placeholder="SHOPIFY_ADMIN_TOKEN"
-              spellCheck={false}
-              autoCapitalize="characters"
-              autoComplete="off"
-              aria-invalid={!!name && !nameValid}
-            />
-          </div>
-        </div>
-        <div>
-          <Label htmlFor="sec-value" hint={exists ? 'A secret with this name exists in this scope. Saving replaces it.' : undefined}>
-            Value
-          </Label>
-          <input
-            id="sec-value"
-            type="password"
-            autoComplete="new-password"
-            className="field font-mono !text-[13px]"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Paste the value"
-            spellCheck={false}
-            data-1p-ignore
-            data-lpignore="true"
-          />
-        </div>
-        {formError && <ErrorNote>{formError}</ErrorNote>}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" variant="primary" icon="key" busy={saving} disabled={!name || !value}>
-            {exists ? 'Replace secret' : 'Save secret'}
-          </Button>
-          {savedMsg && (
-            <span className="pop-in inline-flex items-center gap-1.5 text-[12.5px] text-fg-2">
-              <StatusDot status="done" /> {savedMsg}
-            </span>
-          )}
-        </div>
-      </form>
+      </Card>
 
       {res.error ? (
         <ErrorNote onRetry={res.reload}>{res.error}</ErrorNote>
       ) : !res.data ? (
         <Loading />
       ) : groups.length === 0 ? (
-        <Empty icon="key" title={scoped ? 'No secrets reach this channel' : 'No secrets yet'}>
+        <Empty icon="key" title="No secrets yet">
           Add a token above, for example a Shopify Admin API token scoped to the client's channel.
         </Empty>
       ) : (
-        <div className="space-y-4">
-          {groups.map(([sc, rows]) => (
-            <section key={sc}>
-              <h3 className="caption mb-2 flex items-center gap-2 px-2">
+        groups.map(([sc, rows], i) => (
+          <Card
+            key={sc}
+            title={
+              <>
                 {sc === 'global' ? (
-                  scoped ? 'Inherited from Global' : 'Global'
+                  'Global'
                 ) : (
-                  <a href={href.channel(sc.replace(/^channel:/, ''))} className="hover:text-fg">
+                  <a href={href.channel(sc.replace(/^channel:/, ''))} className="hover:underline hover:underline-offset-2">
                     {scopeLabel(sc, channelName)}
                   </a>
-                )}
-                <span className="text-fg-4/70">{rows.length}</span>
-              </h3>
-              <ul className="rounded-[20px] bg-surface p-1.5">
-                {rows.map((s) => {
-                  const key = `${s.scope}/${s.name}`;
-                  return (
-                    <li key={s.name} className="rounded-2xl px-2.5 py-1.5">
-                      <div className="flex min-h-9 items-center gap-3">
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg text-fg-4">
-                          <Icon name="key" size={13} />
-                        </span>
-                        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{s.name}</span>
-                        {scoped &&
-                          (s.scope === 'global' ? (
-                            <Origin of="inherited" label="Global" />
-                          ) : (
-                            <Origin of="channel" label={globalNames.has(s.name) ? 'Overrides global' : 'Set on this channel'} />
-                          ))}
-                        <span className="hidden shrink-0 font-num text-[11px] text-fg-4 sm:inline" title={s.updated_at}>
-                          {relTime(s.updated_at)}
-                        </span>
-                        <InlineConfirm label="Delete" icon="trash" confirmLabel="Delete" doneLabel="Deleted" busyLabel="Deleting" undoMs={5000} onConfirm={() => remove(s)} />
+                )}{' '}
+                <span className="font-num text-fg-3">· {rows.length}</span>
+              </>
+            }
+            subtitle={i === 0 ? `Deleting a secret removes it from ${store}. Threads that use it fail until you add it again.` : undefined}
+          >
+            <ul className="divide-y divide-line">
+              {rows.map((s) => {
+                const key = `${s.scope}/${s.name}`;
+                return (
+                  <li key={s.name} className="py-1.5">
+                    <div className="flex min-h-9 items-center gap-3">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
+                        <Icon name="key" size={13} />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{s.name}</span>
+                      <span className="hidden shrink-0 font-num text-[12px] whitespace-nowrap text-fg-3 sm:inline" title={s.updated_at}>
+                        {relTime(s.updated_at)}
+                      </span>
+                      <InlineConfirm tone="danger" label="Delete" confirmLabel="Delete" doneLabel="Deleted" busyLabel="Deleting" undoMs={5000} onConfirm={() => remove(s)} />
+                    </div>
+                    {deleteError?.key === key && (
+                      <div className="pt-1 pb-1 pl-10 text-[12.5px] text-fg-2">
+                        <StatusDot status="needs" size={7} className="mr-1.5" />
+                        {deleteError.msg}
                       </div>
-                      {deleteError?.key === key && <div className="pt-1 pb-1 pl-10 text-[12px] text-fg-2"><StatusDot status="needs" size={7} className="mr-1.5" />{deleteError.msg}</div>}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
-        </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        ))
       )}
+
+      <FootNote>
+        Values live in {store}
+        {status?.secretStore !== 'file' && (
+          <>
+            {' '}
+            under the service <span className="font-mono text-[12px]">omni-os</span>
+          </>
+        )}
+        . A thread gets them as environment variables when it runs. Sync credentials{status?.grokBot ? ' and the Grok Bot webhook' : ''} stay on the server, so a
+        thread never sees them.
+      </FootNote>
     </>
   );
 }

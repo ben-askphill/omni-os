@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 
 import { relTime } from '@omni/shared/format.ts';
 import { useApi, type SearchHit } from '../api.ts';
 import { Empty, ErrorNote, Icon, Loading, PageHeader, StatusDot } from '../components/ui.tsx';
+import { pageColumn } from '../components/ui/feedback.tsx';
 import { plural, safeSnippet } from '../format.ts';
 import { href, navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -27,8 +28,8 @@ export function SearchPage({ q }: { q: string }) {
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader width="max-w-3xl" title="Search" subtitle="Titles, prompts, replies and tool output across every channel." />
-      <div className="mx-auto max-w-3xl px-4 pt-2 pb-16 md:px-8">
+      <PageHeader width="measure" title="Search" subtitle="Titles, prompts, replies and tool output across every channel." />
+      <div className={`${pageColumn('measure')} pt-2 pb-16`}>
         <form onSubmit={submit} className="relative">
           <Icon name="search" size={17} className="pointer-events-none absolute top-1/2 left-4.5 -translate-y-1/2 text-fg-3" />
           <input
@@ -59,6 +60,7 @@ export function SearchPage({ q }: { q: string }) {
             <>
               <div className="caption mb-2 px-3.5">
                 {hits.length >= 40 ? 'Top 40 results' : plural(hits.length, 'result')}
+                {hits.length > 1 && ' · best match first'}
               </div>
               <ul className="rise">
                 {hits.map((h, i) => (
@@ -66,9 +68,9 @@ export function SearchPage({ q }: { q: string }) {
                     <a href={h.event_id ? href.threadAt(h.thread_id, h.event_id) : href.thread(h.thread_id)} className="hov block rounded-[18px] px-3.5 py-3 [--hov:var(--surface)]">
                       <div className="flex min-w-0 items-center gap-2">
                         <StatusDot status={h.status} />
-                        <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{h.title}</span>
-                        <span className="shrink-0 rounded-full bg-surface-2 px-2 text-[11.5px] leading-5 text-fg-2">#{channel(h.channel_id)?.name ?? h.channel_id}</span>
-                        <span className="w-16 shrink-0 text-right font-num text-[11px] text-fg-4">{relTime(h.updated_at)}</span>
+                        <span className="min-w-0 flex-1 truncate text-[length:var(--fs-body)] font-medium">{h.title}</span>
+                        <span className="shrink-0 rounded-full bg-surface-2 px-2 text-[11.5px] leading-5 text-fg-2" title={channel(h.channel_id)?.name}>#{h.channel_id}</span>
+                        <span className="shrink-0 pl-1 font-num text-[12px] whitespace-nowrap text-fg-3 tabular-nums">{relTime(h.updated_at)}</span>
                       </div>
                       {h.snippet && (
                         <p

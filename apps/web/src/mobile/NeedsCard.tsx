@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, errorText, type PendingMsg, type Thread } from '../api.ts';
-import { Button } from '../components/ui.tsx';
+import { Button, asksForYou } from '../components/ui.tsx';
 import { LIMIT_ACTION } from '../limits.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -64,7 +64,7 @@ export function NeedsActions({ card, size = 'lg', onRecovered }: { card: NeedsCa
         <Button
           key={a.label}
           size={size}
-          variant={i ? 'secondary' : card.glyph === 'needs' ? 'needs' : 'primary'}
+          variant={i ? 'secondary' : asksForYou(card.glyph) ? 'needs' : 'primary'}
           busy={busy === a}
           disabled={!!busy}
           onClick={() => void run(card, a)}

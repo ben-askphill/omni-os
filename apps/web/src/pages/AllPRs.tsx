@@ -4,6 +4,7 @@ import { DEFAULT_PR_QUERY, isNarrowed, queryPRs, type PRQuery } from '@omni/shar
 import { prBadge } from '@omni/shared/thread-glance.ts';
 import { useApi, type AllPRs, type Async, type ListedPR } from '../api.ts';
 import { Button, Chip, Empty, ErrorNote, Icon, Loading, PageHeader } from '../components/ui.tsx';
+import { pageColumn } from '../components/ui/feedback.tsx';
 import { ChecksSummary } from './PRs.tsx';
 import { PRGroupHead, PRToolbar, type SetPRQuery } from './PRToolbar.tsx';
 
@@ -35,15 +36,45 @@ export function usePRQuery(data: AllPRs | undefined) {
 /** What the list says when the toolbar leaves no PR. */
 export const noMatchText = (q: PRQuery) => (isNarrowed(q) ? 'No pull request matches this search and these filters.' : `No pull requests in ${q.repo}.`);
 
+/** What every listed PR shares, so the rows can leave it out: one repo, and whether any has checks. */
+export function sharedColumns(prs: ListedPR[]) {
+  const repos = new Set(prs.map((p) => p.repo));
+  return {
+    repo: repos.size === 1 ? prs[0].repo : null,
+    checks: prs.some((p) => p.checks.passed || p.checks.failed || p.checks.pending),
+  };
+}
+
+function Subtitle({ prs }: { prs: ListedPR[] | undefined }) {
+  const lead = 'Pull requests from every channel’s repo.';
+  if (!prs?.length) return <>{lead}</>;
+  const { repo, checks } = sharedColumns(prs);
+  const n = prs.length;
+  return (
+    <>
+      {lead}
+      {repo && (
+        <>
+          {' '}
+          {n === 1 ? 'It is' : `All ${n} are`} in <span className="font-mono text-[length:var(--fs-code)] text-fg-2">{repo}</span>
+          {checks ? '.' : ` and ${n === 1 ? 'has' : 'have'} no checks yet.`}
+        </>
+      )}
+      {!repo && !checks && ` None ${n === 1 ? 'has' : 'have'} checks yet.`}
+    </>
+  );
+}
+
 export function AllPRsPage() {
   const q = useAllPRs();
   const empty = allPRsEmpty(q);
   const failed = q.data?.failed ?? [];
   const { q: query, set, groups } = usePRQuery(q.data);
+  const shared = q.data?.prs.length ? sharedColumns(q.data.prs) : { repo: null, checks: true };
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader title="Pull requests" subtitle="Every channel’s repo." width="max-w-4xl" />
-      <div className="mx-auto max-w-4xl px-4 pb-16 md:px-8">
+      <PageHeader title="Pull requests" subtitle={<Subtitle prs={q.data?.prs} />} width="page" />
+      <div className={`${pageColumn('page')} pb-16`}>
         {empty?.kind === 'error' ? (
           <ErrorNote onRetry={q.reload}>{empty.text}</ErrorNote>
         ) : empty?.kind === 'loading' ? (
@@ -72,7 +103,7 @@ export function AllPRsPage() {
                 <section key={g.key} className="rise mt-4" aria-label={g.label}>
                   <PRGroupHead g={g} className="mb-1 px-3.5" />
                   {g.prs.map((p, i) => (
-                    <AllPRRow key={`${p.repo}#${p.number}`} p={p} i={i} />
+                    <AllPRRow key={`${p.repo}#${p.number}`} p={p} i={i} showRepo={!shared.repo} showChecks={shared.checks} />
                   ))}
                 </section>
               ))
@@ -84,28 +115,30 @@ export function AllPRsPage() {
   );
 }
 
-function AllPRRow({ p, i }: { p: ListedPR; i: number }) {
+function AllPRRow({ p, i, showRepo, showChecks }: { p: ListedPR; i: number; showRepo: boolean; showChecks: boolean }) {
   const b = prBadge(p);
   return (
-    <a href={p.url} target="_blank" rel="noreferrer" style={{ '--i': i } as CSSProperties} className="hov block rounded-[18px] px-3.5 py-3 [--hov:var(--surface)]">
+    <a href={p.url} target="_blank" rel="noreferrer" style={{ '--i': i } as CSSProperties} className="hov block rounded-[var(--r-lg)] px-3.5 py-3 [--hov:var(--surface)]">
       <div className="flex min-w-0 items-center gap-2">
-        <Icon name="pr" size={14} className={b.label === 'open' ? 'text-live-text' : b.label === 'merged' ? 'text-fg-2' : 'text-fg-4'} />
-        <span className="min-w-0 truncate text-[14px] font-medium">{p.title}</span>
-        <span className="shrink-0 font-num text-[11.5px] text-fg-4">#{p.number}</span>
+        <Icon name="pr" size={14} className="text-fg-3" />
+        <span className="min-w-0 truncate text-[length:var(--fs-body)] font-medium">{p.title}</span>
+        <span className="shrink-0 font-num text-[length:var(--fs-code)] text-fg-3">#{p.number}</span>
         <Chip tone={b.tone}>{b.label}</Chip>
-        <span className="ml-auto shrink-0">
-          <ChecksSummary c={p.checks} />
-        </span>
+        {showChecks && (
+          <span className="ml-auto shrink-0">
+            <ChecksSummary c={p.checks} />
+          </span>
+        )}
       </div>
-      <div className="mt-0.5 flex min-w-0 items-center gap-x-3 pl-[22px] text-[12px] text-fg-3">
-        <span className="min-w-0 truncate font-mono text-[11.5px]">{p.repo}</span>
+      <div className="mt-0.5 flex min-w-0 items-center gap-x-3 pl-[22px] text-[length:var(--fs-12)] text-fg-3">
+        {showRepo && <span className="min-w-0 truncate font-mono text-[length:var(--fs-code)]">{p.repo}</span>}
         <span className="shrink-0">{p.author?.login ?? 'unknown'}</span>
         {(p.labels ?? []).map((l) => (
           <Chip key={l} tone="outline" className="hidden sm:inline-flex">
             {l}
           </Chip>
         ))}
-        <span className="ml-auto shrink-0 font-num text-[11px] text-fg-4">{relTime(p.updatedAt)}</span>
+        <span className="ml-auto shrink-0 font-num text-[length:var(--fs-meta)] text-fg-3">{relTime(p.updatedAt)}</span>
       </div>
     </a>
   );

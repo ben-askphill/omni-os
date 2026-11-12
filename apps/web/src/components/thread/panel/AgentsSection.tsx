@@ -4,7 +4,7 @@ import { type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import type { BackgroundTask, Thread } from '../../../api.ts';
 import { href } from '../../../router.ts';
 import { harnessLabel, HarnessLogo } from '../../brand.tsx';
-import { Icon, STATUS_LABEL, StatusDot, type IconName } from '../../ui.tsx';
+import { Icon, statusLabel, StatusDot, type IconName } from '../../ui.tsx';
 import { SubagentRow } from './RunningSubagents.tsx';
 import { isWorking } from '@omni/shared/delegate-count.ts';
 
@@ -35,7 +35,6 @@ function AgentLink({ to, title, mark, side, sub }: { to: string; title: string; 
 
 /** The card's element id: a delegate count in the sidebar opens Details scrolled to it. */
 export const AGENTS_CARD_ID = 'thread-agents';
-const statusText = (s: string) => STATUS_LABEL[s] ?? s;
 
 /**
  * Where the thread sits among its agents: the thread it came from (parent or continued from), what it handed on to,
@@ -53,7 +52,7 @@ export function AgentsSection({ parent, links, children, agents, onJump, now = D
       {lineage && (
         <>
           <div className="caption px-3 pt-2 pb-1">Lineage</div>
-          {parent && <AgentLink to={parent.id} title={parent.title} mark={<AgentMark icon="arrowUpRight" status={parent.status} />} sub="From" side={statusText(parent.status)} />}
+          {parent && <AgentLink to={parent.id} title={parent.title} mark={<AgentMark icon="arrowUpRight" status={parent.status} />} sub="From" side={statusLabel(parent.status)} />}
           {links.from && <AgentLink to={links.from.id} title={links.from.title} mark={<AgentMark harness={links.from.harness} status={links.from.status} />} sub="Continued from" side={relTime(links.from.created_at, now)} />}
           {links.into.map((l) => (
             <AgentLink key={l.id} to={l.id} title={l.title} mark={<AgentMark harness={l.harness} status={l.status} />} sub="Continued in" side={relTime(l.created_at, now)} />
@@ -85,7 +84,7 @@ export function AgentsSection({ parent, links, children, agents, onJump, now = D
             <Icon name="delegate" size={15} className="shrink-0 text-fg-3" />
             <span className="flex-1">Previous agents</span>
             <span className="font-num text-[11px] text-fg-3">{previous.length}</span>
-            <Icon name="chevronDown" size={13} className={`shrink-0 text-fg-4 transition-transform ${showPrev ? '' : '-rotate-90'}`} />
+            <Icon name="chevronDown" size={13} className={`shrink-0 text-fg-3 transition-transform ${showPrev ? '' : '-rotate-90'}`} />
           </button>
           {showPrev &&
             previous.map((c) => <AgentLink key={c.id} to={c.id} title={c.title} mark={<AgentMark harness={c.harness} status={c.status} />} side={relTime(c.updated_at, now)} />)}

@@ -2,7 +2,7 @@ import type { SettingsSectionId } from '@omni/shared/settings-catalog.ts';
 
 import { ModelsSection, ThreadsSection } from './AgentSections';
 import { ChannelsSection, WorkspaceSection, WorktreesSection } from './CodeSections';
-import { AccessSection, IntegrationsSection, MachinesSection, SyncSection } from './ConnectionSections';
+import { AccessSection, MachinesSection, SyncSection } from './ConnectionSections';
 import { AboutSection, AppearanceSection, GeneralSection } from './OmniSections';
 
 /**
@@ -20,7 +20,6 @@ const SECTIONS: Partial<Record<SettingsSectionId, () => React.JSX.Element>> = {
   machines: MachinesSection,
   sync: SyncSection,
   access: AccessSection,
-  integrations: IntegrationsSection,
   about: AboutSection,
 };
 

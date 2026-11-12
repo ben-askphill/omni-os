@@ -27,13 +27,13 @@ describe('what a channel avatar draws', () => {
     expect(face.kind === 'svg' && face.markup).not.toMatch(/<\?xml|<!--/);
   });
 
-  it('falls back to the first letter for no icon, an unknown icon or an SVG that could run or load', () => {
-    expect(channelFace('acme-store', null)).toEqual({ kind: 'letter', letter: 'A' });
-    expect(channelFace('acme', '  ')).toEqual({ kind: 'letter', letter: 'A' });
-    expect(channelFace('acme', 'icon:not-a-glyph')).toEqual({ kind: 'letter', letter: 'A' });
-    expect(channelFace('acme', 'svg:<svg><script>alert(1)</script></svg>')).toEqual({ kind: 'letter', letter: 'A' });
-    expect(channelFace('acme', 'svg:<svg><image href="https://evil.example/x.png"/></svg>')).toEqual({ kind: 'letter', letter: 'A' });
-    expect(channelFace('#!', null)).toEqual({ kind: 'letter', letter: '?' });
+  it('falls back to the monogram for no icon, an unknown icon or an SVG that could run or load', () => {
+    expect(channelFace('acme-store', null)).toEqual({ kind: 'letters', letters: 'AS' });
+    expect(channelFace('acme', '  ')).toEqual({ kind: 'letters', letters: 'AC' });
+    expect(channelFace('acme', 'icon:not-a-glyph')).toEqual({ kind: 'letters', letters: 'AC' });
+    expect(channelFace('acme', 'svg:<svg><script>alert(1)</script></svg>')).toEqual({ kind: 'letters', letters: 'AC' });
+    expect(channelFace('acme', 'svg:<svg><image href="https://evil.example/x.png"/></svg>')).toEqual({ kind: 'letters', letters: 'AC' });
+    expect(channelFace('#!', null)).toEqual({ kind: 'letters', letters: '?' });
   });
 
   it('draws the Omni mark for the Conductor whatever its icon', () => {

@@ -1,12 +1,34 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { ErrorNote } from './feedback.tsx';
+import { KbdHintText } from './overlay.tsx';
 import { Button, IconButton } from './primitives.tsx';
 import { useDismissable } from './use-dismissable.ts';
 
 // ---------- modal / confirm ----------
 
+/**
+ * The dimmed layer under every modal and the palette: the whole window, the channel rail included. In the desktop app
+ * it also lifts the window's drag regions under it, so a press on the dim closes the modal instead of moving the window.
+ */
+export const SCRIM = 'scrim fixed inset-0 z-50 flex justify-center [-webkit-app-region:no-drag]';
+
+/** A modal's actions along its bottom edge, the main one last, with the key that runs it on the left. */
+export function ModalFooter({ hint, children, className = '' }: { hint?: { keys: readonly string[]; label: string }; children: ReactNode; className?: string }) {
+  return (
+    <div className={`sticky bottom-0 flex items-center justify-end gap-2 border-t border-line bg-elev px-6 py-4 ${className}`}>
+      {hint && (
+        <span className="mr-auto">
+          <KbdHintText keys={hint.keys}>{hint.label}</KbdHintText>
+        </span>
+      )}
+      {children}
+    </div>
+  );
+}
+
 export function Modal({ open, onClose, children, title, wide }: { open: boolean; onClose: () => void; children: ReactNode; title?: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   useDismissable(open, onClose, { outside: false });
   // On open only. Callers pass a new onClose on each render, and the app re-renders whenever any thread moves: a
   // focus move on each of those took the caret out of the field Ben was typing in.
@@ -24,16 +46,19 @@ export function Modal({ open, onClose, children, title, wide }: { open: boolean;
   }, [open]);
   if (!open) return null;
   return (
-    <div className="scrim fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={`${SCRIM} items-end p-0 sm:items-center sm:p-6`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className={`modal-in max-h-[92vh] w-full overflow-auto rounded-t-[28px] bg-elev pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-menu)] sm:rounded-[28px] sm:pb-0 ${wide ? 'sm:max-w-5xl' : 'sm:max-w-md'}`}
       >
         {title && (
           <div className="flex items-center justify-between gap-3 py-3 pr-3 pl-6">
-            <div className="min-w-0 font-display text-[16px]">{title}</div>
+            <div id={titleId} className="min-w-0 font-display text-[length:var(--fs-heading)]">
+              {title}
+            </div>
             <IconButton icon="x" label="Close" onClick={onClose} />
           </div>
         )}
@@ -68,7 +93,7 @@ export function ConfirmDialog({
     <Modal open={open} onClose={busy ? () => {} : onCancel} title={title}>
       <div className="space-y-3 px-6 pt-1 pb-4 text-[13.5px] text-fg-2">{children}</div>
       {error && <ErrorNote className="mx-6 mb-3">{error}</ErrorNote>}
-      <div className="flex justify-end gap-2 px-5 pt-1 pb-5">
+      <ModalFooter>
         {/* Focus starts on Cancel: every confirm here is destructive, so a stray Enter must not fire it. */}
         <Button variant="secondary" onClick={onCancel} disabled={busy} data-autofocus>
           Cancel
@@ -76,7 +101,7 @@ export function ConfirmDialog({
         <Button variant={danger ? 'needs' : 'primary'} onClick={onConfirm} busy={busy}>
           {confirmLabel}
         </Button>
-      </div>
+      </ModalFooter>
     </Modal>
   );
 }

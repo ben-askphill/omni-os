@@ -1,7 +1,7 @@
 // The sidebar's Inbox view, T3 Code's default thread list: every thread in one list across channels, split into
 // shelves by what it waits on. Pure, so the rules are tested on their own (apps/web/tests/inbox.test.ts).
 import type { NeedsYouBlocker, NeedsYouItem, ThreadStub } from './api.ts';
-import type { Glyph } from './components/ui.tsx';
+import { STATUS, type Glyph } from '@omni/shared/status.ts';
 import { isWorking, showsRunning } from '@omni/shared/delegate-count.ts';
 
 export type InboxThread = ThreadStub & { pinned_at?: string | null; source?: string; archived?: number | boolean };
@@ -47,27 +47,29 @@ export interface RowStatus {
   label: string;
 }
 
-const BLOCKER_LABEL: Record<NeedsYouBlocker['kind'], string> = {
-  question: 'Input',
-  setup: 'Setup failed',
-  limited: 'Limited',
-  uncertain: 'Resume',
-  recovered: 'Resume',
+const BLOCKER_GLYPH: Record<NeedsYouBlocker['kind'], Glyph> = {
+  question: 'needs',
+  setup: 'failed',
+  limited: 'limited',
+  uncertain: 'needs',
+  recovered: 'needs',
 };
+
+const as = (glyph: Glyph): RowStatus => ({ glyph, label: STATUS[glyph].label });
 
 /** A blocker first, as T3 puts approvals and input ahead of work; then work in progress; then an unread result. */
 export function rowStatus(t: ThreadStub, need: NeedsYouItem | undefined, agents = 0): RowStatus | null {
   const b = need?.blockers[0];
-  if (b) return { glyph: 'needs', label: BLOCKER_LABEL[b.kind] };
-  if (t.status === 'queued') return { glyph: 'queued', label: 'Queued' };
-  if (showsRunning(t) || agents > 0) return { glyph: 'running', label: 'Working' };
+  if (b) return as(BLOCKER_GLYPH[b.kind]);
+  if (t.status === 'queued') return as('queued');
+  if (showsRunning(t) || agents > 0) return as('running');
   switch (need?.result?.status) {
     case 'failed':
-      return { glyph: 'needs', label: 'Failed' };
+      return as('failed');
     case 'done':
-      return { glyph: 'done', label: 'Finished' };
+      return as('done');
     case 'stopped':
-      return { glyph: 'settled', label: 'Stopped' };
+      return as('settled');
   }
   return null;
 }

@@ -1,7 +1,8 @@
 // A thread as the phone lists it: in a channel and in search. Pure.
 import { relTime } from '@omni/shared/format.ts';
 import type { Thread, ThreadStub } from '../api.ts';
-import { isWorking, shownStatus } from '@omni/shared/delegate-count.ts';
+import { isWorking } from '@omni/shared/delegate-count.ts';
+import { STATUS, threadGlyph } from '@omni/shared/status.ts';
 
 export interface RowItem {
   id: string;
@@ -33,9 +34,8 @@ export type ListedThread = ThreadStub & Partial<Pick<Thread, 'role' | 'updated_a
 /** "3m", "2h", "now": a list's time column, without the "ago". */
 export const shortTime = (iso: string, now: number) => relTime(iso, now).replace(/ ago$/, '').replace(/^just now$/, 'now');
 
-const META: Record<string, string> = { queued: 'Queued', running: 'Running', failed: 'Failed', stopped: 'Stopped' };
-
 export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: number): RowItem {
+  const glyph = threadGlyph(t);
   return {
     id: t.id,
     title: t.title || 'Untitled',
@@ -44,9 +44,9 @@ export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: nu
     channelIcon: channel?.icon ?? null,
     avatarBg: channel?.avatar_bg,
     role: t.role ?? null,
-    status: shownStatus(t),
+    status: glyph,
     settled: !isWorking(t),
     time: shortTime(t.updated_at ?? t.created_at, now),
-    meta: META[shownStatus(t)] ?? null,
+    meta: glyph === 'done' || glyph === 'idle' ? null : STATUS[glyph].label,
   };
 }

@@ -17,6 +17,7 @@ import { HtmlRender } from '../components/HtmlRender.tsx';
 import { ArtifactCard, ChangesCard, Clamped, Delegation, MoProse, NowLine, Outcome, Plan, Report, StepsRow, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
 import { shortTime } from './rows.ts';
+import { limitLabel } from '../limits.ts';
 import type { useShell, useThread } from './shell.tsx';
 import type { ThreadView as ThreadOf } from '@omni/shared/thread-view.ts';
 import { showsRunning } from '@omni/shared/delegate-count.ts';
@@ -83,7 +84,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
             Conductor
           </div>
         ) : (
-          (t.result || t.error || t.status !== 'done') && <Outcome t={t} harness={t.harness} />
+          (t.result || t.error || t.status !== 'done') && <Outcome t={t} harness={t.harness} limit={last ? limitLabel(thread, now) : null} />
         )}
         {t.error && <Clamped text={t.error} />}
         {t.cloud && <CloudAgentCard p={t.cloud} />}

@@ -54,17 +54,6 @@ export function railSelection(route: Route, openThread: { id: string; channel_id
   }
 }
 
-/** Two letters for a channel's disc: the first letters of its first two words ("Acne Studios" AS), else its first two ("Patta" Pa). */
-export function monogram(name: string): string {
-  const words = name.trim().split(/[\s_-]+/).filter(Boolean).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean);
-  // A short acronym after the name ("Omni OS") is the channel's own mark.
-  if (words.length === 2 && /^[A-Z]{2,3}$/.test(words[1])) return words[1].slice(0, 2);
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  const w = words[0] ?? '';
-  if (!w) return '?';
-  return w.length === 1 ? w.toUpperCase() : w[0].toUpperCase() + w[1].toLowerCase();
-}
-
 /** The badge on a disc: needs you (a vermilion diamond) wins over running (the live dot). */
 export type RailBadge = 'needs' | 'running' | null;
 

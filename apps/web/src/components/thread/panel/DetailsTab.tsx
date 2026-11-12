@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { type ThreadLinks } from '@omni/shared/continue-flow.ts';
-import type { BackgroundTask, Channel, Thread } from '../../../api.ts';
+import { useApi, type BackgroundTask, type Channel, type HarnessWithRunning, type Thread } from '../../../api.ts';
+import { threadRunLabels } from '@omni/shared/thread-run.ts';
 import { HarnessMark } from '../../brand.tsx';
 import { Chip, CopyButton, Icon, StatusDot } from '../../ui.tsx';
 import { duration, fullDate, plural } from '../../../format.ts';
@@ -47,7 +48,7 @@ function McpList({ servers }: { servers: string[] }) {
           {good.length} connected
           {bad.length > 0 && <span className="text-fg-3"> · {bad.length} not connected</span>}
         </span>
-        <Icon name="chevronDown" size={12} className={`shrink-0 text-fg-4 transition-transform group-hover:text-fg-3 ${open ? '' : '-rotate-90'}`} />
+        <Icon name="chevronDown" size={12} className={`shrink-0 text-fg-3 transition-transform group-hover:text-fg-3 ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && (
         <div className="mt-1.5 flex flex-wrap gap-1">
@@ -117,6 +118,7 @@ export function DetailsTab({
   onMerged?: () => void;
   onTab?: (tab: PanelTab) => void;
 }) {
+  const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   const cwd = init?.cwd || thread.cwd;
   const cloud = thread.harness === 'cursor-cloud';
   const remote = thread.harness === 'hermes' || cloud;
@@ -126,6 +128,9 @@ export function DetailsTab({
     codex: `codex resume ${thread.session_id}`,
     cursor: `cursor-agent --resume ${thread.session_id}`,
   };
+  // The composer's model pill reads these too, so Details names the model and effort the same way.
+  const run = threadRunLabels(thread, harnesses);
+  const slug = thread.model || init?.model;
   const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin flex h-full flex-col gap-3 overflow-y-auto px-2.5 pb-3 [&>*]:shrink-0">
@@ -143,10 +148,11 @@ export function DetailsTab({
           <HarnessMark harness={thread.harness} withLabel />
         </Row>
         <Row k="Model">
-          {thread.model || init?.model || <span className="text-fg-3">default</span>}
-          {thread.model && init?.model && init.model !== thread.model && <span className="ml-1 text-fg-3">({init.model})</span>}
+          {run.model}
+          {slug && slug !== run.model && <span className="ml-1.5 font-mono text-[11.5px] text-fg-3">{slug}</span>}
+          {thread.model && init?.model && init.model !== thread.model && <span className="ml-1.5 font-mono text-[11.5px] text-fg-3">({init.model})</span>}
         </Row>
-        <Row k="Effort">{thread.effort || <span className="text-fg-3">default</span>}</Row>
+        <Row k="Effort">{run.effort}</Row>
         {thread.auto_reason && <Row k="Auto">{thread.auto_reason}</Row>}
         <Row k="Source">
           {thread.source}

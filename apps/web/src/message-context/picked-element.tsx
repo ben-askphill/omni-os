@@ -6,7 +6,7 @@ import type { PickedElement } from '@omni/shared/message-context-browser.ts';
 
 const Row = ({ label, children }: { label: string; children: string }) => (
   <div className="mt-1.5">
-    <div className="text-[10.5px] tracking-wide text-fg-4 uppercase">{label}</div>
+    <div className="text-[10.5px] tracking-wide text-fg-3 uppercase">{label}</div>
     <div className="font-mono text-[11.5px] leading-[1.45] break-words whitespace-pre-wrap text-fg-2">{children}</div>
   </div>
 );
@@ -43,7 +43,7 @@ export function PickedElementDetails({ element: e, defaultOpen = false, classNam
                 .join('\n')}
             </Row>
           )}
-          {e.truncated && <div className="mt-1.5 text-[11px] text-fg-4">The text or markup was cut to a fixed size. The agent gets this excerpt, not the whole element.</div>}
+          {e.truncated && <div className="mt-1.5 text-[11px] text-fg-3">The text or markup was cut to a fixed size. The agent gets this excerpt, not the whole element.</div>}
         </div>
       )}
     </div>

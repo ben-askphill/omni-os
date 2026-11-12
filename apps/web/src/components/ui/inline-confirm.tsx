@@ -21,6 +21,7 @@ export function InlineConfirm({
   busyLabel,
   undoMs,
   needs = true,
+  tone,
   disabled,
   onConfirm,
   className = '',
@@ -33,6 +34,7 @@ export function InlineConfirm({
   busyLabel?: string;
   undoMs?: number;
   needs?: boolean;
+  tone?: 'danger';
   disabled?: boolean;
   onConfirm: () => void | Promise<void>;
   className?: string;
@@ -140,7 +142,7 @@ export function InlineConfirm({
     );
   } else {
     content = (
-      <button type="button" className="say-btn" disabled={disabled} onClick={() => setPhase('asking')}>
+      <button type="button" className={`say-btn${tone === 'danger' ? ' text-danger-text' : ''}`} disabled={disabled} onClick={() => setPhase('asking')}>
         {icon && <Icon name={icon} size={14} />}
         {label}
       </button>

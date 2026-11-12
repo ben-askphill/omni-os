@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canSend, CONDUCTOR, dictationSettled, editingHint, quickPromptKey, quickPromptThread, reopened, sentLabel } from '../src/pages/quick-prompt-model.ts';
+import { canSend, CONDUCTOR, dictationSettled, quickPromptHints, quickPromptKey, quickPromptThread, reopened, sentLabel } from '../src/pages/quick-prompt-model.ts';
 import { pageTitle, parseHash } from '../src/router.ts';
 import { screenOf } from '../src/mobile/screens.ts';
 
@@ -59,7 +59,7 @@ describe('the Quick Prompt', () => {
   it('says what it started, and which keys do what on each OS', () => {
     expect(sentLabel('Plan the week')).toBe('Started “Plan the week”');
     expect(sentLabel('')).toBe('Started a thread');
-    expect(editingHint(true)).toBe('Return to send, ⌘Return to send and open, Esc to close');
-    expect(editingHint(false)).toBe('Return to send, Ctrl+Return to send and open, Esc to close');
+    expect(quickPromptHints(true).map(([keys, label]) => `${keys.join('')} ${label}`)).toEqual(['↵ send', '⌘↵ send and open', 'esc close']);
+    expect(quickPromptHints(false)[1]).toEqual([['Ctrl', '↵'], 'send and open']);
   });
 });

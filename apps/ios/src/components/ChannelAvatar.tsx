@@ -7,12 +7,13 @@ import { Text } from '../ui/Text';
 
 import { Icon } from '../ui/Icon';
 import { rounded, useOmniTheme, weight } from '../theme';
-import { channelFace, letterOf, type ChannelFace } from './channel-face';
+import { monogram } from '@omni/shared/monogram.ts';
+import { channelFace, type ChannelFace } from './channel-face';
 import { type Glyph, StatusDot } from './StatusDot';
 
 /**
  * A channel as the Web UI's Avatar draws it, everywhere a channel shows: its own icon (an emoji, a design system icon
- * or an uploaded SVG) or its first letter in a soft circle, the Omni mark for the Conductor, and a thread's status glyph
+ * or an uploaded SVG) or its monogram (packages/shared/monogram.ts) in a soft circle, the Omni mark for the Conductor, and a thread's status glyph
  * on the corner when given.
  */
 export function ChannelAvatar({
@@ -59,15 +60,15 @@ function Face({ face, name, size, color }: { face: ChannelFace; name: string; si
     case 'svg': {
       const box = size * 0.58;
       // Drawn by react-native-svg as native shapes: nothing in it runs, and the shared check refused anything that loads.
-      return <SvgCss xml={face.markup} width={box} height={box} color={color} onError={() => {}} fallback={<Letter letter={letterOf(name)} size={size} color={color} />} />;
+      return <SvgCss xml={face.markup} width={box} height={box} color={color} onError={() => {}} fallback={<Letters letters={monogram(name)} size={size} color={color} />} />;
     }
-    case 'letter':
-      return <Letter letter={face.letter} size={size} color={color} />;
+    case 'letters':
+      return <Letters letters={face.letters} size={size} color={color} />;
   }
 }
 
-function Letter({ letter, size, color }: { letter: string; size: number; color: string }) {
-  return <Text style={[styles.letter, { color, fontSize: size * 0.42, lineHeight: size * 0.5 }]}>{letter}</Text>;
+function Letters({ letters, size, color }: { letters: string; size: number; color: string }) {
+  return <Text style={[styles.letter, { color, fontSize: size * 0.42, lineHeight: size * 0.5 }]}>{letters}</Text>;
 }
 
 /** The static Omni mark (web: StaticMark): a heavy ring with a satellite at its top right. */

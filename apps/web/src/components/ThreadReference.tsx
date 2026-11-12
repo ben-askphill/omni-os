@@ -62,7 +62,7 @@ export function ThreadReferencePanel({ thread, onPicked, touch }: { thread: Thre
       <div className="flex items-center gap-2 px-3 pt-3">
         <label className="relative min-w-0 flex-1">
           <span className="sr-only">Search threads by title or channel</span>
-          <Icon name="search" size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-4" />
+          <Icon name="search" size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
           <input
             ref={input}
             type="search"
@@ -111,7 +111,7 @@ export function ThreadReferencePanel({ thread, onPicked, touch }: { thread: Thre
               <StatusDot status={c.status} />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[13px] font-medium text-fg">{c.title}</span>
-                <span className="truncate text-[11.5px] text-fg-4">
+                <span className="truncate text-[11.5px] text-fg-3">
                   {c.channel_name} · {c.short_id} · {relTime(c.updated_at)}
                 </span>
               </span>

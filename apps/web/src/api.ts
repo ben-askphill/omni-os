@@ -36,7 +36,7 @@ export type Thread = ThreadRow & { delegating?: boolean };
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> &
-  Partial<Pick<Thread, 'parent_id' | 'source' | 'delegating'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
+  Partial<Pick<Thread, 'parent_id' | 'source' | 'delegating' | 'limit_state'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
 /** A Conductor job and its cross-channel delegated threads, as the channel API sends them. */
 export interface ConductorHandoffGroup {
   parent: ThreadStub;

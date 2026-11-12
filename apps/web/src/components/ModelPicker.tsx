@@ -152,13 +152,13 @@ export function ModelPicker({
         {effortShown ? (
           <span className="shrink-0 text-fg-3">· {effortShown}</span>
         ) : (
-          current.h && <span className="hidden shrink-0 text-fg-4 sm:inline">· {current.h.name}</span>
+          current.h && <span className="hidden shrink-0 text-fg-3 sm:inline">· {current.h.name}</span>
         )}
-        <Icon name="chevronDown" size={13} className="text-fg-4" />
+        <Icon name="chevronDown" size={13} className="text-fg-3" />
       </button>
       {open && (
         <div className={`pik-card w-[min(340px,calc(100vw-32px))] left-0 ${up ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'}`} data-up={up || undefined}>
-          <label className="mb-1 flex h-10 items-center gap-2 rounded-2xl bg-surface px-3 text-fg-4">
+          <label className="mb-1 flex h-10 items-center gap-2 rounded-2xl bg-surface px-3 text-fg-3">
             <Icon name="search" size={14} />
             <input
               autoFocus

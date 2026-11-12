@@ -9,9 +9,9 @@ export function BaseChip({ rows, value, onClick }: { rows: BaseOption[]; value: 
   return (
     <button type="button" onClick={onClick} aria-label={`Base: ${row?.label ?? 'none'}`} className="mo-press inline-flex h-8 max-w-full min-w-0 items-center gap-1.5 self-start rounded-full bg-surface-2 pr-3 pl-2.5 text-[12.5px] font-medium text-fg">
       <Icon name="branch" size={13} className="shrink-0 text-fg-3" />
-      <span className="shrink-0 text-fg-4">From</span>
+      <span className="shrink-0 text-fg-3">From</span>
       <span className="truncate">{row?.label ?? 'Choose'}</span>
-      <Icon name="chevronDown" size={12} className="shrink-0 text-fg-4" />
+      <Icon name="chevronDown" size={12} className="shrink-0 text-fg-3" />
     </button>
   );
 }

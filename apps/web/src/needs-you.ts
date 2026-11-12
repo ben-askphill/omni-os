@@ -1,7 +1,7 @@
 // Needs you (apps/server/db/repos/needs-you.ts) from the Web UI's side: why each thread is there, and which result an
 // open thread has shown.
 import type { NeedsYou, NeedsYouItem } from './api.ts';
-import type { Glyph } from './components/ui.tsx';
+import { asksForYou, type Glyph } from '@omni/shared/status.ts';
 import { resetLabel } from './limits.ts';
 
 export interface Reason {
@@ -18,22 +18,33 @@ export function reasonOf(item: NeedsYouItem): Reason {
   const preview = item.thread.last_text ? item.thread.last_text.replace(/\s+/g, ' ').trim().slice(0, 240) : null;
   const b = item.blockers[0];
   if (b?.kind === 'question') return { glyph: 'needs', label: plural(b.count, 'Waiting on your answer', '# questions wait on your answer'), detail: b.detail };
-  if (b?.kind === 'setup') return { glyph: 'needs', label: 'Worktree could not be prepared', detail: b.detail };
+  if (b?.kind === 'setup') return { glyph: 'failed', label: 'Worktree could not be prepared', detail: b.detail };
   if (b?.kind === 'limited') {
     const at = b.resets_at ? resetLabel(b.resets_at) : null;
     const where = b.elsewhere ? ' on your other machine' : '';
-    return { glyph: 'needs', label: `Usage limit reached${where}`, detail: at ? `${b.scheduled ? 'Resumes' : 'Resets'} at ${at}` : 'No reset time given' };
+    return { glyph: 'limited', label: `Usage limit reached${where}`, detail: at ? `${b.scheduled ? 'Resumes' : 'Resets'} at ${at}` : 'No reset time given' };
   }
   if (b?.kind === 'uncertain') return { glyph: 'needs', label: plural(b.count, 'A message may not have been sent', '# messages may not have been sent'), detail: preview };
   if (b?.kind === 'recovered') return { glyph: 'needs', label: plural(b.count, 'A message waits for Resume', '# messages wait for Resume'), detail: preview };
   switch (item.result?.status) {
     case 'failed':
-      return { glyph: 'needs', label: 'Failed', detail: preview };
+      return { glyph: 'failed', label: 'Failed', detail: preview };
     case 'stopped':
       return { glyph: 'settled', label: 'Stopped', detail: preview };
     default:
       return { glyph: 'done', label: 'Finished', detail: preview };
   }
+}
+
+/**
+ * Needs you proper (a question, a failure, a usage limit: Ben has to act) apart from Unread (a result that finished
+ * and he has not opened). Each item lands in one of the two.
+ */
+export function splitNeeds(items: readonly NeedsYouItem[]): { needs: NeedsYouItem[]; unread: NeedsYouItem[] } {
+  const needs: NeedsYouItem[] = [];
+  const unread: NeedsYouItem[] = [];
+  for (const i of items) (asksForYou(reasonOf(i).glyph) ? needs : unread).push(i);
+  return { needs, unread };
 }
 
 /** One channel's part of the inbox, with its own counts. */

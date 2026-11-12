@@ -28,10 +28,30 @@ const lead = (icon: IconName) => (
   </span>
 );
 
+/** The words typed, lowercased: an item matches when its label and sub hold every one. */
+export const queryWords = (q: string) => q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+/** `text` with each typed word marked where it appears. */
+export function Marked({ text, words }: { text: string; words: readonly string[] }) {
+  if (!words.length) return text;
+  const lower = text.toLowerCase();
+  const hit = new Array<boolean>(text.length).fill(false);
+  for (const w of words) for (let i = lower.indexOf(w); i !== -1; i = lower.indexOf(w, i + w.length)) hit.fill(true, i, i + w.length);
+  const parts: ReactNode[] = [];
+  let start = 0;
+  for (let i = 1; i <= text.length; i++) {
+    if (i < text.length && hit[i] === hit[start]) continue;
+    const piece = text.slice(start, i);
+    parts.push(hit[start] ? <mark key={start}>{piece}</mark> : piece);
+    start = i;
+  }
+  return <>{parts}</>;
+}
+
 /** What the palette lists for `q`: pages, channels, recent threads and the theme, filtered by every word typed, plus a search row. */
 export function paletteItems(q: string, channels: ChannelWithRunning[], recent: Thread[] | undefined, route: Route, openThread: ThreadStub | null): Item[] {
   const s = q.trim().toLowerCase();
-  const words = s.split(/\s+/).filter(Boolean);
+  const words = queryWords(q);
   const match = (i: Item) => !words.length || words.every((w) => `${i.label} ${i.sub ?? ''}`.toLowerCase().includes(w));
 
   const newThread = () => startNewThread(route, openThread);
@@ -76,7 +96,7 @@ export function paletteItems(q: string, channels: ChannelWithRunning[], recent: 
           <StatusDot status={t.status} />
         </span>
       ),
-      right: <span className="font-num text-[11px] text-fg-4">{relTime(t.updated_at)}</span>,
+      right: <span className="font-num text-[11px] text-fg-3">{relTime(t.updated_at)}</span>,
       run: () => go(href.thread(t.id)),
     })),
     { id: 'x:light', group: 'Theme', label: 'Light theme', lead: lead('sun'), run: () => setTheme('light') },

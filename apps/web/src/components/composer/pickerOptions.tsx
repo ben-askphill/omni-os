@@ -17,7 +17,7 @@ export function pickerOptions(visibleChannels: Channels, channel: string, crew: 
   }));
   if (!visibleChannels.some((c) => c.id === channel)) channelOptions.push({ value: channel, label: channel, avatar: channel });
   const roleOptions: PickerOption<string>[] = [
-    { value: '', label: 'No role', sub: 'No charter', avatar: false, icon: 'x' },
+    { value: '', label: 'No role', sub: 'No charter', avatar: false, icon: 'user' },
     ...crew.map((r) => ({ value: r.id, label: r.name, sub: r.description, avatar: r.name, lead: isCrewRole(r.id) ? <CrewMark role={r.id} size={13} /> : undefined })),
   ];
   return { channelOptions, roleOptions };

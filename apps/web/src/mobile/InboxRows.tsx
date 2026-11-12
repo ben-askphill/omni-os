@@ -70,8 +70,6 @@ export function MoInboxRow({
   const summary = useDelegateSummary(delegated);
   const ch = channel(t.channel_id);
   const title = t.title || 'Untitled';
-  // Work in progress recedes, as on the desktop card: what waits on Ben stands out.
-  const receded = status?.glyph === 'running';
   const actions: RowAction[] = [];
   if (pinned) actions.push({ icon: 'pin', label: `Unpin ${title}`, run: () => act.unpin(t) });
   if (canMarkDone(t.status)) actions.push({ icon: 'check', label: `Mark ${title} done`, run: () => act.done(t) });
@@ -82,7 +80,7 @@ export function MoInboxRow({
         <MoAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} state={status?.glyph ?? t.status} />
         <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last ? '' : 'border-b border-line'}`} style={{ paddingRight: reserve }}>
           <span className="flex items-baseline gap-2">
-            <span className={`min-w-0 flex-1 truncate text-[15px] leading-[1.3] ${receded ? 'text-fg-3' : 'text-fg'}`}>{title}</span>
+            <span className="min-w-0 flex-1 truncate text-[15px] leading-[1.3] text-fg">{title}</span>
             <span className="shrink-0 text-[12px] leading-none text-fg-3 tabular-nums">{status ? status.label : shortTime(t.updated_at ?? t.created_at, now)}</span>
           </span>
           <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
@@ -129,8 +127,8 @@ export function MoShelf({ label, shelf }: { label: string; shelf: InboxShelf }) 
   return (
     <button type="button" onClick={shelf.toggle} aria-expanded={shelf.open} className="mo-row flex h-11 w-full items-center gap-1.5 px-1 text-left">
       <span className="text-[12px] leading-[1.3] font-medium text-fg-3">{label}</span>
-      <span className="text-[12px] leading-[1.3] text-fg-4 tabular-nums">{shelf.count}</span>
-      <Icon name="chevronDown" size={14} className={`ml-auto text-fg-4 transition-transform ${shelf.open ? '' : '-rotate-90'}`} />
+      <span className="text-[12px] leading-[1.3] text-fg-3 tabular-nums">{shelf.count}</span>
+      <Icon name="chevronDown" size={14} className={`ml-auto text-fg-3 transition-transform ${shelf.open ? '' : '-rotate-90'}`} />
     </button>
   );
 }

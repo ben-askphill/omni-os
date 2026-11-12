@@ -14,6 +14,8 @@ export function Icon({ name, size = 16, className = '', strokeWidth = 1.75 }: { 
     );
   }
   if (name === 'more') strokeWidth = 3;
+  // A name cast from a string (settings catalog, PR groups) can miss the table and would draw nothing.
+  if (import.meta.env.DEV && !PATHS[name]) console.error(`Icon: no icon named "${name}"`);
   return (
     <svg
       width={size}

@@ -8,16 +8,18 @@ import { useApp } from '../store.tsx';
 import { openContinue } from './ContinueSheet.tsx';
 import { useThreadMenuActions } from './useThreadMenuActions.ts';
 import { ThreadReferencePanel } from './ThreadReference.tsx';
-import { FolderChoices, MenuGroups, containerItems, focusFirstItem, moveFocus, useMenuDismiss, useMenuPlacement, useThreadRow, type MenuItem } from './ContextMenuParts.tsx';
+import { FolderChoices, MenuCaption, MenuGroups, containerItems, focusFirstItem, itemForKey, moveFocus, useMenuDismiss, useMenuPlacement, useThreadRow, type MenuItem } from './ContextMenuParts.tsx';
+import { KbdFooter, MENU_SURFACE, MOD_KEY } from './ui/overlay.tsx';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
-type Open = { target: Target; x: number; y: number };
+/** `align: 'end'`: `x` is the menu's right edge, for a button that opens it under itself at the right of a bar. */
+type Open = { target: Target; x: number; y: number; align?: 'start' | 'end' };
 
 const OPEN_EVENT = 'omni:context-menu';
 
 /** Open the menu for `target` at a point, as a right-click there would: the "…" button on a folder or the thread header, or a key. */
-export function openMenu(target: Target, x: number, y: number) {
-  window.dispatchEvent(new CustomEvent<Open>(OPEN_EVENT, { detail: { target, x, y } }));
+export function openMenu(target: Target, x: number, y: number, align: 'start' | 'end' = 'start') {
+  window.dispatchEvent(new CustomEvent<Open>(OPEN_EVENT, { detail: { target, x, y, align } }));
 }
 
 const THREAD_HREF = /^#\/t\/([^/?]+)/;
@@ -78,19 +80,12 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   const { error, toggleArchive, rename: renameTo, togglePin, toggleDone, sendGrok } = useThreadMenuActions({ id: target.id, row, archived, current, onClose });
   const folders = useFolders();
 
-  const pos = useMenuPlacement(ref, open.x, open.y);
+  const pos = useMenuPlacement(ref, open.x, open.y, open.align);
 
   // Keyboard: the first item takes the focus, arrows move it.
   useEffect(() => {
     focusFirstItem(ref);
   }, [moving, row]);
-  const onKey = (e: ReactKeyboardEvent) => {
-    // The reference picker's search and list keep their own keys.
-    if (referencing || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
-    e.preventDefault();
-    moveFocus(ref, e.key);
-  };
-
   useMenuDismiss(ref, onClose);
 
   const folder = target.kind === 'folder' ? folders.find(target.id) : undefined;
@@ -115,7 +110,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   // The desktop app opens a thread in a window of its own.
   const ownWindow: { items: MenuItem[] }[] =
     desktop && target.kind === 'thread'
-      ? [{ items: [{ label: 'Open in New Window', icon: 'external', run: () => (desktop?.openWindow(href.thread(target.id)), onClose()) }] }]
+      ? [{ items: [{ label: 'Open in new window', icon: 'external', keys: [MOD_KEY, '↵'], run: () => (desktop?.openWindow(href.thread(target.id)), onClose()) }] }]
       : [];
   const groups: { title?: string; items: MenuItem[] }[] =
     target.kind === 'thread'
@@ -128,9 +123,24 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
           child: !!row?.parent_id,
           harness: row?.harness ?? null,
           grokBot: !!status?.grokBot,
-        }).map((g) => ({ title: g.title, items: g.items.map((it) => ({ ...it, run: runs[it.id] })) }))]
+        }).map((g) => ({ title: g.title, items: g.items.map(({ key, ...it }) => ({ ...it, keys: key ? [key] : undefined, run: runs[it.id] })) }))]
       : [{ items: containerItems(target, folders, onClose) }];
   const title = target.kind === 'channel' ? `#${channel(target.id)?.name ?? ''}` : folder ? folder.name : undefined;
+  // The items show: not the title field, the folder list or the reference picker, which keep their own keys.
+  const listing = draft === null && !moving && !referencing;
+
+  const onKey = (e: ReactKeyboardEvent) => {
+    if (referencing || draft !== null) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveFocus(ref, e.key);
+      return;
+    }
+    const item = listing ? itemForKey(groups, e, MOD_KEY) : undefined;
+    if (!item) return;
+    e.preventDefault();
+    item.run();
+  };
 
   return (
     <div
@@ -139,28 +149,40 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
       aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : referencing ? 'Reference a thread' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
       style={{ left: pos.x, top: pos.y }}
       onKeyDown={onKey}
-      className={`pop-in fixed z-[60] ${referencing ? 'max-h-[calc(100vh-1rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto rounded-[22px]' : 'min-w-[190px] max-w-[280px] rounded-[16px] p-1.5'} bg-elev shadow-[var(--shadow-menu)]`}
+      className={`pop-in fixed z-[60] ${MENU_SURFACE} ${referencing ? 'max-h-[calc(100vh-1rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto' : 'min-w-[220px] max-w-[280px]'}`}
     >
-      {title && <div className="caption truncate px-2.5 pt-1 pb-1.5 text-fg-4">{title}</div>}
-      {referencing && row ? (
-        <ThreadReferencePanel thread={row} onPicked={onClose} />
-      ) : moving && row ? (
-        <FolderChoices current={row.folder_id ?? null} choices={choices} onPick={moveTo} />
-      ) : draft !== null ? (
-        <input
-          autoFocus
-          value={draft}
-          maxLength={200}
-          aria-label="Thread title"
-          onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && renameTo(draft)}
-          className="h-8 w-[260px] rounded-[10px] bg-surface px-2.5 text-[13px] text-fg outline-none"
+      <div className={referencing ? '' : 'p-1.5'}>
+        {title && <MenuCaption>{title}</MenuCaption>}
+        {referencing && row ? (
+          <ThreadReferencePanel thread={row} onPicked={onClose} />
+        ) : moving && row ? (
+          <FolderChoices current={row.folder_id ?? null} choices={choices} onPick={moveTo} />
+        ) : draft !== null ? (
+          <input
+            autoFocus
+            value={draft}
+            maxLength={200}
+            aria-label="Thread title"
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && renameTo(draft)}
+            className="h-8 w-[260px] rounded-[var(--r-sm)] bg-surface px-2.5 text-[13px] text-fg outline-none"
+          />
+        ) : (
+          <MenuGroups groups={groups} />
+        )}
+        {error && <div className="px-2.5 py-1.5 text-[12px] leading-snug break-words text-pretty text-fg-3">{error}</div>}
+      </div>
+      {(listing || moving) && (
+        <KbdFooter
+          className="gap-3 px-3.5"
+          hints={[
+            [['↑', '↓'], 'move'],
+            [['↵'], moving ? 'pick' : 'open'],
+            [['esc'], 'close'],
+          ]}
         />
-      ) : (
-        <MenuGroups groups={groups} />
       )}
-      {error && <div className="px-2.5 py-1.5 text-[12px] leading-snug break-words text-pretty text-fg-3">{error}</div>}
     </div>
   );
 }

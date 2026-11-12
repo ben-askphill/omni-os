@@ -27,7 +27,7 @@
       "group": "omni",
       "title": "General",
       "icon": "sliders",
-      "blurb": "Who you are, and running setup again."
+      "blurb": "Your name, pronouns, timezone and email, and the setup walkthrough."
     },
     {
       "id": "appearance",
@@ -57,7 +57,7 @@
       "group": "agents",
       "title": "Threads",
       "icon": "message",
-      "blurb": "Where new threads run, how long they stay warm, and how they recover from a usage limit."
+      "blurb": "Where new threads run and how they recover from a usage limit."
     },
     {
       "id": "channels",
@@ -72,59 +72,49 @@
       "group": "code",
       "title": "Workspace",
       "icon": "folder",
-      "blurb": "Where your work lives on this machine.",
-      "scoped": true
+      "blurb": "Where your work lives on this machine."
     },
     {
       "id": "worktrees",
       "group": "code",
       "title": "Worktrees",
       "icon": "branch",
-      "blurb": "The checkouts Omni makes for threads, and cleaning them up.",
-      "scoped": true
+      "blurb": "The checkouts Omni makes for threads, and cleaning them up."
     },
     {
       "id": "machines",
       "group": "connections",
       "title": "Machines",
       "icon": "monitor",
-      "blurb": "The machine Omni runs on and its server."
+      "blurb": "Your machines, their connections and their updates."
     },
     {
       "id": "sync",
       "group": "connections",
       "title": "Sync",
       "icon": "refresh",
-      "blurb": "History across your machines, through your own Cloudflare relay."
+      "blurb": "Your history across machines, through your own Cloudflare relay."
     },
     {
       "id": "access",
       "group": "connections",
       "title": "Sharing & access",
       "icon": "lock",
-      "blurb": "Who and what can reach this Omni: Google sign-in, Omni Connect, Tailscale and MCP."
-    },
-    {
-      "id": "integrations",
-      "group": "connections",
-      "title": "Integrations",
-      "icon": "switchboard",
-      "blurb": "Hermes and the central brain."
+      "blurb": "Who and what can reach this Omni."
     },
     {
       "id": "secrets",
       "group": "connections",
       "title": "Secrets",
       "icon": "key",
-      "blurb": "API keys and tokens for the crew, stored outside the database.",
-      "scoped": true
+      "blurb": "API keys and tokens for threads, kept outside the database."
     },
     {
       "id": "desktop",
       "group": "app",
       "title": "Desktop app",
       "icon": "monitor",
-      "blurb": "Quick Prompt, zoom, updates and how this app starts.",
+      "blurb": "Quick Prompt and how this app starts.",
       "desktopApp": true
     },
     {
@@ -132,7 +122,7 @@
       "group": "app",
       "title": "About",
       "icon": "info",
-      "blurb": "Version, build and where Omni keeps its files."
+      "blurb": "Version, server and where Omni keeps its files."
     }
   ],
   "entries": [
@@ -191,11 +181,12 @@
     {
       "id": "zoom",
       "section": "appearance",
-      "title": "Text size",
+      "title": "Text size and zoom",
       "keywords": [
         "zoom",
         "scale",
         "font size",
+        "text size",
         "bigger",
         "smaller"
       ]
@@ -262,6 +253,17 @@
         "cap",
         "parallel",
         "limit"
+      ]
+    },
+    {
+      "id": "hermes",
+      "section": "models",
+      "title": "Hermes URL",
+      "keywords": [
+        "hermes",
+        "tailnet",
+        "HERMES_API_KEY",
+        "integrations"
       ]
     },
     {
@@ -414,6 +416,17 @@
       ]
     },
     {
+      "id": "brain",
+      "section": "workspace",
+      "title": "Central brain folder",
+      "keywords": [
+        "notes",
+        "brain-nightly",
+        "export",
+        "digests"
+      ]
+    },
+    {
       "id": "worktree-retention",
       "section": "worktrees",
       "title": "Automatic cleanup",
@@ -465,7 +478,7 @@
     {
       "id": "update-machines",
       "section": "machines",
-      "title": "Update all machines",
+      "title": "Your machines and updates",
       "keywords": [
         "update",
         "upgrade",
@@ -476,19 +489,6 @@
         "fleet",
         "every machine",
         "check for updates"
-      ]
-    },
-    {
-      "id": "server",
-      "section": "machines",
-      "title": "Server port and host",
-      "keywords": [
-        "port",
-        "host",
-        "node",
-        "repo",
-        "log",
-        "OMNI_PORT"
       ]
     },
     {
@@ -569,27 +569,6 @@
       ]
     },
     {
-      "id": "hermes",
-      "section": "integrations",
-      "title": "Hermes URL",
-      "keywords": [
-        "hermes",
-        "tailnet",
-        "HERMES_API_KEY"
-      ]
-    },
-    {
-      "id": "brain",
-      "section": "integrations",
-      "title": "Central brain folder",
-      "keywords": [
-        "notes",
-        "brain-nightly",
-        "export",
-        "digests"
-      ]
-    },
-    {
       "id": "secrets",
       "section": "secrets",
       "title": "Secrets",
@@ -636,23 +615,8 @@
       "needs": "loginItem"
     },
     {
-      "id": "desktop-zoom",
-      "section": "desktop",
-      "title": "Zoom",
-      "keywords": [
-        "text size",
-        "scale",
-        "bigger",
-        "smaller",
-        "font size"
-      ],
-      "surfaces": [
-        "desktop"
-      ]
-    },
-    {
       "id": "desktop-updates",
-      "section": "desktop",
+      "section": "machines",
       "title": "App version and updates",
       "keywords": [
         "version",
@@ -670,17 +634,17 @@
       ]
     },
     {
-      "id": "desktop-app",
-      "section": "desktop",
-      "title": "App server, data folder and log",
+      "id": "server",
+      "section": "about",
+      "title": "Server address, port and log",
       "keywords": [
+        "port",
+        "host",
+        "address",
+        "node",
         "log",
-        "data folder",
-        "server",
-        "port"
-      ],
-      "surfaces": [
-        "desktop"
+        "OMNI_PORT",
+        "data folder"
       ]
     },
     {
@@ -713,7 +677,8 @@
     "quickPrompt": "general",
     "server": "machines",
     "connection": "machines",
-    "storage": "worktrees"
+    "storage": "worktrees",
+    "integrations": "models"
   },
   "searches": [
     {
@@ -745,7 +710,8 @@
         "channel-model",
         "model-options",
         "harnesses",
-        "concurrency"
+        "concurrency",
+        "hermes"
       ]
     },
     {
@@ -780,7 +746,6 @@
       "expected": [
         "server",
         "channel-actions",
-        "desktop-app",
         "brain"
       ]
     },

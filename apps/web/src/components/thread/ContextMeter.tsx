@@ -188,103 +188,114 @@ function ContextPanel({
   const tools = [...(context?.tools ?? [])].sort((a, b) => b.callTokens + b.resultTokens - (a.callTokens + a.resultTokens)).slice(0, 6);
   const largest = view?.largest ?? [];
   const scale = context?.max || context?.used || 1;
+  // A fade over the bottom edge while more of the panel sits below it.
+  const scroller = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  const measure = useCallback(() => {
+    const el = scroller.current;
+    if (el) setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+  }, []);
+  useEffect(measure, [measure, context, view]);
 
   return (
     <div role="dialog" aria-label="Context window" style={{ transformOrigin: '100% 0' }} className="pik-card top-[calc(100%+8px)] right-0 w-[min(380px,calc(100vw-32px))] p-0">
-      <div className="scroll-thin max-h-[min(560px,70vh)] overflow-y-auto px-3.5 pt-3 pb-2">
-        {/* headline */}
-        <div className="flex items-start gap-3">
-          <ContextRing percent={percent} size={40} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span className={`font-num text-[20px] leading-none tabular-nums ${level === 'ok' ? 'text-fg' : TEXT[level]}`}>
-                {percent === null ? '?' : `${approx}${Math.round(percent)}%`}
-              </span>
-              <span className="text-[12px] text-fg-3">of the context window</span>
+      <div className="relative">
+        <div ref={scroller} onScroll={measure} className="scroll-thin max-h-[min(560px,70vh)] overflow-y-auto px-3.5 pt-3 pb-2">
+          {/* headline */}
+          <div className="flex items-start gap-3">
+            <ContextRing percent={percent} size={40} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className={`font-num text-[20px] leading-none tabular-nums ${level === 'ok' ? 'text-fg' : TEXT[level]}`}>
+                  {percent === null ? '?' : `${approx}${Math.round(percent)}%`}
+                </span>
+                <span className="text-[12px] text-fg-3">of the context window</span>
+              </div>
+              <div className="mt-1 font-num text-[12px] text-fg-3 tabular-nums">
+                {context
+                  ? context.max
+                    ? `${approx}${formatTokens(context.used)} of ${formatTokens(context.max)} tokens`
+                    : `${approx}${formatTokens(context.used)} tokens, window unknown`
+                  : 'No reading yet'}
+              </div>
+              {context?.model && <div className="mt-0.5 truncate text-[11.5px] text-fg-3">{context.model}</div>}
             </div>
-            <div className="mt-1 font-num text-[12px] text-fg-3 tabular-nums">
-              {context
-                ? context.max
-                  ? `${approx}${formatTokens(context.used)} of ${formatTokens(context.max)} tokens`
-                  : `${approx}${formatTokens(context.used)} tokens, window unknown`
-                : 'No reading yet'}
-            </div>
-            {context?.model && <div className="mt-0.5 truncate text-[11.5px] text-fg-4">{context.model}</div>}
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              title="Refresh"
+              aria-label="Refresh"
+              className="hov press grid h-7 w-7 shrink-0 place-items-center rounded-full text-fg-3 hover:text-fg disabled:opacity-40"
+            >
+              <Icon name="refresh" size={14} className={refreshing ? 'animate-spin' : ''} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={refreshing}
-            title="Refresh"
-            aria-label="Refresh"
-            className="hov press grid h-7 w-7 shrink-0 place-items-center rounded-full text-fg-3 hover:text-fg disabled:opacity-40"
-          >
-            <Icon name="refresh" size={14} className={refreshing ? 'animate-spin' : ''} />
-          </button>
+
+          {context?.autoCompactAt && context.max ? (
+            <p className="mt-2 text-[11.5px] text-fg-3">
+              Autocompact starts at {formatTokens(context.autoCompactAt)} ({Math.round((context.autoCompactAt / context.max) * 100)}%).
+              {context.modelWindow ? ` The model allows ${formatTokens(context.modelWindow)}.` : ''}
+            </p>
+          ) : null}
+
+          {!context && (
+            <p className="mt-3 text-[12.5px] text-fg-3">
+              The meter fills once the agent has run a turn in this thread.
+            </p>
+          )}
+
+          {used.length > 0 && (
+            <Section title="What fills it" note="approximate">
+              {used.map((c) => (
+                <Bar key={c.name} label={c.name} tokens={c.tokens} of={scale} />
+              ))}
+              {room.map((c) => (
+                <Bar key={c.name} label={c.name} tokens={c.tokens} of={scale} faint />
+              ))}
+            </Section>
+          )}
+
+          {tools.length > 0 && (
+            <Section title="Tool calls and results, by tool" note="approximate">
+              {tools.map((t) => (
+                <Bar key={t.name} label={shortTool(t.name)} title={t.name} tokens={t.callTokens + t.resultTokens} of={scale} />
+              ))}
+            </Section>
+          )}
+
+          {largest.length > 0 && (
+            <Section title="Largest tool results" note="approximate">
+              {largest.map((r, i) => (
+                <div key={i} className="flex items-baseline gap-2 py-[3px] text-[12px]">
+                  <span className="shrink-0 text-fg-2">{shortTool(r.tool)}</span>
+                  <Tail text={shortPath(r.label, thread.cwd)} title={r.label} className="text-fg-3" />
+                  <span className="shrink-0 font-num text-fg-3 tabular-nums">{formatTokens(r.tokens)}</span>
+                </div>
+              ))}
+            </Section>
+          )}
+
+          {context?.spend && <SpendSection spend={context.spend} />}
+
+          {(context?.memoryFiles?.length ?? 0) > 0 && (
+            <Section title="Memory files">
+              {context!.memoryFiles!.map((m) => (
+                <div key={m.path} className="flex items-baseline gap-2 py-[3px] text-[12px]">
+                  <Tail text={shortPath(m.path, thread.cwd)} title={m.path} className="text-fg-3" />
+                  <span className="shrink-0 font-num text-fg-3 tabular-nums">{formatTokens(m.tokens)}</span>
+                </div>
+              ))}
+            </Section>
+          )}
+
+          {context && (
+            <p className="mt-3 text-[11px] text-fg-3">
+              {SOURCE_NOTE[context.source]} Updated {relTime(context.updated_at)}.
+            </p>
+          )}
         </div>
-
-        {context?.autoCompactAt && context.max ? (
-          <p className="mt-2 text-[11.5px] text-fg-3">
-            Autocompact starts at {formatTokens(context.autoCompactAt)} ({Math.round((context.autoCompactAt / context.max) * 100)}%).
-            {context.modelWindow ? ` The model allows ${formatTokens(context.modelWindow)}.` : ''}
-          </p>
-        ) : null}
-
-        {!context && (
-          <p className="mt-3 text-[12.5px] text-fg-3">
-            The meter fills once the agent has run a turn in this thread.
-          </p>
-        )}
-
-        {used.length > 0 && (
-          <Section title="What fills it" note="approximate">
-            {used.map((c) => (
-              <Bar key={c.name} label={c.name} tokens={c.tokens} of={scale} />
-            ))}
-            {room.map((c) => (
-              <Bar key={c.name} label={c.name} tokens={c.tokens} of={scale} faint />
-            ))}
-          </Section>
-        )}
-
-        {tools.length > 0 && (
-          <Section title="Tool calls and results, by tool" note="approximate">
-            {tools.map((t) => (
-              <Bar key={t.name} label={shortTool(t.name)} title={t.name} tokens={t.callTokens + t.resultTokens} of={scale} />
-            ))}
-          </Section>
-        )}
-
-        {largest.length > 0 && (
-          <Section title="Largest tool results" note="approximate">
-            {largest.map((r, i) => (
-              <div key={i} className="flex items-baseline gap-2 py-[3px] text-[12px]">
-                <span className="shrink-0 text-fg-2">{shortTool(r.tool)}</span>
-                <Tail text={shortPath(r.label, thread.cwd)} title={r.label} className="text-fg-4" />
-                <span className="shrink-0 font-num text-fg-3 tabular-nums">{formatTokens(r.tokens)}</span>
-              </div>
-            ))}
-          </Section>
-        )}
-
-        {context?.spend && <SpendSection spend={context.spend} />}
-
-        {(context?.memoryFiles?.length ?? 0) > 0 && (
-          <Section title="Memory files">
-            {context!.memoryFiles!.map((m) => (
-              <div key={m.path} className="flex items-baseline gap-2 py-[3px] text-[12px]">
-                <Tail text={shortPath(m.path, thread.cwd)} title={m.path} className="text-fg-3" />
-                <span className="shrink-0 font-num text-fg-3 tabular-nums">{formatTokens(m.tokens)}</span>
-              </div>
-            ))}
-          </Section>
-        )}
-
-        {context && (
-          <p className="mt-3 text-[11px] text-fg-4">
-            {SOURCE_NOTE[context.source]} Updated {relTime(context.updated_at)}.
-          </p>
-        )}
+        {more && <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-elev to-transparent" />}
       </div>
       {/* Cursor has no compact command; the panel is the meter and the thread's spend. */}
       {thread.harness !== 'cursor' && <CompactAction thread={thread} view={view} onCompacted={onCompacted} />}
@@ -325,7 +336,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
     <div className="mt-3.5">
       <div className="mb-1 flex items-baseline gap-1.5">
         <span className="caption">{title}</span>
-        {note && <span className="text-[10.5px] text-fg-4">{note}</span>}
+        {note && <span className="text-[10.5px] text-fg-3">{note}</span>}
       </div>
       {children}
     </div>
@@ -337,7 +348,7 @@ function Bar({ label, title, tokens, of, faint }: { label: string; title?: strin
   return (
     <div className="py-[3px]" title={title ?? label}>
       <div className="flex items-baseline gap-2 text-[12px]">
-        <span className={`min-w-0 flex-1 truncate ${faint ? 'text-fg-4' : 'text-fg-2'}`}>{label}</span>
+        <span className={`min-w-0 flex-1 truncate ${faint ? 'text-fg-3' : 'text-fg-2'}`}>{label}</span>
         <span className="shrink-0 font-num text-fg-3 tabular-nums">{formatTokens(tokens)}</span>
       </div>
       <div className="mt-[3px] h-[3px] overflow-hidden rounded-full bg-[var(--wash)]">
@@ -421,7 +432,7 @@ function CompactAction({ thread, view, onCompacted }: { thread: Thread; view: Co
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 text-[11.5px] text-fg-4">{blocked ?? 'Summarize the conversation to free up room.'}</span>
+          <span className="min-w-0 flex-1 text-[11.5px] text-fg-3">{blocked ?? 'Summarize the conversation to free up room.'}</span>
           <Button size="sm" variant="secondary" icon="layers" disabled={!!blocked || !view} onClick={() => setAsking(true)} title={blocked ?? undefined}>
             Compact
           </Button>

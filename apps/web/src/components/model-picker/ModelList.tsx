@@ -32,7 +32,7 @@ export function ModelList({
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-[13px] text-fg">Auto</span>
-            <span className="truncate text-[11.5px] text-fg-4">{AUTO_NOTE}</span>
+            <span className="truncate text-[11.5px] text-fg-3">{AUTO_NOTE}</span>
           </span>
           <span className="pik-mark">{auto && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
         </button>
@@ -44,12 +44,12 @@ export function ModelList({
               <HarnessLogo harness={harness.id} size={12} />
               <span className="truncate">{harness.name}</span>
             </span>
-            <span className="shrink-0 text-[11.5px] text-fg-4">
+            <span className="shrink-0 text-[11.5px] text-fg-3">
               {harness.available ? (harness.plan.endsWith('plan') ? `Bills your ${harness.plan}` : harness.plan) : 'Unavailable'}
             </span>
           </div>
           {!harness.available ? (
-            <div className="px-3 pb-2 text-[11.5px] text-fg-4">
+            <div className="px-3 pb-2 text-[11.5px] text-fg-3">
               {harness.fix && harness.fix.split(/\s+/).length <= 3 ? (
                 <>
                   Not available. Run <code className="font-mono text-fg-2">{harness.fix}</code>.
@@ -74,9 +74,9 @@ export function ModelList({
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[13px] text-fg">
                     {m.label}
-                    {m.default && <span className="text-fg-4"> (default)</span>}
+                    {m.default && <span className="text-fg-3"> (default)</span>}
                   </span>
-                  {m.note && <span className="truncate text-[11.5px] text-fg-4">{m.note}</span>}
+                  {m.note && <span className="truncate text-[11.5px] text-fg-3">{m.note}</span>}
                 </span>
                 <span className="pik-mark">
                   {harness.id === value.harness && m.id === value.model && <Icon name="check" size={12} strokeWidth={2.6} />}
@@ -84,7 +84,7 @@ export function ModelList({
               </button>
             ))
           ) : query.trim() ? (
-            <div className="px-3 pb-2 text-[11.5px] text-fg-4">No match</div>
+            <div className="px-3 pb-2 text-[11.5px] text-fg-3">No match</div>
           ) : null}
         </div>
       ))}

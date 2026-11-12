@@ -139,7 +139,7 @@ export function FileMenu({
       aria-label="Files"
       // Keep focus (and the phone keyboard) in the composer.
       onMouseDown={(e) => e.preventDefault()}
-      className={`fade-in scroll-thin absolute inset-x-0 z-20 max-h-[min(22rem,45vh)] overflow-y-auto rounded-[22px] bg-elev p-1.5 shadow-[var(--shadow-menu)] ${below ? 'top-full mt-2' : 'bottom-full mb-2'}`}
+      className={`fade-in scroll-thin absolute inset-x-0 z-20 max-h-[min(22rem,45vh)] overflow-y-auto rounded-[var(--r-2xl)] bg-elev p-1.5 shadow-[var(--shadow-menu)] ${below ? 'top-full mt-2' : 'bottom-full mb-2'}`}
     >
       {rows.map((r, k) => (
         <div
@@ -155,7 +155,7 @@ export function FileMenu({
           <Icon name="file" size={14} className="shrink-0 text-fg-3" />
           <span className="flex min-w-0 flex-1 items-baseline gap-2">
             <span className="shrink-0 text-[13px] font-medium text-fg">{r.name}</span>
-            <span className="truncate text-[11.5px] text-fg-4">{r.detail}</span>
+            <span className="truncate text-[11.5px] text-fg-3">{r.detail}</span>
           </span>
           {r.kind === 'artifact' && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">artifact</span>}
         </div>

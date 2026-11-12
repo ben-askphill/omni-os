@@ -1,37 +1,57 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { sectionDef, sectionShows, type Provenance } from '@omni/shared/settings-catalog.ts';
 import { pageFields, SETTING_PAGES, settingHint, settingId, settingPlaceholder, settingProblem, type SettingField, type SettingPage } from '@omni/shared/settings.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SetupState, type Status, type UserConfig, type UserConfigPatch } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setChannelAlerts, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
-import { PronounsInput, TimezoneInput } from '../components/Onboarding.tsx';
+import { PRONOUNS } from '../components/onboarding-parts.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { setLayout, useLayout } from '../layout-pref.ts';
 import { desktop } from '../desktop.ts';
-import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
-import { ChannelSettingsForm, Section } from './ChannelSettings.tsx';
+import { ChannelSettingsForm } from './ChannelSettings.tsx';
 import { GoogleAccountSection } from './GoogleAccount.tsx';
 import { ConnectSection } from './Connect.tsx';
 import { IosPairingSection } from './IosPairing.tsx';
 import { MachinesSection, RunOnCard } from './Machines.tsx';
 import { SecretsSection } from './Secrets.tsx';
-import { DesktopSection } from './SettingsDesktop.tsx';
+import { AppServerRows, DesktopSection, ZoomRow } from './SettingsDesktop.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
 import { StorageSection } from './Storage.tsx';
 import { PathMapEditor, SyncSection } from './Sync.tsx';
-import { Advanced, Card, InfoRow, Origin, Row, rowHintId, ScopeBar, ServerOptions, settingAnchor, SwitchRow, useScopedChannel } from './settings-parts.tsx';
+import {
+  Advanced,
+  AutosaveNote,
+  Card,
+  EnvNote,
+  FootNote,
+  InfoList,
+  InfoRow,
+  LinkLine,
+  Origin,
+  ResetButton,
+  Row,
+  rowHintId,
+  ScopeBar,
+  ServerOptions,
+  settingAnchor,
+  SettingRow,
+  SwitchRow,
+  useScopedChannel,
+} from './settings-parts.tsx';
 
 // Settings: a searchable nav of grouped sections beside one section at a time (@omni/shared/settings-catalog.ts),
-// the same sections in the same order as the phone's Settings screen. A scoped
-// section shows the channel picker: Every channel is this machine's values, a channel shows what it sets and what it
-// inherits. Each value says where it comes from (built-in default, .env, this machine, the channel, this device),
-// with Reset beside one Omni saved. Config fields come from the shared contract (@omni/shared/settings.ts) and save
-// to data/omni.config.json through PUT /api/setup.
+// the same sections in the same order as the phone's Settings screen. A scoped section shows the channel picker: This
+// machine is this machine's values, a channel shows what it sets and what it inherits. Each value says where it comes
+// from (built-in default, .env, this machine, the channel, this device), with Reset beside one Omni saved. Config
+// fields come from the shared contract (@omni/shared/settings.ts) and save to data/omni.config.json through PUT
+// /api/setup: as you change them, except a form with a URL, which saves with Save changes so a half-typed address
+// never reaches the server.
 
 export function SettingsPage({ section, focus }: { section?: SettingsSection; focus?: string }) {
   // The desktop app's own section is no page in a browser or on a phone.
@@ -77,7 +97,7 @@ function SectionBody({ section }: { section: SettingsSection }) {
     case 'notifications':
       return <NotificationsCard scoped={channel?.id} />;
     case 'models':
-      return <ModelsSection />;
+      return <ModelsSection hermes={<ConfigSection part="models" />} />;
     case 'threads':
       return <ThreadsSection />;
     case 'channels':
@@ -92,21 +112,15 @@ function SectionBody({ section }: { section: SettingsSection }) {
       return (
         <>
           <SyncSection />
-          <Advanced summary="Where your folders are on your other machines">
-            <div id={settingAnchor('path-map')} className="scroll-mt-6">
-              <PathMapEditor />
-            </div>
-          </Advanced>
+          <PathMapEditor />
         </>
       );
     case 'access':
       return <AccessSection />;
-    case 'integrations':
-      return <ConfigSection part="integrations" />;
     case 'secrets':
       return (
         <div id={settingAnchor('secrets')} className="scroll-mt-6 space-y-5">
-          <SecretsSection scoped={channel?.id} />
+          <SecretsSection />
         </div>
       );
     case 'desktop':
@@ -150,16 +164,18 @@ function useSetupState() {
 function GeneralSection() {
   const { openSetup } = useApp();
   return (
-    <>
-      <ConfigSection part="general" />
-      <div id={settingAnchor('setup')} className="flex scroll-mt-6 flex-wrap items-center justify-between gap-3 rounded-[20px] bg-surface p-4 md:p-5">
-        <div className="min-w-0">
-          <div className="font-display text-[15px]">Setup</div>
-          <p className="mt-0.5 text-[12.5px] text-fg-3">Walk through the onboarding screens again, including the harness check.</p>
-        </div>
-        <Button onClick={openSetup}>Run setup again</Button>
-      </div>
-    </>
+    <ConfigSection part="general">
+      <Card
+        entry="setup"
+        title="Setup"
+        subtitle="Walk through the onboarding screens again, including the harness check."
+        actions={
+          <Button size="sm" onClick={openSetup}>
+            Run setup again
+          </Button>
+        }
+      />
+    </ConfigSection>
   );
 }
 
@@ -171,70 +187,19 @@ function ConfigSection({ part, children }: { part: SettingPage; children?: React
       {error && <ErrorNote>{error}</ErrorNote>}
       {state ? <ConfigForm part={part} state={state} onSaved={setState} /> : !error && <Loading />}
       {children}
-      {part !== 'access' && <ConfigNote path={state?.path} />}
+      {part !== 'access' && part !== 'models' && <ConfigNote path={state?.path} />}
     </>
   );
 }
 
 function WorkspaceSection() {
-  const { channel } = useScopedChannel();
-  const setup = useApi<SetupState>(channel ? '/setup' : null);
-  return (
-    <>
-      {channel && (
-        <Card entry="folders" title={`Where #${channel.name}'s threads run`} subtitle="A channel with a repo runs each thread in a worktree of it; without one, in its base directory, else your workspace folder.">
-          {channel.repo_path ? (
-            <Row label="Repo" htmlFor="ws-repo" origin={<Origin of="channel" label={`Set on #${channel.name}`} />}>
-              <div id="ws-repo" className="font-mono text-[12.5px] break-all">{channel.repo_path}</div>
-            </Row>
-          ) : channel.base_dir ? (
-            <Row label="Base directory" htmlFor="ws-base" origin={<Origin of="channel" label={`Set on #${channel.name}`} />}>
-              <div id="ws-base" className="font-mono text-[12.5px] break-all">{channel.base_dir}</div>
-            </Row>
-          ) : (
-            <Row label="Base directory" htmlFor="ws-base" origin={<Origin of="inherited" label="Inherited: workspace folder" />}>
-              <div id="ws-base" className="font-mono text-[12.5px] break-all text-fg-2">{setup.data?.resolved.workspaceRoot ?? '…'}</div>
-            </Row>
-          )}
-          <div>
-            <Button size="sm" onClick={() => navigate(href.settingsSection('channels', 'channel-code'))}>
-              Change in Channels
-            </Button>
-          </div>
-        </Card>
-      )}
-      <ConfigSection part="workspace" />
-    </>
-  );
+  return <ConfigSection part="workspace" />;
 }
 
 function WorktreesSection() {
-  const { channel } = useScopedChannel();
   return (
     <>
-      {channel && (
-        <Card
-          title={`Worktrees in #${channel.name}`}
-          subtitle={channel.repo_path ? 'Each new thread gets its own git worktree and branch, so threads never share a checkout.' : 'This channel has no repo, so its threads run in a folder and get no worktree.'}
-          origin={channel.repo_path ? <Origin of="channel" label={`Set on #${channel.name}`} /> : undefined}
-        >
-          {channel.repo_path && (
-            <div className="flex items-center gap-3 text-[13px]">
-              <span className="flex-1">Worktree per thread</span>
-              <span className="text-fg-2">{channel.use_worktree ? 'On' : 'Off'}</span>
-              <Button size="sm" onClick={() => navigate(href.settingsSection('channels', 'channel-code'))}>
-                Change
-              </Button>
-            </div>
-          )}
-          <p className="text-[12px] text-fg-3">Cleanup below is per machine. A channel cannot set its own yet.</p>
-        </Card>
-      )}
-      <div id={settingAnchor('worktree-retention')} className="scroll-mt-6 space-y-5">
-        <span id={settingAnchor('worktree-storage')} />
-        <span id={settingAnchor('worktree-slim')} />
-        <StorageSection />
-      </div>
+      <StorageSection />
       <ServerOptions section="worktrees" />
     </>
   );
@@ -248,16 +213,11 @@ function ThreadsSection() {
       <div id={settingAnchor('keep-alive')} className="scroll-mt-6">
         <span id={settingAnchor('limits')} />
         <span id={settingAnchor('thread-features')} />
-        <ServerOptions section="threads" title="Sessions, usage limits and thread features" />
+        <ServerOptions section="threads" />
       </div>
-      <Card
-        entry="automations"
-        title="Automations"
-        subtitle="Threads that start on a schedule, a GitHub event or a webhook. They have a page of their own."
-        origin={<LinkButton size="sm" href={href.automations()} icon="zap">Open Automations</LinkButton>}
-      >
-        {null}
-      </Card>
+      <div id={settingAnchor('automations')} className="scroll-mt-6">
+        <LinkLine href={href.automations()}>Automations have their own page</LinkLine>
+      </div>
     </>
   );
 }
@@ -273,16 +233,25 @@ function ChannelsSection() {
           <ChannelSettingsForm key={channel.id} existing={channel} />
         </div>
         <div id={settingAnchor('channel-actions')} className="scroll-mt-6">
-          <Section title="Actions">
+          <Card title="Actions">
             <ChannelActionsEditor channelId={channel.id} />
-          </Section>
+          </Card>
         </div>
       </>
     );
   const listed = channels.filter((c) => !c.archived);
   const archived = channels.filter((c) => c.archived);
   return (
-    <Card entry="channel-list" title="Your channels" subtitle="One per client or project. Pick one to see and change its settings; it stays picked as you move between sections." origin={<LinkButton size="sm" href={href.newChannel()} icon="plus">New channel</LinkButton>}>
+    <Card
+      entry="channel-list"
+      title="Your channels"
+      subtitle="Pick one to see and change its settings. It stays picked as you move between sections."
+      actions={
+        <LinkButton size="sm" href={href.newChannel()} icon="plus">
+          New channel
+        </LinkButton>
+      }
+    >
       <ul className="divide-y divide-line">
         {listed.map((c) => (
           <li key={c.id}>
@@ -318,12 +287,8 @@ function ChannelsSection() {
 function AccessSection() {
   return (
     <>
-      <div id={settingAnchor('google')} className="scroll-mt-6 space-y-5">
-        <GoogleAccountSection />
-      </div>
-      <div id={settingAnchor('connect')} className="scroll-mt-6 space-y-5">
-        <ConnectSection />
-      </div>
+      <GoogleAccountSection />
+      <ConnectSection />
       <IosPairingSection />
       <ConfigSection part="access" />
     </>
@@ -336,78 +301,108 @@ function AboutSection() {
   const setup = useApi<SetupState>('/setup');
   const store = useSecretStoreLabel();
   const s = status.data?.server;
+  const mono = 'min-w-0 truncate font-mono text-[12.5px]';
   return (
     <>
       <Card entry="version" title="Version and build">
-        <div className="space-y-2 text-[13px]">
+        <InfoList>
           <InfoRow label="Version">
             <span className="font-num">{s?.version ?? '…'}</span>
           </InfoRow>
           <InfoRow label="Commit">
-            <span className="truncate font-mono text-[12.5px]">{s?.gitHead?.slice(0, 12) ?? 'Unknown'}</span>
+            <span className={mono}>{s?.gitHead?.slice(0, 12) ?? 'Unknown'}</span>
           </InfoRow>
           {s?.startedAt && (
             <InfoRow label="Started">
               <span>{relTime(s.startedAt)}</span>
             </InfoRow>
           )}
-        </div>
+        </InfoList>
+      </Card>
+      <LinkLine href={href.settingsSection('machines', 'update-machines')}>Updates are in Machines</LinkLine>
+      <Card entry="server" title="Server">
+        <InfoList>
+          <InfoRow label="Address">
+            <span className={mono}>{location.origin}</span>
+          </InfoRow>
+          {desktop ? (
+            <AppServerRows bridge={desktop} />
+          ) : (
+            s?.port && (
+              <InfoRow label="Port">
+                <span className="font-num">{s.port}</span>
+              </InfoRow>
+            )
+          )}
+        </InfoList>
       </Card>
       <Card entry="files" title="Where Omni keeps its files" subtitle="All on this machine. None of it goes into git.">
-        <div className="space-y-2 text-[13px]">
+        <InfoList>
           <InfoRow label="Repo">
-            <span className="truncate font-mono text-[12.5px]">{s?.root ?? '…'}</span>
+            <span className={mono}>{s?.root ?? '…'}</span>
           </InfoRow>
-          <InfoRow label="Data">
-            <span className="truncate font-mono text-[12.5px]">{s?.dataDir ?? '…'}</span>
-          </InfoRow>
+          {!desktop && (
+            <InfoRow label="Data">
+              <span className={mono}>{s?.dataDir ?? '…'}</span>
+            </InfoRow>
+          )}
           <InfoRow label="Config">
-            <span className="truncate font-mono text-[12.5px]">{setup.data?.path ?? 'data/omni.config.json'}</span>
+            <span className={mono}>{setup.data?.path ?? 'data/omni.config.json'}</span>
           </InfoRow>
           <InfoRow label="Secrets">
-            <span className="truncate">{store}</span>
+            <span className="min-w-0 truncate">{store}</span>
           </InfoRow>
-        </div>
+        </InfoList>
       </Card>
+      <ServerOptions section="machines" />
     </>
   );
 }
 
 function ConfigNote({ path }: { path?: string }) {
   return (
-    <div className="flex gap-3 rounded-[20px] bg-surface p-4 text-[12.5px] leading-relaxed text-fg-2">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg text-fg-3">
-        <Icon name="info" size={15} />
-      </span>
-      <div>
-        These settings live in <code>{path ?? 'data/omni.config.json'}</code> on this machine and never go into git, so a fork stays clean. An environment variable in{' '}
-        <code>.env</code> wins over a value here; the chip beside a field says so.
-      </div>
-    </div>
+    <FootNote>
+      These settings live in <code>{path ?? 'data/omni.config.json'}</code> on this machine and never go into git. A value set in <code>.env</code> wins over one here,
+      and the field then says so.
+    </FootNote>
   );
 }
 
 /** Where a config field's value comes from now. */
-function fieldOrigin(f: SettingField, state: SetupState): { of: Provenance; label?: string } {
+function fieldOrigin(f: SettingField, state: SetupState): { of: Provenance; env?: string } {
   const env = state.env?.[settingId(f)];
-  if (env) return { of: 'env', label: `Set by ${env}` };
+  if (env) return { of: 'env', env };
   const saved = (state.config[f.section] as Record<string, string | undefined>)[f.key] ?? '';
   return saved && saved !== f.default ? { of: 'machine' } : { of: 'default' };
 }
 
+/** What a field .env sets resolves to, where the server says. */
+const RESOLVED: Partial<Record<string, keyof SetupState['resolved']>> = {
+  'user.timezone': 'timezone',
+  'workspace.root': 'workspaceRoot',
+  'integrations.hermesUrl': 'hermesUrl',
+  'integrations.centralBrainDir': 'centralBrainDir',
+};
+
+/**
+ * Typed fields wait for Save changes on a page with a URL, so a half-typed address never reaches the server. Every
+ * other page saves a field as it changes: a text field on Return or leaving it, a picker on pick.
+ */
+const savesAsYouGo = (fields: readonly SettingField[]) => fields.every((f) => f.input !== 'url');
+
 /**
  * One section's config fields, drawn from the shared settings contract (@omni/shared/settings.ts), so a new field
- * there shows here with no change to this file. Each section saves its own fields, so the others stay as they are.
- * Reset beside a field saves its default at once and keeps the other drafts.
+ * there shows here with no change to this file. A field .env sets, or one only the file sets, shows its value
+ * read-only with where to change it. Reset beside a field saves its default at once and keeps the other drafts.
  */
 function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupState; onSaved: (s: SetupState) => void }) {
   const { reloadProfile } = useApp();
   const fields = useMemo(() => pageFields(part), [part]);
-  const editable = useMemo(() => fields.filter((f) => !f.readonly), [fields]);
+  const editable = fields.filter((f) => !f.readonly && !state.env?.[settingId(f)]);
+  const auto = savesAsYouGo(editable);
   const page = SETTING_PAGES[part];
   const [values, setValues] = useState(() => formValues(fields, state.config));
-  const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -423,88 +418,98 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
   const patch = formPatch(editable, values);
   const dirty = JSON.stringify(patch) !== JSON.stringify(formPatch(editable, formValues(editable, state.config)));
 
-  const after = async (next: SetupState) => {
-    onSaved(next);
-    if (part === 'general') await reloadProfile();
-  };
-
-  const save = async (e: FormEvent) => {
-    e.preventDefault();
-    const problem = editable.map((f) => settingProblem(f, values[settingId(f)] ?? '', 'form')).find(Boolean);
-    if (problem) return setError(problem);
-    setSaving(true);
+  /** `key`: the field whose Reset spins, or 'form'. */
+  const put = async (key: string, body: UserConfigPatch) => {
+    setSaving(key);
     setError(null);
     setSaved(false);
     try {
-      await after(await api.put<SetupState>('/setup', patch));
+      onSaved(await api.put<SetupState>('/setup', body));
+      if (part === 'general') await reloadProfile();
       setSaved(true);
+      return true;
     } catch (err) {
       setError(errorText(err));
+      return false;
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
+  };
+
+  /** Saves one field as it stands, unless it is unchanged or refused. */
+  const commit = (f: SettingField, raw = values[settingId(f)] ?? '') => {
+    if (!auto) return;
+    const problem = settingProblem(f, raw, 'form');
+    if (problem) return setError(problem);
+    const next = raw.trim() || f.default;
+    const now = (state.config[f.section] as Record<string, string | undefined>)[f.key] || f.default;
+    if (next === now) return setError(null);
+    void put(settingId(f), { [f.section]: { [f.key]: next } });
+  };
+
+  const saveAll = async (e: FormEvent) => {
+    e.preventDefault();
+    if (auto) return;
+    const problem = editable.map((f) => settingProblem(f, values[settingId(f)] ?? '', 'form')).find(Boolean);
+    if (problem) return setError(problem);
+    await put('form', patch);
   };
 
   const reset = async (f: SettingField) => {
-    setResetting(settingId(f));
-    setError(null);
-    try {
-      await after(await api.put<SetupState>('/setup', { [f.section]: { [f.key]: f.default } }));
-      setValues((cur) => ({ ...cur, [settingId(f)]: f.default }));
-    } catch (err) {
-      setError(errorText(err));
-    } finally {
-      setResetting(null);
-    }
+    if (await put(settingId(f), { [f.section]: { [f.key]: f.default } })) setValues((cur) => ({ ...cur, [settingId(f)]: f.default }));
   };
 
-  const set = (f: SettingField) => (v: string) => (setValues((cur) => ({ ...cur, [settingId(f)]: v })), setSaved(false));
   const field = (f: SettingField) => {
     const o = fieldOrigin(f, state);
+    const id = settingId(f);
+    const fixed = f.readonly || o.of === 'env';
     return (
       <ConfigField
-        key={settingId(f)}
+        key={id}
         field={f}
-        value={values[settingId(f)] ?? ''}
+        value={values[id] ?? ''}
+        fixed={fixed ? { env: o.env, shown: o.env ? (RESOLVED[id] ? state.resolved[RESOLVED[id]] : null) : (values[id] ?? '') } : null}
         fallbacks={state.fallbacks}
-        onChange={set(f)}
-        origin={<Origin of={o.of} label={o.label} onReset={f.readonly || f.required ? undefined : () => void reset(f)} busy={resetting === settingId(f)} />}
+        onChange={(v) => (setValues((cur) => ({ ...cur, [id]: v })), setSaved(false))}
+        onCommit={(v) => commit(f, v)}
+        origin={<Origin of={o.of} />}
+        action={!fixed && !f.required && <ResetButton of={o.of} onReset={() => void reset(f)} busy={saving === id} />}
       />
     );
   };
   const rows = (list: readonly SettingField[]) => <div className="space-y-5">{list.map(field)}</div>;
   const advanced = fields.filter((f) => f.advanced);
-  const entry = FORM_ENTRY[part];
 
   return (
-    <form onSubmit={save} className="space-y-5">
-      <div id={settingAnchor(entry)} className="scroll-mt-6">
-        {part === 'integrations' && <span id={settingAnchor('brain')} />}
-        <Card title={page.title} subtitle={page.note}>
-          {rows(fields.filter((f) => !f.advanced))}
-        </Card>
-      </div>
+    <form onSubmit={saveAll} className="space-y-5">
+      <Card entry={FORM_ENTRY[part]} title={page.title} subtitle={page.note}>
+        {part === 'workspace' && <span id={settingAnchor('brain')} className="block scroll-mt-6" />}
+        {rows(fields.filter((f) => !f.advanced))}
+        {error && <ErrorNote>{error}</ErrorNote>}
+        {editable.length > 0 &&
+          (auto ? (
+            <AutosaveNote saving={saving !== null} saved={saved} />
+          ) : (
+            <div className="flex items-center justify-end gap-3">
+              {saved && !dirty && <span className="text-[12.5px] text-fg-3">Saved</span>}
+              <Button type="submit" variant="primary" size="sm" busy={saving === 'form'} disabled={!dirty}>
+                Save changes
+              </Button>
+            </div>
+          ))}
+      </Card>
       {advanced.length > 0 && (
         <Advanced summary={page.advanced?.summary}>
           {page.advanced?.note && <p className="text-[12.5px] text-fg-3">{page.advanced.note}</p>}
           {rows(advanced)}
         </Advanced>
       )}
-      {editable.length > 0 && (
-        <div className="flex items-center gap-3">
-          <Button type="submit" variant="primary" busy={saving} disabled={!dirty}>
-            Save
-          </Button>
-          {saved && !dirty && <span className="text-[12.5px] text-fg-3">Saved</span>}
-        </div>
-      )}
-      {error && <ErrorNote>{error}</ErrorNote>}
     </form>
   );
 }
 
 /** The search entry each form answers to. */
-const FORM_ENTRY: Record<SettingPage, string> = { general: 'you', workspace: 'folders', integrations: 'hermes', access: 'network' };
+const FORM_ENTRY: Record<SettingPage, string> = { general: 'you', workspace: 'folders', models: 'hermes', access: 'network' };
 
 const formValues = (fields: readonly SettingField[], c: UserConfig): Record<string, string> =>
   Object.fromEntries(fields.map((f) => [settingId(f), (c[f.section] as Record<string, string | undefined>)[f.key] ?? f.default]));
@@ -518,33 +523,61 @@ function formPatch(fields: readonly SettingField[], values: Record<string, strin
 
 const MONO = new Set<SettingField['input']>(['folder', 'url', 'owner']);
 
+/**
+ * One config field. `fixed`: .env or only the file sets it, so it shows the value read-only with where to change it.
+ * `onCommit` saves a value as it stands: a text field on Return or blur, a picker on pick.
+ */
 function ConfigField({
   field: f,
   value,
+  fixed,
   fallbacks,
   onChange,
+  onCommit,
   origin,
+  action,
 }: {
   field: SettingField;
   value: string;
+  /** `shown`: null where the server does not say what .env resolves to. */
+  fixed: { env?: string; shown: string | null } | null;
   fallbacks: SetupState['fallbacks'];
   onChange: (v: string) => void;
+  onCommit: (v?: string) => void;
   origin: ReactNode;
+  action: ReactNode;
 }) {
   const id = `set-${f.key}`;
   const hint = settingHint(f, fallbacks);
   const describedBy = hint ? rowHintId(id) : undefined;
-  const input = f.readonly ? (
-    <input id={id} className={`field w-full font-mono !text-[13px] text-fg-2`} value={value} placeholder={settingPlaceholder(f, fallbacks) || 'Not set'} readOnly aria-readonly aria-describedby={describedBy} />
+  const pick = (v: string) => (onChange(v), onCommit(v));
+  const input = fixed ? (
+    <>
+      {fixed.shown !== null && (
+        <div id={id} aria-describedby={describedBy} className={`font-mono text-[13px] break-all ${fixed.shown ? 'text-fg' : 'text-fg-3'}`}>
+          {fixed.shown || 'Not set'}
+        </div>
+      )}
+      <EnvNote env={fixed.env} file={fixed.env ? undefined : f.key} />
+    </>
   ) : f.input === 'pronouns' ? (
-    <PronounsInput id={id} value={value} onChange={onChange} describedBy={describedBy} />
+    <PronounsField id={id} value={value} onChange={onChange} onPick={pick} onCommit={onCommit} describedBy={describedBy} />
   ) : f.input === 'timezone' ? (
-    <TimezoneInput id={id} value={value} onChange={onChange} describedBy={describedBy} />
+    <Picker
+      id={id}
+      describedBy={describedBy}
+      label={f.label}
+      size="field"
+      searchable
+      value={value}
+      onChange={pick}
+      options={timezoneOptions(value, fallbacks.timezone)}
+    />
   ) : (
     <input
       id={id}
       aria-describedby={describedBy}
-      className={`field w-full${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
+      className={`field h-10 w-full${MONO.has(f.input) ? ' font-mono !text-[13px]' : ''}`}
       type={f.input === 'email' ? 'email' : 'text'}
       value={value}
       maxLength={f.max}
@@ -553,12 +586,75 @@ function ConfigField({
       spellCheck={MONO.has(f.input) ? false : undefined}
       autoCapitalize={f.input === 'owner' ? 'off' : undefined}
       onChange={(e) => onChange(e.target.value)}
+      onKeyDown={commitOnEnter}
+      onBlur={() => onCommit()}
     />
   );
   return (
-    <Row label={f.label} htmlFor={id} hint={hint} origin={origin}>
+    <Row label={f.label} htmlFor={id} hint={hint} origin={origin} action={action}>
       {input}
     </Row>
+  );
+}
+
+/** Return saves a field that saves as you go; on a form with Save changes, Return submits it. */
+const commitOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter' && !e.currentTarget.form?.querySelector('[type=submit]')) e.currentTarget.blur();
+};
+
+const SERVER_TZ = '';
+
+function timezoneOptions(value: string, server: string) {
+  let zones: string[] = [];
+  try {
+    zones = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
+  } catch {
+    zones = [];
+  }
+  if (value && !zones.includes(value)) zones = [value, ...zones];
+  return [
+    { value: SERVER_TZ, label: server ? `Server's timezone (${server})` : "Server's timezone", avatar: false as const },
+    ...zones.map((z) => ({ value: z, label: z.replace(/_/g, ' '), avatar: false as const })),
+  ];
+}
+
+const OTHER = 'other';
+
+/** Pronouns: the common ones in a picker, or Other with a field of your own. */
+function PronounsField({
+  id,
+  value,
+  onChange,
+  onPick,
+  onCommit,
+  describedBy,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  onPick: (v: string) => void;
+  onCommit: () => void;
+  describedBy?: string;
+}) {
+  const [other, setOther] = useState(!PRONOUNS.includes(value));
+  return (
+    <div className="flex gap-2">
+      <Picker
+        id={id}
+        describedBy={describedBy}
+        label="Pronouns"
+        size="field"
+        className="min-w-0 flex-1"
+        value={other ? OTHER : value}
+        onChange={(v) => {
+          setOther(v === OTHER);
+          if (v !== OTHER) onPick(v);
+          else onChange('');
+        }}
+        options={[...PRONOUNS.map((p) => ({ value: p, label: p, avatar: false as const })), { value: OTHER, label: 'Other…', avatar: false as const }]}
+      />
+      {other && <input aria-label="Your pronouns" className="field h-10 min-w-0 flex-1" value={value} placeholder="xe/xem" onChange={(e) => onChange(e.target.value)} onKeyDown={commitOnEnter} onBlur={onCommit} />}
+    </div>
   );
 }
 
@@ -566,50 +662,52 @@ function AppearanceCard() {
   const [theme, setTheme] = useTheme();
   const layout = useLayout();
   const mobile = useIsMobile();
+  const thisBrowser = <Origin of="device" label="This browser" />;
   return (
     <>
-      <Card entry="theme" title="Theme" subtitle="Follows your system, or stays light or dark." origin={<Origin of="device" label="This browser only" />}>
-        <Segmented
-          radio
+      <Card entry="theme" title="Look">
+        <SettingRow
           label="Theme"
-          value={theme}
-          onChange={setTheme}
-          options={[
-            { id: 'system', icon: 'monitor', label: 'Match system' },
-            { id: 'light', icon: 'sun', label: 'Light' },
-            { id: 'dark', icon: 'moon', label: 'Dark' },
-          ]}
+          origin={thisBrowser}
+          hint="Follows your system, or stays light or dark."
+          control={
+            <Segmented
+              radio
+              label="Theme"
+              value={theme}
+              onChange={setTheme}
+              options={[
+                { id: 'system', icon: 'monitor', label: 'Match system' },
+                { id: 'light', icon: 'sun', label: 'Light' },
+                { id: 'dark', icon: 'moon', label: 'Dark' },
+              ]}
+            />
+          }
         />
-      </Card>
-      {!mobile && (
-      <Card
-        entry="layout"
-        title="New layout"
-        subtitle="Channels as a rail of discs, with a list of the selected channel's threads beside it. Still in progress: turn it off to go back to the classic sidebar. The phone layout stays as it is."
-        origin={<Origin of="device" label="This browser only" />}
-      >
-        <div className="flex items-center gap-3 rounded-[16px] bg-bg px-4 py-2.5">
-          <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium">
-            Channel rail <Chip tone="live">Beta</Chip>
+        {!mobile && (
+          <div id={settingAnchor('layout')} className="scroll-mt-6">
+            <SwitchRow
+              title="Channel rail"
+              origin={
+                <>
+                  <Chip tone="outline">Beta</Chip>
+                  {thisBrowser}
+                </>
+              }
+              detail="Channels as a rail of discs, with the selected channel's threads beside it. Turn it off for the classic sidebar. The phone layout stays as it is."
+              checked={layout === 'rail'}
+              onChange={(on) => setLayout(on ? 'rail' : 'classic')}
+            />
           </div>
-          <Toggle checked={layout === 'rail'} onChange={(on) => setLayout(on ? 'rail' : 'classic')} label="Use the new channel rail layout (Beta)" />
-        </div>
+        )}
       </Card>
-      )}
-      {desktop ? (
-        <Card
-          entry="zoom"
-          title="Text size"
-          subtitle="This app has its own zoom, in Desktop app and in the View menu."
-          origin={<LinkButton size="sm" href={href.settingsSection('desktop', 'desktop-zoom')}>Open Desktop app</LinkButton>}
-        >
-          {null}
-        </Card>
-      ) : (
-        <Card entry="zoom" title="Text size" subtitle="For bigger or smaller text, use the browser's zoom (Cmd + and Cmd -). The desktop app has its own." origin={<Origin of="device" label="This browser only" />}>
-          {null}
-        </Card>
-      )}
+      <Card entry="zoom" title="Text size">
+        {desktop ? (
+          <ZoomRow bridge={desktop} />
+        ) : (
+          <SettingRow label="Zoom" origin={thisBrowser} hint="Use the browser's zoom: Cmd + and Cmd -, or Ctrl + and Ctrl - on Windows and Linux. The desktop app has its own." />
+        )}
+      </Card>
     </>
   );
 }
@@ -629,62 +727,63 @@ function NotificationsCard({ scoped }: { scoped?: string }) {
   const toggle = async (on: boolean) => setPermission(await setNotificationsEnabled(on));
   const listed = channels.filter((c) => !c.archived);
   const inScope = listed.find((c) => c.id === scoped);
+  const thisBrowser = <Origin of="device" label="This browser" />;
   const channelRow = (c: (typeof listed)[number]) => (
-    <div key={c.id} className="flex items-center gap-3 rounded-[16px] bg-bg px-4 py-2.5">
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium">{c.name}</div>
-        <div className="truncate font-mono text-[11.5px] text-fg-3">#{c.id}</div>
-      </div>
-      <Toggle checked={!prefs.muted.includes(c.id)} onChange={(on) => setChannelAlerts(c.id, on)} label={`Notify for ${c.name}`} disabled={!prefs.enabled} />
-    </div>
+    <li key={c.id} className="py-2.5">
+      <SwitchRow
+        title={c.id === 'conductor' ? 'Conductor' : `#${c.name}`}
+        origin={inScope ? thisBrowser : undefined}
+        checked={!prefs.muted.includes(c.id)}
+        onChange={(on) => setChannelAlerts(c.id, on)}
+        disabled={!prefs.enabled}
+      />
+    </li>
   );
+  const muteNote = 'A channel turned off still lists its results in Needs you, without a notification.';
 
   return (
     <>
-      <Card
-        entry="notify"
-        title="Notify on this device"
-        subtitle="This browser can tell you when a thread finishes or fails while you are in another tab or app. Click one to open its thread. Nothing alerts for the thread you are looking at."
-        origin={<Origin of="device" label="This browser only" />}
-      >
+      <Card entry="notify" title="This browser">
         <SwitchRow
           title="Notify in this browser"
-          detail="New finished and failed results, the ones Needs you lists. Turning this on asks the browser the first time."
+          origin={thisBrowser}
+          detail="Alerts when a thread finishes or fails while you are in another tab or app. Nothing alerts for the thread you are looking at. Turning it on asks the browser the first time."
           checked={prefs.enabled}
           onChange={toggle}
           disabled={permission === 'unsupported'}
         />
-        <div className="flex items-center gap-2 text-[13px]">
-          <span className="w-20 shrink-0 text-fg-3">Browser</span>
-          <StatusDot status={PERMISSION_GLYPH[permission]} size={7} />
-          <span>{PERMISSION_LABEL[permission]}</span>
-          {permission === 'default' && prefs.enabled && (
-            <Button size="sm" className="ml-auto" onClick={() => void toggle(true)}>
-              Ask the browser
-            </Button>
-          )}
-        </div>
+        <SettingRow
+          label="Browser permission"
+          control={
+            <>
+              {permission === 'default' && prefs.enabled && (
+                <Button size="sm" onClick={() => void toggle(true)}>
+                  Ask the browser
+                </Button>
+              )}
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">
+                <StatusDot status={PERMISSION_GLYPH[permission]} size={7} />
+                {PERMISSION_LABEL[permission]}
+              </span>
+            </>
+          }
+        />
         {prefs.enabled && permission === 'denied' && (
           <ErrorNote>The browser blocks notifications for Omni. Allow them in the site settings (the icon left of the address), then come back.</ErrorNote>
         )}
       </Card>
       {inScope ? (
-        <Card
-          entry="notify-channels"
-          title={`#${inScope.name}`}
-          subtitle="A channel turned off still lists its results in Needs you, without a notification."
-          origin={<Chip tone={prefs.muted.includes(inScope.id) ? 'outline' : 'default'}>{prefs.muted.includes(inScope.id) ? 'Muted on this browser' : 'Notifies'}</Chip>}
-        >
-          <div className={prefs.enabled ? '' : 'pointer-events-none opacity-55'}>{channelRow(inScope)}</div>
+        <Card entry="notify-channels" title={inScope.id === 'conductor' ? 'Conductor' : `#${inScope.name}`} subtitle={muteNote}>
+          <ul className={prefs.enabled ? '' : 'pointer-events-none opacity-55'}>{channelRow(inScope)}</ul>
         </Card>
       ) : (
         // One switch per channel grows with the sidebar, so the list folds shut like Advanced (#405).
         <div id={settingAnchor('notify-channels')} className="scroll-mt-6">
           <Advanced title="Channels" summary={`${listed.filter((c) => !prefs.muted.includes(c.id)).length} of ${listed.length} notify`}>
-            <div className={`space-y-3 ${prefs.enabled ? '' : 'pointer-events-none opacity-55'}`}>
-              <p className="text-[12.5px] text-fg-3">A channel turned off still lists its results in Needs you, without a notification.</p>
+            <div className={`space-y-2 ${prefs.enabled ? '' : 'pointer-events-none opacity-55'}`}>
+              <p className="text-[12.5px] text-fg-3">{muteNote}</p>
               {listed.length === 0 && <p className="text-[12.5px] text-fg-3">No channels yet.</p>}
-              <div className="space-y-1.5">{listed.map(channelRow)}</div>
+              <ul className="divide-y divide-line">{listed.map(channelRow)}</ul>
             </div>
           </Advanced>
         </div>

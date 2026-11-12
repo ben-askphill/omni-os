@@ -99,7 +99,7 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
         setDone(true);
         setTimeout(() => setDone(false), 1400);
       }}
-      className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-4 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
+      className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-3 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
     >
       <Icon name={done ? 'check' : 'copy'} size={12} /> {done ? 'Copied' : 'Copy'}
     </button>
@@ -131,7 +131,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
       {cut && '...'}
       {open && (
         <span className="mt-1.5 block border-t border-line pt-1.5 text-[12.5px] leading-snug whitespace-normal text-fg-3">
-          {open.description || 'No description'} <span className="text-fg-4">· {SOURCE_TAG[open.source]}</span>
+          {open.description || 'No description'} <span className="text-fg-3">· {SOURCE_TAG[open.source]}</span>
         </span>
       )}
     </>
@@ -150,7 +150,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
             <Icon name="x" size={11} /> {p.undelivered ? 'Not delivered' : 'Not sent'}
           </span>
         )}
-        <span className="font-num text-[11px] text-fg-4">{clock(toDate(at))}</span>
+        <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} /> : null}
       <ContextChips records={p.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
@@ -175,25 +175,26 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
   );
 }
 
-function ResultLine({ p }: { p: ResultP }) {
-  const word = p.ok ? 'done' : p.stopped ? 'stopped' : 'ended';
-  const bits = [p.duration_ms != null ? `${word} in ${duration(p.duration_ms)}` : word];
-  if (p.turns) bits.push(plural(p.turns, 'turn'));
+/**
+ * How a turn ended, as a quiet divider: one glyph and one sentence-case line, the phone's Outcome words. `limit` is the
+ * thread's limit line (limits.ts `limitLabel`) on the turn the usage limit stopped.
+ */
+function ResultLine({ p, limit }: { p: ResultP; limit?: string | null }) {
+  const took = p.duration_ms != null ? duration(p.duration_ms) : null;
   const bad = !p.ok && !p.stopped;
-  const tokens = p.input_tokens != null ? `${p.input_tokens} in / ${p.output_tokens ?? 0} out` : null;
+  const glyph = limit ? 'limited' : p.ok ? 'done' : p.stopped ? 'settled' : 'failed';
+  const [word, after] = p.ok ? ['Done', 'Done in'] : p.stopped ? ['Stopped', 'Stopped after'] : ['Failed', 'Failed after'];
+  const bits = [limit ?? (took ? `${after} ${took}` : word)];
+  if (p.turns) bits.push(plural(p.turns, 'turn'));
+  if (p.model) bits.push(p.model);
+  if (p.input_tokens != null) bits.push(`${p.input_tokens} in / ${p.output_tokens ?? 0} out`);
+  if (bad && !limit && p.subtype && p.subtype !== 'success') bits.push(p.subtype.replace(/_/g, ' '));
   return (
-    <div className="flex items-center gap-3 py-1 font-num text-[12px] font-medium text-fg-4">
+    <div className="flex items-center gap-3 py-1 font-num text-[12px] font-medium text-fg-3">
       <div className="h-px flex-1 bg-line" />
-      <span className={`flex items-center gap-2 ${bad ? 'text-fg-2' : ''}`}>
-        {bad ? (
-          <StatusDot status="needs" size={8} />
-        ) : (
-          <span className={`inline-block h-1 w-1 rounded-full ${p.ok ? 'bg-done shadow-[inset_0_0_0_0.5px_var(--done-edge)]' : 'bg-fg-4'}`} />
-        )}
-        {bits.join(' · ')}
-        {p.model ? <span> · {p.model}</span> : null}
-        {tokens ? <span> · {tokens}</span> : null}
-        {bad && p.subtype && p.subtype !== 'success' ? ` · ${p.subtype.replace(/_/g, ' ')}` : ''}
+      <span className="flex min-w-0 items-center gap-2">
+        <StatusDot status={glyph} size={8} />
+        <span className="min-w-0">{bits.join(' · ')}</span>
       </span>
       <div className="h-px flex-1 bg-line" />
     </div>
@@ -205,7 +206,7 @@ export function SwitchLine({ it, running }: { it: SwitchItem; running: boolean }
   const note = handoverNote(it.p, it.done, it.superseded);
   const waiting = it.p.mode === 'handover' && !it.done && !it.superseded && running;
   return (
-    <div className="py-1 text-center text-[12px] font-medium text-fg-4">
+    <div className="py-1 text-center text-[12px] font-medium text-fg-3">
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-line" />
         {/* Inline, so a line that wraps on a phone keeps its icon on the first line. */}
@@ -224,7 +225,7 @@ export function SwitchLine({ it, running }: { it: SwitchItem; running: boolean }
 /** Mod log lines: dim system rows, each with the plugin that wrote it, in the status line's quiet style. */
 function ModLog({ lines }: { lines: ModLine[] }) {
   return (
-    <div className="space-y-0.5 text-[12px] leading-[1.5] text-fg-4">
+    <div className="space-y-0.5 text-[12px] leading-[1.5] text-fg-3">
       {lines.map((l) => (
         <div key={l.key} className="flex min-w-0 items-baseline gap-2">
           <span className="shrink-0 font-mono text-[11px] text-fg-3">{l.plugin}</span>
@@ -342,6 +343,8 @@ interface ItemRowProps {
   pages?: Published[];
   /** The plan, on the group of the latest TodoWrite. */
   plan?: FoldPlan;
+  /** The thread's limit line, on the last result when the usage limit stopped that turn. */
+  limit?: string | null;
 }
 
 /**
@@ -350,7 +353,7 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, isLast, team, brief, reports, byId, artifacts, pages, plan }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, isLast, team, brief, reports, byId, artifacts, pages, plan, limit }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -390,7 +393,7 @@ const ItemRow = memo(
           return plan ? [...out, <PlanCard key="plan" todos={plan.todos} threadId={threadId} />] : out;
         }
         case 'result':
-          return <ResultLine key={it.key} p={it.p} />;
+          return <ResultLine key={it.key} p={it.p} limit={limit} />;
         case 'error':
           return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
         case 'report':
@@ -435,6 +438,7 @@ export const Transcript = memo(function Transcript({
   reports = NO_REPORTS,
   history = null,
   delegated = false,
+  limit = null,
 }: {
   threadId: string;
   /** Every row held, anchors included. */
@@ -453,6 +457,8 @@ export const Transcript = memo(function Transcript({
   history?: ThreadHistory | null;
   /** Another thread started this one: its first message is that thread's brief. */
   delegated?: boolean;
+  /** The thread's limit line (limits.ts `limitLabel`) while a usage limit holds it: the last result says it. */
+  limit?: string | null;
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
   const spans = history?.history.spans;
@@ -517,6 +523,7 @@ export const Transcript = memo(function Transcript({
               artifacts={artifacts}
               pages={pages.get(it.key)}
               plan={plan?.after === it.key ? plan : undefined}
+              limit={idx === lastIdx && it.type === 'result' ? limit : undefined}
             />,
           ])}
           {edgeRow(-1)}

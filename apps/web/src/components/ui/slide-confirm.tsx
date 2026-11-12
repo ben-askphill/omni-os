@@ -66,7 +66,7 @@ export function SlideToConfirm({
       ) : (
         <>
           <div className="sld-wash" data-spring={spring || undefined} style={{ width: x + GRIP }} />
-          <div className="sld-say" style={{ opacity: phase === 'busy' ? 1 : 1 - progress * 1.4 }}>
+          <div className="sld-say text-fg-3" style={{ opacity: phase === 'busy' ? 1 : 1 - progress * 1.4 }}>
             {phase === 'busy' ? (
               <span className="inline-flex items-center gap-2 text-fg-2">
                 <Loader size={14} /> {busyLabel ?? 'Working'}

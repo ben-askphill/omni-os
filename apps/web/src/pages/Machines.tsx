@@ -5,13 +5,17 @@ import { useApi, type SetupState, type SyncStatus } from '../api.ts';
 import { DeviceLabel } from '../components/DeviceLabel.tsx';
 import { RUN_ON_HINT, runOnOptions, useRunOnSetting } from '../components/RunOnPicker.tsx';
 import { ErrorNote, Picker, StatusDot } from '../components/ui.tsx';
+import { desktop } from '../desktop.ts';
+import { href } from '../router.ts';
 import { useApp, useHereName } from '../store.tsx';
-import { Card, InfoRow, Origin, ServerOptions } from './settings-parts.tsx';
+import { ConnectMachinesCard } from './Connect.tsx';
+import { AppUpdatesCard } from './SettingsDesktop.tsx';
+import { Card, InfoList, InfoRow, LinkLine, Origin, ResetButton, Row } from './settings-parts.tsx';
 import { UpdateMachinesCard } from './UpdateMachines.tsx';
 
-// Settings, Machines: this machine (its name, sync state, the address this browser uses, the feed and the thread
-// counts), Update all machines (UpdateMachines.tsx) and the server options from .env (port and host). Where new
-// threads run is under Threads (RunOnCard); Sync, Sharing & access and Worktrees are sections of their own.
+// Settings, Machines: the one home for machines. This machine (its name, sync state, feed and thread counts), your
+// machines and their updates (UpdateMachines.tsx), this app's own updates in the desktop app, and the machines Omni
+// Connect reaches. The address, port and paths are in About; where new threads run is under Threads (RunOnCard).
 
 function syncLine(s: SyncStatus | undefined, now: number): { dot: string; text: string } {
   if (!s) return { dot: 'settled', text: 'Reading sync' };
@@ -28,19 +32,12 @@ export function MachinesSection() {
   const synced = syncLine(sync.data, Date.now());
   return (
     <>
-      <Card entry="this-machine" title={machineLabel(status?.device?.name)} subtitle="The machine Omni runs on, as your other machines and the sync list name it.">
-        <div className="space-y-2 text-[13px]">
-          {status?.device && (
-            <InfoRow label="Machine">
-              <DeviceLabel device={status.device} />
-            </InfoRow>
-          )}
+      <Card entry="this-machine" title="This machine" subtitle="The machine Omni runs on, as your other machines name it.">
+        <InfoList>
+          <InfoRow label="Name">{status?.device ? <DeviceLabel device={status.device} /> : <span>{machineLabel(undefined)}</span>}</InfoRow>
           <InfoRow label="Sync">
             <StatusDot status={synced.dot} size={7} />
             <span className="min-w-0 truncate">{synced.text}</span>
-          </InfoRow>
-          <InfoRow label="Address">
-            <span className="truncate font-mono text-[12.5px]">{location.origin}</span>
           </InfoRow>
           <InfoRow label="Feed">
             <StatusDot status={feedLive ? 'done' : 'needs'} size={7} />
@@ -53,10 +50,12 @@ export function MachinesSection() {
               </span>
             </InfoRow>
           )}
-        </div>
+        </InfoList>
       </Card>
       <UpdateMachinesCard />
-      <ServerOptions section="machines" entry="server" title="Server port and host" />
+      {desktop && <AppUpdatesCard bridge={desktop} />}
+      <ConnectMachinesCard />
+      <LinkLine href={href.settingsSection('about', 'server')}>Address, port and file paths are in About</LinkLine>
     </>
   );
 }
@@ -66,18 +65,27 @@ export function RunOnCard({ state }: { state: SetupState | null }) {
   const runOn = useRunOnSetting(state);
   const saved = runOn.device;
   const hereName = useHereName();
+  const of = saved ? 'machine' : 'default';
   return (
-    <Card
-      entry="run-on"
-      title="Run new threads on"
-      subtitle={runOn.offered ? RUN_ON_HINT : 'Only this machine for now. Sync another machine with this one to run threads there.'}
-      origin={state && <Origin of={saved ? 'machine' : 'default'} label={saved ? undefined : `Built-in default: ${machineLabel(hereName)}`} onReset={() => void runOn.save(HERE)} busy={runOn.saving} />}
-    >
-      <div className="flex flex-wrap items-center gap-3">
-        <Picker label="Run new threads on" value={runOn.pick} options={runOnOptions(runOn.rows)} onChange={(v) => void runOn.save(v)} disabled={runOn.loading || runOn.saving || !runOn.offered} />
-        {runOn.saving && <span className="text-[12.5px] text-fg-3">Saving</span>}
-      </div>
-      {runOn.error && <ErrorNote className="mt-2">{runOn.error}</ErrorNote>}
+    <Card entry="run-on" title="New threads">
+      <Row
+        label="Run new threads on"
+        htmlFor="run-on"
+        hint={runOn.offered ? RUN_ON_HINT : 'Only this machine for now. Sync another machine with this one to run threads there.'}
+        origin={state && <Origin of={of} label={saved ? undefined : `Built-in default: ${machineLabel(hereName)}`} />}
+        action={state && <ResetButton of={of} onReset={() => void runOn.save(HERE)} busy={runOn.saving} />}
+      >
+        <Picker
+          id="run-on"
+          size="field"
+          label="Run new threads on"
+          value={runOn.pick}
+          options={runOnOptions(runOn.rows)}
+          onChange={(v) => void runOn.save(v)}
+          disabled={runOn.loading || runOn.saving || !runOn.offered}
+        />
+      </Row>
+      {runOn.error && <ErrorNote>{runOn.error}</ErrorNote>}
     </Card>
   );
 }

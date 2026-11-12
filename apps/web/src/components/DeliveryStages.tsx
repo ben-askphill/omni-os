@@ -13,7 +13,7 @@ export function DeliveryStages({ stages }: { stages: DeliveryStage[] }) {
             {s.tone === 'live' && <i className="ping" />}
             <i />
           </span>
-          <span className="w-16 shrink-0 text-fg-4">{s.name}</span>
+          <span className="w-16 shrink-0 text-fg-3">{s.name}</span>
           <span className="min-w-0 flex-1">
             <span className="font-medium text-fg">{s.label}</span>
             {s.note && <span className="block text-[11.5px] break-words text-fg-3">{s.note}</span>}

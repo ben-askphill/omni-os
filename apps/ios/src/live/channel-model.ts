@@ -1,4 +1,5 @@
 import type { ChannelWithRunning, NeedsYou, ThreadStub } from '@omni/client-core';
+import { statusLabel } from '@omni/shared/status.ts';
 
 type ConductorHandoff = NonNullable<ChannelWithRunning['handoffs']>[number];
 
@@ -80,13 +81,6 @@ export interface HandoffGroup {
   running: number;
 }
 
-const STATUS_LABEL: Partial<Record<ThreadStub['status'], string>> = {
-  queued: 'Queued',
-  running: 'Running',
-  failed: 'Failed',
-  stopped: 'Stopped',
-};
-
 /** Short relative time: "now", "5m", "3h", "2d". Clocks past a week show the date. */
 export function shortAgo(iso: string, now: number): string {
   const t = Date.parse(iso);
@@ -105,7 +99,7 @@ export function threadRow(t: ThreadStub, now: number): ThreadRow {
     title: t.title || 'Untitled',
     status: t.status,
     busy: t.status === 'running' || t.status === 'queued',
-    statusLabel: STATUS_LABEL[t.status] ?? null,
+    statusLabel: t.status === 'done' || t.status === 'imported' ? null : statusLabel(t.status),
     ago: shortAgo(t.updated_at ?? t.created_at, now),
     pinned: !!t.pinned_at,
     target: targetOfStub(t),

@@ -49,7 +49,7 @@ export interface Thread {
 }
 
 /** The part of a thread the channel list sends for each of its threads. */
-export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at' | 'updated_at' | 'folder_id' | 'harness' | 'pinned_at' | 'done_at' | 'parent_id' | 'source'>;
+export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at' | 'updated_at' | 'folder_id' | 'harness' | 'pinned_at' | 'done_at' | 'parent_id' | 'source' | 'limit_state'>;
 
 export interface ListThreads {
   channel?: string;

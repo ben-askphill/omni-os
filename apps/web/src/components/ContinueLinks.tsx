@@ -11,7 +11,7 @@ export const linkName = (l: ContinueLink) => `${l.title || 'Untitled'} · ${harn
 function Crumb({ to, title, children }: { to: ContinueLink; title?: string; children: ReactNode }) {
   return (
     <>
-      <span className="shrink-0 text-fg-4">·</span>
+      <span className="shrink-0 text-fg-3">·</span>
       <a href={href.thread(to.id)} title={title} className="min-w-0 truncate hover:text-fg">
         {children}
       </a>
@@ -77,7 +77,7 @@ export function MoContinueLinks({ links, onOpen }: { links: ThreadLinks; onOpen:
               {link === links.from && link.carried && ` · ${carriedText(link.carried)}`}
             </span>
           </span>
-          <Icon name="chevronRight" size={15} className="shrink-0 text-fg-4" />
+          <Icon name="chevronRight" size={15} className="shrink-0 text-fg-3" />
         </button>
       ))}
     </div>

@@ -127,7 +127,7 @@ export function DeviceCodeSignIn<R extends { state: string }>({
   };
   if (flow) {
     return (
-      <div className="space-y-3 rounded-2xl bg-surface p-4">
+      <div className="space-y-3 rounded-[16px] bg-bg p-4">
         <p className="text-[13px] text-fg-2">Open the sign-in page, choose Google, and check it shows this code before you approve.</p>
         <div className="font-mono text-[22px] tracking-[0.12em] text-fg" aria-label="Sign-in code">
           {flow.userCode}

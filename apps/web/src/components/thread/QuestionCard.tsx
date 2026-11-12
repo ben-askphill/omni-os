@@ -17,7 +17,6 @@ import { api, ApiError, errorText } from '../../api.ts';
 import { Button, Chip, ErrorNote, Icon, IconButton, StatusPill } from '../ui.tsx';
 
 /** The status a thread shows while a question waits on Ben, in its header and under the card. */
-export const ASKING_LABEL = 'Needs your input';
 
 const STATE_LABEL: Record<Exclude<QuestionState, 'pending'>, string> = { answered: 'Answered', skipped: 'Skipped', dismissed: 'Not answered' };
 
@@ -195,7 +194,7 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
         </div>
         {error && <ErrorNote className="mx-3 mb-3">{error}</ErrorNote>}
       </section>
-      <StatusPill status="needs" label={ASKING_LABEL} />
+      <StatusPill status="needs" />
     </div>
   );
 }

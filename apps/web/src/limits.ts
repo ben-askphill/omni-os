@@ -18,6 +18,17 @@ export function resetLabel(iso: string, now = Date.now()): string {
   return `${d.toLocaleDateString('en-GB', { weekday: 'short' })} ${clock(d)}`;
 }
 
+/**
+ * A limit stop in the one status line every surface shows (header pill, run divider, quick card): "Limited · resumes
+ * 13:00" once Omni will resume it, "Limited · resets 13:00" before, plain "Limited" without a reset time. Null without one.
+ */
+export function limitLabel(thread: Pick<Thread, 'limit_state' | 'limit_resets_at'>, now = Date.now()): string | null {
+  if (!thread.limit_state) return null;
+  const at = thread.limit_resets_at ? resetLabel(thread.limit_resets_at, now) : null;
+  if (!at) return 'Limited';
+  return `Limited · ${thread.limit_state === 'scheduled' ? 'resumes' : 'resets'} ${at}`;
+}
+
 export type LimitAction = 'schedule' | 'cancel' | 'resume';
 
 /** Each action's button and its route under /threads/:id/limit/. */

@@ -48,7 +48,7 @@ export function ChannelActionsEditor({ channelId }: { channelId: string }) {
         editing === a.id ? (
           <ActionForm key={a.id} path={path} action={a} onSaved={saved} onCancel={() => setEditing(null)} />
         ) : (
-          <div key={a.id} className="rounded-[18px] bg-surface px-4 py-3">
+          <div key={a.id} className="rounded-[var(--r-lg)] bg-bg px-4 py-3">
             <ActionLine action={a} />
             <div className="flex flex-wrap items-center gap-1.5 pt-2">
               {a.secrets.map((s) => (

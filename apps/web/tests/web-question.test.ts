@@ -49,7 +49,7 @@ describe('the question card, pending', () => {
     expect(out).toContain('Next');
     expect(out).not.toContain('Send');
     expect(out).toContain('Skip');
-    expect(out).toContain('Needs your input');
+    expect(out).toContain('>Needs you</span>');
     // Only the page shown.
     expect(out).not.toContain('Which locales ship first?');
   });
@@ -80,7 +80,7 @@ describe('the question card, settled', () => {
     expect(out).toContain('SQLite, it is local');
     expect(out).toContain('Dutch, German');
     expect(out).not.toContain('<button');
-    expect(out).not.toContain('Needs your input');
+    expect(out).not.toContain('>Needs you</span>');
   });
 
   it('says skipped and not answered', () => {

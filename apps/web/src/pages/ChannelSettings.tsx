@@ -12,7 +12,10 @@ import { lastGrapheme } from '../format.ts';
 import { channelBody, channelForm, channelFormProblem, CHANNEL_ID, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelRun } from '@omni/shared/channel-form.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { Advanced } from './settings-parts.tsx';
+import { pageColumn } from '../components/ui/feedback.tsx';
+import { Advanced, Card } from './settings-parts.tsx';
+
+/** Settings' channel scope still imports the card by this name. */
 
 function Field({ label, hint, children, htmlFor }: { label: string; hint?: ReactNode; children: ReactNode; htmlFor?: string }) {
   return (
@@ -110,7 +113,7 @@ function IconPicker({ value, name, avatarBg, onChange }: { avatarBg?: string; va
               aria-label={g}
               title={g}
               onClick={() => change(on ? '' : glyphIcon(g))}
-              className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${on ? 'bg-fg text-on-ink' : 'hov text-fg-2 [--hov:var(--surface)]'}`}
+              className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${on ? 'bg-fg text-on-ink' : 'hov text-fg-2 [--hov:var(--surface-2)]'}`}
             >
               <Icon name={g} size={17} />
             </button>
@@ -174,7 +177,7 @@ function DesignSystemPicker({ channel, onChange }: { channel: Channel; onChange:
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         {channel.design_system_name && (
-          <span className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-[13px] text-fg">
+          <span className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1.5 text-[13px] text-fg">
             <Icon name="file" size={14} />
             <a className="hov" href={`/api${url}`} target="_blank" rel="noreferrer" title="Open the file">
               {channel.design_system_name}
@@ -204,15 +207,6 @@ function DesignSystemPicker({ channel, onChange }: { channel: Channel; onChange:
       </div>
       {error && <ErrorNote>{error}</ErrorNote>}
     </div>
-  );
-}
-
-export function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-4 rounded-[24px] p-5 shadow-[inset_0_0_0_1px_var(--line)]">
-      <h2 className="font-display text-[16px]">{title}</h2>
-      {children}
-    </section>
   );
 }
 
@@ -292,7 +286,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Section title="Basics">
+      <Card title="Basics">
         <Field label="Name" htmlFor="ch-name">
           <input id="ch-name" className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
         </Field>
@@ -329,15 +323,15 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Field label="Notes" htmlFor="ch-notes" hint="Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.">
           <textarea id="ch-notes" className="field min-h-[84px] resize-y" value={f.notes} onChange={(e) => set('notes', e.target.value)} />
         </Field>
-      </Section>
+      </Card>
 
-      <Section title="Code">
+      <Card title="Code">
         <Field label="Repo path" htmlFor="ch-repo" hint="Absolute path to a local git repo. Omni reads its GitHub repo from it, and it enables per-thread worktrees and the PRs tab.">
           <input id="ch-repo" className="field font-mono !text-[13px]" value={f.repo_path} onChange={(e) => set('repo_path', e.target.value)} placeholder="~/code/acme-theme" spellCheck={false} />
         </Field>
-      </Section>
+      </Card>
 
-      <Section title="Store">
+      <Card title="Store">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
             <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" spellCheck={false} />
@@ -346,7 +340,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" spellCheck={false} />
           </Field>
         </div>
-      </Section>
+      </Card>
 
       {/* Id, GitHub repo and base directory fill themselves in; each shows as a field only when Omni could not work
           it out or you choose to change it, and a failure opens the fold (#405). */}
@@ -438,8 +432,8 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 export function NewChannelPage() {
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      <PageHeader width="max-w-2xl" title="New channel" subtitle="One channel per client or project. Threads, PRs, secrets and the browser profile are scoped to it." />
-      <div className="mx-auto max-w-2xl px-4 pt-2 pb-16 md:px-8">
+      <PageHeader width="measure" title="New channel" subtitle="One channel per client or project. Threads, PRs, secrets and the browser profile are scoped to it." />
+      <div className={`${pageColumn('measure')} pt-2 pb-16`}>
         <ChannelSettingsForm />
       </div>
     </div>

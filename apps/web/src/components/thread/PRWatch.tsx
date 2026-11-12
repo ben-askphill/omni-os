@@ -49,7 +49,7 @@ export type PRWatchState = ReturnType<typeof usePRWatch>;
  * with its PR keeps its line, without the toggle.
  */
 export function PRWatchRow({ w, open }: { w: PRWatchState; open: boolean }) {
-  if (!open && !w.watching) return w.watch ? <div className="mt-1 px-2 pt-1.5 text-[11.5px] text-fg-4 shadow-[inset_0_1px_0_var(--line)]">{watchLine(w.watch)}</div> : null;
+  if (!open && !w.watching) return w.watch ? <div className="mt-1 px-2 pt-1.5 text-[11.5px] text-fg-3 shadow-[inset_0_1px_0_var(--line)]">{watchLine(w.watch)}</div> : null;
   const { action, line } = watchCopy(w.watch);
   return (
     <button
@@ -62,7 +62,7 @@ export function PRWatchRow({ w, open }: { w: PRWatchState; open: boolean }) {
       <Icon name="bell" size={14} className={w.watching ? 'text-live-text' : 'text-fg-3'} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13px] text-fg-2">{action}</span>
-        {w.error ? <span className="text-[11.5px] break-words text-needs">{w.error}</span> : <span className="truncate text-[11.5px] text-fg-4">{line}</span>}
+        {w.error ? <span className="text-[11.5px] break-words text-needs">{w.error}</span> : <span className="truncate text-[11.5px] text-fg-3">{line}</span>}
       </span>
     </button>
   );
@@ -89,9 +89,9 @@ export function PRWakeList({ items, more = 0 }: { items: PRWakeItem[]; more?: nu
         <li key={i} className="flex min-w-0 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="max-w-[60%] shrink-0 truncate font-medium text-fg-2">{it.label}</span>
-            {it.kind && <span className="min-w-0 truncate text-fg-4">{it.kind}</span>}
+            {it.kind && <span className="min-w-0 truncate text-fg-3">{it.kind}</span>}
             {it.url && (
-              <a href={it.url} target="_blank" rel="noreferrer" aria-label={`Open ${it.label} on GitHub`} className="ml-auto grid shrink-0 text-fg-4 hover:text-fg">
+              <a href={it.url} target="_blank" rel="noreferrer" aria-label={`Open ${it.label} on GitHub`} className="ml-auto grid shrink-0 text-fg-3 hover:text-fg">
                 <Icon name="external" size={12} />
               </a>
             )}
@@ -99,7 +99,7 @@ export function PRWakeList({ items, more = 0 }: { items: PRWakeItem[]; more?: nu
           {it.excerpt && <span className="line-clamp-3 break-words text-fg-3">{it.excerpt}</span>}
         </li>
       ))}
-      {more > 0 && <li className="text-fg-4">and {more} more</li>}
+      {more > 0 && <li className="text-fg-3">and {more} more</li>}
     </ul>
   );
 }

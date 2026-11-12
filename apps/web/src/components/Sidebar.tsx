@@ -214,7 +214,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
             <ChannelMark icon={c.icon} avatarBg={c.avatar_bg} size={14} />
           </span>
         ) : (
-          <span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-4'}`}>#</span>
+          <span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-3'}`}>#</span>
         ),
       )}
       {threadLinks(c)}

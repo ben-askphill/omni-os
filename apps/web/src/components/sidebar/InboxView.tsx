@@ -47,7 +47,7 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
       <div className="space-y-px">
         {pinned.map((t) => card(t, true))}
         {inbox.map((t) => card(t))}
-        {loaded && !pinned.length && !inbox.length && <p className="px-3 py-6 text-center text-[12.5px] text-fg-4">Nothing is waiting on you.</p>}
+        {loaded && !pinned.length && !inbox.length && <p className="px-3 py-6 text-center text-[12.5px] text-fg-3">Nothing is waiting on you.</p>}
       </div>
 
       <div className="mt-auto space-y-px pt-4">
@@ -65,7 +65,7 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
           <button
             type="button"
             onClick={done.showMore}
-            className="hov z-[1] flex h-8 w-full items-center gap-2 rounded-full px-3 text-[12.5px] text-fg-4 transition-colors hover:text-fg-2"
+            className="hov z-[1] flex h-8 w-full items-center gap-2 rounded-full px-3 text-[12.5px] text-fg-3 transition-colors hover:text-fg-2"
           >
             <Icon name="chevronDown" size={12} />
             Show {done.more} more
@@ -90,8 +90,8 @@ function Shelf({ label, count, open, onToggle }: { label: string; count: number;
       className="caption flex h-8 w-full items-center gap-2 px-3 text-left transition-colors hover:text-fg-2"
     >
       {label}
-      <span className="font-num font-normal text-fg-4 tabular-nums">{count}</span>
-      <Icon name="chevronDown" size={11} className={`ml-auto text-fg-4 transition-transform ${open ? '' : '-rotate-90'}`} />
+      <span className="font-num font-normal text-fg-3 tabular-nums">{count}</span>
+      <Icon name="chevronDown" size={11} className={`ml-auto text-fg-3 transition-transform ${open ? '' : '-rotate-90'}`} />
     </button>
   );
 }
@@ -100,7 +100,7 @@ function ChannelLead({ channel }: { channel: ReturnType<typeof useApp>['channels
   if (channel?.avatar_bg) return <Avatar name={channel.name} channelIcon={channel.icon} avatarBg={channel.avatar_bg} omni={channel.id === 'conductor'} size={18} />;
   if (channel?.id === 'conductor') return <OmniMark size={13} />;
   if (channel && parseChannelIcon(channel.icon)) return <ChannelMark icon={channel.icon} avatarBg={channel.avatar_bg} size={12} />;
-  return <span className="font-num text-[11px] leading-none text-fg-4">#</span>;
+  return <span className="font-num text-[11px] leading-none text-fg-3">#</span>;
 }
 
 /** T3's card: the channel on top with the status or the time on its right, the title, then the branch and harness. */
@@ -126,10 +126,8 @@ function InboxCard({
   const delegates = useRowDelegates(t.id, delegated, onNavigate);
   const title = t.title || 'Untitled';
   const channelName = channel?.id === 'conductor' ? 'Conductor' : (channel?.name ?? t.channel_id);
-  // Work in progress recedes, as in T3: what waits on Ben stands out.
-  const receded = !active && status?.glyph === 'running';
   const harness = t.harness && !delegates && (
-    <span className="shrink-0 text-fg-4">
+    <span className="shrink-0 text-fg-3">
       <HarnessLogo harness={t.harness} size={11} />
     </span>
   );
@@ -141,9 +139,9 @@ function InboxCard({
         title={`${title} · ${channelName}${status ? ` · ${status.label}` : ''}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
-        className={`hov z-[1] block rounded-[14px] [grid-area:1/1] px-3 py-2 transition-colors ${active ? '[--hov:transparent]' : ''} ${receded ? 'opacity-70' : ''}`}
+        className={`hov z-[1] block rounded-[14px] [grid-area:1/1] px-3 py-2 transition-colors ${active ? '[--hov:transparent]' : ''}`}
       >
-        <span className="flex h-4 items-center gap-1.5 text-[11.5px] text-fg-4">
+        <span className="flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3">
           <span className="grid min-w-3 shrink-0 place-items-center">
             <ChannelLead channel={channel} />
           </span>
@@ -160,13 +158,13 @@ function InboxCard({
             )}
           </span>
         </span>
-        <span className={`mt-1 flex items-center gap-1.5 text-[13px] leading-5 ${active ? 'font-medium text-fg' : receded ? 'text-fg-3' : 'font-medium text-fg-2'}`}>
+        <span className={`mt-1 flex items-center gap-1.5 text-[13px] leading-5 ${active ? 'font-medium text-fg' : 'font-medium text-fg-2'}`}>
           <span className="min-w-0 flex-1 truncate">{title}</span>
           {!t.branch && harness}
           {!t.branch && delegates && <DelegateCountSpace summary={delegates.summary} />}
         </span>
         {t.branch && (
-          <span className="mt-0.5 flex h-4 items-center gap-1.5 text-[11.5px] text-fg-4">
+          <span className="mt-0.5 flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3">
             <Icon name="branch" size={11} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate">{t.branch}</span>
             {harness}
@@ -202,7 +200,7 @@ function DoneRow({ t, active, onNavigate }: { t: InboxThread; active: boolean; o
           <DoneMark size={7} />
         </span>
         <span className="min-w-0 flex-1 truncate">{title}</span>
-        <span className="shrink-0 font-num text-[11px] text-fg-4 tabular-nums md:group-focus-within/row:invisible md:group-hover/row:invisible">
+        <span className="shrink-0 font-num text-[11px] text-fg-3 tabular-nums md:group-focus-within/row:invisible md:group-hover/row:invisible">
           {relTime(t.done_at ?? t.updated_at ?? t.created_at, now)}
         </span>
       </a>

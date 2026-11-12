@@ -26,7 +26,7 @@ interface LineRowProps {
 export const LineRow = memo(function LineRow({ fileKey, index, line, width, picked, onPress }: LineRowProps) {
   const { colors } = useOmniTheme();
   const canPick = pickable(line);
-  const tint = picked ? colors.mark : line.kind === 'add' ? colors.diffAdd : line.kind === 'del' ? colors.diffDel : line.kind === 'hunk' ? colors.surface2 : 'transparent';
+  const tint = picked ? colors.mark : line.kind === 'add' ? colors.diffAddBg : line.kind === 'del' ? colors.diffDelBg : line.kind === 'hunk' ? colors.surface2 : 'transparent';
   const number = line.new ?? line.old;
   const body = (
     <View style={[styles.line, { backgroundColor: tint, borderLeftColor: picked ? colors.fg : 'transparent' }]}>

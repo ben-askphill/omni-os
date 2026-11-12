@@ -30,7 +30,7 @@ describe('questions from delegated threads', () => {
     expect(out).toContain('Which market goes first for Build the export?');
     expect(out).toContain('Which market goes first for Write the copy?');
     expect(out.split('role="radiogroup"').length - 1).toBe(2);
-    expect(out).toContain('Needs your input');
+    expect(out).toContain('>Needs you</span>');
   });
 
   it('labels a thread without a task id by its title, with phone-sized targets on touch', () => {

@@ -79,7 +79,7 @@ function Grid({ shots, onOpen }: { shots: Shot[]; onOpen: (s: Shot) => void }) {
             <img src={artifactUrl(s)} alt={s.name} loading="lazy" className="aspect-[4/3] w-full rounded-xl object-cover object-top shadow-[inset_0_0_0_1px_var(--line)] transition-opacity group-hover:opacity-90" />
             <div className="flex min-w-0 items-center gap-1.5 px-1.5 pt-1 pb-0.5 text-[10.5px]">
               {from && <span className="min-w-0 flex-1 truncate text-fg-3">{from}</span>}
-              <span className={`shrink-0 font-num text-fg-4 ${from ? '' : 'truncate'}`}>{relTime(s.updated_at)}</span>
+              <span className={`shrink-0 font-num text-fg-3 ${from ? '' : 'truncate'}`}>{relTime(s.updated_at)}</span>
             </div>
           </button>
         );

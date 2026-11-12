@@ -115,7 +115,7 @@ export function ClippedNote({ event, clipped, className = '' }: { event: number;
   const busy = history?.rowBusy(event);
   const error = history?.rowError(event);
   return (
-    <div className={`flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-fg-4 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-fg-3 ${className}`}>
       <span>Trimmed for loading</span>
       {history && (
         <>

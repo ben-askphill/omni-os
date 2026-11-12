@@ -8,8 +8,8 @@ describe('settings contract', () => {
     const ids = SETTING_FIELDS.map((f) => `${f.section}.${f.key}`);
     expect(new Set(ids).size).toBe(ids.length);
     expect(pageFields('general').map((f) => f.key)).toEqual(['name', 'pronouns', 'timezone', 'email']);
-    expect(pageFields('workspace').map((f) => f.key)).toEqual(['root', 'reposDir', 'githubOwner']);
-    expect(pageFields('integrations').map((f) => f.key)).toEqual(['hermesUrl', 'centralBrainDir']);
+    expect(pageFields('workspace').map((f) => f.key)).toEqual(['root', 'reposDir', 'githubOwner', 'centralBrainDir']);
+    expect(pageFields('models').map((f) => f.key)).toEqual(['hermesUrl']);
     // Network access is shown, never edited: only the file or its env var opens this Omni wider.
     expect(pageFields('access').map((f) => [f.key, f.readonly])).toEqual([
       ['tailscaleLogin', true],

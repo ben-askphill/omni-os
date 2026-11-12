@@ -28,7 +28,7 @@ export function Empty({ title, children, icon, action }: { title: string; childr
           <Icon name={icon} size={19} />
         </div>
       )}
-      <div className="font-display text-[17px]">{title}</div>
+      <div className="font-display text-[length:var(--fs-heading)]">{title}</div>
       {children && <div className="mt-1.5 max-w-sm text-[13px] text-fg-3">{children}</div>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -133,21 +133,72 @@ export function Toggle({ checked, onChange, disabled, label }: { checked: boolea
   );
 }
 
-/** `width` matches the page body's max width so the title lines up with the content under it. */
-export function PageHeader({ title, subtitle, actions, children, eyebrow, width = '' }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children?: ReactNode; eyebrow?: ReactNode; width?: string }) {
+/** The two content widths, both centred: `page` (--w-page) for lists, `measure` (--measure) for reading and forms. */
+export type PageWidth = 'page' | 'measure';
+
+const COLUMN: Record<PageWidth, string> = {
+  page: 'max-w-[var(--w-page)]',
+  measure: 'max-w-[var(--measure)]',
+};
+
+/** The centred column a page's header and body share. content-box, so the side padding sits outside the width. */
+export const pageColumn = (width: PageWidth) => `mx-auto box-content px-4 md:px-8 ${COLUMN[width]}`;
+
+/**
+ * A page's title block: eyebrow, title, subtitle and one action on the right. `width` takes a PageWidth so the title
+ * lines up with a body in `pageColumn(width)`; a Tailwind max-width class still works for pages not moved over yet.
+ */
+export function PageHeader({ title, subtitle, actions, children, eyebrow, width = '' }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children?: ReactNode; eyebrow?: ReactNode; width?: PageWidth | string }) {
+  const column = width === 'page' || width === 'measure' ? pageColumn(width) : `mx-auto px-4 md:px-8 ${width}`;
   return (
-    <div className={`mx-auto px-4 pt-6 pb-4 md:px-8 md:pt-10 ${width}`}>
+    <div className={`${column} pt-6 pb-4 md:pt-10 md:pb-6`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          {eyebrow && <div className="caption mb-2.5">{eyebrow}</div>}
-          <h1 className="truncate font-display text-[26px] leading-[1.1] md:text-[30px]">{title}</h1>
-          {subtitle && <div className="mt-1.5 max-w-xl text-[13.5px] text-fg-3">{subtitle}</div>}
+          {eyebrow && <div className="caption mb-1.5">{eyebrow}</div>}
+          <h1 className="truncate font-display text-[length:var(--fs-title)] leading-[1.1] md:text-[length:var(--fs-title-lg)]">{title}</h1>
+          {subtitle && <div className="mt-2 max-w-2xl text-[length:var(--fs-body)] leading-[1.45] text-fg-3">{subtitle}</div>}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
       {children}
     </div>
   );
+}
+
+/** A list page's controls in one row: search and filters from the left, then `right` (view, refresh) at the far end. */
+export function PageToolbar({ children, right, className = '' }: { children?: ReactNode; right?: ReactNode; className?: string }) {
+  return (
+    <div className={`flex min-w-0 flex-wrap items-center gap-2 ${className}`}>
+      {children}
+      {right && <div className="ml-auto flex shrink-0 items-center gap-2">{right}</div>}
+    </div>
+  );
+}
+
+/** The one search field: --h-search tall, a pill on surface. Escape clears it. */
+export function SearchField({ value, onChange, placeholder, label, className = '' }: { value: string; onChange: (v: string) => void; placeholder: string; label: string; className?: string }) {
+  return (
+    <label
+      className={`flex h-[var(--h-search,40px)] min-w-0 flex-[1_1_280px] items-center gap-2.5 rounded-full bg-surface px-3.5 text-fg-3 shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] focus-within:bg-bg focus-within:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_4px_var(--wash)] sm:max-w-[360px] ${className}`}
+    >
+      <Icon name="search" size={15} />
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && value && onChange('')}
+        placeholder={placeholder}
+        aria-label={label}
+        className="h-full min-w-0 flex-1 bg-transparent text-[length:var(--fs-ui)] text-fg outline-none placeholder:text-fg-3"
+      />
+    </label>
+  );
+}
+
+/** Refresh for a toolbar's right slot. `status` (when it last ran, what it found) goes in its tooltip. */
+export function RefreshButton({ onClick, busy, status, label = 'Refresh' }: { onClick: () => void; busy?: boolean; status?: string; label?: string }) {
+  const title = status ? `${label}. ${status}` : label;
+  return <Button variant="ghost" icon="refresh" aria-label={title} title={title} onClick={onClick} busy={busy} className="h-8 w-8 px-0" />;
 }
 
 export function Label({ children, hint, htmlFor }: { children: ReactNode; hint?: ReactNode; htmlFor?: string }) {

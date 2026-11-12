@@ -3,11 +3,13 @@ import type { ConnectMachine, ConnectStatus } from '@omni/server/connect/service
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { useHereName } from '../store.tsx';
-import { Button, Chip, ErrorNote, Loading, StatusDot } from '../components/ui.tsx';
-import { Card, InfoRow, SwitchRow } from './settings-parts.tsx';
+import { Button, Chip, ErrorNote, InlineConfirm, Loading, StatusDot } from '../components/ui.tsx';
+import { href } from '../router.ts';
+import { Card, DangerRow, InfoList, InfoRow, LinkLine } from './settings-parts.tsx';
 
-// Settings, Sharing & access, Omni Connect (docs/user/omni-connect.md): turn this machine's Cloudflare tunnel on and off, see
-// its address and tunnel, and open your other machines.
+// Settings, Sharing & access, Omni Connect (docs/user/omni-connect.md): turn this machine's Cloudflare tunnel on, see
+// its address and tunnel, and turn it off, which deletes the tunnel, behind a confirm. The machines it reaches are
+// listed in Machines (ConnectMachinesCard), the one home for machine lists.
 
 const TUNNEL: Record<ConnectStatus['tunnel']['state'], { dot: string; label: string }> = {
   off: { dot: 'idle', label: 'Off' },
@@ -50,20 +52,38 @@ export function ConnectSection() {
   const tunnel = TUNNEL[s.tunnel.state] ?? { dot: 'idle', label: s.tunnel.state };
   const problem = s.tunnel.error ?? s.error;
   return (
-    <Card title="Omni Connect" subtitle="Reach this Omni from any device without Tailscale, through a Cloudflare tunnel your relay sets up. Devices still sign in with Google.">
-      {!s.signedIn && <p className="text-[13px] text-fg-3">Omni Connect uses the sync relay&rsquo;s sign-in. Sign in under Sync above first.</p>}
-      <SwitchRow
-        title={`Reach ${machineLabel(hereName)} with Omni Connect`}
-        detail={s.enabled ? 'On: this Omni answers at its own address below. Turning it off deletes the tunnel.' : 'Off: only this machine, your LAN and your tailnet reach it.'}
-        checked={s.enabled}
-        disabled={busy || !s.signedIn}
-        onChange={(v) => void toggle(v)}
-      />
+    <Card
+      entry="connect"
+      title="Omni Connect"
+      subtitle="Reach this Omni from any device through a Cloudflare tunnel your relay sets up. Devices still sign in with Google."
+      actions={
+        s.enabled ? (
+          <span className="inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">
+            <StatusDot status="done" size={7} />
+            On
+          </span>
+        ) : (
+          <Button size="sm" variant="primary" busy={busy} disabled={!s.signedIn} onClick={() => void toggle(true)}>
+            Turn on
+          </Button>
+        )
+      }
+    >
+      {!s.signedIn && (
+        <p className="text-[13px] text-fg-3">
+          Omni Connect uses the sync relay&rsquo;s sign-in.{' '}
+          <a className="underline underline-offset-2 hover:text-fg" href={href.settingsSection('sync')}>
+            Sign in under Sync
+          </a>{' '}
+          first.
+        </p>
+      )}
+      {!s.enabled && s.signedIn && <p className="text-[13px] text-fg-3">Off: only {machineLabel(hereName)}, your LAN and your tailnet reach this Omni.</p>}
       {s.enabled && (
-        <div className="space-y-2 text-[13px]">
+        <InfoList>
           <InfoRow label="Address">
             {s.url ? (
-              <a className="min-w-0 truncate font-mono text-[12.5px] text-live-text hover:underline" href={s.url} target="_blank" rel="noreferrer">
+              <a className="min-w-0 truncate font-mono text-[12.5px] text-fg hover:underline" href={s.url} target="_blank" rel="noreferrer">
                 {s.hostname}
               </a>
             ) : (
@@ -74,16 +94,60 @@ export function ConnectSection() {
             <StatusDot status={tunnel.dot} size={7} />
             <span className="min-w-0 truncate">{tunnel.label}</span>
           </InfoRow>
-        </div>
+        </InfoList>
       )}
       {s.enabled && problem && <p className="text-[12.5px] text-fg-3">{problem}</p>}
       {error && <ErrorNote>{error}</ErrorNote>}
-      {s.enabled && <MachineList connectPage={s.connectPage} tunnelState={s.tunnel.state} />}
+      {s.enabled && (
+        <DangerRow
+          action={
+            <InlineConfirm
+              tone="danger"
+              label="Turn off"
+              confirmLabel="Turn off and delete"
+              busyLabel="Turning off"
+              disabled={busy}
+              onConfirm={() => toggle(false)}
+            />
+          }
+        >
+          Turning Omni Connect off deletes the tunnel. This address stops working until you turn it on again.
+        </DangerRow>
+      )}
+      {s.enabled && <LinkLine href={href.settingsSection('machines')}>Your machines and their addresses are in Machines</LinkLine>}
     </Card>
   );
 }
 
-function MachineList({ connectPage, tunnelState }: { connectPage: string | null; tunnelState: ConnectStatus['tunnel']['state'] }) {
+/** The machines Omni Connect reaches, in Machines. Nothing while Connect is off. */
+export function ConnectMachinesCard() {
+  const res = useApi<ConnectStatus>('/connect');
+  const { reload } = res;
+  // The relay sees this machine as offline until its tunnel is up, so follow the tunnel as Sharing & access does.
+  useEffect(() => {
+    const t = setInterval(() => document.visibilityState === 'visible' && reload(), 5000);
+    return () => clearInterval(t);
+  }, [reload]);
+  const s = res.data;
+  if (!s?.enabled) return null;
+  return (
+    <Card
+      title="Through Omni Connect"
+      subtitle="Each machine with Omni Connect on, at its own address. On a phone, bookmark Omni Connect: sign in once there and open any machine that is on."
+      actions={
+        s.connectPage && (
+          <Button size="sm" onClick={() => window.open(s.connectPage!, '_blank', 'noopener')}>
+            Open Omni Connect
+          </Button>
+        )
+      }
+    >
+      <MachineList tunnelState={s.tunnel.state} />
+    </Card>
+  );
+}
+
+function MachineList({ tunnelState }: { tunnelState: ConnectStatus['tunnel']['state'] }) {
   const res = useApi<{ machines: ConnectMachine[] }>('/connect/machines');
   const list = res.data?.machines ?? [];
   const { reload } = res;
@@ -102,19 +166,11 @@ function MachineList({ connectPage, tunnelState }: { connectPage: string | null;
   }, [reload]);
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <span className="text-[12.5px] font-medium text-fg-2">Your machines</span>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="ghost" icon="refresh" busy={res.loading} onClick={res.reload}>
-            Check
-          </Button>
-          {connectPage && (
-            <Button size="sm" onClick={() => window.open(connectPage, '_blank', 'noopener')}>
-              Open Omni Connect
-            </Button>
-          )}
-        </div>
+    <div className="space-y-2">
+      <div className="flex justify-end">
+        <Button size="sm" variant="ghost" icon="refresh" busy={res.loading} onClick={res.reload}>
+          Check
+        </Button>
       </div>
       {res.error ? (
         <ErrorNote onRetry={res.reload}>{res.error}</ErrorNote>
@@ -128,7 +184,7 @@ function MachineList({ connectPage, tunnelState }: { connectPage: string | null;
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate">{m.name}</span>
-                  {m.current && <Chip tone="outline">Current</Chip>}
+                  {m.current && <Chip tone="outline">This machine</Chip>}
                 </div>
                 <div className="truncate text-[12px] text-fg-3">{m.problem ?? (m.online ? m.hostname : `Offline · ${m.hostname}`)}</div>
               </div>
@@ -141,7 +197,6 @@ function MachineList({ connectPage, tunnelState }: { connectPage: string | null;
           ))}
         </ul>
       )}
-      <p className="mt-2 text-[12px] text-fg-3">On a phone, bookmark Omni Connect: sign in once there and open any machine that is on.</p>
     </div>
   );
 }

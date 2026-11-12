@@ -1,4 +1,4 @@
-import { relTime } from '@omni/shared/format.ts';
+import { clock, relTime, startOfDay, toDate } from '@omni/shared/format.ts';
 import type { Artifact, ArtifactWithThread } from '../../../api.ts';
 import { ArtifactViewer, kindIcon } from '../../ArtifactViewer.tsx';
 import { Empty, Icon } from '../../ui.tsx';
@@ -39,6 +39,12 @@ export function ArtifactsTab({ artifacts, crew, selected, onSelect }: { artifact
   );
 }
 
+/** A file's time as a day and a clock, so every row in the list reads alike: "Today 09:09", "Yesterday 13:02". */
+function fileTime(iso: string, now = Date.now()) {
+  const d = toDate(iso);
+  return d.getTime() >= startOfDay(new Date(now)).getTime() ? `Today ${clock(d)}` : relTime(iso, now);
+}
+
 function Row({ a, thread, on, onSelect }: { a: Artifact; thread?: string; on: boolean; onSelect: (id: number) => void }) {
   return (
     <button
@@ -52,7 +58,7 @@ function Row({ a, thread, on, onSelect }: { a: Artifact; thread?: string; on: bo
       <Icon name={kindIcon(a.kind)} size={13} className="text-fg-3" />
       <span className="min-w-0 flex-1 truncate font-medium">{a.name}</span>
       {thread && <span className="max-w-[45%] shrink truncate text-[11px] text-fg-3">{thread}</span>}
-      <span className="shrink-0 font-num text-[10.5px] text-fg-4">{relTime(a.updated_at)}</span>
+      <span className="shrink-0 font-num text-[10.5px] text-fg-3">{fileTime(a.updated_at)}</span>
     </button>
   );
 }

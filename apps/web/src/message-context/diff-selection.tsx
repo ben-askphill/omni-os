@@ -26,21 +26,21 @@ function DiffSelectionDetail({ body: b }: { body: DiffSelection }) {
         {where}
       </div>
       <div className="mt-0.5 text-[11.5px] text-fg-2">{rangeText(b)}</div>
-      <div className="truncate font-mono text-[11px] text-fg-4">{sourceText(b)}</div>
+      <div className="truncate font-mono text-[11px] text-fg-3">{sourceText(b)}</div>
       <div className="scroll-thin mt-2 max-h-64 overflow-auto rounded-xl bg-bg shadow-[inset_0_0_0_1px_var(--line)]">
         <pre className="min-w-max py-1 font-mono text-[11.5px] leading-[1.6]">
           {b.rows.map((r, i) => (
             <div key={i} className={`flex ${LINE_CLASS[r.kind]}`}>
-              <span className="w-9 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
+              <span className="w-9 shrink-0 pr-2 text-right font-num text-fg-3 select-none" aria-hidden>
                 {r.old ?? ''}
               </span>
-              <span className="w-9 shrink-0 pr-2 text-right font-num text-fg-4 select-none" aria-hidden>
+              <span className="w-9 shrink-0 pr-2 text-right font-num text-fg-3 select-none" aria-hidden>
                 {r.new ?? ''}
               </span>
               <span className="pr-3 pl-1">
                 {SIGN[r.kind]}
                 {r.text}
-                {r.cut && <span className="text-fg-4">…</span>}
+                {r.cut && <span className="text-fg-3">…</span>}
               </span>
             </div>
           ))}

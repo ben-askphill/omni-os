@@ -104,7 +104,7 @@ A script is a list of steps, or an object with the run's settings and `steps`:
 | `{"command": "settings"}` | Sends a `DesktopCommand` to the current window on the event channel, as a menu item does: `new-thread`, `go-to`, `search`, `home`, `settings` |
 | `{"menu": "View > Zoom In"}` | Clicks that item of the application menu for the current window. Labels match without `&`, a trailing ellipsis, or case |
 | `{"window": "main"}`, `"quick-prompt"`, `"newest"` | Makes that window current, waiting for it to show. Quick Prompt's panel stays loaded while hidden, so this waits until it is on screen |
-| `{"openThread": "<id>"}`, `{"openWindow": "#/settings"}` | Opens the route in a window of its own through the bridge, as Open in New Window does, and makes it current |
+| `{"openThread": "<id>"}`, `{"openWindow": "#/settings"}` | Opens the route in a window of its own through the bridge, as Open in new window does, and makes it current |
 | `{"appearance": "dark"}` | Sets `nativeTheme` and the pages' color scheme |
 | `{"zoom": 1.2}` | Sets the zoom through the bridge's settings, then on the window |
 | `{"size": [1100, 800]}` | Resizes the current window. A tiling window manager may size it back |
@@ -132,13 +132,13 @@ On a Mac, `npm run build:desktop` (`scripts/build-desktop.sh`) builds the unpack
 
 ## Updates
 
-The packaged app updates from the GitHub releases the release workflow publishes ([RELEASE.md](RELEASE.md)). The repo is public, so it reads them without a token. Settings > Desktop app > Updates shows this copy's version and the updater's state with the one action it allows: Check for Updates, Download, the download's progress as ticks, or Relaunch to Update. The coming release's notes show folded under it, as plain lines (the first 8 items of the GitHub release, each PR's title and number), with a link to the release. The sidebar notice shows the same states.
+The packaged app updates from the GitHub releases the release workflow publishes ([RELEASE.md](RELEASE.md)). The repo is public, so it reads them without a token. Settings > Machines > This app's updates shows this copy's version and the updater's state with the one action it allows: Check for updates, Download, the download's progress as ticks, or Relaunch to update. The coming release's notes show folded under it, as plain lines (the first 8 items of the GitHub release, each PR's title and number), with a link to the release. The sidebar notice shows the same states.
 
-**Check automatically** (on by default, `autoUpdate` in the app's `settings.json`) checks at launch and every 4 hours and downloads in the background. Off, only Check for Updates looks, and a found update waits as "available" for Download. Turning it back on checks at once.
+**Check automatically** (on by default, `autoUpdate` in the app's `settings.json`) checks at launch and every 4 hours and downloads in the background. Off, only Check for updates looks, and a found update waits as "available" for Download. Turning it back on checks at once.
 
 A copy that cannot update itself says why and offers no check: a development build, a build from `scripts/build-desktop.sh` (an unpacked `--dir` build, which electron-builder writes no `app-update.yml` into), a Mac app run from its disk image or a translocated copy, and an AppImage in a folder it cannot write.
 
-A downloaded update installs as the app quits, once the server it started has stopped. Keep Server Running in the quit question leaves the update for a later quit, because that server still runs from the files the update replaces. Relaunch to Update asks the same question without that choice: Update When They Finish, Stop Them and Update, or Cancel.
+A downloaded update installs as the app quits, once the server it started has stopped. Keep Server Running in the quit question leaves the update for a later quit, because that server still runs from the files the update replaces. Relaunch to update asks the same question without that choice: Update When They Finish, Stop N Turns and Update, or Cancel.
 
 The server this app started cannot reach the updater itself, so the app reports to it. The main process posts the updater's version and state to `POST /api/update/desktop` right after each change and every 5 seconds, and the answer carries at most one command: `check`, `download` or `install` (`packages/shared/update-fleet.ts`, `src/update-report.ts`). That is how an update of every machine at once reaches the app. A command is carried out once and named in the next report. `install` is Update When They Finish with nobody to answer: it waits until no turn runs, then relaunches into the update. A server this app did not start gets no reports, and one that is down or too old to take them is skipped, with one log line the first time.
 
@@ -151,7 +151,7 @@ OMNI_UPDATE_URL=http://127.0.0.1:47921/ npx tsx scripts/dist.ts --platform mac -
   -c.extraMetadata.version=0.1.1 -c.mac.identity=- -c.mac.target=zip -c.mac.notarize=false
 ```
 
-The app keeps the download in `~/Library/Caches/@omnidesktop-updater`, and Squirrel.Mac its state in `~/Library/Caches/com.omni-os.desktop.ShipIt`. Quitting with an update ready installs it into the test bundle. Never take Relaunch to Update there: the relaunched app gets no `--port` or `--data-dir` and opens on 4747.
+The app keeps the download in `~/Library/Caches/@omnidesktop-updater`, and Squirrel.Mac its state in `~/Library/Caches/com.omni-os.desktop.ShipIt`. Quitting with an update ready installs it into the test bundle. Never take Relaunch to update there: the relaunched app gets no `--port` or `--data-dir` and opens on 4747.
 
 ```sh
 npx tsx scripts/update-check.ts

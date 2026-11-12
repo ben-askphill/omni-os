@@ -12,7 +12,7 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
       {lines.map((m) => (
         <span key={m.plugin} className="inline-flex min-w-0 max-w-full items-center gap-1.5" title={`${m.plugin}: ${m.text}`}>
           <span className="h-1 w-1 shrink-0 rounded-full bg-fg-4" />
-          <span className="shrink-0 font-mono text-[10.5px] text-fg-4">{m.plugin}</span>
+          <span className="shrink-0 font-mono text-[10.5px] text-fg-3">{m.plugin}</span>
           <span className="min-w-0 truncate">{m.text}</span>
         </span>
       ))}
@@ -48,16 +48,16 @@ export function ThreadHeader({
           </a>
           {parent && (
             <>
-              <Icon name="chevronRight" size={12} className="shrink-0 text-fg-4" />
+              <Icon name="chevronRight" size={12} className="shrink-0 text-fg-3" />
               <a href={href.thread(parent.id)} className="min-w-0 truncate hover:text-fg" title={`Delegated from ${parent.title}`}>
                 {parent.title}
               </a>
             </>
           )}
-          {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-4">{thread.task_id}</span>}
+          {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-3">{thread.task_id}</span>}
           <ContinueCrumbs links={links} />
         </div>
-        <h1 className="mt-0.5 truncate font-display text-[16px] leading-snug md:text-[18px]" title={thread.title}>
+        <h1 className="mt-0.5 truncate font-display text-[length:var(--fs-heading)] leading-snug" title={thread.title}>
           {thread.title}
         </h1>
         {modLines.length > 0 && <ModStatusLines lines={modLines} />}

@@ -1,7 +1,7 @@
 // Quitting: a server this app started stops with it, unless turns
 // still run on it. Then the app asks whether to keep the server running for them. A server someone else started keeps
 // running, and the app quits at once. The activity monitor this app started stops either way. Restart Server asks
-// the same question before it stops a server with turns on it. Relaunch to Update asks it without Keep Server
+// the same question before it stops a server with turns on it. Relaunch to update asks it without Keep Server
 // Running: the update replaces the files a server left running would still run from.
 import { app, BrowserWindow, dialog } from 'electron';
 import { stopActivityMonitor } from './activity-monitor.ts';
@@ -14,7 +14,7 @@ export type QuitAction = { kind: 'stay-open' } | { kind: 'wait-for-turns' } | { 
 
 /** How the app quits, once the quit flow lets it go. updates.ts installs a downloaded update by it. */
 export interface QuitPlan {
-  /** Relaunch to Update asked for this quit, so the app opens again on the new version. */
+  /** Relaunch to update asked for this quit, so the app opens again on the new version. */
   forUpdate: boolean;
   /** A server this app started keeps running after it (Keep Server Running). */
   serverKeepsRunning: boolean;
@@ -53,8 +53,13 @@ export function updateAction(choice: UpdateChoice): QuitAction {
 }
 
 /** The dialog's text. Buttons follow QUIT_CHOICES. */
+/** "Stop 2 Turns": the button says what it stops. Title case, as macOS draws its alerts. */
+function stopTurns(runningTurns: number | null): string {
+  return runningTurns === null ? 'Stop Turns' : runningTurns === 1 ? 'Stop 1 Turn' : `Stop ${runningTurns} Turns`;
+}
+
 export function quitDialog(runningTurns: number | null): { message: string; detail: string; buttons: string[] } {
-  const buttons = ['Keep Server Running', 'Stop Them and Quit', 'Cancel'];
+  const buttons = ['Keep Server Running', `${stopTurns(runningTurns)} and Quit`, 'Cancel'];
   if (runningTurns === null) {
     return {
       message: 'Turns may still be running',
@@ -74,7 +79,7 @@ export const RESTART_CHOICES: readonly RestartChoice[] = ['when-finished', 'stop
 
 /** Restart Server's question when turns run, as the quit dialog words it. Buttons follow RESTART_CHOICES. */
 export function restartDialog(runningTurns: number | null): { message: string; detail: string; buttons: string[] } {
-  const buttons = ['Restart When They Finish', 'Stop Them and Restart', 'Cancel'];
+  const buttons = ['Restart When They Finish', `${stopTurns(runningTurns)} and Restart`, 'Cancel'];
   const message =
     runningTurns === null ? 'Turns may still be running' : runningTurns === 1 ? '1 turn is still running' : `${runningTurns} turns are still running`;
   const detail =
@@ -84,9 +89,9 @@ export function restartDialog(runningTurns: number | null): { message: string; d
   return { message, detail, buttons };
 }
 
-/** Relaunch to Update's question when turns run. Buttons follow UPDATE_CHOICES. */
+/** Relaunch to update's question when turns run. Buttons follow UPDATE_CHOICES. */
 export function updateDialog(runningTurns: number | null): { message: string; detail: string; buttons: string[] } {
-  const buttons = ['Update When They Finish', 'Stop Them and Update', 'Cancel'];
+  const buttons = ['Update When They Finish', `${stopTurns(runningTurns)} and Update`, 'Cancel'];
   const message =
     runningTurns === null ? 'Turns may still be running' : runningTurns === 1 ? '1 turn is still running' : `${runningTurns} turns are still running`;
   const detail =
@@ -156,7 +161,7 @@ export function quitPlan(): QuitPlan | null {
   return plan;
 }
 
-/** Relaunch to Update: the quit flow, asking about running turns without Keep Server Running. */
+/** Relaunch to update: the quit flow, asking about running turns without Keep Server Running. */
 export function quitToUpdate(): void {
   forUpdate = true;
   app.quit();
@@ -203,7 +208,7 @@ export function installQuitHold(ctx: AppContext): void {
   app.prependListener('before-quit', (event: Electron.Event) => {
     if (decided) return;
     event.preventDefault();
-    // Read on every held quit, so a Relaunch to Update made while a quit is asked about does not carry to the next.
+    // Read on every held quit, so a Relaunch to update made while a quit is asked about does not carry to the next.
     const update = forUpdate;
     forUpdate = false;
     if (quitHeld) return;

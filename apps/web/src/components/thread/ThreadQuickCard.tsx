@@ -2,11 +2,12 @@ import { useState, type ReactNode } from 'react';
 import type { BackgroundTask, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { HarnessMark, Loader } from '../brand.tsx';
-import { Chip, copyText, Icon, IconButton, STATUS_LABEL, StatusDot, type IconName } from '../ui.tsx';
+import { Chip, copyText, Icon, IconButton, StatusDot, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
-import { isWorking, shownStatus } from '@omni/shared/delegate-count.ts';
+import { isWorking } from '@omni/shared/delegate-count.ts';
+import { threadPill } from './thread-state.ts';
 import { toDate } from '@omni/shared/format.ts';
 import { duration } from '../../format.ts';
 import { useNow } from '../../store.tsx';
@@ -33,21 +34,29 @@ function QuickRow({
 }) {
   const body = (
     <>
-      <Icon name={icon} size={15} className={`shrink-0 ${disabled ? 'text-fg-4' : 'text-fg-3'}`} />
-      <span className={`flex min-w-0 flex-1 items-center gap-2 ${disabled ? 'text-fg-4' : 'text-fg'}`}>{children}</span>
-      {trailing}
-      {onClick && !disabled && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-4" />}
+      <Icon name={icon} size={15} className={`shrink-0 ${disabled ? 'text-fg-disabled' : 'text-fg-3'}`} />
+      <span className={`flex min-w-0 flex-1 items-center gap-2 ${disabled ? 'text-fg-disabled' : 'text-fg'}`}>{children}</span>
+      {onClick && !disabled && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-3" />}
     </>
   );
   const cls = 'flex min-h-[36px] w-full min-w-0 items-center gap-2.5 rounded-[11px] px-2 text-left text-[12.5px]';
-  if (onClick && !disabled) {
-    return (
+  const row =
+    onClick && !disabled ? (
       <button type="button" aria-label={label} onClick={onClick} className={`hov ${cls} [--hov:var(--bg)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-line-strong`}>
         {body}
       </button>
+    ) : (
+      <div className={cls}>{body}</div>
     );
-  }
-  return <div className={cls}>{body}</div>;
+  // A trailing button sits beside the row's own, never inside it.
+  return trailing ? (
+    <div className="flex min-w-0 items-center gap-0.5">
+      <div className="min-w-0 flex-1">{row}</div>
+      {trailing}
+    </div>
+  ) : (
+    row
+  );
 }
 
 /**
@@ -70,6 +79,8 @@ export function ThreadQuickCard({
   onOpen,
   onOpenThread,
   onJump,
+  asking = false,
+  reconnecting = false,
   className = '',
 }: {
   thread: Thread;
@@ -91,6 +102,9 @@ export function ThreadQuickCard({
   onOpenThread: (id: string) => void;
   /** Scrolls the transcript to the call that started a sub-agent. */
   onJump: (eventId: number) => void;
+  /** The agent waits on a question card: the turn is open, but on Ben. */
+  asking?: boolean;
+  reconnecting?: boolean;
   className?: string;
 }) {
   const cloud = thread.harness === 'cursor-cloud';
@@ -100,7 +114,10 @@ export function ThreadQuickCard({
   const badge = pr ? prBadge(pr) : null;
   const line = pr ? prLine(pr) : null;
   const model = thread.model || init?.model;
-  const status = shownStatus(thread);
+  const now = useNow(60_000);
+  // The run row says what the header pill says, except that a turn in progress reads as one.
+  const pill = threadPill(thread, { asking, reconnecting, now });
+  const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? 'Waiting on you' : pill.label } : { glyph: 'running' as const, label: 'Turn running' };
   const branchDisabled = !thread.branch;
 
   return (
@@ -108,19 +125,22 @@ export function ThreadQuickCard({
       aria-label="Thread quick actions"
       className={`w-full rounded-[18px] border border-line bg-surface p-1.5 shadow-[inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))] ${className}`}
     >
-      <QuickRow
-        icon="monitor"
-        trailing={!remote && cwd ? <CopyPath path={cwd} /> : undefined}
-      >
+      <QuickRow icon="monitor">
         <span className="min-w-0 truncate">{machineLabel(machineName)}</span>
-        {thread.task_id && <span className="shrink-0 font-num text-[10px] text-fg-4">{thread.task_id}</span>}
+        {thread.task_id && <span className="shrink-0 font-num text-[10px] text-fg-3">{thread.task_id}</span>}
       </QuickRow>
       {cloud && cloudUrl ? (
         <QuickRow icon="external" label="Open in Cursor" onClick={() => window.open(cloudUrl, '_blank', 'noopener,noreferrer')}>
           <span className="truncate">Open in Cursor</span>
         </QuickRow>
       ) : (
-        <QuickRow icon="folder" disabled={remote} label={remote ? undefined : 'Show working directory in details'} onClick={remote ? undefined : () => onOpen('details')}>
+        <QuickRow
+          icon="folder"
+          disabled={remote}
+          label={remote ? undefined : 'Show working directory in details'}
+          onClick={remote ? undefined : () => onOpen('details')}
+          trailing={!remote && cwd ? <CopyPath path={cwd} /> : undefined}
+        >
           <span className="min-w-0 truncate font-mono text-[11.5px]">{remote ? (cloud ? 'Cursor cloud' : 'Remote session') : shortPath(cwd)}</span>
         </QuickRow>
       )}
@@ -129,20 +149,20 @@ export function ThreadQuickCard({
         <span className="shrink-0 whitespace-nowrap">
           <HarnessMark harness={thread.harness} withLabel />
         </span>
-        {model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-4">default model</span>}
+        {model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
       </QuickRow>
-      <QuickRow icon={slotBusy ? 'zap' : 'clock'}>
-        <StatusDot status={slotBusy ? 'running' : status} size={7} />
+      <QuickRow icon={run.glyph === 'running' ? 'zap' : 'clock'}>
+        <StatusDot status={run.glyph} size={8} />
         <span className="truncate">
-          {slotBusy ? 'Turn running' : (STATUS_LABEL[status] ?? status)}
-          {warm !== undefined && !remote && (
+          {run.label}
+          {warm !== undefined && !remote && !reconnecting && (
             <span className="text-fg-3"> · {warm ? 'Live session' : 'Cold start next message'}</span>
           )}
         </span>
       </QuickRow>
       {branchDisabled ? (
         <QuickRow icon="branch" disabled>
-          <span className="text-fg-4">No branch</span>
+          <span className="text-fg-3">No branch</span>
         </QuickRow>
       ) : (
         <>
@@ -284,7 +304,7 @@ function Lineage({
           <Branch last={i === total - 1} />
           <StatusDot status={c.status} size={6} />
           <span className="min-w-0 flex-1 truncate">{c.title || 'Untitled'}</span>
-          <Icon name="chevronRight" size={12} className="shrink-0 text-fg-4" />
+          <Icon name="chevronRight" size={12} className="shrink-0 text-fg-3" />
         </button>
       ))}
       {agents.map((t, i) => (
