@@ -127,7 +127,7 @@ export function FolderRow({ f, openId, tasks, handoffs, onNavigate }: { f: Folde
             aria-expanded={open}
             aria-label={label}
             title={`${label}. Double-click or F2 to rename.`}
-            className="hov z-[1] flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full pr-1 pl-3 text-left text-[13px] text-fg-2 transition-colors hover:text-fg md:h-7 md:text-[12.5px]"
+            className="item flex h-8 min-w-0 flex-1 items-center gap-2 pr-1 pl-3 text-left text-[13px] text-fg-2 hover:text-fg md:h-7 md:text-[12.5px]"
           >
             <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-3" />
             <span className="min-w-0 flex-1 truncate">{f.name}</span>
@@ -154,7 +154,7 @@ export function FolderRow({ f, openId, tasks, handoffs, onNavigate }: { f: Folde
         <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} handoffs={handoffs} onNavigate={onNavigate} />
       ))}
       {open && !all && list.length > shown.length && (
-        <button type="button" onClick={() => setAll(true)} className="hov z-[1] ml-[25px] flex h-7 items-center rounded-full pr-3 pl-8 text-[12px] text-fg-3 transition-colors hover:text-fg-2">
+        <button type="button" onClick={() => setAll(true)} className="item ml-[25px] flex h-7 items-center pr-3 pl-8 text-[12px] text-fg-3 hover:text-fg-2">
           {list.length - shown.length} more
         </button>
       )}
