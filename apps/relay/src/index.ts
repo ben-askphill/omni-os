@@ -10,6 +10,7 @@ import { CloudflareApi } from './cloudflare.ts';
 import { CLIENT_DAYS, ConnectStore, notConfigured } from './connect.ts';
 import { connectPage, errorPage, PAGE_HEADERS } from './page.ts';
 import { SIGNIN_OBJECT, SigninStore } from './signin.ts';
+import { compactStep, createKeyIndex, keysFrom, topCursor } from './compact.ts';
 import { objectPath, RelayStore } from './store.ts';
 
 interface Env {
@@ -190,6 +191,7 @@ export class Relay extends DurableObject<Env> {
   private store: RelayStore | null = null;
   private connectStore: ConnectStore | null = null;
   private moving: Promise<void> | null = null;
+  private compacting: Promise<void> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -230,6 +232,41 @@ export class Relay extends DurableObject<Env> {
       console.error(`[relay] moving change data to R2 stopped: ${err.message}`);
       // The next request starts it again from the saved cursor.
       this.moving = null;
+    });
+  }
+
+  /**
+   * Shrink the change log to the newest row per item per machine (compact.ts), in the background, from the cursor saved
+   * after each step, then create the key index and prune on every push from then on. A request starts it, like
+   * moveInline. Rows go before anything is written to storage, so it also makes headway on a database that is full.
+   */
+  private compact(store: RelayStore) {
+    if (store.prune) return;
+    this.compacting ??= (async () => {
+      const storage = this.ctx.storage;
+      const sql = storage.sql;
+      const transaction = <T>(fn: () => T) => storage.transactionSync(fn);
+      if (!(await storage.get<boolean>('compacted'))) {
+        const saved = await storage.get<number>('compact_below');
+        let below = saved ?? topCursor(sql);
+        const seen = saved === undefined ? new Set<string>() : keysFrom(sql, below);
+        let removed = 0;
+        for (let step = compactStep(sql, transaction, below, seen); step.next !== null; step = compactStep(sql, transaction, below, seen)) {
+          removed += step.removed;
+          below = step.next;
+          await storage.put('compact_below', below);
+        }
+        createKeyIndex(sql);
+        await storage.put('compacted', true);
+        await storage.delete('compact_below');
+        console.log(`[relay] change log compacted, ${removed} superseded rows removed`);
+      }
+      createKeyIndex(sql);
+      store.prune = true;
+    })().catch((err: Error) => {
+      console.error(`[relay] compacting the change log stopped: ${err.message}`);
+      // The next request starts it again from the saved cursor.
+      this.compacting = null;
     });
   }
 
@@ -280,6 +317,7 @@ export class Relay extends DurableObject<Env> {
       const user = req.headers.get('x-omni-user');
       if (!user) throw new RelayError(400, 'No user');
       const store = this.open(user);
+      this.compact(store);
       this.moveInline(store);
 
       if (url.pathname.startsWith('/internal/') && url.pathname !== '/internal/token') return await this.internalRoute(req, user, url.pathname);
