@@ -2,7 +2,8 @@ import { useContext, useEffect, type ReactNode } from 'react';
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { ChannelWithRunning } from '../../api.ts';
-import { href } from '../../router.ts';
+import { href, navigate } from '../../router.ts';
+import { useInboxKey } from '../../inbox-key.ts';
 import { useApp } from '../../store.tsx';
 import { monogram } from '@omni/shared/monogram.ts';
 import { needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
@@ -29,6 +30,8 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
     </RailItem>
   );
   const { ref, fade } = useScrollFade();
+  // "i" opens the Inbox here as the classic Sidebar's does: the rail's Inbox is the home page.
+  useInboxKey(() => navigate(href.home()));
   // The selected disc scrolls into view when it is out of sight, for a thread opened from elsewhere.
   const selectedId = selection.kind === 'channel' ? selection.id : null;
   useEffect(() => {
