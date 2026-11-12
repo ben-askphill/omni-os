@@ -5,6 +5,7 @@ import { createRelayTransport, isoTs, isSignedOut, type Change, type SyncTranspo
 import { watchNetwork, type NetworkWatch } from './network.ts';
 import { automationsOwner, claimIfUnowned, type AutomationsOwner } from './owner.ts';
 import { hardwareId } from './hardware.ts';
+import { resendChannelColors } from './resend-channel-colors.ts';
 import './handlers/index.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
@@ -185,6 +186,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   async function cycle(): Promise<SyncResult> {
     const result: SyncResult = { pushed: 0, pulled: 0, applied: 0, skipped: 0, deferred: 0 };
     try {
+      resendChannelColors(worker.machineId);
       for (const fn of syncingListeners) fn(worker);
       result.pushed = await push();
       await pull(result);
