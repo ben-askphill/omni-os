@@ -2,8 +2,9 @@
 // on which shelf, with what status, and how far each shelf is open. The rules are apps/web/src/inbox.ts.
 import { useMemo, useState } from 'react';
 import { delegatedIds, delegatesByParent } from '@omni/shared/delegate-count.ts';
-import { taskHost, type ThreadStub } from '../api.ts';
-import { DONE_INITIAL, DONE_PAGE, inboxLayout, rowStatus, shelfView, type InboxThread, type RowStatus, type ShelfView } from '../inbox.ts';
+import { inboxStatus, type RowStatus } from '@omni/shared/status.ts';
+import type { ThreadStub } from '../api.ts';
+import { DONE_INITIAL, DONE_PAGE, inboxLayout, shelfView, type InboxThread, type ShelfView } from '../inbox.ts';
 import { useLiveThreads } from '../components/ThreadList.tsx';
 import { useRoute } from '../router.ts';
 import { readPref, useApp, writePref } from '../store.tsx';
@@ -27,6 +28,7 @@ export interface Inbox {
   loaded: boolean;
   /** The thread on screen, if any. */
   openId: string | null;
+  /** What a card says in place of the time, as Home says it (inboxStatus). */
   status: (t: InboxThread) => RowStatus | null;
   /** A Conductor thread's delegated threads, by its id: their count on its row stands for them. */
   delegates: Map<string, readonly ThreadStub[]>;
@@ -45,7 +47,7 @@ function useShelf(pref: string): [open: boolean, toggle: () => void] {
 
 export function useInbox(): Inbox {
   const route = useRoute();
-  const { channels, pinned, needsYou, openThread, tasks } = useApp();
+  const { channels, pinned, needsYou, openThread } = useApp();
   const recent = useLiveThreads(`/recent?limit=${RECENT_LIMIT}`, acceptAll, RECENT_LIMIT);
   const [workingOpen, toggleWorking] = useShelf('sidebar.inbox.workingOpen');
   const [doneOpen, toggleDone] = useShelf('sidebar.inbox.doneOpen');
@@ -79,7 +81,7 @@ export function useInbox(): Inbox {
     },
     loaded: !!recent.data,
     openId,
-    status: (t) => rowStatus(t, needOf.get(t.id), tasks.filter((k) => taskHost(k) === t.id).length),
+    status: (t) => inboxStatus(t, needOf.get(t.id)),
     delegates: delegatesByParent(handoffs),
   };
 }

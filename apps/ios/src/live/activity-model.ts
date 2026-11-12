@@ -1,29 +1,25 @@
-// The Activity tab: phone web's Inbox (apps/web/src/mobile/ActivityScreen.tsx), with its rules mirrored from
-// apps/web/src/inbox.ts (inboxLayout, rowStatus). Pinned threads, then the threads waiting on Ben, the latest back
-// first; Working and Done fold away below them. Pure.
-import type { ChannelWithRunning, NeedsYou, NeedsYouBlocker, NeedsYouItem, PinnedThread, Thread, ThreadStub } from '@omni/client-core';
+// The Activity tab: phone web's Inbox (apps/web/src/mobile/ActivityScreen.tsx), with its shelves mirrored from
+// apps/web/src/inbox.ts (inboxLayout) and its card status shared with the web (inboxStatus). Pinned threads, then the
+// threads waiting on Ben, the latest back first; Working and Done fold away below them. Pure.
+import type { ChannelWithRunning, NeedsYou, NeedsYouItem, PinnedThread, Thread, ThreadStub } from '@omni/client-core';
 import {
   delegatedIds,
   delegatesByParent,
   delegateSummary,
   isWorking,
-  showsRunning,
   type DelegateNeeds,
   type DelegateSummary,
 } from '@omni/shared/delegate-count.ts';
 
-import { STATUS, asksForYou, threadGlyph, type Glyph } from '@omni/shared/status.ts';
+import { asksForYou, inboxStatus, threadGlyph, type Glyph, type RowStatus } from '@omni/shared/status.ts';
 import { canMarkDone, targetOfStub, type ThreadTarget } from '../thread/target';
 import { shortAgo } from './channel-model';
 
 /** Any thread the inbox can list: a full row from the recent list, or the stub the pinned and channel lists send. */
 type InboxThread = ThreadStub & Partial<Pick<Thread, 'role' | 'branch' | 'archived'>> & { delegating?: boolean };
 
-/** What a row says on its right in place of the time (web: RowStatus). */
-export interface InboxStatus {
-  glyph: Glyph;
-  label: string;
-}
+/** What a row says on its right in place of the time, as the web and Home say it. */
+export type InboxStatus = RowStatus;
 
 /** A thread on the inbox or the Working shelf, as phone web's MoInboxRow draws it. */
 export interface InboxRow {
@@ -82,33 +78,6 @@ export interface ActivityInput {
 export const DONE_INITIAL = 10;
 export const DONE_PAGE = 25;
 
-const BLOCKER_GLYPH: Record<NeedsYouBlocker['kind'], Glyph> = {
-  question: 'needs',
-  setup: 'failed',
-  limited: 'limited',
-  uncertain: 'needs',
-  recovered: 'needs',
-};
-
-const as = (glyph: Glyph): InboxStatus => ({ glyph, label: STATUS[glyph].label });
-
-/** A blocker first, then work in progress, then an unread result (web: rowStatus). */
-function rowStatus(t: InboxThread, need: NeedsYouItem | undefined): InboxStatus | null {
-  const b = need?.blockers[0];
-  if (b) return as(BLOCKER_GLYPH[b.kind]);
-  if (t.status === 'queued') return as('queued');
-  if (showsRunning(t)) return as('running');
-  switch (need?.result?.status) {
-    case 'failed':
-      return as('failed');
-    case 'done':
-      return as('done');
-    case 'stopped':
-      return as('settled');
-  }
-  return null;
-}
-
 const at = (t: InboxThread) => t.updated_at ?? t.created_at;
 /** Newest first; a tie goes to the lower id, so the order never flickers between reloads. */
 const newest = (key: (t: InboxThread) => string) => (a: InboxThread, b: InboxThread) => key(b).localeCompare(key(a)) || a.id.localeCompare(b.id);
@@ -147,7 +116,7 @@ export function activityInbox({ recent, needsYou, pinned, channels, now }: Activ
   shelves.done.sort(newest((t) => t.done_at ?? ''));
 
   const row = (t: InboxThread): InboxRow => {
-    const status = rowStatus(t, needOf.get(t.id));
+    const status = inboxStatus(t, needOf.get(t.id));
     const children = delegates.get(t.id);
     return {
       id: t.id,

@@ -1,7 +1,7 @@
 // Needs you (apps/server/db/repos/needs-you.ts) from the Web UI's side: why each thread is there, and which result an
 // open thread has shown.
 import type { NeedsYou, NeedsYouItem } from './api.ts';
-import { asksForYou, type Glyph } from '@omni/shared/status.ts';
+import { BLOCKER_GLYPH, STATUS, asksForYou, resultGlyph, type Glyph } from '@omni/shared/status.ts';
 import { resetLabel } from './limits.ts';
 
 export interface Reason {
@@ -17,23 +17,21 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many.r
 export function reasonOf(item: NeedsYouItem): Reason {
   const preview = item.thread.last_text ? item.thread.last_text.replace(/\s+/g, ' ').trim().slice(0, 240) : null;
   const b = item.blockers[0];
-  if (b?.kind === 'question') return { glyph: 'needs', label: plural(b.count, 'Waiting on your answer', '# questions wait on your answer'), detail: b.detail };
-  if (b?.kind === 'setup') return { glyph: 'failed', label: 'Worktree could not be prepared', detail: b.detail };
-  if (b?.kind === 'limited') {
-    const at = b.resets_at ? resetLabel(b.resets_at) : null;
-    const where = b.elsewhere ? ' on your other machine' : '';
-    return { glyph: 'limited', label: `Usage limit reached${where}`, detail: at ? `${b.scheduled ? 'Resumes' : 'Resets'} at ${at}` : 'No reset time given' };
+  // The glyphs are the Inbox card's (inboxStatus), so Home and the Inbox never say two things about one thread.
+  if (b) {
+    const glyph = BLOCKER_GLYPH[b.kind];
+    if (b.kind === 'question') return { glyph, label: plural(b.count, 'Waiting on your answer', '# questions wait on your answer'), detail: b.detail };
+    if (b.kind === 'setup') return { glyph, label: 'Worktree could not be prepared', detail: b.detail };
+    if (b.kind === 'limited') {
+      const at = b.resets_at ? resetLabel(b.resets_at) : null;
+      const where = b.elsewhere ? ' on your other machine' : '';
+      return { glyph, label: `Usage limit reached${where}`, detail: at ? `${b.scheduled ? 'Resumes' : 'Resets'} at ${at}` : 'No reset time given' };
+    }
+    if (b.kind === 'uncertain') return { glyph, label: plural(b.count, 'A message may not have been sent', '# messages may not have been sent'), detail: preview };
+    return { glyph, label: plural(b.count, 'A message waits for Resume', '# messages wait for Resume'), detail: preview };
   }
-  if (b?.kind === 'uncertain') return { glyph: 'needs', label: plural(b.count, 'A message may not have been sent', '# messages may not have been sent'), detail: preview };
-  if (b?.kind === 'recovered') return { glyph: 'needs', label: plural(b.count, 'A message waits for Resume', '# messages wait for Resume'), detail: preview };
-  switch (item.result?.status) {
-    case 'failed':
-      return { glyph: 'failed', label: 'Failed', detail: preview };
-    case 'stopped':
-      return { glyph: 'settled', label: 'Stopped', detail: preview };
-    default:
-      return { glyph: 'done', label: 'Finished', detail: preview };
-  }
+  const glyph = resultGlyph(item.result?.status ?? 'done');
+  return { glyph, label: glyph === 'done' ? 'Finished' : STATUS[glyph].label, detail: preview };
 }
 
 /**

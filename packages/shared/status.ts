@@ -55,3 +55,37 @@ export function threadGlyph(t: { status: string; delegating?: boolean; limit_sta
 
 /** The glyph asks for Ben: he answers it, resumes it or looks into it. */
 export const asksForYou = (g: Glyph) => g === 'needs' || g === 'failed' || g === 'limited';
+
+/** What holds a thread up until Ben acts (NeedsYouBlocker in apps/server/db/repos/needs-you.ts), to its glyph. */
+export const BLOCKER_GLYPH: Record<'question' | 'setup' | 'recovered' | 'uncertain' | 'limited', Glyph> = {
+  question: 'needs',
+  setup: 'failed',
+  limited: 'limited',
+  uncertain: 'needs',
+  recovered: 'needs',
+};
+
+/** How a turn ended, a Needs you result's status (done, failed or stopped), to its glyph. A stopped turn reads Stopped. */
+export const resultGlyph = (status: string): Glyph => (status === 'failed' ? 'failed' : status === 'stopped' ? 'settled' : 'done');
+
+/** What a row says on its right in place of the time. */
+export interface RowStatus {
+  glyph: Glyph;
+  label: string;
+}
+
+/**
+ * The status an Inbox card shows (the sidebar's Inbox, the phone's Activity tab and the iOS app's), read the way Home
+ * reads the same thread: what holds it up first, as Home's Needs you card; then its own turn running, queued or
+ * waiting on what it delegated, as Home's dot (threadGlyph); then the result Ben has not read. Null: nothing to say,
+ * so the card shows the time. Background tasks a stopped or finished turn left running do not make it Running.
+ */
+export function inboxStatus(
+  t: Parameters<typeof threadGlyph>[0],
+  need?: { blockers: readonly { kind: keyof typeof BLOCKER_GLYPH }[]; result: { status: string } | null } | null,
+): RowStatus | null {
+  const b = need?.blockers[0];
+  const own = threadGlyph(t);
+  const glyph = b ? BLOCKER_GLYPH[b.kind] : own === 'running' || own === 'queued' ? own : need?.result ? resultGlyph(need.result.status) : null;
+  return glyph ? { glyph, label: STATUS[glyph].label } : null;
+}
