@@ -92,9 +92,16 @@ describe('a thread run on another machine', () => {
     expect(res.body.request).toMatchObject({ id: 'msg-1', state: 'accepted' });
     expect(res.body.forwarded_to).toBe('Box B');
     expect(a.runner.isLive(id)).toBe(false);
+    // Until B takes it, A lists it as on its way to B, under Ben's request id, so its client sees the step underway.
+    const forwarded = async (m: Mac) => ((await m.json(`/threads/${id}`)).body.pending as { forwarded_to?: string }[]).filter((p) => p.forwarded_to);
+    expect(await forwarded(a)).toEqual([expect.objectContaining({ kind: 'user', text: 'and the cart drawer', request_id: 'msg-1', forwarded_to: 'Box B', sent_at: expect.any(String) })]);
 
     await both();
     const taken = await waitFor(() => b.db.messageRequests.byRequestId(id, 'runon:msg-1'), 'B to take the message');
+    // B's answer reaches A, and the row leaves: the message is B's now. Only the sender lists it.
+    for (let n = 0; n < 5 && (await forwarded(a)).length; n++) await both();
+    expect(await forwarded(a)).toEqual([]);
+    expect(await forwarded(b)).toEqual([]);
     // A second sync finds it saved and sends nothing again.
     await both();
     expect(b.db.messageRequests.byRequestId(id, 'runon:msg-1')!.id).toBe(taken.id);
