@@ -124,9 +124,19 @@ export interface Insights {
   automations: InsightsAutomations;
 }
 
-/** Day key in a time zone: the en-CA locale writes YYYY-MM-DD. */
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * Day key in a time zone: the en-CA locale writes YYYY-MM-DD. One formatter per zone, because building one costs about
+ * 40 times a format call and /insights asks for every usage record's day.
+ */
 export function dayKey(ms: number, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
+  let f = dayFormats.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    dayFormats.set(timeZone, f);
+  }
+  return f.format(ms);
 }
 
 /** The range's days, oldest first, ending today. Steps back from noon so a DST change never skips or repeats a day. */
