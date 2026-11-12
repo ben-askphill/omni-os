@@ -2,6 +2,7 @@
 // for Retry with the first prompt and its files saved. Nothing runs in the channel's own checkout instead.
 import { channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
 import { prepareWorktree } from '../sandbox.ts';
+import { followBranch } from '../branch-follow.ts';
 import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
 import { baseFor } from '../worktree-base.ts';
@@ -77,6 +78,9 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
 
 async function prepare(t: Thread): Promise<Thread | undefined> {
   const repo = channels.get(t.channel_id)?.repo_path ?? null;
+  // A worktree its agent moved to another branch keeps that branch: only a detached HEAD or the default branch is
+  // switched back (sandbox.ts prepareWorktree).
+  if (await followBranch(t.id).catch(() => false)) t = threads.get(t.id) ?? t;
   try {
     if (!t.branch) throw new Error('The thread has no branch to check out.');
     const branch = t.branch;
