@@ -7,20 +7,22 @@ import { readPref, writePref } from './store.tsx';
  */
 export type LayoutPref = 'rail' | 'classic';
 
-const KEY = 'layout';
+/** How the rail paints channel discs at rest: greyscale until hover, focus or selection (the default), or full colour. */
+export type RailColorPref = 'grey' | 'full';
+
 const listeners = new Set<() => void>();
+const subscribe = (fn: () => void) => (listeners.add(fn), () => listeners.delete(fn));
 
-export const readLayout = (): LayoutPref => (readPref<LayoutPref>(KEY, 'classic') === 'rail' ? 'rail' : 'classic');
-
-export function setLayout(next: LayoutPref) {
-  writePref(KEY, next);
+function write(key: string, value: string) {
+  writePref(key, value);
   for (const fn of listeners) fn();
 }
 
-export function useLayout(): LayoutPref {
-  return useSyncExternalStore(
-    (fn) => (listeners.add(fn), () => listeners.delete(fn)),
-    readLayout,
-    () => 'classic',
-  );
-}
+export const readLayout = (): LayoutPref => (readPref<LayoutPref>('layout', 'classic') === 'rail' ? 'rail' : 'classic');
+export const readRailColor = (): RailColorPref => (readPref<RailColorPref>('railColor', 'grey') === 'full' ? 'full' : 'grey');
+
+export const setLayout = (next: LayoutPref) => write('layout', next);
+export const setRailColor = (next: RailColorPref) => write('railColor', next);
+
+export const useLayout = (): LayoutPref => useSyncExternalStore(subscribe, readLayout, () => 'classic');
+export const useRailColor = (): RailColorPref => useSyncExternalStore(subscribe, readRailColor, readRailColor);

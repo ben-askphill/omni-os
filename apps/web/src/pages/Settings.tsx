@@ -8,7 +8,7 @@ import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
 import { PRONOUNS } from '../components/onboarding-parts.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
-import { setLayout, useLayout } from '../layout-pref.ts';
+import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
 import { setInboxKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
 import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
@@ -663,6 +663,7 @@ function AppearanceCard() {
   const [theme, setTheme] = useTheme();
   const layout = useLayout();
   const inboxKey = useInboxKeyOn();
+  const railColor = useRailColor();
   const mobile = useIsMobile();
   const thisBrowser = <Origin of="device" label="This browser" />;
   return (
@@ -701,6 +702,15 @@ function AppearanceCard() {
               onChange={(on) => setLayout(on ? 'rail' : 'classic')}
             />
           </div>
+        )}
+        {!mobile && layout === 'rail' && (
+          <SwitchRow
+            title="Full color channel rail"
+            origin={thisBrowser}
+            detail="Channel discs keep their colors. Off, they rest in grayscale until you hover or select one."
+            checked={railColor === 'full'}
+            onChange={(on) => setRailColor(on ? 'full' : 'grey')}
+          />
         )}
       </Card>
       <Card entry="inbox-key" title="Keyboard">

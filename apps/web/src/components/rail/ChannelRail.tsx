@@ -4,6 +4,7 @@ import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { ChannelWithRunning } from '../../api.ts';
 import { href, navigate } from '../../router.ts';
 import { useInboxKey } from '../../inbox-key.ts';
+import { useRailColor } from '../../layout-pref.ts';
 import { useApp } from '../../store.tsx';
 import { monogram } from '@omni/shared/monogram.ts';
 import { needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
@@ -32,6 +33,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
   const { ref, fade } = useScrollFade();
   // "i" opens the Inbox here as the classic Sidebar's does: the rail's Inbox is the home page.
   useInboxKey(() => navigate(href.home()));
+  const color = useRailColor();
   // The selected disc scrolls into view when it is out of sight, for a thread opened from elsewhere.
   const selectedId = selection.kind === 'channel' ? selection.id : null;
   useEffect(() => {
@@ -40,7 +42,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
   }, [selectedId, ref, channels.length]);
 
   return (
-    <nav aria-label="Channels" className="scheme-dark rail-chrome relative flex h-full w-[72px] shrink-0 flex-col items-center bg-[var(--chrome)] pb-3.5 text-fg">
+    <nav aria-label="Channels" data-color={color} className="scheme-dark rail-chrome relative flex h-full w-[72px] shrink-0 flex-col items-center bg-[var(--chrome)] pb-3.5 text-fg">
       {/* The glass capsule behind the macOS traffic lights, in the desktop app only (index.css). */}
       <span aria-hidden="true" className="rail-lights-glass" />
       {/* rail-top: the desktop app's macOS window drags by this strip, where its traffic lights sit (index.css). */}

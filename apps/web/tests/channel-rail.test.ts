@@ -2,11 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const state = vi.hoisted(() => ({ channels: [] as { id: string; name: string; kind: string; icon: string | null; avatar_bg: string | null; running: number }[] }));
+const state = vi.hoisted(() => ({
+  channels: [] as { id: string; name: string; kind: string; icon: string | null; avatar_bg: string | null; running: number }[],
+  prefs: {} as Record<string, unknown>,
+}));
 
-vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: state.channels, needsYou: null, profile: null }) }));
+vi.mock('../src/store.tsx', () => ({
+  useApp: () => ({ channels: state.channels, needsYou: null, profile: null }),
+  readPref: (key: string, fallback: unknown) => (key in state.prefs ? state.prefs[key] : fallback),
+  writePref: (key: string, value: unknown) => {
+    state.prefs[key] = value;
+  },
+}));
 
 import { ChannelRail } from '../src/components/rail/ChannelRail.tsx';
+import { readRailColor, setRailColor } from '../src/layout-pref.ts';
 
 const disc = (html: string, label: string) => {
   const at = html.indexOf(`aria-label="${label}"`);
@@ -36,5 +46,18 @@ describe('ChannelRail', () => {
     expect(disc(onInbox, 'Inbox')).toContain('aria-current="page"');
     const onChannel = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'channel', id: 'inbox' } }));
     expect(current(onChannel)).toBe(1);
+  });
+
+  it('rests in grayscale by default and switches to full color from the Appearance pref', () => {
+    state.channels = [];
+    state.prefs = {};
+    const colorOf = () => renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'inbox' } })).match(/data-color="(\w+)"/)?.[1];
+    expect(colorOf()).toBe('grey');
+    setRailColor('full');
+    expect(colorOf()).toBe('full');
+    setRailColor('grey');
+    expect(colorOf()).toBe('grey');
+    state.prefs = { railColor: 'rainbow' };
+    expect(readRailColor()).toBe('grey');
   });
 });
