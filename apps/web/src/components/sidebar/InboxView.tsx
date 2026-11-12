@@ -15,8 +15,8 @@ import { WorkspaceLinks } from './SidebarLinks.tsx';
 
 /**
  * The sidebar's Inbox view, T3 Code's default thread list: every channel's threads in one list. Pinned cards, then the
- * threads waiting on Ben, the latest back on top. Working and Done fold away at the bottom. Marking a thread done
- * (the check on hover) moves it to Done, as Settle does in T3.
+ * threads waiting on Ben, the latest back on top, then the Working shelf right under them. Done folds away at the
+ * bottom. Marking a thread done (the check on hover) moves it to Done, as Settle does in T3.
  */
 export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
   const hash = useHash();
@@ -50,13 +50,14 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
         {loaded && !pinned.length && !inbox.length && <p className="px-3 py-6 text-center text-[12.5px] text-fg-3">Nothing is waiting on you.</p>}
       </div>
 
+      {working.count > 0 && (
+        <div className="space-y-px pt-3">
+          <Shelf label="Working" count={working.count} open={working.open} onToggle={working.toggle} />
+          {working.rows.map((t) => card(t))}
+        </div>
+      )}
+
       <div className="mt-auto space-y-px pt-4">
-        {working.count > 0 && (
-          <>
-            <Shelf label="Working" count={working.count} open={working.open} onToggle={working.toggle} />
-            {working.rows.map((t) => card(t))}
-          </>
-        )}
         <Shelf label="Done" count={done.count} open={done.open} onToggle={done.toggle} />
         {done.rows.map((t) => (
           <DoneRow key={t.id} t={t} active={t.id === openId} onNavigate={onNavigate} />
