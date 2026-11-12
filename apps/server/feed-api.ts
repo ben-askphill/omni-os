@@ -1,4 +1,4 @@
-// /api/feed, /status, /tasks, /recent, /needs-you, /search: the global views across threads.
+// /api/feed, /status, /tasks, /recent, /needs-you, /search, /insights: the global views across threads.
 import { Hono } from 'hono';
 import { sessionSSE } from './sse.ts';
 import { about } from './about.ts';
@@ -13,6 +13,8 @@ import { fromThisMac } from './request-guard.ts';
 import { getProfile } from './profile.ts';
 import { activeMods, activeTasks, queuedCount, runningCount, slotsByHarness } from './runner.ts';
 import { usageByHarness } from './usage.ts';
+import { getInsights, validTimeZone } from './insights.ts';
+import { isInsightRange } from '@omni/shared/insights.ts';
 
 export const feedApi = new Hono();
 
@@ -36,6 +38,15 @@ feedApi.get('/feed', (c) =>
     }
   }),
 );
+
+// The Inbox dashboard for one range. `tz` is the viewer's IANA zone, which decides where each day starts.
+feedApi.get('/insights', async (c) => {
+  const range = c.req.query('range') ?? '30d';
+  if (!isInsightRange(range)) return c.json({ error: 'range must be today, 7d or 30d' }, 400);
+  const tz = c.req.query('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!validTimeZone(tz)) return c.json({ error: 'unknown time zone' }, 400);
+  return c.json(await getInsights(range, tz));
+});
 
 feedApi.get('/status', (c) =>
   c.json({

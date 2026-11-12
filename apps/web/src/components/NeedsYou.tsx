@@ -10,7 +10,7 @@ import { Avatar, Icon, StatusDot, type IconName } from './ui.tsx';
  * One thread that needs Ben: why, and the result's last words or Setup's reason. Opening it reads the result. On
  * hover, a check marks it done: out of here until something new happens in it (right-click has it too).
  */
-function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: boolean }) {
+export function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: boolean }) {
   useNow(60_000);
   const { channels, setDone } = useApp();
   const t = item.thread;
