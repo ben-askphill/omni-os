@@ -92,6 +92,16 @@ describe('the thread quick card', () => {
     expect(html).not.toContain('Lineage');
   });
 
+  it('always shows a delegated thread its parent, so it can go back up a level', () => {
+    const html = renderToStaticMarkup(
+      createElement(ThreadQuickCard, { ...base, thread: thread({ title: 'Builder', status: 'done' }), parent: thread({ id: 'p', title: 'Conductor', status: 'running' }), agents: [], children: [] }),
+    );
+    expect(html).toContain('Lineage');
+    expect(html).toContain('Back to the thread that delegated this one: Conductor');
+    expect(html.indexOf('Conductor')).toBeLessThan(html.indexOf('Builder', html.indexOf('Lineage')));
+    expect(html).not.toContain('running</span>');
+  });
+
   it('draws the lineage at the bottom while agents run: parent, this thread, then what runs under it', () => {
     const html = renderToStaticMarkup(
       createElement(ThreadQuickCard, {
