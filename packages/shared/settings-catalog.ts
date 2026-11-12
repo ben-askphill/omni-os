@@ -99,7 +99,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'you', section: 'general', title: 'Name, pronouns, timezone and email', keywords: ['name', 'pronouns', 'timezone', 'time zone', 'email', 'greeting', 'profile'] },
   { id: 'setup', section: 'general', title: 'Run setup again', keywords: ['onboarding', 'wizard', 'harness check', 'first run'] },
   { id: 'theme', section: 'appearance', title: 'Theme', keywords: ['dark', 'light', 'system', 'mode', 'colors'] },
-  { id: 'layout', section: 'appearance', title: 'New layout (Beta)', keywords: ['beta', 'layout', 'rail', 'sidebar', 'channel rail', 'classic', 'new ui', 'redesign'] },
+  { id: 'layout', section: 'appearance', title: 'New layout (Beta)', keywords: ['beta', 'layout', 'rail', 'sidebar', 'channel rail', 'classic', 'new ui', 'redesign', 'color', 'colour', 'grayscale', 'greyscale'] },
   { id: 'inbox-key', section: 'appearance', title: 'Press I for the Inbox', keywords: ['keyboard', 'shortcut', 'key', 'inbox', 'i key', 'quick command'] },
   { id: 'zoom', section: 'appearance', title: 'Text size and zoom', keywords: ['zoom', 'scale', 'font size', 'text size', 'bigger', 'smaller'] },
   { id: 'notify', section: 'notifications', title: 'Notify on this device', keywords: ['alerts', 'finished', 'failed', 'desktop', 'permission', 'needs you'] },

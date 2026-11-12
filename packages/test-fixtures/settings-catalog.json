@@ -175,7 +175,11 @@
         "channel rail",
         "classic",
         "new ui",
-        "redesign"
+        "redesign",
+        "color",
+        "colour",
+        "grayscale",
+        "greyscale"
       ]
     },
     {

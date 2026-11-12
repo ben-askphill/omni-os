@@ -488,8 +488,9 @@
   }
 
   /* ---- channel rail items (ChannelRail.tsx) ----
-     Discs rest in greyscale and take their colour back on hover or keyboard focus. The selected disc and the status
-     badges (outside the disc) always keep theirs. Hover and focus grow the 48px item to 110% about its centre, which
+     Discs rest in greyscale and take their colour back on hover or keyboard focus, unless Settings, Appearance sets
+     the rail to full colour (data-color="full"). The selected disc and the status badges (outside the disc) always
+     keep theirs. Hover and focus grow the 48px item to 110% about its centre, which
      the rail's width (72px, 98px on a Mac) and the scroll area's 6px padding leave room for, and round its wash and
      focus ring into a circle. Reduced motion keeps the colour and drops the growth and every transition. */
   .rail-item {
@@ -516,7 +517,8 @@
       color 150ms var(--ease-out),
       background-color 150ms var(--ease-out);
   }
-  .rail-item:is(:hover, :focus-visible, [aria-current="page"]) .rail-disc {
+  .rail-item:is(:hover, :focus-visible, [aria-current="page"]) .rail-disc,
+  .rail-chrome[data-color="full"] .rail-disc {
     filter: none;
   }
   @media (prefers-reduced-motion: reduce) {
