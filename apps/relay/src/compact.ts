@@ -5,8 +5,9 @@
 // same way it did before the older rows went.
 //
 // Two parts:
-// - compactStep: a one-time pass over a log that already grew, scanning down from the newest row in steps, so a
-//   Durable Object can run it in bounded alarms and resume from a saved cursor.
+// - compactStep: a one-time pass over a log that already grew, scanning down from the newest row in steps. The
+//   Durable Object runs a few steps per alarm (maintain.ts) and resumes from a saved cursor: one unbounded loop
+//   runs past the object's CPU limit, which resets it and fails every request it was serving.
 // - prune (RelayStore.push, once the index exists): deletes the superseded rows as each push lands, so the log stays
 //   at one row per item per machine.
 // The change data in R2 is not deleted here: a batch object is shared by every row of one push, and R2 is not what
@@ -21,11 +22,26 @@ export const key = (machine: string, entity: string, entityId: string) => JSON.s
 /** Rows scanned per compaction step. */
 export const COMPACT_STEP_ROWS = 5000;
 
-/** The items that already have a row at or above `from`: their older rows are superseded. Rebuilds a lost step's state. */
-export function keysFrom(sql: Sql, from: number): Set<string> {
+/**
+ * Items remembered at most, so `seen` fits in a Durable Object's memory however many items the log holds. Past it
+ * the set starts over: an item then keeps one more older row, which is space, never a wrong answer.
+ */
+export const SEEN_MAX = 200_000;
+
+/**
+ * The items that already have a row at or above `from`, newest first, up to `max`: their older rows are superseded.
+ * Rebuilds a lost step's state. Reads in steps, so a long log never comes back as one result.
+ */
+export function keysFrom(sql: Sql, from: number, max = SEEN_MAX, stepRows = COMPACT_STEP_ROWS): Set<string> {
   const seen = new Set<string>();
-  const rows = sql.exec('SELECT DISTINCT machine_id, entity, entity_id FROM changes WHERE seq >= ?', from).toArray() as { machine_id: string; entity: string; entity_id: string }[];
-  for (const r of rows) seen.add(key(r.machine_id, r.entity, r.entity_id));
+  for (let below = topCursor(sql); seen.size < max; ) {
+    const rows = sql
+      .exec('SELECT seq, machine_id, entity, entity_id FROM changes WHERE seq >= ? AND seq < ? ORDER BY seq DESC LIMIT ?', from, below, stepRows)
+      .toArray() as { seq: number; machine_id: string; entity: string; entity_id: string }[];
+    if (!rows.length) break;
+    for (const r of rows) seen.add(key(r.machine_id, r.entity, r.entity_id));
+    below = Number(rows[rows.length - 1].seq);
+  }
   return seen;
 }
 
@@ -40,7 +56,9 @@ export function compactStep(
   below: number,
   seen: Set<string>,
   maxRows = COMPACT_STEP_ROWS,
+  maxSeen = SEEN_MAX,
 ): { next: number | null; removed: number } {
+  if (seen.size >= maxSeen) seen.clear();
   const rows = sql
     .exec('SELECT seq, machine_id, entity, entity_id FROM changes WHERE seq < ? ORDER BY seq DESC LIMIT ?', below, maxRows)
     .toArray() as { seq: number; machine_id: string; entity: string; entity_id: string }[];

@@ -13,5 +13,7 @@
   // CLERK_ISSUER, CLERK_CLIENT_ID and ALLOWED_USERS are Worker secrets (`wrangler secret bulk`), so a deploy keeps them.
   // Omni Connect adds four optional ones: CF_API_TOKEN, CF_ACCOUNT_ID, CF_ZONE_ID and CONNECT_ZONE. Without them the
   // relay answers 503 connect_not_configured to Connect calls and sync keeps working.
+  // Room for the one statement that cannot be cut into slices: creating the change log's key index (compact.ts).
+  "limits": { "cpu_ms": 300000 },
   "observability": { "enabled": true }
 }

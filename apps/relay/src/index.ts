@@ -10,7 +10,7 @@ import { CloudflareApi } from './cloudflare.ts';
 import { CLIENT_DAYS, ConnectStore, notConfigured } from './connect.ts';
 import { connectPage, errorPage, PAGE_HEADERS } from './page.ts';
 import { SIGNIN_OBJECT, SigninStore } from './signin.ts';
-import { compactStep, createKeyIndex, keysFrom, topCursor } from './compact.ts';
+import { Maintenance } from './maintain.ts';
 import { objectPath, RelayStore } from './store.ts';
 
 interface Env {
@@ -29,6 +29,9 @@ interface Env {
 const connectConfigured = (env: Env) => !!(env.CF_API_TOKEN && env.CF_ACCOUNT_ID && env.CF_ZONE_ID && env.CONNECT_ZONE);
 
 const COOKIE = 'omni_connect';
+
+/** Wait before the next slice of background work after one failed. */
+const UPKEEP_RETRY_MS = 60_000;
 
 function cookie(req: Request, name: string): string | null {
   for (const part of (req.headers.get('cookie') ?? '').split(';')) {
@@ -190,8 +193,10 @@ export default {
 export class Relay extends DurableObject<Env> {
   private store: RelayStore | null = null;
   private connectStore: ConnectStore | null = null;
-  private moving: Promise<void> | null = null;
-  private compacting: Promise<void> | null = null;
+  private upkeep: Maintenance | null = null;
+  private kicking: Promise<void> | null = null;
+  /** The change log needs no more background work. */
+  private idle = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -213,61 +218,48 @@ export class Relay extends DurableObject<Env> {
     return this.store;
   }
 
-  /**
-   * Move change data left inline in SQLite out to R2, in the background, from the cursor saved after each run.
-   * A request starts it, since only a request names the user. Once done, a flag keeps it from scanning again.
-   */
-  private moveInline(store: RelayStore) {
-    this.moving ??= (async () => {
-      const storage = this.ctx.storage;
-      if (await storage.get<boolean>('inline_moved')) return;
-      let after = (await storage.get<number>('inline_moved_to')) ?? 0;
-      for (let next = await store.moveInline(after); next !== null; next = await store.moveInline(after)) {
-        after = next;
-        await storage.put('inline_moved_to', after);
-      }
-      await storage.put('inline_moved', true);
-      console.log('[relay] all change data is in R2');
-    })().catch((err: Error) => {
-      console.error(`[relay] moving change data to R2 stopped: ${err.message}`);
-      // The next request starts it again from the saved cursor.
-      this.moving = null;
-    });
+  private upkeepFor(store: RelayStore) {
+    const storage = this.ctx.storage;
+    this.upkeep ??= new Maintenance(storage.sql, storage, (fn) => storage.transactionSync(fn), store);
+    return this.upkeep;
   }
 
   /**
-   * Shrink the change log to the newest row per item per machine (compact.ts), in the background, from the cursor saved
-   * after each step, then create the key index and prune on every push from then on. A request starts it, like
-   * moveInline. Rows go before anything is written to storage, so it also makes headway on a database that is full.
+   * Start the change log's background work (maintain.ts) when there is some and no alarm is set. A request starts
+   * it, since only a request names the user. The work itself runs a slice per alarm: as one loop behind a request
+   * it ran past the CPU limit, which reset the object and failed every request with it.
    */
-  private compact(store: RelayStore) {
-    if (store.prune) return;
-    this.compacting ??= (async () => {
-      const storage = this.ctx.storage;
-      const sql = storage.sql;
-      const transaction = <T>(fn: () => T) => storage.transactionSync(fn);
-      if (!(await storage.get<boolean>('compacted'))) {
-        const saved = await storage.get<number>('compact_below');
-        let below = saved ?? topCursor(sql);
-        const seen = saved === undefined ? new Set<string>() : keysFrom(sql, below);
-        let removed = 0;
-        for (let step = compactStep(sql, transaction, below, seen); step.next !== null; step = compactStep(sql, transaction, below, seen)) {
-          removed += step.removed;
-          below = step.next;
-          await storage.put('compact_below', below);
-        }
-        createKeyIndex(sql);
-        await storage.put('compacted', true);
-        await storage.delete('compact_below');
-        console.log(`[relay] change log compacted, ${removed} superseded rows removed`);
-      }
-      createKeyIndex(sql);
-      store.prune = true;
-    })().catch((err: Error) => {
-      console.error(`[relay] compacting the change log stopped: ${err.message}`);
-      // The next request starts it again from the saved cursor.
-      this.compacting = null;
-    });
+  private kick(store: RelayStore, user: string) {
+    if (this.idle || this.kicking) return;
+    const storage = this.ctx.storage;
+    const upkeep = this.upkeepFor(store);
+    this.kicking = (async () => {
+      if (await upkeep.done()) return void (this.idle = true);
+      if ((await storage.getAlarm()) !== null) return;
+      // A full database takes no write, not even an alarm: the first slice deletes rows before it writes anything.
+      await upkeep.slice();
+      await storage.put('user', user);
+      await storage.setAlarm(Date.now());
+    })()
+      .catch((err: Error) => console.error(`[relay] could not start the change log's upkeep: ${err.message}`))
+      .finally(() => (this.kicking = null));
+    this.ctx.waitUntil(this.kicking);
+  }
+
+  /** One slice of the background work, then the next alarm while there is more. */
+  async alarm() {
+    const storage = this.ctx.storage;
+    const user = await storage.get<string>('user');
+    if (!user) return;
+    let wait = 0;
+    try {
+      if (!(await this.upkeepFor(this.open(user)).slice())) return;
+    } catch (err) {
+      // Not thrown: a thrown alarm retries a few times and then stops for good.
+      console.error(`[relay] upkeep slice failed: ${(err as Error).message}`);
+      wait = UPKEEP_RETRY_MS;
+    }
+    await storage.setAlarm(Date.now() + wait);
   }
 
   private connectFor(user: string) {
@@ -317,8 +309,7 @@ export class Relay extends DurableObject<Env> {
       const user = req.headers.get('x-omni-user');
       if (!user) throw new RelayError(400, 'No user');
       const store = this.open(user);
-      this.compact(store);
-      this.moveInline(store);
+      this.kick(store, user);
 
       if (url.pathname.startsWith('/internal/') && url.pathname !== '/internal/token') return await this.internalRoute(req, user, url.pathname);
 
