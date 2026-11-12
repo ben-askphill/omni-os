@@ -5,7 +5,9 @@ vi.mock('@omni/server/db.ts', () => {
 });
 
 import type { NeedsYouItem, Thread } from '../src/api.ts';
-import { inboxLayout, rowStatus, shelfView, type InboxThread } from '../src/inbox.ts';
+import { inboxStatus } from '@omni/shared/status.ts';
+import { reasonOf } from '../src/needs-you.ts';
+import { inboxLayout, shelfView, type InboxThread } from '../src/inbox.ts';
 
 const t = (id: string, over: Partial<InboxThread> = {}): InboxThread => ({
   id,
@@ -89,20 +91,28 @@ describe('inboxLayout', () => {
 
   it('labels a card by what it waits on before what it is doing', () => {
     const question = need('a', '2026-10-02', [{ kind: 'question', detail: null, count: 1 }]);
-    expect(rowStatus(t('a', { status: 'running' }), question)?.label).toBe('Needs you');
-    expect(rowStatus(t('a', { status: 'running' }), undefined)?.label).toBe('Running');
-    expect(rowStatus(t('a'), undefined, 2)?.label).toBe('Running');
-    expect(rowStatus(t('a'), need('a', '2026-10-02'))).toEqual({ glyph: 'done', label: 'Done' });
-    expect(rowStatus(t('a'), undefined)).toBeNull();
+    expect(inboxStatus(t('a', { status: 'running' }), question)?.label).toBe('Needs you');
+    expect(inboxStatus(t('a', { status: 'running' }), undefined)?.label).toBe('Running');
+    expect(inboxStatus(t('a'), need('a', '2026-10-02'))).toEqual({ glyph: 'done', label: 'Done' });
+    expect(inboxStatus(t('a'), undefined)).toBeNull();
+  });
+
+  it('says Stopped on a stopped thread, as Home does, on desktop and the phone', () => {
+    const stopped = t('s', { status: 'stopped' });
+    const item: NeedsYouItem = { thread: stopped as Thread, result: { uid: 'r-s', status: 'stopped', event_uid: null, at: '2026-10-02' }, blockers: [], at: '2026-10-02' };
+    expect(inboxStatus(stopped, item)).toEqual({ glyph: 'settled', label: 'Stopped' });
+    expect(reasonOf(item)).toMatchObject({ glyph: 'settled', label: 'Stopped' });
+    // It waits in the inbox, not under Working.
+    expect(ids(inboxLayout({ threads: [stopped], needs: [item], delegated: none, open: null }).inbox)).toEqual(['s']);
   });
 
   it('keeps a thread whose own turn ended in Working while a thread it delegated works, on desktop and the phone', () => {
     const l = inboxLayout({ threads: [t('job', { status: 'done', delegating: true }), t('idle')], needs: [], delegated: none, open: null });
     expect(ids(l.working)).toEqual(['job']);
     expect(ids(l.inbox)).toEqual(['idle']);
-    expect(rowStatus(t('job', { status: 'done', delegating: true }), undefined)).toEqual({ glyph: 'running', label: 'Running' });
+    expect(inboxStatus(t('job', { status: 'done', delegating: true }), undefined)).toEqual({ glyph: 'running', label: 'Running' });
     // Once nothing it delegated works, it is back to its own status.
-    expect(rowStatus(t('job', { status: 'done', delegating: false }), undefined)).toBeNull();
+    expect(inboxStatus(t('job', { status: 'done', delegating: false }), undefined)).toBeNull();
   });
 
   it('sorts done threads by when they were marked done, newest first', () => {

@@ -107,6 +107,13 @@ describe('the Activity inbox', () => {
     expect(busy).toMatchObject({ status: { glyph: 'running', label: 'Running' }, receded: true, canMarkDone: false });
   });
 
+  it('says Stopped on a stopped thread, as the web Inbox and Home do', () => {
+    const stopped = thread('s', { status: 'stopped' });
+    const a = inbox({ recent: [stopped], needsYou: needs(item(stopped, { result: result('stopped') })) });
+    expect(ids(a.working)).toEqual([]);
+    expect(a.waiting[0]).toMatchObject({ status: { glyph: 'settled', label: 'Stopped' }, glyph: 'settled', receded: false, canMarkDone: true });
+  });
+
   it('keeps a Conductor job in Working while a thread it delegated works, and counts its delegates', () => {
     const crew = stub('crew', { status: 'running' });
     const conductor = channel('conductor', { handoffs: [{ parent: stub('job'), children: [crew] }] });
