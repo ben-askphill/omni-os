@@ -7,7 +7,7 @@ Roles live in `crew/*.md` (frontmatter + charter, edit freely, read on every run
 | conductor | Front agent in #conductor. Routes every task to a crew thread, never does the work |
 | researcher | Research, audits, answers to client questions, HTML reports |
 | store-ops | Shopify store work, PSI/SEO, translations, imports |
-| builder | Code in a repo channel, own worktree, opens PRs |
+| builder | Code in a repo channel, own worktree, opens PRs. Pushes through a no-mistakes gate when that checkout has one ([No-mistakes](no-mistakes.md)) |
 | inbox | Mail, calendar, Productive, Notion, Slack drafts. Never sends on its own |
 
 The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Home and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.

@@ -14,7 +14,7 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 | --- | --- |
 | cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else your workspace folder |
 | context | your workspace folder added with `--add-dir`, its CLAUDE.md loaded, all your user skills and MCP servers |
-| system prompt | channel facts (store, Portal slug, repo, notes), artifacts and browser rules, the channel's design system file, the crew role charter |
+| system prompt | channel facts (store, Portal slug, repo, notes), artifacts and browser rules, the channel's design system file, the crew role charter, and a Shipping section when this checkout has a no-mistakes gate |
 | MCP | `omni-browser` (`@playwright/mcp` at the exact version in `apps/server/package.json`, run by `node` from Omni's install, never `npx`; attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); `omni-ask` (`apps/mcp/ask.ts`, the `ask_user_question` tool) and `omni-threads` (`apps/mcp/threads.ts`, `read_referenced_thread`), which Claude Code, Codex and Cursor threads all get; conductor also gets `omni`, which has `read_referenced_thread` itself |
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, `OMNI_TOKEN` (the API token), plus global and channel secrets, after that harness's strip list (`apps/server/harness/env-guard.ts`). Claude Code never sees `ANTHROPIC_BASE_URL` or `CLAUDE_CONFIG_DIR`, so it keeps the plan login and writes transcripts under `~/.claude` |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context. A switch to another harness and back resumes it with a handover of what it missed (`apps/server/runner/switch.ts`) |
