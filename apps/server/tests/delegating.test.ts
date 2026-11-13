@@ -127,6 +127,43 @@ describe('delegating, live', () => {
     expect(D.delegatingIds().has(conductor.id)).toBe(false);
   });
 
+  it('a turn that ended with its sub-agents still working stays working, and so does the thread above it, until they finish', T, async () => {
+    const conductor = await H.start('be the conductor');
+    await H.untilResults(conductor.id, 1);
+    const t = await H.runner.createThread({ channel: 'scratch', prompt: 'BG:1500 fan out', parent_id: conductor.id, task_id: 'T-2', source: 'conductor' });
+    const shown = watchShown(t.id);
+    await H.untilResults(t.id, 1);
+    expect(H.thread(t.id).status).toBe('done');
+    expect(H.runner.activeTasks().some((k) => k.thread_id === t.id && k.subagent)).toBe(true);
+
+    const ids = D.delegatingIds();
+    expect(ids.has(t.id)).toBe(true);
+    expect(ids.has(conductor.id)).toBe(true);
+    const ch = await scratch();
+    expect(ch.active.find((x) => x.id === t.id)).toMatchObject({ status: 'done', delegating: true });
+    expect(ch.running).toBe(ch.active.filter(working).length);
+    expect((await detail(t.id)).thread).toMatchObject({ status: 'done', delegating: true });
+    await H.until('sent on the feed as working', () => shown.log.includes('working'));
+
+    // The agent finishes and the CLI runs a turn about it; once that is done, nothing works.
+    await H.until('agent ended', () => !H.runner.activeTasks().some((k) => k.thread_id === t.id), 5000);
+    await H.untilResults(t.id, 2);
+    await H.until('idle on the feed', () => shown.log.at(-1) === 'idle');
+    shown.stop();
+    expect(D.delegatingIds().has(t.id)).toBe(false);
+  });
+
+  it('sub-agents a stopped or failed turn left running do not make it working', T, async () => {
+    for (const status of ['stopped', 'failed'] as const) {
+      const t = await H.start('BG:1500 left behind');
+      await H.untilResults(t.id, 1);
+      expect(D.delegatingIds().has(t.id)).toBe(true);
+      H.db.threads.update(t.id, { status });
+      expect(H.runner.activeTasks().some((k) => k.thread_id === t.id)).toBe(true);
+      expect(D.delegatingIds().has(t.id)).toBe(false);
+    }
+  });
+
   it('a delegate_team lead and its conductor work while the members run', T, async () => {
     const conductor = await H.start('be the conductor');
     await H.untilResults(conductor.id, 1);

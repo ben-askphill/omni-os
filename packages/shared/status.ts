@@ -45,7 +45,7 @@ export const statusLabel = (status: string | null | undefined) => STATUS[glyphFo
 /**
  * The glyph a thread shows. A turn the harness stopped at its usage limit ends failed and keeps its `limit_state`
  * (apps/server/runner/records.ts limitStop): that reads Limited, not Failed. A thread whose own turn ended while
- * threads it delegated still work reads Running.
+ * threads or sub-agents it delegated still work reads Running.
  */
 export function threadGlyph(t: { status: string; delegating?: boolean; limit_state?: string | null }): Glyph {
   if (t.delegating && t.status !== 'queued') return 'running';
@@ -78,7 +78,8 @@ export interface RowStatus {
  * The status an Inbox card shows (the sidebar's Inbox, the phone's Activity tab and the iOS app's), read the way Home
  * reads the same thread: what holds it up first, as Home's Needs you card; then its own turn running, queued or
  * waiting on what it delegated, as Home's dot (threadGlyph); then the result Ben has not read. Null: nothing to say,
- * so the card shows the time. Background tasks a stopped or finished turn left running do not make it Running.
+ * so the card shows the time. Sub-agents still working after a turn ended done make it Running, through
+ * `delegating`; background shells and monitors, and anything a stopped turn left running, do not.
  */
 export function inboxStatus(
   t: Parameters<typeof threadGlyph>[0],

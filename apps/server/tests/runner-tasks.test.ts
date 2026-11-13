@@ -49,8 +49,9 @@ describe('runner: background tasks', () => {
     expect(h.thread(t.id).status).toBe('done');
     const busy = await listed();
     expect(busy.active.map((x) => x.id)).toContain(t.id);
-    // Listed for its agents, not counted as running.
-    expect(busy.running).toBe(0);
+    // Listed for its agents, and counted as running while they work (apps/server/delegating.ts).
+    expect(busy.active.find((x) => x.id === t.id)).toMatchObject({ status: 'done', delegating: true });
+    expect(busy.running).toBe(1);
     await h.until('task ended', () => !r.activeTasks().some((x) => x.thread_id === t.id), 5000);
     // The task's end starts a turn of its own, listed while it runs: the thread leaves once that turn is done.
     await h.untilResults(t.id, 2);

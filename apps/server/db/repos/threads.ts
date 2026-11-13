@@ -243,19 +243,22 @@ export const threads = {
       .all() as unknown as Thread[],
   running: () => db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE status IN ('running','queued')`).all() as unknown as Thread[],
   /**
-   * The threads with a delegated thread running or queued below them, at any depth (apps/server/delegating.ts). An
-   * archived thread pins nothing. UNION drops an id met again, so a parent_id cycle ends.
+   * The threads with a delegated thread running or queued below them, at any depth (apps/server/delegating.ts), and
+   * the threads in `agentHosts` (whose own sub-agents still run) with every thread above them. A host whose turn was
+   * stopped or failed counts for nothing. An archived thread pins nothing. UNION drops an id met again, so a parent_id
+   * cycle ends.
    */
-  delegating: () =>
+  delegating: (agentHosts: readonly string[] = []) =>
     (
       db
         .prepare(
           `WITH RECURSIVE up(id) AS (
              SELECT parent_id FROM threads WHERE status IN ('running','queued') AND archived = 0 AND parent_id IS NOT NULL
+             UNION SELECT id FROM threads WHERE id IN (SELECT value FROM json_each(?)) AND status NOT IN ('stopped','failed') AND archived = 0
              UNION SELECT t.parent_id FROM threads t JOIN up ON t.id = up.id WHERE t.parent_id IS NOT NULL)
            SELECT id FROM up`,
         )
-        .all() as { id: string }[]
+        .all(JSON.stringify(agentHosts)) as { id: string }[]
     ).map((r) => r.id),
   /** The machine that wrote the thread's running or queued status (sync), or null. For the status merge; ownership reads the assignment. */
   runMachine: (id: string) =>

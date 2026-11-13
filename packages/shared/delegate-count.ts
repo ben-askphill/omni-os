@@ -32,8 +32,9 @@ export interface DelegateNeeds {
 }
 
 /**
- * The parts of a thread its running state reads. `delegating`: a thread it delegated, at any depth, runs or queues.
- * The server derives it from the statuses (apps/server/delegating.ts) and sends it with every thread.
+ * The parts of a thread its running state reads. `delegating`: a thread it delegated, at any depth, runs or queues,
+ * or a sub-agent its own turn started still works after that turn ended done. The server derives it from the statuses
+ * and the live tasks (apps/server/delegating.ts) and sends it with every thread.
  */
 export interface WorkState {
   status: string;
