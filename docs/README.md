@@ -7,6 +7,7 @@
 - [Threads](user/threads.md): Inbox and Needs you, Mark done, the composer (including Open PR when the agent asks), the quick-actions card, context chips, history, channel actions, Watch PR and Send to Grok Bot
 - [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud
 - [Crew and Conductor](user/crew.md)
+- [No-mistakes](user/no-mistakes.md): optional local git gate for pushing a branch and opening its PR
 - [Automations](user/automations.md): cron, GitHub PR events, published pages and signed GitHub webhooks
 - [Sync between two Macs](user/sync.md)
 - [Remote access and security](user/remote-access.md), including the phone layout, home-screen setup and pairing the native iOS app

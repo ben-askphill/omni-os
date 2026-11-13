@@ -26,6 +26,8 @@ If you already run Omni for real on :4747, do not develop against it. Use the th
 | `cd apps/server && npx vitest run tests/<file>.test.ts` | One file |
 | `npx turbo run test --affected` | Only what changed against `main` |
 
+[No-mistakes](docs/user/no-mistakes.md) is optional. When the `no-mistakes` command is on PATH and the checkout has that remote, a local thread pushes through the gate instead of `git push origin`. The commands for this repo are in `.no-mistakes.yaml`, and no-mistakes reads them from `main`.
+
 `npm test` runs on macOS and Linux and needs Node 24 and git. It runs two packages at a time, each on half the cores. On a small machine, pass a lower cap: `npx turbo run test --concurrency=1 -- --maxWorkers=2`. The server suite points `TMPDIR` at one `omni-test-*` folder per run (`apps/server/tests/global-tmpdir.ts`) and removes it afterwards, so leftover mkdtemp folders do not fill a quota'd `/tmp`. Sandbox tests set their own temp `OMNI_DATA_DIR` before `config.ts` loads, so a live install's `omni.config.json` cannot leak into them. Some tests need more and skip without it:
 
 - The desktop app's QA harness (`apps/desktop/scripts/qa.ts`) needs a display to open the app's windows. A Mac build of the desktop app (`npm run build:desktop`) needs macOS.

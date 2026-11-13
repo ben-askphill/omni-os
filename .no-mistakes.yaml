@@ -1,0 +1,43 @@
+# Repo policy for Kun Chen's no-mistakes (https://kunchenguid.github.io/no-mistakes/reference/repo-config/).
+# commands, gates, document.instructions, test.prepare, test.instructions, pr.template,
+# pr.appendix and no_ci are read from the default branch. They apply once this file is on main.
+# A pushed branch cannot replace them. allow_repo_commands stays off.
+#
+# commands.test is intentionally unset. That field is a targeted check of the change, and the
+# test step still drives the product afterwards. The full typecheck, suite and build are gates.
+
+commands:
+  # Disposable worktrees have no node_modules. --include=dev covers a daemon started with NODE_ENV=production.
+  prepare: "npm ci --include=dev --prefer-offline"
+  # Knip. This repo has no root eslint script.
+  lint: "npm run unused"
+
+gates:
+  - name: typecheck
+    after: lint
+    command: "npm run typecheck"
+  - name: suite
+    after: lint
+    command: "npm test"
+  - name: build
+    after: lint
+    command: "npm run build"
+
+document:
+  instructions: |
+    docs/user owns how to use Omni. docs/internals owns decisions and traps that span the server and the clients. docs/adr owns one decision each. CONTEXT.md owns the domain words (channel, thread, turn, crew role, harness). CONTRIBUTING.md owns the checks a contributor runs. CLAUDE.md and AGENTS.md are agent memory. Correct them when a fact is wrong. Do not add sections to them to fill a gap.
+
+# The test step runs before lint, so prepare has to be eager or the evidence agent has no dependencies.
+test:
+  prepare: true
+  instructions: |
+    Stand the product up with scripts/qa-stack.sh. Pick a free QA_SERVER_PORT and set QA_WEB_PORT one higher. Never use port 4747, and never the checkout's data/ directory. Drive the change in a browser at desktop width and at 390px. Stop the stack with QA_SERVER_PORT set to that same port and scripts/qa-stack.sh down before you finish. Do not kill processes by name. Typecheck, Knip, the test suite and the build run as later gates. This step checks the change you can drive.
+
+pr:
+  template: .github/pull_request_template.md
+  appendix: collapsed
+
+# Pull requests register no checks today. scripts/ci-workflow.yml is not installed under
+# .github/workflows, and desktop-release.yml runs only when dispatched. An empty check list
+# then counts as passed. A check that does register still has to pass.
+no_ci: true

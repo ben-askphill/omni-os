@@ -4,6 +4,7 @@ import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
+import { noMistakesGate, noMistakesShippingLines } from '../no-mistakes.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
 
 /** Claude Code's Artifact tool publishes to claude.ai. Omni links a publish to its file and keeps the URL per channel. */
@@ -70,6 +71,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   const name = userName();
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
   const hands = !role?.delegateOnly;
+  // Provider turns are not on this machine, and a router has no shell. Both keep the plain git push path.
+  const gate = !remote && hands && noMistakesGate(thread.cwd);
   const lines = [
     '# Omni OS context',
     TOOL_FAILURE_POLICY,
@@ -87,7 +90,9 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     remote
       ? '- This thread does not run in an Omni worktree or browser. Work on your own clone of the repo and open pull requests there.'
       : thread.branch
-        ? `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here; open a PR when asked.`
+        ? gate
+          ? `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here. Shipping below is how a push or a PR leaves this checkout.`
+          : `- You are in a dedicated git worktree on branch ${thread.branch}. Commit here; open a PR when asked.`
         : '',
     // zsh slips recur in every harness's shell calls: an unquoted glob that matches nothing, a word that starts with =.
     !remote && /zsh$/.test(process.env.SHELL ?? '')
@@ -148,5 +153,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     );
   }
   if (role) lines.push('', `## Your role: ${role.name}`, role.charter);
+  // After the charter, so the gate instructions win over "git push origin" in a role file.
+  if (gate) lines.push(...noMistakesShippingLines(name));
   return lines.filter((l) => l !== '').join('\n').replace(/\n## /g, '\n\n## ');
 }
