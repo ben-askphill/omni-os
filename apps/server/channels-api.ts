@@ -142,12 +142,15 @@ function busyThreads(delegating: ReadonlySet<string>) {
   return busy;
 }
 
-/** Its own turn runs or queues, or a thread it delegated does. A thread with only sub-agents left is not counted. */
+/**
+ * Its own turn runs or queues, or a thread or sub-agent it delegated still works. A thread listed only for background
+ * shells or monitors, or for sub-agents a stopped turn left, is not counted.
+ */
 const isWorking = (t: Thread, delegating: ReadonlySet<string>) => t.status === 'running' || t.status === 'queued' || delegating.has(t.id);
 
 /**
  * A channel plus its busy threads, its latest ones, and its folders with their threads, so the sidebar can list them
- * under the name. `running` counts the running and queued ones and those whose delegated threads still work.
+ * under the name. `running` counts the running and queued ones and those whose delegated threads or sub-agents still work.
  */
 const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<string, unknown[]>, handoffs: ReturnType<typeof conductorHandoffs>, delegating: ReadonlySet<string>) => {
   const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
