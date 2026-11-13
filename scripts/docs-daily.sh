@@ -269,10 +269,15 @@ merge_when_ready() {
       die "PR #$pr has merge conflicts; fix manually"
     fi
 
-    local failed=0 merge_state
+    local failed merge_state
     merge_state="$(gh pr view "$pr" --repo "$repo_slug" --json mergeStateStatus -q '.mergeStateStatus' 2>/dev/null || echo UNKNOWN)"
-    failed="$(gh pr checks "$pr" --repo "$repo_slug" 2>/dev/null | awk '$2=="fail"{f=1} END{print f+0}' || echo 0)"
-    if [[ "$failed" -eq 0 ]] && [[ "$merge_state" == "CLEAN" || "$merge_state" == "UNKNOWN" ]]; then
+    # gh pr checks exits 8 while checks are pending and 1 when one failed or the PR has none; the count is on stdout.
+    failed="$(gh pr checks "$pr" --repo "$repo_slug" --json bucket -q '[.[] | select(.bucket == "fail")] | length' 2>/dev/null || true)"
+    [[ "$failed" =~ ^[0-9]+$ ]] || failed=0
+    if (( failed > 0 )); then
+      die "PR #$pr has $failed failed check(s); leave it open and fix or rerun them"
+    fi
+    if [[ "$merge_state" == "CLEAN" || "$merge_state" == "UNKNOWN" ]]; then
       if gh pr merge "$pr" --repo "$repo_slug" --squash --delete-branch 2>>"$LOG_FILE"; then
         log "merge-when-ready: squashed and merged PR #$pr"
         return 0
@@ -286,7 +291,7 @@ merge_when_ready() {
     fi
 
     log "merge-when-ready: waiting for checks (attempt $((tries + 1))/$max_tries)"
-    sleep 60
+    sleep "${DOCS_DAILY_POLL_SECONDS:-60}"
     tries=$((tries + 1))
   done
 
