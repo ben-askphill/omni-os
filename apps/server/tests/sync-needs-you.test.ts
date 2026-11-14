@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { trustEachOther } from './sync-sign.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 
 // Needs you between two Macs in one process, each with its own data dir, through one in-memory relay
@@ -57,7 +56,6 @@ const row = (m: Mac, id: string) => ({ ...m.db.threads.get(id)!, run_machine: m.
 beforeAll(async () => {
   a = await machine('mac-a');
   b = await machine('mac-b');
-  trustEachOther([a, b]);
   a.db.channels.create({ id: 'volero', name: 'Volero', kind: 'client', use_worktree: 0, base_dir: join(home, 'work') });
   await exchange();
 });

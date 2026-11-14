@@ -605,9 +605,8 @@ export function migrate() {
     seen_seal_key TEXT,
     seen_at TEXT
   );`);
-  // The other machines Ben trusts to make this one act (sync/keyring.ts), each with the signing key he trusted. A new
-  // machine syncs ordinary data at once, but its commands, assignments, update asks, owner claims and secrets wait in
-  // sync_deferred until he clicks Trust in Settings > Sync. Local, never synced.
+  // The other machines trusted to make this one act (sync/keyring.ts), each with the signing key it is trusted with: the
+  // first one pinned for it, or one Ben confirmed after a key change. Local, never synced.
   db.exec(`CREATE TABLE IF NOT EXISTS sync_trusted (machine_id TEXT PRIMARY KEY, sign_key TEXT NOT NULL, trusted_at TEXT NOT NULL);`);
   // Synced changes whose signature did not check out (sync/verify.ts): refused, or applied while that entity still
   // takes unsigned changes. One row per machine, entity, reason and (for a refused one) entity id.
@@ -623,4 +622,12 @@ export function migrate() {
     at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sync_refused_at ON sync_refused(at);`);
+  // Builds before trust on first pin (ADR 0013) left paired machines untrusted until a Trust click, so their commands
+  // sat in sync_deferred. Trust every machine with a pinned signing key and no changed key waiting, with that key; the
+  // next sync applies what was held. One trusted with another key keeps that. Safe to run again: it is the same rule.
+  db.exec(`INSERT INTO sync_trusted (machine_id, sign_key, trusted_at)
+    SELECT machine_id, sign_key, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM sync_keys WHERE sign_key IS NOT NULL AND seen_sign_key IS NULL
+    ON CONFLICT(machine_id) DO NOTHING;
+  DELETE FROM sync_refused WHERE reason = 'waiting for Trust' AND machine IN
+    (SELECT t.machine_id FROM sync_trusted t JOIN sync_keys k ON k.machine_id = t.machine_id AND k.sign_key = t.sign_key);`);
 }

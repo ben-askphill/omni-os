@@ -211,7 +211,7 @@ export function sendSecret(machine: string, scope: string, name: string, value: 
   // or one Ben confirmed. Never to whatever its record says now.
   const pin = keyring.get(target.id);
   if (pin?.seenSealKey) throw refused(`${target.name} announces a key for secrets this Mac has not confirmed. Check its fingerprint and confirm it in Settings > Sync first.`);
-  if (!keyring.trusted(target.id)) throw refused(`${target.name} is new to this Mac. Check its fingerprint and trust it in Settings > Sync first.`);
+  if (!keyring.trusted(target.id)) throw refused(`${target.name} is not trusted on this Mac yet. Check its fingerprint and trust it in Settings > Sync first.`);
   const key = pin?.sealKey;
   if (!key) {
     const why = deviceRecord(target.id)?.sealKey ? 'has not sent a signed key for secrets yet' : 'has not published a key for secrets yet';

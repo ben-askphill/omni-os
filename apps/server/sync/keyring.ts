@@ -7,9 +7,11 @@ import { fingerprint } from './signing.ts';
 // as seen_*, changes from that machine stop verifying, secrets stop sealing to it, and Sync settings shows the change
 // until Ben confirms the new key (a re-paired or reinstalled Mac).
 //
-// Trust on first sight for keys: a machine id this machine has never seen is pinned with whatever key its first record
-// carries. Its ordinary changes sync at once, but it may not make this machine act (sync/verify.ts) until Ben trusts it
-// in Sync settings, where the device list shows its fingerprint. One button confirms a new machine and a changed key.
+// Trust on first pin: a machine id this machine has never seen is pinned with the key its first signed record or change
+// carries, and trusted with that key at once, so its commands, assignments and the rest apply (sync/verify.ts). The
+// relay only takes changes from a machine paired through Omni Connect and binds each to the token that pushed it, so
+// that pairing is the trust step (ADR 0012). A changed key is the one thing Ben confirms: trust stays bound to the key
+// pinned before it, and Sync settings shows the change until he confirms the new one.
 
 export type KeyKind = 'sign' | 'seal';
 
@@ -72,7 +74,10 @@ export const keyring = {
     let r = rowOf(machine);
     if (!r) {
       db.prepare('INSERT INTO sync_keys (machine_id, sign_key, seal_key, pinned_at) VALUES (?, ?, ?, ?)').run(machine, pin ? sign : null, pin ? seal : null, now);
-      if (pin) return false;
+      if (pin) {
+        if (sign) keyring.trust(machine, now);
+        return false;
+      }
       r = rowOf(machine)!;
     }
     // Keys that come from a change that did not verify are only ever seen, never pinned: Ben confirms them.
@@ -85,6 +90,8 @@ export const keyring = {
     db.prepare(
       'UPDATE sync_keys SET sign_key = ?, seal_key = ?, seen_sign_key = ?, seen_seal_key = ?, seen_at = ? WHERE machine_id = ?',
     ).run(pinSign, pinSeal, seenSign, seenSeal, seenAt, machine);
+    // The first signing key pinned for a machine is trusted with it. A key that replaces a pinned one never is here.
+    if (!r.sign_key && pinSign) keyring.trust(machine, now);
     return changed;
   },
 
@@ -100,8 +107,8 @@ export const keyring = {
   },
 
   /**
-   * Whether Ben trusts a machine to make this one act (its commands, assignments, update asks, owner claims and
-   * secrets). Trust holds for the signing key he trusted: a key pinned for that machine later does not inherit it.
+   * Whether a machine may make this one act (its commands, assignments, update asks, owner claims and secrets). Trust
+   * holds for one signing key: the first one pinned, or the one Ben confirmed. A key pinned later does not inherit it.
    */
   trusted(machine: string): boolean {
     const r = db.prepare('SELECT sign_key FROM sync_trusted WHERE machine_id = ?').get(machine) as { sign_key: string } | undefined;

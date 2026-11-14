@@ -31,6 +31,11 @@ const command = (id: string, over: Record<string, unknown> = {}): Change => ({
   // For a third machine, so this one only stores it.
   data: { thread_id: 't-signed', kind: 'message', state: 'sent', sender: 'mac-b', target: 'mac-c', target_name: 'Mac C', prompt: 'hi', expires_at: '2099-01-01T00:00:00.000Z', ...over },
 });
+/** A command sent by another machine than mac-b. */
+const commandFrom = (machine: string, id: string): Change => {
+  const c = command(id);
+  return { ...c, machine_id: machine, data: { ...(c.data as object), sender: machine } };
+};
 const stored = (id: string) => !!r.db.db.prepare('SELECT 1 FROM remote_commands WHERE id = ?').get(id);
 const refused = async () => (await (await app.request('/api/sync/refused?limit=50')).json()) as any[];
 const devices = async () => (await (await app.request('/api/sync/devices')).json()) as any[];
@@ -55,47 +60,77 @@ const trust = (id: string) => app.request(`/api/sync/devices/${id}/confirm-key`,
 const sendSecret = (machine: string) =>
   app.request('/api/secrets/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ machine, scope: 'global', name: 'SOME_KEY', value: 'v' }) });
 
-describe('a new machine waits for Trust', () => {
-  it("syncs a new machine's ordinary data at once, but holds its remote command until Ben trusts it", async () => {
+const trusted = (id: string) => r.db.db.prepare('SELECT sign_key FROM sync_trusted WHERE machine_id = ?').get(id) as { sign_key: string } | undefined;
+const record = (id: string, key: string, over: Record<string, unknown> = {}) =>
+  signAs({ machine_id: id, entity: 'kv', entity_id: `devices.${id}`, op: 'upsert', ts: later(), data: { value: { id, name: id.toUpperCase(), tailscale: null, signKey: key, at: later(), ...over } } });
+
+describe('a paired machine is trusted with its first key', () => {
+  it("pins and trusts a new machine's first signed key, so its remote command applies at once", async () => {
     await pull(
-      signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'devices.mac-b', op: 'upsert', ts: later(), data: { value: { id: 'mac-b', name: 'Mac B', tailscale: null, signKey: rawPublicKey(keyOf('mac-b')), at: later() } } }),
+      record('mac-b', rawPublicKey(keyOf('mac-b')), { name: 'Mac B' }),
       signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'note.new-machine', op: 'upsert', data: { value: 'hello' }, ts: later() }),
-      signAs(command('cmd-untrusted')),
+      signAs(command('cmd-first')),
     );
     expect(r.db.kv.get('note.new-machine')).toBe('hello');
-    expect(stored('cmd-untrusted')).toBe(false);
-    expect(await refused()).toContainEqual(expect.objectContaining({ machine: 'mac-b', entity: 'remote_command', entityId: 'cmd-untrusted', reason: 'waiting for Trust', applied: false }));
-    // Held, not dropped: the next sync does not log it again.
-    await pull();
-    expect((await refused()).filter((e) => e.entityId === 'cmd-untrusted')).toEqual([expect.objectContaining({ count: 1 })]);
-    // Its key is pinned all the same: Trust confirms the machine, not a new key.
-    expect(r.db.db.prepare('SELECT sign_key FROM sync_keys WHERE machine_id = ?').get('mac-b')).toEqual({ sign_key: rawPublicKey(keyOf('mac-b')) });
-    expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ trusted: false, keyChanged: false });
-  });
-
-  it('applies the held command and later ones once Ben trusts it', async () => {
-    expect((await trust('mac-b')).status).toBe(200);
-    expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ trusted: true });
-    await pull();
-    expect(stored('cmd-untrusted')).toBe(true);
-    expect((await refused()).filter((e) => e.entityId === 'cmd-untrusted')).toEqual([]);
-    await pull(signAs(command('cmd-signed')));
-    expect(stored('cmd-signed')).toBe(true);
-    // Nothing waits any more, and a machine this one never saw cannot be trusted ahead of time.
+    expect(stored('cmd-first')).toBe(true);
+    expect(trusted('mac-b')).toEqual({ sign_key: rawPublicKey(keyOf('mac-b')) });
+    expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ trusted: true, keyChanged: false, held: 0 });
+    expect((await refused()).filter((e) => e.machine === 'mac-b')).toEqual([]);
+    // Nothing waits, so there is nothing to confirm, and a machine never seen cannot be trusted ahead of time.
     expect((await trust('mac-b')).status).toBe(404);
     expect((await trust('mac-never-seen')).status).toBe(404);
     expect((await trust('this-mac')).status).toBe(404);
   });
 
-  it('refuses a secret sent to a machine not trusted yet', async () => {
+  it('trusts a machine whose first signed change comes before its record', async () => {
+    await pull(signAs(commandFrom('mac-e', 'cmd-before-record')));
+    expect(stored('cmd-before-record')).toBe(true);
+    expect(trusted('mac-e')).toEqual({ sign_key: rawPublicKey(keyOf('mac-e')) });
+  });
+
+  it('sends a secret to a newly paired machine', async () => {
     const sealKey = rawPublicKey(generateKeyPairSync('x25519').privateKey);
-    await pull(signAs({ machine_id: 'mac-n', entity: 'kv', entity_id: 'devices.mac-n', op: 'upsert', ts: later(), data: { value: { id: 'mac-n', name: 'Mac N', tailscale: null, signKey: rawPublicKey(keyOf('mac-n')), sealKey, at: later() } } }));
+    await pull(record('mac-n', rawPublicKey(keyOf('mac-n')), { sealKey }));
     expect(r.db.db.prepare('SELECT seal_key FROM sync_keys WHERE machine_id = ?').get('mac-n')).toEqual({ seal_key: sealKey });
-    const res = await sendSecret('mac-n');
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { error: string }).error).toMatch(/new to this Mac/);
-    expect((await trust('mac-n')).status).toBe(200);
     expect((await sendSecret('mac-n')).status).toBe(200);
+  });
+
+  it('holds the actions of a machine trusted with another key until Ben trusts it, then applies them', async () => {
+    await pull(record('mac-s', rawPublicKey(keyOf('mac-s'))));
+    // Trusted once with a key that is not the pinned one, as a confirmed-but-not-trusted key could leave it.
+    r.db.db.prepare('UPDATE sync_trusted SET sign_key = ? WHERE machine_id = ?').run('an-older-key', 'mac-s');
+    await pull(signAs(commandFrom('mac-s', 'cmd-stale')));
+    expect(stored('cmd-stale')).toBe(false);
+    expect(await refused()).toContainEqual(expect.objectContaining({ machine: 'mac-s', entityId: 'cmd-stale', reason: 'waiting for Trust', applied: false }));
+    // Held, not dropped: the next sync does not log it again.
+    await pull();
+    expect((await refused()).filter((e) => e.entityId === 'cmd-stale')).toEqual([expect.objectContaining({ count: 1 })]);
+    expect((await devices()).find((d) => d.id === 'mac-s')).toMatchObject({ trusted: false, keyChanged: false, held: 1 });
+    expect((await sendSecret('mac-s')).status).toBe(409);
+    expect((await trust('mac-s')).status).toBe(200);
+    await pull();
+    expect(stored('cmd-stale')).toBe(true);
+    expect((await refused()).filter((e) => e.entityId === 'cmd-stale')).toEqual([]);
+  });
+
+  it('the migration trusts machines already pinned before this build and lets their held commands apply', async () => {
+    // A machine from the Trust-click build: pinned, never trusted, its command held.
+    await pull(record('mac-m', rawPublicKey(keyOf('mac-m'))));
+    r.db.db.prepare('DELETE FROM sync_trusted WHERE machine_id = ?').run('mac-m');
+    await pull(signAs(commandFrom('mac-m', 'cmd-held')));
+    expect(stored('cmd-held')).toBe(false);
+    // And one whose key changed and waits for Ben: the migration leaves it alone.
+    await pull(record('mac-k', rawPublicKey(keyOf('mac-k'))));
+    r.db.db.prepare('DELETE FROM sync_trusted WHERE machine_id = ?').run('mac-k');
+    await pull(record('mac-k', rawPublicKey(generateKeyPairSync('ed25519').privateKey)));
+    expect(r.db.db.prepare('SELECT seen_sign_key IS NOT NULL AS seen FROM sync_keys WHERE machine_id = ?').get('mac-k')).toEqual({ seen: 1 });
+
+    r.db.migrate();
+    expect(trusted('mac-m')).toEqual({ sign_key: rawPublicKey(keyOf('mac-m')) });
+    expect(trusted('mac-k')).toBeUndefined();
+    expect((await refused()).filter((e) => e.entityId === 'cmd-held')).toEqual([]);
+    await pull();
+    expect(stored('cmd-held')).toBe(true);
   });
 });
 
@@ -157,12 +192,12 @@ describe('keys and deletes', () => {
 
   it('a remote command is deleted only by its sender or target', async () => {
     await pull(signAs({ ...command('cmd-del'), op: 'delete', machine_id: 'mac-d', data: null }));
-    expect(stored('cmd-signed')).toBe(true);
-    await pull(signAs({ ...command('cmd-signed'), op: 'delete', machine_id: 'mac-d', data: null }));
-    expect(stored('cmd-signed')).toBe(true);
-    expect((await refused())[0]).toMatchObject({ entityId: 'cmd-signed', reason: 'deleted by a machine that had no part in it' });
-    await pull(signAs({ ...command('cmd-signed'), op: 'delete', data: null }));
-    expect(stored('cmd-signed')).toBe(false);
+    expect(stored('cmd-first')).toBe(true);
+    await pull(signAs({ ...command('cmd-first'), op: 'delete', machine_id: 'mac-d', data: null }));
+    expect(stored('cmd-first')).toBe(true);
+    expect((await refused())[0]).toMatchObject({ entityId: 'cmd-first', reason: 'deleted by a machine that had no part in it' });
+    await pull(signAs({ ...command('cmd-first'), op: 'delete', data: null }));
+    expect(stored('cmd-first')).toBe(false);
   });
 });
 
@@ -214,11 +249,10 @@ describe('synced paths', () => {
 });
 
 describe('signing keys in Sync settings', () => {
-  const record = (key: string) =>
-    signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'devices.mac-b', op: 'upsert', ts: later(), data: { value: { id: 'mac-b', name: 'Mac B', tailscale: null, signKey: key, at: later() } } });
+  const recordB = (key: string) => record('mac-b', key, { name: 'Mac B' });
 
   it('lists this machine first and each other machine with its pinned key', async () => {
-    await pull(record(rawPublicKey(keyOf('mac-b'))));
+    await pull(recordB(rawPublicKey(keyOf('mac-b'))));
     const list = await devices();
     expect(list[0]).toMatchObject({ id: 'this-mac', current: true, keyChanged: false });
     const b = list.find((d) => d.id === 'mac-b');
@@ -228,19 +262,30 @@ describe('signing keys in Sync settings', () => {
     wireFixture('sync-refused.json', (await refused()).slice(0, 3));
   });
 
-  it('flags a new key until Ben confirms it, and changes signed with it wait for that', async () => {
+  it('flags a new key until Ben confirms it: changes signed with it wait, then apply', async () => {
+    const before = trusted('mac-b');
     const next = generateKeyPairSync('ed25519').privateKey;
-    await pull(record(rawPublicKey(next)));
+    await pull(recordB(rawPublicKey(next)));
     const b = (await devices()).find((d) => d.id === 'mac-b');
     expect(b.keyChanged).toBe(true);
     expect(b.fingerprint).not.toBe(b.pinnedFingerprint);
+    // A changed key never inherits trust by itself: the old key stays the trusted one.
+    expect(trusted('mac-b')).toEqual(before);
     await pull(signChange(command('cmd-new-key'), next));
     expect(stored('cmd-new-key')).toBe(false);
+    expect(await refused()).toContainEqual(expect.objectContaining({ machine: 'mac-b', entityId: 'cmd-new-key', reason: 'waiting for the new key to be confirmed', applied: false }));
+    expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ keyChanged: true, held: 1 });
+    // A third key that is neither pinned nor announced is still refused outright.
+    await pull(signChange(command('cmd-other-key'), generateKeyPairSync('ed25519').privateKey));
+    expect(await refused()).toContainEqual(expect.objectContaining({ entityId: 'cmd-other-key', reason: 'signature does not match the pinned key' }));
 
-    expect((await app.request('/api/sync/devices/mac-b/confirm-key', { method: 'POST' })).status).toBe(200);
-    expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ keyChanged: false });
+    expect((await trust('mac-b')).status).toBe(200);
+    expect(trusted('mac-b')).toEqual({ sign_key: rawPublicKey(next) });
+    expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ keyChanged: false, trusted: true, held: 0 });
     await pull(signChange(command('cmd-after-confirm'), next));
+    expect(stored('cmd-new-key')).toBe(true);
     expect(stored('cmd-after-confirm')).toBe(true);
-    expect((await app.request('/api/sync/devices/mac-b/confirm-key', { method: 'POST' })).status).toBe(404);
+    expect(stored('cmd-other-key')).toBe(false);
+    expect((await trust('mac-b')).status).toBe(404);
   });
 });

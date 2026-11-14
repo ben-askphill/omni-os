@@ -5,7 +5,7 @@ import { claimAutomations, OWNER_KEY } from './sync/owner.ts';
 import { currentRecords, deviceRecord, deviceRecords } from './sync/devices.ts';
 import { fingerprintOf, keyring } from './sync/keyring.ts';
 import { signPublicKey } from './sync/sign-key.ts';
-import { clearHeld, refusedChanges } from './sync/verify.ts';
+import { clearHeld, heldActions, refusedChanges } from './sync/verify.ts';
 import { pathMap } from './sync/paths.ts';
 import { checkPathMap, checkRelayUrl, defaultSetupDeps, disableSync, enableSync, pollRelaySignIn, SetupError, startRelaySignIn, type SetupDeps } from './sync/setup.ts';
 import { activeWorker, syncNow, syncStatus } from './sync/worker.ts';
@@ -89,13 +89,14 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
   /**
    * The synced machines with their signing keys (sync/keyring.ts), this one first. `fingerprint`: the key the machine
    * announces now; `pinnedFingerprint`: the one this machine checks its changes with. `keyChanged`: they differ (or
-   * its seal key does). `trusted`: Ben trusts it to make this machine act. A changed key or an untrusted machine shows
-   * a Trust button, which calls POST /devices/:id/confirm-key.
+   * its seal key does). `trusted`: it may make this machine act, which a paired machine is from its first pinned key.
+   * `held`: its actions waiting here for a confirm. A changed key, or a machine whose only key came unsigned, shows a
+   * button that calls POST /devices/:id/confirm-key.
    */
   app.get('/devices', async (c) => c.json(await syncDevices()));
 
   /**
-   * Trust a machine: pin the keys it announces now and let its commands, assignments, update asks, owner claims and
+   * Confirm a machine's new key, or trust one that is not trusted yet: pin the keys it announces now and let its commands, assignments, update asks, owner claims and
    * secrets apply, the held ones with the sync this starts. 404 for a machine this one has not seen, or one already
    * trusted with no new key waiting; 409 for one that has not sent a signed key yet.
    */
@@ -136,8 +137,10 @@ export interface SyncDevice {
   fingerprint: string | null;
   pinnedFingerprint: string | null;
   keyChanged: boolean;
-  /** Ben trusts it to make this machine act. Always true for this machine. */
+  /** It may make this machine act: trusted with its first pinned key, or a key Ben confirmed. Always true for this machine. */
   trusted: boolean;
+  /** Its commands, assignments, update asks, owner claims and secrets this machine holds until Ben confirms. */
+  held: number;
 }
 
 export async function syncDevices(): Promise<SyncDevice[]> {
@@ -146,12 +149,14 @@ export async function syncDevices(): Promise<SyncDevice[]> {
   const own = await signPublicKey().catch(() => null);
   const records = currentRecords(deviceRecords());
   const pins = keyring.list();
+  const held = new Map<string, number>();
+  for (const h of heldActions()) held.set(h.machine, (held.get(h.machine) ?? 0) + h.count);
   const ids = [...new Set([self, ...records.map((r) => r.id), ...pins.filter((p) => p.seenSignKey || p.seenSealKey || !keyring.trusted(p.machine)).map((p) => p.machine)])];
   return ids.map((id) => {
     const rec = records.find((r) => r.id === id) ?? deviceRecord(id);
     if (id === self) {
       const fp = fingerprintOf(own ?? rec?.signKey);
-      return { id, name: rec?.name ?? id, current: true, fingerprint: fp, pinnedFingerprint: fp, keyChanged: false, trusted: true };
+      return { id, name: rec?.name ?? id, current: true, fingerprint: fp, pinnedFingerprint: fp, keyChanged: false, trusted: true, held: 0 };
     }
     const pin = pins.find((p) => p.machine === id);
     return {
@@ -162,6 +167,7 @@ export async function syncDevices(): Promise<SyncDevice[]> {
       pinnedFingerprint: fingerprintOf(pin?.signKey),
       keyChanged: !!(pin?.seenSignKey || pin?.seenSealKey),
       trusted: keyring.trusted(id),
+      held: held.get(id) ?? 0,
     };
   });
 }

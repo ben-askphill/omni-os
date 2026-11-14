@@ -3,7 +3,8 @@ import { formatFingerprint, isNewMachine, syncKeyAction } from '@omni/shared/fin
 
 import { shortAgo } from '../live/channel-model';
 
-// Settings, Sync on the phone: each machine's signing-key fingerprint, Key changed with Confirm new key, and the
+// Settings, Sync on the phone: each machine's signing-key fingerprint, Key changed with Confirm new key (a paired machine
+// is trusted with its first key, so that is the usual button), what waits for it, and the
 // Refused changes list, in the words the Web UI and docs/user use.
 
 /** A fingerprint as every client shows it (@omni/shared/fingerprint.ts), so two screens can be compared by eye. */
@@ -15,8 +16,10 @@ export interface SyncKeyRow {
   current: boolean;
   fingerprint: string;
   keyChanged: boolean;
-  /** New to this machine: its commands, assignments, update requests and secrets wait until Ben trusts it. */
+  /** Not trusted here (its only key came unsigned): its commands, assignments, update requests and secrets wait until Ben trusts it. */
   untrusted: boolean;
+  /** "2 actions waiting": what this machine holds from it until Ben confirms. Null when nothing waits. */
+  held: string | null;
   /** The key that was pinned, shown beside the new one while the key changed. */
   pinned: string | null;
   /** The button: Trust this machine, Confirm new key, or none. */
@@ -38,6 +41,7 @@ export function syncKeyRows(devices: readonly SyncDeviceKey[]): SyncKeyRow[] {
       fingerprint: fingerprintLabel(d.fingerprint),
       keyChanged: changed,
       untrusted: isNewMachine(d),
+      held: d.held ? (d.held === 1 ? '1 action waiting' : `${d.held} actions waiting`) : null,
       pinned: changed && d.pinnedFingerprint ? fingerprintLabel(d.pinnedFingerprint) : null,
       buttonLabel: action === 'trust' ? 'Trust this machine' : changed ? 'Confirm new key' : null,
       confirmLabel: action === 'trust' ? `Trust ${d.name}` : changed ? `Confirm new key for ${d.name}` : null,
@@ -49,19 +53,19 @@ export function confirmKeyConfirmation(row: Pick<SyncKeyRow, 'name' | 'fingerpri
   if (row.untrusted)
     return {
       title: `Trust ${row.name}?`,
-      message: `Only if you paired ${row.name} yourself. Check that its Settings › Sync shows ${row.fingerprint} first. Until then, its commands, assignments, update requests and secrets wait.`,
+      message: `Only if you paired ${row.name} yourself. Check that its Settings › Sync shows ${row.fingerprint} first. Until then, its commands, assignments, update requests and secrets wait here.`,
       confirmLabel: 'Trust',
     };
   return {
     title: `Confirm new key for ${row.name}?`,
-    message: `Only if you reinstalled or paired ${row.name} again. Check that its Settings › Sync shows ${row.fingerprint} first. Until then, the changes it signs are refused.`,
+    message: `Only if you reinstalled or paired ${row.name} again. Check that its Settings › Sync shows ${row.fingerprint} first. Until then, its commands, assignments, update requests and secrets wait here.`,
     confirmLabel: 'Confirm new key',
   };
 }
 
 /** The list after a confirm: the new key is the pinned one, and the machine is trusted. */
 export function withKeyConfirmed(devices: readonly SyncDeviceKey[], id: string): SyncDeviceKey[] {
-  return devices.map((d) => (d.id === id ? { ...d, keyChanged: false, pinnedFingerprint: d.fingerprint, trusted: true } : d));
+  return devices.map((d) => (d.id === id ? { ...d, keyChanged: false, pinnedFingerprint: d.fingerprint, trusted: true, held: 0 } : d));
 }
 
 export interface RefusedRow {
