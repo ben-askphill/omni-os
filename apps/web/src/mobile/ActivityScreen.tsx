@@ -3,6 +3,7 @@ import { useInbox } from '../app/useInbox.ts';
 import { OmniMark } from '../components/brand.tsx';
 import { UpdateNotice } from '../components/UpdateNotice.tsx';
 import { DiskNotice } from '../components/DiskNotice.tsx';
+import { AccountNotice } from '../components/AccountNotice.tsx';
 import { href } from '../router.ts';
 import { useNow } from '../store.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
@@ -38,6 +39,7 @@ export function ActivityScreen() {
           <MoTitle title="Activity" sub={`${date} · ${waiting.length} waiting · ${working.count} working`} />
           <UpdateNotice className="mx-4 mb-3" />
           <DiskNotice className="mx-4 mb-3" />
+          <AccountNotice className="mx-4 mb-3" />
         </div>
         <div className="flex flex-col px-4">
           {waiting.map((t, i) => (

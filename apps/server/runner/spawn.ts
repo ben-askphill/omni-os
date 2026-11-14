@@ -7,7 +7,7 @@ import { inWorkspace } from '../workspace.ts';
 import { followBranch } from '../branch-follow.ts';
 import { pathProblem } from '../sync/path-guard.ts';
 import { attachThread, detachThread } from '../browser.ts';
-import { globalSecret, secretsEnv } from '../secrets.ts';
+import { globalSecret, hasSecret, secretsEnv } from '../secrets.ts';
 import { recordUsage } from '../usage.ts';
 import { toolTails } from '../tool-tail.ts';
 import { recordContext, recordContextHint } from '../context.ts';
@@ -27,6 +27,7 @@ import { failSetup } from './setup.ts';
 import { reportToParent } from './queue.ts';
 import { resumesSession, sessionStarted, takeHandover } from './switch.ts';
 import { startTurnSnapshot } from './snapshots.ts';
+import { stampThread } from '../harness-accounts.ts';
 
 /** A thread's process starts: its controller is built here, with the deps the composition root bound, and registered. */
 export function launch(threadId: string, first: Msg): Live | undefined {
@@ -36,6 +37,8 @@ export function launch(threadId: string, first: Msg): Live | undefined {
   lives.set(threadId, live);
   live.claimTurn();
   startTurnSnapshot(live);
+  // The account this process bills, kept on the thread so it shows after a switch. Cursor Cloud on a channel's own key is not this machine's.
+  if (!(thread.harness === 'cursor-cloud' && hasSecret(`channel:${thread.channel_id}`, 'CURSOR_API_KEY'))) stampThread(threadId, thread.harness);
   spawnLive(live, thread).catch((err) => {
     // Never let one broken thread take the whole server down.
     console.error(`[runner] ${threadId} crashed:`, err);

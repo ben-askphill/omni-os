@@ -5,6 +5,8 @@
 // Modes:
 //   create-chat            print a chat id, exit 0
 //   --list-models          print "id - Label" lines, exit 0
+//   about --format json    the signed-in account; FAKE_CURSOR_ABOUT names a JSON file to print instead, else
+//                          $HOME/.fake-cursor-about.json when there is one
 //   -p ...                 run one turn with the prompt on stdin (or as the prompt argument): stream-json events, exit 0
 //   acp                    the ACP server, JSON-RPC over stdio: answers initialize and
 //                          session/new, sends the folder's commands in an
@@ -250,6 +252,12 @@ async function main() {
 
   if (argv.includes('--list-models')) {
     process.stdout.write(MODELS + '\n');
+    return;
+  }
+  if (argv[0] === 'about') {
+    const file = process.env.FAKE_CURSOR_ABOUT || join(process.env.HOME ?? '', '.fake-cursor-about.json');
+    const about = { cliVersion: 'fake', model: 'Composer 2.5', subscriptionTier: 'Pro', osPlatform: process.platform, userEmail: 'dev@example.com' };
+    process.stdout.write((file && existsSync(file) ? readFileSync(file, 'utf8') : JSON.stringify(about, null, 2)) + '\n');
     return;
   }
   if (argv[0] === 'create-chat') {

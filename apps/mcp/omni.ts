@@ -238,6 +238,31 @@ server.registerTool(
 );
 
 server.registerTool(
+  'harness_accounts',
+  {
+    description:
+      'Which account each harness (Claude Code, Codex, Cursor, Cursor Cloud, Hermes) is signed in to on this machine and on every synced machine: ' +
+      'the email or name, org and plan, or why there is none (signed out, not installed, not set up). `switched` names the account before the last switch; ' +
+      `\`notice\` is true while ${USER} has not acknowledged it. Use it before delegating to a machine when the plan that bills matters. Read-only: no token or key is ever returned.`,
+    inputSchema: {
+      refresh: z.boolean().optional().describe('Read this machine again instead of the last reading (under a minute old). Other machines report their own.'),
+    },
+  },
+  async ({ refresh }) => {
+    const view = await call(refresh ? '/accounts?refresh=1' : '/accounts');
+    return text(
+      view.machines.map((m: any) => ({
+        machine: m.name,
+        id: m.id,
+        this_machine: m.current,
+        checked_at: m.checkedAt,
+        accounts: m.accounts.map((a: any) => ({ harness: a.harness, state: a.state, account: a.label, org: a.org, plan: a.plan, note: a.note, switched: a.switched, notice: a.notice })),
+      })),
+    );
+  },
+);
+
+server.registerTool(
   'message_thread',
   {
     description:

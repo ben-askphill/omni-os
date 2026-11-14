@@ -1,5 +1,6 @@
 import type { Device, HandoffView } from '@omni/shared/handoff.ts';
 import type { FleetRequest, FleetResult, FleetView } from '@omni/shared/update-fleet.ts';
+import type { AccountsView } from '@omni/shared/harness-accounts.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 import type { Thread } from './threads.ts';
 
@@ -84,6 +85,10 @@ export function machinesApi(http: HttpClient) {
     confirmSyncKey: (id: string) => http.request<{ ok: true }>('POST', apiPath`/sync/devices/${id}/confirm-key`, { body: {} }),
     /** Synced changes this machine refused, newest first. A 404 means the server predates signed sync. */
     refusedChanges: (limit = 50) => http.request<RefusedChange[]>('GET', apiPath`/sync/refused`, { query: { limit } }),
+    /** Which account each harness is signed in to, here and on every synced machine (apps/server/harness-accounts.ts). `refresh` reads this machine again. */
+    accounts: (refresh = false) => http.request<AccountsView>('GET', apiPath`/accounts`, { query: { refresh: refresh ? 1 : undefined } }),
+    /** Acknowledges the account switch shown for a harness on a machine, for every client. */
+    acknowledgeAccountSwitch: (machine: string, harness: string) => http.request<AccountsView>('POST', apiPath`/accounts/seen`, { body: { machine, harness } }),
     cancelHandoff: (threadId: string) => http.request<HandoffAnswer>('POST', apiPath`/threads/${threadId}/handoff/cancel`, { body: {} }),
   };
 }

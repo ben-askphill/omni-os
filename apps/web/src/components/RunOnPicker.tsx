@@ -27,8 +27,19 @@ export function useRunOn() {
 export const runOnOptions = machineOptions;
 
 /** The new thread's Machine chip: "On Ben's MacBook Pro" or "On omarchy". Renders nothing when there is no other machine to pick. */
-export function RunOnPicker({ rows, value, onChange }: { rows: RunOnRow[] | null; value: string; onChange: (pick: string) => void }) {
-  return <MachineChip rows={rows} value={value} onChange={onChange} />;
+export function RunOnPicker({
+  rows,
+  value,
+  onChange,
+  accountFor,
+}: {
+  rows: RunOnRow[] | null;
+  value: string;
+  onChange: (pick: string) => void;
+  /** The account the picked harness runs as on each machine, for its row. */
+  accountFor?: (value: string) => string | null;
+}) {
+  return <MachineChip rows={rows} value={value} onChange={onChange} accountFor={accountFor} />;
 }
 
 /** What Settings says under "Run new threads on", on the desktop and the phone. */

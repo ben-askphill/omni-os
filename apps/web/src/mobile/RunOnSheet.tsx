@@ -27,6 +27,7 @@ export function RunOnSheet({
   onClose,
   title = 'Run on',
   note,
+  accountFor,
 }: {
   rows: RunOnRow[];
   value: string;
@@ -34,6 +35,8 @@ export function RunOnSheet({
   onClose: () => void;
   title?: string;
   note?: string;
+  /** The account the picked harness runs as on a row's machine, first on its line. */
+  accountFor?: (value: string) => string | null;
 }) {
   const machines = rows.filter((r) => r.value !== GROK_BOT);
   const elsewhere = rows.filter((r) => r.value === GROK_BOT);
@@ -48,7 +51,7 @@ export function RunOnSheet({
       </div>
       <div className="mo-scroll flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto pb-3">
         <MoSection title="Machines">
-          <RunOnRows rows={machines} value={value} onChange={onChange} onClose={onClose} />
+          <RunOnRows rows={machines} value={value} onChange={onChange} onClose={onClose} accountFor={accountFor} />
           {note && <p className="m-0 px-4 pt-2 text-[12.5px] leading-[1.45] text-fg-3">{note}</p>}
         </MoSection>
         {elsewhere.length > 0 && (
@@ -61,7 +64,19 @@ export function RunOnSheet({
   );
 }
 
-function RunOnRows({ rows, value, onChange, onClose }: { rows: RunOnRow[]; value: string; onChange: (pick: string) => void; onClose: () => void }) {
+function RunOnRows({
+  rows,
+  value,
+  onChange,
+  onClose,
+  accountFor,
+}: {
+  rows: RunOnRow[];
+  value: string;
+  onChange: (pick: string) => void;
+  onClose: () => void;
+  accountFor?: (value: string) => string | null;
+}) {
   return (
     <MoGroup>
       {rows.map((r, i) => (
@@ -69,7 +84,7 @@ function RunOnRows({ rows, value, onChange, onClose }: { rows: RunOnRow[]; value
           key={r.value}
           icon={r.icon ?? 'monitor'}
           label={r.label}
-          sub={r.sub}
+          sub={accountFor?.(r.value) ? `${accountFor(r.value)} · ${r.sub}` : r.sub}
           right={<MoRadio on={r.value === value} />}
           onClick={() => {
             onChange(r.value);

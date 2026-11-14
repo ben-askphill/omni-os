@@ -13,6 +13,7 @@ import { UsageCard } from '../sidebar/UsageCard.tsx';
 import { useScrollFade } from './useScrollFade.ts';
 import { UpdateNotice } from '../UpdateNotice.tsx';
 import { DiskNotice } from '../DiskNotice.tsx';
+import { AccountNotice } from '../AccountNotice.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -86,6 +87,7 @@ function InboxList({ onSearch }: { onSearch: () => void }) {
       <div className="px-3 pt-1 pb-3">
         <UpdateNotice className="mb-2" />
         <DiskNotice className="mb-2" />
+        <AccountNotice className="mb-2" />
         <UsageCard />
       </div>
     </>

@@ -1,6 +1,6 @@
 import type { SettingsSectionId } from '@omni/shared/settings-catalog.ts';
 
-import { ModelsSection, ThreadsSection } from './AgentSections';
+import { AccountsSection, ModelsSection, ThreadsSection } from './AgentSections';
 import { ChannelsSection, WorkspaceSection, WorktreesSection } from './CodeSections';
 import { AccessSection, MachinesSection, SyncSection } from './ConnectionSections';
 import { AboutSection, AppearanceSection, GeneralSection } from './OmniSections';
@@ -13,6 +13,7 @@ const SECTIONS: Partial<Record<SettingsSectionId, () => React.JSX.Element>> = {
   general: GeneralSection,
   appearance: AppearanceSection,
   models: ModelsSection,
+  accounts: AccountsSection,
   threads: ThreadsSection,
   channels: ChannelsSection,
   workspace: WorkspaceSection,

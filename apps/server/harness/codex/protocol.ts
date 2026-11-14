@@ -37,7 +37,7 @@ export interface CodexItem {
 
 /** account/read. `account` is null when Codex is not logged in. */
 export interface GetAccountResponse {
-  account: { type: 'chatgpt'; email: string | null; planType: string } | { type: 'apiKey' } | { type: 'amazonBedrock' } | null;
+  account: { type: 'chatgpt'; email: string | null; planType: string; workspaceName?: string | null } | { type: 'apiKey' } | { type: 'amazonBedrock' } | null;
   requiresOpenaiAuth: boolean;
 }
 

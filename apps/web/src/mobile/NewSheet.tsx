@@ -3,6 +3,9 @@ import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type Th
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { useBasePick, useBaseRows } from '../components/BasePicker.tsx';
 import { useRunOn } from '../components/RunOnPicker.tsx';
+import { ComposerAccountNotice } from '../components/AccountNotice.tsx';
+import { pickerAccounts, useAccounts } from '../accounts.ts';
+import { accountLine } from '@omni/shared/harness-accounts.ts';
 import { AttachmentStrip, useAttachments } from '../components/Composer.tsx';
 import { keepLocalFiles } from '../sending.ts';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
@@ -61,6 +64,15 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
   const ro = crew.find((r) => r.id === role);
   const run = harnesses ? draftRun(picked?.target === target ? picked : null, ro, channels.find((c) => c.id === target), harnesses) : null;
   const { rows: baseRows, reload: reloadBases } = useBaseRows(target, run?.choice.harness ?? '');
+  // Who the picked harness runs as on the machine it will run on, as on the desktop composer. Auto picks one later.
+  const accounts = useAccounts();
+  const onMachine = pickerAccounts(accounts.data, runOn.pick);
+  const harness = run && !asksAuto(run.choice) ? run.choice.harness : null;
+  const accountFor = (pick: string) => {
+    const a = harness ? pickerAccounts(accounts.data, pick)?.byHarness[harness] : undefined;
+    return a ? accountLine(a) : null;
+  };
+  const switched = harness ? onMachine?.byHarness[harness] : undefined;
   const onTarget = (next: string) => {
     if (next === target) return;
     setTarget(next);
@@ -185,6 +197,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
                 type="button"
                 onClick={() => {
                   void reload();
+                  accounts.reload();
                   setPicking(true);
                 }}
                 disabled={!harnesses}
@@ -203,6 +216,11 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
           </div>
         </div>
         {grokBlock && <ErrorNote className="mx-3 mt-2">{grokBlock}</ErrorNote>}
+        {switched?.notice && onMachine && (
+          <div className="mt-2 px-1">
+            <ComposerAccountNotice machine={{ id: onMachine.id, name: onMachine.machine }} account={switched} onSeen={accounts.setData} />
+          </div>
+        )}
         {(att.error || error) && <ErrorNote className="mx-3 mt-2">{att.error ?? error}</ErrorNote>}
         <p className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">
           {toGrok
@@ -213,7 +231,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
         </p>
       </MoSheet>
       {pickingBase && baseRows && <BaseSheet rows={baseRows} value={base} onChange={setBase} onClose={() => setPickingBase(false)} />}
-      {pickingMachine && runOn.rows && <RunOnSheet rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} onClose={() => setPickingMachine(false)} />}
+      {pickingMachine && runOn.rows && <RunOnSheet rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} onClose={() => setPickingMachine(false)} />}
       {picking && harnesses && run && (
         <ModelSheet
           harnesses={harnesses}
@@ -221,6 +239,7 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
           effort={run.effort}
           onChange={(choice, effort) => setPicked({ target, choice, effort })}
           onClose={() => setPicking(false)}
+          accounts={onMachine}
         />
       )}
     </>
