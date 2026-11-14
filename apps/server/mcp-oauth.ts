@@ -14,6 +14,7 @@ import { owner } from './google-auth.ts';
 import { config } from './config.ts';
 import { connectHostname } from './connect/service.ts';
 import { mcpClients } from './mcp-clients.ts';
+import { tailnet } from './tailscale.ts';
 import { verifyMcpToken, type Jwk, type Verdict } from './mcp-token.ts';
 import { mcpHostAllowed, mcpPublicHost, viaConnect, viaTailnet } from './request-guard.ts';
 import { resolved } from './user-config.ts';
@@ -94,16 +95,18 @@ async function cachedSub(issuer: string, token: string, now: number): Promise<st
 }
 
 /**
- * This install's /mcp resource URLs, from configuration only, never from what a request names: the configured public
- * URL and this machine's Connect hostname. Loopback on this port only for a request straight from this machine
- * (`local`): every install answers on that URL, so a token naming it says nothing about which one it is for.
+ * This install's /mcp resource URLs, never from what a request names: the configured public URL, this machine's
+ * Connect hostname and its own MagicDNS name (`tailnetName`, from Tailscale). Loopback on this port only for a request
+ * straight from this machine (`local`): every install answers on that URL, so a token naming it says nothing about
+ * which one it is for.
  */
-export function mcpResources(local: boolean): string[] {
+export function mcpResources(local: boolean, tailnetName: string | null = null): string[] {
   const out = new Set<string>(local ? [`http://127.0.0.1:${config.port}/mcp`, `http://localhost:${config.port}/mcp`] : []);
   const configured = resolved.mcpPublicUrl();
   if (configured) out.add(`${configured}/mcp`);
   const connect = connectHostname();
   if (connect) out.add(`https://${connect}/mcp`);
+  if (tailnetName) out.add(`https://${tailnetName.replace(/\.$/, '')}/mcp`);
   return [...out];
 }
 
@@ -119,7 +122,7 @@ export async function mcpTokenVerdict(token: string, local: boolean, now = Date.
   const verdict = await verifyMcpToken(token, {
     issuer,
     ownerSub,
-    resources: mcpResources(local),
+    resources: mcpResources(local, (await tailnet())?.self.dnsName || null),
     clientStatus: mcpClients.status,
     allowOpaque: process.env.OMNI_MCP_ALLOW_OPAQUE === '1',
     keyFor: (kid) => keyFor(issuer, kid, now),

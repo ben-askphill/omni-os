@@ -94,11 +94,21 @@ describe('thread files', () => {
     put.mockRestore();
   });
 
-  it('never overwrites a file B already has', async () => {
+  it('never overwrites a file B edited: A\'s newer version lands beside it as a conflict copy (F1, PRD #667)', async () => {
     const path = join(b.config.threadDir('t1'), 'artifacts', 'report.html');
     writeFileSync(path, 'edited on B');
-    expect((await b.files.pullThreadFiles('t1', b.opts)).count).toBe(0);
+    const r = await b.files.pullThreadFiles('t1', b.opts);
+    expect(r).toMatchObject({ count: 1, conflicts: ['artifacts/report.html'] });
     expect(readFileSync(path, 'utf8')).toBe('edited on B');
+    const copy = join(b.config.threadDir('t1'), 'artifacts', `report (conflict ${sha('<h1>Report v2</h1>').slice(0, 8)}).html`);
+    expect(readFileSync(copy, 'utf8')).toBe('<h1>Report v2</h1>');
+    // B's push sends both: its edit under the name, A's version as the copy. A pulls the two.
+    await b.files.pushThreadFiles('t1', b.opts);
+    const manifest = JSON.parse(Buffer.from(relay.objects.get('manifests/t1.json')!).toString());
+    expect(manifest.files['artifacts/report.html'].sha).toBe(sha('edited on B'));
+    expect(Object.keys(manifest.files)).toContain(`artifacts/report (conflict ${sha('<h1>Report v2</h1>').slice(0, 8)}).html`);
+    await a.files.pullThreadFiles('t1', a.opts);
+    expect(readFileSync(join(a.config.threadDir('t1'), 'artifacts', 'report.html'), 'utf8')).toBe('edited on B');
   });
 
   it('skips manifest entries outside the synced areas and blobs that do not match their sha', async () => {
@@ -409,5 +419,76 @@ describe('files that change here while the relay is slow', () => {
     expect(listed.sha).toBe(sha(Buffer.from(relay.objects.get(`sessions/claude-code/${sid}.jsonl`)!)));
     expect(await a.files.pushSession(onA, a.opts)).toBe(1);
     expect(Buffer.from(relay.objects.get(`sessions/claude-code/${sid}.jsonl`)!).toString()).toBe('turn 1\nturn 2 still being written\n');
+  });
+});
+
+describe('thread files that merge (PRD #667, F1, F3, F2, F4, F24)', () => {
+  const file = (m: typeof a, id: string, rel: string) => join(m.config.threadDir(id), rel);
+  const write = (m: typeof a, id: string, rel: string, body: string) => {
+    mkdirSync(dirname(file(m, id, rel)), { recursive: true });
+    writeFileSync(file(m, id, rel), body);
+  };
+  const manifestOf = (id: string) => JSON.parse(Buffer.from(relay.objects.get(`manifests/${id}.json`)!).toString());
+
+  it('never lets an unchanged stale copy go up over a newer one, and brings the newer one down (F1, F2)', async () => {
+    write(a, 'm1', 'artifacts/plan.md', 'v1');
+    await a.files.pushThreadFiles('m1', a.opts);
+    await b.files.pullThreadFiles('m1', b.opts);
+    write(a, 'm1', 'artifacts/plan.md', 'version two');
+    await a.files.pushThreadFiles('m1', a.opts);
+    // B's copy is still v1 (a different size, so A's quick rewrite in the same millisecond still counts as a change) and unchanged since it synced: its push leaves the relay's v2 alone.
+    await b.files.pushThreadFiles('m1', b.opts);
+    expect(manifestOf('m1').files['artifacts/plan.md'].sha).toBe(sha('version two'));
+    // Opening the thread on B brings v2 down over its unchanged v1.
+    expect((await b.files.pullThreadFiles('m1', b.opts)).count).toBe(1);
+    expect(readFileSync(file(b, 'm1', 'artifacts/plan.md'), 'utf8')).toBe('version two');
+  });
+
+  it('keeps both Macs\' files when their manifest writes race (F3)', async () => {
+    write(a, 'm2', 'artifacts/from-a.md', 'a');
+    write(b, 'm2', 'artifacts/from-b.md', 'b');
+    await a.files.pushThreadFiles('m2', a.opts);
+    await b.files.pullThreadFiles('m2', b.opts);
+    write(a, 'm2', 'artifacts/second-a.md', 'a2');
+    // B's push lands between A's read of the manifest and A's write of it.
+    relay.beforeConditionalPut = () => b.files.pushThreadFiles('m2', b.opts).then(() => {});
+    await a.files.pushThreadFiles('m2', a.opts);
+    expect(Object.keys(manifestOf('m2').files).sort()).toEqual(['artifacts/from-a.md', 'artifacts/from-b.md', 'artifacts/second-a.md']);
+    expect(manifestOf('m2').generation).toBeGreaterThanOrEqual(3);
+  });
+
+  it('stops a push when the manifest does not parse, instead of writing an empty one over it (F3)', async () => {
+    write(a, 'm3', 'artifacts/x.md', 'x');
+    await relay.putObject('manifests/m3.json', Buffer.from('{"v":1,"files":'));
+    await expect(a.files.pushThreadFiles('m3', a.opts)).rejects.toThrow(/does not parse/);
+    expect(Buffer.from(relay.objects.get('manifests/m3.json')!).toString()).toBe('{"v":1,"files":');
+    expect(await b.files.pullThreadFiles('m3', b.opts)).toEqual({ count: 0, skipped: 1 });
+  });
+
+  it('deletes on the other Mac a file deleted here, and never downloads it again (F4)', async () => {
+    write(a, 'm4', 'artifacts/old.md', 'old');
+    await a.files.pushThreadFiles('m4', a.opts);
+    await b.files.pullThreadFiles('m4', b.opts);
+    const { rmSync } = await import('node:fs');
+    rmSync(file(a, 'm4', 'artifacts/old.md'));
+    await a.files.pushThreadFiles('m4', a.opts);
+    expect(manifestOf('m4').files['artifacts/old.md']).toBeUndefined();
+    expect(manifestOf('m4').deleted['artifacts/old.md']).toMatchObject({ sha: sha('old') });
+    await b.files.pullThreadFiles('m4', b.opts);
+    expect(existsSync(file(b, 'm4', 'artifacts/old.md'))).toBe(false);
+    // A pull on A does not bring it back either.
+    await a.files.pullThreadFiles('m4', a.opts);
+    expect(existsSync(file(a, 'm4', 'artifacts/old.md'))).toBe(false);
+  });
+
+  it('marks a download, so the artifact watcher does not take it for a write made here (F24)', async () => {
+    write(a, 'm5', 'artifacts/page.html', '<p>hi</p>');
+    await a.files.pushThreadFiles('m5', a.opts);
+    await b.files.pullThreadFiles('m5', b.opts);
+    const { landedBySync } = await import('../sync/landed.ts');
+    const path = file(b, 'm5', 'artifacts/page.html');
+    expect(landedBySync(path, statSync(path))).toBe(true);
+    writeFileSync(path, '<p>edited here</p>');
+    expect(landedBySync(path, statSync(path))).toBe(false);
   });
 });
