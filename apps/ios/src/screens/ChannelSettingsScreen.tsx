@@ -341,7 +341,7 @@ function ActionsGroup({ channel, navigation }: { channel: Channel; navigation: R
           first={i === 0}
           icon="play"
           title={a.name}
-          detail={[a.command.split('\n')[0], portLabel(a.port), a.setup && SETUP_MODE_LABEL[a.setup]].filter(Boolean).join(' · ')}
+          detail={[a.command.split('\n')[0], portLabel(a.port), a.setup && SETUP_MODE_LABEL[a.setup], a.teardown && 'Before removal'].filter(Boolean).join(' · ')}
           chevron
           onPress={() => navigation.navigate('ChannelAction', { channel: channel.id, action: a })}
         />

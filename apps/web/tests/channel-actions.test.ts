@@ -12,6 +12,7 @@ const action = (over: Partial<ChannelAction> = {}): ChannelAction => ({
   secrets: [],
   port: 0,
   setup: null,
+  teardown: false,
   position: 0,
   created_at: '2026-01-05T09:00:00.000Z',
   updated_at: '2026-01-05T09:00:00.000Z',
@@ -120,13 +121,13 @@ describe('output', () => {
 
 describe('the settings editor', () => {
   it('reads an action into the form and back', () => {
-    expect(draftOf()).toEqual({ name: '', command: '', secrets: '', portMode: 'none', port: '', setup: null });
+    expect(draftOf()).toEqual({ name: '', command: '', secrets: '', portMode: 'none', port: '', setup: null, teardown: false });
     expect(draftOf(action({ port: null }))).toMatchObject({ portMode: 'none', port: '' });
     expect(draftOf(action({ port: 0 }))).toMatchObject({ portMode: 'free', port: '' });
     const fixed = action({ port: 9292, secrets: ['SHOPIFY_CLI_THEME_TOKEN', 'API_KEY'] });
     expect(draftOf(fixed)).toMatchObject({ portMode: 'fixed', port: '9292', secrets: 'SHOPIFY_CLI_THEME_TOKEN, API_KEY' });
     expect(actionInput(draftOf(fixed))).toEqual({
-      input: { name: 'Theme preview', command: 'shopify theme dev --port $OMNI_PORT', secrets: ['SHOPIFY_CLI_THEME_TOKEN', 'API_KEY'], port: 9292, setup: null },
+      input: { name: 'Theme preview', command: 'shopify theme dev --port $OMNI_PORT', secrets: ['SHOPIFY_CLI_THEME_TOKEN', 'API_KEY'], port: 9292, setup: null, teardown: false },
     });
   });
 
@@ -137,20 +138,26 @@ describe('the settings editor', () => {
     expect('input' in input && 'setup' in input.input && input.input.setup).toBeNull();
   });
 
+  it('always sends teardown too, on or off', () => {
+    expect(draftOf(action({ teardown: true })).teardown).toBe(true);
+    expect(actionInput(draftOf(action({ teardown: true })))).toMatchObject({ input: { teardown: true } });
+    expect(actionInput(draftOf(action()))).toMatchObject({ input: { teardown: false } });
+  });
+
   it('splits secret names on commas and spaces, upper-cased, each once', () => {
     expect(parseSecrets(' api_key, SHOPIFY_TOKEN  api_key,,\nOTHER ')).toEqual(['API_KEY', 'SHOPIFY_TOKEN', 'OTHER']);
     expect(parseSecrets('')).toEqual([]);
   });
 
   it('sends the port mode as null, 0 or the number', () => {
-    const base = { name: ' Tests ', command: ' npm test ', secrets: '', port: '9292', setup: null };
-    expect(actionInput({ ...base, portMode: 'none' })).toEqual({ input: { name: 'Tests', command: 'npm test', secrets: [], port: null, setup: null } });
+    const base = { name: ' Tests ', command: ' npm test ', secrets: '', port: '9292', setup: null, teardown: false };
+    expect(actionInput({ ...base, portMode: 'none' })).toEqual({ input: { name: 'Tests', command: 'npm test', secrets: [], port: null, setup: null, teardown: false } });
     expect(actionInput({ ...base, portMode: 'free' })).toMatchObject({ input: { port: 0 } });
     expect(actionInput({ ...base, portMode: 'fixed' })).toMatchObject({ input: { port: 9292 } });
   });
 
   it('refuses a fixed port with no number rather than sending 0', () => {
-    expect(actionInput({ name: 'Preview', command: 'x', secrets: '', portMode: 'fixed', port: '', setup: null })).toEqual({ error: 'Give the fixed port a number, like 9292.' });
-    expect(actionInput({ name: 'Preview', command: 'x', secrets: '', portMode: 'fixed', port: '0', setup: null })).toHaveProperty('error');
+    expect(actionInput({ name: 'Preview', command: 'x', secrets: '', portMode: 'fixed', port: '', setup: null, teardown: false })).toEqual({ error: 'Give the fixed port a number, like 9292.' });
+    expect(actionInput({ name: 'Preview', command: 'x', secrets: '', portMode: 'fixed', port: '0', setup: null, teardown: false })).toHaveProperty('error');
   });
 });
