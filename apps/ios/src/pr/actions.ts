@@ -34,6 +34,19 @@ export async function mergePR(call: <T>(fn: (api: MergeApi) => Promise<T>) => Pr
   }
 }
 
+export type AutoMergeApi = Pick<OmniApi, 'setAutoMerge'>;
+export type AutoMergeOutcome = { kind: 'set' } | { kind: 'failed'; message: string };
+
+/** Turns auto-merge on with the repo's merge method, or off. A repo with auto-merge off comes back with gh's words. */
+export async function setAutoMerge(call: <T>(fn: (api: AutoMergeApi) => Promise<T>) => Promise<T>, channelId: string, number: number, on: boolean): Promise<AutoMergeOutcome> {
+  try {
+    await call((api) => api.setAutoMerge(channelId, number, on));
+    return { kind: 'set' };
+  } catch (e) {
+    return { kind: 'failed', message: e instanceof OmniHttpError && e.failure.kind === 'http' && e.failure.status !== 401 ? e.failure.message : describeFailure(e).message };
+  }
+}
+
 export type WatchOutcome = { kind: 'set'; watch: PRWatchView | null } | { kind: 'failed'; message: string };
 
 /** Starts the thread's PR watch, or stops it. A refused start (no open PR, no GitHub) comes back with the server's reason. */

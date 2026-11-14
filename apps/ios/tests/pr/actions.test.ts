@@ -1,13 +1,37 @@
 import { OmniHttpError } from '@omni/client-core';
 import { describe, expect, it, vi } from 'vitest';
 
-import { mergePR, setWatch, type MergeApi, type WatchApi } from '../../src/pr/actions';
+import { mergePR, setAutoMerge, setWatch, type AutoMergeApi, type MergeApi, type WatchApi } from '../../src/pr/actions';
 
 const http = (status: number, message: string) => new OmniHttpError({ kind: 'http', status, message, body: null, retryAfter: null });
 const mergeVia = (merge: MergeApi['mergePullRequest']) => {
   const api = { mergePullRequest: vi.fn(merge) };
   return { api, call: <T>(fn: (a: MergeApi) => Promise<T>) => fn(api as MergeApi) };
 };
+
+describe('setAutoMerge', () => {
+  const via = (fn: AutoMergeApi['setAutoMerge']) => {
+    const api = { setAutoMerge: vi.fn(fn) };
+    return { api, call: <T>(f: (a: AutoMergeApi) => Promise<T>) => f(api as AutoMergeApi) };
+  };
+
+  it('turns it on with the repo method, and off', async () => {
+    const { api, call } = via(async () => ({ ok: true as const, output: '', method: 'squash', state: 'OPEN', autoMergeRequest: null }));
+    expect(await setAutoMerge(call, 'shop', 12, true)).toEqual({ kind: 'set' });
+    expect(await setAutoMerge(call, 'shop', 12, false)).toEqual({ kind: 'set' });
+    expect(api.setAutoMerge.mock.calls).toEqual([
+      ['shop', 12, true],
+      ['shop', 12, false],
+    ]);
+  });
+
+  it("keeps gh's words when the repo has auto-merge off", async () => {
+    const { call } = via(async () => {
+      throw http(422, 'GraphQL: Auto merge is not allowed for this repository (enablePullRequestAutoMerge)');
+    });
+    expect(await setAutoMerge(call, 'shop', 12, true)).toEqual({ kind: 'failed', message: 'GraphQL: Auto merge is not allowed for this repository (enablePullRequestAutoMerge)' });
+  });
+});
 
 describe('mergePR', () => {
   it('squashes and deletes the branch', async () => {

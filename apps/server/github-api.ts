@@ -6,7 +6,7 @@ import { crewPRs, prThread } from './crew-prs.ts';
 import { followBranch } from './branch-follow.ts';
 import { channels, threads } from './db.ts';
 import { emitThread } from './runner/state.ts';
-import { allPRs, branchPRs, getPR, listPRs, mergePR, threadPRMarks } from './github.ts';
+import { allPRs, branchPRs, getPR, listPRs, mergePR, setAutoMerge, threadPRMarks } from './github.ts';
 import { requestPRReview } from './pr-review.ts';
 import { fetchPRImage, githubImage, proxyPRImages } from './github-images.ts';
 
@@ -85,6 +85,17 @@ githubApi.post('/channels/:id/prs/:n/merge', async (c) => {
   void confirm;
   const out = await mergePR(repoOf(c.req.param('id')), Number(c.req.param('n')), method, delete_branch);
   return c.json({ ok: true, output: out });
+});
+
+// Auto-merge on or off. On merges with no further step once GitHub's rules pass, so it needs `confirm: true` as a merge
+// does. `method` is a wish: one the repo does not allow gives way to one it does. gh's refusal (a repo with auto-merge
+// off) comes back as a 422 with gh's words.
+githubApi.post('/channels/:id/prs/:n/auto-merge', async (c) => {
+  const { enabled, method } = z
+    .object({ enabled: z.boolean(), method: z.enum(['squash', 'merge', 'rebase']).optional(), confirm: z.literal(true).optional() })
+    .refine((b) => !b.enabled || b.confirm, { message: 'turning auto-merge on needs confirm: true' })
+    .parse(await c.req.json());
+  return c.json(await setAutoMerge(repoOf(c.req.param('id')), Number(c.req.param('n')), enabled, method));
 });
 
 // Resolve the PR's origin on the server so every client delegates to the same parent.

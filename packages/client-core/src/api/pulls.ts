@@ -1,3 +1,4 @@
+import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
 import type { PRWatchView } from '@omni/shared/pr-watch.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 
@@ -35,6 +36,8 @@ export interface PRDetail extends PRSummary {
   checkRuns: { name: string; state: string; url?: string }[];
   /** The whole PR as a unified diff, cut at 400 KB. */
   diff: string;
+  /** Armed auto-merge, or null when off. A server older than the field leaves it out. */
+  autoMergeRequest?: AutoMergeRequest | null;
 }
 
 /**
@@ -79,6 +82,17 @@ export interface MergeResult {
   output: string;
 }
 
+/** POST /channels/:id/prs/:n/auto-merge: what gh printed, the method it armed with, and the PR read back after. */
+export interface AutoMergeResult {
+  ok: true;
+  output: string;
+  /** The repo's method it armed with; null when turned off. */
+  method: MergeMethod | null;
+  /** OPEN, or MERGED when GitHub merged it at once. */
+  state: string;
+  autoMergeRequest: AutoMergeRequest | null;
+}
+
 export function pullsApi(http: HttpClient) {
   return {
     threadPR: (id: string) => http.request<ThreadPRs>('GET', apiPath`/threads/${id}/pr`),
@@ -91,6 +105,14 @@ export function pullsApi(http: HttpClient) {
     mergePullRequest: (channelId: string, number: number, options: MergeOptions = {}) =>
       http.request<MergeResult>('POST', apiPath`/channels/${channelId}/prs/${number}/merge`, {
         body: { method: options.method ?? 'squash', delete_branch: options.delete_branch ?? true, confirm: true },
+      }),
+    /**
+     * Turns auto-merge on, with the repo's merge method (`method` when the repo allows it), or off. Turning it on sends
+     * `confirm: true`, so call it only after the person confirmed. A repo with auto-merge off answers with gh's words.
+     */
+    setAutoMerge: (channelId: string, number: number, enabled: boolean, method?: MergeMethod) =>
+      http.request<AutoMergeResult>('POST', apiPath`/channels/${channelId}/prs/${number}/auto-merge`, {
+        body: enabled ? { enabled, ...(method ? { method } : {}), confirm: true } : { enabled },
       }),
     /** The thread's PR watch, or null when it never had one. */
     prWatch: (id: string) => http.request<PRWatchView | null>('GET', apiPath`/threads/${id}/pr-watch`),

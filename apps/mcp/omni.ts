@@ -479,6 +479,30 @@ server.registerTool(
   async ({ search }) => text(prList(await call('/prs'), search)),
 );
 
+server.registerTool(
+  'set_auto_merge',
+  {
+    description:
+      `Turn GitHub auto-merge on or off for a PR (gh pr merge --auto / --disable-auto). On, GitHub merges it by itself once its required checks and reviews pass, with no further step: turn it on only when ${USER} asked for it. ` +
+      "It uses the repo's merge method: `method` when the repo allows it, else the first it allows of squash, merge and rebase. " +
+      "A repo with auto-merge turned off refuses with gh's words. Returns gh's output, the method used, and the PR's state and auto-merge read back after " +
+      '(a PR that can merge already may merge at once). repo and number as list_pull_requests or crew_prs give them; the repo must be a channel\'s GitHub repo.',
+    inputSchema: {
+      repo: z.string().describe('owner/name'),
+      number: z.number().int().positive(),
+      enabled: z.boolean(),
+      method: z.enum(['squash', 'merge', 'rebase']).optional().describe("Preferred merge method. Omit for the repo's own."),
+    },
+  },
+  async ({ repo, number, enabled, method }) => {
+    const channels: { id: string; github_repo?: string | null }[] = await call('/channels');
+    const ch = channels.find((c) => c.github_repo?.toLowerCase() === repo.toLowerCase());
+    if (!ch) throw new Error(`No channel has ${repo} as its GitHub repo. list_channels shows each channel's repo.`);
+    const body = enabled ? { enabled, ...(method ? { method } : {}), confirm: true } : { enabled };
+    return text(await call(`/channels/${encodeURIComponent(ch.id)}/prs/${number}/auto-merge`, { method: 'POST', body: JSON.stringify(body) }));
+  },
+);
+
 /** A machine named by id or name (from list_devices), "here", or nothing for the default, as POST /threads takes it. */
 async function deviceId(device: string | undefined): Promise<string | undefined> {
   const want = device?.trim();

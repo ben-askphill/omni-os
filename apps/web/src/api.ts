@@ -1,5 +1,6 @@
 import type { ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
 import type { DiskLevel } from '@omni/shared/disk-space.ts';
+import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
@@ -265,6 +266,8 @@ export interface PRDetail extends PRSummary {
   diff: string;
   /** The Omni thread on its head branch and the thread that delegated it. null for a PR opened outside Omni. */
   thread?: PRThread | null;
+  /** Armed auto-merge, or null when off. */
+  autoMergeRequest?: AutoMergeRequest | null;
 }
 export interface PRThread {
   id: string;

@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 // A stand-in for the gh CLI, for QA runs that need pull requests without GitHub. Put a `gh` link to it first on PATH.
-// It answers the calls apps/server/github.ts and apps/server/pr-watch/gh.ts make with fixed PRs; `pr merge` prints what gh prints and changes nothing.
+// It answers the calls apps/server/github.ts and apps/server/pr-watch/gh.ts make with fixed PRs; `pr merge` prints what gh prints and changes nothing,
+// except that `--auto` and `--disable-auto` turn the PR's auto-merge on and off.
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 const args = process.argv.slice(2);
+// Auto-merge armed with `pr merge --auto` stays armed until `--disable-auto`, per server (gh's parent), in a temp file.
+const armedFile = (n) => join(tmpdir(), `omni-fake-gh-${process.ppid}-auto-merge-${n}`);
 const has = (...a) => a.every((x, i) => args[i] === x);
 const arg = (name) => args[args.indexOf(name) + 1];
 
@@ -99,7 +106,7 @@ if (has('api')) {
   if (path === 'user') console.log('ben-askphill');
   else for (const f of feedback((path ?? '').replace(/^repos\/[^/]+\/[^/]+\//, ''))) console.log(JSON.stringify(f));
 } else if (has('repo', 'view')) {
-  console.log(JSON.stringify({ nameWithOwner: 'acme/shop' }));
+  console.log(JSON.stringify({ nameWithOwner: 'acme/shop', squashMergeAllowed: true, mergeCommitAllowed: true, rebaseMergeAllowed: false }));
 } else if (has('pr', 'list')) {
   const state = arg('--state');
   const head = args.includes('--head') ? arg('--head') : null;
@@ -107,7 +114,9 @@ if (has('api')) {
 } else if (has('pr', 'view')) {
   const p = PRS.find((x) => String(x.number) === args[2]);
   if (!p) { console.error('no pull request found'); process.exit(1); }
-  console.log(JSON.stringify(detail(p)));
+  const method = existsSync(armedFile(p.number)) ? readFileSync(armedFile(p.number), 'utf8') : null;
+  const autoMergeRequest = method ? { enabledAt: new Date().toISOString(), enabledBy: { login: 'ben-askphill' }, mergeMethod: method, commitHeadline: '', commitBody: '', authorEmail: null } : null;
+  console.log(JSON.stringify({ ...detail(p), autoMergeRequest }));
 } else if (has('pr', 'diff')) {
   process.stdout.write(DIFF);
 } else if (has('run', 'view')) {
@@ -115,6 +124,12 @@ if (has('api')) {
   const at = '2026-10-24T09:12:03.1234567Z';
   for (const l of ['Run npx playwright test', '  1) size guide drawer opens from the size picker', '     Error: expect(locator).toBeVisible() failed', '     Locator: getByRole(\'dialog\', { name: \'Size guide\' })', '1 failed, 41 passed (38.2s)', '##[error]Process completed with exit code 1.'])
     console.log(`e2e\tRun tests\t${at} ${l}`);
+} else if (has('pr', 'merge') && args.includes('--auto')) {
+  writeFileSync(armedFile(args[2]), args.find((a) => ['--squash', '--merge', '--rebase'].includes(a))?.slice(2).toUpperCase() ?? 'MERGE');
+  console.log(`! Pull request acme/shop#${args[2]} will be automatically merged when all requirements are met`);
+} else if (has('pr', 'merge') && args.includes('--disable-auto')) {
+  rmSync(armedFile(args[2]), { force: true });
+  console.log(`✓ Auto-merge disabled for pull request acme/shop#${args[2]}`);
 } else if (has('pr', 'merge')) {
   console.log(`Merged pull request #${args[2]} (${args.filter((a) => a.startsWith('--')).join(' ')})`);
 } else {
