@@ -108,7 +108,7 @@ export function teardown(live: Live) {
   if (live.browser && browserHolder.get(live.channelId) === live.threadId) browserHolder.delete(live.channelId);
   if (live.browserHold) {
     detachThread(live.channelId, live.browserHold);
-    live.browserHold = null;
+    live.setBrowserHold(null);
   }
   if (lives.get(live.threadId) === live) lives.delete(live.threadId);
   live.tornDown();

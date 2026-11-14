@@ -117,7 +117,7 @@ async function spawnLive(live: Live, thread: Thread) {
     if (attached) detachThread(channel.id, attached.hold);
     return;
   }
-  live.browserHold = attached?.hold ?? null;
+  live.setBrowserHold(attached?.hold ?? null);
   const cdpEndpoint = attached?.endpoint ?? null;
   if (!remote) writeDesignSystem(thread.id, channel);
   const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl() });

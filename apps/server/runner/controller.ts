@@ -254,6 +254,11 @@ export class ThreadController {
     this.browser = true;
   }
 
+  /** The live browser's hold for this process (browser.ts attachThread), or null once let go of. */
+  setBrowserHold(hold: string | null) {
+    this.browserHold = hold;
+  }
+
   /** No more input from here on: new messages wait for a fresh process. */
   beginClosing() {
     this.closing = true;
