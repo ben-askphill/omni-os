@@ -117,13 +117,15 @@ describe('GET /api/accounts', () => {
 
 describe('a thread', () => {
   it('is stamped with the account its harness ran as', async () => {
-    const heard: string[] = [];
-    r.bus.on('feed', (e: any) => heard.push(e.type));
+    const heard: { type: string; thread?: string; stamped: boolean }[] = [];
+    r.bus.on('feed', (e: any) => heard.push({ type: e.type, thread: e.thread?.id, stamped: !!e.thread && !!r.db.kv.get(`accounts-ran.${e.thread.id}`) }));
     const t = await r.start('hello');
     await waitFor(() => r.thread(t.id).status === 'done', 'the turn to finish');
     await waitFor(() => r.db.kv.get(`accounts-ran.${t.id}`), 'the stamp');
-    // Clients showing the thread hear of the stamp, so it shows while the turn still runs.
-    await waitFor(() => heard.includes('accounts'), 'an accounts message');
+    // Clients showing the thread hear of the stamp through its own message, so it shows while the turn still runs;
+    // the clients listing accounts do not: a new thread is no news to them.
+    await waitFor(() => heard.some((e) => e.type === 'thread' && e.thread === t.id && e.stamped), 'the thread message after the stamp');
+    expect(heard.some((e) => e.type === 'accounts')).toBe(false);
     const stamp = (await get(`/accounts/threads/${t.id}`)).body.account;
     expect(stamp).toMatchObject({ harness: 'claude-code', label: 'ben@personal.example', org: 'Acme', plan: 'Max' });
     expect((await get('/accounts/threads/nope')).status).toBe(404);

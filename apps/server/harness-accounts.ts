@@ -33,7 +33,7 @@ import {
 } from '@omni/shared/harness-accounts.ts';
 import { publishFeed } from './bus.ts';
 import { config } from './config.ts';
-import { kv, outbox } from './db.ts';
+import { kv, outbox, threads } from './db.ts';
 import { CodexClient } from './harness/codex/client.ts';
 import { codexBin } from './harness/codex/bin.ts';
 import type { GetAccountResponse } from './harness/codex/protocol.ts';
@@ -300,7 +300,8 @@ export function stampThread(threadId: string, harness: string): void {
       const same = had && had.machine === r.id && had.harness === harness && identityKey(had) === identityKey(a) && had.plan === a.plan;
       if (same) return;
       kv.set(ranKey(threadId), { harness, machine: r.id, machineName: r.name, label: a.label, org: a.org, plan: a.plan, at: new Date().toISOString() } satisfies ThreadAccount);
-      publishFeed({ type: 'accounts' });
+      const t = threads.get(threadId);
+      if (t) publishFeed({ type: 'thread', thread: t });
     })
     .catch((err) => console.error('[accounts] could not stamp the thread:', (err as Error).message));
 }

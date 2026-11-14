@@ -29,11 +29,11 @@ export function pickerAccounts(view: AccountsView | undefined, pick: string | nu
   return m ? { id: m.id, machine: m.name, current: m.current, byHarness: accountsByHarness(m) } : null;
 }
 
-/** The account a thread last ran as, read again on every `accounts` message (a new stamp sends one) and reconnect. */
+/** The account a thread last ran as, read again when the thread's feed message comes (a new stamp sends one) and on reconnect. */
 export function useThreadAccount(threadId: string): ThreadAccount | null {
   const res = useApi<{ account: ThreadAccount | null }>(`/accounts/threads/${encodeURIComponent(threadId)}`);
   useFeed((e) => {
-    if (e.type === 'accounts' || e.type === 'reconnect') res.reload();
+    if ((e.type === 'thread' && e.thread.id === threadId) || e.type === 'reconnect') res.reload();
   });
   return res.data?.account ?? null;
 }
