@@ -30,7 +30,23 @@ For install-token authentication, `auth.via` is `token`, and `auth.method` and `
 
 ## Sessions
 
-`GET /api/auth/devices` lists sessions, including the `method` field (`google` or `pairing`). `DELETE /api/auth/devices/:id` revokes one session. The install token and Google sessions can revoke any session. A pairing session can revoke only itself and gets 403 for any other id. `POST /api/auth/signout` revokes the caller's session. Only requests that carry the install token can call `POST /api/auth/pair`, so a session cannot swap itself for the install token. A revoked session cannot make subsequent HTTP requests, and its open SSE connections close. Sessions expire after 90 days without an authenticated request. An open SSE connection does not count as an authenticated request after it starts. The server checks open streams for expired sessions every 15 seconds. A pairing session is local to the selected server and does not require a linked Google account. Linking or unlinking a Google account does not revoke pairing sessions.
+`GET /api/auth/devices` lists sessions, including the `method` field: `token` for a session made from the install token (the desktop app's window through desktop pairing, or a browser through `POST /api/auth/pair`), `google`, or `pairing` for a native app. `DELETE /api/auth/devices/:id` revokes one session. The install token and Google sessions can revoke any session. A pairing session can revoke only itself and gets 403 for any other id. `POST /api/auth/signout` revokes the caller's session. Only requests that carry the install token can call `POST /api/auth/pair`, so a session cannot swap itself for the install token. A revoked session cannot make subsequent HTTP requests, and its open SSE connections close. Sessions expire after 90 days without an authenticated request. An open SSE connection does not count as an authenticated request after it starts. The server checks open streams for expired sessions every 15 seconds. A pairing session is local to the selected server and does not require a linked Google account. Linking or unlinking a Google account does not revoke pairing sessions. Only `token` sessions can open the thread terminal (`POST /api/threads/:id/terminal`); `google` and `pairing` sessions get 403 there, because a shell can read `data/api-token`.
+
+## Desktop pairing
+
+The desktop app pairs its window with no clicks and without putting the install token in the browser.
+
+1. When the Electron main process spawns the server, it generates a random secret and passes it in the server's environment as `OMNI_DESKTOP_PAIR_SECRET`. Only the app and the server process know it.
+2. Before every window load, main calls `POST /api/auth/desktop-nonce` with the header `X-Omni-Desktop-Secret: <secret>` and no body. The answer is `{ "nonce": "...", "expiresIn": 60 }`.
+3. The window loads `GET /api/auth/desktop-pair?nonce=<nonce>`. The nonce works once, within 60 seconds, and only when `Sec-Fetch-Site` is absent or `none`, so a page cannot trigger it. The server creates a `token` session, sets its cookie (`omni_session_<port>`, `HttpOnly`, `SameSite=Strict`) and redirects to `/`. A missing, used or expired nonce gets 401.
+
+A reload or a second window asks for a new nonce. The route still refuses a request through a proxy or from another machine. `GET /api/auth/proof` keeps guarding which server main attaches to, before any of this.
+
+## Rotating the install token
+
+`POST /api/auth/rotate-token` requires the install token itself; a session gets 403. It writes a new `data/api-token`, revokes every device session of every method (closing their SSE streams), and answers `{ "ok": true }`. The desktop app sees its session end and pairs again through the nonce flow, reading the new token from the file. A native app gets 401 and shows the pairing screen.
+
+Running threads keep the old token in `OMNI_TOKEN` until their agent process starts again. Omni's own MCP servers re-read `OMNI_TOKEN_FILE` after a 401, so Conductor tools recover on their next call; a `curl` from an agent's shell does not.
 
 ## Push registration
 
@@ -92,9 +108,9 @@ The shared types are `AppPushKind`, `AppPushPreferences` and `AppPushPreferences
 
 ## What revoking does and does not stop
 
-A pairing session has the same API access as a Google session. It can open the thread terminal and start agents, and both run code as the user who runs the server. That code can read `data/api-token`, and every agent receives the install token in its environment. Revoking a session ends that token's access to HTTP and SSE. It does not undo what the session already ran, and it does not remove anything that code installed.
+A pairing session has the same API access as a Google session. It cannot open the thread terminal, but it can start agents, which run code as the user who runs the server. That code can read `data/api-token`, and every agent receives the install token in its environment. Revoking a session ends that token's access to HTTP and SSE. It does not undo what the session already ran, and it does not remove anything that code installed.
 
-So revoke protects against a lost or stolen token that nobody has used yet. For a device that has already run commands, revoke it, then rotate the install token and check the machine. The API has no route-level limit for pairing sessions, because the terminal, threads, automations and mods all run code. A reduced-capability session would need an allowlist of routes. That is a product decision this contract does not make.
+So revoke protects against a lost or stolen token that nobody has used yet. For a device that has already run commands, revoke it, then rotate the install token (above) and check the machine. Apart from the terminal, the API has no route-level limit for pairing sessions, because threads, automations and mods all run code. A reduced-capability session would need an allowlist of routes. That is a product decision this contract does not make.
 
 ## Notes for the iOS client
 
