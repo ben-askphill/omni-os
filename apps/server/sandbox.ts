@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { tokenPath } from './api-token.ts';
 import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
+import { copyIncludes } from './worktree-include.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import type { Channel } from './db.ts';
@@ -135,6 +136,7 @@ async function switchBack(dir: string, branch: string, on: string | null): Promi
  * earlier try made is checked and kept, a branch it made is checked out again, a clean worktree its agent moved to
  * another branch is switched back, and a folder that is in the way is never deleted. A new branch is cut from the
  * commit `base` names (worktree-base.ts), asked only once the repo and folder checks pass, or from HEAD without one.
+ * A worktree made here gets the repo's `.worktreeinclude` files copied in (worktree-include.ts).
  */
 export async function prepareWorktree(repo: string | null, dir: string, branch: string, base?: () => Promise<string>): Promise<void> {
   if (!repo) throw new Error('The channel has no repository set.');
@@ -167,6 +169,12 @@ export async function prepareWorktree(repo: string | null, dir: string, branch: 
     await removeWorktree(repo, dir);
     throw new Error(problem);
   }
+  await includeFiles(repo, dir);
+}
+
+/** The repo's `.worktreeinclude` files, copied into a worktree just made. A failure is logged and never stops the thread. */
+async function includeFiles(repo: string, dir: string) {
+  await copyIncludes(repo, dir).catch((err) => console.error(`[setup] ${dir}: could not copy the .worktreeinclude files: ${gitMessage(err)}`));
 }
 
 /** The part of a git failure worth showing: its stderr, without the hint lines. */
@@ -333,6 +341,7 @@ export async function restoreWorktree(repoPath: string, dir: string, branch: str
   // A worktree removed by hand is still registered until pruned, and add refuses its path.
   await git('worktree', 'prune').catch(() => {});
   await git('worktree', 'add', dir, branch);
+  await includeFiles(repoPath, dir);
 }
 
 export async function removeWorktree(repoPath: string, dir: string) {

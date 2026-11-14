@@ -112,14 +112,21 @@ async function runEnv(t: Thread, action: ChannelAction, port: number | null): Pr
   const { env: secrets, missing } = await namedSecrets(t.channel_id, named);
   if (missing.length) throw refusal(`${action.name} needs ${missing.join(', ')}, which ${missing.length > 1 ? 'are' : 'is'} not set. Add ${missing.length > 1 ? 'them' : 'it'} under Secrets.`, 409);
   const env = { ...terminalEnv(), ...secrets };
+  const repo = channels.get(t.channel_id)?.repo_path;
   // Omni's own port is in its environment as OMNI_PORT: a run without a port of its own must not take it for one.
   delete env.OMNI_PORT;
   delete env.PORT;
+  // Only this thread's own: never the ones the server itself was started with.
+  delete env.OMNI_REPO_ROOT;
+  delete env.OMNI_WORKTREE;
   Object.assign(env, {
     HOME: env.HOME || homedir(),
     OMNI_THREAD_ID: t.id,
     OMNI_ARTIFACTS_DIR: artifactsDir(t.id),
     ...(t.branch ? { OMNI_BRANCH: t.branch } : {}),
+    // The main checkout, where .env and friends live, and the thread's own worktree when it has one.
+    ...(repo ? { OMNI_REPO_ROOT: repo } : {}),
+    ...(repo && t.branch ? { OMNI_WORKTREE: t.cwd } : {}),
   });
   if (port !== null) Object.assign(env, { OMNI_PORT: String(port), PORT: String(port) });
   return env;
