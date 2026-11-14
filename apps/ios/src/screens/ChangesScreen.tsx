@@ -1,13 +1,15 @@
 import type { Thread, TurnView } from '@omni/client-core';
-import { baseLabel, headMove, shortSha, TURN_NOTE, turnStateNote, turnTitle } from '@omni/shared/changes-view.ts';
+import { baseLabel, headMove, shortSha, TURN_NOTE, turnStateNote, turnTitle, type ChangeGroupView } from '@omni/shared/changes-view.ts';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import { Notice } from '../components/Notice';
 import { DiffPane } from '../changes/DiffPane';
 import { useBranchChanges, useTurnChanges } from '../changes/hooks';
+import { NotesBar, useReviewNotes } from '../changes/ReviewNotes';
+import { notesOnScreen } from '../changes/rows';
 import { useThreadLive, useThreadView } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { DiffCount, Loading } from '../review/parts';
@@ -33,6 +35,7 @@ export function ChangesScreen({ route, navigation }: RootScreenProps<'Changes'>)
   const view = useThreadView(live);
   const [mode, setMode] = useState<Mode>('base');
   const thread = view?.thread ?? null;
+  const notes = useReviewNotes(id);
 
   if (!view || view.status === 'loading') return <Notice title="Loading thread" />;
   if (view.status === 'missing' || !thread) return <Notice title="Thread not found" body="It may have been archived or removed on the server." />;
@@ -43,7 +46,7 @@ export function ChangesScreen({ route, navigation }: RootScreenProps<'Changes'>)
       <View style={styles.modes}>
         <SegmentedControl options={MODES} value={mode} onChange={setMode} />
       </View>
-      {mode === 'base' ? <BasePane thread={thread} onAdded={back} /> : <TurnPane thread={thread} onAdded={back} />}
+      {mode === 'base' ? <BasePane thread={thread} onAdded={back} notes={notes} /> : <TurnPane thread={thread} onAdded={back} notes={notes} />}
     </View>
   );
 }
@@ -51,12 +54,21 @@ export function ChangesScreen({ route, navigation }: RootScreenProps<'Changes'>)
 interface PaneProps {
   thread: Thread;
   onAdded: () => void;
+  notes: ReturnType<typeof useReviewNotes>;
 }
 
-function BasePane({ thread, onAdded }: PaneProps) {
+/** The notes placed on the groups on screen, and the bar over the diff. Sending goes back to the thread, as Add to message does. */
+function useNotes(notes: PaneProps['notes'], groups: readonly ChangeGroupView[] | undefined, onSent: () => void, turn = false) {
+  const placed = useMemo(() => notesOnScreen(notes.notes ?? [], groups ?? []), [notes.notes, groups]);
+  const bar = notes.notes ? <NotesBar notes={notes.notes} placed={placed.placed} actions={notes.actions} turn={turn} onSent={onSent} /> : null;
+  return { byFile: placed.byFile, bar };
+}
+
+function BasePane({ thread, onAdded, notes }: PaneProps) {
   const headerOffset = useHeaderHeight();
   const q = useBranchChanges(thread.id, thread.status, true);
   const { data, view } = q;
+  const placed = useNotes(notes, view?.groups, onAdded);
 
   if (!data) {
     if (q.failure) return <Notice title="Could not load the changes" body={q.failure.message} action={q.failure.retryable ? { label: 'Try again', onPress: q.reload } : undefined} />;
@@ -75,9 +87,14 @@ function BasePane({ thread, onAdded }: PaneProps) {
       empty={{ title: 'No changes', body: `Nothing changed since ${shortSha(base.sha)}: no commits, staged, unstaged or untracked files.` }}
       source={{ from: base.sha, to: data.head, turn: null }}
       refreshing={q.loading}
-      onRefresh={q.reload}
+      onRefresh={() => {
+        q.reload();
+        notes.reload();
+      }}
       onAdded={onAdded}
       headerOffset={headerOffset}
+      notes={placed.byFile}
+      noteActions={notes.actions}
       header={
         <Summary
           lines={[
@@ -93,16 +110,18 @@ function BasePane({ thread, onAdded }: PaneProps) {
           ]}
           failure={q.failure?.message ?? null}
           hint={view.files > 0}
+          bar={placed.bar}
         />
       }
     />
   );
 }
 
-function TurnPane({ thread, onAdded }: PaneProps) {
+function TurnPane({ thread, onAdded, notes }: PaneProps) {
   const headerOffset = useHeaderHeight();
   const q = useTurnChanges(thread.id, thread.status, true);
   const { data, view } = q;
+  const placed = useNotes(notes, view?.groups, onAdded, true);
 
   if (!data) {
     if (q.failure) return <Notice title="Could not load this turn" body={q.failure.message} action={q.failure.retryable ? { label: 'Try again', onPress: q.reload } : undefined} />;
@@ -124,9 +143,14 @@ function TurnPane({ thread, onAdded }: PaneProps) {
       empty={{ title: EMPTY_TURN[turn.state] ?? 'No changes', body: note ?? 'Nothing in the worktree changed during this turn.' }}
       source={turn.before && turn.after ? { from: turn.before.sha, to: turn.after.sha, turn: turn.id } : null}
       refreshing={q.loading}
-      onRefresh={q.reload}
+      onRefresh={() => {
+        q.reload();
+        notes.reload();
+      }}
       onAdded={onAdded}
       headerOffset={headerOffset}
+      notes={placed.byFile}
+      noteActions={notes.actions}
       header={
         <Summary
           lines={[
@@ -145,29 +169,33 @@ function TurnPane({ thread, onAdded }: PaneProps) {
           failure={q.failure?.message ?? null}
           hint={view.files > 0}
           footnote={TURN_NOTE}
+          bar={turn.state === 'ready' ? placed.bar : null}
         />
       }
     />
   );
 }
 
-function Summary({ lines, failure, hint, footnote }: { lines: ReactNode[]; failure: string | null; hint: boolean; footnote?: string }) {
+function Summary({ lines, failure, hint, footnote, bar }: { lines: ReactNode[]; failure: string | null; hint: boolean; footnote?: string; bar?: ReactNode }) {
   const { colors } = useOmniTheme();
   return (
-    <View style={styles.summary}>
-      {lines.filter(Boolean).map((line, i) => (
-        <Text key={i} style={[styles.summaryLine, { color: i === 0 ? colors.fg2 : colors.fg3 }]}>
-          {line}
-        </Text>
-      ))}
-      {footnote ? <Text style={[styles.footnote, { color: colors.fg4 }]}>{footnote}</Text> : null}
-      {failure ? (
-        <Text accessibilityRole="alert" style={[styles.footnote, { color: colors.needs }]}>
-          Could not refresh: {failure}
-        </Text>
-      ) : null}
-      {hint ? <Text style={[styles.footnote, { color: colors.fg4 }]}>{PICK_HINT}</Text> : null}
-    </View>
+    <>
+      <View style={styles.summary}>
+        {lines.filter(Boolean).map((line, i) => (
+          <Text key={i} style={[styles.summaryLine, { color: i === 0 ? colors.fg2 : colors.fg3 }]}>
+            {line}
+          </Text>
+        ))}
+        {footnote ? <Text style={[styles.footnote, { color: colors.fg4 }]}>{footnote}</Text> : null}
+        {failure ? (
+          <Text accessibilityRole="alert" style={[styles.footnote, { color: colors.needs }]}>
+            Could not refresh: {failure}
+          </Text>
+        ) : null}
+        {hint ? <Text style={[styles.footnote, { color: colors.fg4 }]}>{PICK_HINT}</Text> : null}
+      </View>
+      {bar}
+    </>
   );
 }
 

@@ -411,6 +411,8 @@ export type FeedEvent =
   | { type: 'disk'; level: DiskLevel }
   /** A harness account changed, here or on another machine, or a switch was acknowledged: refetch GET /api/accounts. */
   | { type: 'accounts' }
+  /** A thread's review notes changed, here or on another Mac: refetch GET /api/threads/:id/review-notes. */
+  | { type: 'review_notes'; thread_id: string }
   | { type: 'reconnect' };
 
 /** GET /api/update (apps/server/update.ts): how far this server is behind main, and where Update is. */

@@ -128,6 +128,8 @@ export interface LiveHub {
   fileSource(threadId: string, name: string, options?: { download?: boolean }): Promise<FileSource | null>;
   /** Opens or closes a folder for every client. Resolves to the failure's message, or null. */
   setFolderCollapsed(folderId: string, collapsed: boolean): Promise<string | null>;
+  /** Hears every feed message while subscribed, for a screen that refetches on its own kind (the Changes screen's review notes). */
+  watchFeed(fn: (message: unknown) => void): () => void;
   openThread(threadId: string): ThreadLive;
   openActions(threadId: string): ActionsLive;
   /** Pauses the streams while the app is in the background, and reconnects and refetches when it returns. */
@@ -163,6 +165,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   const channels = createStore<ChannelsState>({ channels: null, loading: false, error: null, loadedAt: null });
   const link = createStore<Link>(linkOf({ paired, foreground: true, feed: null, thread: null }));
   const openThreads = new Set<ThreadLiveImpl>();
+  const feedWatchers = new Set<(message: unknown) => void>();
   const openActions = new Set<ActionsLive>();
   let activeThread: ThreadLiveImpl | null = null;
   let foreground = true;
@@ -310,6 +313,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         claudeArtifacts.applyFeed(message);
         // A thread the open one delegated to started, was renamed or finished, or its parent changed.
         for (const t of openThreads) t.applyMessage(message);
+        for (const fn of feedWatchers) fn(message);
       },
       // The feed keeps no replay, so every reconnect refetches the list. The open thread catches up through its own stream.
       onReconnect: () => {
@@ -551,6 +555,10 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       void refreshChannels();
     },
     setFolderCollapsed,
+    watchFeed(fn) {
+      feedWatchers.add(fn);
+      return () => void feedWatchers.delete(fn);
+    },
     openActions(threadId) {
       const actions = createActionsLive({ api, withAuth, threadId });
       if (!foreground) actions.pause();

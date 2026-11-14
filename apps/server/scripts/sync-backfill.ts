@@ -21,6 +21,7 @@ const LABEL: Record<BackfillCount['entity'], string> = {
   trigger_delivery: 'event automation deliveries',
   remote_command: 'commands for threads on other machines',
   assignment: 'which machine runs each thread',
+  review_note: 'review notes on Changes diffs',
   kv: 'settings (kv)',
 };
 

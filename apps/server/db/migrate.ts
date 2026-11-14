@@ -632,4 +632,18 @@ export function migrate() {
     at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sync_refused_at ON sync_refused(at);`);
+  // Review notes on a thread's Changes diff (db/repos/review-notes.ts): the lines as Ben picked them (`anchor`, a
+  // diff_selection body as JSON) and his note. Synced, last writer wins on the whole row (sync/handlers/review-note.ts).
+  db.exec(`CREATE TABLE IF NOT EXISTS review_notes (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    anchor TEXT NOT NULL,
+    body TEXT NOT NULL,
+    resolved_at TEXT,
+    sent_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS review_notes_thread ON review_notes(thread_id, created_at);`);
 }

@@ -66,6 +66,14 @@ In a thread's Changes panel (desktop web, phone and the desktop app), click a li
 
 The agent gets the lines as you saw them, with the path, the line numbers, the commits they were compared at and your note, and is told when the file has changed since you picked them. Your message in the thread keeps the lines exactly as you sent them. It is feedback for this thread only, not a GitHub review. Hermes and Cursor Cloud threads have no Changes panel; a message with lines in it tells them the file is on your Mac. How it works: [Message context](../internals/message-context.md).
 
+### Review notes
+
+**Pin note**, next to Add to message, keeps the note on the lines instead of sending it (desktop web, phone web, the desktop app and the iOS app). The note stays in the diff under its lines, survives a reload and syncs to your other Mac. Edit it with the pencil, resolve it with the check, delete it with the bin. Resolved notes fold into **Resolved** over the diff, kept as history.
+
+When the diff changes, a note follows its lines: Omni looks for the same text nearest where you pinned it and marks the note **Moved** when it found them somewhere else. When the lines are gone, the note is listed over the diff as **Outdated**, with the lines you pinned it to. This turn shows only the notes on lines that turn changed and counts the rest.
+
+**Send open notes** sends every note that is neither resolved nor sent yet as one message to the thread, each with its lines, and marks them **Sent**. Editing a sent note opens it again, so the new words go with the next send. One send carries up to 40 notes.
+
 ## Point the agent at terminal output
 
 In a thread's Terminal tab (desktop web and the desktop app), select output with the mouse as usual. A panel opens over the terminal's foot: write a note and press **Add to message**, and the selected text goes into the reply box as a chip, next to whatever you have typed. Copy and paste work as before, and Esc in the panel clears the selection. On a phone the terminal is read only and can't be dragged over: tap a line, then tap another to take the lines between, then Add to message. A message can be just chips.

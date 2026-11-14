@@ -16,9 +16,10 @@ import {
 } from '@omni/shared/changes-view.ts';
 import { startsOpen } from '@omni/shared/diff.ts';
 import { plural } from '../../../format.ts';
-import { DiffFile, type LineSelect } from '../../DiffViewer.tsx';
+import { DiffFile, type LineNotes, type LineSelect } from '../../DiffViewer.tsx';
 import { Empty, ErrorNote, IconButton, Loading, Picker, Segmented } from '../../ui.tsx';
 import { SelectionDock, useLineSelection } from './LineSelection.tsx';
+import { NotesBar, useNotePlaces, useReviewNotes, type ReviewNotesState } from './ReviewNotes.tsx';
 
 type Mode = 'base' | 'turn';
 
@@ -26,10 +27,11 @@ type Mode = 'base' | 'turn';
  * The thread's changes, read-only, two ways. Since base: its checkout against the base commit Omni recorded, split
  * into committed, staged, unstaged and untracked. This turn: what one turn changed, between the snapshots Omni saved
  * before and after it. Loads when opened, again when a turn starts or ends, and on Refresh. Lines picked in either
- * go on the thread's next message (LineSelection.tsx).
+ * go on the thread's next message (LineSelection.tsx), or keep a review note pinned to them (ReviewNotes.tsx).
  */
 export function ChangesTab({ thread }: { thread: Thread }) {
   const [mode, setMode] = useState<Mode>('base');
+  const notes = useReviewNotes(thread.id);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="px-3.5 pb-2.5">
@@ -44,7 +46,7 @@ export function ChangesTab({ thread }: { thread: Thread }) {
           ]}
         />
       </div>
-      <div className="min-h-0 flex-1">{mode === 'base' ? <SinceBase thread={thread} /> : <ThisTurn thread={thread} />}</div>
+      <div className="min-h-0 flex-1">{mode === 'base' ? <SinceBase thread={thread} notes={notes} /> : <ThisTurn thread={thread} notes={notes} />}</div>
     </div>
   );
 }
@@ -58,10 +60,11 @@ function useReloadOnStatus(status: Thread['status'], reload: () => void) {
   }, [status, reload]);
 }
 
-function SinceBase({ thread }: { thread: Thread }) {
+function SinceBase({ thread, notes }: { thread: Thread; notes: ReviewNotesState }) {
   const { data, error, loading, reload } = useApi<BranchChanges>(`/threads/${encodeURIComponent(thread.id)}/changes`);
   const view = useMemo(() => (data ? changesView(data) : null), [data]);
   const sel = useLineSelection('base', view?.groups);
+  const places = useNotePlaces(notes.notes, view?.groups, notes.actions);
   useReloadOnStatus(thread.status, reload);
 
   if (!data) {
@@ -104,16 +107,23 @@ function SinceBase({ thread }: { thread: Thread }) {
         </ErrorNote>
       )}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
+        {notes.notes && <NotesBar notes={notes.notes} placed={places.placed} actions={notes.actions} />}
         {!view?.files ? (
           <Empty icon="diff" title="No changes">
             Nothing changed since {shortSha(base.sha)}: no commits, staged, unstaged or untracked files.
           </Empty>
         ) : (
-          <Groups groups={view.groups} total={view.files} sel={sel} />
+          <Groups groups={view.groups} total={view.files} sel={sel} notes={places.byFile} />
         )}
       </div>
       {sel.picked && (
-        <SelectionDock threadId={thread.id} picked={sel.picked} source={{ group: sel.picked.group, from: base.sha, to: data.head, turn: null }} onClose={sel.clear} />
+        <SelectionDock
+          threadId={thread.id}
+          picked={sel.picked}
+          source={{ group: sel.picked.group, from: base.sha, to: data.head, turn: null }}
+          onClose={sel.clear}
+          onPin={notes.actions.add}
+        />
       )}
     </div>
   );
@@ -122,13 +132,14 @@ function SinceBase({ thread }: { thread: Thread }) {
 /** Polls this often while a turn's after snapshot is being saved. */
 const SETTLE_POLL_MS = 1500;
 
-function ThisTurn({ thread }: { thread: Thread }) {
+function ThisTurn({ thread, notes }: { thread: Thread; notes: ReviewNotesState }) {
   // Null: the newest turn, which moves on as new turns end.
   const [picked, setPicked] = useState<string | null>(null);
   const path = `/threads/${encodeURIComponent(thread.id)}/turns${picked ? `?turn=${encodeURIComponent(picked)}` : ''}`;
   const { data, error, loading, reload } = useApi<TurnChanges>(path);
   const view = useMemo(() => (data ? turnChangesView(data) : null), [data]);
   const sel = useLineSelection(view?.turn.id ?? '', view?.groups);
+  const places = useNotePlaces(notes.notes, view?.groups, notes.actions);
   useReloadOnStatus(thread.status, reload);
 
   // The turn ended and its snapshot is still being saved: look again shortly.
@@ -192,6 +203,7 @@ function ThisTurn({ thread }: { thread: Thread }) {
         </ErrorNote>
       )}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
+        {notes.notes && !note && <NotesBar notes={notes.notes} placed={places.placed} actions={notes.actions} turn />}
         {note ? (
           turn.state === 'failed' ? (
             <ErrorNote className="mx-1">{note}</ErrorNote>
@@ -203,11 +215,17 @@ function ThisTurn({ thread }: { thread: Thread }) {
             Nothing in the worktree changed during this turn.
           </Empty>
         ) : (
-          <Groups groups={view.groups} total={view.files} sel={sel} />
+          <Groups groups={view.groups} total={view.files} sel={sel} notes={places.byFile} />
         )}
       </div>
       {sel.picked && turn.before && turn.after && (
-        <SelectionDock threadId={thread.id} picked={sel.picked} source={{ group: 'turn', from: turn.before.sha, to: turn.after.sha, turn: turn.id }} onClose={sel.clear} />
+        <SelectionDock
+          threadId={thread.id}
+          picked={sel.picked}
+          source={{ group: 'turn', from: turn.before.sha, to: turn.after.sha, turn: turn.id }}
+          onClose={sel.clear}
+          onPin={notes.actions.add}
+        />
       )}
     </div>
   );
@@ -215,7 +233,7 @@ function ThisTurn({ thread }: { thread: Thread }) {
 
 type Selection = ReturnType<typeof useLineSelection>;
 
-function Groups({ groups, total, sel }: { groups: ChangeGroupView[]; total: number; sel: Selection }) {
+function Groups({ groups, total, sel, notes }: { groups: ChangeGroupView[]; total: number; sel: Selection; notes: ReadonlyMap<string, LineNotes> }) {
   return groups.map((g) => (
     <section key={g.kind} className="mb-4" aria-label={`${g.title} changes`}>
       <div className="flex items-center gap-2 px-1.5 pb-1.5 text-[11.5px] font-medium text-fg-3">
@@ -225,7 +243,7 @@ function Groups({ groups, total, sel }: { groups: ChangeGroupView[]; total: numb
       <div className="space-y-2">
         {g.files.map((f) => {
           const on = sel.pick?.file === f.key ? sel.pick : null;
-          return <ChangedFileDiff key={f.key} f={f} total={total} from={on?.from} to={on?.to} press={sel.press} />;
+          return <ChangedFileDiff key={f.key} f={f} total={total} from={on?.from} to={on?.to} press={sel.press} notes={notes.get(f.key)} />;
         })}
       </div>
       {g.truncated && <div className="px-1.5 pt-2 text-[12px] text-fg-3">More files changed than are listed here.</div>}
@@ -233,19 +251,21 @@ function Groups({ groups, total, sel }: { groups: ChangeGroupView[]; total: numb
   ));
 }
 
-/** One file, its `select` kept stable while its pick is, so a pick elsewhere does not redraw it. */
+/** One file, its `select` kept stable while its pick is, so a pick elsewhere does not redraw it. A file with notes on it starts open. */
 const ChangedFileDiff = memo(function ChangedFileDiff({
   f,
   total,
   from,
   to,
   press,
+  notes,
 }: {
   f: ChangeFileView;
   total: number;
   from?: number;
   to?: number;
   press: Selection['press'];
+  notes?: LineNotes;
 }) {
   const select = useMemo<LineSelect | undefined>(
     () => (f.diff.lines.length ? { range: from === undefined || to === undefined ? null : { from, to }, press: (i, extend) => press(f, i, extend) } : undefined),
@@ -256,8 +276,9 @@ const ChangedFileDiff = memo(function ChangedFileDiff({
       file={f.diff}
       label={f.label}
       notice={f.notice}
-      defaultOpen={startsOpen(f.diff, total)}
+      defaultOpen={startsOpen(f.diff, total) || !!notes}
       select={select}
+      notes={notes}
       badge={
         <span className="w-3 shrink-0 font-mono text-[11px] text-fg-3" title={f.file.status.replace('_', ' ')}>
           {STATUS_LETTER[f.file.status]}
