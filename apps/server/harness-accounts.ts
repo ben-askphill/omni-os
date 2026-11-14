@@ -226,8 +226,12 @@ export function refreshAfterSync(now = Date.now()) {
 
 // ---------- every machine ----------
 
+/** Where a switch is acknowledged: a sync.* key for this machine before sync gives it an id, like its record. */
+const seenKeyOf = (machine: string, harness: string) => (machine === LOCAL_ID ? `sync.${seenKey(machine, harness)}` : seenKey(machine, harness));
+
+/** The acknowledged account; this machine falls back to the one acknowledged before sync gave it an id. */
 const seenOf = (machine: string, harness: string) => {
-  const v = kv.get<unknown>(seenKey(machine, harness));
+  const v = kv.get<unknown>(seenKeyOf(machine, harness)) ?? (machine === selfId() ? kv.get<unknown>(seenKeyOf(LOCAL_ID, harness)) : undefined);
   return typeof v === 'string' ? v : null;
 };
 
@@ -269,7 +273,7 @@ export async function acknowledgeSwitch(machine: string, harness: string): Promi
   const a = m?.accounts.find((x) => x.harness === harness);
   if (!m || !a) throw refused('No account is listed for that harness on that machine.', 404);
   const key = identityKey(a);
-  if (key && seenOf(machine, harness) !== key) kv.set(seenKey(machine, harness), key);
+  if (key && seenOf(machine, harness) !== key) kv.set(seenKeyOf(machine, harness), key);
   return accountsView();
 }
 

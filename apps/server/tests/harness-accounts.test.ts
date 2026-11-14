@@ -117,17 +117,40 @@ describe('GET /api/accounts', () => {
 
 describe('a thread', () => {
   it('is stamped with the account its harness ran as', async () => {
-    const heard: { type: string; thread?: string; stamped: boolean }[] = [];
-    r.bus.on('feed', (e: any) => heard.push({ type: e.type, thread: e.thread?.id, stamped: !!e.thread && !!r.db.kv.get(`accounts-ran.${e.thread.id}`) }));
     const t = await r.start('hello');
     await waitFor(() => r.thread(t.id).status === 'done', 'the turn to finish');
     await waitFor(() => r.db.kv.get(`accounts-ran.${t.id}`), 'the stamp');
-    // Clients showing the thread hear of the stamp through its own message, so it shows while the turn still runs;
-    // the clients listing accounts do not: a new thread is no news to them.
-    await waitFor(() => heard.some((e) => e.type === 'thread' && e.thread === t.id && e.stamped), 'the thread message after the stamp');
-    expect(heard.some((e) => e.type === 'accounts')).toBe(false);
     const stamp = (await get(`/accounts/threads/${t.id}`)).body.account;
     expect(stamp).toMatchObject({ harness: 'claude-code', label: 'ben@personal.example', org: 'Acme', plan: 'Max' });
     expect((await get('/accounts/threads/nope')).status).toBe(404);
+  });
+
+  it('tells the clients showing it of a new stamp, and not the clients listing accounts', async () => {
+    const t = await r.start('hello');
+    await waitFor(() => r.thread(t.id).status === 'done', 'the turn to finish');
+    await waitFor(() => r.db.kv.get(`accounts-ran.${t.id}`), 'the stamp');
+    r.db.db.prepare('DELETE FROM kv WHERE key = ?').run(`accounts-ran.${t.id}`);
+    const heard: { type: string; thread?: string }[] = [];
+    const listen = (e: any) => heard.push({ type: e.type, thread: e.thread?.id });
+    r.bus.on('feed', listen);
+    try {
+      (await import('../harness-accounts.ts')).stampThread(t.id, 'claude-code');
+      await waitFor(() => heard.some((e) => e.type === 'thread' && e.thread === t.id), 'the thread message');
+      expect(r.db.kv.get(`accounts-ran.${t.id}`)).toMatchObject({ label: 'ben@personal.example' });
+      expect(heard.some((e) => e.type === 'accounts')).toBe(false);
+    } finally {
+      r.bus.off('feed', listen);
+    }
+  });
+});
+
+describe('once sync gives this machine an id', () => {
+  it('keeps a switch acknowledged before, and never sent the acknowledgement anywhere', async () => {
+    // The switch test acknowledged ben@personal.example on this machine before sync.
+    expect(r.db.kv.list('accounts-seen.')).toEqual([]);
+    r.db.outbox.arm('mac-x');
+    const { body } = await get('/accounts?refresh=1');
+    expect(body.machines[0].id).toBe('mac-x');
+    expect(harness(body, 'claude-code')).toMatchObject({ label: 'ben@personal.example', switched: { from: { label: 'ben@example.com' } }, notice: false });
   });
 });

@@ -78,4 +78,24 @@ describe('accounts across machines', () => {
     await syncBoth();
     expect(writes()).toBe(before);
   });
+
+  it("tells the other machine's clients of a stamp synced in through the thread, not the accounts list", async () => {
+    const t = await a.start('hello');
+    await waitFor(() => a.thread(t.id).status === 'done', 'the turn on A');
+    await syncBoth();
+    await waitFor(() => b.db.threads.get(t.id), 'the thread on B');
+    const heard: { type: string; thread?: string }[] = [];
+    const listen = (e: any) => heard.push({ type: e.type, thread: e.thread?.id });
+    b.bus.on('feed', listen);
+    try {
+      const stamp = { harness: 'claude-code', machine: 'mac-a', machineName: "Ben's MacBook Air", label: 'ben@stamp.example', org: null, plan: 'Max', at: new Date().toISOString() };
+      a.db.kv.set(`accounts-ran.${t.id}`, stamp);
+      await syncBoth();
+      expect(b.db.kv.get(`accounts-ran.${t.id}`)).toMatchObject({ label: 'ben@stamp.example' });
+      expect(heard.some((e) => e.type === 'thread' && e.thread === t.id)).toBe(true);
+      expect(heard.some((e) => e.type === 'accounts')).toBe(false);
+    } finally {
+      b.bus.off('feed', listen);
+    }
+  });
 });
