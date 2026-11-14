@@ -22,3 +22,7 @@ Sync is off until Ben signs in from Settings. Until the first sign-in nothing is
 - The relay only grows. Nothing prunes `changes` yet; at Ben's volume the free tier lasts years, and a new relay starts from the beginning and re-queues the history.
 - Paths travel with the home folder as `~`, and a per-Mac path map covers folders that live elsewhere. A thread whose repo is not on this Mac shows its history but cannot run there until the repo exists.
 - The Supabase URL, anon key and refresh token are secret-store secrets under the global scope, and are never passed to a thread's environment. The password or emailed code is used once to sign in and never stored. A refresh token the relay refuses shows as "signed out" in Settings and takes a new sign-in, not a retry.
+
+## Amendment, 2026-11-14
+
+An automation's own `machine:` key overrides `automations.owner` for that automation, which stays the default for the rest. A `machine:` that names no known synced machine runs nowhere, never on two machines. See [Automations](../user/automations.md).

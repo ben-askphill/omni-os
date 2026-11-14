@@ -49,3 +49,7 @@ ADR 0009 says the relay holds the authority to mint Connect sessions. That does 
 - Adding a machine takes one manual step: Ben presses Trust on it in Settings > Sync before it can run commands or receive secrets. Machines that were already syncing before the Trust build are not trusted automatically: after every Mac updates, Ben presses Trust on each of the others once, and until then Run on another machine, Hand off and `set_secret` between them are refused. A machine set to `log` gives up that protection: anyone who can write to the relay can make it act with an unsigned change, though not with a forged signature or a disallowed path.
 - A reinstall or a sync reset makes a new key. The other machines mark it "Key changed", or list it as a new machine if its id changed, until Ben confirms it.
 - Replay protection rests on the change's timestamp and the keyring's record of signatures it has seen. A relay can still hold a valid change back and deliver it later within the window the receiving entity allows (a remote command's own deadline, for example).
+
+## Amendment, 2026-11-14
+
+`automation_file`, an automation's YAML in `data/automations/` saved through Omni, is also a signed action entity (`isActionChange` in `apps/server/sync/verify.ts`). A remote automation file applies only with a valid signature from a trusted machine, like `automations.owner`.
