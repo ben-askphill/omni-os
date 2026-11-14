@@ -29,6 +29,7 @@ Before this, the relay was a Supabase project. A machine that still holds the Su
 - `npm run sync:backfill`: queue every existing row again, for instance after restoring a database. It is idempotent and skips rows the other Mac wrote last.
 - Signing in to a different relay or user starts that relay from the beginning and queues the history again.
 - Sidebar folders sync, along with which folder each thread sits in. Whether a folder shows open or closed stays per Mac.
+- Review notes on a thread's Changes diff sync as `review_note`: adding, editing, resolving, deleting and sending one on either Mac shows on the other. The newest edit of a note wins.
 - Needs you is the same on both Macs: a result reviewed on one leaves the other's after the next sync, and a newer result stays unread. A thread marked done is done on both Macs, and a run on either brings it back.
 - Auto's routing reason and a model or harness switch queued for the next turn sync with the thread. A switch still waits for the running turn and its background tasks to end.
 - Published-page and GitHub webhook deliveries sync as `trigger_delivery`. Only the Mac that owns automations starts their runs. Signing secrets stay in each Mac's secret store. See [Automations](automations.md#event-automations).

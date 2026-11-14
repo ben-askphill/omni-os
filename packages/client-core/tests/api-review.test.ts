@@ -17,6 +17,23 @@ describe('changes', () => {
     expect(sent.map((s) => s.url)).toEqual([at('/threads/t1/turns'), at('/threads/t1/turns?turn=turn%2F2')]);
   });
 
+  it('lists, pins, edits, deletes and sends review notes', async () => {
+    const { sent, api: a } = api({ json: { notes: [] } });
+    const anchor = { path: 'a.ts', old_path: null, side: 'new' as const, start: 1, end: 1, rows: [{ kind: 'add' as const, text: 'x', old: null, new: 1 }], source: { group: 'unstaged' as const, from: 'a', to: 'b', turn: null, blob_old: null, blob_new: null } };
+    await a.reviewNotes('t 1');
+    await a.addReviewNote('t1', anchor, 'why');
+    await a.updateReviewNote('t1', 'n/1', { resolved: true });
+    await a.deleteReviewNote('t1', 'n1');
+    await a.sendReviewNotes('t1');
+    expect(sent.map((s) => [s.method, s.url, s.body])).toEqual([
+      ['GET', at('/threads/t%201/review-notes'), undefined],
+      ['POST', at('/threads/t1/review-notes'), { anchor, body: 'why' }],
+      ['PATCH', at('/threads/t1/review-notes/n%2F1'), { resolved: true }],
+      ['DELETE', at('/threads/t1/review-notes/n1'), undefined],
+      ['POST', at('/threads/t1/review-notes/send'), {}],
+    ]);
+  });
+
   it('rejects a turn the thread does not have with the server message', async () => {
     const { api: a } = api({ status: 404, json: { error: 'no such turn' } });
     const err = await a.turnChanges('t1', 'gone').catch((e: unknown) => e);

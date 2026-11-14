@@ -8,6 +8,7 @@ import { applyPage, earlierCursor, historyQuery, openHistory, revealCursor, type
 import { newContext } from '@omni/shared/message-context.ts';
 import { diffSelection, selectRows } from '@omni/shared/message-context-diff.ts';
 import { changesProblems, turnChangesProblems } from '@omni/shared/changes.ts';
+import { reviewNoteProblems } from '@omni/shared/review-notes.ts';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
 import { FAKE_CLAUDE, diffFile, fakeAlive } from './support.ts';
@@ -122,6 +123,11 @@ const NAMES = [
   'thread-context.json',
   // The thread reference picker's search over every channel, from that thread.
   'thread-references.json',
+  // Review notes on that thread's diff (#686): a note pinned to the same lines, the list with it edited and a second
+  // one resolved, and Send open notes.
+  'review-note-request.json',
+  'review-notes.json',
+  'review-notes-sent.json',
   // Bounded history (#223), on a thread whose first message is too big for a row, under a tiny OMNI_HISTORY_BUDGET:
   // the head with an anchor, an older page, a reveal of the first message, that message whole, and search hits.
   'thread-open.json',
@@ -735,6 +741,19 @@ async function scenario() {
   const references = keep('thread-references.json', await get(`/thread-references?thread=${wt.id}&q=&scope=all`)) as { same_channel: boolean }[];
   expect(references.map((r) => r.same_channel)).toContain(false);
 
+  const noteBody = request('review-note-request.json', { anchor: rows.value, body: 'name these better' }) as { anchor: unknown; body: string };
+  const pinned = (await call('POST', `/threads/${wt.id}/review-notes`, noteBody)) as { note: { id: string } };
+  await call('PATCH', `/threads/${wt.id}/review-notes/${pinned.note.id}`, { body: 'name these sum and price' });
+  const done = (await call('POST', `/threads/${wt.id}/review-notes`, { ...noteBody, body: 'already fixed' })) as { note: { id: string } };
+  await call('PATCH', `/threads/${wt.id}/review-notes/${done.note.id}`, { resolved: true });
+  keep('review-notes.json', await get(`/threads/${wt.id}/review-notes`));
+  const notesSent = keep('review-notes-sent.json', await call('POST', `/threads/${wt.id}/review-notes/send`, {})) as { sent: { id: string }[] };
+  expect(notesSent.sent.map((n) => n.id)).toEqual([pinned.note.id]);
+  await eventually(async () => {
+    const d = await detail(wt.id);
+    return d.thread.status === 'done' && !d.pending?.length;
+  }, 'the review notes message to run');
+
   keep('limit-cancelled.json', await call('POST', `/threads/${capped.id}/limit/cancel`, {}));
   keep('limit-resumed.json', await call('POST', `/threads/${capped.id}/limit/resume`, {}));
   await eventually(async () => (await detail(capped.id)).thread.status === 'done', 'the resumed thread to run');
@@ -1011,5 +1030,13 @@ describe('Changes fixtures follow @omni/shared', () => {
     ['turns-unavailable.json', turnChangesProblems],
   ] as const)('%s is what @omni/shared/changes.ts says', (name, problems) => {
     expect(problems(fixture(name))).toEqual([]);
+  });
+
+  it('review-notes.json and review-notes-sent.json are notes as @omni/shared/review-notes.ts reads them', () => {
+    const listed = fixture('review-notes.json') as { notes: unknown[] };
+    const sent = fixture('review-notes-sent.json') as { target: string; sent: unknown[] };
+    expect(listed.notes).toHaveLength(2);
+    expect(typeof sent.target).toBe('string');
+    for (const n of [...listed.notes, ...sent.sent]) expect(reviewNoteProblems(n)).toEqual([]);
   });
 });
