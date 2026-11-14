@@ -9,6 +9,7 @@ const action = (over: Partial<ChannelAction> = {}): ChannelAction => ({
   secrets: [],
   port: 0,
   setup: null,
+  teardown: false,
   position: 0,
   created_at: '2026-01-05T09:00:00.000Z',
   updated_at: '2026-01-05T09:00:00.000Z',

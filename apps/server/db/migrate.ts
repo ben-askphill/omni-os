@@ -436,6 +436,9 @@ export function migrate() {
     thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
     run_id TEXT NOT NULL
   );`);
+  // #678: the one action a channel runs in a worktree right before a cleanup removes it. Local, not synced.
+  ensureColumn('channel_actions', 'teardown', 'INTEGER NOT NULL DEFAULT 0');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS channel_actions_teardown ON channel_actions(channel_id) WHERE teardown = 1');
   // #221: a thread continued on another harness names its source (synced with the row; the source is never written).
   // Its Carryover is a synced `carryover` event. This Mac keeps what cut its worktree (the source's HEAD and snapshot
   // tree, the ref that holds them) and the client's request id, so a retried start gets the same thread back.

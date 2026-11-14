@@ -139,14 +139,27 @@ function flush(l: Live) {
  * the caller's to check (blockedReason): worktree preparation runs its setup action before the thread is ready.
  */
 export async function startRun(t: Thread, action: ChannelAction): Promise<{ run: ActionRun; finished: Promise<ActionRun> }> {
-  for (const l of live.values()) {
-    if (l.run.thread_id === t.id && l.run.action_id === action.id) throw refusal(`${action.name} is already running in this thread.`, 409);
-  }
+  refuseSecondRun(t, action);
   // Held until the process is live, so a cleanup sees it (hasLiveRun); a worktree a cleanup removed is checked out again.
   return inWorkspace(t, async (problem) => {
     if (problem) throw refusal(problem, 409);
     return spawnRun(t, action, await verifiedCwd(t));
   });
+}
+
+function refuseSecondRun(t: Thread, action: ChannelAction) {
+  for (const l of live.values()) {
+    if (l.run.thread_id === t.id && l.run.action_id === action.id) throw refusal(`${action.name} is already running in this thread.`, 409);
+  }
+}
+
+/**
+ * Run an action in dir, a folder the caller already holds (withWorkspace) and has checked: a cleanup's teardown run
+ * (runner/teardown-action.ts), which must not wait on its own hold or check out again a worktree it is removing.
+ */
+export async function startRunHeld(t: Thread, action: ChannelAction, dir: string): Promise<{ run: ActionRun; finished: Promise<ActionRun> }> {
+  refuseSecondRun(t, action);
+  return spawnRun(t, action, dir);
 }
 
 /** Whether an action's process is running in the thread right now. */
