@@ -585,4 +585,13 @@ export function migrate() {
     first_seen TEXT NOT NULL,
     last_seen TEXT NOT NULL
   );`);
+  // When each metadata field of a thread was last edited, for the field-by-field merge of synced rows
+  // (sync/thread-merge.ts). Rows from before it are seeded once with their updated_at (pinned_at and done_at with
+  // their own times when set), which is what whole-row last-writer-wins compared before.
+  const seedEdits = !(db.prepare('PRAGMA table_info(threads)').all() as unknown as { name: string }[]).some((c) => c.name === 'field_edits');
+  ensureColumn('threads', 'field_edits', 'TEXT');
+  if (seedEdits) {
+    db.exec(`UPDATE threads SET field_edits = json_object('title', updated_at, 'archived', updated_at, 'folder_id', updated_at,
+      'pinned_at', COALESCE(pinned_at, updated_at), 'done_at', COALESCE(done_at, updated_at))`);
+  }
 }
