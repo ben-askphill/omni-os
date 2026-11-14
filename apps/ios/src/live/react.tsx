@@ -58,6 +58,19 @@ export function useChannels() {
   return useStore(useLiveHub().channels);
 }
 
+/**
+ * What a row draws of its channel: the name, icon and avatar colour. A row reads only these, so the list refetching
+ * every few seconds while agents run redraws a row only when its channel's look changed. Null until the list loads.
+ */
+export function useChannelLook(id: string): { name: string | null; icon: string | null; avatarBg: string | null } {
+  const { channels } = useLiveHub();
+  const read = (key: 'name' | 'icon' | 'avatar_bg') => () => channels.get().channels?.find((c) => c.id === id)?.[key] ?? null;
+  const name = useSyncExternalStore(channels.subscribe, read('name'), read('name'));
+  const icon = useSyncExternalStore(channels.subscribe, read('icon'), read('icon'));
+  const avatarBg = useSyncExternalStore(channels.subscribe, read('avatar_bg'), read('avatar_bg'));
+  return { name, icon, avatarBg };
+}
+
 /** What waits on Ben: unread results and blockers across the server's threads. Null until the first load. */
 export function useNeedsYou(): NeedsYou | null {
   return useStore(useLiveHub().needsYou).data;

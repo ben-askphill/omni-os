@@ -48,15 +48,16 @@ import type { OmniSession } from './session';
 import { createStore, type Store } from './store';
 import { emptyThreadView, reduceThread, withChanges, withDetail, type ThreadChanges, type ThreadDetail, type ThreadView } from './thread-reducer';
 
-/** Feed messages that change the channel list's counts and rows. Usage and mod lines do not. */
-const LIST_CHANGES = new Set(['thread', 'channel', 'tasks', 'folder']);
+/** Feed messages that change the channel list's counts and rows. Usage and mod lines do not, and `tasks` only sometimes (`taskHostsOf`). */
+const LIST_CHANGES = new Set(['thread', 'channel', 'folder']);
 /** Feed messages that change what waits on Ben: a result arrived or was read, or a blocker came or went. */
 const NEEDS_YOU = 'needs_you';
-/** A burst of feed messages refetches the list once, this long after the last one. */
-export const REFRESH_DEBOUNCE_MS = 300;
+/** A burst of feed messages refetches the lists once, at most this often: a busy server sends several a second. */
+export const REFRESH_DEBOUNCE_MS = 500;
 
 export interface ChannelsState {
   channels: readonly ChannelWithRunning[] | null;
+  /** True while the first list loads. A refetch with a list on screen leaves it alone. */
   loading: boolean;
   /** The last refetch's failure. The channels it held stay on screen. */
   error: string | null;
@@ -172,6 +173,10 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   let feed: SSEClient | null = null;
   let feedState: SSEState | null = null;
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  /** What the scheduled refetch loads. A thread change touches all three; a channel or folder change only the list. */
+  const due = { channels: false, needsYou: false, pinned: false };
+  /** The threads hosting sub-agents, as the last `tasks` message named them. */
+  let taskHosts = '';
 
   function recomputeLink() {
     link.set(linkOf({ paired, foreground, feed: feedState, thread: activeThread?.view.get().link ?? null }));
@@ -248,7 +253,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       refreshAgain = true;
       return refreshing;
     }
-    channels.set((s) => ({ ...s, loading: true }));
+    // Only the first load says so: a refetch with the list on screen would redraw every screen that reads it.
+    if (channels.get().channels === null) channels.set((s) => ({ ...s, loading: true }));
     refreshing = (async () => {
       do {
         refreshAgain = false;
@@ -277,7 +283,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     const readsAtStart = readsMarked;
     try {
       const data = await withAuth(() => requireApi().needsYou());
-      if (readsAtStart === readsMarked) needsYou.set({ data, error: null });
+      // Most loads answer what is on screen already: setting it again would redraw every screen that reads it.
+      if (readsAtStart === readsMarked && !(needsYou.get().error === null && sameJson(needsYou.get().data, data))) needsYou.set({ data, error: null });
     } catch (e) {
       needsYou.set((s) => ({ ...s, error: messageOf(e) }));
     }
@@ -291,12 +298,30 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   }
   const setFolderCollapsed = createFolderCollapse({ api, withAuth, channels, refresh: refreshChannels, pending: pendingFolders });
 
-  function scheduleRefresh() {
+  function scheduleRefresh(what: typeof due) {
+    due.channels ||= what.channels;
+    due.needsYou ||= what.needsYou;
+    due.pinned ||= what.pinned;
     if (refreshTimer !== null) return;
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
-      void refreshChannels();
+      if (due.channels) void refreshChannels();
+      if (due.needsYou) void refreshNeedsYou();
+      if (due.pinned) void activity.refreshPinned();
+      due.channels = due.needsYou = due.pinned = false;
     }, REFRESH_DEBOUNCE_MS);
+  }
+
+  /**
+   * Whether a `tasks` message changes the list. It comes about once a second while any sub-agent runs, but the list only
+   * shows which threads host one, as on the Web UI (apps/web/src/store.tsx).
+   */
+  function taskHostsChanged(message: unknown): boolean {
+    if (!isRecord(message) || message.type !== 'tasks' || !Array.isArray(message.tasks)) return false;
+    const hosts = taskHostsOf(message.tasks);
+    if (hosts === taskHosts) return false;
+    taskHosts = hosts;
+    return true;
   }
 
   function startFeed(client: HttpClient) {
@@ -306,8 +331,9 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       transport,
       refreshAuth: () => session.refreshAuth(),
       onMessage: (message) => {
-        if (isListChange(message)) scheduleRefresh();
-        if (isNeedsYouChange(message)) void refreshNeedsYou();
+        const thread = isThreadChange(message);
+        if (isListChange(message) || taskHostsChanged(message)) scheduleRefresh({ channels: true, needsYou: thread, pinned: thread });
+        if (isRecord(message) && message.type === NEEDS_YOU) void refreshNeedsYou();
         activity.applyFeed(message);
         library.applyFeed(message);
         claudeArtifacts.applyFeed(message);
@@ -605,6 +631,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     close() {
       if (refreshTimer !== null) clearTimeout(refreshTimer);
       refreshTimer = null;
+      due.channels = due.needsYou = due.pinned = false;
       library.close();
       feed?.close();
       feed = null;
@@ -633,11 +660,24 @@ function isListChange(message: unknown): boolean {
   return isRecord(message) && typeof message.type === 'string' && LIST_CHANGES.has(message.type);
 }
 
-/** What can change the inbox: the server says so, or a thread changed, which is how a result lands or a blocker clears. */
-function isNeedsYouChange(message: unknown): boolean {
-  if (!isRecord(message)) return false;
-  if (message.type === NEEDS_YOU) return true;
-  return message.type === 'thread' && isRecord(message.thread) && typeof message.thread.id === 'string';
+/** A thread changed: how a result lands or a blocker clears, and what moves a pinned row. */
+function isThreadChange(message: unknown): boolean {
+  return isRecord(message) && message.type === 'thread' && isRecord(message.thread) && typeof message.thread.id === 'string';
+}
+
+/** The threads a `tasks` message lists sub-agents under: a member's team lead, else its own thread. */
+function taskHostsOf(tasks: unknown[]): string {
+  const hosts = new Set<string>();
+  for (const t of tasks) {
+    if (!isRecord(t)) continue;
+    const host = typeof t.lead_id === 'string' ? t.lead_id : t.thread_id;
+    if (typeof host === 'string') hosts.add(host);
+  }
+  return [...hosts].sort().join();
+}
+
+function sameJson(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function messageOf(e: unknown): string {

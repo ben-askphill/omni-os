@@ -122,6 +122,65 @@ describe('channel list', () => {
     hub.close();
   });
 
+  it('ignores the sub-agent progress ticks until the threads hosting sub-agents change', async () => {
+    const t = fakeTransport();
+    const { fetch, calls } = fakeFetch(() => ({ body: [] }));
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    const [feed] = t.feeds();
+    feed?.sink.open();
+    const lists = () => calls.filter((p) => p === '/api/channels').length;
+    const tick = (tasks: unknown[]) => feed?.sink.message(frame({ type: 'tasks', tasks }));
+
+    tick([{ thread_id: 'a', task_id: '1' }]);
+    await settle(REFRESH_DEBOUNCE_MS);
+    const afterFirst = lists();
+    // The same host, a second agent, a lead's member: the list shows none of it.
+    for (let i = 0; i < 10; i++) {
+      tick([{ thread_id: 'a', task_id: '1' }, { thread_id: 'a', task_id: '2' }, { thread_id: 'm', lead_id: 'a', task_id: '3' }]);
+      await settle(1000);
+    }
+    expect(lists()).toBe(afterFirst);
+    tick([{ thread_id: 'b', task_id: '4' }]);
+    await settle(REFRESH_DEBOUNCE_MS);
+    expect(lists()).toBe(afterFirst + 1);
+    hub.close();
+  });
+
+  it('reloads Needs you and the pins once per burst of thread changes, with the list', async () => {
+    const t = fakeTransport();
+    const { fetch, calls } = fakeFetch((path) => (path === '/api/needs-you' ? { body: { items: [] } } : { body: [] }));
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    const [feed] = t.feeds();
+    feed?.sink.open();
+    const count = (path: string) => calls.filter((p) => p === path).length;
+    const before = ['/api/channels', '/api/needs-you', '/api/pinned'].map(count);
+    for (let i = 0; i < 6; i++) feed?.sink.message(frame({ type: 'thread', thread: { id: `t${i}`, updated_at: '' } }));
+    await settle(REFRESH_DEBOUNCE_MS);
+    expect(['/api/channels', '/api/needs-you', '/api/pinned'].map(count)).toEqual(before.map((n) => n + 1));
+    hub.close();
+  });
+
+  it('leaves the stores alone when a reload answers what is on screen', async () => {
+    const t = fakeTransport();
+    const { fetch } = fakeFetch((path) => (path === '/api/needs-you' ? { body: { items: [], unread: 0, blocked: 0 } } : { body: [] }));
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    const [feed] = t.feeds();
+    feed?.sink.open();
+    const sets = { channels: 0, needsYou: 0, activity: 0 };
+    hub.channels.subscribe(() => sets.channels++);
+    hub.needsYou.subscribe(() => sets.needsYou++);
+    hub.activity.subscribe(() => sets.activity++);
+    feed?.sink.message(frame({ type: 'channel', id: 'x' }));
+    feed?.sink.message(frame({ type: 'needs_you', thread_id: 'x' }));
+    await settle(REFRESH_DEBOUNCE_MS);
+    // The list itself lands once (its time moves on); no loading flag before it, and Needs you is unchanged.
+    expect(sets).toEqual({ channels: 1, needsYou: 0, activity: 0 });
+    hub.close();
+  });
+
   it('shows an icon changed on the computer once the feed says the channel changed', async () => {
     const t = fakeTransport();
     let icon: string | null = '🛍️';

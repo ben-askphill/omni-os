@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import type { ThreadRow } from '../live/channel-model';
-import { useChannels } from '../live/react';
+import { useChannelLook } from '../live/react';
 import { fontSize, lineHeight, minTarget, space, useOmniTheme, weight } from '../theme';
 import { Icon } from '../ui/Icon';
 import { ChannelAvatar } from './ChannelAvatar';
@@ -14,8 +14,7 @@ import { glyphFor } from './StatusDot';
  */
 export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & { channel?: string }; onPress: () => void; onLongPress?: () => void }) {
   const { colors } = useOmniTheme();
-  const { channels } = useChannels();
-  const home = channels?.find((c) => c.id === row.target.channelId);
+  const home = useChannelLook(row.target.channelId);
   const channel = row.channel ? `#${row.channel}` : null;
   const marked = row.target.done ? 'Marked done' : null;
   const glyph = row.target.done ? 'settled' : glyphFor(row.status);
@@ -30,7 +29,7 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
     >
-      <ChannelAvatar name={home?.name ?? row.channel ?? row.target.channelId} icon={home?.icon} avatarBg={home?.avatar_bg} conductor={row.target.channelId === 'conductor'} glyph={glyph} />
+      <ChannelAvatar name={home.name ?? row.channel ?? row.target.channelId} icon={home.icon} avatarBg={home.avatarBg} conductor={row.target.channelId === 'conductor'} glyph={glyph} />
       <View style={[styles.body, { borderBottomColor: colors.line }]}>
         <View style={styles.top}>
           <Text numberOfLines={2} style={[styles.title, { color: settled ? colors.fg2 : colors.fg }]}>

@@ -4,7 +4,7 @@
 import { delegateLabel, type DelegateSummary } from '@omni/shared/delegate-count.ts';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useChannels } from '../../live/react';
+import { useChannelLook } from '../../live/react';
 import type { DoneRow, InboxRow } from '../../live/activity-model';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
 import { Icon, type IconName } from '../../ui/Icon';
@@ -52,8 +52,7 @@ function RowActions({ actions }: { actions: RowAction[] }) {
  */
 export function InboxRowView({ row, last, actions, onPress }: { row: InboxRow; last: boolean; actions: RowAction[]; onPress: () => void }) {
   const { colors } = useOmniTheme();
-  const { channels } = useChannels();
-  const home = channels?.find((c) => c.id === row.channelId);
+  const home = useChannelLook(row.channelId);
   const where = [`#${row.channel}`, row.branch].filter(Boolean).join(' · ');
   const right = row.status ? row.status.label : row.time;
   return (
@@ -64,7 +63,7 @@ export function InboxRowView({ row, last, actions, onPress }: { row: InboxRow; l
         onPress={onPress}
         style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
       >
-        <ChannelAvatar name={home?.name ?? row.channel} icon={home?.icon} avatarBg={home?.avatar_bg} conductor={row.channelId === 'conductor'} glyph={row.glyph} size={AVATAR} />
+        <ChannelAvatar name={home.name ?? row.channel} icon={home.icon} avatarBg={home.avatarBg} conductor={row.channelId === 'conductor'} glyph={row.glyph} size={AVATAR} />
         <View style={[styles.body, { paddingRight: actionsWidth(actions.length) }, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }]}>
           <View style={styles.line}>
             <Text numberOfLines={1} style={[styles.title, { color: row.receded ? colors.fg3 : colors.fg }]}>

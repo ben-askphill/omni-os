@@ -1,7 +1,7 @@
 import type { Fetch, SSEConnection, SSESink, SSETransport } from '@omni/client-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createLiveHub } from '../src/live/hub';
+import { createLiveHub, REFRESH_DEBOUNCE_MS } from '../src/live/hub';
 import type { OmniSession } from '../src/live/session';
 
 const BASE = 'http://omni.test';
@@ -114,9 +114,10 @@ describe('activity', () => {
     t.feed()?.sink.message(frame({ type: 'thread', thread: thread('b', '2026-11-02T12:30:00Z', { archived: 1 }) }));
     expect(hub.activity.get().recent?.map((r) => r.id)).toEqual(['new', 'a']);
 
-    await settle();
-    expect(count('/api/needs-you')).toBe(3);
-    expect(count('/api/pinned')).toBe(3);
+    // The burst reloads Needs you and the pins once, with the channel list, not once per message.
+    await settle(REFRESH_DEBOUNCE_MS);
+    expect(count('/api/needs-you')).toBe(2);
+    expect(count('/api/pinned')).toBe(2);
     hub.close();
   });
 

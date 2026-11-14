@@ -25,7 +25,9 @@ export interface ActivityLive {
   refresh(): Promise<void>;
   /** A thread Ben just changed here (pin, rename): it goes in now, and a load already in flight cannot put the old copy back. */
   applyThread(thread: Thread): void;
+  /** Patches the recent list from a feed message. The pinned list it may move reloads through the hub's batched refetch. */
   applyFeed(message: unknown): void;
+  refreshPinned(): Promise<void>;
 }
 
 export interface ActivityLiveOptions {
@@ -73,7 +75,7 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
     try {
       const token = pinnedReads.begin();
       const pinned = await withAuth(() => api.pinned());
-      if (pinnedReads.holds(token)) state.set((s) => ({ ...s, pinned }));
+      if (pinnedReads.holds(token) && JSON.stringify(pinned) !== JSON.stringify(state.get().pinned)) state.set((s) => ({ ...s, pinned }));
     } catch (e) {
       failed(e);
     }
@@ -83,7 +85,6 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
     if (!isRecord(message)) return;
     if (message.type !== 'thread' || !isRecord(message.thread) || typeof message.thread.id !== 'string') return;
     patchRecent(message.thread as unknown as Thread);
-    void refreshPinned();
   }
 
   function applyThread(thread: Thread) {
@@ -104,7 +105,7 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
     });
   }
 
-  return { state, refresh, applyFeed, applyThread };
+  return { state, refresh, applyFeed, applyThread, refreshPinned };
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
