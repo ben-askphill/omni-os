@@ -19,6 +19,9 @@ const { paths } = await import('../config.ts');
 const automations = await import('../automations.ts');
 const sync = await import('../sync/worker.ts');
 const { app } = await import('../app.ts');
+const { channels } = await import('../db.ts');
+const { updateUserConfig, userConfig } = await import('../user-config.ts');
+for (const id of ['work', 'side']) channels.create({ id, name: id, kind: 'internal', use_worktree: 0, base_dir: shared });
 const relay = new MemoryTransport();
 
 const call = async (method: string, path: string, body?: unknown) => {
@@ -82,6 +85,42 @@ describe('editing', () => {
     const { status, body } = await call('PUT', '/automations/nightly', { fields: fields({ machine: 'here' }) });
     expect(status).toBe(409);
     expect(body.error).toMatch(/Set up sync/);
+  });
+
+  it('the toggle folds an old channel override into the file and drops the override', async () => {
+    updateUserConfig({ automations: { nightly: { enabled: false, channel: 'work' } } });
+    expect((await call('POST', '/automations/nightly/enabled', { enabled: true })).status).toBe(200);
+    const text = readFileSync(own('nightly'), 'utf8');
+    expect(text).toContain('channel: work');
+    expect(text).not.toContain('channel: scratch');
+    expect(userConfig().automations.nightly).toBeUndefined();
+    expect(find('nightly')).toMatchObject({ enabled: true, channel: 'work' });
+    await call('POST', '/automations/nightly/reset');
+  });
+
+  it('raw YAML that leaves the channel as it was keeps an old channel override; one that changes it wins', async () => {
+    updateUserConfig({ automations: { nightly: { channel: 'work' } } });
+    expect((await call('PUT', '/automations/nightly', { yaml: shippedYaml.replace('Nightly', 'Nightly raw') })).status).toBe(200);
+    expect(find('nightly')).toMatchObject({ name: 'Nightly raw', channel: 'work' });
+    expect(userConfig().automations.nightly).toBeUndefined();
+    await call('POST', '/automations/nightly/reset');
+    updateUserConfig({ automations: { nightly: { channel: 'work' } } });
+    expect((await call('PUT', '/automations/nightly', { yaml: shippedYaml.replace('channel: scratch', 'channel: side') })).status).toBe(200);
+    expect(find('nightly')!.channel).toBe('side');
+    await call('POST', '/automations/nightly/reset');
+  });
+
+  it('a machine the file already names saves unchanged without sync', async () => {
+    writeFileSync(own('nightly'), shippedYaml.replace('channel: scratch', 'channel: scratch\nmachine: studio'));
+    const { body: def } = await call('GET', '/automations/nightly/definition');
+    expect(def.fields).toMatchObject({ machine: 'studio', machine_id: null });
+    const { status } = await call('PUT', '/automations/nightly', { fields: { ...def.fields, machine_id: undefined, prompt: 'tidy less' } });
+    expect(status).toBe(200);
+    const text = readFileSync(own('nightly'), 'utf8');
+    expect(text).toContain('machine: studio');
+    expect(text).toContain('tidy less');
+    expect((await call('PUT', '/automations/nightly', { fields: { ...def.fields, machine_id: undefined, machine: 'elsewhere' } })).status).toBe(409);
+    await call('POST', '/automations/nightly/reset');
   });
 });
 

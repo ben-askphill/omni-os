@@ -190,7 +190,8 @@ function render(base: string | null, f: AutomationFields): string {
   setKey(doc, 'timezone', cron ? f.timezone : undefined);
   setKey(doc, 'catchup', cron && f.catchup ? true : undefined);
   setKey(doc, 'channel', f.channel);
-  setKey(doc, 'machine', f.machine ? machineValue(f.machine) : undefined);
+  const written = str(doc.get('machine')).trim();
+  setKey(doc, 'machine', !f.machine ? undefined : f.machine === written ? written : machineValue(f.machine));
   for (const k of ['role', 'harness', 'model', 'effort'] as const) setKey(doc, k, f[k]);
   setKey(doc, 'prompt', f.prompt.trim() ? f.prompt : undefined);
   return doc.toString({ lineWidth: 0 });
@@ -229,7 +230,8 @@ export function createAutomation(f: AutomationFields, id?: string): AutomationDe
 export function saveAutomation(id: string, change: { fields: AutomationFields } | { yaml: string }): AutomationDefinition {
   const src = sourceOf(id);
   if (!src) throw refused('No automation with this id.', 404);
-  const text = 'yaml' in change ? change.yaml : render(readFileSync(src.file, 'utf8'), change.fields);
+  const base = readFileSync(src.file, 'utf8');
+  const text = 'yaml' in change ? keepChannelOverride(id, base, change.yaml) : render(base, change.fields);
   check(id, text, 'fields' in change ? change.fields.channel : undefined);
   write(id, text);
   return definitionOf(id)!;
@@ -242,7 +244,26 @@ export function setAutomationEnabled(id: string, enabled: boolean) {
   const doc = YAML.parseDocument(readFileSync(src.file, 'utf8'));
   if (doc.errors.length || !isMap(doc.contents)) throw refused('The file is not valid YAML. Fix it first.');
   setKey(doc, 'enabled', enabled);
+  const channel = userConfig().automations[id]?.channel;
+  if (channel) setKey(doc, 'channel', channel);
   write(id, doc.toString({ lineWidth: 0 }));
+}
+
+/** Raw YAML that leaves the file's channel as it was keeps this machine's old channel override, which the write drops. */
+function keepChannelOverride(id: string, base: string, text: string): string {
+  const channel = userConfig().automations[id]?.channel;
+  if (!channel) return text;
+  const doc = YAML.parseDocument(text);
+  if (doc.errors.length || !isMap(doc.contents)) return text;
+  let was: unknown;
+  try {
+    was = (YAML.parse(base) as Record<string, unknown> | null)?.channel;
+  } catch {
+    return text;
+  }
+  if (str(doc.get('channel')) !== str(was)) return text;
+  setKey(doc, 'channel', channel);
+  return doc.toString({ lineWidth: 0 });
 }
 
 /** Drop the user's copy of a shipped automation, so the shipped file loads again. */

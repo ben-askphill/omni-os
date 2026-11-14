@@ -620,12 +620,11 @@ server.registerTool(
   },
   async ({ id, create, yaml, fields }) => {
     if (!!yaml === !!fields) throw new Error('Pass fields or yaml, one of them.');
-    const f = fields && { ...fields, machine: fields.machine && fields.machine !== 'here' ? await deviceId(fields.machine) : fields.machine };
     if (create || !id) {
-      if (!f) throw new Error('A new automation needs fields.');
-      return text(await call('/automations', { method: 'POST', body: JSON.stringify({ ...(id && { id }), fields: f }) }));
+      if (!fields) throw new Error('A new automation needs fields.');
+      return text(await call('/automations', { method: 'POST', body: JSON.stringify({ ...(id && { id }), fields }) }));
     }
-    return text(await call(`/automations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(f ? { fields: f } : { yaml }) }));
+    return text(await call(`/automations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(fields ? { fields } : { yaml }) }));
   },
 );
 

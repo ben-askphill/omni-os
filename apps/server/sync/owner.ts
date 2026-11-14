@@ -54,13 +54,14 @@ export function claimIfUnowned(): boolean {
 export function resolveMachine(asked: string): string | null {
   const want = asked.trim();
   if (!want) return null;
-  const all = currentRecords(deviceRecords());
-  if (all.some((d) => d.id === want)) return want;
   const self = outbox.machineId();
-  const named = all.filter((d) => d.name.toLowerCase() === want.toLowerCase());
-  const vouched = named.filter((d) => d.id === self || keyring.trusted(d.id));
-  const pick = vouched.length ? vouched : named;
-  return pick.length === 1 ? pick[0].id : null;
+  const records = deviceRecords();
+  const vouched = records.filter((d) => d.id === self || keyring.trusted(d.id));
+  const named = (list: typeof records) => list.filter((d) => d.name.toLowerCase() === want.toLowerCase());
+  const pick = vouched.some((d) => d.id === want) || named(vouched).length ? currentRecords(vouched) : currentRecords(records);
+  if (pick.some((d) => d.id === want)) return want;
+  const hits = named(pick);
+  return hits.length === 1 ? hits[0].id : null;
 }
 
 /**

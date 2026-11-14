@@ -9,7 +9,7 @@ The Automations page edits every field of an automation and writes the result in
 - The Form tab covers name, on or off, a schedule (cron, timezone, catch-up) or an event with its options, channel, machine, role, harness, model, effort and prompt. The YAML tab edits the file as text.
 - Every save, the toggle included, writes `data/automations/<id>.yaml`. Editing a shared one writes your own copy there first, with the file's comments and any keys the form does not know kept. Its card then says Edited, and updates to the shared file stop reaching it until Reset to shipped in the editor drops your copy.
 - Omni refuses a save it would load as invalid (a bad cron, both `cron` and `on`, an unknown channel, harness or model), and writes nothing.
-- With sync on, a file saved in Omni reaches your other machines too, and so does a Delete of it. A file you edit by hand stays on its machine until the next save in Omni.
+- With sync on, a file saved in Omni reaches your other machines too, and so does a Delete of it. A file you edit by hand, or saved in Omni before sync was set up, stays on its machine until its next save in Omni with sync on.
 - An old per-machine on/off or channel override in `data/omni.config.json` (`automations.<id>.enabled`, `.channel`) is folded into the file on its first save and removed.
 - The Conductor has the same: `list_automations` lists each one with where it runs, `get_automation` reads its file and fields, `save_automation` creates or changes one, `set_automation_enabled` turns it on or off in its YAML, `run_automation` starts one now on this machine and `delete_automation` deletes like the card does.
 
