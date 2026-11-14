@@ -13,8 +13,9 @@ import type { Change, RemoteChange } from './transport.ts';
 // - Everything else is logged when unsigned or invalid and still applied, so a Mac on an older build keeps syncing
 //   while the others update. The `syncSignatures` setting turns that strict, or relaxes actions to log only.
 // - A signer with no key here yet (its device record has not arrived) makes an action wait in sync_deferred.
-// - A machine Ben has not trusted yet (keyring.trusted) syncs everything else, but its actions are refused until he
-//   clicks Trust in Sync settings (POST /api/sync/devices/:id/confirm-key).
+// - A machine Ben has not trusted yet (keyring.trusted) syncs everything else, but its signed actions wait in
+//   sync_deferred, listed in sync_refused, until he clicks Trust in Sync settings (POST /api/sync/devices/:id/confirm-key).
+//   The next sync applies them in order; a command or secret past its expiry lapses there as it would anyway.
 // Refusals, and changes applied without a valid signature, go in sync_refused for Sync settings.
 
 export type SignatureMode = 'actions' | 'strict' | 'log';
@@ -86,10 +87,12 @@ const REASONS: Record<Exclude<Verdict, 'valid'>, string> = {
   'signer-mismatch': 'signed by another machine than the one it names',
 };
 
-const UNTRUSTED = 'from a machine not trusted yet';
+const UNTRUSTED = 'waiting for Trust';
 
 export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syncSignatures()): Gate {
   // A machine describes only itself.
+  // The relay never hands a machine its own changes back: one that names this machine is forged.
+  if (raw.machine_id === outbox.machineId()) return { kind: 'refuse', reason: 'names this machine', change: unsigned(raw).change };
   const described = raw.entity === 'kv' && raw.entity_id.startsWith(DEVICE) ? raw.entity_id.slice(DEVICE.length) : null;
   if (described !== null && described !== raw.machine_id) return { kind: 'refuse', reason: "another machine's record", change: unsigned(raw).change };
   // Trust on first sight: a machine with no signing key here yet is pinned with the key its first signed change
@@ -106,16 +109,18 @@ export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syn
     keyring.observe(described, { signKey: str(v?.signKey), sealKey: str(v?.sealKey) }, { pin: verdict === 'valid' });
   }
   const action = isActionChange(change);
-  const untrusted = action && change.machine_id !== outbox.machineId() && !keyring.trusted(change.machine_id);
   if (verdict === 'valid') {
     const role = action ? roleProblem(change) : null;
     if (role) return { kind: 'refuse', reason: role, change };
-    return untrusted ? { kind: 'refuse', reason: UNTRUSTED, change } : { kind: 'apply', change };
+    if (action && !keyring.trusted(change.machine_id)) {
+      logHeld(change);
+      return { kind: 'defer', reason: `${UNTRUSTED} (${change.machine_id})` };
+    }
+    return { kind: 'apply', change };
   }
   const reason = REASONS[verdict];
   const strict = action || mode === 'strict';
   if (!strict || (action && mode === 'log' && verdict === 'unsigned')) {
-    if (untrusted) return { kind: 'refuse', reason: UNTRUSTED, change };
     logRefused(change, reason, true);
     return { kind: 'apply', change };
   }
@@ -135,6 +140,19 @@ export function logRefused(c: Pick<Change, 'machine_id' | 'entity' | 'entity_id'
      ON CONFLICT(key) DO UPDATE SET count = count + 1, entity_id = excluded.entity_id, at = excluded.at`,
   ).run(key, c.machine_id, c.entity, c.entity_id, reason, applied ? 1 : 0, now);
   db.prepare(`DELETE FROM sync_refused WHERE id NOT IN (SELECT id FROM sync_refused ORDER BY at DESC, id DESC LIMIT ${KEEP})`).run();
+}
+
+/** Note an action held for Trust, once: each sync retries it, and that is not news. */
+function logHeld(c: Pick<Change, 'machine_id' | 'entity' | 'entity_id'>, now = new Date().toISOString()) {
+  const key = [c.machine_id, c.entity, c.entity_id, UNTRUSTED, 0].join('\u0000');
+  db.prepare(
+    `INSERT INTO sync_refused (key, machine, entity, entity_id, reason, applied, at) VALUES (?, ?, ?, ?, ?, 0, ?) ON CONFLICT(key) DO NOTHING`,
+  ).run(key, c.machine_id, c.entity, c.entity_id, UNTRUSTED, now);
+}
+
+/** Once Ben trusts a machine, its held actions apply with the next sync: drop them from the log. */
+export function clearHeld(machine: string) {
+  db.prepare('DELETE FROM sync_refused WHERE machine = ? AND reason = ?').run(machine, UNTRUSTED);
 }
 
 /** GET /api/sync/refused: one entry per refusal, newest first. */

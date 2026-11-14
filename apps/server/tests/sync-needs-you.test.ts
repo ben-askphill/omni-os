@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { trustEachOther } from './sync-sign.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 
 // Needs you between two Macs in one process, each with its own data dir, through one in-memory relay
@@ -18,7 +19,8 @@ async function machine(name: string) {
   const feed: any[] = [];
   bus.on('feed', (e) => feed.push(e));
   const worker = sync.createSyncWorker({ transport: relay, machineId: name });
-  return { name, db, feed, worker };
+  const signKey = await (await import('../sync/sign-key.ts')).signPublicKey();
+  return { name, db, feed, worker, signKey };
 }
 type Mac = Awaited<ReturnType<typeof machine>>;
 
@@ -55,6 +57,7 @@ const row = (m: Mac, id: string) => ({ ...m.db.threads.get(id)!, run_machine: m.
 beforeAll(async () => {
   a = await machine('mac-a');
   b = await machine('mac-b');
+  trustEachOther([a, b]);
   a.db.channels.create({ id: 'volero', name: 'Volero', kind: 'client', use_worktree: 0, base_dir: join(home, 'work') });
   await exchange();
 });

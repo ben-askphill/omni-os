@@ -4,6 +4,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fixture } from '@omni/test-fixtures';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
+import { trustEachOther } from './sync-sign.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 
 // Two Macs in one process: each loads its own copy of the server modules against its own temp data dir,
@@ -23,7 +24,8 @@ async function machine(name: string) {
     bus.on(`thread:${threadId}`, (e) => got.push(e));
     return got;
   };
-  return { name, db, sync, guard, feed, streamed, worker: null as unknown as ReturnType<typeof sync.createSyncWorker> };
+  const signKey = await (await import('../sync/sign-key.ts')).signPublicKey();
+  return { name, db, sync, guard, feed, streamed, signKey, worker: null as unknown as ReturnType<typeof sync.createSyncWorker> };
 }
 
 const relay = new MemoryTransport();
@@ -44,8 +46,7 @@ beforeAll(async () => {
   a.worker = a.sync.createSyncWorker({ transport: relay, machineId: 'mac-a' });
   b = await machine('mac-b');
   b.worker = b.sync.createSyncWorker({ transport: relay, machineId: 'mac-b' });
-  // Each trusts the other, as Ben's Trust click in Sync settings does (sync/keyring.ts).
-  for (const [m, other] of [[a, 'mac-b'], [b, 'mac-a']] as const) m.db.db.prepare('INSERT INTO sync_trusted (machine_id, trusted_at) VALUES (?, ?)').run(other, new Date().toISOString());
+  trustEachOther([a, b]);
 });
 
 describe('two machines, one relay', () => {

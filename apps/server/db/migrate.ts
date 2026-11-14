@@ -605,15 +605,10 @@ export function migrate() {
     seen_seal_key TEXT,
     seen_at TEXT
   );`);
-  // The other machines Ben trusts to make this one act (sync/keyring.ts): a new machine syncs ordinary data at once,
-  // but its commands, assignments, update asks, owner claims and secrets wait until he clicks Trust in Settings > Sync.
-  // Local, never synced. Machines that already synced here before it existed (they wrote a device record) are trusted.
-  const seedTrust = !db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sync_trusted'").get();
-  db.exec(`CREATE TABLE IF NOT EXISTS sync_trusted (machine_id TEXT PRIMARY KEY, trusted_at TEXT NOT NULL);`);
-  if (seedTrust) {
-    db.exec(`INSERT OR IGNORE INTO sync_trusted (machine_id, trusted_at)
-      SELECT substr(key, 9), strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM kv WHERE key LIKE 'devices.%' AND length(key) > 8`);
-  }
+  // The other machines Ben trusts to make this one act (sync/keyring.ts), each with the signing key he trusted. A new
+  // machine syncs ordinary data at once, but its commands, assignments, update asks, owner claims and secrets wait in
+  // sync_deferred until he clicks Trust in Settings > Sync. Local, never synced.
+  db.exec(`CREATE TABLE IF NOT EXISTS sync_trusted (machine_id TEXT PRIMARY KEY, sign_key TEXT NOT NULL, trusted_at TEXT NOT NULL);`);
   // Synced changes whose signature did not check out (sync/verify.ts): refused, or applied while that entity still
   // takes unsigned changes. One row per machine, entity, reason and (for a refused one) entity id.
   db.exec(`CREATE TABLE IF NOT EXISTS sync_refused (

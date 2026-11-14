@@ -99,14 +99,27 @@ export const keyring = {
     return true;
   },
 
-  /** Whether Ben trusts a machine to make this one act (its commands, assignments, update asks, owner claims and secrets). */
+  /**
+   * Whether Ben trusts a machine to make this one act (its commands, assignments, update asks, owner claims and
+   * secrets). Trust holds for the signing key he trusted: a key pinned for that machine later does not inherit it.
+   */
   trusted(machine: string): boolean {
-    return !!db.prepare('SELECT 1 FROM sync_trusted WHERE machine_id = ?').get(machine);
+    const r = db.prepare('SELECT sign_key FROM sync_trusted WHERE machine_id = ?').get(machine) as { sign_key: string } | undefined;
+    return !!r && r.sign_key === rowOf(machine)?.sign_key;
   },
 
-  /** Trust a machine. False when it already was. */
+  /** Trust a machine with the signing key pinned for it now. False when it already was, or no key is pinned yet. */
   trust(machine: string, now = new Date().toISOString()): boolean {
-    return db.prepare('INSERT OR IGNORE INTO sync_trusted (machine_id, trusted_at) VALUES (?, ?)').run(machine, now).changes > 0;
+    const key = rowOf(machine)?.sign_key;
+    if (!key) return false;
+    return (
+      db
+        .prepare(
+          `INSERT INTO sync_trusted (machine_id, sign_key, trusted_at) VALUES (?, ?, ?)
+           ON CONFLICT(machine_id) DO UPDATE SET sign_key = excluded.sign_key, trusted_at = excluded.trusted_at WHERE sign_key IS NOT excluded.sign_key`,
+        )
+        .run(machine, key, now).changes > 0
+    );
   },
 
   /** Forget a machine's pins and trust, for tests and a machine Ben removed. */

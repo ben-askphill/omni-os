@@ -56,7 +56,7 @@ const sendSecret = (machine: string) =>
   app.request('/api/secrets/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ machine, scope: 'global', name: 'SOME_KEY', value: 'v' }) });
 
 describe('a new machine waits for Trust', () => {
-  it("syncs a new machine's ordinary data at once, but refuses its remote command until Ben trusts it", async () => {
+  it("syncs a new machine's ordinary data at once, but holds its remote command until Ben trusts it", async () => {
     await pull(
       signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'devices.mac-b', op: 'upsert', ts: later(), data: { value: { id: 'mac-b', name: 'Mac B', tailscale: null, signKey: rawPublicKey(keyOf('mac-b')), at: later() } } }),
       signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'note.new-machine', op: 'upsert', data: { value: 'hello' }, ts: later() }),
@@ -64,15 +64,21 @@ describe('a new machine waits for Trust', () => {
     );
     expect(r.db.kv.get('note.new-machine')).toBe('hello');
     expect(stored('cmd-untrusted')).toBe(false);
-    expect(await refused()).toContainEqual(expect.objectContaining({ machine: 'mac-b', entity: 'remote_command', entityId: 'cmd-untrusted', reason: 'from a machine not trusted yet', applied: false }));
+    expect(await refused()).toContainEqual(expect.objectContaining({ machine: 'mac-b', entity: 'remote_command', entityId: 'cmd-untrusted', reason: 'waiting for Trust', applied: false }));
+    // Held, not dropped: the next sync does not log it again.
+    await pull();
+    expect((await refused()).filter((e) => e.entityId === 'cmd-untrusted')).toEqual([expect.objectContaining({ count: 1 })]);
     // Its key is pinned all the same: Trust confirms the machine, not a new key.
     expect(r.db.db.prepare('SELECT sign_key FROM sync_keys WHERE machine_id = ?').get('mac-b')).toEqual({ sign_key: rawPublicKey(keyOf('mac-b')) });
     expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ trusted: false, keyChanged: false });
   });
 
-  it('applies its remote command after Ben trusts it', async () => {
+  it('applies the held command and later ones once Ben trusts it', async () => {
     expect((await trust('mac-b')).status).toBe(200);
     expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ trusted: true });
+    await pull();
+    expect(stored('cmd-untrusted')).toBe(true);
+    expect((await refused()).filter((e) => e.entityId === 'cmd-untrusted')).toEqual([]);
     await pull(signAs(command('cmd-signed')));
     expect(stored('cmd-signed')).toBe(true);
     // Nothing waits any more, and a machine this one never saw cannot be trusted ahead of time.
@@ -90,6 +96,16 @@ describe('a new machine waits for Trust', () => {
     expect(((await res.json()) as { error: string }).error).toMatch(/new to this Mac/);
     expect((await trust('mac-n')).status).toBe(200);
     expect((await sendSecret('mac-n')).status).toBe(200);
+  });
+});
+
+describe('forged changes', () => {
+  it("refuses a change that names this machine: the relay never hands a machine its own", async () => {
+    // A relay that follows the protocol never sends it (MemoryTransport filters it out), so the gate is asked directly.
+    const { gateChange } = await import('../sync/verify.ts');
+    const forged = { ...signAs({ machine_id: 'this-mac', entity: 'kv', entity_id: 'note.self', op: 'upsert', data: { value: 'forged' }, ts: later() }), seq: 1 } as const;
+    expect(gateChange(forged as any)).toMatchObject({ kind: 'refuse', reason: 'names this machine' });
+    expect(r.db.db.prepare('SELECT 1 FROM sync_keys WHERE machine_id = ?').get('this-mac')).toBeUndefined();
   });
 });
 
