@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLiveHub, useChannels } from '../live/react';
 import { useEvery, useFetched, useOnChange } from '../review/useFetched';
-import { mergePR, rerunChecks, setWatch, type MergeOutcome, type RerunOutcome } from './actions';
+import { mergePR, rerunChecks, setAutoMerge, setWatch, type MergeOutcome, type RerunOutcome } from './actions';
 import { prPage, prTarget, type PRPage } from './model';
 
 const PR_POLL_MS = 60_000;
@@ -75,6 +75,32 @@ export function useMerge(channelId: string | null, number: number | null, reload
     },
     [hub, channelId, number, reload],
   );
+}
+
+/**
+ * Auto-merge for the PR on screen: `set(true)` from its slider throws on a refusal so the slider springs back, with
+ * gh's words left in `error`. The PR is read again after either change.
+ */
+export function useAutoMerge(channelId: string | null, number: number | null, reload: () => void) {
+  const hub = useLiveHub();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = useCallback(
+    async (on: boolean) => {
+      if (!channelId || !number) return;
+      setBusy(true);
+      setError(null);
+      const out = await setAutoMerge(hub.request, channelId, number, on);
+      setBusy(false);
+      reload();
+      if (out.kind === 'failed') {
+        setError(out.message);
+        throw new Error(out.message);
+      }
+    },
+    [hub, channelId, number, reload],
+  );
+  return { busy, error, set };
 }
 
 /**

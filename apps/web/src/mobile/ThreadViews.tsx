@@ -28,6 +28,7 @@ import { useApp } from '../store.tsx';
 import { toolLabel, toolSummary, type Item, type ToolCall } from '@omni/shared/transcript-fold.ts';
 import { CrewFileList } from './CrewFiles.tsx';
 import { CrewPRList } from './CrewPRs.tsx';
+import { MoAutoMerge } from './MoAutoMerge.tsx';
 import { MoDiff, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoSection } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 import { threadView } from '@omni/shared/thread-view.ts';
@@ -300,6 +301,7 @@ export function PRScreen() {
             {watch.error && <ErrorNote>{watch.error}</ErrorNote>}
           </div>
         )}
+        {open && <MoAutoMerge channelId={ch!.id} n={p.number} p={p} onChanged={q.reload} />}
         {p.checkRuns.length > 0 && (
           <MoSection title="Checks" count={p.checkRuns.length} pad={false}>
             <MoGroup>

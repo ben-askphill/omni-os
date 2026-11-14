@@ -6,7 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { filterClaudeArtifacts, type ClaudeArtifact } from '@omni/shared/claude-artifacts.ts';
 import { ApiError, call, SELF, text } from './api.ts';
-import { prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
+import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
@@ -507,6 +507,34 @@ server.registerTool(
   'list_pull_requests',
   { description: PR_LIST_DESCRIPTION, inputSchema: prListInput },
   async ({ search }) => text(prList(await call('/prs'), search)),
+);
+
+server.registerTool(
+  'set_auto_merge',
+  {
+    description:
+      "Read a PR's GitHub auto-merge, or turn it off (gh pr merge --disable-auto). It cannot turn auto-merge on: that merges " +
+      `with no further step, so only ${USER} arms it, with the slide in the PR view. To have it on, ask ${USER}. ` +
+      'enabled: omit to read the PR state and auto-merge (null when off), false to turn it off. repo and number as ' +
+      "list_pull_requests or crew_prs give them; the repo must be a channel's GitHub repo.",
+    inputSchema: {
+      repo: z.string().describe('owner/name'),
+      number: z.number().int().positive(),
+      enabled: z.boolean().optional().describe('Omit to read, false to turn off. true is refused.'),
+    },
+  },
+  async ({ repo, number, enabled }) => {
+    const step = autoMergeStep(enabled, USER);
+    const channels: { id: string; github_repo?: string | null }[] = await call('/channels');
+    const ch = channels.find((c) => c.github_repo?.toLowerCase() === repo.toLowerCase());
+    if (!ch) throw new Error(`No channel has ${repo} as its GitHub repo. list_channels shows each channel's repo.`);
+    const path = `/channels/${encodeURIComponent(ch.id)}/prs/${number}`;
+    if (step.kind === 'read') {
+      const pr = await call(path);
+      return text({ number: pr.number, state: pr.state, autoMergeRequest: pr.autoMergeRequest ?? null });
+    }
+    return text(await call(`${path}/auto-merge`, { method: 'POST', body: JSON.stringify(step.body) }));
+  },
 );
 
 /** A machine named by id or name (from list_devices), "here", or nothing for the default, as POST /threads takes it. */

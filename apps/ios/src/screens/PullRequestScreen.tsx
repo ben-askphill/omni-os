@@ -17,6 +17,7 @@ import { CheckDot } from '../pr/CheckDot';
 import { stepWorking } from '../pr/step';
 import { usePRStep } from '../pr/use-step';
 import { CrewPRList } from '../pr/CrewPRs';
+import { AutoMergeRow } from '../pr/AutoMerge';
 import { DiffCount, Loading, Section } from '../review/parts';
 import { Chip } from '../ui/Chip';
 import { fontSize, lineHeight, minTarget, mono, space, useOmniTheme, weight } from '../theme';
@@ -191,6 +192,8 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
             {watch.error ? <Callout message={watch.error} /> : null}
           </View>
         ) : null}
+
+        {c.open && page.kind === 'pr' ? <AutoMergeRow channelId={pr.channelId} number={c.number} request={page.pr.autoMergeRequest} draft={!c.canMerge} reload={pr.refresh} /> : null}
 
         {c.review.reviewers.length > 0 || c.reviewLine ? (
           <Section title="Reviews">
