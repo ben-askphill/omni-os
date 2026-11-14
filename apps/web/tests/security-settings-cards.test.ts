@@ -132,6 +132,13 @@ describe('signing keys card', () => {
     await act(async () => {});
     expect(posts).toEqual(['/sync/devices/mini/confirm-key']);
   });
+  it('shows a new machine with no key yet as new, with no Trust button until its key arrives', async () => {
+    replies['/sync/devices'] = [{ id: 'mini', name: 'Mac mini', current: false, fingerprint: null, pinnedFingerprint: null, keyChanged: false, trusted: false }];
+    await mount(createElement(SyncKeysCard));
+    expect(host.textContent).toContain('New machine');
+    expect(host.textContent).toContain('No signing key yet');
+    expect(button('Trust this machine')).toBeFalsy();
+  });
 });
 
 describe('refused changes card', () => {

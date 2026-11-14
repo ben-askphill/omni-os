@@ -10,19 +10,29 @@ export function formatFingerprint(fp: string | null | undefined): string | null 
   return hex.match(/.{1,4}/g)!.join(' ');
 }
 
-/**
- * What Settings › Sync asks of Ben for one machine (GET /api/sync/devices). `trust`: a machine new to this one, which
- * syncs but whose commands, assignments, update requests and secrets wait until he trusts it. `confirm`: a machine he
- * trusted whose key changed since. Both call POST /api/sync/devices/:id/confirm-key. A server from before `trusted`
- * leaves it out, and its machines count as trusted.
- */
-export function syncKeyAction(d: {
+interface SyncDeviceTrust {
   current: boolean;
   keyChanged: boolean;
+  fingerprint: string | null;
   pinnedFingerprint: string | null;
   trusted?: boolean;
-}): 'trust' | 'confirm' | null {
+}
+
+/**
+ * A machine new to this one (GET /api/sync/devices): it syncs, but its commands, assignments, update requests and
+ * secrets wait until Ben trusts it. A server from before `trusted` leaves it out, and its machines count as trusted.
+ */
+export function isNewMachine(d: SyncDeviceTrust): boolean {
+  return !d.current && (d.trusted === false || (d.keyChanged && !d.pinnedFingerprint));
+}
+
+/**
+ * What Settings › Sync asks of Ben for one machine. `trust`: a new machine that has sent its key, so he can compare it.
+ * `confirm`: a machine he trusted whose key changed since. Both call POST /api/sync/devices/:id/confirm-key. A new
+ * machine with no key yet gets no button until one arrives.
+ */
+export function syncKeyAction(d: SyncDeviceTrust): 'trust' | 'confirm' | null {
   if (d.current) return null;
-  if (d.trusted === false || (d.keyChanged && !d.pinnedFingerprint)) return 'trust';
+  if (isNewMachine(d)) return d.fingerprint ? 'trust' : null;
   return d.keyChanged ? 'confirm' : null;
 }

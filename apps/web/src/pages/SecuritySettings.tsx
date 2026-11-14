@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { syncKeyAction } from '@omni/shared/fingerprint.ts';
+import { isNewMachine, syncKeyAction } from '@omni/shared/fingerprint.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, ApiError, errorText, useApi } from '../api.ts';
 import { Button, Chip, ErrorNote, InlineConfirm } from '../components/ui.tsx';
@@ -121,7 +121,7 @@ export function SyncKeysCard() {
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate">{d.name}</span>
                   {d.current && <Chip tone="outline">This machine</Chip>}
-                  {action === 'trust' && <Chip tone="needs">New machine</Chip>}
+                  {isNewMachine(d) && <Chip tone="needs">New machine</Chip>}
                   {action === 'confirm' && <Chip tone="needs">Key changed</Chip>}
                 </div>
                 <div className="font-mono text-[12px] break-all text-fg-3">{fingerprintLabel(d.fingerprint)}</div>

@@ -1,5 +1,5 @@
 import type { RefusedChange, SyncDeviceKey } from '@omni/client-core';
-import { formatFingerprint, syncKeyAction } from '@omni/shared/fingerprint.ts';
+import { formatFingerprint, isNewMachine, syncKeyAction } from '@omni/shared/fingerprint.ts';
 
 import { shortAgo } from '../live/channel-model';
 
@@ -37,7 +37,7 @@ export function syncKeyRows(devices: readonly SyncDeviceKey[]): SyncKeyRow[] {
       current: d.current,
       fingerprint: fingerprintLabel(d.fingerprint),
       keyChanged: changed,
-      untrusted: action === 'trust',
+      untrusted: isNewMachine(d),
       pinned: changed && d.pinnedFingerprint ? fingerprintLabel(d.pinnedFingerprint) : null,
       buttonLabel: action === 'trust' ? 'Trust this machine' : changed ? 'Confirm new key' : null,
       confirmLabel: action === 'trust' ? `Trust ${d.name}` : changed ? `Confirm new key for ${d.name}` : null,

@@ -49,6 +49,11 @@ describe('syncKeyRows', () => {
     expect(unpinned).toMatchObject({ untrusted: true, keyChanged: false, buttonLabel: 'Trust this machine' });
   });
 
+  it('marks a new machine with no key yet as new, with no Trust button until its key arrives', () => {
+    const [d] = syncKeyRows([device({ trusted: false, fingerprint: null, pinnedFingerprint: null })]);
+    expect(d).toMatchObject({ untrusted: true, buttonLabel: null, confirmLabel: null });
+  });
+
   it('treats a machine from a server without the trusted field as trusted', () => {
     const [d] = syncKeyRows([device()]);
     expect(d).toMatchObject({ untrusted: false, buttonLabel: null });
