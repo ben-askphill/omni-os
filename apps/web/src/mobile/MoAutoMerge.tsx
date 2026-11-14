@@ -12,7 +12,7 @@ import { MoGroup, MoListRow } from './parts.tsx';
 export function MoAutoMerge({ channelId, n, p, onChanged }: { channelId: string; n: number; p: PRDetail; onChanged: () => void }) {
   const a = useAutoMerge(channelId, n, p, onChanged);
   const [arming, setArming] = useState(false);
-  const { on, title, detail } = a.view;
+  const { on, title, detail, by } = a.view;
   const icon = <Icon name="zap" size={18} className={on ? 'text-live-text' : ''} />;
   return (
     <div className="flex flex-col gap-2">
@@ -36,7 +36,8 @@ export function MoAutoMerge({ channelId, n, p, onChanged }: { channelId: string;
           <MoListRow
             icon={icon}
             label={title}
-            sub={detail}
+            sub={by ? `${detail}. ${by}.` : detail}
+            wrapSub
             right={
               on ? (
                 <Button size="sm" busy={a.busy} onClick={() => void a.set(false).catch(() => {})}>
