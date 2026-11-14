@@ -1,11 +1,23 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
+    "pr-writer": {
+      "source": "ben-askphill/agent-config",
+      "sourceType": "github",
+      "skillPath": "agents/skills/pr-writer/SKILL.md",
+      "computedHash": "ef0a9c37d3ae30612d7a07fe7e25a5b8abc1291c0cf7180f1e6014329992b8a0"
+    },
     "turborepo": {
       "source": "vercel/turborepo",
       "sourceType": "github",
       "skillPath": "skills/turborepo/SKILL.md",
-      "computedHash": "9681d8dfeb5e6cdff767f1bcaba5d7ac55732a9d6c02ee120f44229f8ec25e7e"
+      "computedHash": "49bb6427015253ce5d93f15dfa6c9ade3f8528f0fbe54769b6da1e1458f058d4"
+    },
+    "unslop": {
+      "source": "ben-askphill/agent-config",
+      "sourceType": "github",
+      "skillPath": "agents/skills/unslop/SKILL.md",
+      "computedHash": "be5fe9bb6a769e12bd9187d1ec3364f66238e357368c9681ec2987c0d0085836"
     }
   }
 }
