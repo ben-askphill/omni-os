@@ -22,10 +22,11 @@ function readToken(): string {
 
 // Rotating the install token rewrites the file, so a 401 reads it again and retries once with what it holds now.
 let token = process.env.OMNI_TOKEN?.trim() || readToken();
+const REREAD = !process.env.OMNI_TOKEN?.trim() || !!process.env.OMNI_TOKEN_FILE;
 const call = callOver(async (path, init) => {
   const send = () => fetch(`${BASE}${path}`, { ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } });
   const res = await send();
-  if (res.status !== 401) return res;
+  if (res.status !== 401 || !REREAD) return res;
   const fresh = readToken();
   if (!fresh || fresh === token) return res;
   token = fresh;

@@ -77,12 +77,10 @@ describe('apps/mcp call() after the install token rotates', () => {
 });
 
 describe('the local stdio MCP server after the install token rotates', () => {
-  it('reads the token file again on a 401 and keeps the new token', { timeout: 30_000 }, async () => {
-    accepted = NEW;
-    writeFileSync(file, `${NEW}\n`);
-    // Plain node, the way a client outside Omni starts it.
+  /** Starts stdio.ts with plain node, the way a client outside Omni does. */
+  const start = (env: Record<string, string>) => {
     const child = spawn(process.execPath, [join(import.meta.dirname, '../../mcp/external/stdio.ts')], {
-      env: { PATH: process.env.PATH ?? '', OMNI_URL: base, OMNI_TOKEN: OLD, OMNI_TOKEN_FILE: file },
+      env: { PATH: process.env.PATH ?? '', OMNI_URL: base, OMNI_TOKEN: OLD, ...env },
       stdio: ['pipe', 'pipe', 'inherit'],
     });
     const waiting = new Map<number, (msg: any) => void>();
@@ -96,8 +94,16 @@ describe('the local stdio MCP server after the install token rotates', () => {
         waiting.set(++id, resolve);
         child.stdin!.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
       });
+    const ready = request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
+    return { child, request, ready };
+  };
+
+  it('reads the token file again on a 401 and keeps the new token', { timeout: 30_000 }, async () => {
+    accepted = NEW;
+    writeFileSync(file, `${NEW}\n`);
+    const { child, request, ready } = start({ OMNI_TOKEN_FILE: file });
     try {
-      await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
+      await ready;
       seen.length = 0;
       const first = await request('tools/call', { name: 'list_channels', arguments: {} });
       expect(first.result.isError).toBeFalsy();
@@ -106,6 +112,22 @@ describe('the local stdio MCP server after the install token rotates', () => {
       const second = await request('tools/call', { name: 'list_channels', arguments: {} });
       expect(second.result.isError).toBeFalsy();
       expect(seen).toEqual([`Bearer ${NEW}`]);
+    } finally {
+      child.kill('SIGTERM');
+    }
+  });
+
+  it('does not send this checkout\'s token file when OMNI_TOKEN came without OMNI_TOKEN_FILE', { timeout: 30_000 }, async () => {
+    accepted = NEW;
+    const data = mkdtempSync(join(tmpdir(), 'omni-mcp-data-'));
+    writeFileSync(join(data, 'api-token'), `${NEW}\n`);
+    const { child, request, ready } = start({ OMNI_DATA_DIR: data });
+    try {
+      await ready;
+      seen.length = 0;
+      const r = await request('tools/call', { name: 'list_channels', arguments: {} });
+      expect(r.result.isError).toBe(true);
+      expect(seen).toEqual([`Bearer ${OLD}`]);
     } finally {
       child.kill('SIGTERM');
     }
