@@ -5,6 +5,7 @@ import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
 import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
+import { GoalLine } from '../components/thread/GoalLine.tsx';
 import { HistoryCtx, HistoryEdgeRow } from '../components/thread/HistoryEdgeRow.tsx';
 import { historyEdges } from '@omni/shared/history.ts';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
@@ -204,6 +205,7 @@ export function ThreadScreen() {
                 );
               })}
               {edges.get(-1) && <HistoryEdgeRow edge={edges.get(-1)!} history={history} touch />}
+              <GoalLine thread={thread} running={thread.status === 'running'} mobile onSent={(t) => applyThread(t, true)} />
               <CrewQuestions threadId={thread.id} touch onOpen={(id) => shell.open(href.thread(id))} />
               <HandoffCard thread={thread} handoff={handoff} mobile onChanged={handedOff} />
               {!view.turns.length && !thread.setup && <MoEmpty>Nothing here yet.</MoEmpty>}

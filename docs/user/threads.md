@@ -54,6 +54,10 @@ The Details tab's agents card lists them under **Running**: every agent the thre
 
 Claude Code reports its agents itself. Codex (multi-agent spawns), Cursor Agent (its task tool) and Hermes (`subagent.*` events) are mapped onto the same list. Cursor Cloud reports no sub-agents.
 
+## Goals
+
+On Claude Code, `/goal <condition>` keeps the thread working until the condition holds. A line under the transcript shows the goal: **Pursuing goal** while a turn works on it, **Goal set** while it waits, and **Goal complete** once a turn ends with it met. It also counts how often Claude's check found the condition unmet. **Clear** sends `/goal clear`. A met goal leaves the line when your next message reaches the session, and any goal goes away when the thread starts a new session. While the thread works toward a goal, its status reads **Goal**, not Running. Claude Code has no pause or resume for goals. The goal stays on the machine that runs the thread and does not sync. Codex, Cursor Agent, Cursor Cloud and Hermes get no goal line.
+
 ## Plan steps
 
 When the agent posts a plan, click a step's checkbox to cycle it through pending, in progress and completed. The change is saved as a `plan_step_update` event and survives reloads. Desktop web, phone web and the desktop app all do this.

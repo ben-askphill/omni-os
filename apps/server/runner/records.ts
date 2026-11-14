@@ -9,6 +9,7 @@ import { notifyEnded } from '../push-sender.ts';
 import { observeToolResult } from '../tool-failures.ts';
 import { toolTails } from '../tool-tail.ts';
 import { isSubagent, type ModUi, type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
+import { goalOf, nextGoal, type GoalSignal } from '@omni/shared/goal.ts';
 import { armIdle, clearInterrupt, endTurn, requeueHeld, teardown } from './session.ts';
 import { finishTurnSnapshot, startTurnSnapshot } from './snapshots.ts';
 import { pump, reportToParent } from './queue.ts';
@@ -118,6 +119,27 @@ export function onMod(live: Live, m: ModUi) {
   if (live.setMod(m.plugin, m.text)) publishMods();
 }
 
+/** Claude Code's goal moved. The thread row keeps it, and the goal line follows. */
+export function onGoal(live: Live, s: GoalSignal) {
+  const id = live.threadId;
+  const t = threads.get(id);
+  if (!t) return;
+  const next = nextGoal(goalOf(t), s);
+  if (next !== undefined && threads.setGoal(id, next)) emitThread(id);
+}
+
+/**
+ * A turn that ends on its own while a goal is active ended with the goal met: Claude's goal hook holds the turn open
+ * until the condition holds, then clears the goal. Not after a stop, a failure, a local command, or while a background
+ * task still runs: the condition may not hold yet.
+ */
+function goalMet(live: Live, p: ResultPayload, stopped: boolean) {
+  const t = threads.get(live.threadId);
+  const goal = t && goalOf(t);
+  if (!goal || goal.status !== 'active' || !p.ok || !p.turns || stopped || hasBackground(live)) return;
+  threads.setGoal(live.threadId, { ...goal, status: 'complete' });
+}
+
 export function onResult(live: Live, p: ResultPayload) {
   const id = live.threadId;
   const { limit, answered } = live.sawResult();
@@ -133,6 +155,7 @@ export function onResult(live: Live, p: ResultPayload) {
   const stopped = !!intr && (intr.acked || !p.ok);
   // The result text duplicates the last assistant message; keep only the metadata.
   addEvent(id, 'result', { ...p, text: undefined, stopped: stopped || undefined });
+  goalMet(live, p, stopped);
   if (!live.turn) return;
   if (stopped) clearInterrupt(live);
   // Steers the CLI has not replayed yet: it starts the next turn with them on its own.
@@ -179,6 +202,8 @@ export function onRecord(live: Live, rec: StreamRecord) {
       // The harness read it: the transcript records it here, where it did.
       const row = addEvent(id, m.event.kind, eventPayload(m));
       track(m, 'delivered', row.id);
+      // A met goal stays on the line until Ben's next message reaches the session.
+      if (threads.get(id)?.goal_status === 'complete') threads.setGoal(id, null);
       return emitThread(id);
     }
     case 'control':
@@ -199,6 +224,8 @@ export function onRecord(live: Live, rec: StreamRecord) {
       return onTask(live, rec.payload);
     case 'mod':
       return onMod(live, rec.payload);
+    case 'goal':
+      return onGoal(live, rec.payload);
     case 'limit':
       // Kept until the result says whether the turn failed. A later one with a reset time wins over one without.
       live.sawLimit(rec.payload.resets_at);

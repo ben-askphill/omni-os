@@ -24,6 +24,8 @@ import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, th
 import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
 import { dismissQuestions } from './questions.ts';
 import { runnerPorts } from './ports.ts';
+import { interruptThread } from './session.ts';
+import { parseGoalCommand } from '@omni/shared/goal.ts';
 import { assignRouted, remoteHolder } from '../ownership.ts';
 import { sendUploads } from '../sync/files.ts';
 
@@ -425,7 +427,8 @@ export async function postMessage(
 ): Promise<PostedThread> {
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
-  const mode = opts.mode ?? 'steer';
+  const goal = goalSend(thread, prompt, opts.attachments?.length ?? 0);
+  const mode = goal ? 'queue' : (opts.mode ?? 'steer');
   const source = opts.from ?? 'ben';
   const files = (opts.attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' }));
   const fingerprint = opts.fingerprint ?? requestFingerprint({ prompt, mode, source, files, context: opts.context });
@@ -461,8 +464,25 @@ export async function postMessage(
   });
   // The same id posted twice at once: the second waits for nothing.
   if (!fresh) return acceptedAgain(threadId, row.request_id, fingerprint)!;
-  await inOrder(threadId, () => deliverRequest(row, () => messageRequests.remove(row.id)));
+  await inOrder(threadId, () => {
+    // Stopped before the command queues: Stop drops what is held behind the turn, and what queues behind a stop runs
+    // next. Checked here, in order, so the command never stops the turn it starts itself.
+    if (goal?.stops && threads.get(threadId)?.status === 'running') interruptThread(threadId);
+    return deliverRequest(row, () => messageRequests.remove(row.id));
+  });
   return accepted(threadId, row);
+}
+
+/**
+ * A `/goal` message to Claude Code, which runs it only as a turn of its own: steered into a running turn it is plain
+ * text. It queues instead. A new goal, or a clear while a goal is active, stops the running turn so it applies now;
+ * a bare `/goal` waits for the turn. Null for anything else, and for a message with files, which is a prompt.
+ */
+function goalSend(thread: Thread, prompt: string, files: number): { stops: boolean } | null {
+  if (thread.harness !== 'claude-code' || files) return null;
+  const cmd = parseGoalCommand(prompt);
+  if (!cmd) return null;
+  return { stops: cmd.type === 'set' || (cmd.type === 'clear' && thread.goal_status === 'active') };
 }
 
 /**

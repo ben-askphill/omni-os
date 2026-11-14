@@ -3,6 +3,7 @@ import { relTime } from '@omni/shared/format.ts';
 import type { Thread, ThreadStub } from '../api.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
 import { STATUS, threadGlyph } from '@omni/shared/status.ts';
+import { runningLabel } from '@omni/shared/goal.ts';
 
 export interface RowItem {
   id: string;
@@ -47,6 +48,6 @@ export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: nu
     status: glyph,
     settled: !isWorking(t),
     time: shortTime(t.updated_at ?? t.created_at, now),
-    meta: glyph === 'done' || glyph === 'idle' ? null : STATUS[glyph].label,
+    meta: glyph === 'done' || glyph === 'idle' ? null : t.status === 'running' ? runningLabel(t, STATUS[glyph].label) : STATUS[glyph].label,
   };
 }

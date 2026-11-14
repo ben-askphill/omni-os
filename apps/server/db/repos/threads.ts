@@ -1,4 +1,5 @@
 import type { RunName } from '@omni/shared/run-switch.ts';
+import type { Goal, GoalStatus } from '@omni/shared/goal.ts';
 import { db, now, tx } from '../connection.ts';
 import { outbox, record } from '../sync.ts';
 import { assignments } from './assignments.ts';
@@ -74,6 +75,13 @@ export interface Thread {
   limit_resets_at: string | null;
   /** 1 when the stop is the other Mac's: it shows here, and is resumed or scheduled there. */
   limit_elsewhere: number;
+  /**
+   * Claude Code's `/goal` on this thread's session (packages/shared/goal.ts): the condition, active or complete, and how
+   * many checks found it unmet. Null objective: none. Local only, not synced: the goal lives in this machine's session.
+   */
+  goal_objective: string | null;
+  goal_status: GoalStatus | null;
+  goal_checks: number;
   /** The thread this one continues on another harness (apps/server/continue.ts), null for most. Not a crew parent. Synced. */
   continued_from: string | null;
   created_at: string;
@@ -132,11 +140,14 @@ const storedHandover = (h: PendingHandover | null | undefined): StoredSessionSta
 const readSessions = (s: StoredSessionState['sessions']): Sessions =>
   Object.fromEntries(Object.entries(s ?? {}).flatMap(([h, p]) => (p ? [[h, { id: p.id, seen: idOf(p.seen) }]] : [])));
 const readHandover = (h: StoredSessionState['handover']): PendingHandover | null => (h ? { from: h.from, since: h.since ? idOf(h.since) : 0, ...(h.started && { started: true }), ...(h.fresh && { fresh: true }) } : null);
+/** Drops the goal when the session id changes; SET reads the row's old values. */
+const GOAL_RESET =
+  'goal_objective = CASE WHEN session_id IS ? THEN goal_objective END, goal_status = CASE WHEN session_id IS ? THEN goal_status END, goal_checks = CASE WHEN session_id IS ? THEN goal_checks ELSE 0 END';
 const json = (v: object | null) => (v ? JSON.stringify(v) : null);
 
 /** The columns clients read, without sync's run_machine, the limit stop's id and owner, or the session state. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, continued_from, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, created_at, updated_at';
 
 /**
  * The machine whose status write this is: this one while it is running or queued here and sync is set up, else nobody.
@@ -276,7 +287,7 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'continued_from'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; auto_reason?: string | null; folder_id?: string | null; setup?: ThreadSetup | null;
     },
@@ -313,6 +324,8 @@ export const threads = {
     if ('sessions' in patch) (sets.push('sessions = ?'), vals.push(json(storedSessions(patch.sessions))));
     if ('handover' in patch) (sets.push('handover = ?'), vals.push(json(storedHandover(patch.handover))));
     if (!('updated_at' in patch)) (sets.push('updated_at = ?'), vals.push(now()));
+    // A new session starts without the old one's goal.
+    if (patch.session_id) (sets.push(GOAL_RESET), vals.push(patch.session_id, patch.session_id, patch.session_id));
     // Every status write says who runs the thread, so the row itself tells the other Mac (apps/server/sync/guard.ts).
     if (patch.status) (sets.push('run_machine = ?'), vals.push(runMachine(patch.status)));
     // A run starting, or Ben retrying its setup, is news: a thread marked done comes back to Needs you when it ends.
@@ -355,6 +368,20 @@ export const threads = {
    */
   setSuggestion(id: string, text: string | null) {
     return db.prepare('UPDATE threads SET suggestion = ? WHERE id = ? AND suggestion IS NOT ?').run(text, id, text).changes > 0;
+  },
+  /** Its goal, or null to drop it. Like the suggestion: updated_at stays and sync never hears of it. True when it changed. */
+  setGoal(id: string, g: Goal | null) {
+    const objective = g?.objective ?? null;
+    const status = g?.status ?? null;
+    const checks = g?.checks ?? 0;
+    return (
+      db
+        .prepare(
+          `UPDATE threads SET goal_objective = ?, goal_status = ?, goal_checks = ?
+           WHERE id = ? AND (goal_objective IS NOT ? OR goal_status IS NOT ? OR goal_checks IS NOT ?)`,
+        )
+        .run(objective, status, checks, id, objective, status, checks).changes > 0
+    );
   },
   /** The proposed follow-up thread, or null to drop it. Like the suggestion: updated_at stays and sync never hears of it. */
   setNextThread(id: string, next: { title: string; prompt: string } | null) {

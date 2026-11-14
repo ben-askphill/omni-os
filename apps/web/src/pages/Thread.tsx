@@ -9,6 +9,7 @@ import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
 import { LimitCard } from '../components/thread/LimitCard.tsx';
+import { GoalLine } from '../components/thread/GoalLine.tsx';
 import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
@@ -227,6 +228,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                     <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} />
                   </ThreadIdCtx.Provider>
                 </LinkChannel.Provider>
+                <div className="mt-4 empty:hidden">
+                  <GoalLine thread={thread} running={turnInProgress} onSent={(t) => applyThread(t, true)} />
+                </div>
                 <div className="mt-4 empty:hidden">
                   <CrewQuestions threadId={id} />
                 </div>

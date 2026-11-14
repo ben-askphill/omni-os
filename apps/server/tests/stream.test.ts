@@ -280,6 +280,37 @@ describe('parseEvent: rate limits and results', () => {
   });
 });
 
+describe('parseEvent: /goal (claude 2.1.316)', () => {
+  const synthetic = (text: string) => ({ type: 'assistant', parent_tool_use_id: null, message: { model: '<synthetic>', content: [{ type: 'text', text }] } });
+
+  it('reads a goal set as a goal record, not a reply', () => {
+    expect(parseEvent(synthetic('Goal set: the suite passes')).records).toEqual([{ kind: 'goal', payload: { event: 'set', objective: 'the suite passes' } }]);
+    expect(parseEvent(synthetic('Goal cleared: the suite passes')).records).toEqual([{ kind: 'goal', payload: { event: 'cleared' } }]);
+  });
+
+  it('keeps the answer to a bare /goal as text', () => {
+    expect(parseEvent(synthetic('Goal active: ship it (2 turns)')).records).toEqual([
+      { kind: 'goal', payload: { event: 'active', objective: 'ship it', checks: 2 } },
+      { kind: 'assistant_text', payload: { text: 'Goal active: ship it (2 turns)' } },
+    ]);
+  });
+
+  it('leaves a model\'s own "Goal set:" text alone', () => {
+    const evt = { type: 'assistant', parent_tool_use_id: null, message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Goal set: done' }] } };
+    expect(parseEvent(evt).records).toEqual([{ kind: 'assistant_text', payload: { text: 'Goal set: done' } }]);
+  });
+
+  it('reads the goal check\'s synthetic message', () => {
+    const evt = { type: 'user', isSynthetic: true, parent_tool_use_id: null, message: { role: 'user', content: [{ type: 'text', text: 'Stop hook feedback:\n[ship it]: Not yet.' }] } };
+    expect(parseEvent(evt).records).toEqual([{ kind: 'goal', payload: { event: 'check', objective: 'ship it' } }]);
+  });
+
+  it('drops a goal acknowledgement from a local command\'s result text', () => {
+    const [res] = parseEvent({ type: 'result', subtype: 'success', num_turns: 0, result: 'Goal cleared: ship it' }).records;
+    expect(res).toMatchObject({ kind: 'result', payload: { ok: true, text: undefined } });
+  });
+});
+
 describe('parseEvent: junk input', () => {
   it.each([null, undefined, 42, 'str', {}, { type: 'nope' }])('returns no records for %j', (evt) => {
     expect(parseEvent(evt).records).toEqual([]);

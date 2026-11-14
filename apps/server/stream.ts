@@ -1,6 +1,7 @@
 // Pure translation of `claude -p --output-format stream-json` events into the
 // small set of records Omni stores and renders. No I/O here so it is testable.
 import { usageTokens } from '@omni/shared/context-meter.ts';
+import { goalCheck, goalReply, type GoalSignal } from '@omni/shared/goal.ts';
 
 export type Record =
   | { kind: 'init'; payload: { model: string; cwd: string; tools: number; mcp: string[] } }
@@ -22,6 +23,8 @@ export type Record =
   | { kind: 'limit'; payload: { resets_at: number | null } }
   /** A mod (a Claude Code plugin with JS hooks) called $.ui.log, $.ui.toast or $.ui.status. */
   | { kind: 'mod'; payload: ModUi }
+  /** Claude Code's `/goal` moved: set, cleared, reported or checked (packages/shared/goal.ts). */
+  | { kind: 'goal'; payload: GoalSignal }
   /** Where a Cursor cloud agent's run stands. A new row each time its status, branch or PR moves; the newest per run wins. */
   | { kind: 'cloud_agent'; payload: CloudAgentState }
   | {
@@ -258,6 +261,12 @@ export function parseEvent(evt: any): Parsed {
       // A local command's reply is '<synthetic>' with zero usage: it says nothing about the window.
       const used = usageTokens(evt.message?.usage);
       if (!parent && used && evt.message?.model !== '<synthetic>') out.context = { used, model: evt.message?.model };
+      // A local `/goal` reply. The goal line shows a set or a clear, so its acknowledgement is not a reply too.
+      const reply = !parent && evt.message?.model === '<synthetic>' ? goalReply(blockText(evt.message?.content)) : null;
+      if (reply) {
+        out.records.push({ kind: 'goal', payload: reply.signal });
+        if (reply.ack) break;
+      }
       for (const b of (evt.message?.content ?? []) as Block[]) {
         if (b.type === 'text' && b.text?.trim()) {
           // Sub-agent chatter stays inside its tool call; only top-level text is the answer.
@@ -276,6 +285,11 @@ export function parseEvent(evt: any): Parsed {
           : '';
         out.records.push({ kind: 'replay', payload: { uuid: String(evt.uuid ?? ''), text } });
         break;
+      }
+      // The goal check said "not yet": the CLI adds its reason as a synthetic message and keeps working.
+      if (evt.isSynthetic && !evt.parent_tool_use_id) {
+        const check = goalCheck(blockText(content));
+        if (check) out.records.push({ kind: 'goal', payload: check });
       }
       // Tool results only. Interrupt markers ("[Request interrupted by user...]") are plain text blocks and drop out here.
       if (!Array.isArray(content)) break;
@@ -342,7 +356,8 @@ export function parseEvent(evt: any): Parsed {
           duration_ms: evt.duration_ms,
           turns: evt.num_turns,
           cost_usd: evt.total_cost_usd,
-          text: typeof evt.result === 'string' ? evt.result : undefined,
+          // A goal acknowledgement repeated as a local command's result: the goal line already shows it.
+          text: typeof evt.result === 'string' && !goalReply(evt.result)?.ack ? evt.result : undefined,
         },
       });
       break;

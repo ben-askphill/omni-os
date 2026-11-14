@@ -327,6 +327,10 @@ export function migrate() {
   // limit_elsewhere is 1 on a Mac that holds the other Mac's stop, so clients show it without offering to act.
   for (const col of ['limit_state', 'limit_resets_at', 'limit_id', 'limit_machine']) ensureColumn('threads', col, 'TEXT');
   ensureColumn('threads', 'limit_elsewhere', 'INTEGER NOT NULL DEFAULT 0');
+  // Claude Code's `/goal` on the thread's session (packages/shared/goal.ts). Local, not synced: the goal is the session's.
+  ensureColumn('threads', 'goal_objective', 'TEXT');
+  ensureColumn('threads', 'goal_status', 'TEXT');
+  ensureColumn('threads', 'goal_checks', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('channels', 'icon', 'TEXT');
   ensureColumn('channels', 'avatar_bg', 'TEXT');
   ensureColumn('channels', 'avatar_bg_manual', 'INTEGER NOT NULL DEFAULT 0');

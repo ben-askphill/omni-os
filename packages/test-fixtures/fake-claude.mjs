@@ -18,6 +18,10 @@
 //                     on its own (no message of ours, no replay)
 //   /<command>        a message starting with a slash is a local command: no model call, a zero-turn success result
 //                     whose text is the command output
+//   /goal <condition> Claude Code's goal (as probed against claude 2.1.316): a synthetic "Goal set: <condition>" reply,
+//                     then the turn runs as usual and the goal clears once it ends. CHECKS:<n> in the condition: the goal
+//                     check finds it unmet that many times first, each a synthetic "Stop hook feedback" message and
+//                     another model call. `/goal` alone and `/goal clear` answer locally, as the real CLI does
 //   TITLE:<ms>        text mode (Omni's title call): take that long to write the title
 //   SUGGEST:<ms>      text mode (Omni's reply suggestion): take that long to answer
 //   SUGGEST_NONE      text mode (Omni's reply suggestion): answer NONE
@@ -429,6 +433,16 @@ function pause(t, ms) {
   });
 }
 
+/** The session's `/goal` condition, null when none is set. */
+let goal = null;
+
+/** A local command's reply, which the CLI sends as an assistant message from no model. */
+const synthetic = (text) =>
+  emit({
+    type: 'assistant', message: { id: `msg_fake_${++seq}`, type: 'message', role: 'assistant', model: '<synthetic>', content: [{ type: 'text', text }], usage: { input_tokens: 0, output_tokens: 0 } },
+    parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID(),
+  });
+
 async function runTurn() {
   const t = (turn = { interrupted: false, ignoreInterrupt: false, abort: null });
   const started = Date.now();
@@ -488,8 +502,30 @@ async function runTurn() {
   };
   if (!take()) return;
 
+  let goalMisses = 0;
+  const goalCmd = seen.length === 1 ? /^\/goal(?:\s+([\s\S]*))?$/.exec(seen[0].trim()) : null;
+  if (goalCmd) {
+    const arg = (goalCmd[1] ?? '').trim();
+    if (!arg || arg.toLowerCase() === 'clear') {
+      const text = arg
+        ? goal ? `Goal cleared: ${goal}` : 'No goal set'
+        : goal ? `Goal active: ${goal} (not yet evaluated)` : 'No goal set. Usage: `/goal <condition>`';
+      if (arg) goal = null;
+      synthetic(text);
+      emit({
+        type: 'result', subtype: 'success', is_error: false, duration_ms: Date.now() - started, duration_api_ms: 0, num_turns: 0,
+        result: text, stop_reason: null, total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0 }, permission_denials: [],
+        fake_pid: process.pid,
+      });
+      return;
+    }
+    goal = arg;
+    goalMisses = Number(arg.match(/CHECKS:(\d+)/)?.[1] ?? 0);
+    synthetic(`Goal set: ${arg}`);
+  }
+
   // A local slash command never calls the model: a zero-turn success result carries its output.
-  if (seen.length === 1 && seen[0].startsWith('/')) {
+  if (!goalCmd && seen.length === 1 && seen[0].startsWith('/')) {
     const output = `Output of ${seen[0].split(/\s/)[0]}`;
     if (seen[0].startsWith('/compact')) contextTokens = 8_000;
     emit({ type: 'system', subtype: 'local_command_output', content: output });
@@ -605,6 +641,16 @@ async function runTurn() {
     steps++;
     finalText = `ack: ${[...seen, ...answers].join(' | ')}`;
     assistant(`msg_fake_${++seq}`, [{ type: 'text', text: finalText }]);
+    if (goal && goalMisses > 0) {
+      // The goal hook blocks the stop: its reason goes in as a synthetic message and the model goes on.
+      goalMisses--;
+      finalText = null;
+      emit({
+        type: 'user', message: { role: 'user', content: [{ type: 'text', text: `Stop hook feedback:\n[${goal}]: Not met yet.` }] },
+        parent_tool_use_id: null, isSynthetic: true, session_id: sessionId, uuid: randomUUID(), timestamp: now(),
+      });
+      continue;
+    }
     emit({ type: 'system', subtype: 'post_turn_summary', status_category: 'completed', status_detail: 'fake turn', needs_action: '' });
     break;
   }
@@ -612,6 +658,8 @@ async function runTurn() {
   if (t.interrupted && finalText == null && !toolRejected) marker('[Request interrupted by user]');
 
   const ok = finalText != null;
+  // Met: the goal clears itself.
+  if (ok) goal = null;
   emit({
     type: 'result',
     subtype: ok ? 'success' : 'error_during_execution',
