@@ -17,6 +17,7 @@ export async function bootMac(id: string, name: string, relay: MemoryTransport, 
   const files = await import('../sync/files.ts');
   const devices = await import('../sync/devices.ts');
   const tailscale = await import('../tailscale.ts');
+  const stats = await import('../machine-stats.ts');
   const { app } = await import('../app.ts');
   const home = join(r.tmp, 'home');
   mkdirSync(home);
@@ -45,7 +46,7 @@ export async function bootMac(id: string, name: string, relay: MemoryTransport, 
     if (res.error) throw new Error(`${id} sync failed: ${res.error}`);
     return res;
   };
-  return { ...r, id, name, home, worker, files, devices, app, json, tailnet, sync: sync1 };
+  return { ...r, id, name, home, worker, files, devices, stats, app, json, tailnet, sync: sync1 };
 }
 
 export type Mac = Awaited<ReturnType<typeof bootMac>>;

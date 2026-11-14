@@ -6,6 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { filterClaudeArtifacts, type ClaudeArtifact } from '@omni/shared/claude-artifacts.ts';
 import { openNotesView } from '@omni/shared/review-notes.ts';
+import { awaitingStats, statsReport, type MachinesView } from '@omni/shared/machines.ts';
 import { ApiError, call, SELF, text } from './api.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
@@ -593,11 +594,24 @@ server.registerTool(
     description:
       `How much each of ${USER}'s machines runs now, this one first: running and queued threads, how many of those were delegated, ` +
       'Needs you items for threads it holds, each harness against its slot cap, and whether Tailscale sees it up. ' +
-      'Sub-agents inside processes are counted for this machine only (agents is null for the others). An offline machine keeps the counts it last reported.',
+      'Sub-agents inside processes are counted for this machine only (agents is null for the others). An offline machine keeps the counts it last reported. ' +
+      'Each machine also has stats: CPU busy percent over the last few seconds, memory in use against the total (as Activity Monitor counts it on macOS, total less MemAvailable on Linux), load average and cores, with sampledAt and ageSeconds. ' +
+      'Another machine samples only while someone watches, so this waits up to 10 seconds for fresh ones. stale is true for a sample over a minute old, an offline machine or sync here not live; a stat is null where that machine cannot measure it, never a guess.',
   },
   async () => {
-    const v = await call('/machines');
-    return text({ ...v, machines: v.machines.map(({ threadIds: _ids, ...m }: { threadIds: string[] }) => m) });
+    let v: MachinesView = await call('/machines?stats=1');
+    for (let i = 0; i < 4 && awaitingStats(v); i++) {
+      await new Promise((r) => setTimeout(r, 2_500));
+      v = await call('/machines?stats=1');
+    }
+    const now = Date.now();
+    return text({
+      ...v,
+      machines: v.machines.map((m) => {
+        const { threadIds: _ids, stats: _stats, ...rest } = m;
+        return { ...rest, ...statsReport(m, v, now) };
+      }),
+    });
   },
 );
 

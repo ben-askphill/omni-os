@@ -3,6 +3,7 @@ import { harnessRank, type MachineHarness, type MachineLoad, type MachinesView }
 import type { DeviceRecord } from '@omni/shared/handoff.ts';
 import { about } from './about.ts';
 import { assignments, db, needsYou, outbox } from './db.ts';
+import { syncedStats, watchStats } from './machine-stats.ts';
 import { activeTasks, slotCaps } from './runner/state.ts';
 import { currentRecords, deviceRecords } from './sync/devices.ts';
 import { syncStatus } from './sync/worker.ts';
@@ -11,7 +12,8 @@ import { reachabilityOf, tailnet } from './tailscale.ts';
 // GET /api/machines (@omni/shared/machines.ts): what each machine runs now. Every number comes from rows sync already
 // carries: a running or queued thread row names the machine running it in run_machine (db/repos/threads.ts), the
 // assignment names the machine that holds a thread, and devices.<id> names each machine and its caps. Only the
-// in-process sub-agents are this machine's alone.
+// in-process sub-agents are this machine's alone. CPU and memory come from each machine's sampler (machine-stats.ts):
+// asking starts this machine's and, through sync, the others'.
 
 type RunRow = { id: string; status: 'running' | 'queued'; harness: string | null; parent_id: string | null; run_machine: string | null };
 
@@ -54,7 +56,8 @@ function load(rows: RunRow[], caps: Record<string, number> | undefined): Pick<Ma
   };
 }
 
-export async function machinesView(): Promise<MachinesView> {
+/** `stats` samples this machine even with no other machine to show it beside (the Conductor's `machines` tool). */
+export async function machinesView({ stats: always = false } = {}): Promise<MachinesView> {
   const self = outbox.machineId();
   const sync = syncStatus();
   const syncLive = !!self && sync.configured && sync.enabled && !sync.signedOut && !sync.lastError;
@@ -63,6 +66,7 @@ export async function machinesView(): Promise<MachinesView> {
   const records = self ? currentRecords(deviceRecords()) : [];
   const own = records.find((d) => d.id === self);
   const others = records.filter((d) => d.id !== self).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  const stats = await watchStats(others.length > 0, always);
 
   const here: MachineLoad = {
     id: self,
@@ -74,6 +78,7 @@ export async function machinesView(): Promise<MachinesView> {
     ...load(rows.filter((r) => r.run_machine === self), slotCaps()),
     agents: activeTasks().filter((t) => t.subagent).length,
     needsYou: needs.get(self) ?? 0,
+    stats,
   };
   if (!others.length) return { syncLive, lastSyncAt: sync.lastSyncAt, machines: [here] };
 
@@ -91,6 +96,7 @@ export async function machinesView(): Promise<MachinesView> {
       ...load(rows.filter((r) => r.run_machine === d.id), d.caps),
       agents: null,
       needsYou: needs.get(d.id) ?? 0,
+      stats: syncedStats(d.id),
     };
   });
   return { syncLive, lastSyncAt: sync.lastSyncAt, machines: [here, ...remote] };
