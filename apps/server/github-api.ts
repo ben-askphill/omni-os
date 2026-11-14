@@ -87,14 +87,18 @@ githubApi.post('/channels/:id/prs/:n/merge', async (c) => {
   return c.json({ ok: true, output: out });
 });
 
-// Auto-merge on or off. On merges with no further step once GitHub's rules pass, so it needs `confirm: true` as a merge
-// does. `method` is a wish: one the repo does not allow gives way to one it does. gh's refusal (a repo with auto-merge
-// off) comes back as a 422 with gh's words.
+// Auto-merge on or off. On merges with no further step once GitHub's rules pass, so it needs `confirm: true` and a
+// paired device's session (the Web UI, the desktop app, the iOS app). The install token, which agents and their MCP
+// servers hold, may only turn it off: a body flag alone is something any agent can send. `method` is a wish: one the
+// repo does not allow gives way to one it does. gh's refusal (a repo with auto-merge off) comes back as a 422 with gh's words.
 githubApi.post('/channels/:id/prs/:n/auto-merge', async (c) => {
   const { enabled, method } = z
     .object({ enabled: z.boolean(), method: z.enum(['squash', 'merge', 'rebase']).optional(), confirm: z.literal(true).optional() })
     .refine((b) => !b.enabled || b.confirm, { message: 'turning auto-merge on needs confirm: true' })
     .parse(await c.req.json());
+  if (enabled && c.get('omniAuth')?.via !== 'session') {
+    return c.json({ error: 'Only a paired device can turn auto-merge on. Arm it with the slide in the PR view.' }, 403);
+  }
   return c.json(await setAutoMerge(repoOf(c.req.param('id')), Number(c.req.param('n')), enabled, method));
 });
 

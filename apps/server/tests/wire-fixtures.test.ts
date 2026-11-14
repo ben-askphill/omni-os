@@ -899,15 +899,25 @@ async function scenario() {
 
   // Auto-merge: the app asks for rebase, the repo allows squash only, so it arms with squash; the PR view shows it
   // armed, then off. A repo with auto-merge turned off answers with gh's words.
+  // Only a paired device arms it: the install token, which agents hold, is refused even with confirm: true.
   const armBody = request('pr-auto-merge-request.json', { enabled: true, method: 'rebase', confirm: true });
-  const armed = keep('pr-auto-merge.json', await call('POST', '/channels/acme/prs/7/auto-merge', armBody));
+  expect(await call('POST', '/channels/acme/prs/7/auto-merge', armBody, false)).toEqual({ error: 'Only a paired device can turn auto-merge on. Arm it with the slide in the PR view.' });
+  const { code } = (await call('POST', '/auth/app-pairings', {})) as { code: string };
+  const { token: device } = (await call('POST', '/auth/app-pairings/redeem', { code, name: 'Fixture iPhone' })) as { token: string };
+  const asDevice = async (path: string, body: unknown, ok = true) => {
+    const res = await fetch(`${base}/api${path}`, { method: 'POST', headers: { authorization: `Bearer ${device}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const text = await res.text();
+    if (res.ok !== ok) throw new Error(`POST ${path}: ${res.status} ${text}`);
+    return JSON.parse(text);
+  };
+  const armed = keep('pr-auto-merge.json', await asDevice('/channels/acme/prs/7/auto-merge', armBody));
   expect(armed).toMatchObject({ ok: true, method: 'squash', state: 'OPEN', autoMergeRequest: { mergeMethod: 'SQUASH', enabledBy: { login: 'ben' } } });
   expect(((await get('/channels/acme/prs/7')) as { autoMergeRequest: unknown }).autoMergeRequest).toMatchObject({ mergeMethod: 'SQUASH' });
   const offBody = request('pr-auto-merge-off-request.json', { enabled: false });
   expect(keep('pr-auto-merge-off.json', await call('POST', '/channels/acme/prs/7/auto-merge', offBody))).toMatchObject({ ok: true, method: null, autoMergeRequest: null });
   expect(((await get('/channels/acme/prs/7')) as { autoMergeRequest: unknown }).autoMergeRequest).toBeNull();
-  expect(await call('POST', '/channels/gadgets/prs/7/auto-merge', armBody, false)).toEqual({ error: 'GraphQL: Auto merge is not allowed for this repository (enablePullRequestAutoMerge)' });
-  expect(JSON.stringify(await call('POST', '/channels/acme/prs/7/auto-merge', { enabled: true }, false))).toContain('needs confirm: true');
+  expect(await asDevice('/channels/gadgets/prs/7/auto-merge', armBody, false)).toEqual({ error: 'GraphQL: Auto merge is not allowed for this repository (enablePullRequestAutoMerge)' });
+  expect(JSON.stringify(await asDevice('/channels/acme/prs/7/auto-merge', { enabled: true }, false))).toContain('needs confirm: true');
 
   // A delegated thread asks: the thread above it lists the question, with the asking thread's id for the answer.
   const conductor = (await call('POST', '/threads', { channel: 'acme', prompt: 'plan the launch week', title: 'Plan the launch week' })) as Thread;

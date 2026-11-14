@@ -6,7 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { filterClaudeArtifacts, type ClaudeArtifact } from '@omni/shared/claude-artifacts.ts';
 import { ApiError, call, SELF, text } from './api.ts';
-import { prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
+import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
@@ -483,23 +483,27 @@ server.registerTool(
   'set_auto_merge',
   {
     description:
-      `Turn GitHub auto-merge on or off for a PR (gh pr merge --auto / --disable-auto). On, GitHub merges it by itself once its required checks and reviews pass, with no further step: turn it on only when ${USER} asked for it. ` +
-      "It uses the repo's merge method: `method` when the repo allows it, else the first it allows of squash, merge and rebase. " +
-      "A repo with auto-merge turned off refuses with gh's words. Returns gh's output, the method used, and the PR's state and auto-merge read back after " +
-      '(a PR that can merge already may merge at once). repo and number as list_pull_requests or crew_prs give them; the repo must be a channel\'s GitHub repo.',
+      "Read a PR's GitHub auto-merge, or turn it off (gh pr merge --disable-auto). It cannot turn auto-merge on: that merges " +
+      `with no further step, so only ${USER} arms it, with the slide in the PR view. To have it on, ask ${USER}. ` +
+      'enabled: omit to read the PR state and auto-merge (null when off), false to turn it off. repo and number as ' +
+      "list_pull_requests or crew_prs give them; the repo must be a channel's GitHub repo.",
     inputSchema: {
       repo: z.string().describe('owner/name'),
       number: z.number().int().positive(),
-      enabled: z.boolean(),
-      method: z.enum(['squash', 'merge', 'rebase']).optional().describe("Preferred merge method. Omit for the repo's own."),
+      enabled: z.boolean().optional().describe('Omit to read, false to turn off. true is refused.'),
     },
   },
-  async ({ repo, number, enabled, method }) => {
+  async ({ repo, number, enabled }) => {
+    const step = autoMergeStep(enabled, USER);
     const channels: { id: string; github_repo?: string | null }[] = await call('/channels');
     const ch = channels.find((c) => c.github_repo?.toLowerCase() === repo.toLowerCase());
     if (!ch) throw new Error(`No channel has ${repo} as its GitHub repo. list_channels shows each channel's repo.`);
-    const body = enabled ? { enabled, ...(method ? { method } : {}), confirm: true } : { enabled };
-    return text(await call(`/channels/${encodeURIComponent(ch.id)}/prs/${number}/auto-merge`, { method: 'POST', body: JSON.stringify(body) }));
+    const path = `/channels/${encodeURIComponent(ch.id)}/prs/${number}`;
+    if (step.kind === 'read') {
+      const pr = await call(path);
+      return text({ number: pr.number, state: pr.state, autoMergeRequest: pr.autoMergeRequest ?? null });
+    }
+    return text(await call(`${path}/auto-merge`, { method: 'POST', body: JSON.stringify(step.body) }));
   },
 );
 
