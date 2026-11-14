@@ -145,3 +145,14 @@ describe('Conductor channel defaults', () => {
     expect(H.thread(other.id)).toMatchObject({ model: 'claude-sonnet-5-5', auto_reason: expect.any(String) });
   });
 });
+
+describe('channel step prompts', () => {
+  it('sets, keeps and clears them; blank goes back to the built-in prompt', async () => {
+    const set = await patch({ prompt_open_pr: '  Use the pr-writer skill and the repo template.  ', prompt_fix_conflicts: 'Rebase and push.' });
+    expect(set.status).toBe(200);
+    expect(set.body).toMatchObject({ prompt_open_pr: 'Use the pr-writer skill and the repo template.', prompt_fix_conflicts: 'Rebase and push.', prompt_fix_checks: null });
+    expect((await patch({ notes: 'z' })).body.prompt_open_pr).toBe('Use the pr-writer skill and the repo template.');
+    expect((await patch({ prompt_open_pr: '   ' })).body.prompt_open_pr).toBeNull();
+    expect((await patch({ prompt_fix_conflicts: null })).body.prompt_fix_conflicts).toBeNull();
+  });
+});

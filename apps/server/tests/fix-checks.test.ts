@@ -77,6 +77,18 @@ describe('fixChecksPrompt', () => {
     expect(text).not.toContain('```');
   });
 
+  it("starts from the channel's own Fix checks prompt, with or without the failing checks", async () => {
+    const own = 'Fix CI with the repo scripts, then push.';
+    H.db.channels.update('scratch', { prompt_fix_checks: own } as any);
+    try {
+      const text = await F.fixChecksPrompt(thread, deps());
+      expect(text.startsWith(`${own}\n\nFailing checks on PR #3 (2).`)).toBe(true);
+      expect(await F.fixChecksPrompt(thread, deps({ branchChecks: async () => null }))).toBe(own);
+    } finally {
+      H.db.channels.update('scratch', { prompt_fix_checks: null } as any);
+    }
+  });
+
   it('falls back to the plain prompt', async () => {
     expect(await F.fixChecksPrompt({ ...thread, branch: null }, deps())).toBe(FIX_CHECKS_PROMPT);
     expect(await F.fixChecksPrompt({ ...thread, channel_id: 'nope' }, deps())).toBe(FIX_CHECKS_PROMPT);

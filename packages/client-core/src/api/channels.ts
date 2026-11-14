@@ -25,6 +25,10 @@ export interface Channel {
   worktree_include: string | null;
   /** Folders linked from the main checkout into each new worktree, one per line. */
   worktree_shared: string | null;
+  /** The channel's own branch step prompts, null for the built-in ones (`stepPrompts` in @omni/shared/thread-glance.ts). Missing from an older server. */
+  prompt_open_pr?: string | null;
+  prompt_fix_conflicts?: string | null;
+  prompt_fix_checks?: string | null;
   design_system_name: string | null;
   design_system_size: number;
   archived: number;

@@ -10,6 +10,7 @@ import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
 import { lastGrapheme } from '../format.ts';
 import { channelBody, channelForm, channelFormProblem, CHANNEL_ID, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelRun } from '@omni/shared/channel-form.ts';
+import { PR_STEPS, STEP_LABEL, STEP_PROMPTS } from '@omni/shared/thread-glance.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { pageColumn } from '../components/ui/feedback.tsx';
@@ -329,6 +330,20 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Field label="Repo path" htmlFor="ch-repo" hint="Absolute path to a local git repo. Omni reads its GitHub repo from it, and it enables per-thread worktrees and the PRs tab.">
           <input id="ch-repo" className="field font-mono !text-[13px]" value={f.repo_path} onChange={(e) => set('repo_path', e.target.value)} placeholder="~/code/acme-theme" spellCheck={false} />
         </Field>
+      </Card>
+
+      <Card title="Branch steps" subtitle="What the Open PR, Fix conflicts and Fix checks buttons ask the agent in this channel. Empty uses the built-in prompt, shown greyed out.">
+        {PR_STEPS.map((step) => (
+          <Field key={step} label={STEP_LABEL[step]} htmlFor={`ch-step-${step}`}>
+            <textarea
+              id={`ch-step-${step}`}
+              className="field min-h-[84px] resize-y"
+              value={f.prompts[step]}
+              placeholder={STEP_PROMPTS[step]}
+              onChange={(e) => set('prompts', { ...f.prompts, [step]: e.target.value })}
+            />
+          </Field>
+        ))}
       </Card>
 
       <Card title="Store">

@@ -17,6 +17,28 @@ export const OPEN_PR_PROMPT = 'Commit your work, push the branch and open a PR w
 export const FIX_CONFLICTS_PROMPT = 'Rebase this branch on its base branch, resolve the merge conflicts, run the tests and force-push with lease.';
 export const FIX_CHECKS_PROMPT = 'The PR has failing checks. Read the failing check logs with gh, fix the cause, run the tests and push.';
 
+/** What each branch step asks the agent: the built-in prompts, or a channel's own (`stepPrompts`). */
+export type StepPrompts = Record<PRStep, string>;
+
+export const STEP_PROMPTS: StepPrompts = { open: OPEN_PR_PROMPT, conflicts: FIX_CONFLICTS_PROMPT, checks: FIX_CHECKS_PROMPT };
+
+/** The channel column that holds a step's own prompt (Channel Settings > Branch steps). Null or blank is the built-in one. */
+export const STEP_PROMPT_FIELD = { open: 'prompt_open_pr', conflicts: 'prompt_fix_conflicts', checks: 'prompt_fix_checks' } as const;
+
+export type StepPromptField = (typeof STEP_PROMPT_FIELD)[PRStep];
+
+/** A channel's step prompts as stored: one per field, null for the built-in. */
+export type StepPromptOverrides = { [K in StepPromptField]?: string | null };
+
+/**
+ * The prompt each step sends in a channel: its own text where Channel Settings sets one, else the built-in. This is the
+ * instruction only; a step that adds context (the failing logs for Fix checks) appends it after this text.
+ */
+export function stepPrompts(c?: StepPromptOverrides | null): StepPrompts {
+  const pick = (step: PRStep) => c?.[STEP_PROMPT_FIELD[step]]?.trim() || STEP_PROMPTS[step];
+  return { open: pick('open'), conflicts: pick('conflicts'), checks: pick('checks') };
+}
+
 export type PRTone = 'live' | 'done' | 'needs' | 'outline';
 
 /** open, draft, merged or closed, with the chip tone the PRs page uses. */
@@ -37,11 +59,11 @@ export type PRNext =
  * The one step a branch's PR calls for, in the order Ben takes them: open it, fix conflicts, fix failing checks, then
  * merge. Nothing for a merged or closed PR, while checks still run, or for a branch with nothing to send.
  */
-export function prNext(pr: PRSummary | null, hasChanges: boolean): PRNext {
-  if (!pr) return hasChanges ? { kind: 'open', label: 'Open PR', prompt: OPEN_PR_PROMPT } : null;
+export function prNext(pr: PRSummary | null, hasChanges: boolean, prompts: StepPrompts = STEP_PROMPTS): PRNext {
+  if (!pr) return hasChanges ? { kind: 'open', label: 'Open PR', prompt: prompts.open } : null;
   if ((pr.state ?? 'OPEN') !== 'OPEN') return null;
-  if (pr.mergeable === 'CONFLICTING') return { kind: 'conflicts', label: 'Fix conflicts', prompt: FIX_CONFLICTS_PROMPT };
-  if (pr.checks?.failed) return { kind: 'checks', label: 'Fix checks', prompt: FIX_CHECKS_PROMPT };
+  if (pr.mergeable === 'CONFLICTING') return { kind: 'conflicts', label: 'Fix conflicts', prompt: prompts.conflicts };
+  if (pr.checks?.failed) return { kind: 'checks', label: 'Fix checks', prompt: prompts.checks };
   if (pr.checks?.pending || pr.isDraft) return null;
   return { kind: 'merge', label: 'Merge' };
 }
@@ -81,7 +103,8 @@ export function prOffered(events: readonly Pick<TranscriptEvent, 'kind' | 'paylo
 
 export type PRStep = 'open' | 'conflicts' | 'checks';
 
-const STEP_OF: Record<string, PRStep> = { [OPEN_PR_PROMPT]: 'open', [FIX_CONFLICTS_PROMPT]: 'conflicts', [FIX_CHECKS_PROMPT]: 'checks' };
+/** The branch steps in the order a branch takes them. */
+export const PR_STEPS: readonly PRStep[] = ['open', 'conflicts', 'checks'];
 
 /**
  * Where the server's list of failing checks starts in a Fix checks message (apps/server/fix-checks.ts). The step prompt
@@ -89,11 +112,20 @@ const STEP_OF: Record<string, PRStep> = { [OPEN_PR_PROMPT]: 'open', [FIX_CONFLIC
  */
 export const FAILING_CHECKS_MARK = '\n\nFailing checks on PR #';
 
-/** The step a message asks for, when it is one of the step prompts, with or without the failing checks after it. */
-export function stepOf(text: string | null | undefined): PRStep | null {
-  const t = text ?? '';
-  const cut = t.indexOf(FAILING_CHECKS_MARK);
-  return STEP_OF[(cut >= 0 ? t.slice(0, cut) : t).trim()] ?? null;
+/**
+ * The step a message asks for: it is one of the step prompts, the channel's own (`prompts`) or the built-in ones, with
+ * or without the failing checks the server adds after it. A prompt with Ben's own words added is a plain message, so
+ * the server never swaps it for the failing-checks version. The channel's prompts win over the built-in ones.
+ */
+export function stepOf(text: string | null | undefined, prompts: StepPrompts = STEP_PROMPTS): PRStep | null {
+  const raw = text ?? '';
+  const cut = raw.indexOf(FAILING_CHECKS_MARK);
+  const t = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
+  if (!t) return null;
+  for (const set of [prompts, STEP_PROMPTS]) {
+    for (const step of PR_STEPS) if (set[step].trim() === t) return step;
+  }
+  return null;
 }
 
 /** What a step's button says while the agent works on it. */
@@ -119,14 +151,15 @@ export function stepUnderway(
   events: readonly { kind: string; payload: string | null }[],
   queued: readonly QueuedStep[],
   busy: boolean,
+  prompts: StepPrompts = STEP_PROMPTS,
 ): PRStep | null {
   const waiting = queued.filter((q) => q.kind === 'user' && !isParked(q));
-  if (waiting.length) return stepOf(waiting[waiting.length - 1].text);
+  if (waiting.length) return stepOf(waiting[waiting.length - 1].text, prompts);
   if (!busy) return null;
   for (let k = events.length - 1; k >= 0; k--) {
     if (events[k].kind !== 'user') continue;
     try {
-      return stepOf(String(JSON.parse(events[k].payload ?? 'null')?.text ?? ''));
+      return stepOf(String(JSON.parse(events[k].payload ?? 'null')?.text ?? ''), prompts);
     } catch {
       return null;
     }
@@ -138,17 +171,18 @@ export function stepUnderway(
  * A step that never started: Ben's newest parked message asks for it. Its `uuid` lets the step's button resume that
  * message instead of sending the same prompt again.
  */
-export function stepParked(queued: readonly QueuedStep[]): { step: PRStep; uuid: string } | null {
+export function stepParked(queued: readonly QueuedStep[], prompts: StepPrompts = STEP_PROMPTS): { step: PRStep; uuid: string } | null {
   for (let k = queued.length - 1; k >= 0; k--) {
     const q = queued[k];
     if (q.kind !== 'user' || !isParked(q) || !q.uuid) continue;
-    const step = stepOf(q.text);
+    const step = stepOf(q.text, prompts);
     if (step) return { step, uuid: q.uuid };
   }
   return null;
 }
 
-const STEP_LABEL: Record<PRStep, string> = { open: 'Open PR', conflicts: 'Fix conflicts', checks: 'Fix checks' };
+/** Each step's button when free to press. */
+export const STEP_LABEL: Record<PRStep, string> = { open: 'Open PR', conflicts: 'Fix conflicts', checks: 'Fix checks' };
 
 /** Why a parked step did not start, for the line under its button. */
 export function stepParkedText(step: PRStep, t: { resume_blocked?: string | null; setup?: string | null }): string {

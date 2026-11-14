@@ -69,6 +69,14 @@ const worktreeList = z
 const listsError = (body: { worktree_include?: string | null; worktree_shared?: string | null }) =>
   worktreeListProblem(body.worktree_include) ?? worktreeListProblem(body.worktree_shared, { shared: true });
 
+/** A branch step's own prompt (packages/shared/thread-glance.ts stepPrompts): blank clears it back to the built-in one. */
+const stepPrompt = z
+  .string()
+  .trim()
+  .max(4000)
+  .transform((s) => s || null)
+  .nullish();
+
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
@@ -90,6 +98,9 @@ const channelSchema = z.object({
   default_effort: runDefault,
   worktree_include: worktreeList,
   worktree_shared: worktreeList,
+  prompt_open_pr: stepPrompt,
+  prompt_fix_conflicts: stepPrompt,
+  prompt_fix_checks: stepPrompt,
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */

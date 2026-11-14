@@ -4,6 +4,7 @@ import { portLabel, SETUP_MODE_LABEL } from '@omni/shared/channel-actions.ts';
 import { CHANNEL_GLYPHS, glyphIcon } from '@omni/shared/channel-icon.ts';
 import { channelBody, channelForm, channelFormProblem, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelKind } from '@omni/shared/channel-form.ts';
 import { bytes } from '@omni/shared/format.ts';
+import { PR_STEPS, STEP_LABEL, STEP_PROMPTS } from '@omni/shared/thread-glance.ts';
 import { StackActions, useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -184,6 +185,12 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
       </Group>
 
       {channel ? <DesignSystemGroup channel={channel} /> : null}
+
+      <Group title="Branch steps" footer="What the Open PR, Fix conflicts and Fix checks buttons ask the agent in this channel. Empty uses the built-in prompt.">
+        {PR_STEPS.map((step, i) => (
+          <InputRow key={step} first={i === 0} label={STEP_LABEL[step]} value={form.prompts[step]} multiline autoCapitalize="sentences" placeholder={STEP_PROMPTS[step]} onChangeText={(t) => set('prompts', { ...form.prompts, [step]: t })} />
+        ))}
+      </Group>
 
       <Group title="Code" footer={hasRepo ? 'The repo is a path on the server’s machine, so it changes on that computer.' : 'No repo, so threads run in the base directory. Set a repo on the computer.'}>
         <InputRow first label="Repo path" value={form.repo_path} code readOnly placeholder="No repo" />
