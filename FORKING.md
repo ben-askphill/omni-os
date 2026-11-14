@@ -42,9 +42,9 @@ The code copies of the tokens live in `apps/web/src/index.css`, `apps/ios/src/th
 ## Customising without touching tracked files
 
 - **A charter**: copy `crew/inbox.md` to `data/crew/inbox.md` and edit the copy. Your copy replaces the shared one.
-- **An automation**: turn it on or off in the Automations page. That writes `automations.<id>.enabled` to your
-  config, not the YAML. To run it in another channel, set `automations.<id>.channel` there. For a different prompt
-  or schedule, copy the YAML into `data/automations/` and edit the copy, or write a new one there.
+- **An automation**: edit or toggle it in the Automations page. Omni writes your own copy to
+  `data/automations/<id>.yaml` and never changes the shared file in `automations/`. You can also write one there by
+  hand. See [docs/user/automations.md](docs/user/automations.md).
 - **Paths and names in shared files**: charters and automation prompts take `{{user}}`, `{{workspace}}`,
   `{{reposDir}}`, `{{githubOwner}}`, `{{omniRoot}}`, `{{omniRepo}}`, `{{centralBrain}}` and `{{timezone}}`, filled
   from your config. Use them instead of hardcoding your own.
