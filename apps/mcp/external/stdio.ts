@@ -24,13 +24,15 @@ function readToken(): string {
 let token = process.env.OMNI_TOKEN?.trim() || readToken();
 const REREAD = !process.env.OMNI_TOKEN?.trim() || !!process.env.OMNI_TOKEN_FILE;
 const call = callOver(async (path, init) => {
-  const send = () => fetch(`${BASE}${path}`, { ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } });
-  const res = await send();
+  const send = (bearer: string) => fetch(`${BASE}${path}`, { ...init, headers: { ...init.headers, authorization: `Bearer ${bearer}` } });
+  // Compare against the token this request sent, not the shared one: a parallel call may have swapped it already.
+  const sent = token;
+  const res = await send(sent);
   if (res.status !== 401 || !REREAD) return res;
   const fresh = readToken();
-  if (!fresh || fresh === token) return res;
+  if (!fresh || fresh === sent) return res;
   token = fresh;
-  return send();
+  return send(fresh);
 });
 
 // The client closed our stdin: it is gone.

@@ -76,6 +76,25 @@ describe('apps/mcp call() after the install token rotates', () => {
   });
 });
 
+describe('apps/mcp call() with parallel calls in flight when the token rotates', () => {
+  // A tool such as signed_in_devices sends two calls at once. Both carry the old token and both get a 401; the
+  // second must still retry with the new one even though the first already swapped it in.
+  it('retries every parallel call that the old token failed', async () => {
+    accepted = NEW;
+    writeFileSync(file, `${NEW}\n`);
+    process.env.OMNI_TOKEN = OLD;
+    vi.resetModules();
+    const fresh: typeof import('@omni/mcp/api.ts') = await import('@omni/mcp/api.ts');
+    seen.length = 0;
+    await expect(Promise.all([fresh.call('/a'), fresh.call('/b')])).resolves.toEqual([
+      { ok: true, path: '/api/a' },
+      { ok: true, path: '/api/b' },
+    ]);
+    expect(seen.filter((s) => s === `Bearer ${OLD}`)).toHaveLength(2);
+    expect(seen.filter((s) => s === `Bearer ${NEW}`)).toHaveLength(2);
+  });
+});
+
 describe('the local stdio MCP server after the install token rotates', () => {
   /** Starts stdio.ts with plain node, the way a client outside Omni does. */
   const start = (env: Record<string, string>) => {

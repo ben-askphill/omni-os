@@ -32,17 +32,19 @@ export class ApiError extends Error {
 }
 
 export async function call(path: string, init?: RequestInit) {
-  const send = () =>
+  const send = (bearer: string) =>
     fetch(`${BASE}/api${path}`, {
       ...init,
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...(init?.headers ?? {}) },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}`, ...(init?.headers ?? {}) },
     });
-  let res = await send();
+  // Compare against the token this request sent, not the shared one: a parallel call may have swapped it already.
+  const sent = token;
+  let res = await send(sent);
   if (res.status === 401) {
     const fresh = readToken(process.env.OMNI_TOKEN_FILE);
-    if (fresh && fresh !== token) {
+    if (fresh && fresh !== sent) {
       token = fresh;
-      res = await send();
+      res = await send(fresh);
     }
   }
   const body = await res.json().catch(() => ({}));
