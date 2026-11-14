@@ -737,6 +737,136 @@ server.registerTool(
     refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/skip`, { method: 'POST', body: JSON.stringify(attempt === undefined ? {} : { attempt }) })),
 );
 
+/** An automation as list_automations shows it: what it runs, when, and how its last runs went. No YAML path, no deliveries. */
+const automationSummary = (a: any) => ({
+  id: a.id,
+  name: a.name,
+  enabled: a.enabled,
+  ...(a.on ? { on: a.on } : { cron: a.cron, timezone: a.timezone, next: a.next ?? null }),
+  channel: a.channel,
+  ...(a.role && { role: a.role }),
+  ...(a.harness && { harness: a.harness }),
+  ...(a.model && { model: a.model }),
+  ...(a.effort && { effort: a.effort }),
+  prompt: a.prompt.length > 200 ? `${a.prompt.slice(0, 200)}…` : a.prompt,
+  ...(a.error && { error: a.error }),
+  ...(a.poll_error && { poll_error: a.poll_error }),
+  last_runs: (a.runs ?? []).slice(0, 3).map((r: any) => ({ thread_id: r.thread_id, trigger: r.trigger, at: r.created_at, status: r.status })),
+});
+
+server.registerTool(
+  'list_automations',
+  {
+    description:
+      'List the automations on this machine: id, name, enabled, its schedule (cron, timezone, next run) or event trigger (on), channel, role and run defaults, ' +
+      'the start of its prompt, any error that stops it running, and its last three runs with their thread ids. Event deliveries are list_automation_deliveries.',
+    inputSchema: {},
+  },
+  async () => text((await call('/automations')).map(automationSummary)),
+);
+
+server.registerTool(
+  'run_automation',
+  {
+    description:
+      `Run an automation now, once, only when ${USER} asks. It starts a new thread on this machine with the automation's prompt and defaults, ` +
+      'even when the automation is disabled or another machine runs the schedule. An automation with an error is refused with the reason. Returns the new thread id.',
+    inputSchema: { automation: z.string().min(1).max(200).describe('Automation id from list_automations.') },
+  },
+  async ({ automation }) => {
+    const t = await call(`/automations/${encodeURIComponent(automation)}/run`, { method: 'POST' });
+    return text({ automation, thread_id: t.id, title: t.title, channel: t.channel_id, status: t.status });
+  },
+);
+
+server.registerTool(
+  'set_automation_enabled',
+  {
+    description:
+      `Turn an automation's schedule or event trigger on or off on this machine, only when ${USER} asks. ` +
+      'The YAML is not edited: the choice is saved in data/omni.config.json. Threads it already started are untouched.',
+    inputSchema: { automation: z.string().min(1).max(200).describe('Automation id from list_automations.'), enabled: z.boolean() },
+  },
+  async ({ automation, enabled }) => {
+    await call(`/automations/${encodeURIComponent(automation)}/enabled`, { method: 'POST', body: JSON.stringify({ enabled }) });
+    return text({ automation, enabled });
+  },
+);
+
+server.registerTool(
+  'delete_automation',
+  {
+    description:
+      `Destructive: delete an automation on this machine, only when ${USER} asks for that automation to be deleted. It cannot be undone from Omni. ` +
+      "The user's own YAML in data/automations/ is removed (removed: file); a shipped one is hidden on this machine (removed: hidden). " +
+      'Its schedule stops now, a webhook automation loses its signing secret, and threads it already started stay. To pause one instead, use set_automation_enabled.',
+    inputSchema: { automation: z.string().min(1).max(200).describe('Automation id from list_automations.') },
+  },
+  async ({ automation }) => {
+    const res = await call(`/automations/${encodeURIComponent(automation)}`, { method: 'DELETE' });
+    return text({ deleted: automation, removed: res.removed });
+  },
+);
+
+/** A channel action without its timestamps and sort position. */
+const actionSummary = (a: any) => ({ id: a.id, name: a.name, command: a.command, port: a.port, setup: a.setup, secrets: a.secrets });
+/** Most of a run's output an agent needs is the end: the error, or the URL a server printed. */
+const RUN_OUTPUT_TAIL = 1500;
+const runSummary = (r: any) => ({
+  run_id: r.id,
+  action_id: r.action_id,
+  name: r.name,
+  state: r.state,
+  port: r.port,
+  exit_code: r.exit_code,
+  ...(r.error && { error: r.error }),
+  started_at: r.started_at,
+  ended_at: r.ended_at,
+  ...(r.output !== undefined && { output: r.output.length > RUN_OUTPUT_TAIL ? `…${r.output.slice(-RUN_OUTPUT_TAIL)}` : r.output }),
+});
+
+server.registerTool(
+  'list_channel_actions',
+  {
+    description:
+      "A channel's actions: named commands (a dev server, a theme preview, tests) that run in a thread's checkout, with their command, port and setup mode. " +
+      'Pass channel for the channel\'s list. Pass thread_id instead to also get that thread\'s runs (state, port, exit code, the end of the output) ' +
+      'and blocked: why no action can run in it right now, or null.',
+    inputSchema: {
+      channel: z.string().optional().describe('Channel id. Use list_channels.'),
+      thread_id: z.string().optional().describe('A thread whose channel actions and runs to list.'),
+    },
+  },
+  async ({ channel, thread_id }) => {
+    if (!channel === !thread_id) throw new Error('Pass channel or thread_id, not both.');
+    if (channel) return text((await call(`/channels/${encodeURIComponent(channel)}/actions`)).map(actionSummary));
+    const res = await call(`/threads/${encodeURIComponent(thread_id!)}/actions`);
+    return text({ actions: res.actions.map(actionSummary), runs: res.runs.map(runSummary), blocked: res.blocked });
+  },
+);
+
+server.registerTool(
+  'run_channel_action',
+  {
+    description:
+      `Start one of a channel's actions in a thread's checkout, by action id or name, only when ${USER} asks or the thread's work needs it (a preview to share, say). ` +
+      'It runs in the background through the login shell; the result is the started run. Read its state and output later with list_channel_actions and thread_id. ' +
+      'Refused with the reason while the worktree is being prepared, for a thread that runs off this machine, or when its fixed port is taken.',
+    inputSchema: {
+      thread_id: z.string().describe('The thread whose checkout it runs in.'),
+      action: z.string().min(1).describe('Action id or name (any case) from list_channel_actions.'),
+    },
+  },
+  async ({ thread_id, action }) => {
+    const { actions } = await call(`/threads/${encodeURIComponent(thread_id)}/actions`);
+    const want = action.trim().toLowerCase();
+    const hit = actions.find((a: any) => a.id === action) ?? actions.find((a: any) => a.name.toLowerCase() === want);
+    if (!hit) throw new Error(`The thread's channel has no action "${action}" (actions: ${actions.map((a: any) => `"${a.name}"`).join(', ') || 'none'}).`);
+    const run = await call(`/threads/${encodeURIComponent(thread_id)}/actions/${encodeURIComponent(hit.id)}/run`, { method: 'POST' });
+    return text(runSummary(run));
+  },
+);
+
 server.registerTool('disk_space', {
   description: `Read-only: free space on the disk with Omni's data (worktrees, the database) and, when it is on another disk or under a Linux per-user /tmp quota, the temp folder the agent CLIs write command output to, as the server last checked it (every 10 minutes). level is ok, low (under 20 GB, or 15% of a small volume) or critical (under 5 GB, or 5%). When it fills, every shell command fails with ENOSPC or EDQUOT. On low or critical, tell ${USER}; worktree_storage shows what a cleanup could free, and only ${USER} removes anything.`,
   inputSchema: {},
