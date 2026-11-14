@@ -88,7 +88,7 @@ export function mcpApi(request: (path: string, init: RequestInit) => Response | 
     if (mcpTokenMatches(bearer) || tokenMatches(bearer)) return answer(c.req.raw);
     if (bearer) {
       try {
-        const verdict = await mcpTokenVerdict(bearer, c);
+        const verdict = await mcpTokenVerdict(bearer);
         if (verdict?.ok) return answer(c.req.raw);
         // A real owner token for a client this install does not take: say why, so the client's user can approve or reconnect.
         if (verdict && verdict.kind !== 'invalid') return challenge(c, true, verdict.reason);

@@ -110,12 +110,15 @@ async function spawnLive(live: Live, thread: Thread) {
     browserHolder.set(channel.id, thread.id);
     live.holdsBrowser();
   }
-  const cdpEndpoint = live.browser ? await attachThread(channel.id, thread.id, !!channel.browser_headless) : null;
-  // Torn down while Chrome started: teardown already ran, so let go of the browser here.
+  const attached = live.browser ? await attachThread(channel.id, thread.id, !!channel.browser_headless) : null;
+  // Torn down while Chrome started: teardown already ran, so let go of this spawn's own hold here. A newer spawn of the
+  // thread may hold the browser by now, and its hold stays.
   if (lives.get(thread.id) !== live) {
-    detachThread(channel.id, thread.id);
+    if (attached) detachThread(channel.id, attached.hold);
     return;
   }
+  live.browserHold = attached?.hold ?? null;
+  const cdpEndpoint = attached?.endpoint ?? null;
   if (!remote) writeDesignSystem(thread.id, channel);
   const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl() });
 
@@ -191,7 +194,9 @@ async function spawnLive(live: Live, thread: Thread) {
   );
 
   // Messages go in through the session, never as CLI args, so leading dashes or huge pastes never get parsed as flags.
-  for (const m of live.inflight) {
+  // A copy: a harness that replays synchronously (Hermes) takes each message out of live.inflight while this loops.
+  for (const m of [...live.inflight]) {
+    if (lives.get(thread.id) !== live) break;
     track(m, 'sent');
     if (!deliver(live, m)) {
       crash(live);

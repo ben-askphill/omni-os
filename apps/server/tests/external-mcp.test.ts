@@ -350,10 +350,23 @@ describe('/mcp: Google sign-in through Clerk', () => {
     expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_approved', aud: RESOURCE }))).status).toBe(401);
   });
 
-  it('lists a client whose bound token got in as approved', async () => {
+  it('lists a client whose bound token got in as bound, not approved', async () => {
     expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_bound', aud: RESOURCE }))).status).toBe(200);
     const list = (await (await api('GET', '/mcp/clients')).json()) as { id: string; status: string; via: string }[];
-    expect(list.find((c) => c.id === 'client_bound')).toMatchObject({ status: 'approved', via: 'audience' });
+    expect(list.find((c) => c.id === 'client_bound')).toMatchObject({ status: 'bound', via: 'audience' });
+    // Bound is not approved: the same client's token without the audience still waits for Ben.
+    expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_bound' }))).status).toBe(401);
+  });
+
+  it('takes no audience from the Host a request names', async () => {
+    const token = clerk.jwtAccessToken(OWNER, { client: 'client_hosty', aud: 'https://omni.example.com/mcp' });
+    expect((await listTools(token)).status).toBe(401);
+    process.env.OMNI_MCP_PUBLIC_URL = 'https://omni.example.com';
+    try {
+      expect((await listTools(token)).status).toBe(200);
+    } finally {
+      delete process.env.OMNI_MCP_PUBLIC_URL;
+    }
   });
 
   it('refuses an opaque token with a reconnect message, unless OMNI_MCP_ALLOW_OPAQUE brings back the subject check', async () => {

@@ -52,6 +52,8 @@ export class ThreadController {
   shutdown = false;
   /** Holds the channel's persistent browser profile. */
   browser = false;
+  /** This process's hold on the channel's live browser (browser.ts attachThread), let go of at teardown. */
+  browserHold: string | null = null;
   initSeen = false;
   /** Tasks the CLI runs beside the turn, by task id, until they end. Background ones keep the process alive. */
   tasks = new Map<string, ActiveTask>();

@@ -11,8 +11,11 @@ import { createPublicKey, createVerify, type JsonWebKeyInput } from 'node:crypto
 
 export type Jwk = JsonWebKeyInput['key'] & { kid?: string };
 
-/** What a client's status in the local list (mcp-clients.ts) says about it. */
-export type ClientStatus = 'approved' | 'pending' | 'removed';
+/**
+ * A client's status in the local list (mcp-clients.ts): approved by Ben, bound (only its tokens that name this install
+ * got in), pending (refused, waiting for approval) or removed.
+ */
+export type ClientStatus = 'approved' | 'bound' | 'pending' | 'removed';
 
 export interface VerifyInput {
   /** The Clerk issuer MCP sign-in uses. */

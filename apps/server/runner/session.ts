@@ -65,7 +65,12 @@ export function requeueHeld(live: Live) {
   if (!live.held.length) return;
   const id = live.threadId;
   const held = live.takeHeld();
-  for (const m of held) track(m, 'waiting');
+  for (const m of held) {
+    // An interrupt has done its job once its turn ends. Waiting for the next process, it is an ordinary message: left
+    // as 'interrupt', the next start would resolve it to stop-startup and drop the message launched ahead of it.
+    if (m.mode === 'interrupt') m.mode = 'steer';
+    track(m, 'waiting');
+  }
   waitingMsgs.set(id, [...held, ...(waitingMsgs.get(id) ?? [])]);
   if (!waiting.includes(id)) waiting.push(id);
 }
@@ -100,9 +105,10 @@ export function teardown(live: Live) {
   endTasks(live);
   toolTails.endThread(live.threadId);
   clearMods(live);
-  if (live.browser && browserHolder.get(live.channelId) === live.threadId) {
-    browserHolder.delete(live.channelId);
-    detachThread(live.channelId, live.threadId);
+  if (live.browser && browserHolder.get(live.channelId) === live.threadId) browserHolder.delete(live.channelId);
+  if (live.browserHold) {
+    detachThread(live.channelId, live.browserHold);
+    live.browserHold = null;
   }
   if (lives.get(live.threadId) === live) lives.delete(live.threadId);
   live.tornDown();

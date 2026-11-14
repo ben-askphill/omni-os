@@ -1,6 +1,7 @@
 // The OAuth clients that reached /mcp with a Clerk JWT for the owner (mcp-token.ts). A client whose token names this
-// install's /mcp resource is approved as it arrives; one whose token does not waits until Ben approves it. Removing a
-// client refuses its tokens from then on, even ones bound to the resource. Machine-local: never synced.
+// install's /mcp resource is listed as 'bound' and only such tokens get in; one whose token does not waits as 'pending'
+// until Ben approves it. Removing a client refuses its tokens from then on, even ones bound to the resource.
+// Machine-local: never synced.
 //
 // /api/mcp/clients lists them, POST /:id/approve approves one, DELETE /:id removes one.
 import { Hono } from 'hono';
@@ -43,15 +44,20 @@ export const mcpClients = {
     if (configured().includes(id)) return 'approved';
     return r?.status ?? null;
   },
-  /** A token from this client was accepted (`via`) or refused for want of approval (null: it waits as pending). */
+  /**
+   * A token from this client was accepted (`via`) or refused for want of approval (null). A new client is 'bound' when
+   * its token named this install, else 'pending'. Only approve() makes a client 'approved': an audience match lets
+   * that one token in and never vouches for the client's other tokens.
+   */
   seen: (id: string, via: 'audience' | 'client' | null) => {
     const at = now();
-    const status: ClientStatus = via ? 'approved' : 'pending';
+    const status: ClientStatus = via === 'audience' ? 'bound' : 'pending';
     db.prepare(
       `INSERT INTO mcp_clients (id, status, via, first_seen, last_seen) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET last_seen = excluded.last_seen,
          via = COALESCE(excluded.via, mcp_clients.via),
-         status = CASE WHEN mcp_clients.status = 'removed' THEN 'removed' WHEN excluded.status = 'approved' THEN 'approved' ELSE mcp_clients.status END`,
+         status = CASE WHEN mcp_clients.status IN ('removed', 'approved') THEN mcp_clients.status
+                       WHEN excluded.status = 'bound' THEN 'bound' ELSE mcp_clients.status END`,
     ).run(id, status, via, at, at);
   },
   approve: (id: string): McpClient => {

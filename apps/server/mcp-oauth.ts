@@ -11,6 +11,8 @@ import { createHash } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_CLERK_PUBLISHABLE_KEY, issuerFromKey } from './clerk.ts';
 import { owner } from './google-auth.ts';
+import { config } from './config.ts';
+import { connectHostname } from './connect/service.ts';
 import { mcpClients } from './mcp-clients.ts';
 import { verifyMcpToken, type Jwk, type Verdict } from './mcp-token.ts';
 import { mcpHostAllowed, mcpPublicHost, viaConnect, viaTailnet } from './request-guard.ts';
@@ -91,11 +93,16 @@ async function cachedSub(issuer: string, token: string, now: number): Promise<st
   return sub;
 }
 
-/** This install's /mcp resource URLs: the configured public one, the Connect hostname's, and the one `c` reached. */
-export function mcpResources(c: Context): string[] {
-  const out = new Set<string>([`${publicBase(c)}/mcp`]);
+/**
+ * This install's /mcp resource URLs, from configuration only, never from what a request names: the configured public
+ * URL, this machine's Connect hostname, and loopback on this port for a client on this machine.
+ */
+export function mcpResources(): string[] {
+  const out = new Set<string>([`http://127.0.0.1:${config.port}/mcp`, `http://localhost:${config.port}/mcp`]);
   const configured = resolved.mcpPublicUrl();
   if (configured) out.add(`${configured}/mcp`);
+  const connect = connectHostname();
+  if (connect) out.add(`https://${connect}/mcp`);
   return [...out];
 }
 
@@ -103,20 +110,21 @@ export function mcpResources(c: Context): string[] {
  * Whether `token` is a Clerk OAuth access token for this install's owner, bound to this install (mcp-token.ts).
  * Null while OAuth is off. Throws ClerkUnreachable when Clerk could not be asked. Records the client it names.
  */
-export async function mcpTokenVerdict(token: string, c: Context, now = Date.now()): Promise<Verdict | null> {
+export async function mcpTokenVerdict(token: string, now = Date.now()): Promise<Verdict | null> {
   const issuer = mcpIssuer();
   const ownerSub = owner()?.sub;
   if (!issuer || !ownerSub || !token) return null;
   const verdict = await verifyMcpToken(token, {
     issuer,
     ownerSub,
-    resources: mcpResources(c),
+    resources: mcpResources(),
     clientStatus: mcpClients.status,
     allowOpaque: process.env.OMNI_MCP_ALLOW_OPAQUE === '1',
     keyFor: (kid) => keyFor(issuer, kid, now),
     userinfoSub: (t) => cachedSub(issuer, t, now),
     now,
   });
+  // Seen, never approved: an audience match lets that token in, and only Ben's approval lets in the client's tokens that lack one.
   if (verdict.ok && verdict.client && verdict.via !== 'opaque') mcpClients.seen(verdict.client, verdict.via);
   else if (!verdict.ok && verdict.kind === 'unbound' && verdict.client) mcpClients.seen(verdict.client, null);
   return verdict;
