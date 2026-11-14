@@ -358,6 +358,13 @@ describe('/mcp: Google sign-in through Clerk', () => {
     expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_bound' }))).status).toBe(401);
   });
 
+  it('takes a loopback audience only from a request straight from this machine', async () => {
+    const token = clerk.jwtAccessToken(OWNER, { client: 'client_loop', aud: RESOURCE });
+    expect((await listTools(token, '/mcp')).status).toBe(200);
+    const viaTunnel = await post('/mcp', 'tools/list', {}, { authorization: `Bearer ${token}`, 'cf-connecting-ip': '203.0.113.9', 'x-forwarded-for': '203.0.113.9' });
+    expect(viaTunnel.status).toBe(401);
+  });
+
   it('takes no audience from the Host a request names', async () => {
     const token = clerk.jwtAccessToken(OWNER, { client: 'client_hosty', aud: 'https://omni.example.com/mcp' });
     expect((await listTools(token)).status).toBe(401);

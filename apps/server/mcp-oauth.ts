@@ -95,10 +95,11 @@ async function cachedSub(issuer: string, token: string, now: number): Promise<st
 
 /**
  * This install's /mcp resource URLs, from configuration only, never from what a request names: the configured public
- * URL, this machine's Connect hostname, and loopback on this port for a client on this machine.
+ * URL and this machine's Connect hostname. Loopback on this port only for a request straight from this machine
+ * (`local`): every install answers on that URL, so a token naming it says nothing about which one it is for.
  */
-export function mcpResources(): string[] {
-  const out = new Set<string>([`http://127.0.0.1:${config.port}/mcp`, `http://localhost:${config.port}/mcp`]);
+export function mcpResources(local: boolean): string[] {
+  const out = new Set<string>(local ? [`http://127.0.0.1:${config.port}/mcp`, `http://localhost:${config.port}/mcp`] : []);
   const configured = resolved.mcpPublicUrl();
   if (configured) out.add(`${configured}/mcp`);
   const connect = connectHostname();
@@ -108,16 +109,17 @@ export function mcpResources(): string[] {
 
 /**
  * Whether `token` is a Clerk OAuth access token for this install's owner, bound to this install (mcp-token.ts).
- * Null while OAuth is off. Throws ClerkUnreachable when Clerk could not be asked. Records the client it names.
+ * `local`: the request came straight from this machine. Null while OAuth is off. Throws ClerkUnreachable when Clerk
+ * could not be asked. Records the client it names.
  */
-export async function mcpTokenVerdict(token: string, now = Date.now()): Promise<Verdict | null> {
+export async function mcpTokenVerdict(token: string, local: boolean, now = Date.now()): Promise<Verdict | null> {
   const issuer = mcpIssuer();
   const ownerSub = owner()?.sub;
   if (!issuer || !ownerSub || !token) return null;
   const verdict = await verifyMcpToken(token, {
     issuer,
     ownerSub,
-    resources: mcpResources(),
+    resources: mcpResources(local),
     clientStatus: mcpClients.status,
     allowOpaque: process.env.OMNI_MCP_ALLOW_OPAQUE === '1',
     keyFor: (kid) => keyFor(issuer, kid, now),

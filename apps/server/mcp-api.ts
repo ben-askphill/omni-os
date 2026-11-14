@@ -20,7 +20,7 @@ import { mcpHttp } from '@omni/mcp/external/http.ts';
 import { apiToken, loadToken, tokenMatches } from './api-token.ts';
 import { paths } from './config.ts';
 import { ClerkUnreachable, mcpIssuer, mcpTokenVerdict, resourceMetadataUrl } from './mcp-oauth.ts';
-import { mcpHostAllowed } from './request-guard.ts';
+import { directFromThisMac, mcpHostAllowed } from './request-guard.ts';
 
 export const mcpTokenPath = () => join(paths.data, 'mcp-token');
 
@@ -88,7 +88,7 @@ export function mcpApi(request: (path: string, init: RequestInit) => Response | 
     if (mcpTokenMatches(bearer) || tokenMatches(bearer)) return answer(c.req.raw);
     if (bearer) {
       try {
-        const verdict = await mcpTokenVerdict(bearer);
+        const verdict = await mcpTokenVerdict(bearer, directFromThisMac(c));
         if (verdict?.ok) return answer(c.req.raw);
         // A real owner token for a client this install does not take: say why, so the client's user can approve or reconnect.
         if (verdict && verdict.kind !== 'invalid') return challenge(c, true, verdict.reason);

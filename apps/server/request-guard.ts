@@ -160,10 +160,13 @@ function fromConnectTunnel(c: Context, host: string): boolean {
 /** The request came in through tailscale serve (or another proxy), whatever Host it names. */
 const cameThroughProxy = (c: Context, host: string) => viaTailnet(hostnameOf(host)) || PROXY_HEADERS.some((h) => c.req.header(h) !== undefined);
 
+/** From a process on this machine, straight to the server: no tailscale serve, tunnel or other proxy in front. */
+export const directFromThisMac = (c: Context) => fromThisMac(c) && !cameThroughProxy(c, requestHost(c));
+
 /** True only for GET desktop-pair from this machine, with no proxy in front. The handler sets the cookie. */
 export function desktopPairAllowed(c: Context): boolean {
   if (c.req.method !== 'GET' || c.req.path !== DESKTOP_PAIR_PATH) return false;
-  return fromThisMac(c) && !cameThroughProxy(c, requestHost(c));
+  return directFromThisMac(c);
 }
 
 const requestHost = (c: Context) => c.req.header('host') ?? new URL(c.req.url).host;
