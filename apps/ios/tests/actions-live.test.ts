@@ -7,7 +7,7 @@ const action = (id: string): ChannelAction => ({ id, channel_id: 'c', name: id, 
 const run = (id: string, state: ActionRun['state'], action_id: string | null = 'a'): ActionRun => ({
   id, thread_id: 't', action_id, name: id, command: '', cwd: '', port: null, state, exit_code: null, error: null, output: '', output_bytes: 0, started_at: '', ended_at: null,
 });
-const data = (runs: ActionRun[], over: Partial<ThreadActions> = {}): ThreadActions => ({ actions: [action('a')], runs, blocked: null, setup_run: null, ...over });
+const data = (runs: ActionRun[], over: Partial<ThreadActions> = {}): ThreadActions => ({ actions: [action('a')], runs, blocked: null, setup_run: null, clone: null, ...over });
 
 function setup(initial: ThreadActions) {
   let server = initial;

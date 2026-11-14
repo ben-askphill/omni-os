@@ -29,7 +29,7 @@ Durable messages: a message is saved as a request before the client hears it was
 
 ## Worktree preparation and cleanup
 
-Worktree preparation, continued-thread copying and cleanup share a hold on the working directory (`apps/server/workspace.ts`). A continued thread starts at the source's HEAD with its carried changes; it does not resolve the new-thread base picker. The channel's setup action runs after checkout, outside that hold, while `setup: preparing` still protects the directory.
+Worktree preparation, continued-thread copying and cleanup share a hold on the working directory (`apps/server/workspace.ts`). A continued thread starts at the source's HEAD with its carried changes; it does not resolve the new-thread base picker. The channel's setup action runs after checkout, outside that hold, while `setup: preparing` still protects the directory. Before either, a channel repo missing on this machine is cloned (`apps/server/repo-clone.ts`), one clone per destination folder; a destination other than the channel's path goes into this machine's `sync.path_map` and a local-only `repo_path`, so the other machine keeps its own path.
 
 A running channel action also keeps its worktree from cleanup. Starting an action after cleanup restores the thread's branch through `inWorkspace` before launching the command. Automatic retention is opt-in per Mac; [Known limits](../user/limits.md) describes the removal guards.
 

@@ -95,6 +95,13 @@ export const channels = {
     }
     return channels.get(id);
   },
+  /**
+   * The channel's repository is at path on this machine (repo-clone.ts). Not recorded for sync: the path map sends the
+   * other machine its own path, which did not change.
+   */
+  relocateRepo(id: string, path: string) {
+    db.prepare('UPDATE channels SET repo_path = ? WHERE id = ?').run(path, id);
+  },
 };
 
 /** The channel as the API sends it: the design system's name and size, never the file, which can be large. */

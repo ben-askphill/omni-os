@@ -11,6 +11,7 @@ import { OUTPUT_LIMIT, type ActionRun, type ChannelAction, type ThreadActions } 
 import { actionRuns, channelActions, channels, threadSetupRuns, threads, type Thread } from './db.ts';
 import { artifactsDir } from './config.ts';
 import { isProviderHarness } from './harness/types.ts';
+import { cloneFor } from './repo-clone.ts';
 import { worktreeProblem } from './sandbox.ts';
 import { inWorkspace } from './workspace.ts';
 import { namedSecrets } from './secrets.ts';
@@ -255,6 +256,7 @@ export function threadActions(t: Thread): ThreadActions {
     runs: runsFor(t.id),
     blocked: blockedReason(t),
     setup_run: (setupRun && settleOrphan(setupRun)) || null,
+    clone: t.setup === 'preparing' ? cloneFor(t.channel_id) : null,
   };
 }
 

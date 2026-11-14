@@ -36,7 +36,7 @@ const run = (over: Partial<ActionRun> = {}): ActionRun => ({
   ...over,
 });
 
-const thread = (runs: ActionRun[], over: Partial<ThreadActions> = {}): ThreadActions => ({ actions: [action()], runs, blocked: null, setup_run: null, ...over });
+const thread = (runs: ActionRun[], over: Partial<ThreadActions> = {}): ThreadActions => ({ actions: [action()], runs, blocked: null, setup_run: null, clone: null, ...over });
 
 describe('polling', () => {
   it('the setup card polls while the worktree is prepared, and a ready thread only while its setup run runs', () => {
@@ -66,6 +66,13 @@ describe('setup steps', () => {
     const running = run({ id: 's1', action_id: 'a9', name: 'Install', state: 'running', exit_code: null, ended_at: null });
     expect(states({ ...data, setup_run: running })).toEqual(['Checkout:done', 'Setup "Install":active', 'Agent:todo']);
     expect(states({ ...data, setup_run: { ...running, state: 'succeeded' } })).toEqual(['Checkout:done', 'Setup "Install":done', 'Agent:active']);
+  });
+
+  it('starts with the clone of the channel repo while one runs, saying where it goes', () => {
+    const data = thread([], { actions: [action(), setup], clone: { repo: 'acme/shop', into: '~/shop' } });
+    expect(states(data)).toEqual(['Clone acme/shop:active', 'Checkout:todo', 'Setup "Install":todo', 'Agent:todo']);
+    expect(setupSteps(data)[0]!.detail).toBe('into ~/shop');
+    expect(states({ ...data, clone: null })).toEqual(['Checkout:active', 'Setup "Install":todo', 'Agent:todo']);
   });
 
   it('names the step after the run, which keeps its name when the action is renamed or deleted', () => {

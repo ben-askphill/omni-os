@@ -5,18 +5,30 @@ import { startRun, stopRun } from '../actions.ts';
 import { channelActions, threadSetupRuns, threads, type Thread } from '../db.ts';
 import { isProviderHarness } from '../harness/types.ts';
 
-const STOPPED = 'Stopped by Ben before the agent started.';
+export const STOPPED = 'Stopped by Ben before the agent started.';
 
 /** Threads whose current preparation attempt Ben stopped. */
 const stops = new Set<string>();
+/** Each attempt's signal, aborted by Stop, for a step that waits on something slow (a clone, repo-clone.ts). */
+const signals = new Map<string, AbortController>();
 
 /** A preparation attempt starts: nothing stopped it yet, and an earlier attempt's setup run is no longer its run. */
 export function beginAttempt(threadId: string) {
   stops.delete(threadId);
+  signals.set(threadId, new AbortController());
   threadSetupRuns.clear(threadId);
 }
 
-export const endAttempt = (threadId: string) => stops.delete(threadId);
+export function endAttempt(threadId: string) {
+  stops.delete(threadId);
+  signals.delete(threadId);
+}
+
+/** Aborted once Ben stops the thread's current preparation attempt. */
+export const attemptSignal = (threadId: string): AbortSignal | undefined => signals.get(threadId)?.signal;
+
+/** Ben stopped the thread's current preparation attempt. */
+export const stopRequested = (threadId: string) => stops.has(threadId);
 
 /**
  * Ben's Stop on a thread whose worktree is being prepared: its setup run is stopped and the attempt ends before the
@@ -25,6 +37,7 @@ export const endAttempt = (threadId: string) => stops.delete(threadId);
 export function stopPreparation(threadId: string): boolean {
   if (threads.get(threadId)?.setup !== 'preparing') return false;
   stops.add(threadId);
+  signals.get(threadId)?.abort();
   const runId = threadSetupRuns.get(threadId);
   if (runId) void stopRun(runId, STOPPED);
   return true;
