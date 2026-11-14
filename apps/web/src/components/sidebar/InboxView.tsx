@@ -3,6 +3,7 @@ import { relTime } from '@omni/shared/format.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { Thread, ThreadStub } from '../../api.ts';
 import { useInbox } from '../../app/useInbox.ts';
+import { useDoneKey } from '../../inbox-key.ts';
 import type { RowStatus } from '@omni/shared/status.ts';
 import type { InboxThread } from '../../inbox.ts';
 import { canMarkDone } from '../../needs-you.ts';
@@ -17,13 +18,19 @@ import { WorkspaceLinks } from './SidebarLinks.tsx';
 /**
  * The sidebar's Inbox view, T3 Code's default thread list: every channel's threads in one list. Pinned cards, then the
  * threads waiting on Ben, the latest back on top, then the Working shelf right under them. Done folds away at the
- * bottom. Marking a thread done (the check on hover) moves it to Done, as Settle does in T3.
+ * bottom. Marking a thread done (the check on hover, or E on the selected card) moves it to Done, as Settle does in T3.
  */
 export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
-  const { channels } = useApp();
+  const { channels, setDone } = useApp();
   const { pinned, inbox, working, done, loaded, openId, status, delegates } = useInbox();
   const channelOf = (id: string) => channels.find((c) => c.id === id);
-
+  useDoneKey((focusedId) => {
+    const id = focusedId ?? openId;
+    const t = id ? [...pinned, ...inbox, ...working.rows].find((r) => r.id === id) : undefined;
+    if (!t || !canMarkDone(t.status)) return false;
+    void setDone(t.id, true).catch(() => {});
+    return true;
+  });
 
   const card = (t: InboxThread, pinnedRow = false) => (
     <InboxCard
@@ -129,7 +136,7 @@ function InboxCard({
     </span>
   );
   return (
-    <div className="group/row grid grid-cols-1">
+    <div className="group/row grid grid-cols-1" data-inbox-thread={t.id}>
       <a
         href={href.thread(t.id)}
         onClick={onNavigate}
@@ -172,7 +179,7 @@ function InboxCard({
       {delegates && <DelegateCount summary={delegates.summary} onOpen={delegates.open} className="z-[2] mr-2 mb-2 self-end justify-self-end [grid-area:1/1]" />}
       <span className="z-[2] mt-1.5 mr-1.5 flex items-center gap-0.5 self-start justify-self-end [grid-area:1/1] opacity-100 transition-opacity md:opacity-0 md:group-focus-within/row:opacity-100 md:group-hover/row:opacity-100">
         {pinned && <RowAction icon="pin" label={`Unpin ${title}`} onClick={() => void setPinned(t, false).catch(() => {})} />}
-        {canMarkDone(t.status) && <RowAction icon="check" label={`Mark ${title} done`} text="Done" onClick={() => void setDone(t.id, true).catch(() => {})} />}
+        {canMarkDone(t.status) && <RowAction icon="check" label={`Mark ${title} done`} text="Done" kbd="E" onClick={() => void setDone(t.id, true).catch(() => {})} />}
       </span>
     </div>
   );
@@ -208,12 +215,13 @@ function DoneRow({ t, active, onNavigate }: { t: InboxThread; active: boolean; o
   );
 }
 
-function RowAction({ icon, label, text, onClick }: { icon: 'check' | 'undo' | 'pin'; label: string; text?: ReactNode; onClick: () => void }) {
+function RowAction({ icon, label, text, kbd, onClick }: { icon: 'check' | 'undo' | 'pin'; label: string; text?: ReactNode; kbd?: string; onClick: () => void }) {
   return (
     <button
       type="button"
       aria-label={label}
-      title={label}
+      aria-keyshortcuts={kbd}
+      title={kbd ? `${label} (${kbd})` : label}
       onClick={onClick}
       className="hov grid h-6 min-w-6 grid-flow-col place-items-center gap-1 rounded-full px-1.5 text-[11.5px] text-fg-3 transition-colors hover:text-fg"
     >

@@ -3,7 +3,7 @@
 ## Using Omni
 
 - [Install and first run](user/install.md): the desktop app, running from a checkout, and the step-by-step agent instructions
-- [Configuration](user/configuration.md): your config, `.env`, placeholders, secrets, Appearance (Channel rail Beta, Full color, Press I for Inbox) and channel avatar backgrounds
+- [Configuration](user/configuration.md): your config, `.env`, placeholders, secrets, Appearance (Channel rail Beta, Full color, Press I for Inbox, Press E to mark done) and channel avatar backgrounds
 - [Threads](user/threads.md): Inbox and Needs you, Mark done, the composer (including Open PR when the agent asks), the quick-actions card, context chips, history, channel actions, Watch PR and Send to Grok Bot
 - [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud
 - [Crew and Conductor](user/crew.md)
