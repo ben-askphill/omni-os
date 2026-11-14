@@ -587,6 +587,20 @@ server.registerTool(
   async () => text(await call('/devices')),
 );
 
+server.registerTool(
+  'machines',
+  {
+    description:
+      `How much each of ${USER}'s machines runs now, this one first: running and queued threads, how many of those were delegated, ` +
+      'Needs you items for threads it holds, each harness against its slot cap, and whether Tailscale sees it up. ' +
+      'Sub-agents inside processes are counted for this machine only (agents is null for the others). An offline machine keeps the counts it last reported.',
+  },
+  async () => {
+    const v = await call('/machines');
+    return text({ ...v, machines: v.machines.map(({ threadIds: _ids, ...m }: { threadIds: string[] }) => m) });
+  },
+);
+
 /** How long set_secret waits for another machine to answer before it says the secret is on its way. */
 const SECRET_WAIT_MS = 20_000;
 

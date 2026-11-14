@@ -46,6 +46,8 @@ const CAPS: Record<string, number> = {
   'cursor-cloud': config.maxConcurrentCursorCloud,
 };
 export const capFor = (harness: string) => CAPS[harness] ?? config.maxConcurrent;
+/** Every harness's cap, as this machine announces them to the others (sync/devices.ts). */
+export const slotCaps = (): Record<string, number> => ({ ...CAPS });
 
 /** The CLI name a harness shows in errors and the resume command. */
 const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud' };

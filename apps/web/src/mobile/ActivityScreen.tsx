@@ -4,6 +4,8 @@ import { OmniMark } from '../components/brand.tsx';
 import { UpdateNotice } from '../components/UpdateNotice.tsx';
 import { DiskNotice } from '../components/DiskNotice.tsx';
 import { AccountNotice } from '../components/AccountNotice.tsx';
+import { MachineTile } from '../components/dashboard/MachineTiles.tsx';
+import { useMachines } from '../app/useMachines.ts';
 import { href } from '../router.ts';
 import { useNow } from '../store.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
@@ -19,6 +21,7 @@ export function ActivityScreen() {
   const shell = useShell();
   const now = useNow(60_000);
   const { pinned, inbox, working, done, loaded, status, delegates } = useInbox();
+  const machines = useMachines().data;
   const waiting = [...pinned, ...inbox];
   const mark = waiting.some((t) => asksForYou(status(t)?.glyph ?? 'idle')) ? 'attention' : working.count ? 'delegating' : 'idle';
   const date = new Date(now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -40,6 +43,15 @@ export function ActivityScreen() {
           <UpdateNotice className="mx-4 mb-3" />
           <DiskNotice className="mx-4 mb-3" />
           <AccountNotice className="mx-4 mb-3" />
+          {machines && machines.machines.length > 1 && (
+            <section aria-label="Machines" className="scroll-thin mb-1 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1">
+              {machines.machines.map((m) => (
+                <div key={m.id ?? 'here'} className="w-[236px] shrink-0 snap-start">
+                  <MachineTile machine={m} view={machines} />
+                </div>
+              ))}
+            </section>
+          )}
         </div>
         <div className="flex flex-col px-4">
           {waiting.map((t, i) => (
