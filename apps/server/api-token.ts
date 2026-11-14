@@ -4,7 +4,7 @@
 // A file rather than the Keychain: shell scripts and the desktop app read it without a Keychain prompt, and the
 // Keychain would guard it from the same account the file's mode already admits, and from no one else.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { chmodSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config, paths } from './config.ts';
 
@@ -37,6 +37,24 @@ export function loadToken(file: string, env: NodeJS.ProcessEnv = process.env): s
 }
 
 let cached: string | null = null;
+
+/** The token comes from OMNI_TOKEN, so rotating it would not stick. */
+export class TokenPinned extends Error {}
+
+/**
+ * A new token in data/api-token, 0600, which replaces the old one at once (PRD #667, story 10). The caller ends every
+ * device session. Running threads keep the old one in OMNI_TOKEN until their next turn.
+ */
+export function rotateToken(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.OMNI_TOKEN?.trim()) throw new TokenPinned('OMNI_TOKEN sets this server\'s token: change it there and restart');
+  const token = randomBytes(32).toString('hex');
+  const file = tokenPath();
+  const tmp = `${file}.rotate-${process.pid}`;
+  writeFileSync(tmp, `${token}\n`, { mode: 0o600 });
+  chmodSync(tmp, 0o600);
+  renameSync(tmp, file);
+  cached = token;
+}
 
 /** This install's token, made on first use. */
 export function apiToken(): string {

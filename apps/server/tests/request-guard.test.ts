@@ -3,8 +3,9 @@ import { Hono } from 'hono';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cookieName, loadToken, proofFor } from '../api-token.ts';
-import { hostAllowed, requestGuard, viaTailnet } from '../request-guard.ts';
+import { cookieName, loadToken, proofFor, sessionCookieName } from '../api-token.ts';
+import { mintNonce } from '../desktop-pairing.ts';
+import { hostAllowed, requestGuard, useLegacyUpgrade, useSessionCheck, viaTailnet } from '../request-guard.ts';
 
 // requestGuard in front of /api: a request without this install's token is refused, and so is what a
 // cross-site page or a DNS-rebinding domain sends. What the Web UI (same origin, or through vite), the
@@ -17,6 +18,18 @@ app.all('*', (c) => c.json({ ok: true }));
 
 const TOKEN = process.env.OMNI_TOKEN!;
 const AUTH = { authorization: `Bearer ${TOKEN}` };
+
+// Sessions without a db: one paired with the token, one signed in with Google.
+const SESSIONS: Record<string, { id: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token' }> = {
+  omni_s_paired: { id: 's-paired', kind: 'browser', method: 'token' },
+  omni_s_google: { id: 's-google', kind: 'browser', method: 'google' },
+};
+useSessionCheck((t) => SESSIONS[t] ?? null);
+const upgraded: string[] = [];
+useLegacyUpgrade((c) => {
+  upgraded.push(c.req.path);
+  return { id: 's-upgraded', token: 'omni_s_upgraded' };
+});
 
 const send = (headers: Record<string, string>, init: RequestInit = {}) =>
   app.request('http://127.0.0.1:4747/api/threads', { method: 'POST', body: '{"prompt":"x"}', ...init, headers: { host: '127.0.0.1:4747', ...AUTH, ...headers } });
@@ -34,12 +47,18 @@ describe('requestGuard: the token', () => {
     expect((await send({ authorization: '', 'content-type': 'application/json' })).status).toBe(401);
   });
 
-  it('lets the right token through as a bearer header or as the paired cookie', async () => {
+  it('lets the right token through as a bearer header, and a paired browser by its session cookie', async () => {
     expect((await get('/api/threads', AUTH)).status).toBe(200);
     expect((await get('/api/threads', { authorization: `bearer  ${TOKEN} ` })).status).toBe(200);
-    expect((await get('/api/threads', { cookie: `other=1; ${cookieName()}=${TOKEN}` })).status).toBe(200);
+    expect((await get('/api/threads', { cookie: `other=1; ${sessionCookieName()}=omni_s_paired` })).status).toBe(200);
     // EventSource sends only the cookie.
-    expect((await get('/api/feed', { cookie: `${cookieName()}=${TOKEN}`, accept: 'text/event-stream' })).status).toBe(200);
+    expect((await get('/api/feed', { cookie: `${sessionCookieName()}=omni_s_paired`, accept: 'text/event-stream' })).status).toBe(200);
+  });
+
+  it("trades an older build's raw-token cookie for a session, once (S11)", async () => {
+    upgraded.length = 0;
+    expect((await get('/api/threads', { cookie: `${cookieName()}=${TOKEN}` })).status).toBe(200);
+    expect(upgraded).toEqual(['/api/threads']);
   });
 
   it('takes no cookie of another name, like another port\'s', async () => {
@@ -53,8 +72,17 @@ describe('requestGuard: the token', () => {
     expect((await get('/api/auth/proof/x')).status).toBe(401);
   });
 
-  it('lets GET /api/auth/desktop-pair through from this machine, and refuses a proxy or another site', async () => {
-    expect((await get('/api/auth/desktop-pair')).status).toBe(200);
+  it('lets GET /api/auth/desktop-pair through from this machine with a fresh nonce, and refuses a proxy or another site', async () => {
+    expect((await get(`/api/auth/desktop-pair?nonce=${mintNonce().nonce}`)).status).toBe(200);
+    expect((await get(`/api/auth/desktop-pair?nonce=${mintNonce().nonce}`, { 'sec-fetch-site': 'none' })).status).toBe(200);
+    // No nonce, or one never handed out: to the pairing screen, not in (S8).
+    for (const q of ['', '?nonce=deadbeef']) {
+      const res = await get(`/api/auth/desktop-pair${q}`);
+      expect(res.status).toBe(303);
+      expect(res.headers.get('location')).toBe('/#/pair?desktop=expired');
+    }
+    // A page on another port of this host cannot navigate the window there with a nonce either.
+    expect((await get(`/api/auth/desktop-pair?nonce=${mintNonce().nonce}`, { 'sec-fetch-site': 'same-site' })).status).toBe(403);
     expect((await get('/api/auth/desktop-pair', { 'x-forwarded-host': 'box.tail1234.ts.net' })).status).toBe(403);
     expect((await get('/api/auth/desktop-pair', { authorization: `Bearer ${TOKEN}`, 'x-forwarded-for': '100.64.0.2' })).status).toBe(403);
     // cloudflared, with a spoofed loopback first in X-Forwarded-For: still a proxy.
@@ -79,8 +107,29 @@ describe('requestGuard: the token', () => {
   });
 
   it('still refuses a cross-site request that carries the cookie', async () => {
-    const res = await send({ authorization: '', cookie: `${cookieName()}=${TOKEN}`, origin: 'https://evil.example', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' });
+    const res = await send({ authorization: '', cookie: `${sessionCookieName()}=omni_s_paired`, origin: 'https://evil.example', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' });
     expect(res.status).toBe(403);
+  });
+
+  it('refuses a page on another port of this host, even for a GET an <img> would make (S14, S18)', async () => {
+    const img = await get('/api/threads/t1/terminal/stream', { cookie: `${sessionCookieName()}=omni_s_paired`, 'sec-fetch-site': 'same-site' });
+    expect(img.status).toBe(403);
+    expect(((await img.json()) as { error: string }).error).toMatch(/another site or port/);
+    const post = await send({ authorization: '', cookie: `${sessionCookieName()}=omni_s_paired`, origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-site', 'content-type': 'application/json' });
+    expect(post.status).toBe(403);
+  });
+
+  it("opens the terminal for the token or a token-paired session, never for a Google session (S12)", async () => {
+    const term = (headers: Record<string, string>) =>
+      app.request('http://127.0.0.1:4747/api/threads/t1/terminal', { method: 'POST', body: '{}', headers: { host: '127.0.0.1:4747', authorization: '', 'content-type': 'application/json', ...headers } });
+    expect((await term(AUTH)).status).toBe(200);
+    expect((await term({ cookie: `${sessionCookieName()}=omni_s_paired` })).status).toBe(200);
+    const google = await term({ cookie: `${sessionCookieName()}=omni_s_google` });
+    expect(google.status).toBe(403);
+    expect(((await google.json()) as { error: string }).error).toMatch(/terminal/);
+    expect((await get('/api/threads/t1/terminal/stream', { cookie: `${sessionCookieName()}=omni_s_google` })).status).toBe(403);
+    // Everything else stays open to it.
+    expect((await get('/api/threads', { cookie: `${sessionCookieName()}=omni_s_google` })).status).toBe(200);
   });
 });
 

@@ -1,17 +1,22 @@
 // /api/auth: pairing a browser, Google sign-in for new devices, and the desktop app's check that the server on the port
 // is this install's Omni. requestGuard has checked the token or a device session before any of these run, except
-// GET /auth/proof, GET /auth/desktop-pair, the sign-in routes (SIGN_IN_ROUTES) and POST /auth/app-pairings/redeem.
-// desktop-pair is the desktop app's window: a loopback GET with no proxy, and the token never appears in the URL.
+// GET /auth/proof, POST /auth/desktop-nonce, GET /auth/desktop-pair, the sign-in routes (SIGN_IN_ROUTES) and POST
+// /auth/app-pairings/redeem. desktop-pair is the desktop app's window: a loopback GET with no proxy and a one-time
+// nonce (desktop-pairing.ts), and the token never appears in the URL. A paired browser holds a session, never the token.
 // App pairing (app-pairing.ts) gives a native app its own revocable session; push-tokens.ts keeps its push token.
 import { Hono, type Context } from 'hono';
-import { deleteCookie, setCookie } from 'hono/cookie';
+import { deleteCookie } from 'hono/cookie';
 import { z } from 'zod';
-import { apiToken, cookieName, proofFor, sessionCookieName } from './api-token.ts';
+import { proofFor, rotateToken, sessionCookieName, TokenPinned } from './api-token.ts';
+import { setSessionCookie } from './browser-session.ts';
+import { DESKTOP_SECRET_HEADER, mintNonce, secretMatches, takeNonce } from './desktop-pairing.ts';
 import { mintPairing, PairingError, redeemPairing } from './app-pairing.ts';
 import { clerkConfig } from './clerk.ts';
 import { connectMethod } from './connect/service.ts';
 import {
   browserName,
+  createSession,
+  endAllSessions,
   listSessions,
   owner,
   pollFlow,
@@ -25,7 +30,7 @@ import {
 } from './google-auth.ts';
 import { PushPreferencesBody, readPushPreferences, updatePushPreferences } from './push-preferences.ts';
 import { deletePushToken, pushRegistration, PushTokenBody, setPushToken } from './push-tokens.ts';
-import { clientKey, desktopPairAllowed, viaConnect } from './request-guard.ts';
+import { clientKey, viaConnect } from './request-guard.ts';
 
 export const authApi = new Hono();
 
@@ -33,14 +38,13 @@ export const authApi = new Hono();
 authApi.get('/', (c) => c.json({ ok: true }));
 
 /**
- * Called with `Authorization: Bearer <token>`: hands the browser the token as an HttpOnly, SameSite=Strict cookie
- * on /api, so page scripts never hold it and EventSource and <img> requests carry it.
+ * Called with `Authorization: Bearer <token>`: hands the browser a device session paired with the token (method
+ * `token`) as an HttpOnly, SameSite=Strict cookie on /api (browser-session.ts). Never the token itself: a session
+ * can be revoked in Settings, Devices, and ends when the token is rotated.
  */
-const overHttps = (c: Context) => new URL(c.req.url).protocol === 'https:' || c.req.header('x-forwarded-proto') === 'https';
-const cookieOptions = (c: Context) => ({ path: '/api', httpOnly: true, sameSite: 'Strict' as const, secure: overHttps(c), maxAge: 400 * 24 * 3600 });
-
-function pairCookie(c: Context) {
-  setCookie(c, cookieName(), apiToken(), cookieOptions(c));
+function pairCookie(c: Context, name: string) {
+  const s = createSession(name, 'browser', '', 'token');
+  setSessionCookie(c, s.token);
 }
 
 /** Only a request that carries the install's token trades it for the cookie: a device session must never turn into the token it was issued instead of. */
@@ -50,15 +54,48 @@ const tokenOnlyCookie = (c: Context) =>
 authApi.post('/pair', (c) => {
   const refused = tokenOnlyCookie(c);
   if (refused) return refused;
-  pairCookie(c);
+  pairCookie(c, browserName(c.req.header('user-agent')));
   return c.json({ ok: true });
 });
 
-/** The desktop app's first navigation. Sets the same cookie as /pair, then sends the window to the Web UI. */
+/**
+ * The desktop app's main process, before each window load: a one-time nonce for desktop-pair (desktop-pairing.ts).
+ * Takes the secret the app started this server with, or the install's token (an app attached to a server it did not
+ * start). requestGuard has checked the request is straight from this machine.
+ */
+authApi.post('/desktop-nonce', (c) => {
+  if (!secretMatches(c.req.header(DESKTOP_SECRET_HEADER)) && c.get('omniAuth')?.via !== 'token') {
+    return c.json({ error: "Forbidden: send the desktop app's secret or this install's token" }, 403);
+  }
+  return c.json(mintNonce());
+});
+
+/**
+ * The desktop app's window opens this with a nonce from /desktop-nonce. Sets a session cookie as /pair does, then sends
+ * the window to the Web UI. A used or stale nonce sends it to the pairing screen instead.
+ */
 authApi.get('/desktop-pair', (c) => {
-  if (!desktopPairAllowed(c)) return c.json({ error: 'Forbidden: desktop pairing is only from this machine' }, 403);
-  pairCookie(c);
+  if (!takeNonce(c.req.query('nonce'))) return c.redirect('/#/pair?desktop=expired', 303);
+  pairCookie(c, 'Desktop app');
   return c.redirect('/');
+});
+
+/**
+ * A new install token (PRD #667, story 10): data/api-token is rewritten and every device session ends, so every
+ * browser, app and the desktop window pairs again. Token only. Running threads keep the old one until their next turn.
+ */
+authApi.post('/rotate-token', (c) => {
+  const refused = tokenOnlyCookie(c);
+  if (refused) return c.json({ error: "Forbidden: only the install's token can rotate it" }, 403);
+  try {
+    rotateToken();
+  } catch (err) {
+    if (err instanceof TokenPinned) return c.json({ error: err.message }, 409);
+    throw err;
+  }
+  endAllSessions();
+  deleteCookie(c, sessionCookieName(), { path: '/api' });
+  return c.json({ ok: true });
 });
 
 /** HMAC-SHA256 of `omni-proof:<port>:<nonce>` keyed with the token: proves this server, on this port, holds it, without revealing it. */
@@ -135,7 +172,7 @@ const PollBody = z.object({ flow: z.string().min(1).max(100), secret: z.string()
 function pollAnswer(c: Context, r: PollResult) {
   if (r.state === 'signed_in') {
     if (r.kind === 'browser') {
-      setCookie(c, sessionCookieName(), r.session.token, cookieOptions(c));
+      setSessionCookie(c, r.session.token);
       return c.json({ state: r.state });
     }
     return c.json({ state: r.state, token: r.session.token });

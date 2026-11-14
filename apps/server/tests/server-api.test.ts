@@ -20,7 +20,7 @@ afterAll(() => rmSync(web, { recursive: true, force: true }));
 const r = await startRunner({ OMNI_WEB_DIST: web });
 const { app } = await import('../app.ts');
 const { gitHead } = await import('../about.ts');
-const { cookieName, proofFor } = await import('../api-token.ts');
+const { proofFor, sessionCookieName } = await import('../api-token.ts');
 const { config } = await import('../config.ts');
 
 const call = async (path: string, init?: RequestInit) => {
@@ -142,11 +142,14 @@ describe('the Web UI', () => {
 describe('/api/auth', () => {
   const TOKEN = process.env.OMNI_TOKEN!;
 
-  it('pairs a browser: the token, sent as a bearer header, comes back as an HttpOnly SameSite=Strict cookie on /api', async () => {
+  it('pairs a browser: the token, sent as a bearer header, comes back as a session in an HttpOnly SameSite=Strict cookie on /api', async () => {
     const res = await app.request('/api/auth/pair', { method: 'POST' });
     expect(res.status).toBe(200);
     const cookie = res.headers.get('set-cookie') ?? '';
-    expect(cookie).toContain(`${cookieName()}=${TOKEN}`);
+    // A revocable session, never the token itself (S11).
+    expect(cookie).not.toContain(TOKEN);
+    const session = cookie.match(new RegExp(`${sessionCookieName()}=(omni_s_[0-9a-f]+)`))?.[1];
+    expect(session).toBeTruthy();
     expect(cookie).toMatch(/; Path=\/api(;|$)/);
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Strict');
@@ -154,16 +157,45 @@ describe('/api/auth', () => {
     const viaServe = await app.request('/api/auth/pair', { method: 'POST', headers: { 'x-forwarded-proto': 'https' } });
     expect(viaServe.headers.get('set-cookie')).toContain('Secure');
     // The cookie alone is enough after that, for GET /api/auth and everything else.
-    const after = await app.request('/api/auth', { headers: { authorization: '', cookie: `${cookieName()}=${TOKEN}` } });
+    const after = await app.request('/api/auth', { headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } });
     expect(after.status).toBe(200);
+    expect(((await after.json()) as { ok: boolean }).ok).toBe(true);
   });
 
-  it('pairs the desktop app window from this machine, with the token only in the cookie', async () => {
-    const res = await app.request('/api/auth/desktop-pair', { headers: { authorization: '' } });
-    expect(res.status).toBe(302);
-    expect(new URL(res.headers.get('location') ?? '', 'http://127.0.0.1').pathname).toBe('/');
+  it('pairs the desktop app window from this machine with a one-time nonce, never the token (S8)', async () => {
+    const SECRET = 'desktop-secret-0123456789abcdef0123456789';
+    process.env.OMNI_DESKTOP_PAIR_SECRET = SECRET;
+    try {
+      // Main asks for a nonce with the secret it started the server with, or with the token.
+      const minted = await app.request('/api/auth/desktop-nonce', { method: 'POST', headers: { authorization: '', 'x-omni-desktop-secret': SECRET } });
+      expect(minted.status).toBe(200);
+      const { nonce, expiresIn } = (await minted.json()) as { nonce: string; expiresIn: number };
+      expect(expiresIn).toBe(60);
+      expect((await app.request('/api/auth/desktop-nonce', { method: 'POST' })).status).toBe(200);
+      expect((await app.request('/api/auth/desktop-nonce', { method: 'POST', headers: { authorization: '', 'x-omni-desktop-secret': 'wrong' } })).status).toBe(403);
+      expect((await app.request('/api/auth/desktop-nonce', { method: 'POST', headers: { authorization: '' } })).status).toBe(403);
+
+      const res = await app.request(`/api/auth/desktop-pair?nonce=${nonce}`, { headers: { authorization: '' } });
+      expect(res.status).toBe(302);
+      expect(new URL(res.headers.get('location') ?? '', 'http://127.0.0.1').pathname).toBe('/');
+      const cookie = res.headers.get('set-cookie') ?? '';
+      expect(cookie).toContain(`${sessionCookieName()}=omni_s_`);
+      expect(cookie).not.toContain(TOKEN);
+      // Used once: the same nonce again goes to the pairing screen.
+      const again = await app.request(`/api/auth/desktop-pair?nonce=${nonce}`, { headers: { authorization: '' } });
+      expect(again.status).toBe(303);
+      expect(again.headers.get('set-cookie')).toBeNull();
+      const without = await app.request('/api/auth/desktop-pair', { headers: { authorization: '' } });
+      expect(without.status).toBe(303);
+    } finally {
+      delete process.env.OMNI_DESKTOP_PAIR_SECRET;
+    }
+  });
+
+  it('pairs the desktop app window with no Secure flag over plain http', async () => {
+    const minted = (await (await app.request('/api/auth/desktop-nonce', { method: 'POST' })).json()) as { nonce: string };
+    const res = await app.request(`/api/auth/desktop-pair?nonce=${minted.nonce}`, { headers: { authorization: '' } });
     const cookie = res.headers.get('set-cookie') ?? '';
-    expect(cookie).toContain(`${cookieName()}=${TOKEN}`);
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Strict');
     expect(cookie).not.toContain('Secure');
@@ -173,6 +205,18 @@ describe('/api/auth', () => {
     });
     expect(proxied.status).toBe(403);
     expect(proxied.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('rotates the install token: the old one stops working and every session ends (story 10)', async () => {
+    const pinned = await app.request('/api/auth/rotate-token', { method: 'POST' });
+    // OMNI_TOKEN pins the token for the tests: rotating is refused with why, rather than half done.
+    expect(pinned.status).toBe(409);
+    expect(((await pinned.json()) as { error: string }).error).toMatch(/OMNI_TOKEN/);
+    const paired = (await app.request('/api/auth/pair', { method: 'POST' })).headers.get('set-cookie') ?? '';
+    const session = paired.match(new RegExp(`${sessionCookieName()}=(omni_s_[0-9a-f]+)`))![1];
+    // A session cannot rotate it.
+    const bySession = await app.request('/api/auth/rotate-token', { method: 'POST', headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } });
+    expect(bySession.status).toBe(403);
   });
 
   it('will not pair without the token', async () => {

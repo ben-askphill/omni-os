@@ -41,8 +41,9 @@ import { toolOutputApi } from './tool-output-api.ts';
 import { threadsApi } from './threads-api.ts';
 import { connectApi } from './connect-api.ts';
 import { connectHostname } from './connect/service.ts';
-import { requestGuard, useConnectHost, useSessionCheck } from './request-guard.ts';
-import { sessionFor } from './google-auth.ts';
+import { requestGuard, useConnectHost, useLegacyUpgrade, useSessionCheck } from './request-guard.ts';
+import { setSessionCookie } from './browser-session.ts';
+import { browserName, createSession, sessionFor } from './google-auth.ts';
 import { toolFailuresApi } from './tool-failures-api.ts';
 import { worktreesApi } from './worktrees-api.ts';
 import { updateApi } from './update-api.ts';
@@ -60,6 +61,12 @@ app.onError((err, c) => {
 // Ahead of every route: refuses requests without this install's token, and those other sites make through a browser
 // (apps/server/request-guard.ts). The Web UI below is served without either: it holds no secret, and pairs to get one.
 useSessionCheck(sessionFor);
+// An older build's raw-token cookie, traded once for a session (browser-session.ts).
+useLegacyUpgrade((c) => {
+  const s = createSession(browserName(c.req.header('user-agent')), 'browser', '', 'token');
+  setSessionCookie(c, s.token);
+  return s;
+});
 useConnectHost(connectHostname);
 api.use('*', requestGuard);
 

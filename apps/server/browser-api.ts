@@ -30,7 +30,21 @@ browserApi.get('/:id/browser', (c) => {
   return c.json(b?.state() ?? { running: false, url: '', title: '', loading: false, canBack: false, canForward: false, tabs: [], active: null, viewport: { width: 1280, height: 713 } });
 });
 
-/** Live view: `state` messages, and `frame` messages with a JPEG. A slow client skips frames rather than queueing them. */
+/** Starts the channel's browser (POST, so no <img> or link can). Answers its state, as GET /:id/browser does. */
+browserApi.post('/:id/browser/start', async (c) => {
+  const b = browserFor(c);
+  try {
+    await b.start();
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 502);
+  }
+  return c.json(b.state());
+});
+
+/**
+ * Live view: `state` messages, and `frame` messages with a JPEG. A slow client skips frames rather than queueing them.
+ * Only attaches: with the browser not running it sends its state (running false) and waits for POST /:id/browser/start.
+ */
 browserApi.get('/:id/browser/stream', (c) => {
   const b = browserFor(c);
   return sessionSSE(c, async (stream) => {
@@ -43,12 +57,7 @@ browserApi.get('/:id/browser/stream', (c) => {
       wake?.();
     });
     await stream.writeSSE({ event: 'ping', data: '' });
-    try {
-      await b.start();
-    } catch (err) {
-      await stream.writeSSE({ data: JSON.stringify({ type: 'error', error: (err as Error).message }) });
-      return;
-    }
+    // watch() sends the state first: running false until POST /:id/browser/start, then the page once Chrome is up.
     stop = b.watch((e) => {
       if (e.type === 'frame') frame = e;
       else states.push(e);
