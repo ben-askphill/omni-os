@@ -10,6 +10,7 @@ import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
 import { lastGrapheme } from '../format.ts';
 import { channelBody, channelForm, channelFormProblem, CHANNEL_ID, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelRun } from '@omni/shared/channel-form.ts';
+import { PR_STEPS, STEP_LABEL, STEP_PROMPTS } from '@omni/shared/thread-glance.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { pageColumn } from '../components/ui/feedback.tsx';
@@ -331,6 +332,20 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         </Field>
       </Card>
 
+      <Card title="Branch steps" subtitle="What the Open PR, Fix conflicts and Fix checks buttons ask the agent in this channel. Empty uses the built-in prompt, shown greyed out.">
+        {PR_STEPS.map((step) => (
+          <Field key={step} label={STEP_LABEL[step]} htmlFor={`ch-step-${step}`}>
+            <textarea
+              id={`ch-step-${step}`}
+              className="field min-h-[84px] resize-y"
+              value={f.prompts[step]}
+              placeholder={STEP_PROMPTS[step]}
+              onChange={(e) => set('prompts', { ...f.prompts, [step]: e.target.value })}
+            />
+          </Field>
+        ))}
+      </Card>
+
       <Card title="Store">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
@@ -399,6 +414,38 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           </div>
           <Toggle checked={f.use_worktree} onChange={(v) => set('use_worktree', v)} label="Worktree per thread" disabled={!hasRepo} />
         </div>
+        {hasRepo && f.use_worktree && (
+          <>
+            <Field
+              label="Copy into new worktrees"
+              htmlFor="ch-wt-include"
+              hint="Ignored files each new worktree gets from the main checkout, one per line in .gitignore syntax, such as .env. Added to the repo's own .worktreeinclude."
+            >
+              <textarea
+                id="ch-wt-include"
+                className="field min-h-[68px] resize-y font-mono !text-[13px]"
+                value={f.worktree_include}
+                onChange={(e) => set('worktree_include', e.target.value)}
+                placeholder={'.env\nshopify.theme.toml'}
+                spellCheck={false}
+              />
+            </Field>
+            <Field
+              label="Shared directories"
+              htmlFor="ch-wt-shared"
+              hint="Folders each new worktree links to in the main checkout instead of installing again, one path per line, such as node_modules. A folder the main checkout lacks is skipped."
+            >
+              <textarea
+                id="ch-wt-shared"
+                className="field min-h-[68px] resize-y font-mono !text-[13px]"
+                value={f.worktree_shared}
+                onChange={(e) => set('worktree_shared', e.target.value)}
+                placeholder="node_modules"
+                spellCheck={false}
+              />
+            </Field>
+          </>
+        )}
         <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
           <div>
             <div className="text-[13px] font-medium text-fg">Show the browser window</div>

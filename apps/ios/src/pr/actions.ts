@@ -1,11 +1,13 @@
 import { OmniHttpError, type OmniApi } from '@omni/client-core';
 import { classifyMergeFailure, type MergeFailure } from '@omni/shared/pr-merge.ts';
 import type { PRWatchView } from '@omni/shared/pr-watch.ts';
+import { rerunText } from '@omni/shared/pr-rerun.ts';
 
 import { describeFailure } from '../review/failure';
 
 export type MergeApi = Pick<OmniApi, 'mergePullRequest'>;
 export type WatchApi = Pick<OmniApi, 'watchPR' | 'stopPRWatch'>;
+export type RerunApi = Pick<OmniApi, 'rerunFailedChecks'>;
 
 export type MergeOutcome =
   | { kind: 'merged' }
@@ -34,12 +36,36 @@ export async function mergePR(call: <T>(fn: (api: MergeApi) => Promise<T>) => Pr
   }
 }
 
+export type AutoMergeApi = Pick<OmniApi, 'setAutoMerge'>;
+export type AutoMergeOutcome = { kind: 'set' } | { kind: 'failed'; message: string };
+
+/** Turns auto-merge on with the repo's merge method, or off. A repo with auto-merge off comes back with gh's words. */
+export async function setAutoMerge(call: <T>(fn: (api: AutoMergeApi) => Promise<T>) => Promise<T>, channelId: string, number: number, on: boolean): Promise<AutoMergeOutcome> {
+  try {
+    await call((api) => api.setAutoMerge(channelId, number, on));
+    return { kind: 'set' };
+  } catch (e) {
+    return { kind: 'failed', message: e instanceof OmniHttpError && e.failure.kind === 'http' && e.failure.status !== 401 ? e.failure.message : describeFailure(e).message };
+  }
+}
+
 export type WatchOutcome = { kind: 'set'; watch: PRWatchView | null } | { kind: 'failed'; message: string };
 
 /** Starts the thread's PR watch, or stops it. A refused start (no open PR, no GitHub) comes back with the server's reason. */
 export async function setWatch(call: <T>(fn: (api: WatchApi) => Promise<T>) => Promise<T>, threadId: string, on: boolean): Promise<WatchOutcome> {
   try {
     return { kind: 'set', watch: await call((api) => (on ? api.watchPR(threadId) : api.stopPRWatch(threadId))) };
+  } catch (e) {
+    return { kind: 'failed', message: describeFailure(e).message };
+  }
+}
+
+export type RerunOutcome = { kind: 'started'; text: string } | { kind: 'failed'; message: string };
+
+/** `gh run rerun --failed` for each failing workflow run, through the server. A refusal comes back with the server's or gh's reason. */
+export async function rerunChecks(call: <T>(fn: (api: RerunApi) => Promise<T>) => Promise<T>, channelId: string, number: number): Promise<RerunOutcome> {
+  try {
+    return { kind: 'started', text: rerunText(await call((api) => api.rerunFailedChecks(channelId, number))) };
   } catch (e) {
     return { kind: 'failed', message: describeFailure(e).message };
   }

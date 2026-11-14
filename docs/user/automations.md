@@ -4,6 +4,8 @@
 
 Delete on an automation's card removes it from this machine after a confirmation. One of your own in `data/automations/` loses its YAML file. A shared one stays in `automations/`, so an update cannot bring it back: Omni hides it with `automations.<id>.deleted` in `data/omni.config.json`, and removing that key restores it. Either way its schedule stops at once, a webhook automation's signing secret goes with it, and threads it already started stay. The hide is per machine, like the on/off override: with sync on, delete it on the machine that runs automations too. Desktop web, phone web and the desktop app all have Delete. The native iOS Automations screen can only toggle.
 
+The Conductor manages them too: `list_automations` lists each one with its schedule or trigger, error and last runs; `run_automation` starts one now on this machine; `set_automation_enabled` writes the same on/off override; `delete_automation` deletes like the card does. Creating one is still a YAML file.
+
 ```yaml
 name: Morning coffee
 enabled: false          # the default; the UI toggle overrides it per machine
@@ -18,6 +20,25 @@ prompt: |
 ```
 
 `timezone` defaults to your timezone from the config (`OMNI_TZ` wins, else the system's). Both folders are watched; edits apply without a restart. The Mac has to be awake at the scheduled time, unless the automation sets `catchup: true`: then a missed slot runs once Omni is back.
+
+## Skipping runs with nothing to do
+
+Two optional fields keep a scheduled automation from spending plan usage on a run it does not need:
+
+```yaml
+precheck:
+  command: gh pr list --author @me --json number --jq 'length > 0' | grep -q true
+  timeout: 30           # seconds, default 30, at most 600
+catchup: true
+catchup_max_age: 6h     # seconds, or 45s, 90m, 6h, 2d
+```
+
+- `precheck` is a shell command (a plain string works too) run in the channel's folder through your login shell, before any thread or harness starts. Exit 0 runs the automation. A non-zero exit, a timeout or a shell that cannot start skips the run. `{{omniRoot}}` and the other prompt placeholders work in it.
+- It runs for scheduled runs only: cron ticks and catch-ups. Run now and event runs ignore it.
+- `catchup_max_age` caps a catch-up: when the missed slot is older than this, Omni skips it instead of starting a stale run after the Mac wakes. A missed slot within the age still runs once.
+- A skipped run makes no thread and nothing in the Inbox. It shows in the automation's run history as Skipped with its reason (the precheck's exit code and last line of stderr, the timeout, or the missed slot's time) on desktop web, phone web, the desktop app and iOS, and it counts as that slot's run, so a catch-up does not try it again.
+
+`pr-babysitter` skips when you have no open PR on the repo, and `docs-daily` skips when `scripts/docs-daily.sh preflight` finds nothing that needs docs.
 
 ## Choose a machine
 

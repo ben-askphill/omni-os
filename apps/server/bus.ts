@@ -24,7 +24,9 @@ export type FeedEvent =
   /** Free disk space crossed a warning level (disk-space.ts). Clients refetch GET /api/disk. */
   | { type: 'disk'; level: string }
   /** A harness account changed on this machine, or another machine's record or an acknowledged switch synced in (harness-accounts.ts). Clients refetch GET /api/accounts. */
-  | { type: 'accounts' };
+  | { type: 'accounts' }
+  /** A thread's review notes changed, here or on another Mac (db/repos/review-notes.ts). Its open Changes panels refetch them. */
+  | { type: 'review_notes'; thread_id: string };
 
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);

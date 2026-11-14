@@ -6,7 +6,8 @@ import { Text } from '../ui/Text';
 
 import { fontSize, lineHeight, space, useOmniTheme, weight } from '../theme';
 import { FileHeader, GroupHeader, LineRow, MoreRow, NoteRow } from './DiffRows';
-import { changeRows, FRESH_ROWS, pickedRange, showAll, toggleFile, type ChangeRow } from './rows';
+import { NoteCard, type NoteActions } from './ReviewNotes';
+import { changeRows, FRESH_ROWS, pickedRange, showAll, toggleFile, type ChangeRow, type FileNotes } from './rows';
 import { SelectionDock, type PickSource } from './SelectionDock';
 
 export interface PaneEmpty {
@@ -29,11 +30,14 @@ interface DiffPaneProps {
   /** The lines are on the thread's next message. */
   onAdded: () => void;
   headerOffset: number;
+  /** Unresolved review notes placed on these groups (rows.ts notesOnScreen), and what changes them. */
+  notes: ReadonlyMap<string, FileNotes>;
+  noteActions: NoteActions;
 }
 
 const keyOf = (row: ChangeRow) => row.id;
 
-export function DiffPane({ threadId, scope, groups, total, header, empty, source, refreshing, onRefresh, onAdded, headerOffset }: DiffPaneProps) {
+export function DiffPane({ threadId, scope, groups, total, header, empty, source, refreshing, onRefresh, onAdded, headerOffset, notes, noteActions }: DiffPaneProps) {
   const { colors } = useOmniTheme();
   const [rowsState, setRowsState] = useState(FRESH_ROWS);
   const [held, setHeld] = useState<HeldPick>(() => noPick(scope));
@@ -51,7 +55,9 @@ export function DiffPane({ threadId, scope, groups, total, header, empty, source
     return f && pick ? { file: pick.file, ...pickedRange(pick, pick.file, f.diff.lines)! } : null;
   }, [picked, pick, files]);
 
-  const rows = useMemo(() => changeRows(groups, total, rowsState), [groups, total, rowsState]);
+  const rows = useMemo(() => changeRows(groups, total, rowsState, notes), [groups, total, rowsState, notes]);
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
 
   const press = useCallback((fileKey: string, index: number) => {
     const f = filesRef.current.get(fileKey);
@@ -59,7 +65,7 @@ export function DiffPane({ threadId, scope, groups, total, header, empty, source
   }, []);
   const toggle = useCallback((fileKey: string) => {
     const f = filesRef.current.get(fileKey);
-    if (f) setRowsState((s) => toggleFile(s, f, total));
+    if (f) setRowsState((s) => toggleFile(s, f, total, notesRef.current.has(fileKey)));
   }, [total]);
   const more = useCallback((fileKey: string) => setRowsState((s) => showAll(s, fileKey)), []);
   const clear = useCallback(() => setHeld(noPick(scopeRef.current)), []);
@@ -77,8 +83,10 @@ export function DiffPane({ threadId, scope, groups, total, header, empty, source
           return <FileHeader row={item} onToggle={toggle} />;
         case 'line': {
           const on = liveRange !== null && liveRange.file === item.fileKey && item.index >= liveRange.from && item.index <= liveRange.to;
-          return <LineRow fileKey={item.fileKey} index={item.index} line={item.line} width={item.width} picked={on} onPress={press} />;
+          return <LineRow fileKey={item.fileKey} index={item.index} line={item.line} width={item.width} picked={on} noted={item.noted} onPress={press} />;
         }
+        case 'reviewNote':
+          return <NoteCard note={item.note} place={item.place} actions={noteActions} inline />;
         case 'note':
           return <NoteRow text={item.text} />;
         case 'more':
@@ -87,7 +95,7 @@ export function DiffPane({ threadId, scope, groups, total, header, empty, source
           return <NoteRow text="More files changed than are listed here." />;
       }
     },
-    [liveRange, press, toggle, more],
+    [liveRange, press, toggle, more, noteActions],
   );
 
   return (
@@ -106,7 +114,7 @@ export function DiffPane({ threadId, scope, groups, total, header, empty, source
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.list}
       />
-      {picked && source ? <SelectionDock threadId={threadId} picked={picked} source={source} onClear={clear} onAdded={added} /> : null}
+      {picked && source ? <SelectionDock threadId={threadId} picked={picked} source={source} onClear={clear} onAdded={added} onPin={noteActions.add} /> : null}
     </KeyboardAvoidingView>
   );
 }

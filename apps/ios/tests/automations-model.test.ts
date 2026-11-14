@@ -1,7 +1,7 @@
 import type { Automation } from '@omni/client-core';
 import { describe, expect, it } from 'vitest';
 
-import { automationRows, nextRunLabel, triggerLabel, withEnabled } from '../src/settings/automations-model';
+import { automationRows, lastRunLine, nextRunLabel, triggerLabel, withEnabled } from '../src/settings/automations-model';
 
 const NOW = Date.parse('2026-11-02T08:00:00Z');
 
@@ -106,5 +106,31 @@ describe('withEnabled', () => {
 
   it('changes nothing for an id that is not there', () => {
     expect(withEnabled(list, 'zzz', false)).toEqual(list);
+  });
+});
+
+describe('lastRunLine', () => {
+  const run = (over: Partial<NonNullable<Automation['runs']>[number]> = {}) => ({
+    thread_id: 't1',
+    trigger: 'cron',
+    created_at: '2026-11-02T07:00:00Z',
+    status: 'done',
+    title: 'Daily digest · 2 Nov',
+    ...over,
+  });
+
+  it('is empty before the first run', () => {
+    expect(lastRunLine(automation(), NOW)).toBe('');
+    expect(lastRunLine(automation({ runs: [] }), NOW)).toBe('');
+  });
+
+  it('names the newest run and its status', () => {
+    expect(lastRunLine(automation({ runs: [run()] }), NOW)).toBe('Last run 1h ago · Done');
+  });
+
+  it('shows a skipped run with its reason', () => {
+    const skipped = run({ thread_id: null, status: 'skipped', title: null, skip_reason: 'precheck exited 1' });
+    expect(lastRunLine(automation({ runs: [skipped, run()] }), NOW)).toBe('Skipped 1h ago: precheck exited 1');
+    expect(automationRows([automation({ runs: [skipped] })], NOW)[0].detail).toContain('Skipped 1h ago: precheck exited 1');
   });
 });

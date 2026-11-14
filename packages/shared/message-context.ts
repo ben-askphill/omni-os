@@ -61,13 +61,19 @@ export type Reading =
   | { as: 'known'; record: MessageContext; body: unknown }
   | { as: 'fallback'; record: MessageContext; why: FallbackWhy };
 
+/** How many records a message may hold. A message Ben writes holds CONTEXT_MAX; one Omni builds may hold more (review-notes.ts). */
+export interface ContextLimits {
+  records: number;
+}
+
 /**
  * The server's boundary: a client's `context` array, checked against `kinds` and normalized (body parsed and upgraded,
  * label recomputed). Refuses unknown kinds, newer versions, bad bodies, repeated ids and anything over the limits.
+ * CONTEXT_JSON_MAX holds whatever `limits` says, since it bounds what the harness gets.
  */
-export function parseContextsWith(raw: unknown, kinds: KindTable): Parsed<MessageContext[]> {
+export function parseContextsWith(raw: unknown, kinds: KindTable, limits: ContextLimits = { records: CONTEXT_MAX }): Parsed<MessageContext[]> {
   if (raw === undefined || raw === null) return { ok: true, value: [] };
-  if (!Array.isArray(raw) || raw.length > CONTEXT_MAX) return { ok: false, error: `context must be a list of at most ${CONTEXT_MAX} records` };
+  if (!Array.isArray(raw) || raw.length > limits.records) return { ok: false, error: `context must be a list of at most ${limits.records} records` };
   const out: MessageContext[] = [];
   for (const [i, c] of raw.entries()) {
     const at = `context[${i}]`;

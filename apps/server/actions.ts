@@ -32,7 +32,10 @@ export const forbiddenSecret = (name: string) => STRIPPED.includes(name);
 interface Live {
   run: ActionRun;
   child: ChildProcess;
+  /** The raw output's end: OUTPUT_LIMIT characters plus room for the longest secret, so a cut one can be dropped. */
   tail: string;
+  /** The values of the secrets the run was given, masked out of every output write (maskSecrets). */
+  hidden: string[];
   bytes: number;
   flush: NodeJS.Timeout | null;
   /** Set by stopRun, so the exit is recorded as stopped and not failed. */
@@ -48,6 +51,25 @@ const claimed = new Set<number>();
 // Colour and cursor codes: the clients show plain text.
 const ANSI = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g;
 const plain = (s: string) => s.replace(ANSI, '').replace(/\r(?!\n)/g, '\n');
+
+/** What a secret's value becomes in a run's stored output. */
+export const MASK = '[redacted]';
+
+/**
+ * A run's output with every injected secret's value replaced by MASK, cut to OUTPUT_LIMIT. Values under 4 characters
+ * are left alone: they would punch holes in ordinary text. When the raw tail was already cut at its start, the first
+ * longest-secret's worth of it is dropped too, since a value cut there no longer matches and would show its end.
+ */
+export function maskSecrets(raw: string, hidden: string[], cut: boolean): string {
+  const values = [...new Set(hidden.map((v) => v.trim()).filter((v) => v.length >= 4))].sort((a, b) => b.length - a.length);
+  let out = raw;
+  for (const v of values) out = out.split(v).join(MASK);
+  if (cut && values.length) out = out.slice(values[0].length);
+  return out.slice(-OUTPUT_LIMIT);
+}
+
+/** How much raw output a run keeps: OUTPUT_LIMIT plus room for the longest secret it was given. */
+const keep = (l: Live) => OUTPUT_LIMIT + Math.max(0, ...l.hidden.map((v) => v.trim().length));
 
 /** Why no action can run in this thread right now, or null. A worktree still being prepared is #211's to run in. */
 export function blockedReason(t: Thread): string | null {
@@ -107,29 +129,37 @@ async function claimPort(want: number | null): Promise<number | null> {
 }
 
 /** The run's environment: the terminal's, the secrets the action names, and where and as what it runs. */
-async function runEnv(t: Thread, action: ChannelAction, port: number | null): Promise<Record<string, string>> {
+async function runEnv(t: Thread, action: ChannelAction, port: number | null): Promise<{ env: Record<string, string>; hidden: string[] }> {
   const named = action.secrets.filter((n) => !forbiddenSecret(n));
   const { env: secrets, missing } = await namedSecrets(t.channel_id, named);
   if (missing.length) throw refusal(`${action.name} needs ${missing.join(', ')}, which ${missing.length > 1 ? 'are' : 'is'} not set. Add ${missing.length > 1 ? 'them' : 'it'} under Secrets.`, 409);
   const env = { ...terminalEnv(), ...secrets };
+  const repo = channels.get(t.channel_id)?.repo_path;
   // Omni's own port is in its environment as OMNI_PORT: a run without a port of its own must not take it for one.
   delete env.OMNI_PORT;
   delete env.PORT;
+  // Only this thread's own: never the ones the server itself was started with.
+  delete env.OMNI_REPO_ROOT;
+  delete env.OMNI_WORKTREE;
   Object.assign(env, {
     HOME: env.HOME || homedir(),
     OMNI_THREAD_ID: t.id,
     OMNI_ARTIFACTS_DIR: artifactsDir(t.id),
     ...(t.branch ? { OMNI_BRANCH: t.branch } : {}),
+    // The main checkout, where .env and friends live, and the thread's own worktree when it has one.
+    ...(repo ? { OMNI_REPO_ROOT: repo } : {}),
+    ...(repo && t.branch ? { OMNI_WORKTREE: t.cwd } : {}),
   });
   if (port !== null) Object.assign(env, { OMNI_PORT: String(port), PORT: String(port) });
-  return env;
+  return { env, hidden: Object.values(secrets) };
 }
 
 /** Write a live run's output tail now. */
 function flush(l: Live) {
   if (l.flush) clearTimeout(l.flush);
   l.flush = null;
-  actionRuns.output(l.run.id, l.tail, l.bytes);
+  // Masked before it is stored, so neither a client nor an agent reading the run (list_channel_actions) sees a value.
+  actionRuns.output(l.run.id, maskSecrets(l.tail, l.hidden, l.tail.length >= keep(l)), l.bytes);
 }
 
 /**
@@ -139,14 +169,27 @@ function flush(l: Live) {
  * the caller's to check (blockedReason): worktree preparation runs its setup action before the thread is ready.
  */
 export async function startRun(t: Thread, action: ChannelAction): Promise<{ run: ActionRun; finished: Promise<ActionRun> }> {
-  for (const l of live.values()) {
-    if (l.run.thread_id === t.id && l.run.action_id === action.id) throw refusal(`${action.name} is already running in this thread.`, 409);
-  }
+  refuseSecondRun(t, action);
   // Held until the process is live, so a cleanup sees it (hasLiveRun); a worktree a cleanup removed is checked out again.
   return inWorkspace(t, async (problem) => {
     if (problem) throw refusal(problem, 409);
     return spawnRun(t, action, await verifiedCwd(t));
   });
+}
+
+function refuseSecondRun(t: Thread, action: ChannelAction) {
+  for (const l of live.values()) {
+    if (l.run.thread_id === t.id && l.run.action_id === action.id) throw refusal(`${action.name} is already running in this thread.`, 409);
+  }
+}
+
+/**
+ * Run an action in dir, a folder the caller already holds (withWorkspace) and has checked: a cleanup's teardown run
+ * (runner/teardown-action.ts), which must not wait on its own hold or check out again a worktree it is removing.
+ */
+export async function startRunHeld(t: Thread, action: ChannelAction, dir: string): Promise<{ run: ActionRun; finished: Promise<ActionRun> }> {
+  refuseSecondRun(t, action);
+  return spawnRun(t, action, dir);
 }
 
 /** Whether an action's process is running in the thread right now. */
@@ -155,8 +198,9 @@ export const hasLiveRun = (threadId: string) => [...live.values()].some((l) => l
 async function spawnRun(t: Thread, action: ChannelAction, cwd: string): Promise<{ run: ActionRun; finished: Promise<ActionRun> }> {
   const port = await claimPort(action.port);
   let env: Record<string, string>;
+  let hidden: string[];
   try {
-    env = await runEnv(t, action, port);
+    ({ env, hidden } = await runEnv(t, action, port));
   } catch (err) {
     if (port !== null) claimed.delete(port);
     throw err;
@@ -165,13 +209,13 @@ async function spawnRun(t: Thread, action: ChannelAction, cwd: string): Promise<
   // Its own process group, so Stop ends what the command started too (a dev server's watchers), not only the shell.
   const child = spawn(process.env.SHELL || '/bin/zsh', ['-lc', action.command], { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let settle!: (r: ActionRun) => void;
-  const l: Live = { run, child, tail: '', bytes: 0, flush: null, stopping: null, finished: new Promise((r) => (settle = r)) };
+  const l: Live = { run, child, tail: '', hidden, bytes: 0, flush: null, stopping: null, finished: new Promise((r) => (settle = r)) };
   live.set(run.id, l);
 
   const decoder = new StringDecoder('utf8');
   const take = (chunk: Buffer) => {
     l.bytes += chunk.length;
-    l.tail = (l.tail + plain(decoder.write(chunk))).slice(-OUTPUT_LIMIT);
+    l.tail = (l.tail + plain(decoder.write(chunk))).slice(-keep(l));
     l.flush ??= setTimeout(() => flush(l), FLUSH_MS);
   };
   child.stdout!.on('data', take);
@@ -181,7 +225,7 @@ async function spawnRun(t: Thread, action: ChannelAction, cwd: string): Promise<
   const end = (code: number | null, signal: string | null, spawnError?: Error) => {
     if (ended) return;
     ended = true;
-    l.tail = (l.tail + plain(decoder.end())).slice(-OUTPUT_LIMIT);
+    l.tail = (l.tail + plain(decoder.end())).slice(-keep(l));
     flush(l);
     live.delete(run.id);
     if (port !== null) claimed.delete(port);
