@@ -153,6 +153,30 @@ describe('activity', () => {
     hub.close();
   });
 
+  it('still shows the first load when the feed sends a thread update while it is out', async () => {
+    const { reply } = activityServer();
+    const held: (() => void)[] = [];
+    const { fetch, count } = fakeFetch((path) =>
+      path.split('?')[0] === '/api/recent' && held.length === 0 && count('/api/recent?limit=200') === 1
+        ? new Promise<Reply>((done) => held.push(() => done(reply(path))))
+        : reply(path),
+    );
+    const t = fakeTransport();
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch, now: () => NOW });
+    await settle();
+    expect(held).toHaveLength(1);
+    t.feed()?.sink.open();
+    t.feed()?.sink.message(frame({ type: 'thread', thread: thread('a', '2026-11-02T09:30:00Z', { status: 'done' }) }));
+    await settle();
+
+    for (const release of held.splice(0)) release();
+    await settle();
+    expect(hub.activity.get()).toMatchObject({ loading: false, error: null, loadedAt: NOW });
+    expect(hub.activity.get().recent?.map((r) => r.id)).toEqual(['b', 'a']);
+    expect(count('/api/recent?limit=200')).toBe(1);
+    hub.close();
+  });
+
   it('runs one needs you load at a time, and one more for any number of changes meanwhile', async () => {
     const { reply } = activityServer();
     let release = () => {};

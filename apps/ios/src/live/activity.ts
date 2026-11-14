@@ -38,24 +38,29 @@ export interface ActivityLiveOptions {
 export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions): ActivityLive {
   const state = createStore<ActivityState>({ recent: null, pinned: [], maxUploadMb: null, loading: false, error: null, loadedAt: null });
   const failed = (e: unknown) => state.set((s) => ({ ...s, error: messageOf(e) }));
-  // A load that started before a local change or a feed update answers with the older lists (@omni/shared/latest.ts).
-  const reads = latestOnly();
+  // A load that started before a local change answers with the older lists (@omni/shared/latest.ts). Feed updates are
+  // server state the next load already carries, so they patch the list without making it stale.
+  const recentReads = latestOnly();
+  const pinnedReads = latestOnly();
 
   const refresh = serial(async () => {
     if (!api) return;
     state.set((s) => ({ ...s, loading: true }));
-    const token = reads.begin();
+    const recentToken = recentReads.begin();
+    const pinnedToken = pinnedReads.begin();
     const [recent, pinned, status] = await Promise.allSettled([
       withAuth(() => api.recent(RECENT_LIMIT)),
       withAuth(() => api.pinned()),
       withAuth(() => api.status()),
     ]);
+    if (!recentReads.holds(recentToken)) {
+      void refresh();
+      return;
+    }
     const failure = [recent, pinned, status].find((r) => r.status === 'rejected');
-    const fresh = reads.holds(token);
-    if (!fresh) void refreshPinned();
     state.set((s) => ({
-      recent: fresh && recent.status === 'fulfilled' ? recent.value : s.recent,
-      pinned: fresh && pinned.status === 'fulfilled' ? pinned.value : s.pinned,
+      recent: recent.status === 'fulfilled' ? recent.value : s.recent,
+      pinned: pinnedReads.holds(pinnedToken) && pinned.status === 'fulfilled' ? pinned.value : s.pinned,
       maxUploadMb: status.status === 'fulfilled' ? (status.value.maxUploadMb ?? null) : s.maxUploadMb,
       loading: false,
       error: failure ? messageOf(failure.reason) : null,
@@ -66,9 +71,9 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
   const refreshPinned = serial(async () => {
     if (!api) return;
     try {
-      const token = reads.begin();
+      const token = pinnedReads.begin();
       const pinned = await withAuth(() => api.pinned());
-      if (reads.holds(token)) state.set((s) => ({ ...s, pinned }));
+      if (pinnedReads.holds(token)) state.set((s) => ({ ...s, pinned }));
     } catch (e) {
       failed(e);
     }
@@ -77,11 +82,13 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
   function applyFeed(message: unknown) {
     if (!isRecord(message)) return;
     if (message.type !== 'thread' || !isRecord(message.thread) || typeof message.thread.id !== 'string') return;
-    applyThread(message.thread as unknown as Thread);
+    patchRecent(message.thread as unknown as Thread);
+    void refreshPinned();
   }
 
   function applyThread(thread: Thread) {
-    reads.edit();
+    recentReads.edit();
+    pinnedReads.edit();
     patchRecent(thread);
     void refreshPinned();
   }
