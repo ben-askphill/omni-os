@@ -111,7 +111,7 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
     return c.json({ ok: true });
   });
 
-  /** Synced changes refused for their signature or a path, and ones applied without a valid signature, newest first. */
+  /** Synced changes refused for their signature or a path, ones applied without a valid signature, and actions waiting for Trust, newest first. */
   app.get('/refused', (c) => {
     const limit = Number(c.req.query('limit') ?? 50);
     return c.json(refusedChanges(Number.isFinite(limit) ? limit : 50));
