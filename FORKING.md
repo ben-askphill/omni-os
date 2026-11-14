@@ -1,7 +1,7 @@
 # Forking Omni OS
 
 Omni is built so you can fork it, run it as your own, and keep pulling updates from upstream without merge
-conflicts. The rule that makes this work: **everything personal lives in `data/`, which git never sees.** The repo
+conflicts. It works because **everything personal lives in `data/`, which git never sees.** The repo
 holds only shared code and generic examples.
 
 ## Set up your fork
@@ -36,7 +36,7 @@ Omni seeds only `#conductor` and `#inbox`.
 `design-system/` is a copy of the Omni OS design system: tokens (`tokens.json`, `tokens.css`, `tokens/`), the
 component sources and previews (`components/`), logo and icon assets, the brand book (`README.md`,
 `guidelines/brand-book.html`) and the desktop and phone UI kits. Open `design-system/README.md` first. Its source
-of truth is a Claude Design System artifact, so edits made here do not flow back; change it there and re-export.
+of truth is a Claude Design System artifact, so edits made here do not reach it. Change it there and re-export.
 The code copies of the tokens live in `apps/web/src/index.css`, `apps/ios/src/theme.ts` and `apps/desktop/src/windows.ts`.
 
 ## Customising without touching tracked files

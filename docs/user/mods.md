@@ -4,7 +4,7 @@ Claude Code mods are plugins of function hooks (Claude Code 2.1.287 and later, e
 
 | Mod | What |
 | --- | --- |
-| `omni-progress` | Keeps a status line for the running turn (`Edit: src/foo.ts · 4 tools · 2m 10s`) and a summary when it ends (`Done · 7 tools · 1m 3s`). A watchdog toasts and logs when one tool call runs past 5 minutes, or the same tool fails 3 times in a row with the same input. It only observes: every hook passes the call through, and a failing hook passes it through too |
+| `omni-progress` | Keeps a status line for the running turn (`Edit: src/foo.ts · 4 tools · 2m 10s`) and a summary when it ends (`Done · 7 tools · 1m 3s`). A watchdog toasts and logs when one tool call runs past 5 minutes, or the same tool fails 3 times in a row with the same input. It only observes. Every hook passes the call through, and a failing hook passes it through too |
 
 Under `-p` stream-json these come out as `system` events with subtype `ui_status`, `ui_toast` and `ui_log`.
 

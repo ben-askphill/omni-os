@@ -1,6 +1,6 @@
 # Harnesses
 
-A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to. Hermes and Cursor Cloud are the exceptions: they run off the Mac and Omni talks to them over HTTP. [Accounts](#accounts) shows which account each one is signed in to on each machine.
+A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to. Hermes and Cursor Cloud are the exceptions. They run off the Mac and Omni talks to them over HTTP. [Accounts](#accounts) shows which account each one is signed in to on each machine.
 
 | Harness | Bills | Install and sign in | Runs as |
 | --- | --- | --- | --- |
@@ -13,8 +13,8 @@ A harness is the agent CLI a thread runs on. Pick one per channel (its default) 
 - `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN` and `OMNI_CURSOR_BIN` in `.env` point at a binary that is not on `PATH`. Without one, Codex also tries the copy inside the ChatGPT app.
 - The usage meter is per harness: Claude's rate-limit events drive the 5h / 7d meter, Codex reports its own, Cursor reports none.
 - Each harness has its own concurrency cap (12 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_HERMES`, `OMNI_MAX_CONCURRENT_CURSOR_CLOUD`. A full harness never holds up threads on another.
-- Each harness drops variables that would move it off the signed-in plan or away from the login Omni expects (`apps/server/harness/env-guard.ts`). Claude Code drops `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and `CLAUDE_CONFIG_DIR` (so traffic and transcripts stay on `~/.claude`). Codex drops `OPENAI_API_KEY`, `CODEX_API_KEY` and `OPENAI_BASE_URL`. Cursor and Cursor Cloud drop `CURSOR_API_KEY` and `CURSOR_AUTH_TOKEN`. Hermes drops `HERMES_API_KEY`. The guard wins over the server environment, a channel or global secret, and any extras: a secret with one of those names never reaches that harness. A thread's terminal drops the union of every harness list. A login shell profile still runs, so a value exported there can come back.
-- Cursor Agent streams partial reply text into one Markdown message as it writes, and tool rows show the call name and path, command or pattern when they start. It still cannot steer or interrupt a running turn: messages sent mid-turn wait for the next one ([Sending while a thread is busy](threads.md#sending-while-a-thread-is-busy)).
+- Each harness drops variables that would move it off the signed-in plan or away from the login Omni expects (`apps/server/harness/env-guard.ts`). Claude Code drops `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and `CLAUDE_CONFIG_DIR` (so traffic and transcripts stay on `~/.claude`). Codex drops `OPENAI_API_KEY`, `CODEX_API_KEY` and `OPENAI_BASE_URL`. Cursor and Cursor Cloud drop `CURSOR_API_KEY` and `CURSOR_AUTH_TOKEN`. Hermes drops `HERMES_API_KEY`. The guard wins over the server environment, a channel or global secret, and any extras, so a secret with one of those names never reaches that harness. A thread's terminal drops the union of every harness list. A login shell profile still runs, so a value exported there can come back.
+- Cursor Agent streams partial reply text into one Markdown message as it writes, and tool rows show the call name and path, command or pattern when they start. It still cannot steer or interrupt a running turn. Messages sent mid-turn wait for the next one ([Sending while a thread is busy](threads.md#sending-while-a-thread-is-busy)).
 - Some features are Claude Code only: published artifact cards and [mods](mods.md).
 - Claude Code's model picker includes Fable 5.2 (`claude-fable-5-2`, between Sonnet 5 and Fable 5.1). The `fable` alias resolves to 5.2.
 
@@ -39,30 +39,30 @@ Settings > Accounts lists every synced machine, each harness on it, and the acco
 
 ## Switching mid-thread
 
-The model and effort pickers in a thread's reply box move it to another model, effort or harness. Not to or from Hermes or Cursor Cloud, which have no worktree on this Mac, and a Cursor Cloud thread keeps the model its agent started with.
+The model and effort pickers in a thread's reply box move it to another model, effort or harness. Switching does not work to or from Hermes or Cursor Cloud, which have no worktree on this Mac. A Cursor Cloud thread keeps the model its agent started with.
 
 - Between turns the switch applies at once.
-- While a turn or its background tasks run, it waits: the pills show the pick with "Next turn" until the turn ends, however it ends (done, failed or stopped), and its background tasks finish, then it applies. A later pick replaces it; picking the current model and effort again, or the pill's clear button, drops it. Anything you send meanwhile waits for the turn too and runs on the new pick, instead of steering the running turn.
+- While a turn or its background tasks run, the switch waits. The pills show the pick with "Next turn" until the turn ends, however it ends (done, failed or stopped), and its background tasks finish. Then the switch applies. A later pick replaces it; picking the current model and effort again, or the pill's clear button, drops it. Anything you send meanwhile waits for the turn too and runs on the new pick, instead of steering the running turn.
 
 - Stop keeps the queued switch; clear Next turn to cancel it. If the pick is no longer available when it applies, Omni drops it with an error row and keeps the current run.
 - Same harness: its session carries on with the new model or effort.
 - Another harness: your next message starts a session there with a handover ahead of it. Omni builds it from the thread's transcript: title, folder, artifacts, open todos, then the messages, replies and tool calls, the newest kept whole when it runs past 32K characters. The transcript shows "Handing over from ... to ...", then how much the new session read. A message that starts with a command, like `/review`, runs first, and the handover goes with your next message.
-- Back to a harness the thread ran on before: its own earlier session resumes and reads only what happened since. Straight back before anything ran elsewhere needs no handover.
+- Back to a harness the thread ran on before: its own earlier session resumes and reads only what happened since. Switching straight back before anything ran on the other harness needs no handover.
 - The Conductor can do the same with `switch_thread_run`, when you ask it to.
 
 ## Continuing on another harness
 
 A switch keeps one thread. To leave a thread as it is and carry on in a new one, use **Fork thread** (the branch icon in the reply box, under + on a phone, or the thread's menu). The new thread is linked both ways ("Continued from" and "Continued in"). It gets its own session on the harness, model and effort you pick, and its own worktree. The source thread, its session and its checkout stay as they were.
 
-- Only an idle thread can be continued. Nothing may be running in it: no turn, background task or delegated thread, no queued messages, no scheduled limit resume, no open Terminal shell (the sheet offers to close it). The sheet still shows the preview and says what is in the way. Messages waiting for Resume don't block; the carryover lists them as not sent.
+- You can continue only an idle thread. Nothing may be running in it: no turn, background task or delegated thread, no queued messages, no scheduled limit resume, no open Terminal shell (the sheet offers to close it). The sheet still shows the preview and says what is in the way. Messages waiting for Resume don't block; the carryover lists them as not sent.
 - The preview shows the **carryover**, what the new session reads ahead of your message: the thread's goal, constraints, changed files, the checks it ran, then its history. The newest history is kept whole and older entries are shortened to their first line. Whatever does not fit the 24K-character budget is listed as left out, with where the new session can read it. Your message comes after the carryover and is never cut.
-- For repo work, Omni snapshots the source's worktree the way it saves a turn: HEAD, every tracked change and untracked text file git does not ignore. The new branch starts at the source's HEAD with those changes laid in, uncommitted. Ignored files such as `.env`, and binary or large untracked files, are not copied; the preview lists the ones it left out. A source that runs in the channel's own checkout (worktree per thread off) shares it with you and other threads, so its uncommitted changes are listed, not copied, and the new thread still gets a worktree of its own.
+- For repo work, Omni snapshots the source's worktree the way it saves a turn: HEAD, every tracked change and untracked text file git does not ignore. The new branch starts at the source's HEAD with those changes laid in, uncommitted. Omni does not copy ignored files such as `.env`, or binary or large untracked files; the preview lists the ones it left out. A source that runs in the channel's own checkout (worktree per thread off) shares it with you and other threads, so its uncommitted changes are listed, not copied, and the new thread still gets a worktree of its own.
 - Paths from the source's checkout reach the new session relative to the repo root, so it works in its own worktree. Older history it left out is readable as text at `GET /api/threads/:id/transcript`, and the carryover says how. This is separate from `/history`, which serves pages of events to the clients.
-- If the source changes between the preview and Start (a new message, a turn, an edit to its files), Start is refused and the sheet shows the new preview.
-- **Attachments** from the source are listed with their name, type, size and whether Omni still has the bytes. None goes unless you tick it. A ticked file is copied into the new thread's own uploads folder and arrives with your first message the way any attachment does: images inline on Claude Code and Codex, and as a path to the file on Cursor Agent (the sheet says which). The new thread never points at the source's folder. A file that is missing on this Mac (for example attached on the other Mac), over the upload limit, past the 4-files'-worth total, a link instead of a file, or changed since it was attached stays on the list with its reason, and the carryover names it as not carried. Cancelling the sheet copies nothing, and a retried Start gives the same thread and the same files.
+- If the source changes between the preview and Start (a new message, a turn, an edit to its files), Omni refuses Start and the sheet shows the new preview.
+- **Attachments** from the source are listed with their name, type, size and whether Omni still has the bytes. None goes unless you tick it. Omni copies a ticked file into the new thread's own uploads folder, and it arrives with your first message the way any attachment does: images inline on Claude Code and Codex, and as a path to the file on Cursor Agent (the sheet says which). The new thread never points at the source's folder. A file that is missing on this Mac (for example attached on the other Mac), over the upload limit, past the 4-files'-worth total, a link instead of a file, or changed since it was attached stays on the list with its reason, and the carryover names it as not carried. Cancelling the sheet copies nothing, and a retried Start gives the same thread and the same files.
 - A message that starts with a command, like `/review`, runs first, and the carryover goes with your next message.
 - Hermes and Cursor Cloud can't take a continued thread, and a thread running on them can't be continued, since their files are not on this Mac.
-- The fork runs where Settings > Threads, Run new threads on, says, as a new thread from the composer does. When that is another machine, the fork is made here and goes there with your message, its files and, for repo work, the source's snapshot, which that machine lays out as the fork's worktree before its setup action runs. The preview names that machine under Carryover. While it is offline, the preview says so and Start stays off. If the other machine cannot take it, the fork stays here, and Retry (repo work) or Resume runs it on this machine. See [Run a thread on another machine](sync.md#run-a-thread-on-another-machine).
+- The fork runs where Settings > Threads, Run new threads on, says, as a new thread from the composer does. When that is another machine, Omni makes the fork here and sends it there with your message, its files and, for repo work, the source's snapshot, which that machine lays out as the fork's worktree before its setup action runs. The preview names that machine under Carryover. While it is offline, the preview says so and Start stays off. If the other machine cannot take it, the fork stays here, and Retry (repo work) or Resume runs it on this machine. See [Run a thread on another machine](sync.md#run-a-thread-on-another-machine).
 - A synced thread that works in a folder (no branch) can be forked on a Mac that doesn't have that folder: the new thread starts in the channel's folder, as any new thread does. A thread running on your other Mac can't be forked until it finishes there. A thread whose worktree is not on this Mac (made on the other one, or removed by a cleanup) forks from the last commit of its branch, here or on origin, and its uncommitted changes stay behind. When that branch is gone too, for example deleted after its PR merged, the fork starts in the channel's folder like any new thread. The sheet says which.
 - The Conductor can do the same with `continue_thread`, when you ask it to, and on its own when it has a follow-up for a thread whose session went cold ([Crew](crew.md)). It names the attachments to carry, and the answer says which went and why the others did not.
 
@@ -86,8 +86,8 @@ Auto is the first entry in the model picker and the default for a new thread. Om
 - Image generation goes to Codex because it is the only harness here that makes images; the image shows in the thread's artifacts. If Codex is not signed in, the thread runs on Claude Code and the Auto note says there is no image generation.
 - Your claude.ai connectors (Gmail, Calendar, Notion, Slack, Productive, the Portal) exist only in Claude Code, so that work stays there even when the plan is busy.
 - A review goes to Codex so a different model family checks work Claude most likely wrote.
-- "Quick", "fast", "asap" and the like lower the effort a step on any harness. For code, they also move the thread to Cursor's Composer, a fast and cheap coding model, as does a mechanical change across many files ("rename X across the repo"). Not for the hardest tasks, and not when the first message has images, which Cursor Agent cannot see.
-- Composer only runs while Cursor's Auto and Composer usage is under 90%. Auto never picks Grok, Gemini or Cursor's other named models, Hermes or Cursor Cloud: see [Auto routing](../internals/auto-routing.md#lanes) for why.
+- "Quick", "fast", "asap" and the like lower the effort a step on any harness. For code, they also move the thread to Cursor's Composer, a fast and cheap coding model, as does a mechanical change across many files ("rename X across the repo"). This does not happen for the hardest tasks, or when the first message has images, which Cursor Agent cannot see.
+- Composer only runs while Cursor's Auto and Composer usage is under 90%. Auto never picks Grok, Gemini or Cursor's other named models, Hermes or Cursor Cloud. [Auto routing](../internals/auto-routing.md#lanes) explains why.
 - A model picked on the thread, a crew role's or a channel's default all win over Auto. Set a channel's default to Auto in its settings, or `model: auto` in a crew role's frontmatter.
 - In #conductor, a saved channel default takes precedence over the Conductor role's charter. New thread follows saved settings until you pick a model or effort for that draft. Other crew roles keep their own defaults ahead of the channel's.
 - How well it picks, and how to check that again: [Auto routing](../internals/auto-routing.md).
@@ -96,39 +96,39 @@ Auto is the first entry in the model picker and the default for a new thread. Om
 
 Hermes is an always-on agent on your own Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL`, the server's Tailscale address and port (set it in Settings or `npm run setup`; empty means Hermes is off). The Mac must be on the tailnet.
 
-The bearer token is the global secret `HERMES_API_KEY`. It is not an env var, not a database column and not written to logs.
+The bearer token is the global secret `HERMES_API_KEY`. It is not an env var or a database column, and Omni never writes it to logs.
 
 | Piece | What |
 | --- | --- |
 | Where it runs | On the Hermes server, in whatever clone Hermes already has. Omni does not create a worktree, browser profile or artifacts dir for the thread |
 | Session | `omni-<thread id>`. The same id continues the conversation, with Hermes' own context |
 | Prompt | Channel facts (repo, store, notes) go in `instructions` on the first run. The transcript shows only what you typed |
-| Steer / interrupt | `POST /v1/runs/{id}/steer` and `/stop`. A steer that arrives after the run finished is queued as the next run |
+| Steer / interrupt | `POST /v1/runs/{id}/steer` and `/stop`. Omni queues a steer that arrives after the run finished as the next run |
 | Attachments | Described in the message. The files stay on the Mac; Hermes cannot read those paths |
 | Usage | Token counts on the run, not the plan meter. It bills the Anthropic API, not the Claude, ChatGPT or Cursor plan |
-| Availability | `GET /v1/capabilities` with the bearer token. Missing key or an unreachable URL shows the fix in the model picker |
+| Availability | `GET /v1/capabilities` with the bearer token. A missing key or an unreachable URL shows the fix in the model picker |
 
 ## Cursor Cloud
 
-A Cursor Cloud thread is a [Cursor cloud agent](https://cursor.com/docs/cloud-agent): it runs on Cursor's own Linux machines, on a fresh clone of the channel's GitHub repo, pushes a branch and opens a PR. The `cursor` harness is something else: it runs `cursor-agent` on your Mac. Ask the Conductor for a "Cursor cloud agent" and it picks Cursor Cloud; Auto never does.
+A Cursor Cloud thread is a [Cursor cloud agent](https://cursor.com/docs/cloud-agent). It runs on Cursor's own Linux machines, on a fresh clone of the channel's GitHub repo, pushes a branch and opens a PR. The `cursor` harness is something else: it runs `cursor-agent` on your Mac. Ask the Conductor for a "Cursor cloud agent" and it picks Cursor Cloud; Auto never does.
 
 It needs two things, and the model picker says which is missing:
 
-- The secret `CURSOR_API_KEY`, globally or on the channel, made at cursor.com/dashboard under Integrations. A key only in the secret store (service `omni-os`, account `global/CURSOR_API_KEY`) works too. Omni sends it only to the Cloud Agents API, on the Authorization header: never to the local `cursor` harness (`apps/server/harness/env-guard.ts` strips it there) and never into a process environment or a log.
+- The secret `CURSOR_API_KEY`, globally or on the channel, made at cursor.com/dashboard under Integrations. A key only in the secret store (service `omni-os`, account `global/CURSOR_API_KEY`) works too. Omni sends it only to the Cloud Agents API, on the Authorization header. It never goes to the local `cursor` harness (`apps/server/harness/env-guard.ts` strips it there) and never into a process environment or a log.
 - The channel's GitHub repo, which Omni reads from the channel's repo path (when it cannot, type it under Advanced in the channel's settings). Cursor also needs access to that repo through its GitHub integration.
 
 | Piece | What |
 | --- | --- |
 | Start | The first message creates the agent (`POST /v1/agents`) with Omni's context and your brief, on the repo's default branch, with Cursor opening the PR when the run ends. The agent id is `bc-<thread id>`, which is also the thread's session |
-| Follow-ups | Each later message is a new run on the same agent (`POST /v1/agents/{id}/runs`), on the same branch. A message sent mid-run waits for the run to end: cloud agents can't steer here |
+| Follow-ups | Each later message is a new run on the same agent (`POST /v1/agents/{id}/runs`), on the same branch. A message sent mid-run waits for the run to end, because cloud agents can't steer here |
 | In the thread | A card per run with its status, the agent on cursor.com, the branch it pushed and the PR. It updates every 10 seconds (`OMNI_CURSOR_CLOUD_POLL_MS`) |
 | Reply | The agent's final message, with a line linking the agent and the PR. A delegated thread sends it to the Conductor as its crew report |
-| Stop | Cancels the run. Quitting Omni does not: the agent keeps working, and the next message waits for it before it goes |
-| Attachments | Images (PNG, JPEG, GIF, WebP, up to five, 15 MB each) go with the prompt. Other files stay on the Mac and are described |
+| Stop | Cancels the run. Quitting Omni does not cancel it. The agent keeps working, and the next message waits for it before it goes |
+| Attachments | Images (PNG, JPEG, GIF, WebP, up to five, 15 MB each) go with the prompt. Other files stay on the Mac and the message describes them |
 | Models | Cursor default (the one set on cursor.com) or a model from Cursor's list. No effort levels |
 | Usage | Billed to your Cursor plan. Omni shows no meter for it |
 
-Not supported, since the agent runs on a Cursor machine: a Mac build of the desktop app, running the desktop app, and screenshots of it or a browser. Its prompt tells it to say what it could not check. Pull the branch and do those on your own machine.
+Because the agent runs on a Cursor machine, it cannot build the desktop app for the Mac, run the desktop app, or take screenshots of it or a browser. Its prompt tells it to say what it could not check. Pull the branch and do those on your own machine.
 
 Omni drives the [Cloud Agents API v1](https://cursor.com/docs/cloud-agent/api/endpoints), which Cursor marks as a public beta.
 

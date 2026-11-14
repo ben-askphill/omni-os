@@ -2,7 +2,7 @@
 
 Omni is one person's daily tool, built in the open so others can fork it. Fixes and generic improvements from forks are welcome as PRs against `ben-askphill/omni-os`. Changes that only make sense for your own setup belong in your `data/` folder instead; if you need to edit a tracked file just for yourself, that is a missing config option, so open an issue ([FORKING.md](FORKING.md)).
 
-Most work here is done by agents running inside Omni. [CLAUDE.md](CLAUDE.md) is their guide and applies to humans too.
+Agents running inside Omni do most of the work here. [CLAUDE.md](CLAUDE.md) is their guide and applies to humans too.
 
 ## Set up
 
@@ -51,10 +51,10 @@ node scripts/qa-handoff-smoke.mjs    # proves devices, offline, idle and running
 scripts/qa-handoff-stack.sh down     # stops only what up started, deletes the rig's dir
 ```
 
-`up` runs `scripts/qa-relay.mjs` (an in-memory stand-in for `apps/relay` with the same HTTP and WebSocket protocol and one shared token) and two `qa-stack.sh` servers with no Web UI. Each has its own data dir, secret file store (`OMNI_SECRET_STORE=file`, never a Keychain), `HOME`, sync id, device name (`OMNI_DEVICE_NAME`) and fake Tailscale status (`OMNI_TAILSCALE_BIN`). The relay URL and token are stored as the sync secrets and sync is switched on. The channel `qa-shared`, with the same folder on both, is made on A and syncs to B. Everything lives in `$TMPDIR/omni-qa-handoff`; `QA_HANDOFF_PORT` (47300 to 47397) and `QA_HANDOFF_DIR` move it.
+`up` runs `scripts/qa-relay.mjs` (an in-memory stand-in for `apps/relay` with the same HTTP and WebSocket protocol and one shared token) and two `qa-stack.sh` servers with no Web UI. Each has its own data dir, secret file store (`OMNI_SECRET_STORE=file`, never a Keychain), `HOME`, sync id, device name (`OMNI_DEVICE_NAME`) and fake Tailscale status (`OMNI_TAILSCALE_BIN`). `up` stores the relay URL and token as the sync secrets and switches sync on. It makes the channel `qa-shared`, with the same folder on both, on A, and the channel syncs to B. Everything lives in `$TMPDIR/omni-qa-handoff`; `QA_HANDOFF_PORT` (47300 to 47397) and `QA_HANDOFF_DIR` move it.
 
 - `env A|B` prints the `EXPO_PUBLIC_OMNI_DEV_URL` and `EXPO_PUBLIC_OMNI_DEV_TOKEN` exports for the iOS dev build ([apps/ios/README.md](apps/ios/README.md#development-shortcut)). `status` shows ports and token files.
-- `offline B` makes A's Tailscale report B asleep (`online B` reverses it); it waits until `GET /api/devices` on A shows it, which takes up to 5 seconds because the server caches Tailscale. A handoff or Run on to an offline device is refused with 409.
+- `offline B` makes A's Tailscale report B asleep (`online B` reverses it); it waits until `GET /api/devices` on A shows it, which takes up to 5 seconds because the server caches Tailscale. The server refuses a handoff or Run on to an offline device with 409.
 - `thread A "TOOL:600000 hold"` starts a thread whose fake-claude turn runs for ten minutes, so there is a running thread to hand over. Stop it on whichever server holds it.
 - A failed `up` tears itself down; `QA_HANDOFF_KEEP=1` leaves the rig to read `scripts/qa-handoff-stack.sh logs`.
 

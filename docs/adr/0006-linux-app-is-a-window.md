@@ -22,5 +22,5 @@ The window is Chromium's app mode, the same kind of window Omarchy uses for a we
 ## Options turned down
 
 - Porting the SwiftUI app to GTK. That is a second client, and the phone would still use the Web UI.
-- A WebKitGTK window. WebKitGTK 6 is not installed here, and the Web UI is exercised in Chromium.
+- A WebKitGTK window. WebKitGTK 6 is not installed here, and the Web UI is tested in Chromium.
 - `omarchy-webapp-install` on its own. That opens a URL and does not start or stop the server.

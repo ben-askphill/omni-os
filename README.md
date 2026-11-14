@@ -7,9 +7,9 @@
 
 # Omni OS
 
-One local workspace for all agent work. Channels per client or project, a thread per task, a Conductor that hands work to a crew, and automations on a schedule or on GitHub PR events. Replaces hopping between Claude Desktop, Cursor cloud agents and a separate conductor bot.
+One local workspace for all agent work. Channels per client or project, a thread per task, a Conductor that hands work to a crew, and automations on a schedule or on GitHub PR events. It replaces hopping between Claude Desktop, Cursor cloud agents and a separate conductor bot.
 
-One Node server runs everything (threads, harnesses, database, secrets, automations). The clients sit on top of its `/api` and show the same channels and threads:
+One Node server runs everything (threads, harnesses, database, secrets, automations). The clients use its `/api` and show the same channels and threads:
 
 | Client | What | Where |
 | --- | --- | --- |
@@ -70,10 +70,10 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 ## What you get
 
 - **Channels** per client or project, each with its own icon and avatar background, default harness, model and effort, a design system file for the agent, and facts like the repo, Shopify store and Portal slug
-- **Threads** per task, dated, full-text searchable and resumable. Running and Pinned keep work reachable across channels; the sidebar Inbox (Activity on a phone, or the Channel rail Beta's Inbox disc) lists pinned, waiting, Working and Done; Mark done clears a thread from Needs you until something new happens. With sync on, Home and phone Activity show a tile per machine (running threads, harness slots, live CPU and RAM). Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
+- **Threads** per task, dated, full-text searchable and resumable. Running and Pinned list threads from every channel; the sidebar Inbox (Activity on a phone, or the Channel rail Beta's Inbox disc) lists pinned, waiting, Working and Done; Mark done clears a thread from Needs you until something new happens. With sync on, Home and phone Activity show a tile per machine (running threads, harness slots, live CPU and RAM). Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
 - **Composer**: `/` menu for skills, slash commands and MCP prompts per harness, `@` to mention artifacts and repo files, attachments, and chips for diff lines, terminal output, browser annotations and other threads, plus suggested next replies. The Machine chip can send a new message straight to Grok Bot when its webhook is set
 - **Sandbox per thread**: its own git worktree in repo channels (with `.worktreeinclude` or a channel copy list for ignored files, optional shared directories, setup and teardown actions), a choice of base commit, named actions, a persistent browser shown live in the Browser panel, a real terminal, and secrets from the Keychain (or a 0600 file on Linux) as env. Hermes and Cursor Cloud run remotely without these local tools
-- **Artifacts** listed in each thread, an Artifacts page across channels (Files / claude.ai, with list or grid), cards for pages a thread published to claude.ai, and the same claude.ai list in the phone and iOS Library. With `html_render`, an agent shows a chart, diagram or mockup right in the transcript above its reply: sandboxed, interactive, sized to fit and drawn in Omni's theme
+- **Artifacts** listed in each thread, an Artifacts page across channels (Files / claude.ai, with list or grid), cards for pages a thread published to claude.ai, and the same claude.ai list in the phone and iOS Library. With `html_render`, an agent shows a chart, diagram or mockup in the transcript above its reply. The render is sandboxed, interactive, sized to fit and drawn in Omni's theme
 - **PRs** per repo channel and in each thread's panel: checks, diff and merge in place from the panel (phone keeps its merge slide), plus Auto-merge and Rerun failed checks. Changes can pin review notes on the diff and send the open ones as one message (to this thread or a delegate). A Pull requests page across every channel (search, sort, filters; Authored, Review requested, Others). Watch PR in the thread's PRs tab wakes the thread for failing checks or new review feedback. When the agent asks whether to open a PR, the composer offers Open PR; Fix checks includes failing log tails. Branch steps in Channel Settings set the Open PR, Fix conflicts and Fix checks prompts per channel
 - **Quick-actions card** on a thread (desktop web, phone web popover, desktop app): machine, branch, lineage and a one-click path into the full inspector
 - **Conductor and crew**: one front agent that delegates to roles (builder, researcher, store-ops, inbox), alone or as a team

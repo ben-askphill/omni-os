@@ -36,7 +36,7 @@ Four, under `/api/threads/:id/transitions`, the same for every kind:
 | read | `GET .../transitions/:tid` | the transition as it stands now |
 | cancel | `POST .../transitions/:tid/cancel` | a queued reconfigure dropped, a relocate under way cancelled; a 409 for one that is over, or for a fork |
 
-The six routes from before answer through the same service, in the shapes they always had, so the Web UI (in a browser
+The six older routes answer through the same service, in the shapes they always had, so the Web UI (in a browser
 or the desktop app), the Conductor and a machine on an older build keep working without a change:
 
 | Older route | Is |
@@ -48,7 +48,7 @@ or the desktop app), the Conductor and a machine on an older build keep working 
 | `POST /:id/takeover` | create of a `relocate` to `here` |
 | `POST /:id/handoff/cancel` | cancel of the thread's current `relocate` |
 
-A refusal is the same whichever door it comes through: the ownership check at the delivery boundary
+A refusal is the same whichever route asks: the ownership check at the delivery boundary
 (`sync/guard.ts turnBlocked`), the handoff's refusals, Continue's `busy`, `changed` and `request_reused`.
 
 ## What each machine keeps
@@ -60,11 +60,11 @@ A refusal is the same whichever door it comes through: the ownership check at th
   from the new thread. The other machine sees the move, never the transition: a read of one it did not create is a 404.
 - The handoff records stay as synced kv (`handoff.offer.<thread>`, `handoff.reply.<thread>`,
   `handoff.request.<thread>`, `apps/server/handoff/records.ts`). They are the relocate's cross-machine state and what
-  a Mac on an older build reads and writes, so they are not replaced by the ledger. The same holds for the older
+  a Mac on an older build reads and writes, so the ledger does not replace them. The same holds for the older
   `runon.msgs.*` and `runon.stop.*` keys `run-on.ts` reads but never writes, and `handoff.holder.<thread>` written in
   step with the assignment ([ADR 0005](../adr/0005-one-execution-owner.md)). Each goes when every synced machine is on a
   build that no longer writes it.
 - The planners stay with their kinds: `runner/switch-plan.ts` (what a switch does to the sessions),
   `continue.ts capture` (what a Continue carries), `handoff.ts giveAway` and `take` (what a handoff moves). They decide
   different things and share `transcript-select.ts` and `checkpoint.ts` for what they have in common; the service is
-  the one front door, not a fourth planner.
+  the one entry point for all three, not a fourth planner.
