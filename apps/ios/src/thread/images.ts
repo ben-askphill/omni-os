@@ -21,6 +21,13 @@ const placeholder = (alt: string) => `[image${alt.trim() ? `: ${alt.trim()}` : '
 /** The reply with every image it may not load written as text. */
 export function gateReplyImages(markdown: string, origin: string): string {
   if (!markdown.includes('![') && !/<img\b/i.test(markdown)) return markdown;
+  let out = markdown;
+  for (const [raw, text] of refusedImages(markdown, origin)) out = out.split(raw).join(text);
+  return refusedImages(out, origin).size ? withoutImages(markdown) : out;
+}
+
+/** Each refused image's source text as the lexer gives it, with the text it shows instead. */
+function refusedImages(markdown: string, origin: string): Map<string, string> {
   const refused = new Map<string, string>();
   lexer.walkTokens(lexer.lexer(markdown), (token: Token) => {
     if (token.type === 'image') {
@@ -30,13 +37,10 @@ export function gateReplyImages(markdown: string, origin: string): string {
       refused.set(token.raw, placeholder(''));
     }
   });
-  if ([...refused.keys()].some((raw) => !markdown.includes(raw))) return withoutImages(markdown);
-  let out = markdown;
-  for (const [raw, text] of refused) out = out.split(raw).join(text);
-  return out;
+  return refused;
 }
 
-/** Every image syntax in the reply escaped, for a refused image whose source text the reply does not hold as is. */
+/** Every image syntax in the reply escaped, for a reply whose refused images text replacement could not all remove. */
 function withoutImages(markdown: string): string {
   return markdown.replace(/!\[/g, '!\\[').replace(/<(img\b)/gi, '\\<$1');
 }

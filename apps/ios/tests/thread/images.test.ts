@@ -39,6 +39,8 @@ describe('agent reply images (S18)', () => {
     ['a list item with alt text over two lines', '- ![a\n b](http://127.0.0.1:4747/api/x)'],
     ['a blockquote with alt text over two lines', '> ![a\n> b](http://127.0.0.1:4747/api/x)'],
     ['a list item with a title over two lines', '- ![a](http://127.0.0.1:4747/api/x\n "t\n u")'],
+    ['a list item after the same image at top level', '![a\nb](http://127.0.0.1:4747/api/x)\n\n- ![a\n b](http://127.0.0.1:4747/api/x)'],
+    ['a blockquote after the same image at top level', '![a\nb](http://127.0.0.1:4747/api/x)\n\n> ![a\n> b](http://127.0.0.1:4747/api/x)'],
   ])('leaves no loadable image in %s', (_, md) => {
     const out = gateReplyImages(md, ORIGIN);
     const images: string[] = [];
