@@ -10,6 +10,9 @@ import { startRunner } from './runner-boot.ts';
 // /api/channels/:id/actions and /api/threads/:id/actions: named commands run in a thread's verified checkout.
 
 process.env.SHELL = '/bin/sh';
+// As if Omni itself had been started from an action: a run never inherits these.
+process.env.OMNI_REPO_ROOT = '/stale/repo';
+process.env.OMNI_WORKTREE = '/stale/worktree';
 const r = await startRunner({ ANTHROPIC_API_KEY: 'sk-billing', OMNI_RELAY_TOKEN: 'sync-token', GROKBOT_WEBHOOK_URL: 'https://hook' });
 const { app } = await import('../app.ts');
 const { PREVIEW_PORTS, stopAllRuns } = await import('../actions.ts');
@@ -172,7 +175,8 @@ describe('a run', () => {
     // The value reached the run; its output shows it masked.
     expect(env.THEME_TOKEN).toBe('[redacted]');
     expect(env.OMNI_THREAD_ID).toBe(t.id);
-    for (const name of ['ANTHROPIC_API_KEY', 'OMNI_RELAY_TOKEN', 'GROKBOT_WEBHOOK_URL', 'NODE_OPTIONS', 'OMNI_PORT']) expect(env[name]).toBeUndefined();
+    // Not a worktree thread and no repo: no OMNI_REPO_ROOT or OMNI_WORKTREE, even ones the server was started with.
+    for (const name of ['ANTHROPIC_API_KEY', 'OMNI_RELAY_TOKEN', 'GROKBOT_WEBHOOK_URL', 'NODE_OPTIONS', 'OMNI_PORT', 'OMNI_REPO_ROOT', 'OMNI_WORKTREE']) expect(env[name]).toBeUndefined();
     expect(JSON.stringify(db.prepare('SELECT command FROM action_runs').all())).not.toContain('shptka_secret_value');
 
     const parts = await run(t.id, (await action('echo "${#THEME_TOKEN} ${THEME_TOKEN%_value}"', { secrets: ['THEME_TOKEN'] })).id);
@@ -308,6 +312,10 @@ describe('when it may run', () => {
     const ok = await run(t.id, own.id);
     expect(ok.status).toBe(201);
     expect((await ended(t.id, ok.body.id)).output.trim()).toBe(realpathSync(wt));
+    // It knows the main checkout and its own worktree.
+    const vars = (await call<ChannelAction>('POST', '/channels/acts-repo/actions', { name: 'Vars', command: 'echo "$OMNI_REPO_ROOT|$OMNI_WORKTREE|$OMNI_BRANCH"' })).body;
+    const varsRun = await run(t.id, vars.id);
+    expect((await ended(t.id, varsRun.body.id)).output.trim()).toBe(`${repo}|${wt}|omni/actions`);
     // Another channel's action is not this thread's to run.
     expect((await run(t.id, a.id)).status).toBe(404);
   });
