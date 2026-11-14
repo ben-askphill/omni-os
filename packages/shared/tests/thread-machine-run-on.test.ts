@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { Device } from '../handoff.ts';
-import { HERE, offersRunOn, runOnDefault, runOnPick, runOnRequest, runOnRows, runOnSetting, settingPick } from '../thread-machine.ts';
+import {
+  GROK_BOT,
+  grokBotBlock,
+  HERE,
+  newThreadPick,
+  newThreadRows,
+  offersRunOn,
+  runOnDefault,
+  runOnPick,
+  runOnPrefix,
+  runOnRequest,
+  runOnRows,
+  runOnSetting,
+  settingPick,
+} from '../thread-machine.ts';
 
 const now = Date.parse('2026-10-29T20:00:00Z');
 const omarchy: Device = { id: 'omarchy-id', name: 'omarchy', reachability: 'online', dnsName: 'omarchy.tail.ts.net', lastSeen: null };
@@ -62,5 +76,60 @@ describe('where a new thread runs', () => {
     expect(settingPick('omarchy-id', [omarchy])).toBe('omarchy-id');
     expect(settingPick('removed-id', [omarchy])).toBe(HERE);
     expect(settingPick('mini-id', [mini])).toBe('mini-id');
+  });
+});
+
+describe('Grok Bot as a new thread target', () => {
+  it('follows the machines with Grok Bot, offered while its webhook is set', () => {
+    const rows = newThreadRows([omarchy], { grokBot: true, now, hereName: "Ben's MacBook Pro" })!;
+    expect(rows.map((r) => [r.value, r.label, r.disabled])).toEqual([
+      [HERE, "Ben's MacBook Pro", false],
+      ['omarchy-id', 'omarchy', false],
+      [GROK_BOT, 'Grok Bot', false],
+    ]);
+    expect(rows[2]).toMatchObject({ icon: 'grok', sub: 'Sends the text. No thread here' });
+    expect(rows[0]!.icon).toBeUndefined();
+  });
+
+  it('shows the chip for Grok Bot alone when this is the only machine', () => {
+    expect(newThreadRows([], { grokBot: true, now, hereName: 'omarchy' })!.map((r) => r.value)).toEqual([HERE, GROK_BOT]);
+    expect(newThreadRows(undefined, { grokBot: true, now })!.map((r) => r.value)).toEqual([HERE, GROK_BOT]);
+  });
+
+  it('lists an unset Grok Bot disabled, naming this machine, when other machines show the chip anyway', () => {
+    const row = newThreadRows([omarchy], { grokBot: false, now, hereName: 'omarchy' })!.at(-1)!;
+    expect(row).toMatchObject({ value: GROK_BOT, disabled: true, sub: 'Not set up on omarchy' });
+  });
+
+  it('hides the chip with no other machine and no Grok Bot', () => {
+    expect(newThreadRows([], { grokBot: false, now })).toBeNull();
+    expect(newThreadRows(undefined, { grokBot: false, now })).toBeNull();
+  });
+
+  it('keeps Grok Bot picked while it is set up, and falls back to Settings default once it is not', () => {
+    expect(newThreadPick(GROK_BOT, 'omarchy-id', [omarchy], true)).toBe(GROK_BOT);
+    expect(newThreadPick(GROK_BOT, '', [], true)).toBe(GROK_BOT);
+    expect(newThreadPick(GROK_BOT, 'omarchy-id', [omarchy], false)).toBe('omarchy-id');
+    expect(newThreadPick(GROK_BOT, '', undefined, false)).toBe(HERE);
+    expect(newThreadPick(null, 'omarchy-id', [omarchy], true)).toBe('omarchy-id');
+    expect(newThreadPick('omarchy-id', '', [omarchy], true)).toBe('omarchy-id');
+  });
+
+  it('says To for Grok Bot and On for a machine', () => {
+    expect(runOnPrefix(GROK_BOT)).toBe('To');
+    expect(runOnPrefix(HERE)).toBe('On');
+    expect(runOnPrefix('omarchy-id')).toBe('On');
+  });
+
+  it('stops a send with attachments instead of dropping them', () => {
+    expect(grokBotBlock(0)).toBeNull();
+    expect(grokBotBlock(1)).toBe('Grok Bot takes text only. Remove the attachment to send.');
+    expect(grokBotBlock(3)).toBe('Grok Bot takes text only. Remove the 3 attachments to send.');
+  });
+
+  it('never names Grok Bot as a machine id or a default', () => {
+    expect(runOnRows([omarchy], { now }).some((r) => r.value === GROK_BOT)).toBe(false);
+    expect(runOnRows([omarchy], { now, asDefault: true }).some((r) => r.value === GROK_BOT)).toBe(false);
+    expect(settingPick(GROK_BOT, [omarchy])).toBe(HERE);
   });
 });

@@ -10,6 +10,8 @@ import { Avatar, ErrorNote } from '../components/ui.tsx';
 import { draftRun, draftRunRequest } from '@omni/shared/draft-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
+import { GROK_BOT_NOTE, GROK_BOT_PLACEHOLDER, GROK_BOT_SENT, grokBotBlock } from '@omni/shared/thread-machine.ts';
+import { sendMessageToGrokBot } from '../grokbot.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { useDictation, withPhrase } from './dictation.ts';
@@ -24,7 +26,8 @@ const pill = (on: boolean) =>
 
 /**
  * A new delegation to the Conductor, or a new thread in one channel: the same POST /threads the desktop composer
- * makes, with the role's or the channel's run defaults until Ben picks another model.
+ * makes, with the role's or the channel's run defaults until Ben picks another model. With Grok Bot on the machine
+ * chip it posts the text to /api/grokbot instead, as the desktop composer does, and no thread starts.
  */
 export function NewSheet({ channel: initial }: { channel?: string }) {
   const shell = useShell();
@@ -64,10 +67,25 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
     setPicked(null);
   };
   const close = () => shell.sheet(null);
+  // Grok Bot takes the text alone: the model and the base do not apply, and attachments stop the send.
+  const toGrok = runOn.grokBot;
+  const grokBlock = toGrok ? grokBotBlock(att.files.length) : null;
+
+  const sendToGrok = async (prompt: string) => {
+    if (grokBlock) return;
+    setBusy(true);
+    setError(null);
+    const result = await sendMessageToGrokBot(prompt, target);
+    setBusy(false);
+    if (!result.ok) return setError(result.error);
+    shell.toast(GROK_BOT_SENT);
+    close();
+  };
 
   const send = async () => {
     const prompt = text.trim();
     if (!prompt || busy) return;
+    if (toGrok) return sendToGrok(prompt);
     setBusy(true);
     setError(null);
     try {
@@ -123,12 +141,12 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
             onPaste={att.onPaste}
             rows={4}
             enterKeyHint="send"
-            placeholder={ch ? `Describe the task for #${ch.name}` : 'Ask the Conductor. It delegates to the crew.'}
+            placeholder={toGrok ? GROK_BOT_PLACEHOLDER : ch ? `Describe the task for #${ch.name}` : 'Ask the Conductor. It delegates to the crew.'}
             className="resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-3"
           />
-          {(baseRows || runOn.rows) && (
+          {((baseRows && !toGrok) || runOn.rows) && (
             <div className="flex min-w-0 flex-wrap gap-1.5">
-              {baseRows && (
+              {baseRows && !toGrok && (
                 <BaseChip
                   rows={baseRows}
                   value={base}
@@ -162,31 +180,36 @@ export function NewSheet({ channel: initial }: { channel?: string }) {
               }}
             />
             <MoRound icon="plus" label="Attach files" onClick={() => file.current?.click()} disabled={busy} />
-            <button
-              type="button"
-              onClick={() => {
-                void reload();
-                setPicking(true);
-              }}
-              disabled={!harnesses}
-              className="mo-press inline-flex h-10 min-w-0 items-center gap-[7px] rounded-full bg-surface-2 px-3 text-[13px] font-medium text-fg disabled:opacity-40"
-            >
-              {run && (asksAuto(run.choice) ? <OmniMark size={15} /> : <HarnessLogo harness={run.choice.harness} size={13} />)}
-              <span className="truncate">{run ? runLabel(harnesses, run.choice, run.effort) : 'Model'}</span>
-            </button>
+            {!toGrok && (
+              <button
+                type="button"
+                onClick={() => {
+                  void reload();
+                  setPicking(true);
+                }}
+                disabled={!harnesses}
+                className="mo-press inline-flex h-10 min-w-0 items-center gap-[7px] rounded-full bg-surface-2 px-3 text-[13px] font-medium text-fg disabled:opacity-40"
+              >
+                {run && (asksAuto(run.choice) ? <OmniMark size={15} /> : <HarnessLogo harness={run.choice.harness} size={13} />)}
+                <span className="truncate">{run ? runLabel(harnesses, run.choice, run.effort) : 'Model'}</span>
+              </button>
+            )}
             <span className="flex-1" />
             {text.trim() || !mic.supported ? (
-              <MoRound ink icon="send" label="Send" onClick={() => void send()} disabled={!text.trim() || busy} />
+              <MoRound ink icon="send" label={toGrok ? 'Send to Grok Bot' : 'Send'} onClick={() => void send()} disabled={!text.trim() || busy || !!grokBlock} />
             ) : (
               <MoRound ink={!mic.on} icon={mic.on ? 'stop' : 'mic'} label={mic.on ? 'Stop dictating' : 'Dictate'} onClick={mic.toggle} />
             )}
           </div>
         </div>
+        {grokBlock && <ErrorNote className="mx-3 mt-2">{grokBlock}</ErrorNote>}
         {(att.error || error) && <ErrorNote className="mx-3 mt-2">{att.error ?? error}</ErrorNote>}
         <p className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">
-          {ch
-            ? `Runs in #${ch.name} with its repo, store and browser profile.`
-            : 'The Conductor picks the crew and reports back here. Activity shows you when something needs you.'}
+          {toGrok
+            ? GROK_BOT_NOTE
+            : ch
+              ? `Runs in #${ch.name} with its repo, store and browser profile.`
+              : 'The Conductor picks the crew and reports back here. Activity shows you when something needs you.'}
         </p>
       </MoSheet>
       {pickingBase && baseRows && <BaseSheet rows={baseRows} value={base} onChange={setBase} onClose={() => setPickingBase(false)} />}
