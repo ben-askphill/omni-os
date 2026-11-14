@@ -174,7 +174,7 @@ The Mac has to be awake for any of these to answer.
 
 #### What the Clerk instance needs
 
-Google sign-in for devices already needs a public OAuth application with the device grant. For MCP clients, also turn on **dynamic client registration** in the Clerk dashboard (OAuth applications settings): claude.ai, ChatGPT and the other clients register themselves there, as public clients with PKCE. Check it took: `https://<instance>.clerk.accounts.dev/.well-known/oauth-authorization-server` lists a `registration_endpoint` once it is on. Without it, a client asks you for a client id, or fails to connect. Also have the OAuth applications issue JWT access tokens: `/mcp` refuses opaque ones (see [Security](#security)).
+Google sign-in for devices already needs a public OAuth application with the device grant. For MCP clients, also turn on **dynamic client registration** in the Clerk dashboard (OAuth applications settings): claude.ai, ChatGPT and the other clients register themselves there, as public clients with PKCE. Check it took: `https://<instance>.clerk.accounts.dev/.well-known/oauth-authorization-server` lists a `registration_endpoint` once it is on. Without it, a client asks you for a client id, or fails to connect.
 
 ## Connect Grok Bot
 
@@ -221,11 +221,7 @@ The Mac has to be awake and Omni running for Grok Bot to reach it.
 
 Three things open `/mcp`, each checked on every request:
 
-- **A Clerk JWT access token** for the Google account linked to this install, as a `Bearer` header, and bound to this install (`apps/server/mcp-token.ts`). Omni holds no Clerk secret key: it checks the JWT's signature against the instance's public keys, then asks Clerk's `userinfo` endpoint whether the token still stands and caches the answer for a minute, so a token revoked in Clerk can still work for up to that minute. Any other Google account gets a 401, and unlinking the account turns this way in off at once. A token never goes in a URL. If Clerk cannot be reached, `/mcp` answers 503 and the static tokens still work. Every Omni install can share one Clerk instance, so the account alone is not enough. The token must also either:
-  - name this install's `/mcp` as its audience: `mcpPublicUrl`, this machine's Omni Connect or tailnet name, or loopback on this port for a request straight from this Mac. Omni takes these from its configuration, never from the request's `Host` or `X-Forwarded-*` headers. Its client is then listed as bound, not approved.
-  - come from an OAuth client you approved. A client whose tokens name neither waits as pending. Approve or remove clients with `GET /api/mcp/clients`, `POST /api/mcp/clients/<id>/approve` and `DELETE /api/mcp/clients/<id>`, or list approved ids, comma-separated, in `integrations.mcpClients` in `data/omni.config.json`. A removed client is refused even when its token names this install.
-
-  An opaque (non-JWT) Clerk token is refused: turn on JWT access tokens for the instance's OAuth applications (see [What the Clerk instance needs](#what-the-clerk-instance-needs)). `OMNI_MCP_ALLOW_OPAQUE=1` takes opaque tokens on the account alone, as older builds did.
+- **A Clerk access token** for the Google account linked to this install, as a `Bearer` header. Omni holds no Clerk secret key: it asks Clerk's `userinfo` endpoint who the token belongs to and caches the answer for a minute, so a token revoked in Clerk can still work for up to that minute. Any other Google account gets a 401, and unlinking the account turns this way in off at once. A token never goes in a URL. If Clerk cannot be reached, `/mcp` answers 503 and the static tokens still work.
 - **`data/mcp-token`** (mode 0600, made on first use), apart from the API token, as a header or in the path for clients that take only a URL. Anyone with that URL can start threads on your Mac, and threads run with `bypassPermissions`, so treat it like a password. To rotate it, delete the file, restart Omni and update each client that uses it.
 - **The API token**, as a header only.
 

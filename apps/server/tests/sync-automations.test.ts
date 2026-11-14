@@ -12,6 +12,8 @@ import { signAs } from './sync-sign.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'omni-automations-'));
 const r = await startRunner({ OMNI_AUTOMATIONS_DIR: dir });
+// The other Mac's owner claims apply only from a machine Ben trusts (sync/keyring.ts).
+r.db.db.prepare('INSERT INTO sync_trusted (machine_id, trusted_at) VALUES (?, ?)').run('mac-b', new Date().toISOString());
 writeFileSync(join(dir, 'nightly.yaml'), 'name: Nightly\nenabled: true\ncron: "0 2 * * *"\nchannel: scratch\nprompt: tidy up\n');
 const automations = await import('../automations.ts');
 const sync = await import('../sync/worker.ts');

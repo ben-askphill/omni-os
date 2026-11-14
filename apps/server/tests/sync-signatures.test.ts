@@ -51,12 +51,49 @@ afterAll(async () => {
   await stopRunners();
 });
 
-describe('action entities need a valid signature', () => {
-  it('a signed remote command from a machine lands, and pins its key', async () => {
+const trust = (id: string) => app.request(`/api/sync/devices/${id}/confirm-key`, { method: 'POST' });
+const sendSecret = (machine: string) =>
+  app.request('/api/secrets/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ machine, scope: 'global', name: 'SOME_KEY', value: 'v' }) });
+
+describe('a new machine waits for Trust', () => {
+  it("syncs a new machine's ordinary data at once, but refuses its remote command until Ben trusts it", async () => {
+    await pull(
+      signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'devices.mac-b', op: 'upsert', ts: later(), data: { value: { id: 'mac-b', name: 'Mac B', tailscale: null, signKey: rawPublicKey(keyOf('mac-b')), at: later() } } }),
+      signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'note.new-machine', op: 'upsert', data: { value: 'hello' }, ts: later() }),
+      signAs(command('cmd-untrusted')),
+    );
+    expect(r.db.kv.get('note.new-machine')).toBe('hello');
+    expect(stored('cmd-untrusted')).toBe(false);
+    expect(await refused()).toContainEqual(expect.objectContaining({ machine: 'mac-b', entity: 'remote_command', entityId: 'cmd-untrusted', reason: 'from a machine not trusted yet', applied: false }));
+    // Its key is pinned all the same: Trust confirms the machine, not a new key.
+    expect(r.db.db.prepare('SELECT sign_key FROM sync_keys WHERE machine_id = ?').get('mac-b')).toEqual({ sign_key: rawPublicKey(keyOf('mac-b')) });
+    expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ trusted: false, keyChanged: false });
+  });
+
+  it('applies its remote command after Ben trusts it', async () => {
+    expect((await trust('mac-b')).status).toBe(200);
+    expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ trusted: true });
     await pull(signAs(command('cmd-signed')));
     expect(stored('cmd-signed')).toBe(true);
-    expect(r.db.db.prepare('SELECT sign_key FROM sync_keys WHERE machine_id = ?').get('mac-b')).toEqual({ sign_key: rawPublicKey(keyOf('mac-b')) });
+    // Nothing waits any more, and a machine this one never saw cannot be trusted ahead of time.
+    expect((await trust('mac-b')).status).toBe(404);
+    expect((await trust('mac-never-seen')).status).toBe(404);
+    expect((await trust('this-mac')).status).toBe(404);
   });
+
+  it('refuses a secret sent to a machine not trusted yet', async () => {
+    const sealKey = rawPublicKey(generateKeyPairSync('x25519').privateKey);
+    await pull(signAs({ machine_id: 'mac-n', entity: 'kv', entity_id: 'devices.mac-n', op: 'upsert', ts: later(), data: { value: { id: 'mac-n', name: 'Mac N', tailscale: null, signKey: rawPublicKey(keyOf('mac-n')), sealKey, at: later() } } }));
+    expect(r.db.db.prepare('SELECT seal_key FROM sync_keys WHERE machine_id = ?').get('mac-n')).toEqual({ seal_key: sealKey });
+    const res = await sendSecret('mac-n');
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toMatch(/new to this Mac/);
+    expect((await trust('mac-n')).status).toBe(200);
+    expect((await sendSecret('mac-n')).status).toBe(200);
+  });
+});
+
+describe('action entities need a valid signature', () => {
 
   it('an unsigned remote command is refused and logged', async () => {
     await pull(command('cmd-unsigned'));
@@ -97,7 +134,7 @@ describe('keys and deletes', () => {
     await pull({ machine_id: 'mac-f', entity: 'kv', entity_id: 'devices.mac-f', op: 'upsert', ts: later(), data: { value: { id: 'mac-f', name: 'Mac F', tailscale: null, signKey: forged, sealKey: 'x'.repeat(43), at: later() } } });
     expect(r.db.db.prepare('SELECT sign_key, seen_sign_key FROM sync_keys WHERE machine_id = ?').get('mac-f')).toEqual({ sign_key: null, seen_sign_key: forged });
     expect((await devices()).find((d) => d.id === 'mac-f')).toMatchObject({ keyChanged: true, pinnedFingerprint: null });
-    const res = await app.request('/api/secrets/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ machine: 'mac-f', scope: 'global', name: 'SOME_KEY', value: 'v' }) });
+    const res = await sendSecret('mac-f');
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toMatch(/not confirmed/);
   });

@@ -1,5 +1,5 @@
 import { ASK_PREFIX } from '@omni/shared/update-fleet.ts';
-import { db, kv } from '../db.ts';
+import { db, kv, outbox } from '../db.ts';
 import { resolved } from '../user-config.ts';
 import { keyring } from './keyring.ts';
 import { OWNER_KEY } from './owner.ts';
@@ -13,6 +13,8 @@ import type { Change, RemoteChange } from './transport.ts';
 // - Everything else is logged when unsigned or invalid and still applied, so a Mac on an older build keeps syncing
 //   while the others update. The `syncSignatures` setting turns that strict, or relaxes actions to log only.
 // - A signer with no key here yet (its device record has not arrived) makes an action wait in sync_deferred.
+// - A machine Ben has not trusted yet (keyring.trusted) syncs everything else, but its actions are refused until he
+//   clicks Trust in Sync settings (POST /api/sync/devices/:id/confirm-key).
 // Refusals, and changes applied without a valid signature, go in sync_refused for Sync settings.
 
 export type SignatureMode = 'actions' | 'strict' | 'log';
@@ -84,6 +86,8 @@ const REASONS: Record<Exclude<Verdict, 'valid'>, string> = {
   'signer-mismatch': 'signed by another machine than the one it names',
 };
 
+const UNTRUSTED = 'from a machine not trusted yet';
+
 export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syncSignatures()): Gate {
   // A machine describes only itself.
   const described = raw.entity === 'kv' && raw.entity_id.startsWith(DEVICE) ? raw.entity_id.slice(DEVICE.length) : null;
@@ -102,13 +106,16 @@ export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syn
     keyring.observe(described, { signKey: str(v?.signKey), sealKey: str(v?.sealKey) }, { pin: verdict === 'valid' });
   }
   const action = isActionChange(change);
+  const untrusted = action && change.machine_id !== outbox.machineId() && !keyring.trusted(change.machine_id);
   if (verdict === 'valid') {
     const role = action ? roleProblem(change) : null;
-    return role ? { kind: 'refuse', reason: role, change } : { kind: 'apply', change };
+    if (role) return { kind: 'refuse', reason: role, change };
+    return untrusted ? { kind: 'refuse', reason: UNTRUSTED, change } : { kind: 'apply', change };
   }
   const reason = REASONS[verdict];
   const strict = action || mode === 'strict';
   if (!strict || (action && mode === 'log' && verdict === 'unsigned')) {
+    if (untrusted) return { kind: 'refuse', reason: UNTRUSTED, change };
     logRefused(change, reason, true);
     return { kind: 'apply', change };
   }

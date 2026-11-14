@@ -44,6 +44,8 @@ beforeAll(async () => {
   a.worker = a.sync.createSyncWorker({ transport: relay, machineId: 'mac-a' });
   b = await machine('mac-b');
   b.worker = b.sync.createSyncWorker({ transport: relay, machineId: 'mac-b' });
+  // Each trusts the other, as Ben's Trust click in Sync settings does (sync/keyring.ts).
+  for (const [m, other] of [[a, 'mac-b'], [b, 'mac-a']] as const) m.db.db.prepare('INSERT INTO sync_trusted (machine_id, trusted_at) VALUES (?, ?)').run(other, new Date().toISOString());
 });
 
 describe('two machines, one relay', () => {

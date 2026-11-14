@@ -7,8 +7,9 @@ import { fingerprint } from './signing.ts';
 // as seen_*, changes from that machine stop verifying, secrets stop sealing to it, and Sync settings shows the change
 // until Ben confirms the new key (a re-paired or reinstalled Mac).
 //
-// Trust on first sight: a machine id this machine has never seen is pinned with whatever key its first record carries.
-// The device list shows each key's fingerprint, so a machine Ben does not recognize stands out.
+// Trust on first sight for keys: a machine id this machine has never seen is pinned with whatever key its first record
+// carries. Its ordinary changes sync at once, but it may not make this machine act (sync/verify.ts) until Ben trusts it
+// in Sync settings, where the device list shows its fingerprint. One button confirms a new machine and a changed key.
 
 export type KeyKind = 'sign' | 'seal';
 
@@ -98,9 +99,20 @@ export const keyring = {
     return true;
   },
 
-  /** Forget a machine's pins, for tests and a machine Ben removed. */
+  /** Whether Ben trusts a machine to make this one act (its commands, assignments, update asks, owner claims and secrets). */
+  trusted(machine: string): boolean {
+    return !!db.prepare('SELECT 1 FROM sync_trusted WHERE machine_id = ?').get(machine);
+  },
+
+  /** Trust a machine. False when it already was. */
+  trust(machine: string, now = new Date().toISOString()): boolean {
+    return db.prepare('INSERT OR IGNORE INTO sync_trusted (machine_id, trusted_at) VALUES (?, ?)').run(machine, now).changes > 0;
+  },
+
+  /** Forget a machine's pins and trust, for tests and a machine Ben removed. */
   forget(machine: string) {
     db.prepare('DELETE FROM sync_keys WHERE machine_id = ?').run(machine);
+    db.prepare('DELETE FROM sync_trusted WHERE machine_id = ?').run(machine);
   },
 };
 
