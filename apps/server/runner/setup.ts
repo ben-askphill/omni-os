@@ -9,6 +9,7 @@ import { recordStartBase } from '../changes.ts';
 import { baseFor } from '../worktree-base.ts';
 import { carryInto } from '../continue-carry.ts';
 import { notifyEnded } from '../push-sender.ts';
+import type { MessageContext } from '@omni/shared/message-context.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
 import { attemptSignal, beginAttempt, endAttempt, runSetupAction, STOPPED, stopRequested } from './setup-action.ts';
@@ -22,7 +23,7 @@ export const START_REQUEST = 'thread-start';
  * Save a new worktree thread's first prompt and files as its first request before the worktree is made, so a
  * failure or a restart keeps them for Retry (db/repos/requests.ts). It runs once the worktree is ready.
  */
-export function saveStart(thread: Thread, prompt: string, attachments: Attachment[] | undefined) {
+export function saveStart(thread: Thread, prompt: string, attachments: Attachment[] | undefined, context?: MessageContext[]) {
   const source = thread.source === 'conductor' ? 'conductor' : 'ben';
   messageRequests.accept({
     thread_id: thread.id,
@@ -31,7 +32,8 @@ export function saveStart(thread: Thread, prompt: string, attachments: Attachmen
     mode: 'steer',
     source,
     attachments: attachments ?? null,
-    fingerprint: requestFingerprint({ prompt, mode: 'steer', source, files: (attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' })) }),
+    context: context ?? null,
+    fingerprint: requestFingerprint({ prompt, mode: 'steer', source, files: (attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' })), context }),
     machine_id: outbox.machineId(),
   });
 }

@@ -25,12 +25,18 @@ describe('changes', () => {
     await a.updateReviewNote('t1', 'n/1', { resolved: true });
     await a.deleteReviewNote('t1', 'n1');
     await a.sendReviewNotes('t1');
+    await a.reviewNoteTargets('t1');
+    await a.sendReviewNotes('t1', { target: 'd1' });
+    await a.sendReviewNotes('t1', { new_delegate: true });
     expect(sent.map((s) => [s.method, s.url, s.body])).toEqual([
       ['GET', at('/threads/t%201/review-notes'), undefined],
       ['POST', at('/threads/t1/review-notes'), { anchor, body: 'why' }],
       ['PATCH', at('/threads/t1/review-notes/n%2F1'), { resolved: true }],
       ['DELETE', at('/threads/t1/review-notes/n1'), undefined],
       ['POST', at('/threads/t1/review-notes/send'), {}],
+      ['GET', at('/threads/t1/review-notes/targets'), undefined],
+      ['POST', at('/threads/t1/review-notes/send'), { target: 'd1' }],
+      ['POST', at('/threads/t1/review-notes/send'), { new_delegate: true }],
     ]);
   });
 

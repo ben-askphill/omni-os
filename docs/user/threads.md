@@ -72,6 +72,8 @@ When the diff changes, a note follows its lines: Omni looks for the same text ne
 
 **Send open notes** sends every note that is neither resolved nor sent yet as one message to the thread, each with its lines, and marks them **Sent**. Editing a sent note opens it again, so the new words go with the next send. One send carries up to 40 notes.
 
+**Send to**, under the button, picks where that message goes: this thread (the default), one of the threads it delegated to, or **New delegate**, which starts a thread under this one in the same channel, with the same harness and model and the notes as its first message. A new delegate runs on this Mac and, in a worktree channel, branches from this thread's branch (committed work only). Its report comes back to this thread like any delegate's. Either way the notes stay on this thread, marked **Sent**. The picker is the same on the desktop, the phone and the iOS Changes screen. The Conductor reads a thread's open notes with `list_review_notes`.
+
 ## Point the agent at terminal output
 
 In a thread's Terminal tab (desktop web and the desktop app), select output with the mouse as usual. A panel opens over the terminal's foot: write a note and press **Add to message**, and the selected text goes into the reply box as a chip, next to whatever you have typed. Copy and paste work as before, and Esc in the panel clears the selection. On a phone the terminal is read only and can't be dragged over: tap a line, then tap another to take the lines between, then Add to message. A message can be just chips.

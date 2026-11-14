@@ -5,7 +5,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { parseDiff } from '@omni/shared/diff.ts';
-import type { ReviewNote, ReviewNotesList } from '@omni/shared/review-notes.ts';
+import type { ReviewNote, ReviewNoteTarget, ReviewNotesList } from '@omni/shared/review-notes.ts';
 import { DiffFile } from '../src/components/DiffViewer.tsx';
 import { NoteCard, NotesBar, type NoteActions } from '../src/components/thread/panel/ReviewNotes.tsx';
 
@@ -15,7 +15,8 @@ import { NoteCard, NotesBar, type NoteActions } from '../src/components/thread/p
 const recorded = (JSON.parse(readFileSync(join(WIRE_FIXTURES, 'review-notes.json'), 'utf8')) as ReviewNotesList).notes;
 const open = recorded.find((n) => !n.resolved_at)!;
 const resolved = recorded.find((n) => n.resolved_at)!;
-const actions: NoteActions = { add: async () => {}, update: async () => {}, remove: async () => {}, send: async () => {} };
+const actions: NoteActions = { add: async () => {}, update: async () => {}, remove: async () => {}, send: async () => ({ target: open.thread_id, sent: [] }) };
+const target = { delegates: [] as ReviewNoteTarget[], pick: 'self' as const, setPick: () => {} };
 const html = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el);
 
 const DIFF =
@@ -39,22 +40,38 @@ describe('the notes bar', () => {
   it('counts the notes and sends only when one is open', () => {
     const sent: ReviewNote = { ...open, sent_at: '2026-01-05T10:00:00.000Z' };
     const placed = new Map([[open.id, { file: 'k', from: 1, to: 3, moved: false }]]);
-    const withOpen = html(createElement(NotesBar, { notes: [open, resolved], placed, actions }));
+    const withOpen = html(createElement(NotesBar, { notes: [open, resolved], placed, actions, target }));
     expect(withOpen).toContain('1 open note');
     expect(withOpen).toContain(' · 1 resolved');
     expect(withOpen).toMatch(/<button[^>]*>(?:(?!<\/button>).)*Send open notes/);
     expect(withOpen).not.toMatch(/disabled=""[^>]*>(?:(?!<\/button>).)*Send open notes/);
-    const none = html(createElement(NotesBar, { notes: [sent], placed: new Map([[sent.id, placed.get(open.id)!]]), actions }));
+    const none = html(createElement(NotesBar, { notes: [sent], placed: new Map([[sent.id, placed.get(open.id)!]]), actions, target }));
     expect(none).toContain('0 open notes');
     expect(none).toMatch(/disabled=""[^>]*>(?:(?!<\/button>).)*Send open notes/);
   });
 
+  it('picks where open notes go: this thread by default, a delegate, or a new delegate, and says so on the button', () => {
+    const placed = new Map([[open.id, { file: 'k', from: 1, to: 3, moved: false }]]);
+    const crew: ReviewNoteTarget = { id: '11111111-2222-4333-8444-555555555555', title: 'Check totals', role: null, status: 'done' };
+    const self = html(createElement(NotesBar, { notes: [open], placed, actions, target: { ...target, delegates: [crew] } }));
+    expect(self).toContain('aria-label="Send notes to: This thread"');
+    const toCrew = html(createElement(NotesBar, { notes: [open], placed, actions, target: { delegates: [crew], pick: crew.id, setPick: () => {} } }));
+    expect(toCrew).toContain('aria-label="Send notes to: Check totals"');
+    expect(toCrew).toMatch(/<button[^>]*>(?:(?!<\/button>).)*Send to delegate/);
+    const toNew = html(createElement(NotesBar, { notes: [open], placed, actions, target: { delegates: [], pick: 'new', setPick: () => {} } }));
+    expect(toNew).toContain('aria-label="Send notes to: New delegate"');
+    expect(toNew).toMatch(/<button[^>]*>(?:(?!<\/button>).)*Send to new delegate/);
+    // Nothing open: nothing to route.
+    const none = html(createElement(NotesBar, { notes: [{ ...open, sent_at: '2026-01-05T10:00:00.000Z' }], placed, actions, target }));
+    expect(none).not.toContain('Send notes to');
+  });
+
   it('lists a note whose lines are gone as outdated, quoting them; on This turn it only counts it', () => {
-    const base = html(createElement(NotesBar, { notes: [open], placed: new Map(), actions }));
+    const base = html(createElement(NotesBar, { notes: [open], placed: new Map(), actions, target }));
     expect(base).toContain('data-note-state="outdated"');
     expect(base).toContain('Outdated');
     expect(base).toContain(open.anchor.rows[0]!.text.replace(/[<>]/g, ''));
-    const turn = html(createElement(NotesBar, { notes: [open], placed: new Map(), actions, turn: true }));
+    const turn = html(createElement(NotesBar, { notes: [open], placed: new Map(), actions, target, turn: true }));
     expect(turn).toContain('1 note is on lines this turn did not change');
     expect(turn).not.toContain('data-note-state');
   });
