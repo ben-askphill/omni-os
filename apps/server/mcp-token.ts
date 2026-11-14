@@ -68,7 +68,7 @@ export async function verifyMcpToken(token: string, input: VerifyInput): Promise
     if (!input.allowOpaque)
       return refuse(
         'opaque',
-        'This sign-in gave the client an opaque Clerk token, which Omni cannot tie to this install. Use the MCP token (data/mcp-token), or reconnect once the Clerk instance issues JWT access tokens',
+        "This sign-in gave the client an opaque Clerk token, which Omni cannot tie to this install. Turn on JWT access tokens for the Clerk instance's OAuth applications and reconnect, use the MCP token (data/mcp-token), or set OMNI_MCP_ALLOW_OPAQUE=1 to take opaque tokens on the user alone",
       );
     const sub = await input.userinfoSub(token);
     return sub && sub === input.ownerSub ? { ok: true, client: null, via: 'opaque' } : refuse('invalid', 'Clerk does not name the owner for this token');
