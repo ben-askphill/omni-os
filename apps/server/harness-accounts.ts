@@ -55,8 +55,10 @@ const SYNC_EVERY_MS = 10 * 60_000;
 const REWRITE_MS = 6 * 60 * 60_000;
 /** How long one harness's check may take. */
 const CHECK_MS = 8_000;
-/** The key this machine's record has before sync gives it an id. Never listed as another machine. */
+/** This machine's id before sync gives it one. */
 const LOCAL_ID = 'local';
+/** Where this machine's record lives before sync gives it an id: a sync.* key, so it never leaves this machine. */
+const LOCAL_KEY = 'sync.accounts.local';
 
 const options: { env?: NodeJS.ProcessEnv; read?: (harness: HarnessId) => Promise<HarnessAccount> } = {};
 /** For tests: the environment the checks run in (each Mac in one process has its own), or a reader that stands in for them. */
@@ -168,7 +170,7 @@ async function readOne(harness: HarnessId): Promise<HarnessAccount> {
 // ---------- this machine's record ----------
 
 const selfId = () => outbox.machineId() ?? LOCAL_ID;
-const keyOf = (id: string) => `${ACCOUNTS_PREFIX}${id}`;
+const keyOf = (id: string) => (id === LOCAL_ID ? LOCAL_KEY : `${ACCOUNTS_PREFIX}${id}`);
 
 function parseRecord(id: string, v: unknown): MachineAccountsRecord | null {
   const r = v as Partial<MachineAccountsRecord> | null;
@@ -182,7 +184,7 @@ function parseRecord(id: string, v: unknown): MachineAccountsRecord | null {
 
 /** The record this machine wrote last: under its sync id, or the local key from before sync gave it one. */
 const storedOwn = (): MachineAccountsRecord | null =>
-  parseRecord(selfId(), kv.get<unknown>(keyOf(selfId()))) ?? (selfId() === LOCAL_ID ? null : parseRecord(selfId(), kv.get<unknown>(keyOf(LOCAL_ID))));
+  parseRecord(selfId(), kv.get<unknown>(keyOf(selfId()))) ?? (selfId() === LOCAL_ID ? null : parseRecord(selfId(), kv.get<unknown>(LOCAL_KEY)));
 
 let own: { record: MachineAccountsRecord; at: number } | null = null;
 let reading: Promise<MachineAccountsRecord> | null = null;
@@ -244,7 +246,7 @@ function otherRecords(self: string): MachineAccountsRecord[] {
     .list<unknown>(ACCOUNTS_PREFIX)
     .flatMap(([key, v]) => {
       const id = key.slice(ACCOUNTS_PREFIX.length);
-      if (id === self || id === LOCAL_ID || !machines.has(id)) return [];
+      if (id === self || !machines.has(id)) return [];
       return parseRecord(id, v) ?? [];
     })
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
@@ -298,6 +300,7 @@ export function stampThread(threadId: string, harness: string): void {
       const same = had && had.machine === r.id && had.harness === harness && identityKey(had) === identityKey(a) && had.plan === a.plan;
       if (same) return;
       kv.set(ranKey(threadId), { harness, machine: r.id, machineName: r.name, label: a.label, org: a.org, plan: a.plan, at: new Date().toISOString() } satisfies ThreadAccount);
+      publishFeed({ type: 'accounts' });
     })
     .catch((err) => console.error('[accounts] could not stamp the thread:', (err as Error).message));
 }

@@ -122,7 +122,7 @@ export function ThreadQuickCard({
   const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? 'Waiting on you' : pill.label } : { glyph: 'running' as const, label: 'Turn running' };
   const branchDisabled = !thread.branch;
   // The account its harness ran as when its process last started (apps/server/harness-accounts.ts), here or elsewhere.
-  const ran = useThreadAccount(thread.id, thread.status);
+  const ran = useThreadAccount(thread.id);
   const hereName = useHereName();
 
   return (

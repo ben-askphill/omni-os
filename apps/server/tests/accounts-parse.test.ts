@@ -20,12 +20,19 @@ describe('clean', () => {
     expect(clean('Ask Phill')).toBe('Ask Phill');
   });
 
+  it('keeps ordinary text that holds a key prefix inside a word', () => {
+    expect(clean('risk-analytics@acme.com')).toBe('risk-analytics@acme.com');
+    expect(clean('Helpdesk-Operations')).toBe('Helpdesk-Operations');
+    expect(clean('monkey_business@example.com')).toBe('monkey_business@example.com');
+  });
+
   it('drops anything shaped like a credential, whole or inside a longer string', () => {
     for (const t of TOKENS) {
       expect(clean(t)).toBeNull();
       expect(clean(`token: ${t}`)).toBeNull();
     }
     expect(clean('Bearer abcdefghijklmnopqrstuvwxyz')).toBeNull();
+    expect(clean('user-sk-ant-oat01-abcdefghijklmnop')).toBeNull();
     expect(clean('A'.repeat(48))).toBeNull();
   });
 

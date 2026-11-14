@@ -7,7 +7,7 @@ import type { GetAccountResponse } from './codex/protocol.ts';
 // ---------- what a reader may return ----------
 
 /** Shapes of credentials: an Anthropic, OpenAI or Cursor key, a JWT, a bearer header, or a long run of key characters. */
-const CREDENTIAL = /(?:sk-[A-Za-z0-9_-]{8,}|sk_[A-Za-z0-9]{8,}|key_[A-Za-z0-9]{12,}|crsr_[A-Za-z0-9]{8,}|eyJ[A-Za-z0-9_-]{8,}\.|bearer\s+\S{12,}|[A-Za-z0-9+/_=-]{40,})/i;
+const CREDENTIAL = /(?:(?<![A-Za-z0-9])(?:sk-[A-Za-z0-9_-]{8,}|sk_[A-Za-z0-9]{8,}|key_[A-Za-z0-9]{12,}|crsr_[A-Za-z0-9]{8,}|eyJ[A-Za-z0-9_-]{8,}\.)|bearer\s+\S{12,}|[A-Za-z0-9+/_=-]{40,})/i;
 
 /** A field fit to show: a string, on one line, cut to `max`, and null when it is empty or shaped like a credential. */
 export function clean(v: unknown, max = 120): string | null {

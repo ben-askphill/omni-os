@@ -69,9 +69,17 @@ describe('GET /api/accounts', () => {
     expect(text).not.toMatch(/accessToken|refreshToken|idToken|apiKey/);
     // Only the documented fields, on every row.
     for (const a of body.machines[0].accounts) expect(Object.keys(a).sort()).toEqual(['harness', 'label', 'note', 'notice', 'org', 'plan', 'state', 'switched']);
-    // Nor in the record that syncs to the other machines.
-    const stored = JSON.stringify(r.db.kv.list('accounts.'));
+    // Nor in the record kept for the other machines.
+    const stored = JSON.stringify([r.db.kv.get('sync.accounts.local'), r.db.kv.list('accounts.')]);
     for (const s of SECRETS) expect(stored).not.toContain(s);
+  });
+
+  it('keeps the record on this machine until sync gives it an id', async () => {
+    const { body } = await get('/accounts?refresh=1');
+    expect(body.synced).toBe(false);
+    // sync.* keys never go out (db/sync.ts localKey): another machine's pre-sync record can never arrive in its place.
+    expect(r.db.kv.get<any>('sync.accounts.local')).toMatchObject({ id: 'local', accounts: expect.any(Array) });
+    expect(r.db.kv.list('accounts.')).toEqual([]);
   });
 
   it('drops a field that is itself shaped like a credential, so the account reads as unknown', async () => {
@@ -109,9 +117,13 @@ describe('GET /api/accounts', () => {
 
 describe('a thread', () => {
   it('is stamped with the account its harness ran as', async () => {
+    const heard: string[] = [];
+    r.bus.on('feed', (e: any) => heard.push(e.type));
     const t = await r.start('hello');
     await waitFor(() => r.thread(t.id).status === 'done', 'the turn to finish');
     await waitFor(() => r.db.kv.get(`accounts-ran.${t.id}`), 'the stamp');
+    // Clients showing the thread hear of the stamp, so it shows while the turn still runs.
+    await waitFor(() => heard.includes('accounts'), 'an accounts message');
     const stamp = (await get(`/accounts/threads/${t.id}`)).body.account;
     expect(stamp).toMatchObject({ harness: 'claude-code', label: 'ben@personal.example', org: 'Acme', plan: 'Max' });
     expect((await get('/accounts/threads/nope')).status).toBe(404);

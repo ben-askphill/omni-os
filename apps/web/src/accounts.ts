@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { accountsByHarness, machineAccounts, type AccountsView, type HarnessAccountView, type ThreadAccount } from '@omni/shared/harness-accounts.ts';
 import { api, useApi } from './api.ts';
 import { useFeed } from './store.tsx';
@@ -30,12 +29,11 @@ export function pickerAccounts(view: AccountsView | undefined, pick: string | nu
   return m ? { id: m.id, machine: m.name, current: m.current, byHarness: accountsByHarness(m) } : null;
 }
 
-/** The account a thread last ran as, read again whenever its status moves (a new process stamps it). */
-export function useThreadAccount(threadId: string, status: string | undefined): ThreadAccount | null {
+/** The account a thread last ran as, read again on every `accounts` message (a new stamp sends one) and reconnect. */
+export function useThreadAccount(threadId: string): ThreadAccount | null {
   const res = useApi<{ account: ThreadAccount | null }>(`/accounts/threads/${encodeURIComponent(threadId)}`);
-  const { reload } = res;
-  useEffect(() => {
-    if (status === 'running' || status === 'done' || status === 'failed') reload();
-  }, [status, reload]);
+  useFeed((e) => {
+    if (e.type === 'accounts' || e.type === 'reconnect') res.reload();
+  });
   return res.data?.account ?? null;
 }
