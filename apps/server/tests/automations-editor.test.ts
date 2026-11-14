@@ -3,7 +3,9 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
-import { MemoryTransport } from '../sync/transport.ts';
+import { MemoryTransport, type Change } from '../sync/transport.ts';
+import { rawPublicKey } from '../sync/signing.ts';
+import { keyOf, signAs } from './sync-sign.ts';
 
 // The Automations editor: every change is written to a YAML file (automation-files.ts). A shipped automation becomes
 // the user's own copy in data/automations/, its comments kept, and Reset drops the copy. `machine:` picks the synced
@@ -144,22 +146,31 @@ describe('choosing a machine, with sync on', () => {
     expect(await automations.fireScheduled(find('digest')!)).toBeNull();
   });
 
-  it('the file goes to the relay, and one from the other machine is written here', async () => {
+  it('the file goes to the relay, and one the other machine signed is written here', async () => {
     await call('PUT', '/automations/digest', { fields: fields({ name: 'Digest v2', machine: 'mac-b' }) });
     expect((await worker.syncNow()).error).toBeUndefined();
     const sent = relay.changes.filter((c) => c.entity === 'automation_file' && c.entity_id === 'digest').at(-1)!;
     expect((sent.data as any).yaml).toContain('name: Digest v2');
 
+    let n = 0;
+    const at = () => new Date(Date.now() + 1_000 + n++).toISOString();
+    const file = (id: string, data: unknown, op: Change['op'] = 'upsert'): Change => ({ machine_id: 'mac-b', entity: 'automation_file', entity_id: id, op, data, ts: at() });
+    // mac-b announces itself with its signing key, as a paired machine does; this one pins and trusts that first key.
+    const record = signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'devices.mac-b', op: 'upsert', ts: at(), data: { value: { id: 'mac-b', name: "Ben's MacBook Pro", tailscale: null, signKey: rawPublicKey(keyOf('mac-b')), at: at() } } });
     const yaml = 'name: From B\nenabled: true\ncron: "0 9 * * *"\nchannel: scratch\nmachine: mac-a\nprompt: hello\n';
-    await relay.push([{ machine_id: 'mac-b', entity: 'automation_file', entity_id: 'from-b', op: 'upsert', data: { yaml }, ts: new Date(Date.now() + 1_000).toISOString() }]);
-    // An id that is a path is dropped.
-    await relay.push([{ machine_id: 'mac-b', entity: 'automation_file', entity_id: '../evil', op: 'upsert', data: { yaml }, ts: new Date(Date.now() + 1_000).toISOString() }]);
+    // Unsigned: an automation is a prompt that runs, so a file nobody signed is held, never written.
+    await relay.push([record, file('unsigned', { yaml })]);
+    expect((await worker.syncNow()).error).toBeUndefined();
+    expect(existsSync(own('unsigned'))).toBe(false);
+
+    await relay.push([signAs(file('from-b', { yaml })), signAs(file('../evil', { yaml }))]);
     expect((await worker.syncNow()).error).toBeUndefined();
     expect(readFileSync(own('from-b'), 'utf8')).toBe(yaml);
+    // An id that is a path is dropped.
     expect(existsSync(join(paths.personalAutomations, '..', 'evil.yaml'))).toBe(false);
     expect(find('from-b')).toMatchObject({ name: 'From B', machine: 'mac-a' });
 
-    await relay.push([{ machine_id: 'mac-b', entity: 'automation_file', entity_id: 'from-b', op: 'delete', data: null, ts: new Date(Date.now() + 2_000).toISOString() }]);
+    await relay.push([signAs(file('from-b', null, 'delete'))]);
     expect((await worker.syncNow()).error).toBeUndefined();
     expect(find('from-b')).toBeUndefined();
   });

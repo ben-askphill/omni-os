@@ -1,5 +1,6 @@
 import { db, kv, outbox } from '../db.ts';
 import { currentRecords, deviceRecords } from './device-records.ts';
+import { keyring } from './keyring.ts';
 
 // Which Mac runs the scheduled (cron) automations once sync is on, so a nightly job does not run on both.
 // kv `automations.owner` holds that Mac's sync id. It is not a sync.* key, so it syncs, last writer wins,
@@ -46,15 +47,20 @@ export function claimIfUnowned(): boolean {
 
 /**
  * A synced machine named by an automation's `machine:`: its sync id, matched by id first, then by name (any case) when
- * one machine has it. Null when no synced machine matches, or two share the name.
+ * one machine has it. This machine and the machines trusted with their signing key (sync/keyring.ts) are asked first,
+ * so a device record nobody vouched for cannot take a trusted machine's name. Null when no synced machine matches, or
+ * two share the name.
  */
 export function resolveMachine(asked: string): string | null {
   const want = asked.trim();
   if (!want) return null;
   const all = currentRecords(deviceRecords());
   if (all.some((d) => d.id === want)) return want;
+  const self = outbox.machineId();
   const named = all.filter((d) => d.name.toLowerCase() === want.toLowerCase());
-  return named.length === 1 ? named[0].id : null;
+  const vouched = named.filter((d) => d.id === self || keyring.trusted(d.id));
+  const pick = vouched.length ? vouched : named;
+  return pick.length === 1 ? pick[0].id : null;
 }
 
 /**
