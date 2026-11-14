@@ -9,6 +9,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { RepoClone } from '@omni/shared/channel-actions.ts';
+import { publishFeed } from './bus.ts';
 import { channels, kv, type Channel } from './db.ts';
 import { pathMap, toPortable, toRemote } from './sync/paths.ts';
 import { expandHome, tildify, userConfig } from './user-config.ts';
@@ -27,7 +28,7 @@ type Plan =
 export const CLONE_TIMEOUT_MS = 15 * 60_000;
 
 /** owner/name as GitHub allows them. Anything else (from the other machine, or typed) is never put in a path or a command. */
-const GITHUB_REPO = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
+const GITHUB_REPO = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 /** Clones running now, by the folder they make. */
 const cloning = new Map<string, { status: RepoClone; done: Promise<void> }>();
@@ -137,6 +138,7 @@ function adopt(channelId: string, { repo, path, into }: Extract<Plan, { kind: 'c
   if (!now || now.repo_path !== path || now.github_repo?.trim() !== repo || resolve(path) === into) return;
   kv.set('sync.path_map', { ...pathMap(), [toRemote(path)]: toPortable(into) });
   channels.relocateRepo(channelId, into);
+  publishFeed({ type: 'channel', id: channelId });
   console.log(`[clone] channel ${channelId}: repository is at ${into} on this machine (was ${path})`);
 }
 

@@ -181,6 +181,13 @@ describe('a worktree thread whose channel repository is not on this machine', ()
     expect(clones()).toEqual([]);
     expect(r.spawns(t.id)).toEqual([]);
   });
+
+  it('fails, without running gh, when the GitHub repo starts with a dash', async () => {
+    const t = await r.runner.createThread({ channel: channel(missing('shop'), '-x/shop'), prompt: 'go' });
+    expect((await failed(t.id)).setup_error).toMatch(/is not an owner\/name Omni can clone/);
+    expect(clones()).toEqual([]);
+    expect(r.spawns(t.id)).toEqual([]);
+  });
 });
 
 describe('a channel path that cannot be made on this machine', () => {
