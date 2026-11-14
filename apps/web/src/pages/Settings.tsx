@@ -17,6 +17,7 @@ import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
 import { ChannelSettingsForm } from './ChannelSettings.tsx';
 import { GoogleAccountSection } from './GoogleAccount.tsx';
+import { InstallTokenCard, McpClientsCard, RefusedChangesCard, SyncKeysCard } from './SecuritySettings.tsx';
 import { ConnectSection } from './Connect.tsx';
 import { IosPairingSection } from './IosPairing.tsx';
 import { MachinesSection, RunOnCard } from './Machines.tsx';
@@ -113,6 +114,8 @@ function SectionBody({ section }: { section: SettingsSection }) {
       return (
         <>
           <SyncSection />
+          <SyncKeysCard />
+          <RefusedChangesCard />
           <PathMapEditor />
         </>
       );
@@ -291,6 +294,8 @@ function AccessSection() {
       <GoogleAccountSection />
       <ConnectSection />
       <IosPairingSection />
+      <McpClientsCard />
+      <InstallTokenCard />
       <ConfigSection part="access" />
     </>
   );

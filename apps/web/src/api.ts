@@ -544,6 +544,8 @@ export const openToolTail = (threadId: string, toolUseId: string, onData: (data:
 export interface Async<T> {
   data: T | undefined;
   error: string | null;
+  /** The status of the failed read when the server answered it, so a caller can tell a missing route from an outage. */
+  status?: number | null;
   loading: boolean;
   reload: () => void;
   setData: (fn: T | ((prev: T | undefined) => T)) => void;
@@ -553,6 +555,7 @@ export interface Async<T> {
 export function useApi<T>(path: string | null): Async<T> {
   const [data, setDataState] = useState<T | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(!!path);
   const [tick, setTick] = useState(0);
   const lastPath = useRef<string | null>(null);
@@ -574,8 +577,13 @@ export function useApi<T>(path: string | null): Async<T> {
         if (!alive) return;
         setDataState(d);
         setError(null);
+        setStatus(null);
       })
-      .catch((e) => alive && setError(errorText(e)))
+      .catch((e) => {
+        if (!alive) return;
+        setError(errorText(e));
+        setStatus(e instanceof ApiError ? e.status : null);
+      })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
@@ -586,7 +594,7 @@ export function useApi<T>(path: string | null): Async<T> {
   const setData = useCallback((fn: T | ((prev: T | undefined) => T)) => {
     setDataState((prev) => (typeof fn === 'function' ? (fn as (p: T | undefined) => T)(prev) : fn));
   }, []);
-  return { data, error, loading, reload, setData };
+  return { data, error, status, loading, reload, setData };
 }
 
 // ---------- SSE with reconnect ----------

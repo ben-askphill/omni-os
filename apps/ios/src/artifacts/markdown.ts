@@ -1,3 +1,4 @@
+import { isApiPath } from '@omni/shared/markdown-image.ts';
 import { Marked, type Tokens } from 'marked';
 
 import { textDocument, type DocumentColors } from './sandbox';
@@ -8,6 +9,15 @@ const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 const SAFE_HREF = /^(?:https?:|mailto:|#)/i;
 /** Pictures a document may keep: https and inline data images. A relative path points at nothing the phone can reach. */
 const SAFE_SRC = /^(?:https:|data:image\/(?:png|jpe?g|gif|webp);)/i;
+/** Never a picture that points at an Omni API route, on any host: loading it would act (PRD #667, S18). */
+const apiPath = (src: string) => {
+  try {
+    return isApiPath(new URL(src).pathname) !== false;
+  } catch {
+    return false;
+  }
+};
+const safeSrc = (src: string) => SAFE_SRC.test(src) && !apiPath(src);
 
 const markdown = new Marked({
   gfm: true,
@@ -16,7 +26,7 @@ const markdown = new Marked({
   renderer: { html: ({ text }: Tokens.HTML | Tokens.Tag) => escapeHtml(text) },
   walkTokens(token) {
     if (token.type === 'link' && !SAFE_HREF.test(token.href.trim())) token.href = '';
-    if (token.type === 'image' && !SAFE_SRC.test(token.href.trim())) token.href = '';
+    if (token.type === 'image' && !safeSrc(token.href.trim())) token.href = '';
   },
 });
 

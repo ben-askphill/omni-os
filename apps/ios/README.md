@@ -76,7 +76,9 @@ Settings opens with Servers, then a search over every setting and the same group
 - Workspace: the GitHub owner. Folders, the central brain folder included, show their value, since they are paths on the server's machine. The Hermes URL is under Harnesses & models.
 - Worktrees: automatic cleanup and its idle days (`PUT /worktrees/retention`).
 - Machines: the server's machine, read-only, and Update all machines, which checks, downloads and updates every synced machine through `/update/fleet` as the Web UI's card does.
-- Sync, Sharing & access and About: what the server reports, read-only, with Devices under Sharing & access.
+- Sync: what the server reports, plus each machine's signing key (Trust this machine for a machine new to this one, Confirm new key when a trusted machine's key changed) and the changes this server refused.
+- Sharing & access: Devices, Rotate install token and the MCP clients that reached `/mcp` (Approve, Remove).
+- About: what the server reports, read-only.
 - Secrets: names by scope, add or replace a value, delete one. A value is never shown again.
 
 Channel Settings opens from the gear on a channel's header, from holding a channel in Channels, and from Settings › Channels. It edits the fields the Web UI's channel settings edit: name, icon (an emoji or one of the design system's icons), kind, default model, notes, the design system file (picked from Files), the GitHub repo, worktree per thread, the browser window, store domain, portal slug, the channel's actions (each saved on its own), its secrets, and Archive. Save sends `PATCH /channels/:id` with the body `@omni/shared/channel-form.ts` builds, the same one the Web UI sends. The repo path and the base directory show their value: they are paths on the server's machine. An uploaded SVG icon shows and can be cleared, but is uploaded on the computer.
@@ -113,7 +115,7 @@ The app fetches the file in native code with the token (`hub.fetchArtifactFile`,
 - A Content-Security-Policy meta goes first in the document. It sets `connect-src 'none'`, `frame-src 'none'`, `form-action 'none'` and `base-uri 'none'`, so a page cannot call out or post.
 - `onShouldStartLoadWithRequest` decides every move. A tapped http(s) link opens in the system browser. Redirects, script navigation, frames and other schemes are blocked.
 - Incognito, no cache, no cookies, no file access.
-- Markdown shows raw HTML as text and drops links and image sources that are not web, mail or `https`.
+- Markdown shows raw HTML as text and drops links that are not web or mail, and image sources that are not `https` or an inline picture or that point at an Omni `/api` route on any host. An agent reply in a thread gets the same image rule (`src/thread/images.ts`): a refused image shows as "[image: alt]", since the reply renderer cannot hold an image back for a tap.
 
 `tests/sandbox.test.ts` and `tests/markdown.test.ts` hold these rules. Manual check on a throwaway server: publish an HTML artifact that reads `window.ReactNativeWebView`, `localStorage` and `document.cookie`, calls `fetch` on the server and `/api`, sets `location`, submits a form and adds an iframe, and prints each result. Every call must fail or be undefined.
 

@@ -323,6 +323,44 @@ describe('open thread', () => {
     hub.close();
   });
 
+  it('adds a crew thread started after opening, updates it from the feed and shows a new artifact at once', async () => {
+    const t = fakeTransport();
+    const { fetch } = fakeFetch((path) => (path.split('?')[0] === '/api/threads/t1' ? { body: threadDetail() } : { body: [] }));
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    const live = hub.openThread('t1');
+    await settle();
+    expect(live.view.get().children).toEqual([]);
+
+    const [feed] = t.feeds();
+    feed?.sink.open();
+    const crew = { id: 'k1', channel_id: 'c', parent_id: 't1', title: 'Crew', status: 'running', created_at: '', updated_at: '' };
+    feed?.sink.message(frame({ type: 'thread', thread: crew }));
+    expect(live.view.get().children.map((c) => [c.id, c.status])).toEqual([['k1', 'running']]);
+    feed?.sink.message(frame({ type: 'thread', thread: { ...crew, title: 'Crew renamed', status: 'done' } }));
+    expect(live.view.get().children.map((c) => [c.title, c.status])).toEqual([['Crew renamed', 'done']]);
+
+    const [stream] = t.threadStreams('t1');
+    stream?.sink.open();
+    const artifact = { id: 7, thread_id: 't1', path: '/x/r.html', name: 'r.html', kind: 'html', size: 1, url: null, description: null, created_at: '', updated_at: '' };
+    stream?.sink.message(frame({ kind: 'artifact', artifact }));
+    expect(live.view.get().artifacts.map((a) => a.id)).toEqual([7]);
+    live.close();
+    hub.close();
+  });
+
+  it('draws the opening message while the turn starts instead of an empty thread and a pending card', async () => {
+    const pending = [{ uuid: 'u1', kind: 'user', text: 'Fix it', mode: 'queue', state: 'sent', request_id: 'r1' }];
+    const detail = threadDetail({ events: [], history: { from: 0, to: null, results_below: 0 }, pending, opening: { text: 'Fix it', uuid: 'u1' } });
+    const { fetch } = fakeFetch((path) => (path.split('?')[0] === '/api/threads/t1' ? { body: detail } : { body: [] }));
+    const hub = createLiveHub({ session: session(), transport: fakeTransport().transport, fetch });
+    const live = hub.openThread('t1');
+    await settle();
+    expect(live.view.get().rows.map((r) => [r.id, r.kind])).toEqual([[0, 'user']]);
+    expect(live.view.get().pending).toEqual([]);
+    live.close();
+    hub.close();
+  });
+
   it('reports a thread the server does not have as missing', async () => {
     const { fetch } = fakeFetch(() => ({ status: 404, body: { error: 'not found' } }));
     const hub = createLiveHub({ session: session(), transport: fakeTransport().transport, fetch });

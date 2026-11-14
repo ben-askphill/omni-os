@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ChannelWithRunning, ConductorHandoffGroup, Thread } from '../api.ts';
 import { OmniMark } from '../components/brand.tsx';
-import { useLiveThreads } from '../components/ThreadList.tsx';
+import { useChannelThreads } from '../app/useChannelThreads.ts';
+import { folderOf } from '../folder-groups.ts';
 import { Avatar, Icon, Segmented, StatusDot, asksForYou } from '../components/ui.tsx';
 import { inChannel, reasonOf } from '../needs-you.ts';
 import { href } from '../router.ts';
@@ -134,7 +135,7 @@ export function ChannelScreen({ id }: { id: string }) {
   const folders = useFolders();
   const ch: ChannelWithRunning | undefined = channel(id);
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
-  const list = useLiveThreads(`/channels/${encodeURIComponent(id)}/threads`, accept);
+  const list = useChannelThreads(id, accept);
   const now = useNow(60_000);
   const [tab, setTab] = useState<'active' | 'recent'>('active');
   const conductor = id === 'conductor';
@@ -154,9 +155,12 @@ export function ChannelScreen({ id }: { id: string }) {
       const finalRow = item ? { ...row, meta: reasonOf(item).label, status: asksForYou(reasonOf(item).glyph) ? reasonOf(item).glyph : row.status } : row;
       const isActive = !!item || busy(t);
 
-      if (t.folder_id) {
-        if (!folderMap.has(t.folder_id)) folderMap.set(t.folder_id, { active: [], recent: [] });
-        folderMap.get(t.folder_id)![isActive ? 'active' : 'recent'].push(finalRow);
+      // The sidebar's rule (folder-groups.ts): a folder this channel no longer has, say one just deleted, falls through
+      // to ungrouped rather than hiding the thread.
+      const folder = ch ? folderOf(ch, t) : null;
+      if (folder) {
+        if (!folderMap.has(folder)) folderMap.set(folder, { active: [], recent: [] });
+        folderMap.get(folder)![isActive ? 'active' : 'recent'].push(finalRow);
       } else {
         if (isActive) activeRows.push(finalRow);
         else recentRows.push(finalRow);
@@ -177,7 +181,7 @@ export function ChannelScreen({ id }: { id: string }) {
         const inActive = activeRows.some((row) => row.id === group.parent.id);
         if (inActive) continue;
         const parent = rowOf(group.parent, info, now);
-        const folder = group.parent.folder_id;
+        const folder = ch ? folderOf(ch, group.parent) : null;
         if (folder) {
           if (!folderMap.has(folder)) folderMap.set(folder, { active: [], recent: [] });
           const rows = folderMap.get(folder)!;
@@ -257,6 +261,16 @@ export function ChannelScreen({ id }: { id: string }) {
                   ? `Nothing running in ${name}. Start a thread below; crew threads the Conductor delegates here show up too.`
                   : `Nothing finished in ${name} yet.`}
             </MoEmpty>
+          )}
+          {list.more && (
+            <button
+              type="button"
+              onClick={() => void list.loadMore()}
+              disabled={list.loadingMore}
+              className="mo-press mx-auto mt-1 flex h-11 items-center gap-2 rounded-full px-4 text-[14px] font-medium text-fg-2 disabled:opacity-60"
+            >
+              {list.loadingMore ? 'Loading older threads' : 'Show older threads'}
+            </button>
           )}
         </MoSection>
       </MoScroll>

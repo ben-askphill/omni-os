@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
-import { api, errorText, openSSE } from '../api.ts';
+import { api, ApiError, errorText, openSSE } from '../api.ts';
 import { AnnotateButton, AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from './BrowserAnnotate.tsx';
 import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from './BrowserAnnotationOverlay.tsx';
 import { Button, Icon, IconButton } from './ui.tsx';
@@ -122,32 +122,51 @@ export function useChannelBrowser(channelId: string) {
       decoding = false;
       void decode();
     };
-    const h = openSSE(
-      () => `/api${base}/stream`,
-      (d) => {
-        const m = d as { type: string; state?: BrowserState; data?: string; width?: number; height?: number; scrollX?: number; scrollY?: number; error?: string };
-        if (m.type === 'state' && m.state) {
-          setState(m.state);
-          if (!m.state.running) {
-            frame.current = null;
-            setHasFrame(false);
-          }
-        } else if (m.type === 'frame' && m.data) {
-          // Only the newest frame waiting to decode counts.
-          pending = { data: m.data, width: m.width!, height: m.height!, ...(typeof m.scrollX === 'number' && typeof m.scrollY === 'number' && { scroll: { x: m.scrollX, y: m.scrollY } }) };
-          void decode();
-        } else if (m.type === 'error') setError(m.error ?? 'The browser could not start');
-      },
-      {
-        onOpen: () => {
-          setError(null);
-          setOpened((n) => n + 1);
+    // Start Chrome with a deliberate POST (PRD #667: the stream only attaches). A server from before that route has no
+    // /start, and its stream starts Chrome itself.
+    let h: { close(): void } | null = null;
+    let startError: string | null = null;
+    const attach = () => {
+      if (!alive) return;
+      h = openSSE(
+        () => `/api${base}/stream`,
+        (d) => {
+          const m = d as { type: string; state?: BrowserState; data?: string; width?: number; height?: number; scrollX?: number; scrollY?: number; error?: string };
+          if (m.type === 'state' && m.state) {
+            setState(m.state);
+            if (!m.state.running) {
+              frame.current = null;
+              setHasFrame(false);
+            }
+          } else if (m.type === 'frame' && m.data) {
+            // Only the newest frame waiting to decode counts.
+            pending = { data: m.data, width: m.width!, height: m.height!, ...(typeof m.scrollX === 'number' && typeof m.scrollY === 'number' && { scroll: { x: m.scrollX, y: m.scrollY } }) };
+            void decode();
+          } else if (m.type === 'error') setError(m.error ?? 'The browser could not start');
         },
-      },
-    );
+        {
+          onOpen: () => {
+            setError(startError);
+            setOpened((n) => n + 1);
+          },
+        },
+      );
+    };
+    void api
+      .post<BrowserState>(`${base}/start`, {})
+      .then((st) => {
+        if (alive) setState(st);
+      })
+      .catch((e) => {
+        if (alive && !(e instanceof ApiError && e.status === 404)) {
+          startError = errorText(e);
+          setError(startError);
+        }
+      })
+      .finally(attach);
     return () => {
       alive = false;
-      h.close();
+      h?.close();
     };
   }, [base, epoch]);
 

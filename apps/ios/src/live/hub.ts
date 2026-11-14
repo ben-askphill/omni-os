@@ -9,7 +9,6 @@ import {
   ThreadHistory,
   type AnswerResult,
   type Artifact,
-  type Channel,
   type ChannelWithRunning,
   type Fetch,
   type HarnessInfo,
@@ -17,19 +16,18 @@ import {
   type HttpClient,
   type NeedsYou,
   type OmniApi,
-  type PendingMsg,
   type Recovered,
   type RawResponse,
   type SSEClient,
   type SSEState,
   type SSETransport,
   type Thread,
-  type ThreadOpen,
   type UploadTransport,
 } from '@omni/client-core';
 import type { ClaudeArtifactsSchedule } from '@omni/shared/claude-artifacts.ts';
-import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
-import { earlierCursor, type HistoryPage, type Span } from '@omni/shared/history.ts';
+import type { HandoffView } from '@omni/shared/handoff.ts';
+import { earlierCursor, type HistoryPage } from '@omni/shared/history.ts';
+import { latestOnly } from '@omni/shared/latest.ts';
 import type { Answer } from '@omni/shared/question.ts';
 import type { OutputChunk } from '@omni/shared/tool-output.ts';
 
@@ -48,6 +46,7 @@ import { createClaudeArtifactsLive, type ClaudeArtifactsLiveState } from './clau
 import { createLibraryLive, type LibraryState } from './library';
 import type { OmniSession } from './session';
 import { createStore, type Store } from './store';
+import { emptyThreadView, reduceThread, withChanges, withDetail, type ThreadChanges, type ThreadDetail, type ThreadView } from './thread-reducer';
 
 /** Feed messages that change the channel list's counts and rows. Usage and mod lines do not. */
 const LIST_CHANGES = new Set(['thread', 'channel', 'tasks', 'folder']);
@@ -64,31 +63,7 @@ export interface ChannelsState {
   loadedAt: number | null;
 }
 
-export interface ThreadView {
-  threadId: string;
-  status: 'loading' | 'ready' | 'missing' | 'error';
-  error: string | null;
-  thread: Thread | null;
-  channel: Channel | null;
-  parent: Thread | null;
-  children: Thread[];
-  artifacts: Artifact[];
-  pending: PendingMsg[];
-  live: boolean;
-  blocked: string | null;
-  /** The handoff in flight on this thread, from either machine's side. Null when there is none. */
-  handoff: HandoffView | null;
-  /** Another machine holds the thread and this server could take it. Null when this one holds it. */
-  takeover: Takeover | null;
-  /** The loaded rows in order: the newest page, then any older pages Ben loaded. */
-  rows: readonly HistoryEvent[];
-  /** The spans of the loaded history. A row outside them only informs the fold and never shows. */
-  spans: readonly Span[];
-  hasOlder: boolean;
-  loadingOlder: boolean;
-  /** The thread's stream state. Null before it opens. */
-  link: SSEState | null;
-}
+export type { ThreadView } from './thread-reducer';
 
 export interface NeedsYouState {
   /** Unread results and blockers across the server's threads. Null until the first load. */
@@ -259,7 +234,9 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
 
   const pendingFolders = createPendingFolders();
 
-  // One refetch at a time. A call that arrives meanwhile asks for one more pass, so the last state wins.
+  // One refetch at a time. A call that arrives meanwhile asks for one more pass, so the last state wins. A pass that
+  // started before a local rename, pin or move is not applied: it would show the old row until the next pass lands.
+  const channelReads = latestOnly();
   let refreshing: Promise<void> | null = null;
   let refreshAgain = false;
   function refreshChannels(): Promise<void> {
@@ -273,7 +250,12 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       do {
         refreshAgain = false;
         try {
+          const token = channelReads.begin();
           const list = await withAuth(() => requireApi().channels());
+          if (!channelReads.holds(token)) {
+            refreshAgain = true;
+            continue;
+          }
           channels.set({ channels: pendingFolders.apply(list), loading: false, error: null, loadedAt: now() });
         } catch (e) {
           channels.set((s) => ({ ...s, loading: false, error: messageOf(e) }));
@@ -326,6 +308,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         activity.applyFeed(message);
         library.applyFeed(message);
         claudeArtifacts.applyFeed(message);
+        // A thread the open one delegated to started, was renamed or finished, or its parent changed.
+        for (const t of openThreads) t.applyMessage(message);
       },
       // The feed keeps no replay, so every reconnect refetches the list. The open thread catches up through its own stream.
       onReconnect: () => {
@@ -355,35 +339,17 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
 
     constructor(private readonly threadId: string) {
       this.send = this.applying(senders.for(threadId));
-      this.view = createStore<ThreadView>({
-        threadId,
-        status: 'loading',
-        error: null,
-        thread: null,
-        channel: null,
-        parent: null,
-        children: [],
-        artifacts: [],
-        pending: [],
-        live: false,
-        blocked: null,
-        handoff: null,
-        takeover: null,
-        rows: [],
-        spans: [],
-        hasOlder: false,
-        loadingOlder: false,
-        link: null,
-      });
+      this.view = createStore<ThreadView>(emptyThreadView(threadId));
       // What the stream shows decides whether a message this phone is still sending has already landed.
       this.unwatch = this.view.subscribe(() => {
-        const { pending, rows } = this.view.get();
+        // The server's rows and list: the opening message drawn from its pending row has not been read yet.
+        const { pending, rows } = this.view.get().held;
         this.send.observe({ pending, userRowId: latestUserRowId(rows) });
       });
     }
 
-    private patch(next: Partial<ThreadView>) {
-      this.view.set((v) => ({ ...v, ...next }));
+    private patch(next: ThreadChanges) {
+      this.view.set((v) => withChanges(v, next));
     }
 
     /** The sender, with what each answer says about the thread put on screen before the stream repeats it. */
@@ -421,7 +387,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     private async open(): Promise<void> {
       const id = this.threadId;
       try {
-        const live = await openThreadLive<HistoryEvent, ThreadOpen>({
+        const live = await openThreadLive<HistoryEvent, ThreadDetail>({
           load: () => withAuth(() => requireApi().thread(id)),
           streamUrl: (after) => requireHttp().url(apiPath`/threads/${id}/stream`, { after }),
           token: () => session.token(),
@@ -432,7 +398,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
             this.history = history as ThreadHistory<HistoryEvent>;
             this.publishRows();
           },
-          onOther: (message) => this.applyOther(message),
+          onOther: (message) => this.applyMessage(message),
           onState: (state) => {
             this.patch({ link: state });
             if (activeThread === this) recomputeLink();
@@ -448,36 +414,13 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       }
     }
 
-    private applyDetail(detail: Partial<ThreadOpen>) {
-      const prev = this.view.get();
-      this.patch({
-        status: 'ready',
-        error: null,
-        thread: detail.thread ?? prev.thread,
-        channel: detail.channel ?? null,
-        parent: detail.parent ?? null,
-        children: detail.children ?? prev.children,
-        artifacts: detail.artifacts ?? prev.artifacts,
-        pending: detail.pending ?? [],
-        live: detail.live ?? false,
-        blocked: detail.blocked ?? null,
-        handoff: detail.handoff ?? null,
-        takeover: detail.takeover ?? null,
-      });
+    private applyDetail(detail: Partial<ThreadDetail>) {
+      this.view.set((v) => withDetail(v, detail));
     }
 
-    /** A status change arrives as a `thread` message on the stream, not as rows. */
-    private applyOther(message: unknown) {
-      if (!isRecord(message) || message.kind !== 'thread' || !isRecord(message.thread)) return;
-      this.patch({
-        status: 'ready',
-        thread: message.thread as unknown as Thread,
-        pending: Array.isArray(message.pending) ? (message.pending as PendingMsg[]) : [],
-        live: message.live === true,
-        blocked: typeof message.blocked === 'string' ? message.blocked : null,
-        handoff: isRecord(message.handoff) ? (message.handoff as unknown as HandoffView) : null,
-        takeover: isRecord(message.takeover) ? (message.takeover as unknown as Takeover) : null,
-      });
+    /** A thread or artifact message from the stream, or a thread message from the feed (thread-reducer.ts). */
+    applyMessage(message: unknown) {
+      if (!this.closed) this.view.set((v) => reduceThread(v, message));
     }
 
     async answerQuestion(questionId: string, answers: Answer[]): Promise<AnswerResult> {
@@ -591,6 +534,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     fileSource,
     applyThread(thread) {
       for (const t of openThreads) t.applyThread(thread);
+      channelReads.edit();
+      activity.applyThread(thread);
       void refreshChannels();
     },
     refreshNeedsYou,

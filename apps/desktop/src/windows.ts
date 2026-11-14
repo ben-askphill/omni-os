@@ -5,6 +5,7 @@ import { app, BrowserWindow, Menu, screen, session, type WebContents } from 'ele
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { clampZoom, ZOOM_STEP, type DesktopLayout } from '@omni/shared/desktop-bridge.ts';
+import { redactNonce } from './backend/pairing.ts';
 import type { AppContext } from './context.ts';
 import { editMenuTemplate } from './menu-template.ts';
 import { openExternal } from './open-external.ts';
@@ -13,6 +14,7 @@ import {
   appPermissionAllowed,
   isGesture,
   linkTarget,
+  mayPairAgain,
   nextWindowState,
   parseWindowState,
   recentGesture,
@@ -126,6 +128,22 @@ const failedLoads = new WeakSet<BrowserWindow>();
 export function reloadIfFailed(ctx: AppContext, win: BrowserWindow, route?: string | null): boolean {
   if (!failedLoads.has(win)) return false;
   void load(ctx, win, { kind: ctx.mainWindow() === win ? 'main' : 'secondary', route });
+  return true;
+}
+
+/** When each window last paired again (DesktopBridge.pairAgain). */
+const pairedAgainAt = new WeakMap<BrowserWindow, number>();
+
+/**
+ * Pairs a window again with a fresh nonce, then opens `route`: the page lost its session (the install token rotated,
+ * or the session was revoked). The windows share one session, so this pairs them all. At most once per window per
+ * PAIR_AGAIN_MS; a second ask inside that leaves the page on its own pairing screen.
+ */
+export function pairWindowAgain(ctx: AppContext, win: BrowserWindow, route: string | null): boolean {
+  const now = Date.now();
+  if (win.isDestroyed() || !mayPairAgain(pairedAgainAt.get(win) ?? null, now)) return false;
+  pairedAgainAt.set(win, now);
+  void load(ctx, win, { kind: 'main', route });
   return true;
 }
 
@@ -263,14 +281,27 @@ async function load(ctx: AppContext, win: BrowserWindow, input: { kind: WindowKi
   failedLoads.delete(win);
   try {
     if (input.kind === 'main') {
-      // Pairing sets the API cookie for this app's session; the server then sends the window to its UI.
-      await win.loadURL(`${ctx.backend.origin()}/api/auth/desktop-pair`);
+      // Pairing sets the API cookie for this app's session; the server then sends the window to its UI. Each pairing
+      // load takes a fresh nonce from the server (backend/pairing.ts); a renderer reload keeps the cookie and needs none.
+      let pairUrl: string;
+      try {
+        pairUrl = await ctx.backend.desktopPairUrl();
+      } catch (err) {
+        if (win.isDestroyed()) return;
+        // Never desktop-pair without a nonce here: the window stays unpaired, and showMain tries again.
+        failedLoads.add(win);
+        console.error('[omni] could not pair the window:', err instanceof Error ? err.message : err);
+        win.show();
+        return;
+      }
+      if (win.isDestroyed()) return;
+      await win.loadURL(pairUrl);
       if (ctx.appUrl() === ctx.backend.origin() && !input.route) return;
     }
     await win.loadURL(routeUrl(ctx.appUrl(), input.route));
   } catch (err) {
     // A load the user replaced with another (a click while loading) rejects too. A failed one is marked by
     // did-fail-load, and showMain loads the window again once the server is up.
-    if (!win.isDestroyed() && failedLoads.has(win)) console.error('[omni] window load failed:', err);
+    if (!win.isDestroyed() && failedLoads.has(win)) console.error('[omni] window load failed:', redactNonce(err instanceof Error ? err.message : String(err)));
   }
 }

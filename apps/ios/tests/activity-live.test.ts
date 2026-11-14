@@ -120,6 +120,63 @@ describe('activity', () => {
     hub.close();
   });
 
+  it('keeps a rename or pin made here when a load that started before it answers late (7.5)', async () => {
+    const { server, reply } = activityServer();
+    const held: (() => void)[] = [];
+    let hold = false;
+    const slow = new Set(['/api/recent', '/api/pinned', '/api/channels']);
+    const { fetch } = fakeFetch((path) => {
+      const answer = reply(path);
+      if (path.split('?')[0] === '/api/channels') answer.body = [{ id: 'c', name: server.recent.length ? 'Channel' : '', active: server.recent }];
+      return hold && slow.has(path.split('?')[0]!) ? new Promise<Reply>((done) => held.push(() => done(answer))) : answer;
+    });
+    const hub = createLiveHub({ session: session(), transport: fakeTransport().transport, fetch });
+    await settle();
+
+    hold = true;
+    void hub.refreshActivity();
+    void hub.refreshChannels();
+    await settle();
+    const renamed = thread('a', '2026-11-02T11:00:00Z', { title: 'Renamed', pinned_at: '2026-11-02T11:00:00Z' });
+    server.recent = [renamed, thread('b', '2026-11-02T10:00:00Z')];
+    server.pinned = [renamed];
+    hold = false;
+    hub.applyThread(renamed as never);
+    expect(hub.activity.get().recent?.find((t) => t.id === 'a')?.title).toBe('Renamed');
+
+    for (const release of held.splice(0)) release();
+    await settle();
+    expect(hub.activity.get().recent?.find((t) => t.id === 'a')?.title).toBe('Renamed');
+    expect(hub.activity.get().pinned.map((t) => t.id)).toEqual(['a']);
+    const active = (hub.channels.get().channels?.[0] as unknown as { active: { id: string; title: string }[] }).active;
+    expect(active.find((t) => t.id === 'a')?.title).toBe('Renamed');
+    hub.close();
+  });
+
+  it('still shows the first load when the feed sends a thread update while it is out', async () => {
+    const { reply } = activityServer();
+    const held: (() => void)[] = [];
+    const { fetch, count } = fakeFetch((path) =>
+      path.split('?')[0] === '/api/recent' && held.length === 0 && count('/api/recent?limit=200') === 1
+        ? new Promise<Reply>((done) => held.push(() => done(reply(path))))
+        : reply(path),
+    );
+    const t = fakeTransport();
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch, now: () => NOW });
+    await settle();
+    expect(held).toHaveLength(1);
+    t.feed()?.sink.open();
+    t.feed()?.sink.message(frame({ type: 'thread', thread: thread('a', '2026-11-02T09:30:00Z', { status: 'done' }) }));
+    await settle();
+
+    for (const release of held.splice(0)) release();
+    await settle();
+    expect(hub.activity.get()).toMatchObject({ loading: false, error: null, loadedAt: NOW });
+    expect(hub.activity.get().recent?.map((r) => r.id)).toEqual(['b', 'a']);
+    expect(count('/api/recent?limit=200')).toBe(1);
+    hub.close();
+  });
+
   it('runs one needs you load at a time, and one more for any number of changes meanwhile', async () => {
     const { reply } = activityServer();
     let release = () => {};

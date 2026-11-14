@@ -1,4 +1,5 @@
 import type { ChannelKind } from '@omni/shared/channel-form.ts';
+import { CHANNEL_THREADS_CURSOR, CHANNEL_THREADS_PAGE, readChannelThreadsPage, type ChannelThreadsPage } from '@omni/shared/channel-threads.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 import type { Thread, ThreadStub } from './threads.ts';
 
@@ -65,6 +66,14 @@ export function channelsApi(http: HttpClient) {
     channel: (id: string) => http.request<ChannelWithRunning>('GET', apiPath`/channels/${id}`),
     /** At most 200, most recently updated first, without team members. */
     channelThreads: (id: string, o?: ListArchived) => http.request<Thread[]>('GET', apiPath`/channels/${id}/threads`, { query: archivedQuery(o) }),
+    /**
+     * One page of a channel's threads, newest first; `cursor` is the previous page's `next`. A server from before paging
+     * answers with its plain list of up to 200, read as one page with no next.
+     */
+    channelThreadsPage: async (id: string, cursor: string | null = null, limit = CHANNEL_THREADS_PAGE): Promise<ChannelThreadsPage<Thread>> =>
+      readChannelThreadsPage<Thread>(
+        await http.request<unknown>('GET', apiPath`/channels/${id}/threads`, { query: { paged: '1', limit: String(limit), [CHANNEL_THREADS_CURSOR]: cursor ?? undefined } }),
+      ),
     /** Every folder, or one channel's. */
     folders: (channel?: string) => http.request<Folder[]>('GET', apiPath`/folders`, { query: { channel } }),
     /** Opens or closes a folder in every client's channel list: the server keeps the state. A 404 for a folder it does not have. */
