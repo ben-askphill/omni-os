@@ -15,6 +15,7 @@ import { describeAttachments, inlinable, messageContent, type Attachment } from 
 import { harnessEnv } from '../env-guard.ts';
 import { processSession } from '../session.ts';
 import { normalizeClaudeCommands } from './commands.ts';
+import { syncClaudeLoginBeforeSpawn } from './login-sync.ts';
 import { fromClaudeContext, type ContextUsage } from '@omni/shared/context-meter.ts';
 import { CAPABILITIES } from '../types.ts';
 import { CLAUDE_ALIASES } from '../catalog.ts';
@@ -144,6 +145,8 @@ export const claudeAdapter: HarnessAdapter = {
     for (const dir of modDirs()) args.push('--plugin-dir', dir);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
 
+    // A login made over ssh lands in the file, not the Keychain this process reads (login-sync.ts).
+    syncClaudeLoginBeforeSpawn();
     const child = spawn(config.claudeBin, args, {
       cwd: thread.cwd,
       env: harnessEnv('claude-code', {
