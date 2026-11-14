@@ -68,10 +68,28 @@ describe('pull requests', () => {
     ]);
   });
 
+  it('turns auto-merge on with the confirmation the server wants, and off without it', async () => {
+    const { sent, api: a } = api({ json: { ok: true, output: '', method: 'squash', state: 'OPEN', autoMergeRequest: { mergeMethod: 'SQUASH' } } });
+    await a.setAutoMerge('c 1', 12, true);
+    await a.setAutoMerge('c 1', 12, true, 'rebase');
+    await a.setAutoMerge('c 1', 12, false);
+    expect(sent).toEqual([
+      { method: 'POST', url: at('/channels/c%201/prs/12/auto-merge'), body: { enabled: true, confirm: true } },
+      { method: 'POST', url: at('/channels/c%201/prs/12/auto-merge'), body: { enabled: true, method: 'rebase', confirm: true } },
+      { method: 'POST', url: at('/channels/c%201/prs/12/auto-merge'), body: { enabled: false } },
+    ]);
+  });
+
   it('rejects a merge GitHub refuses with gh\'s own message', async () => {
     const { api: a } = api({ status: 500, json: { error: 'Pull request #12 is not mergeable: the merge commit cannot be cleanly created.' } });
     const err = await a.mergePullRequest('c1', 12).catch((e: unknown) => e);
     expect((err as OmniHttpError).failure).toMatchObject({ kind: 'http', status: 500, message: expect.stringContaining('not mergeable') });
+  });
+
+  it('reruns the failed checks of a PR through its channel', async () => {
+    const { sent, api: a } = api({ json: { runs: [{ id: '200', ok: true }], skipped: 0 } });
+    expect(await a.rerunFailedChecks('c1', 12)).toEqual({ runs: [{ id: '200', ok: true }], skipped: 0 });
+    expect(sent).toEqual([{ method: 'POST', url: at('/channels/c1/prs/12/rerun-failed'), body: {} }]);
   });
 
   it('starts a watch on the branch\'s PR or a named one, stops it, and reads it', async () => {

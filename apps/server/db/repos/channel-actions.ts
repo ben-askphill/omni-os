@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { ActionRun, ActionRunState, ChannelAction, ChannelActionInput } from '@omni/shared/channel-actions.ts';
 import { db, now } from '../connection.ts';
 
-type ActionRow = Omit<ChannelAction, 'secrets'> & { secrets: string };
-const action = (r: ActionRow | undefined): ChannelAction | undefined => r && { ...r, secrets: JSON.parse(r.secrets) as string[] };
+type ActionRow = Omit<ChannelAction, 'secrets' | 'teardown'> & { secrets: string; teardown: number };
+const action = (r: ActionRow | undefined): ChannelAction | undefined => r && { ...r, secrets: JSON.parse(r.secrets) as string[], teardown: r.teardown === 1 };
 
 /** A channel's named actions (apps/server/actions.ts), in the order the editor lists them. Local to this Mac. */
 export const channelActions = {
@@ -15,25 +15,31 @@ export const channelActions = {
   /** The action the channel runs to set up each new worktree, if it has one. */
   setupFor: (channelId: string) =>
     action(db.prepare('SELECT * FROM channel_actions WHERE channel_id = ? AND setup IS NOT NULL').get(channelId) as unknown as ActionRow | undefined),
+  /** The action the channel runs in a worktree right before a cleanup removes it, if it has one. */
+  teardownFor: (channelId: string) =>
+    action(db.prepare('SELECT * FROM channel_actions WHERE channel_id = ? AND teardown = 1').get(channelId) as unknown as ActionRow | undefined),
   create(channelId: string, input: Required<ChannelActionInput>): ChannelAction {
     const id = randomUUID();
     const ts = now();
     const { n } = db.prepare('SELECT COALESCE(MAX(position) + 1, 0) AS n FROM channel_actions WHERE channel_id = ?').get(channelId) as { n: number };
     if (input.setup) clearSetup(channelId);
+    if (input.teardown) clearTeardown(channelId);
     db.prepare(
-      'INSERT INTO channel_actions (id, channel_id, name, command, secrets, port, setup, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).run(id, channelId, input.name, input.command, JSON.stringify(input.secrets), input.port, input.setup, n, ts, ts);
+      'INSERT INTO channel_actions (id, channel_id, name, command, secrets, port, setup, teardown, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(id, channelId, input.name, input.command, JSON.stringify(input.secrets), input.port, input.setup, input.teardown ? 1 : 0, n, ts, ts);
     return channelActions.get(id)!;
   },
   update(id: string, input: Required<ChannelActionInput>): ChannelAction | undefined {
     const channelId = channelActions.get(id)?.channel_id;
     if (input.setup && channelId) clearSetup(channelId, id);
-    db.prepare('UPDATE channel_actions SET name = ?, command = ?, secrets = ?, port = ?, setup = ?, updated_at = ? WHERE id = ?').run(
+    if (input.teardown && channelId) clearTeardown(channelId, id);
+    db.prepare('UPDATE channel_actions SET name = ?, command = ?, secrets = ?, port = ?, setup = ?, teardown = ?, updated_at = ? WHERE id = ?').run(
       input.name,
       input.command,
       JSON.stringify(input.secrets),
       input.port,
       input.setup,
+      input.teardown ? 1 : 0,
       now(),
       id,
     );
@@ -45,6 +51,10 @@ export const channelActions = {
 /** A channel has one setup action at most: making another one it takes the role off the rest. */
 const clearSetup = (channelId: string, except = '') =>
   db.prepare('UPDATE channel_actions SET setup = NULL, updated_at = ? WHERE channel_id = ? AND setup IS NOT NULL AND id != ?').run(now(), channelId, except);
+
+/** A channel has one teardown action at most, the same way. */
+const clearTeardown = (channelId: string, except = '') =>
+  db.prepare('UPDATE channel_actions SET teardown = 0, updated_at = ? WHERE channel_id = ? AND teardown = 1 AND id != ?').run(now(), channelId, except);
 
 /** Runs kept per thread. Older ones are dropped when a new one starts. */
 const KEPT_RUNS = 20;

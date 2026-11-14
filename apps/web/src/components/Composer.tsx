@@ -17,7 +17,7 @@ import { baseRequest } from '../worktree-base.ts';
 import { SlashMenu, useCommands } from './SlashMenu.tsx';
 import { FileMenu, useFileMenu } from './FileMenu.tsx';
 import { replySlash } from '@omni/shared/composer-slash.ts';
-import { OPEN_PR_PROMPT, STEP_WORKING } from '@omni/shared/thread-glance.ts';
+import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
 import { newThreadBody, sameSettings } from '../new-thread-preset.ts';
 import { draftRun, draftRunRequest, type DraftRun } from '@omni/shared/draft-run.ts';
 import { sendKey } from '../requests.ts';
@@ -313,7 +313,7 @@ export function ReplyComposer({
   /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
   stop?: { busy: boolean; run: () => void } | null;
   /** Set when the agent's last reply asks whether to open a PR: Open PR beside the Machine chip answers yes. */
-  openPR?: { busy: boolean; run: () => void } | null;
+  openPR?: { busy: boolean; prompt: string; run: () => void } | null;
   onSent?: (t: Thread, mode?: SendMode) => void;
   /** Called as a message leaves the box, before the server has it: it shows in the thread from now on. */
   onSending?: () => void;
@@ -472,7 +472,7 @@ export function ReplyComposer({
         <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />
         {machine && <ThreadMachineChip thread={thread} held={machine} disabled={busy} onError={setError} />}
         {openPR && (
-          <Button size="sm" variant="primary" icon="pr" busy={openPR.busy} title={OPEN_PR_PROMPT} onClick={openPR.run}>
+          <Button size="sm" variant="primary" icon="pr" busy={openPR.busy} title={openPR.prompt} onClick={openPR.run}>
             {openPR.busy ? STEP_WORKING.open : 'Open PR'}
           </Button>
         )}

@@ -7,6 +7,7 @@ import { followBranch } from '../branch-follow.ts';
 import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
 import { baseFor } from '../worktree-base.ts';
+import { channelExtras } from '../worktree-include.ts';
 import { carryInto } from '../continue-carry.ts';
 import { notifyEnded } from '../push-sender.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
@@ -96,7 +97,7 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
     const base = continuations.get(t.id) ? undefined : () => baseFor(t.id, repo!);
     await withWorkspace(t.cwd, async () => {
       await carryInto(t);
-      await prepareWorktree(repo, t.cwd, branch, base);
+      await prepareWorktree(repo, t.cwd, branch, base, channelExtras(channels.get(t.channel_id)));
     });
     // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
     await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));
