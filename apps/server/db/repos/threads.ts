@@ -189,6 +189,19 @@ export const threads = {
     db
       .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND archived = ? ORDER BY updated_at DESC LIMIT ?`)
       .all(channelId, archived ? 1 : 0, limit) as unknown as Thread[],
+  /**
+   * One page of a channel's threads, newest first, after `after` (the last row of the page before). The clients page
+   * a channel screen with it (GET /api/channels/:id/threads?paged=1), so threads past the sidebar's preview are there.
+   */
+  byChannelPage: (channelId: string, opts: { limit: number; archived?: boolean; after?: { updated_at: string; id: string } | null }) => {
+    const after = opts.after ?? null;
+    return db
+      .prepare(
+        `SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND archived = ?
+         AND (? IS NULL OR updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
+      )
+      .all(channelId, opts.archived ? 1 : 0, after?.updated_at ?? null, after?.updated_at ?? null, after?.updated_at ?? null, after?.id ?? null, opts.limit) as unknown as Thread[];
+  },
   recent: (limit = 50) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>

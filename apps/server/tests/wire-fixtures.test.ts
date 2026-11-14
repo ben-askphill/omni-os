@@ -47,6 +47,8 @@ const NAMES = [
   'channel.json',
   'thread.json',
   'channel-threads.json',
+  // One page of the same, as the phone and iOS channel screens read it (PRD #667, story 41).
+  'channel-threads-page.json',
   'threads.json',
   'recent.json',
   'artifacts.json',
@@ -416,6 +418,7 @@ async function scenario() {
   );
 
   keep('channel-threads.json', await get('/channels/acme/threads'));
+  keep('channel-threads-page.json', await get('/channels/acme/threads?paged=1&limit=1'));
   keep('threads.json', await get('/threads?channel=acme'));
   keep('recent.json', await get('/recent'));
   keep('artifacts.json', await get('/artifacts'));
