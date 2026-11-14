@@ -169,14 +169,49 @@ describe('a run', () => {
     const t = await thread();
     const res = await run(t.id, (await action('env', { secrets: ['THEME_TOKEN'] })).id);
     const env = Object.fromEntries((await ended(t.id, res.body.id)).output.trim().split('\n').map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
-    expect(env.THEME_TOKEN).toBe('shptka_secret_value');
+    // The value reached the run; its output shows it masked.
+    expect(env.THEME_TOKEN).toBe('[redacted]');
     expect(env.OMNI_THREAD_ID).toBe(t.id);
     for (const name of ['ANTHROPIC_API_KEY', 'OMNI_RELAY_TOKEN', 'GROKBOT_WEBHOOK_URL', 'NODE_OPTIONS', 'OMNI_PORT']) expect(env[name]).toBeUndefined();
     expect(JSON.stringify(db.prepare('SELECT command FROM action_runs').all())).not.toContain('shptka_secret_value');
 
+    const parts = await run(t.id, (await action('echo "${#THEME_TOKEN} ${THEME_TOKEN%_value}"', { secrets: ['THEME_TOKEN'] })).id);
+    expect((await ended(t.id, parts.body.id)).output).toBe('19 shptka_secret\n');
+
     const missing = await run(t.id, (await action('true', { secrets: ['NOT_SET'] })).id);
     expect(missing.status).toBe(409);
     expect(missing.body.error).toContain('NOT_SET');
+  });
+});
+
+describe('secret values in run output', () => {
+  it('masks every value the run was given, live and once it ends, and never stores one', async () => {
+    const t = await thread();
+    const res = await run(t.id, (await action('echo "token=$THEME_TOKEN"; sleep 1; printf "%s" "$THEME_TOKEN" >&2', { secrets: ['THEME_TOKEN'] })).id);
+    await until('the first line', async () => (await runOf(t.id, res.body.id)).output.includes('token='));
+    expect((await runOf(t.id, res.body.id)).output).toBe('token=[redacted]\n');
+    expect((await ended(t.id, res.body.id)).output).toBe('token=[redacted]\n[redacted]');
+    expect(JSON.stringify(db.prepare('SELECT output FROM action_runs').all())).not.toContain('shptka_secret_value');
+  });
+
+  it('masks a value in a long output, and drops one cut at the start of the kept tail', async () => {
+    const { maskSecrets, MASK } = await import('../actions.ts');
+    const secret = 'abcdefghij0123456789';
+    expect(maskSecrets(`a ${secret} b ${secret}`, [secret, ' xy ', ''], false)).toBe(`a ${MASK} b ${MASK}`);
+    // Values under 4 characters are not masked.
+    expect(maskSecrets('the key is abc', ['abc'], false)).toBe('the key is abc');
+    // A raw tail cut inside a value: its end must not survive.
+    const raw = `${secret.slice(7)}${'x'.repeat(OUTPUT_LIMIT)}`;
+    const out = maskSecrets(raw, [secret], true);
+    expect(out).not.toContain(secret.slice(7));
+    expect(out.length).toBeLessThanOrEqual(OUTPUT_LIMIT);
+
+    const t = await thread();
+    const res = await run(t.id, (await action(`i=0; while [ $i -lt 5000 ]; do echo "$i $THEME_TOKEN"; i=$((i+1)); done`, { secrets: ['THEME_TOKEN'] })).id);
+    const done = await ended(t.id, res.body.id);
+    expect(done.output).not.toMatch(/shptka|secret_value|_value/);
+    expect(done.output.endsWith('4999 [redacted]\n')).toBe(true);
+    expect(done.output_bytes).toBeGreaterThan(OUTPUT_LIMIT);
   });
 });
 

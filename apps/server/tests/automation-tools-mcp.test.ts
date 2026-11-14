@@ -174,8 +174,15 @@ describe('Conductor channel action tools', () => {
     expect(body).toEqual([{ id: 'act-1', name: 'Theme preview', command: action.command, port: 0, setup: null, secrets: ['SHOPIFY_TOKEN'] }]);
   });
 
-  it("list_channel_actions with a thread adds its runs, output cut to the end", T, async () => {
-    const { body, requests } = await tool('list_channel_actions', { thread_id: 'th-1' });
+  it('list_channel_actions with a thread leaves run output out unless include_output is true', T, async () => {
+    const { body } = await tool('list_channel_actions', { thread_id: 'th-1' });
+    expect(body.runs[0]).toMatchObject({ run_id: 'run-1', state: 'running' });
+    expect(body.runs[0]).not.toHaveProperty('output');
+    expect((await tool('list_channel_actions', { thread_id: 'th-1', include_output: false })).body.runs[0]).not.toHaveProperty('output');
+  });
+
+  it("list_channel_actions with include_output adds each run's output, cut to the end", T, async () => {
+    const { body, requests } = await tool('list_channel_actions', { thread_id: 'th-1', include_output: true });
     expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual(['GET /api/threads/th-1/actions']);
     expect(body.blocked).toBeNull();
     expect(body.actions).toHaveLength(1);
@@ -193,6 +200,7 @@ describe('Conductor channel action tools', () => {
     const { body, requests } = await tool('run_channel_action', { thread_id: 'th-1', action: 'theme PREVIEW' });
     expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual(['GET /api/threads/th-1/actions', 'POST /api/threads/th-1/actions/act-1/run']);
     expect(body).toMatchObject({ run_id: 'run-1', action_id: 'act-1', name: 'Theme preview', state: 'running', port: 9301 });
+    expect(body).not.toHaveProperty('output');
   });
 
   it('run_channel_action names the actions there are when none matches', T, async () => {

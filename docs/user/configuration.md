@@ -76,11 +76,11 @@ Values live in the server's secret store under service `omni-os`, account `<scop
 A channel's settings list its named actions: a name, a command, the secrets it needs (names only) and a port. Each thread runs them from its Actions tab. They are kept on this Mac and not synced.
 
 - The command runs with your login shell in the thread's checkout, with the terminal's environment plus `OMNI_THREAD_ID`, `OMNI_BRANCH` and `OMNI_ARTIFACTS_DIR`.
-- Secrets: only the names listed reach the run, read from the secret store (the channel's value, else the global one). A missing one stops the run before it starts. Billing, sync and Grok Bot keys can't be listed.
+- Secrets: only the names listed reach the run, read from the secret store (the channel's value, else the global one). A missing one stops the run before it starts. Their values are masked as `[redacted]` in the run's stored output (values under 4 characters are not). Billing, sync and Grok Bot keys can't be listed.
 - Port: none, a free one per run, or a fixed one. A free one comes from 9300 to 9399, as `$OMNI_PORT` and `$PORT`, so two threads previewing at once never share one: `shopify theme dev --port $OMNI_PORT`. A fixed port that another run or another program holds stops the run with a message naming it. A command with `--port 9292` written in it is refused unless the action's port is set to 9292, so Omni knows about it.
 - Setup: one action per channel can run in every new worktree, once each time the worktree is prepared. Pick "Before the agent starts" to hold the agent until it succeeds, or "Alongside the agent" to start both together. A blocking setup that fails, or one you stop, leaves the thread at Setup failed with its output and your first message kept, and Retry setup runs it again. Opening a thread or sending it a follow-up never reruns it. Threads in the channel's own checkout, Hermes and Cursor Cloud threads get no setup.
 
-The Conductor reads a channel's actions, or a thread's actions and runs, with `list_channel_actions`, and starts one in a thread with `run_channel_action` (by id or name). Adding, editing and stopping actions stay in the UI.
+The Conductor reads a channel's actions, or a thread's actions and runs, with `list_channel_actions` (run output only with `include_output: true`), and starts one in a thread with `run_channel_action` (by id or name). Adding, editing and stopping actions stay in the UI.
 
 ## Worktree storage
 

@@ -812,7 +812,7 @@ server.registerTool(
 const actionSummary = (a: any) => ({ id: a.id, name: a.name, command: a.command, port: a.port, setup: a.setup, secrets: a.secrets });
 /** Most of a run's output an agent needs is the end: the error, or the URL a server printed. */
 const RUN_OUTPUT_TAIL = 1500;
-const runSummary = (r: any) => ({
+const runSummary = (r: any, withOutput = false) => ({
   run_id: r.id,
   action_id: r.action_id,
   name: r.name,
@@ -822,7 +822,7 @@ const runSummary = (r: any) => ({
   ...(r.error && { error: r.error }),
   started_at: r.started_at,
   ended_at: r.ended_at,
-  ...(r.output !== undefined && { output: r.output.length > RUN_OUTPUT_TAIL ? `…${r.output.slice(-RUN_OUTPUT_TAIL)}` : r.output }),
+  ...(withOutput && r.output !== undefined && { output: r.output.length > RUN_OUTPUT_TAIL ? `…${r.output.slice(-RUN_OUTPUT_TAIL)}` : r.output }),
 });
 
 server.registerTool(
@@ -830,18 +830,19 @@ server.registerTool(
   {
     description:
       "A channel's actions: named commands (a dev server, a theme preview, tests) that run in a thread's checkout, with their command, port and setup mode. " +
-      'Pass channel for the channel\'s list. Pass thread_id instead to also get that thread\'s runs (state, port, exit code, the end of the output) ' +
-      'and blocked: why no action can run in it right now, or null.',
+      'Pass channel for the channel\'s list. Pass thread_id instead to also get that thread\'s runs (state, port, exit code) ' +
+      'and blocked: why no action can run in it right now, or null. include_output: true adds the end of each run\'s output, with the values of its secrets masked; ask for it only when you need it.',
     inputSchema: {
       channel: z.string().optional().describe('Channel id. Use list_channels.'),
       thread_id: z.string().optional().describe('A thread whose channel actions and runs to list.'),
+      include_output: z.boolean().optional().describe('With thread_id: add the last 1,500 characters of each run\'s output.'),
     },
   },
-  async ({ channel, thread_id }) => {
+  async ({ channel, thread_id, include_output }) => {
     if (!channel === !thread_id) throw new Error('Pass channel or thread_id, not both.');
     if (channel) return text((await call(`/channels/${encodeURIComponent(channel)}/actions`)).map(actionSummary));
     const res = await call(`/threads/${encodeURIComponent(thread_id!)}/actions`);
-    return text({ actions: res.actions.map(actionSummary), runs: res.runs.map(runSummary), blocked: res.blocked });
+    return text({ actions: res.actions.map(actionSummary), runs: res.runs.map((r: any) => runSummary(r, include_output === true)), blocked: res.blocked });
   },
 );
 
@@ -850,7 +851,7 @@ server.registerTool(
   {
     description:
       `Start one of a channel's actions in a thread's checkout, by action id or name, only when ${USER} asks or the thread's work needs it (a preview to share, say). ` +
-      'It runs in the background through the login shell; the result is the started run. Read its state and output later with list_channel_actions and thread_id. ' +
+      'It runs in the background through the login shell; the result is the started run. Read its state later with list_channel_actions and thread_id (include_output: true for its output). ' +
       'Refused with the reason while the worktree is being prepared, for a thread that runs off this machine, or when its fixed port is taken.',
     inputSchema: {
       thread_id: z.string().describe('The thread whose checkout it runs in.'),
