@@ -10,7 +10,7 @@ import { fingerprint } from './signing.ts';
 // Trust on first pin: a machine id this machine has never seen is pinned with the key its first signed record or change
 // carries, and trusted with that key at once, so its commands, assignments and the rest apply (sync/verify.ts). The
 // relay only takes changes from a machine paired through Omni Connect and binds each to the token that pushed it, so
-// that pairing is the trust step (ADR 0012). A changed key is the one thing Ben confirms: trust stays bound to the key
+// that pairing is the trust step (ADR 0013). A changed key is the one thing Ben confirms: trust stays bound to the key
 // pinned before it, and Sync settings shows the change until he confirms the new one.
 
 export type KeyKind = 'sign' | 'seal';
