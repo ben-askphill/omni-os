@@ -748,6 +748,27 @@ server.registerTool('revoke_signed_in_device', {
   inputSchema: { device_id: z.string().min(1).max(100) },
 }, async ({ device_id }) => text(await call(`/auth/devices/${encodeURIComponent(device_id)}`, { method: 'DELETE' })));
 
+server.registerTool('rotate_install_token', {
+  description:
+    `Replace this Omni's install token (data/api-token), only when ${USER} asks, for instance after it leaked. ` +
+    'Every signed-in device session ends (browsers, phones, the iOS app), so each signs in or pairs again; the desktop app re-pairs by itself. ' +
+    'Omni MCP servers, in threads and the local stdio one other clients start (when it reads its token from the file), read the new token on their next call. A running agent\'s own $OMNI_TOKEN in its shell stays the old one until its agent process starts again. ' +
+    'The server takes this only from the install token or a session paired with it (a Google or app session gets 403), and answers 409 when OMNI_TOKEN in its environment pins the token.',
+  inputSchema: {},
+}, async () => text(await call('/auth/rotate-token', { method: 'POST' })));
+
+server.registerTool('mcp_clients', {
+  description:
+    `Read-only: the OAuth clients (claude.ai, ChatGPT, Grok and others) that connected to this Omni's /mcp with ${USER}'s Google sign-in, ` +
+    'with status (approved, bound, pending, removed; bound means its token names this Omni\'s /mcp resource; removed wins over the rest), when each was first and last seen, and how it was matched (token audience or client id).',
+  inputSchema: {},
+}, async () => text(await call('/mcp/clients')));
+
+server.registerTool('remove_mcp_client', {
+  description: `Remove one OAuth client from /mcp by id from mcp_clients, only when ${USER} asks. Its tokens are refused from then on; it has to be approved again in Settings to reconnect.`,
+  inputSchema: { client_id: z.string().min(1).max(200) },
+}, async ({ client_id }) => text(await call(`/mcp/clients/${encodeURIComponent(client_id)}`, { method: 'DELETE' })));
+
 server.registerTool('omni_connect_status', {
   description: 'Read-only state of Omni Connect on this machine: whether it is on, its public hostname and URL, the relay\'s Connect page, the cloudflared tunnel state and the last error. While it is on, also the machines the relay knows with online state. Connect needs the sync relay sign-in first.',
   inputSchema: {},

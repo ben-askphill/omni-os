@@ -3,8 +3,12 @@
 import { readFileSync } from 'node:fs';
 
 const BASE = process.env.OMNI_URL ?? 'http://127.0.0.1:4747';
-/** The API token: OMNI_TOKEN from the thread's env, else the file Omni named in OMNI_TOKEN_FILE (data/api-token). */
-const TOKEN = process.env.OMNI_TOKEN || readToken(process.env.OMNI_TOKEN_FILE);
+/**
+ * The API token: OMNI_TOKEN from the thread's env, else the file Omni named in OMNI_TOKEN_FILE (data/api-token).
+ * Rotating the install token (POST /api/auth/rotate-token) rewrites that file but not the env of a running thread,
+ * so a 401 reads the file again and retries once with what it holds now.
+ */
+let token = process.env.OMNI_TOKEN || readToken(process.env.OMNI_TOKEN_FILE);
 
 function readToken(file?: string) {
   try {
@@ -28,10 +32,21 @@ export class ApiError extends Error {
 }
 
 export async function call(path: string, init?: RequestInit) {
-  const res = await fetch(`${BASE}/api${path}`, {
-    ...init,
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}`, ...(init?.headers ?? {}) },
-  });
+  const send = (bearer: string) =>
+    fetch(`${BASE}/api${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}`, ...(init?.headers ?? {}) },
+    });
+  // Compare against the token this request sent, not the shared one: a parallel call may have swapped it already.
+  const sent = token;
+  let res = await send(sent);
+  if (res.status === 401) {
+    const fresh = readToken(process.env.OMNI_TOKEN_FILE);
+    if (fresh && fresh !== sent) {
+      token = fresh;
+      res = await send(fresh);
+    }
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(body.error ?? `HTTP ${res.status}`, res.status);
   return body;
