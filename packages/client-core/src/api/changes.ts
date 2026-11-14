@@ -1,10 +1,10 @@
 import type { BranchChanges, TurnChanges } from '@omni/shared/changes.ts';
 import type { DiffSelection } from '@omni/shared/message-context-diff.ts';
-import type { ReviewNote, ReviewNotesList, ReviewNotesSent } from '@omni/shared/review-notes.ts';
+import type { ReviewNote, ReviewNoteTargets, ReviewNotesList, ReviewNotesSent } from '@omni/shared/review-notes.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 
 export type { BranchChanges, ChangeBase, ChangeGroup, ChangeKind, ChangedFile, TurnChanges, TurnView } from '@omni/shared/changes.ts';
-export type { ReviewNote, ReviewNotesList, ReviewNotesSent } from '@omni/shared/review-notes.ts';
+export type { ReviewNote, ReviewNoteTarget, ReviewNoteTargets, ReviewNotesList, ReviewNotesSent } from '@omni/shared/review-notes.ts';
 
 export function changesApi(http: HttpClient) {
   return {
@@ -24,7 +24,13 @@ export function changesApi(http: HttpClient) {
     updateReviewNote: (id: string, note: string, change: { body?: string; resolved?: boolean }) =>
       http.request<{ note: ReviewNote }>('PATCH', apiPath`/threads/${id}/review-notes/${note}`, { body: change }),
     deleteReviewNote: (id: string, note: string) => http.request<{ ok: true }>('DELETE', apiPath`/threads/${id}/review-notes/${note}`),
-    /** Send open notes: one message with every open note on it. `target` is the thread it goes to, this one when left out. */
-    sendReviewNotes: (id: string, opts: { target?: string } = {}) => http.request<ReviewNotesSent>('POST', apiPath`/threads/${id}/review-notes/send`, { body: opts }),
+    /** Where the notes may go besides the thread: its delegates, oldest first. */
+    reviewNoteTargets: (id: string) => http.request<ReviewNoteTargets>('GET', apiPath`/threads/${id}/review-notes/targets`),
+    /**
+     * Send open notes: one message with every open note on it. `target` is one of the thread's delegates, `new_delegate`
+     * starts one for them; with neither it goes to the thread itself. The notes are marked sent on this thread.
+     */
+    sendReviewNotes: (id: string, opts: { target?: string; new_delegate?: true } = {}) =>
+      http.request<ReviewNotesSent>('POST', apiPath`/threads/${id}/review-notes/send`, { body: opts }),
   };
 }

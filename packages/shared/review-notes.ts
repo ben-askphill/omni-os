@@ -29,11 +29,55 @@ export interface ReviewNotesList {
   notes: ReviewNote[];
 }
 
-/** POST /api/threads/:id/review-notes/send. `target` is the thread it went to; `sent` the notes it carried. */
+/**
+ * POST /api/threads/:id/review-notes/send. `target` is the thread it went to; `sent` the notes it carried, marked sent
+ * on this thread. `created` when the send started a new delegate for them.
+ */
 export interface ReviewNotesSent {
   target: string;
   sent: ReviewNote[];
+  created?: boolean;
 }
+
+/** A thread open notes can go to besides the thread itself: one this thread delegated to (not a team member). */
+export interface ReviewNoteTarget {
+  id: string;
+  title: string | null;
+  role: string | null;
+  status: string;
+}
+
+/** GET /api/threads/:id/review-notes/targets: this thread's delegates, oldest first. */
+export interface ReviewNoteTargets {
+  targets: ReviewNoteTarget[];
+}
+
+/**
+ * Where Send open notes sends, as the clients pick it: this thread, a delegate by its thread id, or a new delegate
+ * started for the notes (through the same path as the Conductor's delegate). Thread ids are uuids, so neither word
+ * is one.
+ */
+export type NoteTargetPick = 'self' | 'new' | (string & {});
+
+/** The picker's rows: this thread first, then its delegates, then a new one. */
+export function noteTargetRows(targets: readonly ReviewNoteTarget[]): { value: NoteTargetPick; label: string; sub: string }[] {
+  return [
+    { value: 'self', label: 'This thread', sub: 'Its agent gets the notes' },
+    ...targets.map((t) => ({ value: t.id, label: t.title?.trim() || 'Untitled delegate', sub: [t.role ? `Delegate · ${t.role}` : 'Delegate', t.status].join(' · ') })),
+    { value: 'new', label: 'New delegate', sub: 'A new thread under this one' },
+  ];
+}
+
+/** A pick whose delegate is gone falls back to this thread. */
+export const notePick = (pick: NoteTargetPick, targets: readonly ReviewNoteTarget[]): NoteTargetPick =>
+  pick === 'self' || pick === 'new' || targets.some((t) => t.id === pick) ? pick : 'self';
+
+/** The send's request body for a pick. */
+export const noteSendBody = (pick: NoteTargetPick): { target?: string; new_delegate?: true } =>
+  pick === 'self' ? {} : pick === 'new' ? { new_delegate: true } : { target: pick };
+
+/** The send button's words for a pick. */
+export const noteSendLabel = (pick: NoteTargetPick) => (pick === 'self' ? 'Send open notes' : pick === 'new' ? 'Send to new delegate' : 'Send to delegate');
 
 export const NOTE_BODY_MAX = 4_000;
 /** Notes one send may carry: more than a message Ben writes (CONTEXT_MAX), still within CONTEXT_JSON_MAX as JSON. */
@@ -166,4 +210,30 @@ export function reviewNoteProblems(raw: unknown): string[] {
   for (const k of ['resolved_at', 'sent_at'] as const) if (raw[k] !== null && !isTime(raw[k])) out.push(`${k} must be a time or null`);
   for (const k of ['created_at', 'updated_at'] as const) if (!isTime(raw[k])) out.push(`${k} must be a time`);
   return out;
+}
+
+// ---------- the Conductor's read of a thread's notes ----------
+
+/** Lines of a note's quote list_review_notes shows; its `at` says where the rest are. */
+const QUOTE_ROWS = 6;
+
+/** One open note as the Conductor's list_review_notes returns it: where, what Ben wrote, and the first lines it is on. */
+export interface OpenNoteView {
+  id: string;
+  /** "src/cart.ts:12-14", with `(removed)` for removed lines. */
+  at: string;
+  note: string;
+  lines: string[];
+  /** Rows of the quote left out past QUOTE_ROWS. */
+  more?: number;
+  created_at: string;
+}
+
+/** A thread's open notes (not resolved, not sent since their last edit), oldest first and compact, for an agent to forward. */
+export function openNotesView(notes: readonly ReviewNote[]): OpenNoteView[] {
+  return openNotes(notes).map((n) => {
+    const rows = n.anchor.rows;
+    const lines = rows.slice(0, QUOTE_ROWS).map((r) => `${r.kind === 'add' ? '+' : r.kind === 'del' ? '-' : ' '}${r.text}`);
+    return { id: n.id, at: noteLabel(n), note: n.body, lines, ...(rows.length > QUOTE_ROWS && { more: rows.length - QUOTE_ROWS }), created_at: n.created_at };
+  });
 }

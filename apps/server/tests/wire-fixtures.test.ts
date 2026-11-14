@@ -128,6 +128,8 @@ const NAMES = [
   'review-note-request.json',
   'review-notes.json',
   'review-notes-sent.json',
+  // Where a thread's notes may go besides itself (#687): the rich thread's one delegate.
+  'review-note-targets.json',
   // Bounded history (#223), on a thread whose first message is too big for a row, under a tiny OMNI_HISTORY_BUDGET:
   // the head with an anchor, an older page, a reveal of the first message, that message whole, and search hits.
   'thread-open.json',
@@ -765,6 +767,8 @@ async function scenario() {
   keep('review-notes.json', await get(`/threads/${wt.id}/review-notes`));
   const notesSent = keep('review-notes-sent.json', await call('POST', `/threads/${wt.id}/review-notes/send`, {})) as { sent: { id: string }[] };
   expect(notesSent.sent.map((n) => n.id)).toEqual([pinned.note.id]);
+  const targets = keep('review-note-targets.json', await get(`/threads/${rich.id}/review-notes/targets`)) as { targets: { title: string }[] };
+  expect(targets.targets.map((t) => t.title)).toEqual(['Check the checkout']);
   await eventually(async () => {
     const d = await detail(wt.id);
     return d.thread.status === 'done' && !d.pending?.length;

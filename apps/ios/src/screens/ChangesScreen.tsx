@@ -60,7 +60,7 @@ interface PaneProps {
 /** The notes placed on the groups on screen, and the bar over the diff. Sending goes back to the thread, as Add to message does. */
 function useNotes(notes: PaneProps['notes'], groups: readonly ChangeGroupView[] | undefined, onSent: () => void, turn = false) {
   const placed = useMemo(() => notesOnScreen(notes.notes ?? [], groups ?? []), [notes.notes, groups]);
-  const bar = notes.notes ? <NotesBar notes={notes.notes} placed={placed.placed} actions={notes.actions} turn={turn} onSent={onSent} /> : null;
+  const bar = notes.notes ? <NotesBar notes={notes.notes} placed={placed.placed} actions={notes.actions} target={notes.target} turn={turn} onSent={onSent} /> : null;
   return { byFile: placed.byFile, bar };
 }
 

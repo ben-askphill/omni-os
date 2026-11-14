@@ -3,7 +3,22 @@ import { parseDiff } from '../diff.ts';
 import { selectRows, type DiffSelection } from '../message-context-diff.ts';
 import { CONTEXT_MAX } from '../message-context.ts';
 import { parseContexts } from '../message-context-kinds.ts';
-import { noteState, openNotes, parseNoteInput, placeNote, sendRecords, SEND_NOTES_MAX, type PlaceFile } from '../review-notes.ts';
+import {
+  noteSendBody,
+  noteSendLabel,
+  notePick,
+  noteState,
+  noteTargetRows,
+  openNotes,
+  openNotesView,
+  parseNoteInput,
+  placeNote,
+  sendRecords,
+  SEND_NOTES_MAX,
+  type PlaceFile,
+  type ReviewNote,
+  type ReviewNoteTarget,
+} from '../review-notes.ts';
 
 // Placing a review note on the diff on screen, and the message Send open notes builds.
 
@@ -116,5 +131,44 @@ describe('notes and sending', () => {
     expect(parseNoteInput({ anchor: picked, body: '' })).toEqual({ ok: false, error: 'Write the note first.' });
     expect(parseNoteInput({ anchor: { ...picked, rows: [] }, body: 'x' })).toMatchObject({ ok: false, error: expect.stringMatching(/^anchor: rows/) });
     expect(parseNoteInput(null)).toEqual({ ok: false, error: 'not an object' });
+  });
+});
+
+describe('where open notes go', () => {
+  const crew: ReviewNoteTarget[] = [{ id: '11111111-2222-4333-8444-555555555555', title: 'Check totals', role: 'reviewer', status: 'done' }];
+
+  it('offers this thread first, then its delegates, then a new delegate', () => {
+    expect(noteTargetRows(crew).map((r) => [r.value, r.label, r.sub])).toEqual([
+      ['self', 'This thread', 'Its agent gets the notes'],
+      [crew[0]!.id, 'Check totals', 'Delegate · reviewer · done'],
+      ['new', 'New delegate', 'A new thread under this one'],
+    ]);
+    expect(noteTargetRows([{ ...crew[0]!, title: null, role: null }])[1]).toMatchObject({ label: 'Untitled delegate', sub: 'Delegate · done' });
+  });
+
+  it('maps a pick to the send body, and a gone delegate back to this thread', () => {
+    expect(noteSendBody('self')).toEqual({});
+    expect(noteSendBody('new')).toEqual({ new_delegate: true });
+    expect(noteSendBody(crew[0]!.id)).toEqual({ target: crew[0]!.id });
+    expect(notePick(crew[0]!.id, crew)).toBe(crew[0]!.id);
+    expect(notePick(crew[0]!.id, [])).toBe('self');
+    expect(notePick('new', [])).toBe('new');
+    expect([noteSendLabel('self'), noteSendLabel(crew[0]!.id), noteSendLabel('new')]).toEqual(['Send open notes', 'Send to delegate', 'Send to new delegate']);
+  });
+
+  it("lists a thread's open notes compactly for the Conductor", () => {
+    const at = '2026-11-14T10:00:00.000Z';
+    const base = { thread_id: 't', created_at: at, updated_at: at, resolved_at: null, sent_at: null };
+    const long: DiffSelection = { ...picked, rows: Array.from({ length: 8 }, (_, k) => ({ kind: 'add' as const, text: `line ${k}`, old: null, new: k + 1 })), start: 1, end: 8 };
+    const notes: ReviewNote[] = [
+      { ...base, id: 'a', anchor: picked, body: 'rename these' },
+      { ...base, id: 'b', anchor: long, body: 'split this' },
+      { ...base, id: 'c', anchor: picked, body: 'sent already', sent_at: at },
+      { ...base, id: 'd', anchor: picked, body: 'fixed', resolved_at: at },
+    ];
+    expect(openNotesView(notes)).toEqual([
+      { id: 'a', at: 'src/cart.ts:2', note: 'rename these', lines: ['+  return items.reduce((sum, n) => sum + n, 0);'], created_at: at },
+      { id: 'b', at: 'src/cart.ts:1-8', note: 'split this', lines: ['+line 0', '+line 1', '+line 2', '+line 3', '+line 4', '+line 5'], more: 2, created_at: at },
+    ]);
   });
 });

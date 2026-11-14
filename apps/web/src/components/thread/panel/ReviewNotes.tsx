@@ -1,17 +1,23 @@
 // Review notes in a thread's Changes panel (packages/shared/review-notes.ts): each open or sent one pinned under its
 // lines in the diff, the ones whose lines are gone listed as outdated, resolved ones kept collapsed as history, and
-// Send open notes, which puts every open one on one message.
+// Send open notes, which puts every open one on one message to this thread, one of its delegates or a new delegate.
 import { useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import type { DiffSelection } from '@omni/shared/message-context-diff.ts';
 import {
   NOTE_BODY_MAX,
   noteLabel,
+  notePick,
+  noteSendBody,
+  noteSendLabel,
   noteState,
+  noteTargetRows,
   placeNotes,
   type NotePlace,
+  type NoteTargetPick,
   type PlaceFile,
   type ReviewNote,
+  type ReviewNoteTargets,
   type ReviewNotesList,
   type ReviewNotesSent,
 } from '@omni/shared/review-notes.ts';
@@ -21,7 +27,7 @@ import { plural } from '../../../format.ts';
 import { ShellCtx } from '../../../mobile/shell.tsx';
 import { useFeed } from '../../../store.tsx';
 import type { LineNotes } from '../../DiffViewer.tsx';
-import { Button, Chip, ErrorNote, Icon, IconButton } from '../../ui.tsx';
+import { Button, Chip, ErrorNote, Icon, IconButton, Picker, type PickerOption } from '../../ui.tsx';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
@@ -29,16 +35,27 @@ export type NoteActions = {
   add(anchor: DiffSelection, body: string): Promise<void>;
   update(id: string, change: { body?: string; resolved?: boolean }): Promise<void>;
   remove(id: string): Promise<void>;
-  send(): Promise<void>;
+  /** Every open note to the picked thread. What it answers says where they went and whether it made a delegate. */
+  send(pick: NoteTargetPick): Promise<ReviewNotesSent>;
 };
 
-/** The thread's notes, kept fresh by the feed (an edit here, on the phone or on the other Mac), and what changes them. */
+/**
+ * The thread's notes, kept fresh by the feed (an edit here, on the phone or on the other Mac), what changes them, and
+ * where Send open notes sends: this thread unless Ben picks one of its delegates or a new one. The delegates refetch
+ * when one of them changes, a new delegate included.
+ */
 export function useReviewNotes(threadId: string) {
   const path = `/threads/${encodeURIComponent(threadId)}/review-notes`;
   const { data, error, reload, setData } = useApi<ReviewNotesList>(path);
+  const targets = useApi<ReviewNoteTargets>(`${path}/targets`);
+  const reloadTargets = targets.reload;
+  const [picked, setPick] = useState<NoteTargetPick>('self');
   useFeed((e) => {
     if (e.type === 'review_notes' && e.thread_id === threadId) reload();
+    if (e.type === 'thread' && e.thread.parent_id === threadId) reloadTargets();
   });
+  const delegates = useMemo(() => targets.data?.targets ?? [], [targets.data]);
+  const pick = notePick(picked, delegates);
   const put = useCallback(
     (list: ReviewNote[]) =>
       setData((prev) => {
@@ -60,11 +77,16 @@ export function useReviewNotes(threadId: string) {
         await api.del(`${path}/${encodeURIComponent(id)}`);
         setData((prev) => ({ notes: (prev?.notes ?? []).filter((n) => n.id !== id) }));
       },
-      send: async () => put((await api.post<ReviewNotesSent>(`${path}/send`, {})).sent),
+      send: async (to) => {
+        const sent = await api.post<ReviewNotesSent>(`${path}/send`, noteSendBody(to));
+        put(sent.sent);
+        if (sent.created) reloadTargets();
+        return sent;
+      },
     }),
-    [path, put, setData],
+    [path, put, setData, reloadTargets],
   );
-  return { notes: data?.notes ?? null, error, reload, actions };
+  return { notes: data?.notes ?? null, error, reload, actions, delegates, pick, setPick };
 }
 
 export type ReviewNotesState = ReturnType<typeof useReviewNotes>;
@@ -99,11 +121,29 @@ export function useNotePlaces(notes: readonly ReviewNote[] | null, groups: reado
  * Over the diff when the thread has notes: how many are open, Send open notes, the unresolved ones whose lines are not
  * on screen and the resolved ones, collapsed. `turn`: This turn shows one turn, so a note off it is only counted.
  */
-export function NotesBar({ notes, placed, actions, turn = false }: { notes: readonly ReviewNote[]; placed: ReadonlyMap<string, NotePlace>; actions: NoteActions; turn?: boolean }) {
+export function NotesBar({
+  notes,
+  placed,
+  actions,
+  target,
+  turn = false,
+}: {
+  notes: readonly ReviewNote[];
+  placed: ReadonlyMap<string, NotePlace>;
+  actions: NoteActions;
+  /** Where Send open notes sends, from useReviewNotes. */
+  target: Pick<ReviewNotesState, 'delegates' | 'pick' | 'setPick'>;
+  turn?: boolean;
+}) {
   const shell = useContext(ShellCtx);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState(false);
+  const [sentTo, setSentTo] = useState<{ id: string; label: string } | null>(null);
+  const options = useMemo<PickerOption<NoteTargetPick>[]>(
+    () => noteTargetRows(target.delegates).map((r) => ({ ...r, avatar: false, icon: r.value === 'self' ? 'message' : r.value === 'new' ? 'plus' : 'delegate' })),
+    [target.delegates],
+  );
   if (!notes.length) return null;
   const open = notes.filter((n) => noteState(n) === 'open').length;
   const sent = notes.filter((n) => noteState(n) === 'sent').length;
@@ -113,10 +153,20 @@ export function NotesBar({ notes, placed, actions, turn = false }: { notes: read
   const send = async () => {
     setBusy(true);
     setError(null);
+    setSentTo(null);
     try {
-      await actions.send();
-      // As after Add to message: the phone goes back to the thread, where the message now is.
-      shell?.back();
+      const pick = target.pick;
+      const sent = await actions.send(pick);
+      if (pick === 'self') {
+        // As after Add to message: the phone goes back to the thread, where the message now is.
+        shell?.back();
+        return;
+      }
+      const label = sent.created ? 'a new delegate' : (options.find((o) => o.value === pick)?.label ?? 'the delegate');
+      // The notes went elsewhere, so the phone stays here and says where; the desktop links to it.
+      if (shell) shell.toast(`Notes sent to ${label}`);
+      else setSentTo({ id: sent.target, label });
+      if (sent.created) target.setPick(sent.target);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -138,9 +188,24 @@ export function NotesBar({ notes, placed, actions, turn = false }: { notes: read
           )}
         </div>
         <Button size="sm" variant="primary" icon="send" disabled={!open} busy={busy} onClick={send}>
-          Send open notes
+          {noteSendLabel(target.pick)}
         </Button>
       </div>
+      {open > 0 && (
+        <div className="mt-1.5 flex min-w-0 items-center justify-end gap-2 text-[11.5px] text-fg-3">
+          <span className="shrink-0">Send to</span>
+          <Picker label="Send notes to" value={target.pick} options={options} onChange={target.setPick} align="right" className="min-w-0" />
+        </div>
+      )}
+      {sentTo && (
+        <p className="mt-1.5 text-[11.5px] leading-snug text-fg-3">
+          Notes sent to{' '}
+          <a href={`#/t/${encodeURIComponent(sentTo.id)}`} className="font-medium text-fg underline-offset-2 hover:underline">
+            {sentTo.label}
+          </a>
+          .
+        </p>
+      )}
       {error && <ErrorNote className="mt-2">{error}</ErrorNote>}
       {away.length > 0 &&
         (turn ? (

@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { filterClaudeArtifacts, type ClaudeArtifact } from '@omni/shared/claude-artifacts.ts';
+import { openNotesView } from '@omni/shared/review-notes.ts';
 import { ApiError, call, SELF, text } from './api.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
@@ -421,6 +422,23 @@ server.registerTool(
     return text(
       items.map((c: any) => ({ thread_id: c.thread_id, thread_title: c.thread_title, task_id: c.task_id, questions: c.question.questions.map((q: any) => q.question) })),
     );
+  },
+);
+
+server.registerTool(
+  'list_review_notes',
+  {
+    description:
+      `The open review notes ${USER} pinned to lines of a thread's Changes diff and has not sent yet (resolved and sent ones are left out), ` +
+      'oldest first: where each is (path:lines), the note, and the first lines it is on. Read-only: forward them in a brief with delegate ' +
+      `or message_thread when ${USER} asks; ${USER} sends them himself from the Changes panel. thread_id defaults to your own thread.`,
+    inputSchema: { thread_id: z.string().optional() },
+  },
+  async ({ thread_id }) => {
+    const id = thread_id ?? SELF;
+    if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
+    const { notes } = await call(`/threads/${encodeURIComponent(id)}/review-notes`);
+    return text(openNotesView(notes));
   },
 );
 

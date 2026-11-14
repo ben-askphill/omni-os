@@ -107,7 +107,7 @@ function SinceBase({ thread, notes }: { thread: Thread; notes: ReviewNotesState 
         </ErrorNote>
       )}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
-        {notes.notes && <NotesBar notes={notes.notes} placed={places.placed} actions={notes.actions} />}
+        {notes.notes && <NotesBar notes={notes.notes} placed={places.placed} actions={notes.actions} target={notes} />}
         {!view?.files ? (
           <Empty icon="diff" title="No changes">
             Nothing changed since {shortSha(base.sha)}: no commits, staged, unstaged or untracked files.
@@ -203,7 +203,7 @@ function ThisTurn({ thread, notes }: { thread: Thread; notes: ReviewNotesState }
         </ErrorNote>
       )}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
-        {notes.notes && !note && <NotesBar notes={notes.notes} placed={places.placed} actions={notes.actions} turn />}
+        {notes.notes && !note && <NotesBar notes={notes.notes} placed={places.placed} actions={notes.actions} target={notes} turn />}
         {note ? (
           turn.state === 'failed' ? (
             <ErrorNote className="mx-1">{note}</ErrorNote>
