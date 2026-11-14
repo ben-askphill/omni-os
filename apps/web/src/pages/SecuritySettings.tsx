@@ -111,7 +111,7 @@ export function SyncKeysCard() {
     }
   };
   return (
-    <Card entry="sync-keys" title="Signing keys" subtitle="Each machine signs what it syncs. A change that makes this Mac act needs a key it pinned.">
+    <Card entry="sync-keys" title="Signing keys" subtitle="Each machine signs what it syncs. A change that makes this Mac act needs a machine you trust and the key this Mac pinned.">
       <ul className="divide-y divide-line">
         {list.map((d) => {
           const action = syncKeyAction(d);
