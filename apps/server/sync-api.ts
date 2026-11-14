@@ -106,6 +106,8 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
     const id = c.req.param('id');
     if (id === outbox.machineId() || (!deviceRecord(id) && !keyring.get(id))) return c.json({ error: 'Nothing waits for confirmation for that machine' }, 404);
     if (!keyring.get(id)?.signKey && !keyring.get(id)?.seenSignKey) return c.json({ error: `${deviceRecord(id)?.name ?? id} has not sent a signed key yet. Update Omni there and let it sync once.` }, 409);
+    const waiting = keyring.get(id);
+    if (!waiting?.seenSignKey && !waiting?.seenSealKey && keyring.trusted(id)) return c.json({ error: 'Nothing waits for confirmation for that machine' }, 404);
     const worker = activeWorker();
     if (!worker) return c.json({ error: 'Sync is off here. Turn it on so held actions can be checked before confirming.' }, 503);
     if (confirming.has(id)) return c.json({ error: 'Already confirming that machine' }, 409);
@@ -115,8 +117,10 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
       const drained = await worker.syncNow();
       if (drained.error || activeWorker() !== worker) return c.json({ error: `Could not sync before confirming: ${drained.error ?? 'sync stopped'}` }, 503);
       const after = keyring.get(id);
-      if (after?.signKey !== before?.signKey || after?.seenSignKey !== before?.seenSignKey || after?.seenSealKey !== before?.seenSealKey)
+      const referenced = before?.seenSignKey ?? before?.signKey;
+      if ((after?.seenSignKey ?? after?.signKey) !== referenced || (after?.seenSealKey && after.seenSealKey !== before?.seenSealKey))
         return c.json({ error: `${deviceRecord(id)?.name ?? id} announced another key while confirming. Compare the fingerprint again.` }, 409);
+      if (!after?.seenSignKey && !after?.seenSealKey && keyring.trusted(id)) return c.json({ ok: true });
       const changed = tx(() => {
         const confirmed = keyring.confirm(id);
         const trusted = keyring.trust(id);

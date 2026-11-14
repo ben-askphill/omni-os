@@ -139,11 +139,12 @@ describe('first-key pairing evidence from the relay', () => {
 
   it('keeps the first key of a machine missing from Connect seen only, syncs its data and holds its actions, including after a restart migration', async () => {
     const list = vi.spyOn(relay, 'pairedMachines').mockResolvedValue(new Set());
+    const notPairedSeal = rawPublicKey(generateKeyPairSync('x25519').privateKey);
     try {
       await pull(
         signAs(commandFrom('not-paired', 'cmd-not-paired')),
         signAs({ machine_id: 'not-paired', entity: 'kv', entity_id: 'note.not-paired', op: 'upsert', data: { value: 'data' }, ts: later() }),
-        record('not-paired', rawPublicKey(keyOf('not-paired'))),
+        record('not-paired', rawPublicKey(keyOf('not-paired')), { sealKey: notPairedSeal }),
       );
       expect(keys('not-paired')).toEqual({ sign_key: null, seen_sign_key: rawPublicKey(keyOf('not-paired')) });
       expect(r.db.kv.get('note.not-paired')).toBe('data');
@@ -160,6 +161,40 @@ describe('first-key pairing evidence from the relay', () => {
       expect(stored('cmd-not-paired')).toBe(true);
       expect(trusted('not-paired')).toEqual({ sign_key: rawPublicKey(keyOf('not-paired')) });
       expect((await devices()).find((d) => d.id === 'not-paired')).toMatchObject({ trusted: true, keyChanged: false, held: 0 });
+      expect(r.db.db.prepare('SELECT seal_key FROM sync_keys WHERE machine_id = ?').get('not-paired')).toEqual({ seal_key: notPairedSeal });
+      expect((await sendSecret('not-paired')).status).toBe(200);
+    } finally {
+      list.mockRestore();
+    }
+  });
+
+  it('never pins a seal key from an unsigned record when a later registration trusts the machine', async () => {
+    const list = vi.spyOn(relay, 'pairedMachines').mockResolvedValue(new Set());
+    const forgedSeal = rawPublicKey(generateKeyPairSync('x25519').privateKey);
+    try {
+      await pull(
+        { machine_id: 'forged-seal', entity: 'kv', entity_id: 'devices.forged-seal', op: 'upsert', ts: later(), data: { value: { id: 'forged-seal', name: 'Forged', tailscale: null, signKey: rawPublicKey(keyOf('forged-seal')), sealKey: forgedSeal, at: later() } } },
+        signAs(commandFrom('forged-seal', 'cmd-forged-seal')),
+      );
+      list.mockResolvedValue(new Set(['forged-seal']));
+      await pull();
+      expect(trusted('forged-seal')).toEqual({ sign_key: rawPublicKey(keyOf('forged-seal')) });
+      expect(r.db.db.prepare('SELECT seal_key, seen_seal_key FROM sync_keys WHERE machine_id = ?').get('forged-seal')).toEqual({ seal_key: null, seen_seal_key: null });
+      expect((await sendSecret('forged-seal')).status).toBe(409);
+    } finally {
+      list.mockRestore();
+    }
+  });
+
+  it('a Trust click succeeds when the sync before it finds the registration for the same key', async () => {
+    const list = vi.spyOn(relay, 'pairedMachines').mockResolvedValue(new Set());
+    try {
+      await pull(signAs(commandFrom('race-mac', 'cmd-race')), record('race-mac', rawPublicKey(keyOf('race-mac'))));
+      expect(keys('race-mac')).toEqual({ sign_key: null, seen_sign_key: rawPublicKey(keyOf('race-mac')) });
+      list.mockResolvedValue(new Set(['race-mac']));
+      expect((await trust('race-mac')).status).toBe(200);
+      expect(trusted('race-mac')).toEqual({ sign_key: rawPublicKey(keyOf('race-mac')) });
+      expect(stored('cmd-race')).toBe(true);
     } finally {
       list.mockRestore();
     }

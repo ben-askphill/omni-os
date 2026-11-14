@@ -106,10 +106,12 @@ export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syn
   const carried = unsigned(raw).signature;
   if (carried && carried.signer === raw.machine_id && !signKeyOf(raw.machine_id) && verifyChange(raw, () => carried.key).verdict === 'valid') {
     // Without relay registration evidence the key is only seen: Ben trusts it in Sync settings, or a later
-    // registration pins it. A pinned key would be trusted by the startup migration.
+    // registration pins it. A pinned key would be trusted by the startup migration. Its signed device record waits
+    // too, so the seal key it announces is pinned from that record once its signing key is.
     const paired = !!pairedMachines?.has(raw.machine_id);
     keyring.observe(raw.machine_id, { signKey: carried.key }, { pin: paired });
     if (paired) db.prepare('DELETE FROM sync_refused WHERE machine = ? AND reason = ?').run(raw.machine_id, UNTRUSTED);
+    else if (described) return { kind: 'defer', reason: `${UNTRUSTED} (${raw.machine_id})` };
   }
   const { verdict, change } = verifyChange(raw, signKeyOf);
   // The keys a record announces: pinned only from a record that verifies, else kept as seen for Ben to confirm.

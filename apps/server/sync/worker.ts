@@ -150,6 +150,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   let offNetwork: (() => void) | undefined;
   let inflight: Promise<SyncResult> | null = null;
   let queued: Promise<SyncResult> | null = null;
+  let listError: string | null = null;
 
   /**
    * Every change signed with this machine's key (sync/signing.ts). Without the key (a locked Keychain), nothing goes
@@ -190,9 +191,12 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       checked = true;
       try {
         ctx.pairedMachines = (await transport.pairedMachines?.()) ?? new Set();
+        listError = null;
       } catch (err) {
         ctx.pairedMachines = new Set();
-        console.warn(`[sync] the relay's registration list is unavailable, so new machines wait for Trust: ${(err as Error)?.message ?? err}`);
+        const message = (err as Error)?.message ?? String(err);
+        if (message !== listError) console.warn(`[sync] the relay's registration list is unavailable, so new machines wait for Trust: ${message}`);
+        listError = message;
       }
     };
     for (;;) {
