@@ -11,3 +11,4 @@ import './limit-stop.ts';
 import './trigger-delivery.ts';
 import './remote-command.ts';
 import './assignment.ts';
+import './review-note.ts';

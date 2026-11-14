@@ -22,3 +22,12 @@ export function prList(all: { prs: (ListedPR & { url: string })[]; failed: unkno
     failed: all.failed,
   };
 }
+
+/**
+ * What set_auto_merge does: read the PR's auto-merge, or turn it off. Never on: arming merges with no further step, so
+ * only the person arms it, in the PR view. The server refuses an arm from the install token too (github-api.ts).
+ */
+export function autoMergeStep(enabled: boolean | undefined, user = 'the user'): { kind: 'read' } | { kind: 'disable'; body: { enabled: false } } {
+  if (enabled === true) throw new Error(`Agents cannot turn auto-merge on. Ask ${user} to arm it with the slide in the PR view.`);
+  return enabled === false ? { kind: 'disable', body: { enabled: false } } : { kind: 'read' };
+}

@@ -46,7 +46,8 @@
         "trigger": "event",
         "created_at": "2026-01-05T09:00:00.000Z",
         "status": "done",
-        "title": "CI fixer · Fix the cart total"
+        "title": "CI fixer · Fix the cart total",
+        "skip_reason": null
       }
     ],
     "deliveries": [
@@ -105,7 +106,8 @@
         "trigger": "manual",
         "created_at": "2026-01-05T09:00:00.000Z",
         "status": "done",
-        "title": "Daily digest · 5 Jan"
+        "title": "Daily digest · 5 Jan",
+        "skip_reason": null
       }
     ],
     "deliveries": [],
@@ -230,7 +232,8 @@
         "trigger": "event",
         "created_at": "2026-01-05T09:00:00.000Z",
         "status": "done",
-        "title": "Page review · launch-plan.html"
+        "title": "Page review · launch-plan.html",
+        "skip_reason": null
       }
     ],
     "deliveries": [

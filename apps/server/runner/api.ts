@@ -98,6 +98,11 @@ export interface CreateThreadInput {
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
   files?: File[];
   /**
+   * Records on the first message, already normalized (parseContexts), as on a message Ben posts. Only for a thread
+   * that runs here: one sent to another machine is refused, since its first prompt travels as text.
+   */
+  context?: MessageContext[];
+  /**
    * The machine to run it on (run-on.ts): a synced machine's id, or "here". Left out, Settings' default. A thread for
    * another machine is made here and sent there with its first prompt; nothing runs here.
    */
@@ -174,6 +179,8 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   // Team members stay with their lead, which runs once with all their replies. A delegated thread may go: its report
   // comes back to the parent (run-on.ts).
   const route = input.source === 'team' ? null : await runnerPorts().routing.targetFor(input.device);
+  const context = input.context?.length ? input.context : undefined;
+  if (route && context) throw refusal(`A first message with attachments from Omni runs here, not on ${route.to.name}.`, 409);
   if (route) {
     // In Storage before the thread is made, so a failed upload leaves nothing behind and the other machine finds them.
     const bodies = await Promise.all((input.files ?? []).map(async (f) => new Uint8Array(await f.arrayBuffer())));
@@ -198,7 +205,7 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const attachments = saved.length ? saved : undefined;
   if (thread.setup) {
     // A worktree thread: its prompt and files are saved first, and sent once the worktree is made and checked.
-    saveStart(thread, input.prompt, attachments);
+    saveStart(thread, input.prompt, attachments, context);
     if (!input.title) void generateTitle(thread.id, input.prompt);
     void setUpThread(thread.id);
     return threads.get(thread.id)!;
@@ -210,10 +217,11 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
     text: withMentions(text, { cwd: thread.cwd, threadId: thread.id }),
     mode: 'steer',
     attachments,
+    contexts: context,
     commands,
     event: {
       kind: 'user',
-      payload: { text: input.prompt, source: thread.source, ...(slash && { slash }), ...(attachments && { attachments }) },
+      payload: { text: input.prompt, source: thread.source, ...(slash && { slash }), ...(attachments && { attachments }), ...(context && { context }) },
     },
   });
   if (!input.title) void generateTitle(thread.id, input.prompt);
