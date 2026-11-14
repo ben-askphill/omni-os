@@ -12,6 +12,7 @@ import type { PRNext, PRStep } from '@omni/shared/thread-glance.ts';
 import { AgentsSection } from './AgentsSection.tsx';
 import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
+import { CAPTION, CARD_PAD, ROW_X, ROW_X_BLEED } from './inset.ts';
 
 export interface InitP {
   model?: string;
@@ -51,7 +52,7 @@ function McpList({ servers }: { servers: string[] }) {
         <Icon name="chevronDown" size={12} className={`shrink-0 text-fg-3 transition-transform group-hover:text-fg-3 ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
+        <div className="mt-[var(--sp-3)] flex flex-wrap gap-[var(--sp-2)]">
           {bad.map((p) => (
             <Chip key={p.key} tone="outline" title={`${p.name} (${p.status})`}>
               {p.label}
@@ -70,7 +71,7 @@ function McpList({ servers }: { servers: string[] }) {
 
 function Row({ k, children }: { k: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[6.5rem_1fr] gap-2 px-3.5 py-2 text-[12.5px]">
+    <div className={`grid grid-cols-[6.5rem_1fr] gap-[var(--sp-4)] ${ROW_X_BLEED} py-[var(--sp-4)] text-[12.5px]`}>
       <dt className="pt-px text-fg-3">{k}</dt>
       <dd className="min-w-0 text-fg [overflow-wrap:anywhere]">{children}</dd>
     </div>
@@ -136,11 +137,11 @@ export function DetailsTab({
   const slug = thread.model || init?.model;
   const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
-    <div className="scroll-thin flex h-full flex-col gap-3 overflow-y-auto px-2.5 pb-3 [&>*]:shrink-0">
+    <div className="scroll-thin flex h-full flex-col gap-[var(--sp-6)] overflow-y-auto px-[var(--sp-5)] pb-[var(--sp-6)] [&>*]:shrink-0">
       <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} parked={parked} onAsk={onAsk} onMerged={onMerged} onTab={onTab} />
       {prs && <CrewGlance crew={prs.crew} onMerged={onMerged} onTab={onTab} />}
       <AgentsSection parent={parent} links={links} children={children} agents={agents} onJump={onJump} />
-      <dl className="divide-y divide-line rounded-[20px] bg-bg py-1">
+      <dl className="divide-y divide-line rounded-[var(--r-xl)] bg-bg py-[var(--sp-2)]">
         <Row k="Channel">
           <a href={href.channel(thread.channel_id)} className="font-medium hover:underline">
             #{channel?.name ?? thread.channel_id}
@@ -171,7 +172,7 @@ export function DetailsTab({
         <Row k="Session">
           <span className="font-mono text-[12px]">{thread.session_id}</span>
           {warm !== undefined && (
-            <div className="mt-0.5 flex items-center gap-1.5 text-fg-3">
+            <div className="mt-[var(--sp-1)] flex items-center gap-[var(--sp-3)] text-fg-3">
               <StatusDot status={warm ? 'done' : 'imported'} size={6} />
               {warm ? 'Live, the next message starts instantly' : 'Not running, the next message starts a new process'}
             </div>
@@ -205,10 +206,10 @@ export function DetailsTab({
       </dl>
 
       {remote ? (
-        <div className="rounded-[20px] bg-bg p-3.5">
-          <div className="caption mb-2">{cloud ? 'Cursor cloud agent' : 'Remote session'}</div>
+        <div className={`rounded-[var(--r-xl)] bg-bg ${CARD_PAD}`}>
+          <div className={`caption ${CAPTION}`}>{cloud ? 'Cursor cloud agent' : 'Remote session'}</div>
           {cloud ? (
-            <p className="text-[12.5px] leading-relaxed text-fg-2">
+            <p className={`${ROW_X} pb-[var(--sp-4)] text-[12.5px] leading-relaxed text-fg-2`}>
               This thread runs on Cursor's Linux cloud, on its own clone of the channel repo. It pushes a branch and Cursor opens the PR. Another message here
               goes to the agent as a follow-up.{' '}
               {agentUrl ? (
@@ -220,18 +221,20 @@ export function DetailsTab({
               )}
             </p>
           ) : (
-            <p className="text-[12.5px] leading-relaxed text-fg-2">
+            <p className={`${ROW_X} pb-[var(--sp-4)] text-[12.5px] leading-relaxed text-fg-2`}>
               This thread runs on the Hermes server. Another message here resumes <span className="font-mono">{thread.session_id}</span>.
             </p>
           )}
         </div>
       ) : (
-        <div className="rounded-[20px] bg-bg p-3.5">
-          <div className="mb-2 flex items-center justify-between gap-2">
+        <div className={`rounded-[var(--r-xl)] bg-bg ${CARD_PAD}`}>
+          <div className={`flex items-center justify-between gap-[var(--sp-4)] ${CAPTION}`}>
             <span className="caption">Resume in terminal</span>
             <CopyButton text={resume} />
           </div>
-          <code className="block rounded-xl bg-surface px-3 py-2.5 font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
+          <div className={`${ROW_X} pb-[var(--sp-4)]`}>
+            <code className="block rounded-[var(--r-sm)] bg-surface px-[var(--sp-6)] py-[var(--sp-5)] font-mono text-[11.5px] break-all text-fg-2">{resume}</code>
+          </div>
         </div>
       )}
     </div>

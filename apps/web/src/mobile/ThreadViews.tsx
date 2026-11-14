@@ -509,7 +509,7 @@ export function DetailsScreen() {
         <CrewFileList files={crew.files} shots={crew.shots} onOpen={(a) => shell.open(href.thread(thread.id, a.id))} />
         <MoGroup>
           {rows.map(([k, v], i) => (
-            <div key={k} className={`flex min-h-12 items-center px-4 text-[14.5px] ${i ? 'border-t border-line' : ''}`}>
+            <div key={k} className={`flex min-h-[52px] items-center px-4 text-[14.5px] ${i ? 'border-t border-line' : ''}`}>
               <span className="w-[104px] shrink-0 text-fg-3">{k}</span>
               <span className="min-w-0 flex-1 truncate">{v}</span>
             </div>

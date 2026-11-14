@@ -7,6 +7,7 @@ import { harnessLabel, HarnessLogo } from '../../brand.tsx';
 import { Icon, statusLabel, StatusDot, type IconName } from '../../ui.tsx';
 import { SubagentRow } from './RunningSubagents.tsx';
 import { isWorking } from '@omni/shared/delegate-count.ts';
+import { CAPTION, CARD_PAD, DIVIDER, ROW } from './inset.ts';
 
 /** A thread's harness logo with its status dot on the corner, the way the panel marks every agent. */
 function AgentMark({ harness, status, icon }: { harness?: string; status: string; icon?: IconName }) {
@@ -21,7 +22,7 @@ function AgentMark({ harness, status, icon }: { harness?: string; status: string
 /** One thread in the agents card: its mark, title and status or age, opening the thread. */
 function AgentLink({ to, title, mark, side, sub }: { to: string; title: string; mark: ReactNode; side: string; sub?: string }) {
   return (
-    <a href={href.thread(to)} title={sub ? `${sub}: ${title}` : title} className="hov flex h-9 min-w-0 items-center gap-2.5 rounded-full px-3 text-[12.5px] [--hov:var(--surface)]">
+    <a href={href.thread(to)} title={sub ? `${sub}: ${title}` : title} className={`hov flex min-w-0 items-center gap-[var(--sp-5)] ${ROW} text-[12.5px] [--hov:var(--surface)]`}>
       {mark}
       <span className="min-w-0 flex-1 truncate">
         {sub && <span className="text-fg-3">{sub} </span>}
@@ -31,7 +32,6 @@ function AgentLink({ to, title, mark, side, sub }: { to: string; title: string; 
     </a>
   );
 }
-
 
 /** The card's element id: a delegate count in the sidebar opens Details scrolled to it. */
 export const AGENTS_CARD_ID = 'thread-agents';
@@ -48,10 +48,10 @@ export function AgentsSection({ parent, links, children, agents, onJump, now = D
   const lineage = !!parent || !!links.from || links.into.length > 0;
   if (!lineage && !agents.length && !children.length) return null;
   return (
-    <section id={AGENTS_CARD_ID} aria-label="Agents" className="scroll-mt-3 rounded-[20px] bg-bg p-1">
+    <section id={AGENTS_CARD_ID} aria-label="Agents" className={`scroll-mt-[var(--sp-6)] rounded-[var(--r-xl)] bg-bg ${CARD_PAD}`}>
       {lineage && (
         <>
-          <div className="caption px-3 pt-2 pb-1">Lineage</div>
+          <div className={`caption ${CAPTION}`}>Lineage</div>
           {parent && <AgentLink to={parent.id} title={parent.title} mark={<AgentMark icon="arrowUpRight" status={parent.status} />} sub="From" side={statusLabel(parent.status)} />}
           {links.from && <AgentLink to={links.from.id} title={links.from.title} mark={<AgentMark harness={links.from.harness} status={links.from.status} />} sub="Continued from" side={relTime(links.from.created_at, now)} />}
           {links.into.map((l) => (
@@ -60,8 +60,8 @@ export function AgentsSection({ parent, links, children, agents, onJump, now = D
         </>
       )}
       {(agents.length > 0 || running.length > 0) && (
-        <>
-          <div className={`caption flex items-center px-3 pb-1 ${lineage ? 'mt-1 border-t border-line pt-2.5' : 'pt-2'}`}>
+        <div className={lineage ? DIVIDER : ''}>
+          <div className={`caption flex items-center ${CAPTION}`}>
             Running
             <span className="ml-auto font-num text-[11px] text-fg-3">{agents.length + running.length}</span>
           </div>
@@ -71,24 +71,26 @@ export function AgentsSection({ parent, links, children, agents, onJump, now = D
           {agents.map((t) => (
             <SubagentRow key={t.task_id} t={t} onJump={onJump} />
           ))}
-        </>
+        </div>
       )}
       {previous.length > 0 && (
-        <>
+        <div className={lineage || agents.length || running.length ? DIVIDER : ''}>
           <button
             type="button"
             aria-expanded={showPrev}
             onClick={() => setShowPrev((v) => !v)}
-            className={`hov flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-left text-[12.5px] text-fg-2 [--hov:var(--surface)] ${lineage || agents.length || running.length ? 'mt-1' : ''}`}
+            className={`hov flex w-full items-center gap-[var(--sp-5)] ${ROW} text-left text-[12.5px] text-fg-2 [--hov:var(--surface)]`}
           >
-            <Icon name="delegate" size={15} className="shrink-0 text-fg-3" />
+            <span className="grid size-5 shrink-0 place-items-center text-fg-3">
+              <Icon name="delegate" size={15} />
+            </span>
             <span className="flex-1">Previous agents</span>
             <span className="font-num text-[11px] text-fg-3">{previous.length}</span>
             <Icon name="chevronDown" size={13} className={`shrink-0 text-fg-3 transition-transform ${showPrev ? '' : '-rotate-90'}`} />
           </button>
           {showPrev &&
             previous.map((c) => <AgentLink key={c.id} to={c.id} title={c.title} mark={<AgentMark harness={c.harness} status={c.status} />} side={relTime(c.updated_at, now)} />)}
-        </>
+        </div>
       )}
     </section>
   );

@@ -18,6 +18,7 @@ import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
 import type { ThreadPRs } from './panel/PRsTab.tsx';
 import type { InitP } from './panel/DetailsTab.tsx';
+import { CAPTION, CARD_PAD, DIVIDER, ROW } from './panel/inset.ts';
 
 function QuickRow({
   icon,
@@ -37,11 +38,11 @@ function QuickRow({
   const body = (
     <>
       <Icon name={icon} size={15} className={`shrink-0 ${disabled ? 'text-fg-disabled' : 'text-fg-3'}`} />
-      <span className={`flex min-w-0 flex-1 items-center gap-2 ${disabled ? 'text-fg-disabled' : 'text-fg'}`}>{children}</span>
-      {onClick && !disabled && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-3" />}
+      <span className={`flex min-w-0 flex-1 items-center gap-[var(--sp-4)] ${disabled ? 'text-fg-disabled' : 'text-fg'}`}>{children}</span>
+      {onClick && !disabled && !trailing && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-3" />}
     </>
   );
-  const cls = 'flex min-h-[36px] w-full min-w-0 items-center gap-2.5 rounded-[11px] px-2 text-left text-[12.5px]';
+  const cls = `flex w-full min-w-0 items-center gap-[var(--sp-5)] ${ROW} text-left text-[12.5px]`;
   const row =
     onClick && !disabled ? (
       <button type="button" aria-label={label} onClick={onClick} className={`hov ${cls} [--hov:var(--bg)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-line-strong`}>
@@ -52,7 +53,7 @@ function QuickRow({
     );
   // A trailing button sits beside the row's own, never inside it.
   return trailing ? (
-    <div className="flex min-w-0 items-center gap-0.5">
+    <div className="flex min-w-0 items-center gap-[var(--sp-1)]">
       <div className="min-w-0 flex-1">{row}</div>
       {trailing}
     </div>
@@ -128,7 +129,7 @@ export function ThreadQuickCard({
   return (
     <section
       aria-label="Thread quick actions"
-      className={`w-full rounded-[18px] border border-line bg-surface p-1.5 shadow-[inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))] ${className}`}
+      className={`w-full rounded-[var(--r-lg)] border border-line bg-surface ${CARD_PAD} shadow-[inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))] ${className}`}
     >
       <QuickRow icon="monitor">
         <span className="min-w-0 truncate">{machineLabel(machineName)}</span>
@@ -149,7 +150,7 @@ export function ThreadQuickCard({
           <span className="min-w-0 truncate font-mono text-[11.5px]">{remote ? (cloud ? 'Cursor cloud' : 'Remote session') : shortPath(cwd)}</span>
         </QuickRow>
       )}
-      <div className="my-0.5 h-px bg-line" />
+      <div className="my-[var(--sp-2)] h-px bg-line" />
       <QuickRow icon="info" label="Harness and model">
         <span className="shrink-0 whitespace-nowrap">
           <HarnessMark harness={thread.harness} withLabel />
@@ -203,7 +204,7 @@ export function ThreadQuickCard({
           <span>{plural(artifactCount, 'artifact')}</span>
         </QuickRow>
       )}
-      <div className="mt-0.5 border-t border-line pt-0.5">
+      <div className={DIVIDER}>
         <QuickRow icon="panel" onClick={() => onOpen('details')} label="Open full inspector">
           <span className="font-medium">All details</span>
         </QuickRow>
@@ -220,7 +221,7 @@ function CopyPath({ path }: { path: string }) {
       icon={done ? 'check' : 'copy'}
       label={done ? 'Copied' : 'Copy the working directory path'}
       size={13}
-      className="h-7 w-7 shrink-0"
+      className="mr-[var(--sp-2)] h-7 w-7 shrink-0"
       onClick={() => {
         void copyText(path).then(() => {
           setDone(true);
@@ -241,7 +242,7 @@ function Branch({ last }: { last: boolean }) {
   );
 }
 
-const treeRow = 'flex h-8 w-full min-w-0 items-center gap-2 rounded-[10px] px-2 text-left text-[12px]';
+const treeRow = `flex w-full min-w-0 items-center gap-[var(--sp-4)] ${ROW} text-left text-[12px]`;
 const treeButton = `hov ${treeRow} [--hov:var(--bg)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-line-strong`;
 
 function SubagentLeaf({ t, last, indent, onJump }: { t: BackgroundTask; last: boolean; indent: string; onJump: (eventId: number) => void }) {
@@ -293,11 +294,12 @@ function Lineage({
 }) {
   const total = delegated.length + agents.length;
   if (!total && !parent) return null;
-  // What runs hangs from the thread's own dot, one step further in when the thread hangs from its parent.
-  const indent = parent ? 'pl-[30px]' : 'pl-[11px]';
+  // What runs hangs from the thread's own dot, one step further in when the thread hangs from its parent. The offsets
+  // past the row's own padding are the elbow (w-3) and gap before that dot, so the trunk lines up under it.
+  const indent = parent ? 'pl-[calc(var(--sp-6)+22px)]' : 'pl-[calc(var(--sp-6)+3px)]';
   return (
-    <section aria-label="Lineage" className="mt-0.5 border-t border-line pt-1">
-      <div className="flex items-center px-2 pt-1 pb-0.5 text-[11px] text-fg-3">
+    <section aria-label="Lineage" className={DIVIDER}>
+      <div className={`flex items-center ${CAPTION} text-[11px] text-fg-3`}>
         Lineage
         {total > 0 && (
           <span className="ml-auto font-num tabular-nums" title={`${plural(total, 'agent')} running`}>
