@@ -8,6 +8,7 @@ import { linksOf, linksWith, NO_LINKS, type ThreadLinks } from '@omni/shared/con
 import { crewShown, withCrewArtifact } from '@omni/shared/crew-artifacts.ts';
 import { holds } from '../thread-history.ts';
 import { asPending, inFlight, useSending } from '../sending.ts';
+import { streamedPending } from '../streamed-pending.ts';
 import { useInterrupt, useTurnState } from './threadTurn.ts';
 import { useThreadHistory } from './useThreadHistory.ts';
 
@@ -58,6 +59,16 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   // The newest context reading the stream pushed. The meter loads its first one itself.
   const [context, setContext] = useState<ContextUsage | null>(null);
 
+  // The stream's pending list and opening, landed with their rows unless a sync or an action's answer comes after them.
+  const streamed = useMemo(
+    () =>
+      streamedPending<PendingMsg, Opening>((next) => {
+        if (next.pending) setQueued(next.pending);
+        if (next.opening !== undefined) setOpening(next.opening);
+      }),
+    [],
+  );
+
   const toast = useToast();
   const { prepare, open, append, snapshot, reveal, withRows } = history;
   const atRef = useRef(at);
@@ -81,6 +92,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   /** The thread's state from a detail: the first load's, or a stream sync's. */
   const applyDetail = useCallback((d: ThreadOpen) => {
     setThread((prev) => newer(prev, d.thread));
+    streamed.replaced();
     setQueued(d.pending ?? []);
     setOpening(d.opening ?? null);
     if (d.live !== undefined) setWarm(d.live);
@@ -94,7 +106,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     setArtifacts(d.artifacts);
     d.artifacts.forEach((a) => artifactIds.current.add(a.id));
     setCrewArtifacts(d.crew_artifacts ?? []);
-  }, []);
+  }, [streamed]);
 
   const load = useCallback(
     async () => {
@@ -168,10 +180,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
         case 'thread':
           setThread((prev) => newer(prev, m.thread));
           // With the rows that came before it: a replayed message leaves `pending` as its row arrives.
-          withRows(() => {
-            if (m.pending) setQueued(m.pending);
-            if (m.opening !== undefined) setOpening(m.opening);
-          });
+          streamed.arrived({ pending: m.pending, opening: m.opening }, withRows);
           if (m.live !== undefined) setWarm(m.live);
           setBlocked(m.blocked ?? null);
           setHandoff(m.handoff ?? null);
@@ -212,6 +221,15 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   const applyThread = useCallback((next: Thread, reply = false) => {
     setThread((prev) => newer(prev, next, reply));
   }, []);
+
+  /** The pending list an action answered with. A stream copy still waiting for its frame is older. */
+  const answered = useCallback(
+    (pending: PendingMsg[]) => {
+      streamed.replaced('pending');
+      setQueued(pending);
+    },
+    [streamed],
+  );
 
   // Sends still on their way go last: one that starts a turn is drawn as its message at once, above Thinking.
   const sends = useSending(id, queued);
@@ -256,7 +274,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     queued: shown.pending.filter((p) => !inFlight(p)),
     /** The server's whole pending list, and the in-flight send drawn in the transcript: neither shows as Sending. */
     listed,
-    setQueued,
+    setQueued: answered,
     warm,
     blocked,
     handoff,
