@@ -1,7 +1,7 @@
 import { OmniHttpError } from '@omni/client-core';
 import { describe, expect, it, vi } from 'vitest';
 
-import { mergePR, setWatch, type MergeApi, type WatchApi } from '../../src/pr/actions';
+import { mergePR, rerunChecks, setWatch, type MergeApi, type RerunApi, type WatchApi } from '../../src/pr/actions';
 
 const http = (status: number, message: string) => new OmniHttpError({ kind: 'http', status, message, body: null, retryAfter: null });
 const mergeVia = (merge: MergeApi['mergePullRequest']) => {
@@ -67,5 +67,25 @@ describe('setWatch', () => {
       },
     });
     expect(await setWatch(call, 't1', true)).toEqual({ kind: 'failed', message: 'No open PR to watch.' });
+  });
+});
+
+describe('rerunChecks', () => {
+  const via = (rerun: RerunApi['rerunFailedChecks']) => {
+    const api = { rerunFailedChecks: vi.fn(rerun) };
+    return { api, call: <T>(fn: (a: RerunApi) => Promise<T>) => fn(api as RerunApi) };
+  };
+
+  it('says how many runs started again', async () => {
+    const { api, call } = via(async () => ({ runs: [{ id: '200', ok: true }], skipped: 0 }));
+    expect(await rerunChecks(call, 'shop', 12)).toEqual({ kind: 'started', text: 'Rerunning the failed jobs of 1 workflow run.' });
+    expect(api.rerunFailedChecks).toHaveBeenCalledWith('shop', 12);
+  });
+
+  it("gives gh's reason when no run started again", async () => {
+    const { call } = via(async () => {
+      throw http(502, 'run 900 cannot be rerun');
+    });
+    expect(await rerunChecks(call, 'shop', 12)).toEqual({ kind: 'failed', message: 'run 900 cannot be rerun' });
   });
 });

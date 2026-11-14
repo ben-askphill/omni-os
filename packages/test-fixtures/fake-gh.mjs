@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // A stand-in for the gh CLI, for QA runs that need pull requests without GitHub. Put a `gh` link to it first on PATH.
-// It answers the calls apps/server/github.ts and apps/server/pr-watch/gh.ts make with fixed PRs; `pr merge` prints what gh prints and changes nothing.
+// It answers the calls apps/server/github.ts and apps/server/pr-watch/gh.ts make with fixed PRs; `pr merge` and `run rerun` print what gh prints and change nothing.
 const args = process.argv.slice(2);
 const has = (...a) => a.every((x, i) => args[i] === x);
 const arg = (name) => args[args.indexOf(name) + 1];
@@ -115,6 +115,8 @@ if (has('api')) {
   const at = '2026-10-24T09:12:03.1234567Z';
   for (const l of ['Run npx playwright test', '  1) size guide drawer opens from the size picker', '     Error: expect(locator).toBeVisible() failed', '     Locator: getByRole(\'dialog\', { name: \'Size guide\' })', '1 failed, 41 passed (38.2s)', '##[error]Process completed with exit code 1.'])
     console.log(`e2e\tRun tests\t${at} ${l}`);
+} else if (has('run', 'rerun')) {
+  console.log(`✓ Requested rerun (failed jobs) of run ${args[2]}`);
 } else if (has('pr', 'merge')) {
   console.log(`Merged pull request #${args[2]} (${args.filter((a) => a.startsWith('--')).join(' ')})`);
 } else {

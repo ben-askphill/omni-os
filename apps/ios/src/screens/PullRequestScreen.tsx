@@ -11,7 +11,7 @@ import { Notice } from '../components/Notice';
 import { useThreadLive, useThreadView } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { MERGE_ADVICE, prContent, type PRContent } from '../pr/model';
-import { useMerge, usePRWatch, useThreadPR } from '../pr/hooks';
+import { useMerge, usePRWatch, useRerunChecks, useThreadPR } from '../pr/hooks';
 import type { MergeOutcome } from '../pr/actions';
 import { CheckDot } from '../pr/CheckDot';
 import { stepWorking } from '../pr/step';
@@ -38,6 +38,7 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
   // A delegated thread's PR is watched from that thread, so the watch here is for this thread's own PR only.
   const watch = usePRWatch(id, pr.number !== null && !pr.from, pr.page.kind === 'pr' && !pr.from ? pr.page.pr : null);
   const merge = useMerge(pr.channelId, pr.number, pr.refresh);
+  const rerun = useRerunChecks(pr.channelId, pr.number, pr.page.kind === 'pr' ? pr.page.pr : null);
   const [asked, setAsked] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<MergeOutcome | null>(null);
   const insets = useSafeAreaInsets();
@@ -139,6 +140,19 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
           ) : null}
           {fix && parkedNote(fix.kind) ? <Text style={[styles.meta, { color: colors.fg3 }]}>{parkedNote(fix.kind)}</Text> : null}
           {asked ? <Text style={[styles.meta, { color: colors.fg3 }]}>{asked}</Text> : null}
+          {rerun.can ? (
+            <View style={styles.inline}>
+              <Button
+                variant="secondary"
+                label="Rerun failed checks"
+                busy={rerun.busy}
+                accessibilityHint="Starts the failed GitHub Actions jobs again, with no message to the agent"
+                onPress={() => void rerun.run()}
+              />
+            </View>
+          ) : null}
+          {rerun.outcome?.kind === 'started' ? <Text accessibilityLiveRegion="polite" style={[styles.meta, { color: colors.fg2 }]}>{rerun.outcome.text}</Text> : null}
+          {rerun.outcome?.kind === 'failed' ? <Callout message={rerun.outcome.message} /> : null}
         </View>
 
         {from ? (

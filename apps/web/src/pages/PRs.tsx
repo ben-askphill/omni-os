@@ -8,6 +8,7 @@ import { href, navigate } from '../router.ts';
 import { DiffStat, PRDetailTabBody, type DetailTab } from './PRDetailTabs.tsx';
 import { PRMergePanel } from './PRMergePanel.tsx';
 import { LinkChannel } from '../link-previews.ts';
+import { RerunNote, useRerunFailedChecks } from '../components/RerunChecks.tsx';
 
 function NoRepo({ channel }: { channel: Channel }) {
   return (
@@ -108,6 +109,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
   const [tab, setTab] = useState<DetailTab>('conversation');
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const rerun = useRerunFailedChecks(channel.id, n, q.data?.checkRuns, !q.data?.state || q.data.state === 'OPEN');
 
   if (!channel.github_repo) return <NoRepo channel={channel} />;
   const back = (
@@ -159,6 +161,11 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
             <LinkButton size="sm" variant="ghost" icon="external" href={p.url} target="_blank">
               GitHub
             </LinkButton>
+            {rerun.can && (
+              <Button size="sm" icon="refresh" onClick={() => void rerun.run()} busy={rerun.busy} title="Runs gh run rerun --failed for each failing workflow run. No agent turn.">
+                Rerun failed checks
+              </Button>
+            )}
             <Button size="sm" icon="delegate" onClick={askReview} busy={reviewBusy}>
               Ask builder to review
             </Button>
@@ -194,6 +201,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
         </header>
       </div>
       {reviewError && <ErrorNote className="mt-2">{reviewError}</ErrorNote>}
+      <RerunNote outcome={rerun.outcome} className="mt-3" />
 
       <PRMergePanel channel={channel} p={p} n={n} onMerged={q.reload} />
       <Tabs

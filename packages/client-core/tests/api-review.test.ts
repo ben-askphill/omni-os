@@ -51,6 +51,12 @@ describe('pull requests', () => {
     expect((err as OmniHttpError).failure).toMatchObject({ kind: 'http', status: 500, message: expect.stringContaining('not mergeable') });
   });
 
+  it('reruns the failed checks of a PR through its channel', async () => {
+    const { sent, api: a } = api({ json: { runs: [{ id: '200', ok: true }], skipped: 0 } });
+    expect(await a.rerunFailedChecks('c1', 12)).toEqual({ runs: [{ id: '200', ok: true }], skipped: 0 });
+    expect(sent).toEqual([{ method: 'POST', url: at('/channels/c1/prs/12/rerun-failed'), body: {} }]);
+  });
+
   it('starts a watch on the branch\'s PR or a named one, stops it, and reads it', async () => {
     const { sent, api: a } = api({ json: null });
     await a.prWatch('t1');
