@@ -73,6 +73,14 @@ export interface ActionRun {
   ended_at: string | null;
 }
 
+/** A clone of the channel's GitHub repo that a preparing thread waits on (apps/server/repo-clone.ts). */
+export interface RepoClone {
+  /** owner/name on GitHub. */
+  repo: string;
+  /** The folder it goes to, with the home folder as "~". */
+  into: string;
+}
+
 /** GET /api/threads/:id/actions: the channel's actions, the thread's latest runs, and why none can run now. */
 export interface ThreadActions {
   actions: ChannelAction[];
@@ -84,6 +92,8 @@ export interface ThreadActions {
    * has none. While the thread is preparing it is the step between the checkout and the agent.
    */
   setup_run: ActionRun | null;
+  /** While the thread is preparing: the clone of the channel's repo it waits on, the step before the checkout. */
+  clone: RepoClone | null;
 }
 
 /** How many characters of a run's output are kept: the end, where a failure says why. */

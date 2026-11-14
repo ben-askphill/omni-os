@@ -1,6 +1,7 @@
 // A worktree thread's preparation: its worktree is made and checked before any harness runs, and a failure waits
 // for Retry with the first prompt and its files saved. Nothing runs in the channel's own checkout instead.
 import { channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+import { ensureRepo } from '../repo-clone.ts';
 import { prepareWorktree } from '../sandbox.ts';
 import { followBranch } from '../branch-follow.ts';
 import { withWorkspace } from '../workspace.ts';
@@ -77,13 +78,15 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
 }
 
 async function prepare(t: Thread): Promise<Thread | undefined> {
-  const repo = channels.get(t.channel_id)?.repo_path ?? null;
   // A worktree its agent moved to another branch keeps that branch: only a detached HEAD or the default branch is
   // switched back (sandbox.ts prepareWorktree).
   if (await followBranch(t.id).catch(() => false)) t = threads.get(t.id) ?? t;
   try {
     if (!t.branch) throw new Error('The thread has no branch to check out.');
     const branch = t.branch;
+    // A channel repo that is not on this machine is cloned first, and may land at a new path here (repo-clone.ts).
+    await ensureRepo(t.channel_id);
+    const repo = channels.get(t.channel_id)?.repo_path ?? null;
     // A continued thread's branch starts at its source's HEAD, with the source's changes laid in (continue-carry.ts),
     // so only a new thread's branch is cut from the base Ben picked.
     const base = continuations.get(t.id) ? undefined : () => baseFor(t.id, repo!);

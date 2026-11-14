@@ -43,34 +43,33 @@ export function outputCut(run: ActionRun) {
 
 // ---------- the setup action in a new worktree ----------
 
-export type SetupStepId = 'checkout' | 'setup' | 'agent';
+export type SetupStepId = 'clone' | 'checkout' | 'setup' | 'agent';
 
 export interface SetupStep {
   id: SetupStepId;
   label: string;
-  /** The setup step's mode: "Before the agent starts". */
+  /** The setup step's mode ("Before the agent starts"), or where the clone goes. */
   detail: string | null;
   state: 'done' | 'active' | 'todo';
 }
 
 /**
- * The steps of a worktree being prepared: Checkout, the channel's setup action when it has one, then Agent. The setup
- * run appears once the checkout is made, so none means the checkout is still going.
+ * The steps of a worktree being prepared: a clone of the channel's repo while one runs, Checkout, the channel's setup
+ * action when it has one, then Agent. The setup run appears once the checkout is made, so none means the checkout is
+ * still going.
  */
 export function setupSteps(data: ThreadActions | undefined): SetupStep[] {
   const run = data?.setup_run ?? null;
+  const clone = data?.clone ?? null;
   const action = data?.actions.find((a) => a.id === run?.action_id) ?? data?.actions.find((a) => a.setup);
   const name = run?.name ?? action?.name;
   const mode = action?.setup;
-  const active: SetupStepId = !run ? 'checkout' : run.state === 'succeeded' ? 'agent' : 'setup';
-  const ids: SetupStepId[] = name ? ['checkout', 'setup', 'agent'] : ['checkout', 'agent'];
+  const active: SetupStepId = clone ? 'clone' : !run ? 'checkout' : run.state === 'succeeded' ? 'agent' : 'setup';
+  const ids: SetupStepId[] = [...(clone ? ['clone' as const] : []), 'checkout', ...(name ? ['setup' as const] : []), 'agent'];
   const at = ids.indexOf(active);
-  return ids.map((id, i) => ({
-    id,
-    label: id === 'checkout' ? 'Checkout' : id === 'agent' ? 'Agent' : `Setup "${name}"`,
-    detail: id === 'setup' && mode ? SETUP_MODE_LABEL[mode] : null,
-    state: i < at ? 'done' : i === at ? 'active' : 'todo',
-  }));
+  const label: Record<SetupStepId, string> = { clone: `Clone ${clone?.repo}`, checkout: 'Checkout', setup: `Setup "${name}"`, agent: 'Agent' };
+  const detail: Record<SetupStepId, string | null> = { clone: clone ? `into ${clone.into}` : null, checkout: null, setup: mode ? SETUP_MODE_LABEL[mode] : null, agent: null };
+  return ids.map((id, i) => ({ id, label: label[id], detail: detail[id], state: i < at ? 'done' : i === at ? 'active' : 'todo' }));
 }
 
 /** The setup run a ready thread shows on its strip: running alongside the agent, or failed. Run again replaces it. */
