@@ -37,27 +37,38 @@ export interface McpClientRow {
   name: string;
   detail: string;
   pending: boolean;
+  /** A second line under the detail, for a bound client. */
+  hint: string | null;
   /** Null on an approved client. */
   approveLabel: string | null;
   removeLabel: string;
 }
 
-export function mcpClientName(c: Pick<McpClient, 'name'>): string {
-  return c.name?.trim() || 'Unnamed client';
+/** Its name, else its id, as the Web UI names it: the server sends no name yet. */
+export function mcpClientName(c: Pick<McpClient, 'id' | 'name'>): string {
+  return c.name?.trim() || c.id;
 }
 
-/** The clients the list shows: removed ones hidden, pending ones first, each with Approve while pending and Remove. */
+const STATUS_RANK: Record<McpClient['status'], number> = { pending: 0, bound: 1, approved: 2, removed: 3 };
+const STATUS_LABEL: Partial<Record<McpClient['status'], string>> = { pending: 'Pending', bound: 'Bound to this Omni' };
+
+/**
+ * The clients the list shows: removed ones hidden, then pending, bound and approved, each most recently seen first.
+ * Approve on a pending or bound client (bound lets in only tokens with this install's audience), Remove on every one.
+ */
 export function mcpClientRows(clients: readonly McpClient[], now: number): McpClientRow[] {
-  const shown = clients.filter((c) => c.status !== 'removed');
-  const ordered = [...shown.filter((c) => c.status === 'pending'), ...shown.filter((c) => c.status !== 'pending')];
+  const ordered = clients
+    .filter((c) => c.status !== 'removed')
+    .sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || b.lastSeen.localeCompare(a.lastSeen));
   return ordered.map((c) => {
     const name = mcpClientName(c);
     return {
       id: c.id,
       name,
-      detail: [c.status === 'pending' ? 'Pending' : '', seenLabel('First seen', c.firstSeen, now), seenLabel('Last seen', c.lastSeen, now)].filter(Boolean).join(' · '),
+      detail: [STATUS_LABEL[c.status] ?? '', seenLabel('First seen', c.firstSeen, now), seenLabel('Last seen', c.lastSeen, now)].filter(Boolean).join(' · '),
       pending: c.status === 'pending',
-      approveLabel: c.status === 'pending' ? `Approve ${name}` : null,
+      hint: c.status === 'bound' ? 'Approve also lets in tokens without an audience.' : null,
+      approveLabel: c.status === 'pending' || c.status === 'bound' ? `Approve ${name}` : null,
       removeLabel: `Remove ${name}`,
     };
   });

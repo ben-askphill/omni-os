@@ -17,6 +17,20 @@ describe('imageSource', () => {
     ['/api/channels/c/prs/1/image/../../../../threads/t/terminal/stream', 'api'],
     ['/api/channels/c/prs/1/image/%2e%2e/%2e%2e/%2e%2e/%2e%2e/threads/t/terminal/stream', 'api'],
     ['/api', 'api'],
+    ['http://127.0.0.1:4748/%61pi/threads/t/terminal/stream', 'api'],
+    ['https://other.example/%61pi/threads/t/terminal/stream', 'api'],
+    ['https://other.example/%2561pi/threads/t/terminal/stream', 'api'],
+    ['https://other.example/API/threads/t/terminal/stream', 'api'],
+    ['https://other.example//api/threads/t/terminal/stream', 'api'],
+    ['https://other.example/%2F%2Fapi/threads', 'api'],
+    ['https://other.example/%E0%A4%A/a.png', 'invalid'],
+    ['http://127.0.0.1:4748/favicon.svg', 'api'],
+    ['http://127.0.0.2:8080/a.png', 'api'],
+    ['http://localhost:3000/a.png', 'api'],
+    ['http://omni.localhost/a.png', 'api'],
+    ['http://[::1]:4747/a.png', 'api'],
+    ['http://0.0.0.0:4747/a.png', 'api'],
+    ['http://127.0.0.1/a.png', 'api'],
     ['/favicon.svg', 'invalid'],
     ['javascript:alert(1)', 'scheme'],
     ['file:///etc/passwd', 'scheme'],
@@ -39,6 +53,14 @@ describe('imageSource', () => {
 
   it('marks another site image as remote, with its host', () => {
     expect(imageSource('https://example.com/shot.png', ORIGIN)).toEqual({ kind: 'remote', src: 'https://example.com/shot.png', host: 'example.com' });
+  });
+
+  it('refuses a non-API path on the page host at another port', () => {
+    expect(imageSource('https://mac.tail.ts.net:8443/shot.png', 'https://mac.tail.ts.net')).toEqual({ kind: 'refused', reason: 'api' });
+  });
+
+  it('still marks a path that only looks like api as remote', () => {
+    expect(imageSource('https://example.com/apis/shot.png', ORIGIN)).toEqual({ kind: 'remote', src: 'https://example.com/apis/shot.png', host: 'example.com' });
   });
 
   it('does not take the PR proxy path on another origin', () => {

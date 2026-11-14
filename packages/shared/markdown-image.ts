@@ -8,6 +8,29 @@ const PR_IMAGE_PROXY = /^\/api\/channels\/[^/]+\/prs\/\d+\/image$/;
 /** Inline pictures that load nothing. SVG is left out: it can carry script. */
 const DATA_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp);/i;
 
+/** This machine, whatever the port: an image there would reach an Omni dev server or another stack with Ben's cookies. */
+const LOOPBACK = /^(?:localhost|.+\.localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1?\]|\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\])$/i;
+
+/**
+ * Whether a URL path names an `/api` route once a server could read it so: percent-decoded until it stops changing,
+ * lowercased, with repeated slashes collapsed. Null when it does not decode.
+ */
+export function isApiPath(pathname: string): boolean | null {
+  let path = pathname;
+  for (;;) {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(path);
+    } catch {
+      return null;
+    }
+    if (decoded === path) break;
+    path = decoded;
+  }
+  path = path.toLowerCase().replace(/\/{2,}/g, '/');
+  return path === '/api' || path.startsWith('/api/');
+}
+
 export type ImageSource =
   /** Load it as is: the PR image proxy on this origin, or an inline picture. */
   | { kind: 'load'; src: string }
@@ -33,12 +56,16 @@ export function imageSource(src: string | null | undefined, origin: string): Ima
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return { kind: 'refused', reason: 'scheme' };
   // Credentials in the URL are never needed for a picture.
   if (url.username || url.password) return { kind: 'refused', reason: 'invalid' };
-  const api = url.pathname === '/api' || url.pathname.startsWith('/api/');
-  if (url.origin === new URL(origin).origin) {
+  const page = new URL(origin);
+  const api = isApiPath(url.pathname);
+  if (url.origin === page.origin) {
     if (PR_IMAGE_PROXY.test(url.pathname)) return { kind: 'load', src: url.pathname + url.search };
-    return { kind: 'refused', reason: api ? 'api' : 'invalid' };
+    return { kind: 'refused', reason: api === false ? 'invalid' : 'api' };
   }
-  // Another port on this host, or another Omni: same-site cookies would still go along.
+  // Another port on this machine or this host: same-site cookies would still go along, whatever the path.
+  if (LOOPBACK.test(url.hostname) || url.hostname === page.hostname) return { kind: 'refused', reason: 'api' };
+  // Another Omni.
+  if (api === null) return { kind: 'refused', reason: 'invalid' };
   if (api) return { kind: 'refused', reason: 'api' };
   return { kind: 'remote', src: url.href, host: url.host };
 }

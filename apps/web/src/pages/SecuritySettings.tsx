@@ -6,8 +6,8 @@ import { entityLabel, fingerprintLabel, listedMcpClients, mcpClientName, type Mc
 import { Card, DangerRow } from './settings-parts.tsx';
 
 // Settings cards for PRD #667: rotating the install token and the MCP clients (Sharing & access), the machines' signing
-// keys and the changes this Mac refused (Sync). A server from before these routes cannot answer their reads, and those
-// cards stay out.
+// keys and the changes this Mac refused (Sync). A server from before these routes answers their reads with 404, and those
+// cards stay out; any other failed read shows in the card with Retry.
 
 const missing = (error: unknown) => error instanceof ApiError && error.status === 404;
 
@@ -40,7 +40,7 @@ export function InstallTokenCard() {
 export function McpClientsCard() {
   const res = useApi<McpClient[]>('/mcp/clients');
   const [error, setError] = useState<string | null>(null);
-  if (res.error && !res.data) return null;
+  if (res.error && !res.data) return res.status === 404 ? null : <Card entry="mcp-clients" title="MCP clients"><ErrorNote onRetry={res.reload}>{res.error}</ErrorNote></Card>;
   const list = listedMcpClients(res.data ?? []);
   const act = async (fn: () => Promise<unknown>) => {
     setError(null);
@@ -64,13 +64,15 @@ export function McpClientsCard() {
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate">{mcpClientName(c)}</span>
                   {c.status === 'pending' && <Chip tone="needs">Pending</Chip>}
+                  {c.status === 'bound' && <Chip tone="outline">Bound to this Omni</Chip>}
                 </div>
+                {c.status === 'bound' && <div className="text-[12px] text-fg-3">Approve also lets in tokens without an audience.</div>}
                 <div className="text-[12px] text-fg-3">
                   First seen {relTime(c.firstSeen, Date.now())}, last seen {relTime(c.lastSeen, Date.now())}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {c.status === 'pending' && (
+                {(c.status === 'pending' || c.status === 'bound') && (
                   <Button size="sm" variant="secondary" onClick={() => void act(() => api.post(`/mcp/clients/${encodeURIComponent(c.id)}/approve`, {})).catch(() => {})}>
                     Approve
                   </Button>
@@ -90,7 +92,7 @@ export function McpClientsCard() {
 export function SyncKeysCard() {
   const res = useApi<SyncDeviceKey[]>('/sync/devices');
   const [error, setError] = useState<string | null>(null);
-  if (res.error && !res.data) return null;
+  if (res.error && !res.data) return res.status === 404 ? null : <Card entry="sync-keys" title="Signing keys"><ErrorNote onRetry={res.reload}>{res.error}</ErrorNote></Card>;
   const list = res.data ?? [];
   if (!list.length) return null;
   const confirm = async (id: string) => {
@@ -134,7 +136,7 @@ export function SyncKeysCard() {
 /** Sync: changes this Mac refused, newest first, with the machine and the reason. */
 export function RefusedChangesCard() {
   const res = useApi<RefusedChange[]>('/sync/refused?limit=50');
-  if (res.error && !res.data) return null;
+  if (res.error && !res.data) return res.status === 404 ? null : <Card entry="sync-refused" title="Refused changes"><ErrorNote onRetry={res.reload}>{res.error}</ErrorNote></Card>;
   const list = res.data ?? [];
   return (
     <Card entry="sync-refused" title="Refused changes" subtitle="Changes from the relay this Mac did not apply: unsigned, signed with a key it did not pin, or pointing at a folder Omni does not run in.">

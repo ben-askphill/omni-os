@@ -1,3 +1,4 @@
+import { isApiPath } from '@omni/shared/markdown-image.ts';
 import { Marked, type Tokens } from 'marked';
 
 import { textDocument, type DocumentColors } from './sandbox';
@@ -11,8 +12,7 @@ const SAFE_SRC = /^(?:https:|data:image\/(?:png|jpe?g|gif|webp);)/i;
 /** Never a picture that points at an Omni API route, on any host: loading it would act (PRD #667, S18). */
 const apiPath = (src: string) => {
   try {
-    const path = new URL(src).pathname;
-    return path === '/api' || path.startsWith('/api/');
+    return isApiPath(new URL(src).pathname) !== false;
   } catch {
     return false;
   }

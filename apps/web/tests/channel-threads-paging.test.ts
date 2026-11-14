@@ -79,6 +79,24 @@ describe('useChannelThreads', () => {
     expect(hook.data!.map((x) => x.id)).toEqual(['new', 'a']);
   });
 
+  it('keeps the older pages already read when a reconnect reloads the first page', async () => {
+    answer = (p) =>
+      p.includes('cursor=n1')
+        ? { threads: [t('c', '2026-01-02'), t('d', '2026-01-01')], next: 'n2' }
+        : { threads: [t('a', '2026-01-04'), t('b', '2026-01-03')], next: 'n1' };
+    await mount();
+    await act(() => hook.loadMore());
+    expect(hook.data!.map((x) => x.id)).toEqual(['a', 'b', 'c', 'd']);
+
+    answer = () => ({ threads: [t('new', '2026-01-05'), t('a', '2026-01-04')], next: 'n1b' });
+    await act(async () => feed!({ type: 'reconnect' } as FeedEvent));
+    await flush();
+    expect(hook.data!.map((x) => x.id)).toEqual(['new', 'a', 'b', 'c', 'd']);
+    expect(hook.more).toBe(true);
+    await act(() => hook.loadMore());
+    expect(gets.at(-1)).toBe('/channels/acme/threads?paged=1&limit=50&cursor=n2');
+  });
+
   it('drops an older page that lands after switching channel', async () => {
     let release!: (v: unknown) => void;
     answer = (p) => (p.includes('cursor=') ? new Promise((r) => (release = r)) : { threads: [t('a', '2026-01-03')], next: 'n1' });

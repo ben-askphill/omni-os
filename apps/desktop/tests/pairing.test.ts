@@ -61,6 +61,25 @@ describe('desktopPairUrl', () => {
     expect(calls[0].headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
   });
 
+  it('gets a nonce with the token alone from a server it did not start', async () => {
+    const server = createServer((req, res) => {
+      res.setHeader('content-type', 'application/json');
+      if (req.headers['x-omni-desktop-secret'] || req.headers.authorization !== `Bearer ${TOKEN}`) {
+        res.statusCode = 403;
+        res.end('{}');
+        return;
+      }
+      res.end(JSON.stringify({ nonce: 'token-nonce', expiresIn: 60 }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    try {
+      const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      expect(await desktopPairUrl({ origin, secret: null, token: TOKEN })).toBe(`${origin}/api/auth/desktop-pair?nonce=token-nonce`);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it('falls back to desktop-pair without a nonce when the server is from before nonces (404)', async () => {
     const { fetch } = fakeFetch(() => json({ error: 'Not found' }, 404));
     expect(await desktopPairUrl({ origin: ORIGIN, secret: SECRET, token: TOKEN, fetch })).toBe(`${ORIGIN}/api/auth/desktop-pair`);

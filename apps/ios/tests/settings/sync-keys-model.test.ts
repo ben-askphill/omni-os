@@ -2,7 +2,7 @@ import { OmniHttpError, type RefusedChange, type SyncDeviceKey } from '@omni/cli
 import { describe, expect, it } from 'vitest';
 
 import { loadOptional, optionalView } from '../../src/settings/optional-remote';
-import { confirmKeyConfirmation, formatFingerprint, refusedRows, syncKeyRows, withKeyConfirmed } from '../../src/settings/sync-keys-model';
+import { confirmKeyConfirmation, fingerprintLabel, refusedRows, syncKeyRows, withKeyConfirmed } from '../../src/settings/sync-keys-model';
 
 const NOW = Date.parse('2026-11-14T12:00:00Z');
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
@@ -15,16 +15,16 @@ function refused(over: Partial<RefusedChange> = {}): RefusedChange {
   return { id: 1, at: ago(5 * 60_000), machine: 'Air', entity: 'remote_command', entityId: 'rc1', reason: 'Bad signature', ...over };
 }
 
-describe('formatFingerprint', () => {
+describe('fingerprintLabel', () => {
   it('groups a hex fingerprint in fours, colons or not', () => {
-    expect(formatFingerprint('AB12CD34EF56')).toBe('ab12 cd34 ef56');
-    expect(formatFingerprint('ab:12:cd:34:e')).toBe('ab12 cd34 e');
+    expect(fingerprintLabel('AB12CD34EF56')).toBe('ab12 cd34 ef56');
+    expect(fingerprintLabel('ab:12:cd:34:e')).toBe('ab12 cd34 e');
   });
 
   it('shows anything else as it came, and says when there is no key', () => {
-    expect(formatFingerprint('SHA256:x9/Kq+=')).toBe('SHA256:x9/Kq+=');
-    expect(formatFingerprint(null)).toBe('No key yet');
-    expect(formatFingerprint(' ')).toBe('No key yet');
+    expect(fingerprintLabel('SHA256:x9/Kq+=')).toBe('SHA256:x9/Kq+=');
+    expect(fingerprintLabel(null)).toBe('No key yet');
+    expect(fingerprintLabel(' ')).toBe('No key yet');
   });
 });
 

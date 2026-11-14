@@ -84,7 +84,7 @@ export function RotateTokenGroup() {
   );
 }
 
-/** MCP clients: who signed in to /mcp with OAuth, first and last seen, Approve on a pending one and Remove. */
+/** MCP clients: who signed in to /mcp with OAuth, first and last seen, Approve on a pending or bound one and Remove. */
 export function McpClientsGroup({ remote }: { remote: Remote<Optional<McpClient[]>> }) {
   const { colors } = useOmniTheme();
   const hub = useLiveHub();
@@ -146,7 +146,7 @@ export function McpClientsGroup({ remote }: { remote: Remote<Optional<McpClient[
               key={row.id}
               first={i === 0}
               title={row.name}
-              detail={row.detail}
+              detail={row.hint ? `${row.detail}\n${row.hint}` : row.detail}
               trailing={
                 <View style={styles.buttons}>
                   {row.approveLabel ? (

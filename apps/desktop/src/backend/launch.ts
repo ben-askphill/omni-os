@@ -50,7 +50,7 @@ export function childEnv(app: NodeJS.ProcessEnv, input: { path: string; port: nu
   env.OMNI_SUPERVISOR = 'desktop';
   // The server runs on this app's own binary, which acts as Node only when told.
   env.ELECTRON_RUN_AS_NODE = '1';
-  // Only a request with it gets a nonce for desktop-pair (pairing.ts).
+  // A request with it, or with the install's token, gets a nonce for desktop-pair (pairing.ts).
   env[PAIR_SECRET_ENV] = input.pairSecret;
   return env;
 }

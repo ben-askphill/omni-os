@@ -7,10 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // server member fixed. A server from before them answers 404 and the read-backed cards stay out.
 
 let replies: Record<string, unknown> = {};
+let failures: Record<string, number> = {};
 const posts: string[] = [];
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
   actual.api.get = vi.fn(async (path: string) => {
+    if (path in failures) throw new actual.ApiError('Server error', failures[path]);
     if (!(path in replies)) throw new actual.ApiError('not found', 404);
     return replies[path];
   }) as typeof actual.api.get;
@@ -27,6 +29,7 @@ let host: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
   replies = {};
+  failures = {};
   posts.length = 0;
   host = document.createElement('div');
   document.body.append(host);
@@ -63,6 +66,39 @@ describe('MCP clients card', () => {
   it('stays out on a server without the route', async () => {
     await mount(createElement(McpClientsCard));
     expect(host.textContent).toBe('');
+  });
+
+  it('shows a bound client with its hint, Approve and Remove, between pending and approved', async () => {
+    replies['/mcp/clients'] = [
+      { id: 'a1', name: 'Approved one', status: 'approved', firstSeen: '2026-11-01T00:00:00Z', lastSeen: '2026-11-13T00:00:00Z', via: 'client' },
+      { id: 'b1', name: 'Bound one', status: 'bound', firstSeen: '2026-11-01T00:00:00Z', lastSeen: '2026-11-02T00:00:00Z', via: 'audience' },
+      { id: 'p1', name: 'Pending one', status: 'pending', firstSeen: '2026-11-01T00:00:00Z', lastSeen: '2026-11-01T00:00:00Z', via: null },
+    ];
+    await mount(createElement(McpClientsCard));
+    const rows = [...host.querySelectorAll('li')];
+    expect(rows.map((r) => r.textContent?.match(/(Pending|Bound|Approved) one/)?.[0])).toEqual(['Pending one', 'Bound one', 'Approved one']);
+    const bound = rows[1];
+    expect(bound.textContent).toContain('Bound to this Omni');
+    expect(bound.textContent).toContain('Approve also lets in tokens without an audience.');
+    const labels = (row: Element) => [...row.querySelectorAll('button')].map((b) => b.textContent?.trim());
+    expect(labels(bound)).toEqual(['Approve', 'Remove']);
+    expect(labels(rows[2])).toEqual(['Remove']);
+    await act(async () => [...bound.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Approve')!.click());
+    expect(posts).toEqual(['/mcp/clients/b1/approve']);
+  });
+});
+
+describe('a card whose read fails for another reason than a missing route', () => {
+  it.each([
+    ['/mcp/clients', McpClientsCard, 'MCP clients'],
+    ['/sync/devices', SyncKeysCard, 'Signing keys'],
+    ['/sync/refused?limit=50', RefusedChangesCard, 'Refused changes'],
+  ] as const)('%s shows the error with Retry instead of hiding', async (path, Card, title) => {
+    failures[path] = 500;
+    await mount(createElement(Card));
+    expect(host.textContent).toContain(title);
+    expect(host.textContent).toContain('Server error');
+    expect(button('Retry')).toBeTruthy();
   });
 });
 

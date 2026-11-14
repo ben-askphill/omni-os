@@ -27,6 +27,9 @@ describe('markdown images that would act (S18)', () => {
     'http://localhost:4747/api/threads/t1/terminal/stream',
     'http://127.0.0.1:4748/api/threads/t1/terminal/stream',
     '/api/channels/c/prs/1/image/../../../../threads/t/terminal/stream',
+    'http://127.0.0.1:4748/%61pi/threads/t/terminal/stream',
+    'https://other.example/API/threads/t/terminal/stream',
+    'http://localhost:3000/a.png',
   ])('never renders an <img> for %s, in replies or PR text', (src) => {
     for (const html of [render(`![shot](${src})`), gated(`![shot](${src})`)]) {
       expect(html).not.toContain('<img');

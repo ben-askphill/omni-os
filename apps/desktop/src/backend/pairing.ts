@@ -1,6 +1,7 @@
 // How a main window pairs with the server: main asks the server for a one-time nonce, then the window opens
-// desktop-pair with it. The server the app starts gets a secret in its environment that only this process knows, and
-// main sends it with the request for a nonce, so a page on another localhost port or a stray curl cannot pair.
+// desktop-pair with it. The server hands out a nonce only to a request that carries either the secret it got in its
+// environment from the app that started it or the install's token, so a page on another localhost port or a stray curl
+// cannot pair. Main sends the token on every request, and the secret too when it started the server.
 // Neither the secret nor the install's token ever reaches a URL, the page or a log: only the nonce goes in the URL.
 import { randomBytes } from 'node:crypto';
 
@@ -30,7 +31,7 @@ export interface PairInput {
   origin: string;
   /** The secret the app gave the server it started. Null for a server it attached to, which it never gave one. */
   secret: string | null;
-  /** The install's token from the data dir. It gets the request past the server's guard, as every call from main does. */
+  /** The install's token from the data dir. It gets the request past the server's guard and earns a nonce on its own, which is how a server the app attached to pairs. */
   token: string | null;
   fetch?: typeof fetch;
   timeoutMs?: number;

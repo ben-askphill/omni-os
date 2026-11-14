@@ -8,7 +8,6 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Backend, isRecordedServer, parseRecord, type BackendState } from '../src/backend/index.ts';
 import { exitMessage, probePort, proofFor } from '../src/backend/launch.ts';
-import { PairingError } from '../src/backend/pairing.ts';
 import { exitCode, stopGroup } from '../src/backend/process.ts';
 
 const TOKEN = 'e'.repeat(64);
@@ -35,7 +34,8 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === '/api/auth/desktop-nonce' && req.method === 'POST') {
-    if (req.headers['x-omni-desktop-secret'] !== process.env.OMNI_DESKTOP_PAIR_SECRET) { res.statusCode = 403; res.end('{}'); return; }
+    const secretOk = !!process.env.OMNI_DESKTOP_PAIR_SECRET && req.headers['x-omni-desktop-secret'] === process.env.OMNI_DESKTOP_PAIR_SECRET;
+    if (!secretOk && req.headers.authorization !== 'Bearer ' + token) { res.statusCode = 403; res.end('{}'); return; }
     res.end(JSON.stringify({ nonce: 'n' + Date.now() + Math.random().toString(16).slice(2), expiresIn: 60 }));
     return;
   }
@@ -329,15 +329,14 @@ describe('Backend', () => {
     expect(r.backend.pairSecret()).toBeNull();
   });
 
-  it('does not know the secret of a server an earlier launch started, and does not pair without one', async () => {
+  it('does not know the secret of a server an earlier launch started, and pairs with the token alone', async () => {
     const r = await rig();
     await r.backend.start();
     const later = r.relaunch();
     await later.start();
     expect(later.info().startedHere).toBe(true);
     expect(later.pairSecret()).toBeNull();
-    // The fake demands the secret; the real server may take the token instead (an open question for its owner).
-    await expect(later.desktopPairUrl()).rejects.toBeInstanceOf(PairingError);
+    expect(await later.desktopPairUrl()).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${r.port}/api/auth/desktop-pair\\?nonce=n`));
   });
 
   it('pairs without a nonce on a server from before nonces', async () => {

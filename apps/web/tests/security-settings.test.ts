@@ -9,6 +9,11 @@ describe('MCP clients in Settings', () => {
     expect(listedMcpClients(list).map((c) => c.id)).toEqual(['p', 'b', 'a']);
   });
 
+  it('puts bound clients after pending and before approved, each by last seen', () => {
+    const list = [client('a', 'approved', '2026-11-09'), client('b1', 'bound', '2026-11-02'), client('p', 'pending', '2026-11-01'), client('b2', 'bound', '2026-11-05')];
+    expect(listedMcpClients(list).map((c) => c.id)).toEqual(['p', 'b2', 'b1', 'a']);
+  });
+
   it('names a client by its name, else its id', () => {
     expect(mcpClientName(client('cl_1', 'approved', 'x', 'Claude'))).toBe('Claude');
     expect(mcpClientName(client('cl_1', 'approved', 'x', '  '))).toBe('cl_1');
@@ -16,9 +21,10 @@ describe('MCP clients in Settings', () => {
 });
 
 describe('sync key fingerprints', () => {
-  it('groups hex in fours, first 16 characters', () => {
-    expect(fingerprintLabel('AB12CD34EF567890aabbccdd')).toBe('ab12 cd34 ef56 7890');
+  it('shows the whole fingerprint, hex grouped in fours, anything else as it came', () => {
+    expect(fingerprintLabel('AB12CD34EF567890aabbccdd')).toBe('ab12 cd34 ef56 7890 aabb ccdd');
     expect(fingerprintLabel('ab:12:cd:34')).toBe('ab12 cd34');
+    expect(fingerprintLabel('SHA256:x9/Kq+=')).toBe('SHA256:x9/Kq+=');
   });
 
   it('says when a machine has no key yet', () => {

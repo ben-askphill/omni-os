@@ -65,8 +65,32 @@ describe('mcpClientRows', () => {
     expect(approved.detail).toBe('First seen 12 Oct · Last seen 5m ago');
   });
 
-  it('names a client that gave no name', () => {
-    expect(mcpClientRows([client({ name: null }), client({ id: 'c2', name: '  ' })], NOW).map((r) => r.name)).toEqual(['Unnamed client', 'Unnamed client']);
+  it('names a client that gave no name by its id', () => {
+    expect(mcpClientRows([client({ name: null }), client({ id: 'c2', name: '  ' })], NOW).map((r) => r.name)).toEqual(['c1', 'c2']);
+  });
+
+  it('puts bound clients between pending and approved, each most recently seen first', () => {
+    const rows = mcpClientRows(
+      [
+        client({ id: 'a', lastSeen: ago(60_000) }),
+        client({ id: 'b-old', status: 'bound', lastSeen: ago(3_600_000) }),
+        client({ id: 'p', status: 'pending', lastSeen: ago(7_200_000) }),
+        client({ id: 'b-new', status: 'bound', lastSeen: ago(120_000) }),
+      ],
+      NOW,
+    );
+    expect(rows.map((r) => r.id)).toEqual(['p', 'b-new', 'b-old', 'a']);
+  });
+
+  it('labels a bound client, explains Approve, and offers both Approve and Remove', () => {
+    const [bound] = mcpClientRows([client({ id: 'b', name: 'claude.ai', status: 'bound' })], NOW);
+    expect(bound).toMatchObject({
+      pending: false,
+      detail: 'Bound to this Omni · First seen 12 Oct · Last seen 5m ago',
+      hint: 'Approve also lets in tokens without an audience.',
+      approveLabel: 'Approve claude.ai',
+      removeLabel: 'Remove claude.ai',
+    });
   });
 });
 

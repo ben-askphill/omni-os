@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const calls: string[] = [];
 let shellOpen = false;
 let startStatus = 200;
+let startGate: Promise<void> | null = null;
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
   actual.api.get = vi.fn(async (path: string) => {
@@ -17,6 +18,7 @@ vi.mock('../src/api.ts', async (importActual) => {
   }) as typeof actual.api.get;
   actual.api.post = vi.fn(async (path: string) => {
     calls.push(`POST ${path}`);
+    if (path.endsWith('/browser/start') && startGate) await startGate;
     if (path.endsWith('/browser/start') && startStatus !== 200) throw new actual.ApiError('nope', startStatus);
     return { running: true };
   }) as typeof actual.api.post;
@@ -51,6 +53,7 @@ beforeEach(() => {
   calls.length = 0;
   shellOpen = false;
   startStatus = 200;
+  startGate = null;
 });
 
 describe('the thread shell', () => {
@@ -93,6 +96,24 @@ describe('the channel browser', () => {
     const root = await mount();
     expect(calls).toContain('POST /channels/omni/browser/start');
     expect(calls).toContain('STREAM /api/channels/omni/browser/stream');
+    act(() => root.unmount());
+  });
+
+  it('attaches only once the start POST has answered', async () => {
+    let release!: () => void;
+    startGate = new Promise<void>((resolve) => (release = resolve));
+    const root = await mount();
+    expect(calls).toEqual(['POST /channels/omni/browser/start']);
+    await act(async () => release());
+    await flush();
+    expect(calls).toEqual(['POST /channels/omni/browser/start', 'STREAM /api/channels/omni/browser/stream']);
+    act(() => root.unmount());
+  });
+
+  it('still attaches when the start fails, so the state shows', async () => {
+    startStatus = 500;
+    const root = await mount();
+    expect(calls).toEqual(['POST /channels/omni/browser/start', 'STREAM /api/channels/omni/browser/stream']);
     act(() => root.unmount());
   });
 

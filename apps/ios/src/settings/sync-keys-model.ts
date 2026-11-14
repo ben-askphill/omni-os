@@ -1,18 +1,13 @@
 import type { RefusedChange, SyncDeviceKey } from '@omni/client-core';
+import { formatFingerprint } from '@omni/shared/fingerprint.ts';
 
 import { shortAgo } from '../live/channel-model';
 
 // Settings, Sync on the phone: each machine's signing-key fingerprint, Key changed with Confirm new key, and the
 // Refused changes list, in the words the Web UI and docs/user use.
 
-/** A hex fingerprint in groups of four, so two screens can be compared by eye. Anything else shows as it came. */
-export function formatFingerprint(fp: string | null | undefined): string {
-  const raw = fp?.trim();
-  if (!raw) return 'No key yet';
-  if (!/^[0-9a-f:]+$/i.test(raw)) return raw;
-  const hex = raw.replace(/:/g, '').toLowerCase();
-  return hex.match(/.{1,4}/g)?.join(' ') ?? hex;
-}
+/** A fingerprint as every client shows it (@omni/shared/fingerprint.ts), so two screens can be compared by eye. */
+export const fingerprintLabel = (fp: string | null | undefined) => formatFingerprint(fp) ?? 'No key yet';
 
 export interface SyncKeyRow {
   id: string;
@@ -35,9 +30,9 @@ export function syncKeyRows(devices: readonly SyncDeviceKey[]): SyncKeyRow[] {
       id: d.id,
       name: d.name,
       current: d.current,
-      fingerprint: formatFingerprint(d.fingerprint),
+      fingerprint: fingerprintLabel(d.fingerprint),
       keyChanged: changed,
-      pinned: changed && d.pinnedFingerprint ? formatFingerprint(d.pinnedFingerprint) : null,
+      pinned: changed && d.pinnedFingerprint ? fingerprintLabel(d.pinnedFingerprint) : null,
       confirmLabel: changed ? `Confirm new key for ${d.name}` : null,
     };
   });

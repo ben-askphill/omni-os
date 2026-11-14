@@ -15,7 +15,8 @@ export interface SignedInDevice {
 export interface McpClient {
   id: string;
   name: string | null;
-  status: 'approved' | 'pending' | 'removed';
+  /** Bound: its tokens get in only when they carry this install's audience; one without still needs Approve. */
+  status: 'approved' | 'bound' | 'pending' | 'removed';
   firstSeen: string;
   lastSeen: string;
   via: 'audience' | 'client' | null;

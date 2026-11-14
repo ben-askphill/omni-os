@@ -1,11 +1,13 @@
 // The shapes and wording behind Settings' install token, MCP clients, sync keys and refused changes (PRD #667).
 // Pure, so the rules are tested on their own.
+import { formatFingerprint } from '@omni/shared/fingerprint.ts';
 
 /** GET /api/mcp/clients: an OAuth client that reached this Omni's /mcp. */
 export interface McpClient {
   id: string;
   name: string | null;
-  status: 'approved' | 'pending' | 'removed';
+  /** Bound: its tokens get in only when they carry this install's audience; one without still needs Approve. */
+  status: 'approved' | 'bound' | 'pending' | 'removed';
   firstSeen: string;
   lastSeen: string;
   /** How its token matched: the RFC 8707 audience, the approved client id, or not yet. */
@@ -35,21 +37,16 @@ export interface RefusedChange {
   reason: string;
 }
 
-/** The clients to list: removed ones stay out. Pending ones first, so an approval is never below the fold. */
+/** The clients to list: removed ones stay out. Pending ones first, so an approval is never below the fold, then bound, then approved. */
 export function listedMcpClients(list: McpClient[]): McpClient[] {
-  const rank = (c: McpClient) => (c.status === 'pending' ? 0 : 1);
+  const rank = (c: McpClient) => (c.status === 'pending' ? 0 : c.status === 'bound' ? 1 : 2);
   return list.filter((c) => c.status !== 'removed').sort((a, b) => rank(a) - rank(b) || b.lastSeen.localeCompare(a.lastSeen));
 }
 
 export const mcpClientName = (c: McpClient) => c.name?.trim() || c.id;
 
-/** A key fingerprint to read aloud: hex in groups of four, the first 16 characters. */
-export function fingerprintLabel(fp: string | null): string {
-  if (!fp) return 'No signing key yet';
-  const hex = fp.replace(/[^0-9a-f]/gi, '').toLowerCase();
-  if (!hex) return fp.slice(0, 19);
-  return (hex.slice(0, 16).match(/.{1,4}/g) ?? []).join(' ');
-}
+/** A key fingerprint as every client shows it (@omni/shared/fingerprint.ts). */
+export const fingerprintLabel = (fp: string | null) => formatFingerprint(fp) ?? 'No signing key yet';
 
 /** The words for a synced entity in the refused list. */
 const ENTITY_LABEL: Record<string, string> = {

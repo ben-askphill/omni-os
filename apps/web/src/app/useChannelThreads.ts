@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { appendPage, channelThreadsPath, readChannelThreadsPage } from '@omni/shared/channel-threads.ts';
+import { appendPage, channelThreadsPath, readChannelThreadsPage, withFreshFirstPage } from '@omni/shared/channel-threads.ts';
 import { api, errorText, type Thread } from '../api.ts';
 import { useFeed } from '../store.tsx';
 
@@ -20,12 +20,15 @@ export function useChannelThreads(channelId: string, accept: (t: Thread) => bool
   /** Bumps when the list starts over (another channel, a reload), so a page asked for before cannot land after. */
   const epoch = useRef(0);
   const lastChannel = useRef<string | null>(null);
+  /** Pages read so far: a reload of the first page keeps the older ones it does not reach (as iOS afterFirstPage). */
+  const pages = useRef(0);
 
   useEffect(() => {
     const mine = ++epoch.current;
     if (lastChannel.current !== channelId) {
       setData(undefined);
       setNext(null);
+      pages.current = 0;
       lastChannel.current = channelId;
     }
     setLoading(true);
@@ -35,8 +38,12 @@ export function useChannelThreads(channelId: string, accept: (t: Thread) => bool
       .then((body) => {
         if (mine !== epoch.current) return;
         const page = readChannelThreadsPage<Thread>(body);
-        setData(page.threads);
-        setNext(page.next);
+        if (pages.current > 1 && page.next !== null) setData((prev) => withFreshFirstPage(prev ?? [], page));
+        else {
+          setData(page.threads);
+          setNext(page.next);
+          pages.current = 1;
+        }
         setError(null);
       })
       .catch((e) => mine === epoch.current && setError(errorText(e)))
@@ -54,6 +61,7 @@ export function useChannelThreads(channelId: string, accept: (t: Thread) => bool
       if (mine !== epoch.current) return;
       setData((prev) => appendPage(prev ?? [], page.threads));
       setNext(page.next);
+      pages.current += 1;
       setError(null);
     } catch (e) {
       if (mine === epoch.current) setError(errorText(e));
