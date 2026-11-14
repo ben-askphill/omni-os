@@ -54,7 +54,8 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       {working.count > 0 && (
-        <div className="space-y-px pt-3">
+        <div className="space-y-px pt-4">
+          <div aria-hidden className="mx-3 mb-3 border-t border-line" />
           <Shelf label="Working" count={working.count} open={working.open} onToggle={working.toggle} />
           {working.rows.map((t) => card(t))}
         </div>

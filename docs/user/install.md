@@ -40,6 +40,8 @@ The desktop app replaced both, and the repo no longer has them.
 | Claude Code, signed in | `claude --version` | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` |
 | `gh`, signed in (GitHub panel, PR automations) | `gh auth status` | `brew install gh && gh auth login` |
 
+Signing Claude Code in over ssh works too. The login keychain is locked there, so `claude` saves the login to `~/.claude/.credentials.json`. Before each Claude Code thread starts, Omni copies that login into the Keychain when it is newer than the one there, because the desktop session reads the Keychain first and would otherwise fail with "OAuth session expired". `OMNI_CLAUDE_LOGIN_SYNC=0` in `.env` turns this off.
+
 Secrets go in the Keychain on a Mac and in `data/secrets.json` on Linux ([Configuration](configuration.md#secrets)). Codex and Cursor Agent are optional; see [Harnesses](harnesses.md).
 
 ## Agent instructions

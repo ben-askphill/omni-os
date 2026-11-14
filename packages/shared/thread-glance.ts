@@ -125,6 +125,12 @@ export function stepOf(text: string | null | undefined, prompts: StepPrompts = S
   return best?.step ?? null;
 }
 
+/**
+ * Where the server's list of failing checks starts in a Fix checks message (apps/server/fix-checks.ts). The step prompt
+ * is what comes before it.
+ */
+export const FAILING_CHECKS_MARK = '\n\nFailing checks on PR #';
+
 /** What a step's button says while the agent works on it. */
 export const STEP_WORKING: Record<PRStep, string> = { open: 'Opening PR', conflicts: 'Fixing conflicts', checks: 'Fixing checks' };
 

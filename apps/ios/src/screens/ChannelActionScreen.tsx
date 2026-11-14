@@ -1,4 +1,4 @@
-import { ACTION_PORT_HINT, ACTION_SETUP_HINT, actionInput, draftOf, type ActionDraft, type PortMode, type SetupMode } from '@omni/shared/channel-actions.ts';
+import { ACTION_PORT_HINT, ACTION_SETUP_HINT, ACTION_TEARDOWN_HINT, actionInput, draftOf, type ActionDraft, type PortMode, type SetupMode } from '@omni/shared/channel-actions.ts';
 import { useCallback, useLayoutEffect, useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 
@@ -22,6 +22,11 @@ const SETUPS: readonly { value: SetupMode | 'off'; label: string }[] = [
   { value: 'off', label: 'Off' },
   { value: 'blocking', label: 'Before agent' },
   { value: 'background', label: 'Alongside' },
+];
+
+const TEARDOWNS: readonly { value: 'off' | 'on'; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'on', label: 'Before removal' },
 ];
 
 /** One channel action, new or edited, with the fields and checks the Web UI's action editor has. Saved on its own. */
@@ -109,6 +114,11 @@ export function ChannelActionScreen({ route, navigation }: RootScreenProps<'Chan
         <ListHeading inset>Run in new worktrees</ListHeading>
         <SegmentedControl options={SETUPS} value={d.setup ?? 'off'} onChange={(m) => set('setup', m === 'off' ? null : m)} />
         <Footnote>{ACTION_SETUP_HINT[d.setup ?? 'off']}</Footnote>
+      </View>
+      <View style={{ gap: space.s2 }}>
+        <ListHeading inset>Run before a worktree is removed</ListHeading>
+        <SegmentedControl options={TEARDOWNS} value={d.teardown ? 'on' : 'off'} onChange={(m) => set('teardown', m === 'on')} />
+        <Footnote>{ACTION_TEARDOWN_HINT[d.teardown ? 'on' : 'off']}</Footnote>
       </View>
       {action ? (
         <Group>

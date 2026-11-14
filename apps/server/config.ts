@@ -1,6 +1,7 @@
 import { join, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { configPath, omniCheckout, resolved } from './user-config.ts';
+import { TEARDOWN_LIMIT_MINUTES } from '@omni/shared/channel-actions.ts';
 
 /**
  * The repo root: data/, crew/, automations/ and mods/ live here, beside apps/ and packages/. The desktop app ships the
@@ -100,6 +101,8 @@ export const config = {
   worktreeIdleDays: Number(env.OMNI_WORKTREE_IDLE_DAYS ?? 7),
   /** How long after startup the first retention pass runs (worktree-cleanup.ts). Tests shorten it. */
   retentionFirstPassMs: Number(env.OMNI_RETENTION_FIRST_PASS_MS ?? 60_000),
+  /** How long a channel's teardown action may run before a cleanup stops it and removes the worktree anyway. Tests shorten it. */
+  teardownTimeoutMs: Number(env.OMNI_TEARDOWN_TIMEOUT_MS ?? TEARDOWN_LIMIT_MINUTES * 60_000),
 };
 
 function mcpScript(name: 'omni' | 'ask' | 'render' | 'threads'): string {

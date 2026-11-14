@@ -96,6 +96,15 @@ describe('channels', () => {
     expect(b.feed).toContainEqual({ type: 'channel', id: 'volero' });
   });
 
+  it('the worktree copy list and shared directories set on one Mac reach the other', async () => {
+    a.db.channels.update('volero', { worktree_include: '.env\nshopify.theme.toml', worktree_shared: 'node_modules' });
+    await exchange();
+    expect(b.db.channels.get('volero')).toMatchObject({ worktree_include: '.env\nshopify.theme.toml', worktree_shared: 'node_modules' });
+    b.db.channels.update('volero', { worktree_shared: null });
+    await exchange();
+    expect(a.db.channels.get('volero')).toMatchObject({ worktree_include: '.env\nshopify.theme.toml', worktree_shared: null });
+  });
+
   it('syncs a manual background and keeps it when the icon changes', async () => {
     a.db.channels.update('volero', { avatar_bg: '#123456' });
     await exchange();
@@ -196,6 +205,12 @@ describe('automation runs', () => {
     await exchange();
     expect(b.worker.status().deferred).toBe(0);
     expect(runs(b).map((r: any) => r.uid)).toContain('run-early');
+  });
+
+  it('a skipped run reaches B with its reason and no thread', async () => {
+    const { uid } = a.db.automationRuns.skip('quiet', 'cron', 'precheck exited 1');
+    await exchange();
+    expect(b.db.db.prepare('SELECT thread_id, skip_reason FROM automation_runs WHERE uid = ?').get(uid)).toEqual({ thread_id: null, skip_reason: 'precheck exited 1' });
   });
 
   it("lists an automation's runs newest first by when they ran, not by when they arrived", async () => {

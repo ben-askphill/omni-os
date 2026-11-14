@@ -21,6 +21,10 @@ export interface Channel {
   default_harness: string | null;
   default_model: string | null;
   default_effort: string | null;
+  /** Ignored files copied into each new worktree, one gitignore pattern per line. */
+  worktree_include: string | null;
+  /** Folders linked from the main checkout into each new worktree, one per line. */
+  worktree_shared: string | null;
   /** The channel's own branch step prompts, null for the built-in ones (`stepPrompts` in @omni/shared/thread-glance.ts). Missing from an older server. */
   prompt_open_pr?: string | null;
   prompt_fix_conflicts?: string | null;

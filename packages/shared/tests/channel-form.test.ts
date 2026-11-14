@@ -40,6 +40,8 @@ describe('channel form', () => {
       default_harness: 'claude-code',
       default_model: 'sonnet',
       default_effort: null,
+      worktree_include: null,
+      worktree_shared: null,
       prompt_open_pr: 'Use the pr-writer skill.',
       prompt_fix_conflicts: null,
       prompt_fix_checks: null,
@@ -50,6 +52,14 @@ describe('channel form', () => {
     const f = channelForm(acme);
     expect(f.prompts).toEqual({ open: 'Use the pr-writer skill.', conflicts: '', checks: '' });
     expect(promptsBody({ ...f.prompts, open: '  ', checks: ' Fix it. ' })).toEqual({ prompt_open_pr: null, prompt_fix_conflicts: null, prompt_fix_checks: 'Fix it.' });
+  });
+
+  it('sends the worktree lists one entry per line and refuses a shared pattern', () => {
+    const f = { ...channelForm(acme), worktree_include: ' .env\n\n# local\nconfig/*.json\n.env ', worktree_shared: '/node_modules/\n' };
+    expect(channelBody(f, { system: false, github: false })).toMatchObject({ worktree_include: '.env\nconfig/*.json', worktree_shared: '/node_modules/' });
+    expect(channelFormProblem(f, false)).toBeNull();
+    expect(channelFormProblem({ ...f, worktree_shared: 'packages/*/node_modules' }, false)).toMatch(/pattern/);
+    expect(channelFormProblem({ ...f, worktree_shared: '../elsewhere' }, false)).toMatch(/inside the repo/);
   });
 
   it('leaves kind out for a system channel and sends the GitHub repo only when asked', () => {

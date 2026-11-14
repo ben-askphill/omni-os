@@ -39,6 +39,8 @@ const channel = (patch: Partial<Channel> = {}): Channel => ({
   default_harness: null,
   default_model: null,
   default_effort: null,
+  worktree_include: null,
+  worktree_shared: null,
   prompt_open_pr: null,
   prompt_fix_conflicts: null,
   prompt_fix_checks: null,
