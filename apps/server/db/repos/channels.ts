@@ -24,6 +24,10 @@ export interface Channel {
   default_harness: string | null;
   default_model: string | null;
   default_effort: string | null;
+  /** The channel's own prompts for the branch steps (packages/shared/thread-glance.ts stepPrompts). Null uses the built-in one. */
+  prompt_open_pr: string | null;
+  prompt_fix_conflicts: string | null;
+  prompt_fix_checks: string | null;
   /** A standalone HTML file the channel's threads follow for the pages they write. Kept out of the API: see publicChannel. */
   design_system: string | null;
   design_system_name: string | null;
@@ -51,8 +55,8 @@ export const channels = {
     return tx(() => {
       db.prepare(
         `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes, icon, avatar_bg, avatar_bg_manual,
-           default_harness, default_model, default_effort)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           default_harness, default_model, default_effort, prompt_open_pr, prompt_fix_conflicts, prompt_fix_checks)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         c.id,
         c.name,
@@ -71,6 +75,9 @@ export const channels = {
         c.default_harness ?? null,
         c.default_model ?? null,
         c.default_effort ?? null,
+        c.prompt_open_pr ?? null,
+        c.prompt_fix_conflicts ?? null,
+        c.prompt_fix_checks ?? null,
       );
       record('channel', c.id);
       return channels.get(c.id)!;
@@ -81,7 +88,7 @@ export const channels = {
     const allowed = [
       'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir',
       'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'avatar_bg', 'avatar_bg_manual', 'design_system', 'design_system_name', 'archived',
-      'default_harness', 'default_model', 'default_effort',
+      'default_harness', 'default_model', 'default_effort', 'prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks',
     ] as const;
     const keys = allowed.filter((k) => k in patch);
     if (keys.length) {

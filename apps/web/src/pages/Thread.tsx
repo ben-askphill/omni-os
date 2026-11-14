@@ -14,7 +14,7 @@ import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.ts
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { useBranchChanges } from '../mobile/ThreadTurn.tsx';
-import { OPEN_PR_PROMPT, prNext, prOffered, stepOf, stepParked, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { prNext, prOffered, stepOf, stepParked, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
@@ -41,7 +41,7 @@ import { tailId } from '@omni/shared/history.ts';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
 
 export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: string; artifact?: number; at?: number; view?: ThreadView }) {
-  const { mods, tasks } = useApp();
+  const { mods, tasks, channel: listedChannel } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
@@ -141,17 +141,20 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     card.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     setToAgents(false);
   }, [toAgents, panelTab, children, panel.open]);
-  const underway = useMemo(() => stepUnderway(events, queued, slotBusy), [events, queued, slotBusy]);
+  // The channel's own step prompts (Channel Settings), from the live channel list so an edit applies without a reload.
+  const ownChannel = (thread && listedChannel(thread.channel_id)) ?? channel;
+  const prompts = useMemo(() => stepPrompts(ownChannel), [ownChannel]);
+  const underway = useMemo(() => stepUnderway(events, queued, slotBusy, prompts), [events, queued, slotBusy, prompts]);
   // A step prompt that never reached the agent (a restart, or a session download that failed): its button says why, and
   // pressing it again resumes that message rather than sending a second copy.
-  const parked = useMemo(() => (underway ? null : stepParked(queued)), [underway, queued]);
-  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, underway, parked, applyThread, setQueued, setActionError, pin });
+  const parked = useMemo(() => (underway ? null : stepParked(queued, prompts)), [underway, queued, prompts]);
+  const { sending, restoring, ask, restore, toggleDone } = useThreadActions({ id, thread, slotBusy, underway, parked, prompts, applyThread, setQueued, setActionError, pin });
   // The branch's PRs and changes: the PRs tab and the Details tab's branch card read them, and the PRs tab's badge.
   const [prs, reloadPRs] = useThreadPR(thread, slotBusy);
   const watch = usePRWatch(thread?.id, prs);
   const changes = useBranchChanges(thread, slotBusy);
-  const next = prNext(prs?.pr ?? null, !!changes?.files.length);
-  const step = stepOf(sending) ?? underway;
+  const next = prNext(prs?.pr ?? null, !!changes?.files.length, prompts);
+  const step = stepOf(sending, prompts) ?? underway;
   const offered = useMemo(() => prOffered(events, !slotBusy && !queued.length, prs?.pr), [events, slotBusy, queued, prs?.pr]);
 
   useThreadPresence(id, thread);
@@ -323,7 +326,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               onChanged={(t) => applyThread(t)}
               machine={{ blocked, handoff, takeover, onChanged: handedOff }}
               asking={asking}
-              openPR={offered || step === 'open' ? { busy: step === 'open', run: () => void ask(OPEN_PR_PROMPT) } : null}
+              openPR={offered || step === 'open' ? { busy: step === 'open', prompt: prompts.open, run: () => void ask(prompts.open) } : null}
             />
           </div>
         </div>
@@ -345,7 +348,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               onTab={setPanelTab}
               onClose={panel.closeInspector}
               details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, parked: parked?.step ?? null, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs(), onTab: setPanelTab }}
-              prs={{ data: prs, watch, next, step, parked: parked?.step ?? null, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs() }}
+              prs={{ data: prs, watch, next, step, parked: parked?.step ?? null, openPrompt: prompts.open, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs() }}
             />
           </div>
         </aside>

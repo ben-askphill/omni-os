@@ -114,6 +114,19 @@ describe('channels', () => {
     for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'from an old Mac', icon, avatar_bg: bg });
   });
 
+  it("syncs the channel's own branch step prompts, a clear back to the built-in one, and keeps them from an older Mac's change", async () => {
+    a.db.channels.update('volero', { prompt_open_pr: 'Use the pr-writer skill and the repo template.', prompt_fix_checks: 'Fix the checks.' });
+    await exchange();
+    expect(b.db.channels.get('volero')).toMatchObject({ prompt_open_pr: 'Use the pr-writer skill and the repo template.', prompt_fix_conflicts: null, prompt_fix_checks: 'Fix the checks.' });
+    b.db.channels.update('volero', { prompt_fix_checks: null });
+    await exchange();
+    expect(a.db.channels.get('volero')!.prompt_fix_checks).toBeNull();
+    const { prompt_open_pr: _o, prompt_fix_conflicts: _c, prompt_fix_checks: _k, ...row } = relay.changes.findLast((c) => c.entity === 'channel' && c.entity_id === 'volero')!.data as any;
+    await relay.push([{ machine_id: 'mac-old', entity: 'channel', entity_id: 'volero', op: 'upsert', ts: new Date(Date.now() + 2000).toISOString(), data: { ...row, notes: 'old Mac again' } }]);
+    await exchange();
+    for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'old Mac again', prompt_open_pr: 'Use the pr-writer skill and the repo template.' });
+  });
+
   it('a color a Mac on an older build dropped reaches it once it updates', async () => {
     a.db.channels.create({ id: 'tinted', name: 'Tinted' });
     a.db.channels.create({ id: 'plain', name: 'Plain' });

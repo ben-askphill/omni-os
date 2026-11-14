@@ -57,6 +57,14 @@ function runDefaultsError(body: { default_harness?: string | null; default_model
   return err ? `Default model: ${err}` : undefined;
 }
 
+/** A branch step's own prompt (packages/shared/thread-glance.ts stepPrompts): blank clears it back to the built-in one. */
+const stepPrompt = z
+  .string()
+  .trim()
+  .max(4000)
+  .transform((s) => s || null)
+  .nullish();
+
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
@@ -76,6 +84,9 @@ const channelSchema = z.object({
   default_harness: runDefault,
   default_model: runDefault,
   default_effort: runDefault,
+  prompt_open_pr: stepPrompt,
+  prompt_fix_conflicts: stepPrompt,
+  prompt_fix_checks: stepPrompt,
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */

@@ -21,6 +21,10 @@ export interface Channel {
   default_harness: string | null;
   default_model: string | null;
   default_effort: string | null;
+  /** The channel's own branch step prompts, null for the built-in ones (`stepPrompts` in @omni/shared/thread-glance.ts). Missing from an older server. */
+  prompt_open_pr?: string | null;
+  prompt_fix_conflicts?: string | null;
+  prompt_fix_checks?: string | null;
   design_system_name: string | null;
   design_system_size: number;
   archived: number;

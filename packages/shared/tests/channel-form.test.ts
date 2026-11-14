@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { channelBody, channelForm, channelFormProblem, runBody, slugify, storeDomain, type ChannelRecord } from '../channel-form.ts';
+import { channelBody, channelForm, channelFormProblem, promptsBody, runBody, slugify, storeDomain, type ChannelRecord } from '../channel-form.ts';
 import { setsRun } from '../draft-run.ts';
 
 const acme: ChannelRecord = {
@@ -18,6 +18,7 @@ const acme: ChannelRecord = {
   default_harness: 'claude-code',
   default_model: 'sonnet',
   default_effort: null,
+  prompt_open_pr: 'Use the pr-writer skill.',
 };
 
 describe('channel form', () => {
@@ -39,7 +40,16 @@ describe('channel form', () => {
       default_harness: 'claude-code',
       default_model: 'sonnet',
       default_effort: null,
+      prompt_open_pr: 'Use the pr-writer skill.',
+      prompt_fix_conflicts: null,
+      prompt_fix_checks: null,
     });
+  });
+
+  it('sends a blank step prompt as null, which goes back to the built-in one', () => {
+    const f = channelForm(acme);
+    expect(f.prompts).toEqual({ open: 'Use the pr-writer skill.', conflicts: '', checks: '' });
+    expect(promptsBody({ ...f.prompts, open: '  ', checks: ' Fix it. ' })).toEqual({ prompt_open_pr: null, prompt_fix_conflicts: null, prompt_fix_checks: 'Fix it.' });
   });
 
   it('leaves kind out for a system channel and sends the GitHub repo only when asked', () => {
