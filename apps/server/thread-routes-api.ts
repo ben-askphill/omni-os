@@ -57,6 +57,8 @@ import { threadFilesReady, threadOpened } from './sync/files.ts';
 import { turnBlocked } from './sync/guard.ts';
 import { basePick, baseView } from './worktree-base.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
+import { stepOf } from '@omni/shared/thread-glance.ts';
+import { fixChecksPrompt } from './fix-checks.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
 export const threadRoutesApi = new Hono();
@@ -272,7 +274,9 @@ threadActionsApi.post('/:id/messages', async (c) => {
   const stamped = stampThreadReferences(id, context.value);
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const attachments = await saveUploads(id, files);
-  return c.json(await postMessage(id, prompt, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint }));
+  // Ben's Fix checks step goes out with the failing checks and their log tails (fix-checks.ts), from any client.
+  const text = from === 'ben' && stepOf(prompt) === 'checks' ? await fixChecksPrompt(target) : prompt;
+  return c.json(await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint }));
 });
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });
