@@ -11,7 +11,7 @@ import { Markdown } from '../components/Markdown.tsx';
 import { ChangesTab } from '../components/thread/panel/ChangesTab.tsx';
 import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
-import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
+import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { ThreadIdCtx, ToolOutput } from '../components/thread/ToolOutput.tsx';
 import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, statusLabel, StatusDot } from '../components/ui.tsx';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
@@ -23,7 +23,7 @@ import { runningSubagents, subagentKind } from '../subagents.ts';
 import { href, type Route } from '../router.ts';
 import { RerunNote, useRerunFailedChecks } from '../components/RerunChecks.tsx';
 import { mergeNote } from '@omni/shared/pr-merge.ts';
-import { checkTone, STEP_WORKING, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { checkTone, STEP_WORKING, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { useApp } from '../store.tsx';
 import { toolLabel, toolSummary, type Item, type ToolCall } from '@omni/shared/transcript-fold.ts';
 import { CrewFileList } from './CrewFiles.tsx';
@@ -159,7 +159,8 @@ export function PRScreen() {
   const { channel } = useApp();
   const [mark] = useThreadPR(thread, slotBusy, true);
   const [asking, setAsking] = useState(false);
-  const opening = asking || stepUnderway(events, queued, slotBusy) === 'open';
+  const prompts = stepPrompts(thread ? channel(thread.channel_id) : null);
+  const opening = asking || stepUnderway(events, queued, slotBusy, prompts) === 'open';
   const watch = usePRWatch(thread?.id, mark);
   const crew = mark?.crew ?? [];
   const [picked, setPicked] = useState<string | null>(null);
@@ -199,7 +200,7 @@ export function PRScreen() {
     if (!thread) return;
     setAsking(true);
     try {
-      applyThread(await api.post(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: OPEN_PR_PROMPT, mode: slotBusy ? 'queue' : undefined }), true);
+      applyThread(await api.post(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: prompts.open, mode: slotBusy ? 'queue' : undefined }), true);
       shell.toast('Asked for a PR');
       shell.back();
     } catch (e) {

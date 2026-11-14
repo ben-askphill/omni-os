@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { stepOf, type PRStep } from '@omni/shared/thread-glance.ts';
+import { stepOf, type PRStep, type StepPrompts } from '@omni/shared/thread-glance.ts';
 import { api, errorText, type PendingMsg, type SendMode, type Thread } from '../api.ts';
-import { OPEN_PR_PROMPT } from '../components/thread/ThreadPR.tsx';
 import { useApp } from '../store.tsx';
 
 /**
@@ -14,6 +13,7 @@ export function useThreadActions({
   slotBusy,
   underway,
   parked,
+  prompts,
   applyThread,
   setQueued,
   setActionError,
@@ -26,6 +26,8 @@ export function useThreadActions({
   underway: PRStep | null;
   /** A step prompt that was parked before the agent got it (`stepParked`). Asking for that step again resumes it. */
   parked: { step: PRStep; uuid: string } | null;
+  /** The channel's step prompts (`stepPrompts`), so its own wording reads as the step too. */
+  prompts: StepPrompts;
   applyThread: (t: Thread, replace?: boolean) => void;
   setQueued: (pending: PendingMsg[]) => void;
   setActionError: (e: string | null) => void;
@@ -41,9 +43,9 @@ export function useThreadActions({
   const seen = useRef(false);
   useEffect(() => {
     if (!sending) return;
-    if (underway !== null && underway === stepOf(sending)) seen.current = true;
+    if (underway !== null && underway === stepOf(sending, prompts)) seen.current = true;
     else if (seen.current && !slotBusy) setSending(null);
-  }, [sending, underway, slotBusy]);
+  }, [sending, underway, slotBusy, prompts]);
   // In case the thread never shows it (another client cleared the queue, the turn ended between two renders).
   useEffect(() => {
     if (!sent) return;
@@ -61,7 +63,7 @@ export function useThreadActions({
     setSent(false);
     setActionError(null);
     try {
-      if (parked && parked.step === stepOf(prompt)) {
+      if (parked && parked.step === stepOf(prompt, prompts)) {
         // The same prompt waits parked: send that one, so the thread does not end up asking twice.
         const res = await api.post<{ thread: Thread; pending: PendingMsg[] }>(`/threads/${encodeURIComponent(id)}/requests/resume`, { ids: [parked.uuid] });
         applyThread(res.thread);
@@ -79,7 +81,7 @@ export function useThreadActions({
     }
   };
 
-  const openPR = () => ask(OPEN_PR_PROMPT);
+  const openPR = () => ask(prompts.open);
 
   // An archived thread opened from its channel's Archived list or a search: put it back in the lists.
   const restore = async () => {

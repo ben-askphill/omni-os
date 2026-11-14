@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 
@@ -71,6 +71,20 @@ describe('a worktree thread', () => {
     // The first prompt went as a request, and the transcript keeps the thread's own source.
     expect(r.byKind(t.id, 'user').map((e) => [e.p.text, e.p.source])).toEqual([['fix the cart', 'manual']]);
     expect(r.db.messageRequests.forThread(t.id).map((q) => [q.request_id, q.state])).toEqual([['thread-start', 'delivered']]);
+  });
+
+  it("has the repo's .worktreeinclude files before its agent starts, and skips what the main checkout lacks", async () => {
+    const dir = repo();
+    writeFileSync(join(dir, '.gitignore'), '.env\nlocal.toml\n');
+    writeFileSync(join(dir, '.worktreeinclude'), '.env\nlocal.toml\n');
+    git(dir, 'add', '.');
+    git(dir, 'commit', '-q', '-m', 'include');
+    writeFileSync(join(dir, '.env'), 'TOKEN=1\n');
+    const t = await r.runner.createThread({ channel: channel(dir), prompt: 'preview the theme' });
+    await r.untilResults(t.id, 1);
+    expect(r.thread(t.id).setup).toBeNull();
+    expect(readFileSync(join(t.cwd, '.env'), 'utf8')).toBe('TOKEN=1\n');
+    expect(existsSync(join(t.cwd, 'local.toml'))).toBe(false);
   });
 
   it('fails visibly when git worktree add fails, keeping the prompt and files, and never runs in the repo', async () => {

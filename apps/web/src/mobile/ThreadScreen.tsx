@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
-import { OPEN_PR_PROMPT, useThreadPR } from '../components/thread/ThreadPR.tsx';
+import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { HistoryCtx, HistoryEdgeRow } from '../components/thread/HistoryEdgeRow.tsx';
@@ -27,7 +27,7 @@ import { RunOnSheet } from './RunOnSheet.tsx';
 import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from '@omni/shared/thread-view.ts';
-import { crewLine, prLine, prOffered, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { crewLine, prLine, prOffered, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { runningSubagents } from '../subagents.ts';
@@ -54,7 +54,10 @@ export function ThreadScreen() {
   const changes = useBranchChanges(thread, slotBusy);
   const [pr] = useThreadPR(thread, slotBusy, true);
   const agents = useMemo(() => runningSubagents(tasks, thread?.id ?? ''), [tasks, thread?.id]);
-  const step = useMemo(() => stepUnderway(events, queued, slotBusy), [events, queued, slotBusy]);
+  // The channel's own step prompts (Channel Settings), else the built-in ones.
+  const ownChannel = thread ? channel(thread.channel_id) : undefined;
+  const prompts = useMemo(() => stepPrompts(ownChannel), [ownChannel]);
+  const step = useMemo(() => stepUnderway(events, queued, slotBusy, prompts), [events, queued, slotBusy, prompts]);
   const artifactCount = files.length + shots.length + crewArtifacts.files.length + crewArtifacts.shots.length;
   const workCwd = init?.cwd || thread?.cwd || '';
   const { scroll, newest } = useOpenOnNewestTurn({ view, history, ready, revealTarget, clearReveal });
@@ -93,7 +96,7 @@ export function ThreadScreen() {
 
   const openPR = async () => {
     try {
-      applyThread(await api.post<Thread>(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: OPEN_PR_PROMPT }), true);
+      applyThread(await api.post<Thread>(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: prompts.open }), true);
       shell.toast(`Asked ${theirs} to open a PR`);
     } catch (e) {
       shell.toast(errorText(e));

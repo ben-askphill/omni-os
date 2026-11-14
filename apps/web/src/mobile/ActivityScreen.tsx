@@ -50,6 +50,7 @@ export function ActivityScreen() {
         <div className="flex flex-col px-4">
           {working.count > 0 && (
             <>
+              <div aria-hidden className="mt-2 mb-1 border-t border-line" />
               <MoShelf label="Working" shelf={working} />
               {working.rows.map((t, i) => (
                 <MoInboxRow key={t.id} t={t} status={status(t)} delegated={delegates.get(t.id)} last={i === working.rows.length - 1} />
