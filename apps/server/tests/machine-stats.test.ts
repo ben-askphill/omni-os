@@ -231,15 +231,27 @@ describe('the sampler', () => {
     expect(await watchStats(false)).toBeNull();
   });
 
+  it('ignores a watch stamped over five minutes ago, as one a waking machine catches up on', async () => {
+    noteSynced('machine-watch.mac-b', { at: '2026-11-14T17:50:00.000Z' });
+    noteSynced('machine-watch.mac-b', { at: 'yesterday' });
+    noteSynced('machine-watch.mac-b', {});
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(feed).toEqual([]);
+    expect(store.has('machine-stats.mac-a')).toBe(false);
+    noteSynced('machine-watch.mac-b', { at: '2026-11-14T17:59:20.000Z' });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(store.get('machine-stats.mac-a')).toMatchObject({ cpu: 15 });
+  });
+
   it('sends at once when a watch arrives while it already samples', async () => {
     await watchStats(true);
     await vi.advanceTimersByTimeAsync(1_000);
-    noteSynced('machine-watch.mac-b', {});
+    noteSynced('machine-watch.mac-b', { at: '2026-11-14T18:00:01.000Z' });
     expect(store.get('machine-stats.mac-a')).toMatchObject({ cpu: 15 });
   });
 
   it('ignores its own watch record, and never sends with sync off', async () => {
-    noteSynced('machine-watch.mac-a', {});
+    noteSynced('machine-watch.mac-a', { at: '2026-11-14T18:00:00.000Z' });
     await vi.advanceTimersByTimeAsync(10_000);
     expect(feed).toEqual([]);
     self.id = null;

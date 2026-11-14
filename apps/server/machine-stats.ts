@@ -184,6 +184,9 @@ export function configureMachineStats(o: Partial<typeof options>) {
 /** Clients get an unchanged sample at most this often, so this machine's tile never looks stale while sampling. */
 const FEED_HEARTBEAT_MS = 30_000;
 
+/** Tolerates clock skew between machines, while ignoring an old watch a machine catches up on after sleeping. */
+const WATCH_MAX_AGE_MS = 5 * 60_000;
+
 let active = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let inflight: Promise<void> | null = null;
@@ -283,12 +286,15 @@ export async function watchStats(others: boolean, always = false): Promise<Machi
 
 /**
  * A kv machine-watch.* or machine-stats.* change synced in from another machine (sync/handlers/kv.ts). A watch is
- * timed from when it arrived here, by this machine's clock, so the two clocks need not agree.
+ * timed from when it arrived here, by this machine's clock, so the two clocks need not agree; one stamped over five
+ * minutes ago is ignored.
  */
 export function noteSynced(key: string, value: unknown) {
   if (key.startsWith(WATCH_PREFIX)) {
     if (key.slice(WATCH_PREFIX.length) === outbox.machineId()) return;
     const now = options.now();
+    const at = Date.parse(String((value as { at?: unknown } | null)?.at));
+    if (!(now - at <= WATCH_MAX_AGE_MS)) return;
     remoteUntil = now + options.remoteLeaseMs;
     sentAt = 0;
     if (active) send(now);
