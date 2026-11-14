@@ -54,7 +54,7 @@ describe('pins', () => {
   });
 
   it('a change from a Mac on an older build, without pinned_at, keeps the pin', async () => {
-    const { pinned_at: _drop, ...row } = relay.changes.findLast((c) => c.entity === 'thread' && c.entity_id === 't-1')!.data as any;
+    const { pinned_at: _drop, edited: _edits, ...row } = relay.changes.findLast((c) => c.entity === 'thread' && c.entity_id === 't-1')!.data as any;
     await relay.push([{ machine_id: 'mac-old', entity: 'thread', entity_id: 't-1', op: 'upsert', ts: new Date(Date.now() + 1000).toISOString(), data: { ...row, title: 'from an old Mac' } }]);
     await exchange();
     expect(b.db.threads.get('t-1')).toMatchObject({ title: 'from an old Mac', pinned_at: expect.any(String) });

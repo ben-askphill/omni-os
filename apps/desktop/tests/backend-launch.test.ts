@@ -50,9 +50,10 @@ describe('server env', () => {
         OPENAI_API_KEY: 'sk',
         OMNI_TOKEN: 'secret',
         OMNI_DATA_DIR: '/somewhere/else',
+        OMNI_DESKTOP_PAIR_SECRET: 'the app\'s own',
         PATH: '/bad',
       },
-      { path: '/home/me/.local/bin:/usr/bin', port: 4747, dataDir: '/data' },
+      { path: '/home/me/.local/bin:/usr/bin', port: 4747, dataDir: '/data', pairSecret: 'f'.repeat(64) },
     );
     expect(env.HOME).toBe('/home/me');
     expect(env.WAYLAND_DISPLAY).toBe('wayland-1');
@@ -62,6 +63,7 @@ describe('server env', () => {
     expect(env.OMNI_DATA_DIR).toBe('/data');
     expect(env.OMNI_SUPERVISOR).toBe('desktop');
     expect(env.ELECTRON_RUN_AS_NODE).toBe('1');
+    expect(env.OMNI_DESKTOP_PAIR_SECRET).toBe('f'.repeat(64));
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
     expect(env.OPENAI_API_KEY).toBeUndefined();
     expect(env.OMNI_TOKEN).toBeUndefined();

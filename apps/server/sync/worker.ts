@@ -1,11 +1,14 @@
 import { kv, outbox, type OutboxRow } from '../db.ts';
 import { globalSecret, LEGACY_SYNC_SECRETS, listSecrets, SYNC_SECRETS } from '../secrets.ts';
-import { applyBatch, deferredCount, getHandler, registeredEntities, retryDeferred, type ApplyContext } from './apply.ts';
+import { applyBatch, deferredChanges, deferredCount, getHandler, registeredEntities, retryDeferred, type ApplyContext } from './apply.ts';
 import { createRelayTransport, isoTs, isSignedOut, type Change, type SyncTransport } from './transport.ts';
 import { watchNetwork, type NetworkWatch } from './network.ts';
 import { automationsOwner, claimIfUnowned, type AutomationsOwner } from './owner.ts';
 import { hardwareId } from './hardware.ts';
 import { resendChannelColors } from './resend-channel-colors.ts';
+import { signChange, unsigned } from './signing.ts';
+import { signingKey } from './sign-key.ts';
+import { keyring } from './keyring.ts';
 import './handlers/index.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
@@ -128,7 +131,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   const machineId = outbox.arm(opts.machineId, hardwareId());
   if (copiedFrom && copiedFrom !== machineId)
     console.warn(`[sync] this data folder was copied from another machine (sync id ${copiedFrom}): this machine is now ${machineId} and pulls the history again`);
-  const ctx: ApplyContext = { machineId };
+  // Made or read now, so the first push does not wait on the secret store.
+  signingKey().catch(() => {});
   const batch = opts.batchSize ?? 200;
   const interval = opts.intervalMs ?? 60_000;
 
@@ -146,6 +150,21 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   let offNetwork: (() => void) | undefined;
   let inflight: Promise<SyncResult> | null = null;
   let queued: Promise<SyncResult> | null = null;
+  let listError: string | null = null;
+
+  /**
+   * Every change signed with this machine's key (sync/signing.ts). Without the key (a locked Keychain), nothing goes
+   * out: the other machines would refuse its commands and assignments. The sync fails, says why and tries again.
+   */
+  async function signed(changes: Change[]): Promise<Change[]> {
+    let key;
+    try {
+      key = await signingKey();
+    } catch (err) {
+      throw new Error(`This Mac's sync signing key could not be read from the secret store: ${(err as Error).message}`);
+    }
+    return changes.map((c) => signChange(c, key));
+  }
 
   async function push(): Promise<number> {
     let pushed = 0;
@@ -154,7 +173,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       const rows = outbox.pending(batch, registeredEntities());
       if (!rows.length) return pushed;
       const changes = toChanges(rows, machineId);
-      if (changes.length) await transport.push(changes);
+      if (changes.length) await transport.push(await signed(changes));
       outbox.ack(rows.map((r) => r.id));
       pushed += changes.length;
       if (rows.length < batch) return pushed;
@@ -162,6 +181,24 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   }
 
   async function pull(result: SyncResult) {
+    // No auto-trust without the relay's registration list: an unavailable list or an older transport leaves new keys
+    // seen only, for Ben to trust, and the rest of the sync goes on. A cached device record is synced data, not
+    // evidence of pairing. This API proves registration only; token bindings remain private to the relay (ADR 0013).
+    const ctx: ApplyContext = { machineId };
+    let checked = false;
+    const checkFirstKeys = async (changes: Change[]) => {
+      if (checked || !changes.some((c) => unsigned(c).signature && !keyring.get(c.machine_id)?.signKey)) return;
+      checked = true;
+      try {
+        ctx.pairedMachines = (await transport.pairedMachines?.()) ?? new Set();
+        listError = null;
+      } catch (err) {
+        ctx.pairedMachines = new Set();
+        const message = (err as Error)?.message ?? String(err);
+        if (message !== listError) console.warn(`[sync] the relay's registration list is unavailable, so new machines wait for Trust: ${message}`);
+        listError = message;
+      }
+    };
     for (;;) {
       const after = kv.get<number>('sync.cursor') ?? 0;
       const changes = await transport.pull({ after, excludeMachine: machineId, limit: batch });
@@ -169,6 +206,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       // changes and this cursor belong to the sync that is over.
       if (stopped) return;
       if (!changes.length) break;
+      await checkFirstKeys(changes);
+      if (stopped) return;
       const stats = applyBatch(changes.map((c) => ({ ...c, ts: isoTs(c.ts) })), ctx);
       result.pulled += changes.length;
       result.applied += stats.applied;
@@ -178,6 +217,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       kv.set('sync.cursor', last);
       if (changes.length < batch) break;
     }
+    await checkFirstKeys(deferredChanges());
+    if (stopped) return;
     const retried = retryDeferred(ctx);
     result.applied += retried.applied;
     result.skipped += retried.skipped;

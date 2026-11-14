@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import { channelThreads, threadSections, type ThreadRow } from '../live/channel-model';
-import { useChannels, useHandoffOpen, useLiveHub, usePullRefresh } from '../live/react';
+import { useChannels, useChannelThreadPages, useHandoffOpen, useLiveHub, usePullRefresh } from '../live/react';
 import { ChannelAvatar } from '../components/ChannelAvatar';
 import { FolderHeader } from '../components/FolderHeader';
 import { HandoffRowView } from '../components/HandoffRowView';
@@ -25,6 +25,8 @@ export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>)
   const name = channel?.name ?? null;
   const icon = channel?.icon ?? null;
   const [menuId, setMenuId] = useState<string | null>(null);
+  // Every thread in the channel, paged from the server; the sidebar previews stand in until the first page lands.
+  const paged = useChannelThreadPages(id);
 
   useEffect(() => {
     if (name) navigation.setOptions({ title: name, headerTitle: () => <ChannelTitle name={name} icon={icon} avatarBg={channel?.avatar_bg} conductor={id === 'conductor'} /> });
@@ -33,8 +35,8 @@ export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>)
   const sections = useMemo(() => {
     if (!channel) return [];
     const nameOf = (channelId: string) => channels?.find((c) => c.id === channelId)?.name ?? channelId;
-    return threadSections(channelThreads(channel, Date.now(), nameOf));
-  }, [channel, channels]);
+    return threadSections(channelThreads(channel, Date.now(), nameOf, paged.threads ?? undefined));
+  }, [channel, channels, paged.threads]);
 
   const toggleFolder = async (folderId: string, collapsed: boolean) => {
     const failure = await hub.setFolderCollapsed(folderId, collapsed);
@@ -90,6 +92,9 @@ export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>)
         }
         renderItem={({ item }) => <ChannelThreadRow row={item} onOpen={open} onMenu={setMenuId} />}
         stickySectionHeadersEnabled={false}
+        onEndReached={() => void paged.loadMore()}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={paged.more ? <ActivityIndicator style={styles.more} color={colors.fg3} /> : undefined}
       />
       <ThreadMenuSheet target={menuTarget} folders={channel?.folders ?? []} onClose={() => setMenuId(null)} onChanged={() => {}} />
     </>
@@ -130,5 +135,8 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: space.s9,
     paddingTop: space.s2,
+  },
+  more: {
+    paddingVertical: space.s9,
   },
 });

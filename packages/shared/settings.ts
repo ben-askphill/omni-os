@@ -183,6 +183,38 @@ export const SETTING_FIELDS = [
     max: 200,
     env: { name: 'OMNI_CLERK_CLIENT_ID', emptyWins: true },
   },
+  {
+    // OAuth clients whose Clerk tokens /mcp takes even when the token names no audience (apps/server/mcp-token.ts),
+    // comma separated client ids. Approving one in Settings does the same per machine; this is for the file.
+    section: 'integrations',
+    key: 'mcpClients',
+    label: 'Approved MCP clients',
+    input: 'text',
+    page: 'access',
+    advanced: true,
+    readonly: true,
+    hint: 'OAuth client ids /mcp accepts, comma separated. Clients whose token names this Omni need no entry.',
+    default: '',
+    max: 2000,
+    env: { name: 'OMNI_MCP_CLIENTS', emptyWins: true },
+  },
+  {
+    // Which synced changes need a valid signature from the machine that sent them (apps/server/sync/verify.ts).
+    // actions: remote commands, assignments, update asks, the automations owner and secret drops; the rest is logged and
+    // applied, so a Mac on an older build keeps syncing. strict: every change. log: nothing is refused for a missing
+    // signature, for a rollout with older Macs still sending commands; a bad signature is still refused.
+    section: 'integrations',
+    key: 'syncSignatures',
+    label: 'Signed sync',
+    input: 'text',
+    page: 'access',
+    advanced: true,
+    readonly: true,
+    hint: 'actions, strict or log. Which synced changes need a signature from the machine that sent them.',
+    default: 'actions',
+    max: 20,
+    env: { name: 'OMNI_SYNC_SIGNATURES' },
+  },
 ] as const satisfies readonly SettingField[];
 
 type Field = (typeof SETTING_FIELDS)[number];

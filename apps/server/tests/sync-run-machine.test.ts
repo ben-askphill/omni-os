@@ -80,9 +80,10 @@ describe('a rename that crosses the end of the run', () => {
     a.db.threads.update('t-cross', { status: 'done' });
     await sync(a);
     b.db.threads.update('t-cross', { title: 'Renamed late' });
-    // A keeps its own status over B's and queues the row again; its next push takes it to B.
+    // A keeps its own status over B's. B takes A's done although its rename is the newer row: A owns the thread, and
+    // its status write is later than the one B last took (sync/thread-merge.ts).
     await sync(b, a);
-    expect(b.db.threads.get('t-cross')!.status).toBe('running');
+    expect(b.db.threads.get('t-cross')!.status).toBe('done');
     await sync(a, b);
     for (const m of [a, b]) {
       expect(m.db.threads.get('t-cross')).toMatchObject({ title: 'Renamed late', status: 'done' });

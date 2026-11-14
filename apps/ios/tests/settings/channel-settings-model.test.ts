@@ -23,6 +23,8 @@ const channel = (over: Partial<Channel> = {}): Channel => ({
   default_harness: null,
   default_model: null,
   default_effort: null,
+  worktree_include: null,
+  worktree_shared: null,
   design_system_name: null,
   design_system_size: 0,
   archived: 0,
@@ -38,6 +40,16 @@ describe('saving channel settings', () => {
     const edited = { ...form, notes: 'Shopify theme', showBrowser: true };
     expect(formDirty(edited, c)).toBe(true);
     expect(saveBody(edited, c)).toMatchObject({ notes: 'Shopify theme', browser_headless: 0, kind: 'client' });
+  });
+
+  it('sends the worktree lists one entry per line, and is clean again once they read back', () => {
+    const c = channel({ worktree_shared: 'node_modules' });
+    const form = channelForm(c);
+    expect(form.worktree_shared).toBe('node_modules');
+    expect(formDirty(form, c)).toBe(false);
+    const edited = { ...form, worktree_include: '.env\n\nshopify.theme.toml\n' };
+    expect(formDirty(edited, c)).toBe(true);
+    expect(saveBody(edited, c)).toMatchObject({ worktree_include: '.env\nshopify.theme.toml', worktree_shared: 'node_modules' });
   });
 
   it('sends the GitHub repo only once it changed, so the server keeps reading it from the path', () => {

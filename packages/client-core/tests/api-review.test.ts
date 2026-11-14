@@ -17,6 +17,29 @@ describe('changes', () => {
     expect(sent.map((s) => s.url)).toEqual([at('/threads/t1/turns'), at('/threads/t1/turns?turn=turn%2F2')]);
   });
 
+  it('lists, pins, edits, deletes and sends review notes', async () => {
+    const { sent, api: a } = api({ json: { notes: [] } });
+    const anchor = { path: 'a.ts', old_path: null, side: 'new' as const, start: 1, end: 1, rows: [{ kind: 'add' as const, text: 'x', old: null, new: 1 }], source: { group: 'unstaged' as const, from: 'a', to: 'b', turn: null, blob_old: null, blob_new: null } };
+    await a.reviewNotes('t 1');
+    await a.addReviewNote('t1', anchor, 'why');
+    await a.updateReviewNote('t1', 'n/1', { resolved: true });
+    await a.deleteReviewNote('t1', 'n1');
+    await a.sendReviewNotes('t1');
+    await a.reviewNoteTargets('t1');
+    await a.sendReviewNotes('t1', { target: 'd1' });
+    await a.sendReviewNotes('t1', { new_delegate: true });
+    expect(sent.map((s) => [s.method, s.url, s.body])).toEqual([
+      ['GET', at('/threads/t%201/review-notes'), undefined],
+      ['POST', at('/threads/t1/review-notes'), { anchor, body: 'why' }],
+      ['PATCH', at('/threads/t1/review-notes/n%2F1'), { resolved: true }],
+      ['DELETE', at('/threads/t1/review-notes/n1'), undefined],
+      ['POST', at('/threads/t1/review-notes/send'), {}],
+      ['GET', at('/threads/t1/review-notes/targets'), undefined],
+      ['POST', at('/threads/t1/review-notes/send'), { target: 'd1' }],
+      ['POST', at('/threads/t1/review-notes/send'), { new_delegate: true }],
+    ]);
+  });
+
   it('rejects a turn the thread does not have with the server message', async () => {
     const { api: a } = api({ status: 404, json: { error: 'no such turn' } });
     const err = await a.turnChanges('t1', 'gone').catch((e: unknown) => e);
@@ -45,10 +68,28 @@ describe('pull requests', () => {
     ]);
   });
 
+  it('turns auto-merge on with the confirmation the server wants, and off without it', async () => {
+    const { sent, api: a } = api({ json: { ok: true, output: '', method: 'squash', state: 'OPEN', autoMergeRequest: { mergeMethod: 'SQUASH' } } });
+    await a.setAutoMerge('c 1', 12, true);
+    await a.setAutoMerge('c 1', 12, true, 'rebase');
+    await a.setAutoMerge('c 1', 12, false);
+    expect(sent).toEqual([
+      { method: 'POST', url: at('/channels/c%201/prs/12/auto-merge'), body: { enabled: true, confirm: true } },
+      { method: 'POST', url: at('/channels/c%201/prs/12/auto-merge'), body: { enabled: true, method: 'rebase', confirm: true } },
+      { method: 'POST', url: at('/channels/c%201/prs/12/auto-merge'), body: { enabled: false } },
+    ]);
+  });
+
   it('rejects a merge GitHub refuses with gh\'s own message', async () => {
     const { api: a } = api({ status: 500, json: { error: 'Pull request #12 is not mergeable: the merge commit cannot be cleanly created.' } });
     const err = await a.mergePullRequest('c1', 12).catch((e: unknown) => e);
     expect((err as OmniHttpError).failure).toMatchObject({ kind: 'http', status: 500, message: expect.stringContaining('not mergeable') });
+  });
+
+  it('reruns the failed checks of a PR through its channel', async () => {
+    const { sent, api: a } = api({ json: { runs: [{ id: '200', ok: true }], skipped: 0 } });
+    expect(await a.rerunFailedChecks('c1', 12)).toEqual({ runs: [{ id: '200', ok: true }], skipped: 0 });
+    expect(sent).toEqual([{ method: 'POST', url: at('/channels/c1/prs/12/rerun-failed'), body: {} }]);
   });
 
   it('starts a watch on the branch\'s PR or a named one, stops it, and reads it', async () => {

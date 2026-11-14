@@ -1,7 +1,7 @@
 // Every kind of message context this build knows: one line per kind. The server's projectors
 // (apps/server/message-context/kinds.ts) and the Web UI's views (apps/web/src/message-context/kinds.ts) are typed
 // over this table, so a kind listed here without them fails typecheck.
-import { parseContextsWith, readContextsWith, type FallbackWhy, type MessageContext, type MessageContextKind, type Parsed } from './message-context.ts';
+import { parseContextsWith, readContextsWith, type ContextLimits, type FallbackWhy, type MessageContext, type MessageContextKind, type Parsed } from './message-context.ts';
 import { browserAnnotation } from './message-context-browser.ts';
 import { diffSelection } from './message-context-diff.ts';
 import { terminalExcerpt } from './message-context-terminal.ts';
@@ -25,7 +25,7 @@ export type KnownContext<K extends KindName = KindName> = {
 export type ContextReading = KnownContext | { as: 'fallback'; record: MessageContext; why: FallbackWhy };
 
 /** The server's boundary for a request's `context`. */
-export const parseContexts = (raw: unknown): Parsed<MessageContext[]> => parseContextsWith(raw, CONTEXT_KINDS);
+export const parseContexts = (raw: unknown, limits?: ContextLimits): Parsed<MessageContext[]> => parseContextsWith(raw, CONTEXT_KINDS, limits);
 
 /** A client's read of stored records. Never throws. */
 export function readContexts(raw: unknown): ContextReading[] {

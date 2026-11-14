@@ -285,6 +285,34 @@ describe('sendToGrokBot', () => {
     expect(leaked(URL)).toBe(false);
   });
 
+  it("says why it could not reach Grok Bot from the failure's system code, and leaves the host out", async () => {
+    const failWith = (cause: unknown) =>
+      sendToGrokBot(
+        { request: 'hello' },
+        deps({
+          fetch: async () => {
+            throw Object.assign(new TypeError('fetch failed'), { cause });
+          },
+        }),
+      );
+    const dns = await failWith(Object.assign(new Error('getaddrinfo ENOTFOUND example.test'), { code: 'ENOTFOUND', hostname: 'example.test' }));
+    expect(dns).toEqual({ ok: false, error: "Could not reach Grok Bot: the webhook's host name did not resolve (ENOTFOUND).", reason: 'network' });
+    if (!dns.ok) expect(dns.error).not.toContain('example.test');
+
+    // Happy eyeballs: undici wraps one error per address in an AggregateError.
+    const refused = await failWith(new AggregateError([Object.assign(new Error('connect ECONNREFUSED 10.0.0.1:443'), { code: 'ECONNREFUSED' })], 'all failed'));
+    expect(refused).toMatchObject({ ok: false, error: 'Could not reach Grok Bot: the connection was refused (ECONNREFUSED).' });
+
+    const cert = await failWith(Object.assign(new Error('certificate has expired'), { code: 'CERT_HAS_EXPIRED' }));
+    expect(cert).toMatchObject({ ok: false, error: 'Could not reach Grok Bot: its TLS certificate was refused (CERT_HAS_EXPIRED).' });
+
+    const other = await failWith(Object.assign(new Error('odd'), { code: 'EPROTO' }));
+    expect(other).toMatchObject({ ok: false, error: 'Could not reach Grok Bot (EPROTO).' });
+
+    const odd = await failWith(Object.assign(new Error('odd'), { code: `not a code ${AUTH}` }));
+    expect(odd).toMatchObject({ ok: false, error: 'Could not reach Grok Bot.' });
+  });
+
   it('reports a timeout', async () => {
     const result = await sendToGrokBot(
       { request: 'hello' },

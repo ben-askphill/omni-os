@@ -95,9 +95,13 @@ export const cursorAdapter: HarnessAdapter = {
 
       const args = ['-p', '--output-format', 'stream-json', '--stream-partial-output', '--model', modelId, '--trust', '--force', '--sandbox', 'disabled', '--approve-mcps', '--plugin-dir', pluginDir];
       if (chatId) args.push('--resume', chatId);
-      args.push(prompt);
 
-      const proc = spawn(bin, args, { cwd: thread.cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      // The prompt goes in on stdin, never as an argument: cursor-agent's parser would read a leading dash as a flag
+      // and a prompt that is one of its command names ("status", "logout") as that command, and a long paste would hit
+      // the OS argument limit. Print mode reads stdin when no prompt argument is given.
+      const proc = spawn(bin, args, { cwd: thread.cwd, env, stdio: ['pipe', 'pipe', 'pipe'] });
+      proc.stdin.on('error', () => {}); // A process that dies first closes the pipe; its exit says why.
+      proc.stdin.end(prompt);
       // The runner watches the session, not this process, so the adapter must see its exit itself.
       closePipesAfterExit(proc);
       currentProc = proc;

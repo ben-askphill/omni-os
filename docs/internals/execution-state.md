@@ -17,15 +17,16 @@ who may run a thread at all is [ADR 0005](../adr/0005-one-execution-owner.md), a
 | A thread on its way between Macs | the handoff records | `handoff.ts`, `handoff/records.ts` |
 | A change to a thread's run or machine, or a Continue, as something asked, read and cancelled by id | the transition service | `transition.ts`, `transitions-api.ts`, ledger in `db/repos/transitions.ts` ([transitions](transitions.md)) |
 
-Every other runner module sees a process as `Live`: the controller with every field read-only. It moves the state
-only through the controller's methods, each one arrow below, so `npm run typecheck` fails on a write anywhere else.
+Every other runner module sees a process as `Live`: the controller with every field read-only. A module changes that
+state only through the controller's methods, and each method is one arrow in the diagrams below. A write anywhere else
+fails `npm run typecheck`.
 `runner/spawn.ts launch` builds the controller with the deps `apps/server/compose.ts` bound: reporting (the transcript
 row and the thread feed), scheduling (timers) and persistence (the status write that claims a turn). A test builds one
 with fakes (`tests/thread-controller.test.ts`).
 
 ## A process
 
-One per thread while it is warm. `[*]` on the left is `launch`; on the right the controller is forgotten (`teardown`).
+There is one per thread while the thread is warm. `[*]` on the left is `launch`; on the right the controller is forgotten (`teardown`).
 
 ```mermaid
 stateDiagram-v2
@@ -112,6 +113,6 @@ binds each to its module and builds the controller deps:
 | `handoff.sendNewThread` | `handoff.ts` | `runner/api.ts` createThread for another machine |
 | `reporting.toolResult` | `published.ts`, then `automation-triggers.ts` | `runner/records.ts` on every tool result |
 
-`app.ts` and the test boot (`tests/runner-boot.ts`) import `compose.ts` first; a port used before that throws naming it.
-`tests/import-boundaries.test.ts` scans the runtime imports and fails on any cycle that crosses an owner, so the lines
-above hold without anyone watching them.
+`app.ts` and the test boot (`tests/runner-boot.ts`) import `compose.ts` first; a port used before that throws an error that names it.
+`tests/import-boundaries.test.ts` scans the runtime imports and fails on any cycle that crosses an owner, so a new import
+that breaks the rules above fails the test.

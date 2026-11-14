@@ -60,7 +60,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const offers = view ? agentOffersPR({ rows: view.rows, pending: view.pending, busy }) : false;
   const offerPR = useThreadPR(offers ? thread : null);
   const offered = offers && offerPR.page.kind === 'empty' && offerPR.page.canOpen;
-  const chip = stepChip(prStep.working, prStep.parked, offered);
+  const chip = stepChip(prStep.working, prStep.parked, offered, prStep.prompts);
 
   const title = thread?.title || 'Thread';
   const hasThread = thread !== null;

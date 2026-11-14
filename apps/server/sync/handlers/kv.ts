@@ -1,6 +1,8 @@
 import { db, threads } from '../../db.ts';
 import { publishFeed } from '../../bus.ts';
 import { ASK_PREFIX, STATUS_PREFIX } from '@omni/shared/update-fleet.ts';
+import { ACCOUNTS_PREFIX, SEEN_PREFIX } from '@omni/shared/harness-accounts.ts';
+import { noteSynced } from '../../machine-stats.ts';
 import { claim, registerHandler } from '../apply.ts';
 
 // kv: last writer wins per key, the value as JSON. sync.* keys (machine id, cursor, switches, path map) belong to
@@ -27,11 +29,15 @@ registerHandler('kv', {
   },
   notify(change) {
     // A handoff record (apps/server/handoff/records.ts) or the thread's holder: its banner, its Take over note, and whether
-    // a turn may start follow it.
-    const thread = /^handoff\.(?:offer|reply|request|holder)\.(.+)$/.exec(change.entity_id)?.[1];
+    // a turn may start follow it. The account a thread ran as (harness-accounts.ts): its quick-actions card.
+    const thread = /^(?:handoff\.(?:offer|reply|request|holder)\.|accounts-ran\.)(.+)$/.exec(change.entity_id)?.[1];
     const t = thread && threads.get(thread);
     if (t) publishFeed({ type: 'thread', thread: t });
     // The Update all machines list refetches (update-fleet.ts).
     if (change.entity_id.startsWith(STATUS_PREFIX) || change.entity_id.startsWith(ASK_PREFIX)) publishFeed({ type: 'update' });
+    // Another machine's harness accounts, or a switch acknowledged there (harness-accounts.ts).
+    if (change.entity_id.startsWith(ACCOUNTS_PREFIX) || change.entity_id.startsWith(SEEN_PREFIX)) publishFeed({ type: 'accounts' });
+    // Another machine's CPU and memory, or its ask for this machine's while it shows the machine tiles (machine-stats.ts).
+    if (change.entity_id.startsWith('machine-')) noteSynced(change.entity_id, (change.data as { value?: unknown } | null)?.value);
   },
 });

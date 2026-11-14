@@ -38,6 +38,7 @@ export interface InvokeChannels {
 export interface SendChannels {
   'omni:open-window': [route: string];
   'omni:focus': [];
+  'omni:pair-again': [route?: string];
   'omni:appearance': [mode: 'system' | 'light' | 'dark'];
   'omni:layout': [layout: DesktopLayout];
   'omni:quick-prompt:done': [route?: string];

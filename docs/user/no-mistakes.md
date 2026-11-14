@@ -71,9 +71,9 @@ no-mistakes doctor
 
 ## What this repo asks the gate to run
 
-`.no-mistakes.yaml` is this repo's policy. no-mistakes reads `commands`, `gates`, `test.instructions`, `document.instructions`, `pr.template`, `pr.appendix` and `no_ci` from the default branch. A value that exists only on the pushed branch is ignored. Those fields apply once this file is on `main`. Until then a run uses the tool's defaults.
+`.no-mistakes.yaml` is this repo's policy. no-mistakes reads `commands`, `gates`, `test.instructions`, `document.instructions`, `pr.template`, `pr.appendix` and `no_ci` from the default branch. It ignores a value that exists only on the pushed branch. Those fields apply once this file is on `main`. Until then a run uses the tool's defaults.
 
-`commands.test` is unset on purpose. In no-mistakes that field is a targeted check of the change, and the test step still drives the product afterwards. The repo's real commands sit next to it:
+`commands.test` is unset on purpose. In no-mistakes that field is a targeted check of the change, and the test step still drives the product afterwards. The repo's real commands are in the other fields:
 
 - `commands.prepare` is `npm ci --include=dev --prefer-offline`, so the disposable worktree has dependencies. `test.prepare: true` runs that install before the agent-driven test step, because test runs before lint. Later lint and gates reuse it.
 - `commands.lint` is `npm run unused` (Knip). This repo has no root eslint script.
@@ -85,7 +85,7 @@ no-mistakes doctor
 
 `no_ci: true` matches GitHub as it is today. Pull requests register no checks. `scripts/ci-workflow.yml` is not under `.github/workflows`, and `desktop-release.yml` runs only when someone dispatches it. An empty check list then counts as passed, so a run can finish. A check that is registered still has to pass. The flag does not waive a failing check.
 
-New pull requests take their narrative from `.github/pull_request_template.md`. The gate's evidence appendix is collapsed under one Validation block.
+New pull requests take their narrative from `.github/pull_request_template.md`. The gate collapses its evidence appendix under one Validation block.
 
 `allow_repo_commands` stays off. A feature branch cannot replace the commands or the agent that runs on this machine.
 

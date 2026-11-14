@@ -3,10 +3,12 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync
 import { homedir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 import { threadDir, uploadsDir } from '../config.ts';
-import { bus } from '../bus.ts';
-import { db, kv, threads, type Thread } from '../db.ts';
+import { bus, publishThread } from '../bus.ts';
+import { db, events, kv, threads, type Thread } from '../db.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { safeName, uniqueName, type Attachment } from '../uploads.ts';
+import { planFiles, type FileVersion } from './file-plan.ts';
+import { markLanded } from './landed.ts';
 import { safeRel, safeSegment } from './paths.ts';
 import type { SyncTransport } from './transport.ts';
 import { activeWorker, onSynced, type SyncWorker } from './worker.ts';
@@ -46,6 +48,10 @@ export interface Manifest {
   files: Record<string, FileEntry>;
   /** By "<harness>:<session id>", since a Codex or Cursor thread gets its session id on the first turn. */
   sessions: Record<string, SessionEntry>;
+  /** Files a Mac deleted, with the sha they had and when (ms), so the other Macs delete them too (file-plan.ts). */
+  deleted?: Record<string, { sha: string; at: number }>;
+  /** Bumped by every write. Older builds leave it out. */
+  generation?: number;
 }
 
 export interface FileSyncOptions {
@@ -62,19 +68,59 @@ const blobPath = (sha: string) => `blobs/${sha}`;
 const sha256 = (buf: Uint8Array) => createHash('sha256').update(buf).digest('hex');
 const emptyManifest = (): Manifest => ({ v: 1, files: {}, sessions: {} });
 
-async function readManifest(t: SyncTransport, threadId: string): Promise<Manifest> {
-  const raw = await t.getObject(manifestPath(threadId));
-  if (!raw) return emptyManifest();
+/** The relay's manifest is there but does not parse: a push stops rather than write an empty one over it (F3). */
+export class ManifestUnreadable extends Error {}
+
+const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, never>) : {});
+
+function parseManifest(raw: Uint8Array, threadId: string): Manifest {
+  let m: Partial<Manifest>;
   try {
-    const m = JSON.parse(Buffer.from(raw).toString('utf8')) as Partial<Manifest>;
-    return { v: 1, files: m.files ?? {}, sessions: m.sessions ?? {} };
+    m = JSON.parse(Buffer.from(raw).toString('utf8')) as Partial<Manifest>;
   } catch {
-    return emptyManifest();
+    throw new ManifestUnreadable(`the file list for thread ${threadId} on the relay does not parse`);
   }
+  if (!m || typeof m !== 'object') throw new ManifestUnreadable(`the file list for thread ${threadId} on the relay is not an object`);
+  return { v: 1, files: obj(m.files), sessions: obj(m.sessions), deleted: obj(m.deleted), generation: Number(m.generation) || 0 };
 }
 
-const writeManifest = (t: SyncTransport, threadId: string, m: Manifest) =>
-  t.putObject(manifestPath(threadId), Buffer.from(JSON.stringify(m)), 'application/json');
+/** The manifest and the version it was read at (null: there is none yet, or the relay has no versions). */
+async function readManifestVersion(t: SyncTransport, threadId: string): Promise<{ manifest: Manifest; etag: string | null; exists: boolean }> {
+  if (t.getObjectVersion) {
+    const got = await t.getObjectVersion(manifestPath(threadId));
+    return got ? { manifest: parseManifest(got.body, threadId), etag: got.etag, exists: true } : { manifest: emptyManifest(), etag: null, exists: false };
+  }
+  const raw = await t.getObject(manifestPath(threadId));
+  return raw ? { manifest: parseManifest(raw, threadId), etag: null, exists: true } : { manifest: emptyManifest(), etag: null, exists: false };
+}
+
+async function readManifest(t: SyncTransport, threadId: string): Promise<Manifest> {
+  return (await readManifestVersion(t, threadId)).manifest;
+}
+
+/** How often a manifest write that lost a race reads again and replans before it gives up for this pass. */
+const MANIFEST_TRIES = 4;
+
+/**
+ * Read the manifest, let `change` edit it, and write it back only if no other Mac wrote it in between (the relay's
+ * If-Match). A lost race reads again and calls `change` on the newer copy, so neither Mac's entries are dropped (F3).
+ * `change` returns false when there is nothing to write. A relay without versions writes as before.
+ */
+async function updateManifest(t: SyncTransport, threadId: string, change: (m: Manifest) => Promise<boolean> | boolean): Promise<boolean> {
+  for (let i = 0; i < MANIFEST_TRIES; i++) {
+    const { manifest, etag, exists } = await readManifestVersion(t, threadId);
+    if (!(await change(manifest))) return false;
+    manifest.generation = (manifest.generation ?? 0) + 1;
+    const body = Buffer.from(JSON.stringify(manifest));
+    // A relay that sends no ETag cannot check a version: write as older builds did.
+    if (!t.putObjectIf || (exists && etag === null)) {
+      await t.putObject(manifestPath(threadId), body, 'application/json');
+      return true;
+    }
+    if (await t.putObjectIf(manifestPath(threadId), body, exists ? etag : null, 'application/json')) return true;
+  }
+  throw new Error(`the file list for thread ${threadId} kept changing on the relay; trying again next sync`);
+}
 
 // ---------- local state ----------
 
@@ -112,11 +158,17 @@ function hashOf(state: LocalState, key: string, path: string): FileEntry | Snaps
   return snapshot(path);
 }
 
-/** Record the file as synced at f, unless it changed since f was taken: then it stays dirty for the next pass. */
+/**
+ * Record the file as synced at f. If it changed since f was taken, the base is still f's sha (what the relay has now),
+ * but with no size or mtime, so the next pass hashes the file again and finds the change.
+ */
 function rememberIf(state: LocalState, key: string, path: string, f: FileEntry) {
   const st = statSync(path, { throwIfNoEntry: false });
-  if (st && st.size === f.size && Math.trunc(st.mtimeMs) === f.mtime) state[key] = { size: f.size, mtime: f.mtime, sha: f.sha };
+  state[key] = st && st.size === f.size && Math.trunc(st.mtimeMs) === f.mtime ? { size: f.size, mtime: f.mtime, sha: f.sha } : unknownAt(f.sha);
 }
+
+/** A base whose sha is known and whose file must be hashed again before it counts as unchanged. */
+const unknownAt = (sha: string) => ({ size: -1, mtime: -1, sha });
 
 const entryOf = (f: FileEntry): FileEntry => ({ sha: f.sha, size: f.size, mtime: f.mtime });
 
@@ -180,72 +232,185 @@ export interface FilesResult {
   count: number;
   /** Files skipped: too big, missing in Storage, or not matching their sha. */
   skipped: number;
+  /** Files edited on both sides since they last synced. Both copies are kept: the other one as a "(conflict …)" file. */
+  conflicts?: string[];
 }
 
-/** Upload this thread's new or changed files and update its manifest. Content already in Storage is not uploaded again. */
-export async function pushThreadFiles(threadId: string, opts: FileSyncOptions): Promise<FilesResult> {
-  const { transport } = opts;
-  const rels = localThreadFiles(threadId);
-  const result: FilesResult = { count: 0, skipped: 0 };
-  if (!rels.length) return result;
-  const state = readState(threadId);
-  const manifest = await readManifest(transport, threadId);
-  let changed = false;
-  for (const rel of rels) {
+/** A relative path the manifest may name: inside one of the synced areas, below its top level. */
+const syncedRel = (rel: string) => safeRel(rel) && (FILE_AREAS as readonly string[]).includes(rel.split('/')[0]) && rel.split('/').length >= 2;
+
+/** The base each file last synced at, by relative path. */
+function baseOf(state: LocalState): Record<string, FileVersion> {
+  const out: Record<string, FileVersion> = {};
+  for (const [k, v] of Object.entries(state)) if (k.startsWith('f:') && v?.sha) out[k.slice(2)] = { sha: v.sha };
+  return out;
+}
+
+/** What is here now: each synced file's sha, from the base when its size and mtime did not change. Big files are left out. */
+function localVersions(threadId: string, state: LocalState, result?: FilesResult): Map<string, FileEntry | Snapshot> {
+  const out = new Map<string, FileEntry | Snapshot>();
+  for (const rel of localThreadFiles(threadId)) {
     const path = join(threadDir(threadId), rel);
-    const key = `f:${rel}`;
     if (lstatSync(path).size > MAX_FILE_BYTES) {
-      result.skipped++;
+      if (result) result.skipped++;
       continue;
     }
-    let f = hashOf(state, key, path);
-    if (manifest.files[rel]?.sha !== f.sha) {
-      // Hash and upload one read of the file, never the file as it is after the await.
-      const snap = 'body' in f ? f : snapshot(path);
-      f = snap;
-      if (!(await transport.hasObject(blobPath(snap.sha)))) {
-        await transport.putObject(blobPath(snap.sha), snap.body);
-        result.count++;
-      }
-      manifest.files[rel] = entryOf(f);
-      changed = true;
-    }
-    rememberIf(state, key, path, f);
+    out.set(rel, hashOf(state, `f:${rel}`, path));
   }
-  if (changed) await writeManifest(transport, threadId, manifest);
+  return out;
+}
+
+const versions = (m: Map<string, FileEntry>) => Object.fromEntries([...m].map(([rel, f]) => [rel, { sha: f.sha }]));
+const listed = (files: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(files).filter(([rel, e]) => syncedRel(rel) && !!e && typeof e === 'object' && typeof (e as FileEntry).sha === 'string')) as Record<string, FileVersion>;
+
+/**
+ * Upload this thread's files that changed here, and mark the ones deleted here, in its manifest. A file the relay has
+ * newer than this Mac's unchanged copy is left for the pull (file-plan.ts): a stale copy never goes up (F1). The
+ * manifest is written only over the version this read (F3). Content already in Storage is not uploaded again.
+ */
+export async function pushThreadFiles(threadId: string, opts: FileSyncOptions): Promise<FilesResult> {
+  const { transport } = opts;
+  const result: FilesResult = { count: 0, skipped: 0 };
+  const state = readState(threadId);
+  const local = localVersions(threadId, state, result);
+  if (!local.size && !Object.keys(baseOf(state)).length) return result;
+  const uploaded = new Map<string, FileEntry>();
+  const removed = new Set<string>();
+  const agreed = new Map<string, string>();
+  await updateManifest(transport, threadId, async (manifest) => {
+    uploaded.clear();
+    removed.clear();
+    agreed.clear();
+    const actions = planFiles({ local: versions(local), base: baseOf(state), remote: listed(manifest.files), deleted: listed(manifest.deleted ?? {}) });
+    let changed = false;
+    for (const a of actions) {
+      const path = join(threadDir(threadId), a.rel);
+      if (a.kind === 'upload') {
+        // Hash and upload one read of the file, never the file as it is after the await.
+        const known = local.get(a.rel)!;
+        const snap = 'body' in known ? known : snapshot(path);
+        local.set(a.rel, snap);
+        if (!(await transport.hasObject(blobPath(snap.sha)))) {
+          await transport.putObject(blobPath(snap.sha), snap.body);
+          result.count++;
+        }
+        manifest.files[a.rel] = entryOf(snap);
+        if (manifest.deleted) delete manifest.deleted[a.rel];
+        uploaded.set(a.rel, snap);
+        changed = true;
+      } else if (a.kind === 'tombstone') {
+        delete manifest.files[a.rel];
+        (manifest.deleted ??= {})[a.rel] = { sha: a.sha, at: Date.now() };
+        removed.add(a.rel);
+        changed = true;
+      } else if (a.kind === 'agree') agreed.set(a.rel, a.sha);
+      else if (a.kind === 'forget') removed.add(a.rel);
+      // download, delete-local and conflict are the pull's.
+    }
+    return changed;
+  });
+  for (const [rel, f] of uploaded) rememberIf(state, `f:${rel}`, join(threadDir(threadId), rel), f);
+  for (const [rel, sha] of agreed) {
+    const f = local.get(rel);
+    if (f) rememberIf(state, `f:${rel}`, join(threadDir(threadId), rel), { ...f, sha });
+  }
+  for (const rel of removed) delete state[`f:${rel}`];
   kv.set(stateKey(threadId), state);
   return result;
 }
 
-/** Download the files in the thread's manifest that this machine does not have. A file already here is left alone. */
+/** "artifacts/report.html" -> "artifacts/report (conflict 1a2b3c4d).html", named after that version's sha, a name not taken yet. */
+function conflictName(threadId: string, rel: string, sha: string) {
+  const dot = rel.lastIndexOf('.');
+  const slash = rel.lastIndexOf('/');
+  const [stem, ext] = dot > slash + 1 ? [rel.slice(0, dot), rel.slice(dot)] : [rel, ''];
+  for (let n = 0; ; n++) {
+    const candidate = `${stem} (conflict ${sha.slice(0, 8)}${n ? ` ${n + 1}` : ''})${ext}`;
+    if (!existsSync(join(threadDir(threadId), candidate))) return candidate;
+  }
+}
+
+/**
+ * Bring this Mac's copy of the thread's files up to the relay's (file-plan.ts): download what is new or newer there,
+ * delete here what was deleted there, and keep both copies of a file edited on both sides. A file that changes here
+ * while a download runs is left as it is. Downloads are marked, so the artifact watcher does not count them as writes
+ * made here (F24).
+ */
 export async function pullThreadFiles(threadId: string, opts: FileSyncOptions): Promise<FilesResult> {
   const { transport } = opts;
   const result: FilesResult = { count: 0, skipped: 0 };
   // Thread ids come from the relay too, and the folder is built from one.
   if (!safeSegment(threadId)) return result;
-  const manifest = await readManifest(transport, threadId);
-  const state = readState(threadId);
-  for (const [rel, entry] of Object.entries(manifest.files)) {
-    if (opts.signal?.aborted) break;
-    const listed = !!entry && typeof entry === 'object' && typeof entry.sha === 'string';
-    if (!listed || !safeRel(rel) || !(FILE_AREAS as readonly string[]).includes(rel.split('/')[0]) || rel.split('/').length < 2) {
-      result.skipped++;
-      continue;
-    }
-    const path = join(threadDir(threadId), rel);
-    if (existsSync(path)) continue;
-    const body = await transport.getObject(blobPath(entry.sha));
-    if (!body || sha256(body) !== entry.sha) {
-      result.skipped++;
-      continue;
-    }
-    // The download stopped mattering, or the file appeared here while it ran: keep this Mac's.
-    const landed = writeAtomic(path, body, entry.mtime, () => !opts.signal?.aborted && !existsSync(path));
-    if (!landed) continue;
-    state[`f:${rel}`] = { ...landed, sha: entry.sha };
-    result.count++;
+  let manifest: Manifest;
+  try {
+    manifest = await readManifest(transport, threadId);
+  } catch (err) {
+    if (err instanceof ManifestUnreadable) return { ...result, skipped: 1 };
+    throw err;
   }
-  if (result.count) kv.set(stateKey(threadId), state);
+  result.skipped += Object.keys(manifest.files).length - Object.keys(listed(manifest.files)).length;
+  const state = readState(threadId);
+  const local = localVersions(threadId, state);
+  const actions = planFiles({ local: versions(local), base: baseOf(state), remote: listed(manifest.files), deleted: listed(manifest.deleted ?? {}) });
+  let touched = false;
+  /** The file is still as it was when this pass hashed it (or still missing). */
+  const still = (rel: string, path: string) => {
+    const f = local.get(rel);
+    const st = statSync(path, { throwIfNoEntry: false });
+    return f ? !!st && st.size === f.size && Math.trunc(st.mtimeMs) === f.mtime : !st;
+  };
+  for (const a of actions) {
+    if (opts.signal?.aborted) break;
+    const path = join(threadDir(threadId), a.rel);
+    if (a.kind === 'download' || a.kind === 'conflict') {
+      const sha = a.kind === 'download' ? a.sha : a.remote;
+      const entry = manifest.files[a.rel];
+      const body = await transport.getObject(blobPath(sha));
+      if (!body || sha256(body) !== sha) {
+        result.skipped++;
+        continue;
+      }
+      if (a.kind === 'conflict') {
+        // Nothing overwrites a file edited here: the other Mac's version lands beside it, under a name of its own, and
+        // both go up with the next push. The base becomes the relay's version, so this Mac's edit counts as the newer.
+        if (opts.signal?.aborted) break;
+        const aside = join(threadDir(threadId), conflictName(threadId, a.rel, a.remote));
+        if (!writeAtomic(aside, body, entry?.mtime, () => !opts.signal?.aborted)) continue;
+        state[`f:${a.rel}`] = unknownAt(sha);
+        (result.conflicts ??= []).push(a.rel);
+        result.count++;
+        touched = true;
+        continue;
+      }
+      // The download stopped mattering, or the file changed here while it ran: keep this Mac's.
+      const landed = writeAtomic(path, body, entry?.mtime, () => !opts.signal?.aborted && still(a.rel, path));
+      if (!landed) continue;
+      markLanded(path, landed);
+      state[`f:${a.rel}`] = { ...landed, sha };
+      result.count++;
+      touched = true;
+    } else if (a.kind === 'delete-local') {
+      if (!still(a.rel, path)) continue;
+      rmSync(path, { force: true });
+      delete state[`f:${a.rel}`];
+      touched = true;
+    } else if (a.kind === 'agree') {
+      const f = local.get(a.rel);
+      if (f) rememberIf(state, `f:${a.rel}`, path, f);
+      touched = true;
+    } else if (a.kind === 'forget') {
+      delete state[`f:${a.rel}`];
+      touched = true;
+    }
+    // upload and tombstone are the push's.
+  }
+  if (touched) kv.set(stateKey(threadId), state);
+  // Flagged in the thread, which syncs, so both Macs say which files have two copies now.
+  if (result.conflicts?.length && threads.get(threadId)) {
+    const names = result.conflicts.map((r) => `"${r}"`).join(', ');
+    publishThread(threadId, events.add(threadId, 'status', { text: `Edited on two machines since the last sync: ${names}. Both versions are kept: the other machine's is saved beside this one as a "(conflict …)" file.` }));
+  }
   return result;
 }
 
@@ -409,8 +574,12 @@ export async function pushSession(t: Thread, opts: FileSyncOptions & { strict?: 
     rememberIf(state, skey, path, f);
   }
   if (uploaded) {
-    manifest.sessions[key] = entry;
-    await writeManifest(opts.transport, t.id, manifest);
+    // Only this session's entry, merged onto whatever the manifest holds when it is written.
+    await updateManifest(opts.transport, t.id, (m) => {
+      const now = m.sessions[key] ?? { harness: t.harness, id: t.session_id, files: {} };
+      m.sessions[key] = { ...now, files: { ...now.files, ...entry.files } };
+      return true;
+    });
   }
   if (rels.length) kv.set(stateKey(t.id), state);
   return uploaded;

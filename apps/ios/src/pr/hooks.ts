@@ -1,10 +1,11 @@
 import type { PRDetail, Thread, ThreadPRs } from '@omni/client-core';
+import { failedRunIds } from '@omni/shared/pr-rerun.ts';
 import type { PRWatchView } from '@omni/shared/pr-watch.ts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLiveHub, useChannels } from '../live/react';
 import { useEvery, useFetched, useOnChange } from '../review/useFetched';
-import { mergePR, setWatch, type MergeOutcome } from './actions';
+import { mergePR, rerunChecks, setAutoMerge, setWatch, type MergeOutcome, type RerunOutcome } from './actions';
 import { prPage, prTarget, type PRPage } from './model';
 
 const PR_POLL_MS = 60_000;
@@ -74,4 +75,51 @@ export function useMerge(channelId: string | null, number: number | null, reload
     },
     [hub, channelId, number, reload],
   );
+}
+
+/**
+ * Auto-merge for the PR on screen: `set(true)` from its slider throws on a refusal so the slider springs back, with
+ * gh's words left in `error`. The PR is read again after either change.
+ */
+export function useAutoMerge(channelId: string | null, number: number | null, reload: () => void) {
+  const hub = useLiveHub();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = useCallback(
+    async (on: boolean) => {
+      if (!channelId || !number) return;
+      setBusy(true);
+      setError(null);
+      const out = await setAutoMerge(hub.request, channelId, number, on);
+      setBusy(false);
+      reload();
+      if (out.kind === 'failed') {
+        setError(out.message);
+        throw new Error(out.message);
+      }
+    },
+    [hub, channelId, number, reload],
+  );
+  return { busy, error, set };
+}
+
+/**
+ * Rerun failed checks: offered while the PR is open, a failing check is a GitHub Actions job, and no rerun of this PR has
+ * started yet. The outcome stays until another PR is shown.
+ */
+export function useRerunChecks(channelId: string | null, number: number | null, detail: PRDetail | null) {
+  const hub = useLiveHub();
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<RerunOutcome | null>(null);
+  useEffect(() => setOutcome(null), [channelId, number]);
+  const run = useCallback(async () => {
+    if (!channelId || !number) return;
+    setBusy(true);
+    setOutcome(null);
+    setOutcome(await rerunChecks(hub.request, channelId, number));
+    setBusy(false);
+  }, [hub, channelId, number]);
+  const open = !!detail && (!detail.state || detail.state === 'OPEN');
+  const can = open && failedRunIds(detail.checkRuns).length > 0 && outcome?.kind !== 'started';
+  return { can, busy, outcome, run };
 }

@@ -1,6 +1,6 @@
 import type { CrewPR, PRDetail, ThreadPRs } from '@omni/client-core';
 import { mergeNote, reviewLine, reviewSummary, type MergeRefusal, type ReviewSummary } from '@omni/shared/pr-merge.ts';
-import { checkTone, prBadge, prLine, prNext, type PRNext, type PRTone } from '@omni/shared/thread-glance.ts';
+import { checkTone, prBadge, prLine, prNext, type PRNext, type PRTone, type StepPrompts } from '@omni/shared/thread-glance.ts';
 
 import type { Fetched, ReviewFailure } from '../review/failure';
 
@@ -93,7 +93,8 @@ export interface PRContent {
 
 const stateLabel = (state: string) => state.toLowerCase().replace(/_/g, ' ');
 
-export function prContent(pr: PRDetail): PRContent {
+/** `prompts`: the channel's step prompts (`stepPrompts`), which the Fix conflicts and Fix checks buttons send. */
+export function prContent(pr: PRDetail, prompts?: StepPrompts): PRContent {
   const open = !pr.state || pr.state === 'OPEN';
   const review = reviewSummary(pr);
   return {
@@ -112,7 +113,7 @@ export function prContent(pr: PRDetail): PRContent {
     reviewLine: reviewLine(review),
     note: mergeNote(pr),
     canMerge: open && !pr.isDraft,
-    next: prNext(pr, true),
+    next: prNext(pr, true, prompts),
   };
 }
 

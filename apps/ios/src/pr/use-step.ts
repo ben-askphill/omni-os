@@ -1,7 +1,8 @@
-import { stepOf, type PRStep } from '@omni/shared/thread-glance.ts';
+import { stepOf, stepPrompts, type PRStep } from '@omni/shared/thread-glance.ts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { ThreadLive, ThreadView } from '../live/hub';
+import { useChannels } from '../live/react';
 import { resumes, shownStep, stepState } from './step';
 
 /** How long a press shows as working when the thread never lists the message (another client cleared it, a lost reply). */
@@ -12,13 +13,18 @@ export type AskOutcome = { kind: 'sent' } | { kind: 'busy' } | { kind: 'failed';
 /**
  * The branch steps of one thread: which one the agent works on (`working`), a step prompt parked before the agent got
  * it, and `ask`, which sends a step prompt, or resumes the parked copy of the same one so the thread is not asked twice.
+ * `prompts` are what each step sends in the thread's channel (Channel Settings > Branch steps, else the built-in ones).
  */
 export function usePRStep(live: ThreadLive | null, view: ThreadView | null) {
   const thread = view?.thread ?? null;
   const busy = thread?.status === 'running' || thread?.status === 'queued';
   const rows = view?.rows;
   const pending = view?.pending;
-  const { underway, parked } = useMemo(() => stepState({ rows: rows ?? [], pending: pending ?? [], busy }), [rows, pending, busy]);
+  // The live channel list first, so an edit on another device applies without reopening the thread.
+  const { channels } = useChannels();
+  const channel = channels?.find((c) => c.id === thread?.channel_id) ?? view?.channel ?? null;
+  const prompts = useMemo(() => stepPrompts(channel), [channel]);
+  const { underway, parked } = useMemo(() => stepState({ rows: rows ?? [], pending: pending ?? [], busy }, prompts), [rows, pending, busy, prompts]);
   const [asked, setAsked] = useState<{ step: PRStep; seen: boolean; at: number } | null>(null);
 
   useEffect(() => {
@@ -36,8 +42,8 @@ export function usePRStep(live: ThreadLive | null, view: ThreadView | null) {
   const ask = useCallback(
     async (prompt: string): Promise<AskOutcome> => {
       if (!live || !thread) return { kind: 'failed', message: 'The thread is not loaded yet.' };
-      const step = stepOf(prompt);
-      if (resumes(parked, prompt) && parked) {
+      const step = stepOf(prompt, prompts);
+      if (resumes(parked, prompt, prompts) && parked) {
         if (step) setAsked({ step, seen: false, at: Date.now() });
         try {
           await live.act({ kind: 'resume', ids: [parked.uuid] });
@@ -54,8 +60,8 @@ export function usePRStep(live: ThreadLive | null, view: ThreadView | null) {
       setAsked(null);
       return { kind: 'failed', message: live.send.state.get().outbox.item?.phase === 'failed' ? 'The message did not send. It is kept in the thread.' : 'Could not send the message.' };
     },
-    [live, thread, parked],
+    [live, thread, parked, prompts],
   );
 
-  return { working: shownStep(asked, underway), parked: underway === null && !asked ? parked : null, ask };
+  return { working: shownStep(asked, underway), parked: underway === null && !asked ? parked : null, ask, prompts };
 }

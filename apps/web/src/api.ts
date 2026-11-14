@@ -1,5 +1,7 @@
 import type { ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
 import type { DiskLevel } from '@omni/shared/disk-space.ts';
+import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
+import type { MachineStats } from '@omni/shared/machines.ts';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
@@ -265,6 +267,8 @@ export interface PRDetail extends PRSummary {
   diff: string;
   /** The Omni thread on its head branch and the thread that delegated it. null for a PR opened outside Omni. */
   thread?: PRThread | null;
+  /** Armed auto-merge, or null when off. */
+  autoMergeRequest?: AutoMergeRequest | null;
 }
 export interface PRThread {
   id: string;
@@ -295,8 +299,11 @@ export interface AutomationRun {
   thread_id: string | null;
   trigger: string;
   created_at: string;
+  /** The thread's status; `skipped` for a scheduled run that never started (see skip_reason). */
   status: string | null;
   title: string | null;
+  /** Why a scheduled run was skipped: its precheck failed, or a catch-up was older than catchup_max_age. Older servers leave it out. */
+  skip_reason?: string | null;
 }
 /** A PR change on GitHub, a page a thread published (`artifact_published`), or a signed GitHub webhook (`github_webhook`). */
 export type AutomationTrigger = PrTrigger | ArtifactTrigger | WebhookTrigger;
@@ -403,6 +410,12 @@ export type FeedEvent =
   | { type: 'claude_artifacts'; state: ClaudeArtifactsState }
   /** Free disk space crossed a warning level: refetch GET /api/disk. */
   | { type: 'disk'; level: DiskLevel }
+  /** A harness account changed, here or on another machine, or a switch was acknowledged: refetch GET /api/accounts. */
+  | { type: 'accounts' }
+  /** A thread's review notes changed, here or on another Mac: refetch GET /api/threads/:id/review-notes. */
+  | { type: 'review_notes'; thread_id: string }
+  /** A machine's CPU and memory sample, while the machine tiles are watched (apps/server/machine-stats.ts). Id null is this machine with sync off. */
+  | { type: 'machine_stats'; id: string | null; stats: MachineStats }
   | { type: 'reconnect' };
 
 /** GET /api/update (apps/server/update.ts): how far this server is behind main, and where Update is. */
@@ -544,6 +557,8 @@ export const openToolTail = (threadId: string, toolUseId: string, onData: (data:
 export interface Async<T> {
   data: T | undefined;
   error: string | null;
+  /** The status of the failed read when the server answered it, so a caller can tell a missing route from an outage. */
+  status?: number | null;
   loading: boolean;
   reload: () => void;
   setData: (fn: T | ((prev: T | undefined) => T)) => void;
@@ -553,6 +568,7 @@ export interface Async<T> {
 export function useApi<T>(path: string | null): Async<T> {
   const [data, setDataState] = useState<T | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(!!path);
   const [tick, setTick] = useState(0);
   const lastPath = useRef<string | null>(null);
@@ -574,8 +590,13 @@ export function useApi<T>(path: string | null): Async<T> {
         if (!alive) return;
         setDataState(d);
         setError(null);
+        setStatus(null);
       })
-      .catch((e) => alive && setError(errorText(e)))
+      .catch((e) => {
+        if (!alive) return;
+        setError(errorText(e));
+        setStatus(e instanceof ApiError ? e.status : null);
+      })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
@@ -586,7 +607,7 @@ export function useApi<T>(path: string | null): Async<T> {
   const setData = useCallback((fn: T | ((prev: T | undefined) => T)) => {
     setDataState((prev) => (typeof fn === 'function' ? (fn as (p: T | undefined) => T)(prev) : fn));
   }, []);
-  return { data, error, loading, reload, setData };
+  return { data, error, status, loading, reload, setData };
 }
 
 // ---------- SSE with reconnect ----------

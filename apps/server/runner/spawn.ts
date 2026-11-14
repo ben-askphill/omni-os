@@ -5,8 +5,9 @@ import { getCrew } from '../crew.ts';
 import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
 import { inWorkspace } from '../workspace.ts';
 import { followBranch } from '../branch-follow.ts';
+import { pathProblem } from '../sync/path-guard.ts';
 import { attachThread, detachThread } from '../browser.ts';
-import { globalSecret, secretsEnv } from '../secrets.ts';
+import { globalSecret, hasSecret, secretsEnv } from '../secrets.ts';
 import { recordUsage } from '../usage.ts';
 import { toolTails } from '../tool-tail.ts';
 import { recordContext, recordContextHint } from '../context.ts';
@@ -26,6 +27,7 @@ import { failSetup } from './setup.ts';
 import { reportToParent } from './queue.ts';
 import { resumesSession, sessionStarted, takeHandover } from './switch.ts';
 import { startTurnSnapshot } from './snapshots.ts';
+import { stampThread } from '../harness-accounts.ts';
 
 /** A thread's process starts: its controller is built here, with the deps the composition root bound, and registered. */
 export function launch(threadId: string, first: Msg): Live | undefined {
@@ -35,6 +37,8 @@ export function launch(threadId: string, first: Msg): Live | undefined {
   lives.set(threadId, live);
   live.claimTurn();
   startTurnSnapshot(live);
+  // The account this process bills, kept on the thread so it shows after a switch. Cursor Cloud on a channel's own key is not this machine's.
+  if (!(thread.harness === 'cursor-cloud' && hasSecret(`channel:${thread.channel_id}`, 'CURSOR_API_KEY'))) stampThread(threadId, thread.harness);
   spawnLive(live, thread).catch((err) => {
     // Never let one broken thread take the whole server down.
     console.error(`[runner] ${threadId} crashed:`, err);
@@ -47,12 +51,15 @@ export function launch(threadId: string, first: Msg): Live | undefined {
 }
 
 /**
- * Why a local thread on a branch cannot start in its folder, or null when it can: a worktree thread runs only in its
- * own worktree, on its branch, never in the channel's checkout or the brain. A thread with no branch runs where it
- * always has.
+ * Why a local thread cannot start in its folder, or null when it can: a worktree thread runs only in its own worktree,
+ * on its branch, never in the channel's checkout or the brain. A thread with no branch runs only in a folder the synced
+ * path policy allows (sync/path-policy.ts), so clearing the branch on a synced row cannot skip the check (S20).
  */
 async function workdirProblem(thread: Thread, repo: string | null): Promise<string | null> {
-  if (!thread.branch) return null;
+  if (!thread.branch) {
+    const problem = pathProblem({ folder: thread.cwd });
+    return problem && `This thread's ${problem}, so it does not start there. Move it to a channel checkout or a folder in your home folder.`;
+  }
   if (!repo) return 'The channel has no repository set.';
   return worktreeProblem(repo, thread.cwd, thread.branch);
 }
@@ -110,12 +117,15 @@ async function spawnLive(live: Live, thread: Thread) {
     browserHolder.set(channel.id, thread.id);
     live.holdsBrowser();
   }
-  const cdpEndpoint = live.browser ? await attachThread(channel.id, thread.id, !!channel.browser_headless) : null;
-  // Torn down while Chrome started: teardown already ran, so let go of the browser here.
+  const attached = live.browser ? await attachThread(channel.id, thread.id, !!channel.browser_headless) : null;
+  // Torn down while Chrome started: teardown already ran, so let go of this spawn's own hold here. A newer spawn of the
+  // thread may hold the browser by now, and its hold stays.
   if (lives.get(thread.id) !== live) {
-    detachThread(channel.id, thread.id);
+    if (attached) detachThread(channel.id, attached.hold);
     return;
   }
+  live.setBrowserHold(attached?.hold ?? null);
+  const cdpEndpoint = attached?.endpoint ?? null;
   if (!remote) writeDesignSystem(thread.id, channel);
   const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl() });
 
@@ -191,7 +201,9 @@ async function spawnLive(live: Live, thread: Thread) {
   );
 
   // Messages go in through the session, never as CLI args, so leading dashes or huge pastes never get parsed as flags.
-  for (const m of live.inflight) {
+  // A copy: a harness that replays synchronously (Hermes) takes each message out of live.inflight while this loops.
+  for (const m of [...live.inflight]) {
+    if (lives.get(thread.id) !== live) break;
     track(m, 'sent');
     if (!deliver(live, m)) {
       crash(live);

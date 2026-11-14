@@ -13,6 +13,7 @@ import { allWithDelegating, delegatingIds } from './delegating.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { publishFeed } from './bus.ts';
 import { baseOptions } from './worktree-base.ts';
+import { storedList, worktreeListProblem } from '@omni/shared/worktree-lists.ts';
 
 export const channelsApi = new Hono();
 
@@ -57,6 +58,25 @@ function runDefaultsError(body: { default_harness?: string | null; default_model
   return err ? `Default model: ${err}` : undefined;
 }
 
+/** A worktree list, one entry per line: blanks, comments and repeats dropped, empty clears it. Checked by listsError. */
+const worktreeList = z
+  .string()
+  .max(64 * 1024)
+  .nullish()
+  .transform((s) => (s === undefined ? undefined : storedList(s)));
+
+/** Why the worktree lists a body sets are refused, as one sentence. */
+const listsError = (body: { worktree_include?: string | null; worktree_shared?: string | null }) =>
+  worktreeListProblem(body.worktree_include) ?? worktreeListProblem(body.worktree_shared, { shared: true });
+
+/** A branch step's own prompt (packages/shared/thread-glance.ts stepPrompts): blank clears it back to the built-in one. */
+const stepPrompt = z
+  .string()
+  .trim()
+  .max(4000)
+  .transform((s) => s || null)
+  .nullish();
+
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
@@ -76,6 +96,11 @@ const channelSchema = z.object({
   default_harness: runDefault,
   default_model: runDefault,
   default_effort: runDefault,
+  worktree_include: worktreeList,
+  worktree_shared: worktreeList,
+  prompt_open_pr: stepPrompt,
+  prompt_fix_conflicts: stepPrompt,
+  prompt_fix_checks: stepPrompt,
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */
@@ -186,7 +211,7 @@ channelsApi.post('/', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   if (channels.get(body.id)) return c.json({ error: 'channel exists' }, 409);
-  const runError = runDefaultsError(body);
+  const runError = runDefaultsError(body) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);
   if (body.repo_path && !existsSync(body.repo_path)) return c.json({ error: `repo path not found: ${body.repo_path}` }, 400);
   if (body.repo_path && !body.github_repo) body.github_repo = await detectRepo(body.repo_path);
@@ -201,7 +226,7 @@ channelsApi.patch('/:id', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   delete (body as any).id;
-  const runError = runDefaultsError(body, current);
+  const runError = runDefaultsError(body, current) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);
   // Read the GitHub repo from the path when none is typed and there is none yet, or when the path moves without one
   // typed (the clients leave it out unless detection failed or it was edited, #405).
@@ -245,4 +270,32 @@ channelsApi.get('/:id/bases', async (c) => {
   return channel ? c.json(await baseOptions(channel)) : c.json({ error: 'not found' }, 404);
 });
 
-channelsApi.get('/:id/threads', (c) => c.json(allWithDelegating(threads.byChannel(c.req.param('id'), 200, c.req.query('archived') === '1'))));
+const PAGE_MAX = 200;
+
+/** A page's opaque cursor: where the next page starts. */
+const cursorOf = (t: { updated_at: string; id: string }) => Buffer.from(JSON.stringify([t.updated_at, t.id])).toString('base64url');
+function readCursor(raw: string | undefined): { updated_at: string; id: string } | null | undefined {
+  if (!raw) return null;
+  try {
+    const [updated_at, id] = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as unknown[];
+    return typeof updated_at === 'string' && typeof id === 'string' ? { updated_at, id } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The channel's threads, newest first. Without `paged`, the newest 200 as an array, as before. With `paged=1`, one page
+ * of `limit` (default 50, at most 200) as `{threads, next}`, where `next` is the cursor for the page after it (`cursor`,
+ * or `before` as its alias) or null at the end (PRD #667, story 41).
+ */
+channelsApi.get('/:id/threads', (c) => {
+  const archived = c.req.query('archived') === '1';
+  if (c.req.query('paged') !== '1') return c.json(allWithDelegating(threads.byChannel(c.req.param('id'), PAGE_MAX, archived)));
+  const after = readCursor(c.req.query('cursor') ?? c.req.query('before'));
+  if (after === undefined) return c.json({ error: 'bad cursor' }, 400);
+  const limit = Math.min(PAGE_MAX, Math.max(1, Number(c.req.query('limit')) || 50));
+  const rows = threads.byChannelPage(c.req.param('id'), { limit: limit + 1, archived, after });
+  const page = rows.slice(0, limit);
+  return c.json({ threads: allWithDelegating(page), next: rows.length > limit ? cursorOf(page.at(-1)!) : null });
+});

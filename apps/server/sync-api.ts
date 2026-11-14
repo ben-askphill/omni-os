@@ -1,11 +1,14 @@
 // /api/sync: the sync status, a manual sync, and sign-in from Settings. Its own app so tests can call it without starting the server.
 import { Hono, type Context } from 'hono';
-import { kv, outbox } from './db.ts';
+import { kv, outbox, tx } from './db.ts';
 import { claimAutomations, OWNER_KEY } from './sync/owner.ts';
-import { deviceRecord } from './sync/devices.ts';
+import { currentRecords, deviceRecord, deviceRecords } from './sync/devices.ts';
+import { fingerprintOf, keyring } from './sync/keyring.ts';
+import { signPublicKey } from './sync/sign-key.ts';
+import { discardHeld, heldActions, refusedChanges } from './sync/verify.ts';
 import { pathMap } from './sync/paths.ts';
 import { checkPathMap, checkRelayUrl, defaultSetupDeps, disableSync, enableSync, pollRelaySignIn, SetupError, startRelaySignIn, type SetupDeps } from './sync/setup.ts';
-import { syncNow, syncStatus } from './sync/worker.ts';
+import { activeWorker, syncNow, syncStatus } from './sync/worker.ts';
 
 const body = async (c: Context): Promise<unknown> => c.req.json().catch(() => ({}));
 
@@ -82,6 +85,62 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
 
   /** This Mac's path map (kv sync.path_map): where another Mac's folders live here. */
   app.get('/path-map', (c) => c.json({ map: pathMap() }));
+
+  /**
+   * The synced machines with their signing keys (sync/keyring.ts), this one first. `fingerprint`: the key the machine
+   * announces now; `pinnedFingerprint`: the one this machine checks its changes with. `keyChanged`: they differ (or
+   * its seal key does). `trusted`: it may make this machine act, which a paired machine is from its first pinned key.
+   * `held`: its actions waiting here for a confirm. A changed key, or a machine whose only key came unsigned, shows a
+   * button that calls POST /devices/:id/confirm-key.
+   */
+  app.get('/devices', async (c) => c.json(await syncDevices()));
+
+  /**
+   * Confirm a machine's new key, or trust one that is not trusted yet: pin the keys it announces now and let its commands, assignments, update asks, owner claims and
+   * secrets apply from now on. A sync first pulls what the relay holds with the old key still pinned, then the held actions are discarded instead of
+   * replayed unseen. 404 for a machine this one has not seen, or one already trusted with no new key waiting; 409 for one that has not sent a signed key
+   * yet, a confirm already running for it, or a key that changed during that sync; 503 when sync is off or that sync failed.
+   */
+  const confirming = new Set<string>();
+  app.post('/devices/:id/confirm-key', async (c) => {
+    const id = c.req.param('id');
+    if (id === outbox.machineId() || (!deviceRecord(id) && !keyring.get(id))) return c.json({ error: 'Nothing waits for confirmation for that machine' }, 404);
+    if (!keyring.get(id)?.signKey && !keyring.get(id)?.seenSignKey) return c.json({ error: `${deviceRecord(id)?.name ?? id} has not sent a signed key yet. Update Omni there and let it sync once.` }, 409);
+    const waiting = keyring.get(id);
+    if (!waiting?.seenSignKey && !waiting?.seenSealKey && keyring.trusted(id)) return c.json({ error: 'Nothing waits for confirmation for that machine' }, 404);
+    const worker = activeWorker();
+    if (!worker) return c.json({ error: 'Sync is off here. Turn it on so held actions can be checked before confirming.' }, 503);
+    if (confirming.has(id)) return c.json({ error: 'Already confirming that machine' }, 409);
+    confirming.add(id);
+    try {
+      const before = keyring.get(id);
+      const drained = await worker.syncNow();
+      if (drained.error || activeWorker() !== worker) return c.json({ error: `Could not sync before confirming: ${drained.error ?? 'sync stopped'}` }, 503);
+      const after = keyring.get(id);
+      const referenced = before?.seenSignKey ?? before?.signKey;
+      if ((after?.seenSignKey ?? after?.signKey) !== referenced || (after?.seenSealKey && after.seenSealKey !== before?.seenSealKey))
+        return c.json({ error: `${deviceRecord(id)?.name ?? id} announced another key while confirming. Compare the fingerprint again.` }, 409);
+      if (!after?.seenSignKey && !after?.seenSealKey && keyring.trusted(id)) return c.json({ ok: true });
+      const changed = tx(() => {
+        const confirmed = keyring.confirm(id);
+        const trusted = keyring.trust(id);
+        if (!confirmed && !trusted) return false;
+        discardHeld(id);
+        return true;
+      });
+      if (!changed) return c.json({ error: 'Nothing waits for confirmation for that machine' }, 404);
+    } finally {
+      confirming.delete(id);
+    }
+    void activeWorker()?.syncNow();
+    return c.json({ ok: true });
+  });
+
+  /** Synced changes refused for their signature or a path, ones applied without a valid signature, and actions waiting for Trust, newest first. */
+  app.get('/refused', (c) => {
+    const limit = Number(c.req.query('limit') ?? 50);
+    return c.json(refusedChanges(Number.isFinite(limit) ? limit : 50));
+  });
   app.put('/path-map', async (c) => {
     const map = checkPathMap(await body(c));
     kv.set('sync.path_map', map);
@@ -92,3 +151,47 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
 }
 
 export const syncApi = createSyncApi();
+
+/** GET /api/sync/devices: one synced machine and its signing key. */
+export interface SyncDevice {
+  id: string;
+  name: string;
+  /** This machine. */
+  current: boolean;
+  fingerprint: string | null;
+  pinnedFingerprint: string | null;
+  keyChanged: boolean;
+  /** It may make this machine act: trusted with its first pinned key, or a key Ben confirmed. Always true for this machine. */
+  trusted: boolean;
+  /** Its commands, assignments, update asks, owner claims and secrets this machine holds until Ben confirms. */
+  held: number;
+}
+
+export async function syncDevices(): Promise<SyncDevice[]> {
+  const self = outbox.machineId();
+  if (!self) return [];
+  const own = await signPublicKey().catch(() => null);
+  const records = currentRecords(deviceRecords());
+  const pins = keyring.list();
+  const held = new Map<string, number>();
+  for (const h of heldActions()) held.set(h.machine, (held.get(h.machine) ?? 0) + h.count);
+  const ids = [...new Set([self, ...records.map((r) => r.id), ...pins.filter((p) => p.seenSignKey || p.seenSealKey || !keyring.trusted(p.machine)).map((p) => p.machine)])];
+  return ids.map((id) => {
+    const rec = records.find((r) => r.id === id) ?? deviceRecord(id);
+    if (id === self) {
+      const fp = fingerprintOf(own ?? rec?.signKey);
+      return { id, name: rec?.name ?? id, current: true, fingerprint: fp, pinnedFingerprint: fp, keyChanged: false, trusted: true, held: 0 };
+    }
+    const pin = pins.find((p) => p.machine === id);
+    return {
+      id,
+      name: rec?.name ?? id,
+      current: false,
+      fingerprint: fingerprintOf(pin?.seenSignKey ?? rec?.signKey ?? pin?.signKey),
+      pinnedFingerprint: fingerprintOf(pin?.signKey),
+      keyChanged: !!(pin?.seenSignKey || pin?.seenSealKey),
+      trusted: keyring.trusted(id),
+      held: held.get(id) ?? 0,
+    };
+  });
+}

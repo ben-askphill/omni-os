@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "output": "! Pull request acme/shop#7 will be automatically merged via --squash when all requirements are met\n",
+  "method": "squash",
+  "state": "OPEN",
+  "autoMergeRequest": {
+    "enabledAt": "2026-01-05T09:00:00Z",
+    "enabledBy": {
+      "login": "ben"
+    },
+    "mergeMethod": "SQUASH",
+    "commitHeadline": "",
+    "commitBody": "",
+    "authorEmail": null
+  }
+}

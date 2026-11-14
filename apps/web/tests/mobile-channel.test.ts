@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   threads: [] as Thread[],
   needsYou: null as NeedsYou | null,
   collapsed: false,
+  more: false,
+  folders: [{ id: 'folder', name: 'Mixed folder' }] as { id: string; name: string }[],
 }));
 
 // Render each tab on the server, keeping the real component, folder rows and badges.
@@ -20,15 +22,17 @@ vi.mock('react', async (original) => {
 });
 vi.mock('../src/store.tsx', () => ({
   useApp: () => ({
-    channel: () => ({ id: 'acme', name: 'Acme', kind: 'client', folders: [
-      { id: 'folder', name: 'Mixed folder', collapsed: state.collapsed, count: state.threads.length, running: 1 },
-    ] }),
+    channel: () => ({ id: 'acme', name: 'Acme', kind: 'client', folders: state.folders.map((f) => (
+      { ...f, collapsed: state.collapsed, count: state.threads.length, running: 1, threads: [] }
+    )) }),
     channelsLoaded: true,
     needsYou: state.needsYou,
   }),
   useNow: () => Date.parse('2026-10-23T12:00:00Z'),
 }));
-vi.mock('../src/components/ThreadList.tsx', () => ({ useLiveThreads: () => ({ data: state.threads, loading: false }) }));
+vi.mock('../src/app/useChannelThreads.ts', () => ({
+  useChannelThreads: () => ({ data: state.threads, loading: false, more: state.more, loadingMore: false, loadMore: vi.fn() }),
+}));
 vi.mock('../src/folders.tsx', () => ({ useFolders: () => ({ toggle: vi.fn() }) }));
 vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: vi.fn(), back: vi.fn(), sheet: vi.fn() }) }));
 
@@ -52,6 +56,8 @@ beforeEach(() => {
   state.threads = [];
   state.needsYou = null;
   state.collapsed = false;
+  state.more = false;
+  state.folders = [{ id: 'folder', name: 'Mixed folder' }];
 });
 
 describe('phone channel folders', () => {
@@ -106,5 +112,25 @@ describe('phone channel folders', () => {
     expect(active).not.toContain('Thread team');
     expect(badge(active, 'Active')).toBe(0);
     expect(render('recent')).toContain('Thread finished');
+  });
+});
+
+describe('phone channel after a folder is deleted', () => {
+  it('lists threads still carrying the deleted folder id as ungrouped', () => {
+    state.folders = [];
+    state.threads = [thread('orphan-run', 'running', 'gone'), thread('orphan-done', 'done', 'gone')];
+    const active = render('active');
+    expect(active).toContain('Thread orphan-run');
+    expect(active).not.toContain('Mixed folder');
+    expect(render('recent')).toContain('Thread orphan-done');
+  });
+});
+
+describe('phone channel paging', () => {
+  it('offers older threads only while the server has another page', () => {
+    state.threads = [thread('a', 'done', null)];
+    expect(render('recent')).not.toContain('Show older threads');
+    state.more = true;
+    expect(render('recent')).toContain('Show older threads');
   });
 });

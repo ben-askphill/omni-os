@@ -2,6 +2,8 @@ import { memo, useMemo } from 'react';
 import { Linking } from 'react-native';
 import { EnrichedMarkdownText, type MarkdownStyle } from 'react-native-enriched-markdown';
 
+import { usePairing } from '../../pairing/PairingProvider';
+import { gateReplyImages } from '../../thread/images';
 import { linkTarget, linkThreads } from '../../thread/links';
 import { fontSize, lineHeight, radius, space, type ColorTokens, useOmniTheme, weight } from '../../theme';
 
@@ -59,7 +61,8 @@ function styleFor(c: ColorTokens): MarkdownStyle {
 export const Markdown = memo(function Markdown({ text, onOpenThread }: { text: string; onOpenThread: (id: string) => void }) {
   const { colors } = useOmniTheme();
   const style = useMemo(() => styleFor(colors), [colors]);
-  const source = useMemo(() => linkThreads(text), [text]);
+  const origin = usePairing().activeServer?.origin ?? 'http://localhost';
+  const source = useMemo(() => linkThreads(gateReplyImages(text, origin)), [text, origin]);
   return (
     <EnrichedMarkdownText
       markdown={source}

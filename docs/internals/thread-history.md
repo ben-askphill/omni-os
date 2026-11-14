@@ -18,11 +18,11 @@ A thread opens with its newest page of events. Older pages load as Ben scrolls u
 
 `GET /api/threads/:id/stream?after=<id>` opens with a catch-up (`apps/server/stream-catch-up.ts`), on the first connect and every reconnect alike:
 
-- **Replay.** When the rows after `after` fit one page (`readAfter`: the oldest page after the cursor reaches the live end), they come one by one with their SSE ids. Then one `sync`: the detail `GET /api/threads/:id` answers with, with `events: []`.
+- **Replay.** When the rows after `after` fit one page (`readAfter`: the oldest page after the cursor reaches the live end), they come one by one with their SSE ids. Then one `sync` arrives, holding the detail `GET /api/threads/:id` would answer, with `events: []`.
 - **Snapshot.** When they do not fit, or `after` is stale (not an id, or past the thread's newest row), no rows come. The `sync` carries the newest page in `events` and `history`, like `?history=recent`, and its SSE id is that page's newest row, unless that row is at or below `after` (a stale cursor), which a client may already have seen.
-- Then the thread's last context reading, then live messages.
+- Then come the thread's last context reading and the live messages.
 
-A client applies the sync in place of fetching the detail again: thread, pending, live, blocked, handoff, artifacts, children and team are the server's now. On a snapshot it calls `detachHead`, so the rows it held become an island with their cursors intact, then joins the page with `applyHead`, and moves its `after` to the page's newest row. Rows it batched before the sync go in first.
+A client applies the sync in place of fetching the detail again: thread, pending, live, blocked, handoff, artifacts, children and team are the server's now. On a snapshot it calls `detachHead`, so the rows it held become an island with their cursors intact, then joins the page with `applyHead`, and moves its `after` to the page's newest row. Rows it batched before the sync go in first. A `thread` message's pending list and opening wait for the frame that lands the rows before them, and frames stop while the window is hidden, so the web client drops a copy still waiting when a sync or an action's answer comes after it (`apps/web/src/streamed-pending.ts`). Landing it later would bring back a message the agent already read.
 
 The stream subscribes to the bus before it reads the catch-up, so a row written in between is both queued and read. It remembers the ids the catch-up sent and drops their queued copies, and drops queued `thread`, `artifact` and `context` messages, which the sync and the context reading supersede. Every row it sends, replayed or live, is clipped to `rowBytes` like a page's, a `tool_result` made compact first. A connection whose reader falls `STREAM_QUEUE_MAX` (2,000) messages behind is closed, and its client reconnects into the catch-up above, so a reader that stopped costs a page at most. The size check reads payload sizes from the record header, so a gap too big to replay is never read whole. `apps/server/tests/stream-catch-up.test.ts` covers the races, the budgets, clipping and stale cursors.
 
@@ -58,13 +58,13 @@ A page also carries rows from outside its span that the clients' folds need. A c
 3. Session, head only. The newest `init` below the page when it has none.
 4. Last result, head only. The newest `result` below the page when it has none.
 
-A new kind (#209) pages like any other row. One that refers back to an earlier row adds a rule in `anchorsFor`. Three cross-edge effects have no rule and are accepted as rare: a cloud agent card whose run spans the floor, a handover that completes a switch across a gap, and a call in a revealed page whose result lies in the gap after it.
+A new kind (#209) pages like any other row. One that refers back to an earlier row adds a rule in `anchorsFor`. Three cross-edge effects have no rule, because they are rare: a cloud agent card whose run spans the floor, a handover that completes a switch across a gap, and a call in a revealed page whose result lies in the gap after it.
 
 ## Clipping
 
 A row whose encoded JSON exceeds `rowBytes` gets its payload rewritten. A `tool_result` is made compact before it gets here (see Tool output), which leaves it far under `rowBytes`, so only the other kinds clip. Every string longer than 2048, then 512, then 128 characters is shortened to a prefix and `…`, stopping at the first tier that fits. The last tier keeps only the top-level scalars of 128 characters or fewer. A payload that is not JSON, or still too big, becomes `{}`. The row gains `clipped: { bytes }`, the stored payload's size, and a boolean `truncated` becomes `true`.
 
-It is blind to kind. Ids, names, `parent`, `tool_use_id` and flags are short top-level fields every tier keeps, so grouping and nesting survive for kinds no client knows. Per-kind stubs could not cover those kinds. Clipping is deterministic, so an anchor and a page copy of one row are the same bytes. When a client holds two copies, the unclipped one wins.
+Clipping ignores the kind. Ids, names, `parent`, `tool_use_id` and flags are short top-level fields every tier keeps, so grouping and nesting survive for kinds no client knows. Per-kind stubs could not cover those kinds. Clipping is deterministic, so an anchor and a page copy of one row are the same bytes. When a client holds two copies, the unclipped one wins.
 
 ## Reading
 

@@ -6,11 +6,18 @@ import { Button, ErrorNote, Icon, Picker } from './ui.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
 import { BasePicker, useBasePick } from './BasePicker.tsx';
 import { RunOnPicker, useRunOn } from './RunOnPicker.tsx';
+import { useToast } from './Toaster.tsx';
+import { sendMessageToGrokBot } from '../grokbot.ts';
+import { GROK_BOT_NOTE, GROK_BOT_PLACEHOLDER, GROK_BOT_SENT, grokBotBlock } from '@omni/shared/thread-machine.ts';
+import { ComposerAccountNotice } from './AccountNotice.tsx';
+import { pickerAccounts, useAccounts } from '../accounts.ts';
+import { accountLine } from '@omni/shared/harness-accounts.ts';
+import { asksAuto } from '@omni/shared/thread-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { SlashMenu, useCommands } from './SlashMenu.tsx';
 import { FileMenu, useFileMenu } from './FileMenu.tsx';
 import { replySlash } from '@omni/shared/composer-slash.ts';
-import { OPEN_PR_PROMPT, STEP_WORKING } from '@omni/shared/thread-glance.ts';
+import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
 import { newThreadBody, sameSettings } from '../new-thread-preset.ts';
 import { draftRun, draftRunRequest, type DraftRun } from '@omni/shared/draft-run.ts';
 import { sendKey } from '../requests.ts';
@@ -74,7 +81,24 @@ export function NewThreadComposer({
 
   const [base, setBase] = useBasePick(channel);
   const runOn = useRunOn();
+  const toast = useToast();
+  // Grok Bot in the Machine chip: the text goes to its webhook and no thread starts, so the run's own pickers step aside.
+  const toGrok = runOn.grokBot;
+  const grokBlock = toGrok ? grokBotBlock(att.files.length) : null;
   const { choice, effort } = draftRun(picked, crew.find((r) => r.id === role), channels.find((c) => c.id === channel), harnesses ?? []);
+  // Who the picked harness runs as on the machine the thread will run on: in the model list, the machine rows, and a
+  // notice when it switched since anyone last looked. Auto picks the harness later, so it shows none.
+  const accounts = useAccounts();
+  const target = pickerAccounts(accounts.data, runOn.pick);
+  const picksHarness = !asksAuto(choice);
+  const accountFor = useCallback(
+    (pick: string) => {
+      const a = picksHarness ? pickerAccounts(accounts.data, pick)?.byHarness[choice.harness] : undefined;
+      return a ? accountLine(a) : null;
+    },
+    [accounts.data, choice.harness, picksHarness],
+  );
+  const switched = picksHarness ? target?.byHarness[choice.harness] : undefined;
 
   // Default the role once crew loads, if the conductor channel is selected. A preset keeps its own.
   useEffect(() => {
@@ -84,7 +108,7 @@ export function NewThreadComposer({
 
   const roleObj = crew.find((r) => r.id === role);
   // The Conductor channel runs the Conductor, and with no crew there is nothing to pick.
-  const showRole = crew.length > 0 && channel !== 'conductor';
+  const showRole = crew.length > 0 && channel !== 'conductor' && !toGrok;
   const visibleChannels = channels.filter((c) => !c.archived);
 
   const onRole = (r: string) => {
@@ -111,9 +135,24 @@ export function NewThreadComposer({
 
   const { slashMenu, fileMenu, menus, hint } = useNewThreadMenus({ ref, text, onText: update, choice, channel });
 
+  /** POST /api/grokbot with the text and the channel, the route Send to Grok Bot uses. The box empties once it took it. */
+  const sendToGrok = async (prompt: string) => {
+    // The note under the box already says to remove the attachments.
+    if (grokBlock) return;
+    setBusy(true);
+    setError(null);
+    const result = await sendMessageToGrokBot(prompt, channel);
+    setBusy(false);
+    if (!result.ok) return setError(result.error);
+    drafts.delete(key);
+    setText('');
+    toast({ title: GROK_BOT_SENT, icon: 'grok' });
+  };
+
   const submit = async () => {
     const prompt = text.trim();
     if (!prompt || busy) return;
+    if (toGrok) return sendToGrok(prompt);
     setBusy(true);
     setError(null);
     try {
@@ -160,16 +199,20 @@ export function NewThreadComposer({
           if (enterKey(e, text, update)) void submit();
         }}
         rows={big ? 3 : 2}
-        placeholder={withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
+        placeholder={toGrok ? GROK_BOT_PLACEHOLDER : withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
         className={`block max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none placeholder:text-fg-3 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
         {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
         {showRole && <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />}
-        {harnesses && (
+        {harnesses && !toGrok && (
           <ModelPicker
             harnesses={harnesses}
-            onOpen={reloadHarnesses}
+            onOpen={() => {
+              reloadHarnesses();
+              accounts.reload();
+            }}
+            accounts={target}
             defaultOpen={preset?.pickModel}
             value={choice}
             onChange={(c) => {
@@ -178,10 +221,10 @@ export function NewThreadComposer({
             effort={{ value: effort, onChange: (effort) => setPicked({ choice, effort }) }}
           />
         )}
-        <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />
-        <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} />
+        {!toGrok && <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />}
+        <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} />
         <AttachButton onPick={att.add} disabled={busy} />
-        {folder && channel === preset?.channel && (
+        {folder && channel === preset?.channel && !toGrok && (
           <button
             type="button"
             onClick={() => setFolder(null)}
@@ -195,14 +238,17 @@ export function NewThreadComposer({
           </button>
         )}
         <div className="ml-auto flex items-center gap-2.5">
-          <SendButton armed={!!text.trim()} busy={busy} onClick={submit}>
-            Start
+          <SendButton armed={!!text.trim() && !grokBlock} busy={busy} onClick={submit}>
+            {toGrok ? 'Send' : 'Start'}
           </SendButton>
         </div>
       </div>
       {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
-      <div aria-live="polite">{hint && !menus.open && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
+      <div aria-live="polite">{hint && !menus.open && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
       {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
+      {toGrok && !grokBlock && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{GROK_BOT_NOTE}</div>}
+      {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
+      {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
       {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
     </div>
   );
@@ -267,7 +313,7 @@ export function ReplyComposer({
   /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
   stop?: { busy: boolean; run: () => void } | null;
   /** Set when the agent's last reply asks whether to open a PR: Open PR beside the Machine chip answers yes. */
-  openPR?: { busy: boolean; run: () => void } | null;
+  openPR?: { busy: boolean; prompt: string; run: () => void } | null;
   onSent?: (t: Thread, mode?: SendMode) => void;
   /** Called as a message leaves the box, before the server has it: it shows in the thread from now on. */
   onSending?: () => void;
@@ -426,7 +472,7 @@ export function ReplyComposer({
         <ThreadRunPills thread={thread} openRequest={pillRequest} onSwitched={(t) => onChanged?.(t)} onError={setError} />
         {machine && <ThreadMachineChip thread={thread} held={machine} disabled={busy} onError={setError} />}
         {openPR && (
-          <Button size="sm" variant="primary" icon="pr" busy={openPR.busy} title={OPEN_PR_PROMPT} onClick={openPR.run}>
+          <Button size="sm" variant="primary" icon="pr" busy={openPR.busy} title={openPR.prompt} onClick={openPR.run}>
             {openPR.busy ? STEP_WORKING.open : 'Open PR'}
           </Button>
         )}

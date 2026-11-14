@@ -7,6 +7,10 @@ enabled: false
 cron: "0 9-18/3 * * 1-5"
 channel: omni-os
 role: builder
+# Skip the run (no thread, no plan usage) when the user has no open PR on the repo.
+precheck:
+  command: gh pr list --repo {{omniRepo}} --state open --author @me --json number --jq 'length > 0' | grep -q true
+  timeout: 30
 prompt: |
   Babysit the open PRs on {{omniRepo}}. Do not merge anything and do not open new PRs.
   List them with `gh pr list --state open --author @me --json number,title,headRefName,mergeable,reviewDecision,statusCheckRollup`.

@@ -3,6 +3,9 @@ import type { OmniApi } from '@omni/client-core';
 import { channelForm } from '@omni/shared/channel-form.ts';
 import { setsRun } from '@omni/shared/draft-run.ts';
 import { HERE, runOnRows } from '@omni/shared/thread-machine.ts';
+import { HARNESS } from '@omni/shared/brand.ts';
+import { relTime } from '@omni/shared/format.ts';
+import { accountDetail, accountLine, accountNotices, accountTone, switchLine } from '@omni/shared/harness-accounts.ts';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useMemo, useState } from 'react';
@@ -27,6 +30,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 const loadHarnesses = (api: OmniApi) => api.harnesses();
 const loadDevices = (api: OmniApi) => api.devices();
 const loadStatus = (api: OmniApi) => api.status();
+const loadAccounts = (api: OmniApi) => api.accounts();
 
 /** Harnesses & models: whether each harness can run, Hermes, each channel's default model, and the .env options behind them. */
 export function ModelsSection() {
@@ -119,6 +123,70 @@ export function ThreadsSection() {
       <Group footer="Threads that start on a schedule, a GitHub event or a webhook.">
         <ListRow first icon="automation" title="Automations" chevron onPress={() => navigation.navigate('Automations')} />
       </Group>
+    </SettingsPage>
+  );
+}
+
+/** Accounts: who each harness is signed in as on each machine, and the switches no one has acknowledged yet. */
+export function AccountsSection() {
+  const { colors } = useOmniTheme();
+  const hub = useLiveHub();
+  const accounts = useRemote(loadAccounts);
+  const [error, setError] = useState<string | null>(null);
+  const label = (h: string) => HARNESS[h]?.label ?? h;
+  const refresh = async () => {
+    try {
+      accounts.setData(await hub.request((api) => api.accounts(true)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not check again.');
+    }
+  };
+  const ack = async (machine: string, harness: string) => {
+    setError(null);
+    try {
+      accounts.setData(await hub.request((api) => api.acknowledgeAccountSwitch(machine, harness)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not acknowledge it.');
+    }
+  };
+  const view = accounts.data;
+  return (
+    <SettingsPage onRefresh={refresh}>
+      {error ? <Callout message={error} /> : null}
+      {view ? (
+        <>
+          {accountNotices(view).map(({ machine, account }) => (
+            <Callout key={`${machine.id}:${account.harness}`} message={switchLine(machine.name, label(account.harness), account)}>
+              <ListRow first title="Got it" onPress={() => void ack(machine.id, account.harness)} />
+            </Callout>
+          ))}
+          {view.machines.map((m) => (
+            <Group key={m.id} title={m.current ? `${m.name} (this machine)` : m.name} footer={m.checkedAt ? `Checked ${relTime(m.checkedAt)}` : null}>
+              {m.accounts.map((a, i) => {
+                const detail = accountDetail(a);
+                return (
+                  <View key={a.harness} style={[styles.harness, i > 0 && { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth }]}>
+                    <View style={styles.head}>
+                      <HarnessLogo harness={a.harness} />
+                      <Text style={[styles.name, { color: colors.fg }]}>{label(a.harness)}</Text>
+                      <StatusDot glyph={a.notice ? 'needs' : accountTone(a)} size={7} />
+                    </View>
+                    <Text style={[styles.meta, { color: a.state === 'signed-in' ? colors.fg : colors.fg3 }]}>{accountLine(a)}</Text>
+                    {detail ? <Text style={[styles.meta, { color: colors.fg3 }]}>{detail}</Text> : null}
+                  </View>
+                );
+              })}
+            </Group>
+          ))}
+          <Footnote>
+            {view.synced
+              ? 'Each machine reads its own harnesses and syncs them. Pull to check this machine again.'
+              : 'Only this machine is listed. Sync your other machines with it and each lists its own accounts here.'}
+          </Footnote>
+        </>
+      ) : (
+        <Loading error={accounts.error} retry={accounts.reload} />
+      )}
     </SettingsPage>
   );
 }

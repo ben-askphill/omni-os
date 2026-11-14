@@ -43,7 +43,9 @@ export async function startRunner(env: Record<string, string> = {}) {
   // instead of defaulting to secrets.json. A file that wants the file store passes OMNI_SECRET_STORE: 'file'.
   const bin = join(tmp, 'bin');
   mkdirSync(bin);
-  writeFileSync(join(bin, 'security'), '#!/bin/sh\nexit 44\n', { mode: 0o755 });
+  // Saving the sync signing key succeeds and reading it finds nothing, so each machine a test plays keeps the key its own
+  // copy of sync/sign-key.ts made: one PATH serves every machine in the process, so a stored key could not be told apart.
+  writeFileSync(join(bin, 'security'), `#!/bin/sh\n[ "$1" = "-i" ] && grep -q '"global/OMNI_SIGN_KEY"' && exit 0\nexit 44\n`, { mode: 0o755 });
   Object.assign(process.env, {
     PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
     OMNI_DATA_DIR: join(tmp, 'data'),

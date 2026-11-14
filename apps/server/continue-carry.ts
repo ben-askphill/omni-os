@@ -5,6 +5,7 @@ import { channels, continuations, type Thread } from './db.ts';
 import { git, gitOr } from './changes.ts';
 import { applyCheckpoint, commitCheckpoint, findCheckpoint } from './checkpoint.ts';
 import { prepareWorktree } from './sandbox.ts';
+import { channelExtras } from './worktree-include.ts';
 
 /** Where a continued thread's snapshot commit is kept, so it is never garbage collected. */
 export const continueRef = (threadId: string) => `refs/omni/continue/${threadId}`;
@@ -31,7 +32,7 @@ export async function carryInto(t: Thread): Promise<void> {
   else if (branch !== c.head) {
     throw new Error(`Branch ${t.branch} already exists at another commit, so Omni left it alone. Rename or delete it, then retry.`);
   }
-  await prepareWorktree(repo, t.cwd, t.branch);
+  await prepareWorktree(repo, t.cwd, t.branch, undefined, channelExtras(channels.get(t.channel_id)));
   // The changes uncommitted, and new files untracked, as they were in the source.
   if (sha) await applyCheckpoint(t.cwd, sha);
   continuations.applied(t.id);

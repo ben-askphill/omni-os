@@ -18,17 +18,17 @@ The first build runs in your own terminal, because EAS asks for your Apple ID an
    - Create the EAS project. EAS saves the project id in `app.json`, which `app.config.ts` merges in. Commit that change.
    - Log in to your Apple account: Apple ID, password, two-factor code, then the team.
    - EAS registers the bundle ID `app.omni-os.ios` and turns on Push Notifications for it, because the app's `aps-environment` entitlement asks for it. It then creates the distribution certificate and the provisioning profile.
-   - For the submission, EAS creates the App Store Connect app, named by `appName` in `eas.json` ("Omni OS"; EAS adds a suffix if the name is taken), and an internal TestFlight group, "Team (Expo)", that gets every build and holds the team's admins. It offers to generate an App Store Connect API key and keeps it for later submissions.
+   - For the submission, EAS creates the App Store Connect app, named by `appName` in `eas.json` ("Omni OS", with a suffix from EAS if the name is taken), and an internal TestFlight group, "Team (Expo)", that gets every build and holds the team's admins. It offers to generate an App Store Connect API key and keeps it for later submissions.
 
    `--no-wait` returns once the build is queued. The build and the submission carry on at expo.dev, which links them.
 3. **Save the App Store Connect app id.** In App Store Connect, open the app, then App Information, and copy the Apple ID (a number). Put it in `submit.production.ios.ascAppId` in `eas.json` and commit. A non-interactive submission needs it. It is not secret.
 4. **Create an APNs key** for push alerts. In Certificates, Identifiers and Profiles, under Keys, add a key with **Apple Push Notifications service (APNs)** enabled. Download the `.p8` file once. Note the ten-character Key ID, and the Team ID under Membership details.
 5. **Save the APNs values in Omni's secret store.** Save these three names:
-   - `APNS_AUTH_KEY`: the `.p8` file's text. Paste all of it into the one-line field; the server restores the line breaks.
+   - `APNS_AUTH_KEY`: the `.p8` file's text. Paste all of it into the one-line field. The server restores the line breaks.
    - `APNS_KEY_ID`: the Key ID from step 4.
    - `APNS_TEAM_ID`: the Team ID.
 
-   Save them in Settings, then Secrets, on the computer the phone is paired with, global scope. The store is the Keychain on a Mac, `data/secrets.json` on Linux, or libsecret when `OMNI_SECRET_STORE` selects it. The server picks them up without a restart. Until all three are there, the app's Notifications screen and the Omni for iOS card in Settings say alerts are off and name what is missing. The server log names them too, never the values. Keep the `.p8` file out of the repository. EAS does not need this key: Omni's server signs alerts with it directly.
+   Save them in Settings, then Secrets, on the computer the phone is paired with, global scope. The store is the Keychain on a Mac, `data/secrets.json` on Linux, or libsecret when `OMNI_SECRET_STORE` selects it. The server picks them up without a restart. Until all three are there, the app's Notifications screen and the Omni for iOS card in Settings say alerts are off and name what is missing. The server log names them too, never the values. Keep the `.p8` file out of the repository. EAS does not need this key, because Omni's server signs alerts with it directly.
 6. **Prepare a privacy policy URL** before external testing or App Store review. Internal TestFlight testing does not ask for one. Host a page that says the app stores and sends data only to the Omni server the user pairs with.
 
 ## Build and submit
@@ -39,7 +39,7 @@ Once steps 2 and 3 are done, from `apps/ios`:
 npx eas-cli@latest build --platform ios --profile production --auto-submit --non-interactive --no-wait
 ```
 
-This needs an Expo session, from `eas login` on that machine or an `EXPO_TOKEN` in the environment (expo.dev, Account settings, Access tokens). It needs no Apple sign-in: EAS holds the signing files and the API key.
+This needs an Expo session, from `eas login` on that machine or an `EXPO_TOKEN` in the environment (expo.dev, Account settings, Access tokens). It needs no Apple sign-in, because EAS holds the signing files and the API key.
 
 The `production` profile bumps the build number on each build (`autoIncrement`). The marketing version is `version` in `app.config.ts`, which is `0.1.0`. Change it there when a release needs a new user-facing version.
 
@@ -60,11 +60,11 @@ The other profiles are for testing outside TestFlight:
 
 Builds use the fingerprint as their runtime version (`runtimeVersion` in `app.config.ts`), so an update never reaches a build whose native code it was not made for. The fingerprint depends on the resolved config, which depends on `APP_VARIANT`. Any job or command that resolves the config outside a build must set `APP_VARIANT=production`, as the workflow does, or its fingerprint will not match the build's.
 
-Runs queue one at a time. Put `[eas skip]` in a commit message to skip the run for that push. Start a run by hand with `npx eas-cli@latest workflow:run .eas/workflows/ios-release.yml`. Builds before build 4 were made without `expo-updates` and never receive updates.
+Runs queue one at a time. Put `[eas skip]` in a commit message to skip the run for that push. Start a run by hand with `npx eas-cli@latest workflow:run .eas/workflows/ios-release.yml`. Builds before build 4 have no `expo-updates` and never receive updates.
 
 ### Set up the workflow
 
-1. In expo.dev, open the `omni-os-ios` project under the `omni-os` account, then Project settings, then GitHub. Connect `ben-askphill/omni-os` and set the base directory to `apps/ios`. The Expo GitHub app is already installed on `ben-askphill`; grant it access to `omni-os` if the repository is not listed.
+1. In expo.dev, open the `omni-os-ios` project under the `omni-os` account, then Project settings, then GitHub. Connect `ben-askphill/omni-os` and set the base directory to `apps/ios`. The Expo GitHub app is already installed on `ben-askphill`. Grant it access to `omni-os` if the repository is not listed.
 2. Nothing else. The workflow runs on EAS with the credentials EAS already holds: the signing files and the App Store Connect API key from the first build. GitHub needs no Expo token.
 
 ### Publish an update by hand

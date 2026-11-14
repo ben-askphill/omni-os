@@ -16,13 +16,13 @@ Agents outside Omni can use it through MCP: Claude Desktop, claude.ai, ChatGPT, 
 | `list_folders`, `create_folder`, `rename_folder`, `delete_folder` | A channel's sidebar folders. Deleting one keeps its threads |
 | `list_automations`, `run_automation`, `set_automation_enabled` | See automations and their last runs, run one now, turn one on or off |
 
-A thread started here has no parent, so its reply does not come back as a `[crew report]`: the calling agent gets it with `get_thread`. The code is in `apps/mcp/external/`, and the same tools serve both ways in below.
+A thread started here has no parent, so its reply does not come back as a `[crew report]`. The calling agent gets it with `get_thread`. The code is in `apps/mcp/external/`, and both ways of connecting below use the same tools.
 
 ## Let an agent install it
 
 Each harness below has its own prompt. Paste it into that harness, and it sets up Omni for itself. On the machine Omni runs on it uses the stdio server; on any other machine it uses the token URL `https://mcp.omni-os.app/mcp/<mcp-token>` (see [From anywhere else](#from-anywhere-else-http)). Before you paste a prompt on another machine, replace `<mcp-token>` with the contents of `data/mcp-token` on Omni's machine (`npm run mcp:config -- --show-token` there prints the full URL). Anyone with that URL can start threads on your machine, so treat it like a password.
 
-Every prompt finds Omni's checkout from the server running on port 4747, not from a fixed path: a machine can hold several checkouts, and only the one serving :4747 has the right data dir. Grok Bot, claude.ai and ChatGPT run on their own servers and can't follow a prompt: for Grok Bot see [Connect Grok Bot](#connect-grok-bot), for the other two [From anywhere else](#from-anywhere-else-http).
+Every prompt finds Omni's checkout from the server running on port 4747, not from a fixed path. A machine can hold several checkouts, and only the one serving :4747 has the right data dir. Grok Bot, claude.ai and ChatGPT run on their own servers and can't follow a prompt. For Grok Bot see [Connect Grok Bot](#connect-grok-bot), and for the other two see [From anywhere else](#from-anywhere-else-http).
 
 ### Claude Code
 
@@ -159,7 +159,7 @@ Omni serves the same tools at `/mcp` over Streamable HTTP. claude.ai, ChatGPT an
 
    Until it is set, `/mcp` refuses the tunnel's name. `OMNI_MCP_PUBLIC_URL` overrides it.
 
-Leave Cloudflare Access off for this hostname: claude.ai, ChatGPT and Grok can't get past its login. Omni's own checks below are the gate.
+Leave Cloudflare Access off for this hostname: claude.ai, ChatGPT and Grok can't get past its login. Omni's own checks, listed under Security below, protect the hostname instead.
 
 Clients connect with the token URL, `https://mcp.omni-os.app/mcp/<mcp-token>`. `npm run mcp:config -- --show-token` prints it with the token from `data/mcp-token` filled in:
 
@@ -174,11 +174,11 @@ The Mac has to be awake for any of these to answer.
 
 #### What the Clerk instance needs
 
-Google sign-in for devices already needs a public OAuth application with the device grant. For MCP clients, also turn on **dynamic client registration** in the Clerk dashboard (OAuth applications settings): claude.ai, ChatGPT and the other clients register themselves there, as public clients with PKCE. Check it took: `https://<instance>.clerk.accounts.dev/.well-known/oauth-authorization-server` lists a `registration_endpoint` once it is on. Without it, a client asks you for a client id, or fails to connect.
+Google sign-in for devices already needs a public OAuth application with the device grant. For MCP clients, also turn on **dynamic client registration** in the Clerk dashboard (OAuth applications settings). claude.ai, ChatGPT and the other clients register themselves there as public clients with PKCE. To check that the setting is on, open `https://<instance>.clerk.accounts.dev/.well-known/oauth-authorization-server`, which lists a `registration_endpoint` once it is. Without it, a client asks you for a client id, or fails to connect. Also have the OAuth applications issue **JWT access tokens**: `/mcp` refuses opaque ones, because it cannot tell which app they were issued to (see [Security](#security)).
 
 ## Connect Grok Bot
 
-Grok Bot runs on xAI's servers. It can't run commands on your Mac, so it can't follow the install prompt above. Grok adds Omni as a custom connector: an MCP server at a public URL, which Grok calls from its servers and offers in every chat (see [xAI's connector docs](https://docs.x.ai/grok/connectors)). Grok rejects private addresses, so `/mcp` has to be on the internet through the Cloudflare Tunnel in [From anywhere else](#from-anywhere-else-http). Setup has three steps.
+Grok Bot runs on xAI's servers. It can't run commands on your Mac, so it can't follow the install prompt above. Grok adds Omni as a custom connector, which is an MCP server at a public URL that Grok calls from its servers and offers in every chat (see [xAI's connector docs](https://docs.x.ai/grok/connectors)). Grok rejects private addresses, so `/mcp` has to be on the internet through the Cloudflare Tunnel in [From anywhere else](#from-anywhere-else-http). Setup has three steps.
 
 **1. Open `/mcp` and get the URL.** Paste this into Claude Code, Codex or Cursor on the machine Omni runs on:
 
@@ -221,12 +221,16 @@ The Mac has to be awake and Omni running for Grok Bot to reach it.
 
 Three things open `/mcp`, each checked on every request:
 
-- **A Clerk access token** for the Google account linked to this install, as a `Bearer` header. Omni holds no Clerk secret key: it asks Clerk's `userinfo` endpoint who the token belongs to and caches the answer for a minute, so a token revoked in Clerk can still work for up to that minute. Any other Google account gets a 401, and unlinking the account turns this way in off at once. A token never goes in a URL. If Clerk cannot be reached, `/mcp` answers 503 and the static tokens still work.
-- **`data/mcp-token`** (mode 0600, made on first use), apart from the API token, as a header or in the path for clients that take only a URL. Anyone with that URL can start threads on your Mac, and threads run with `bypassPermissions`, so treat it like a password. To rotate it, delete the file, restart Omni and update each client that uses it.
+- **A Clerk access token** for the Google account linked to this install, as a `Bearer` header, issued for this Omni. Omni holds no Clerk secret key. It asks Clerk's `userinfo` endpoint who the token belongs to and caches the answer for a minute, so a token revoked in Clerk can still work for up to that minute. Any other Google account gets a 401, and unlinking the account turns this way in off immediately. A token never goes in a URL. If Clerk cannot be reached, `/mcp` answers 503 and the static tokens still work.
+  - The Clerk instance is shared, so a token for your Google account may have been issued to some other app on it. Omni therefore takes only a JWT access token, checks its signature against the instance's keys, and requires that its audience (RFC 8707) is one of this Omni's `/mcp` URLs or that its OAuth client is one you approved. The accepted audiences come from configuration only: `integrations.mcpPublicUrl` plus `/mcp`, `https://<Omni Connect hostname>/mcp` while Connect is on, and `https://<this Mac's MagicDNS name>/mcp`, the name `tailscale status` reports for this Mac. A loopback audience (`http://127.0.0.1:<port>/mcp` or `http://localhost:<port>/mcp`) counts only for a request made directly from this Mac. The `Host` header and `X-Forwarded-*` never add one. Clerk's `userinfo` is still asked, so a token revoked in Clerk stops working.
+  - Settings, Sharing & access, MCP clients lists every client that has presented a token, with when it was first and last seen. Each shows one of four statuses: Approved, Bound, Pending or Removed. A client whose token names this Omni's `/mcp` resource is listed as Bound ("Bound to this Omni"), and only its tokens that carry that audience get in. Its tokens without the audience, like those of a Pending client, need an explicit Approve in Settings or its client id in `integrations.mcpClients` (or `OMNI_MCP_CLIENTS`, comma-separated). Remove refuses its tokens from then on and drops it from the list; it wins over Bound, Approve and the config file. The list is per machine and does not sync. The Conductor has `mcp_clients` and `remove_mcp_client`.
+  - An opaque access token names no client Omni can check without a Clerk secret key, so it gets a 401 that says so. Turn on JWT access tokens for OAuth applications in the Clerk dashboard (see [What the Clerk instance needs](#what-the-clerk-instance-needs)). `OMNI_MCP_ALLOW_OPAQUE=1` in the server's environment brings back the old check, which accepts any owner token whichever app it was issued to.
+  - A client connected before this check came in gets a 401 asking it to reconnect, or to be approved, before it works again.
+- **`data/mcp-token`** (mode 0600, created on first use and separate from the API token), as a header, or in the path for clients that take only a URL. Anyone with that URL can start threads on your Mac, and threads run with `bypassPermissions`, so treat it like a password. To rotate it, delete the file, restart Omni and update each client that uses it.
 - **The API token**, as a header only.
 
-A 401 from `/mcp` names the protected resource metadata (`/.well-known/oauth-protected-resource/mcp`, RFC 9728), which points clients at Clerk. Omni also serves Clerk's own authorization server metadata at `/.well-known/oauth-authorization-server`, for clients on the older MCP spec. Both answer 404 until a Google account is linked.
+A 401 from `/mcp` names the protected resource metadata (`/.well-known/oauth-protected-resource/mcp`, RFC 9728), which points clients at Clerk. Its `resource` URL is `integrations.mcpPublicUrl` when the request came in on that name, and otherwise the allowed `Host` it came in on (https for an Omni Connect or `.ts.net` name). It never comes from `X-Forwarded-*` headers, so a proxy header cannot send a client to another host. A client that signs in over Tailscale on this Mac's own `.ts.net` name gets that name as its audience, so it is Bound and needs no Approve. A client that reaches `/mcp` on any other allowed name outside the accepted audiences shows as Pending and needs Approve. Omni also serves Clerk's own authorization server metadata at `/.well-known/oauth-authorization-server`, for clients on the older MCP spec. Both answer 404 until a Google account is linked.
 
-Through the tunnel, the `integrations.tailscaleLogin` check that guards `/api` does not apply, since tunnel requests carry no Tailscale login. The ingress rule forwards only `/mcp` and `/.well-known`, and `/api` refuses the tunnel's name even if a rule forwards more: the tools reach `/api` in-process through the usual request guard. `/mcp` and the metadata refuse a `Host` that is neither one of `/api`'s allowed names nor `mcpPublicUrl`'s, and `/mcp` refuses a browser `Origin` from another site: the same DNS-rebinding checks as `/api` (see [Remote access and security](remote-access.md)).
+Through the tunnel, the `integrations.tailscaleLogin` check that guards `/api` does not apply, since tunnel requests carry no Tailscale login. The ingress rule forwards only `/mcp` and `/.well-known`, and `/api` refuses the tunnel's name even if a rule forwards more. The tools reach `/api` in-process through the usual request guard. `/mcp` and the metadata refuse a `Host` that is neither one of `/api`'s allowed names nor `mcpPublicUrl`'s, and `/mcp` refuses a browser `Origin` from another site. These are the same DNS-rebinding checks that `/api` uses (see [Remote access and security](remote-access.md)).
 
-The server is stateless: each request gets a fresh MCP server, so a restart drops no session.
+The server is stateless. Each request gets a fresh MCP server, so a restart drops no session.

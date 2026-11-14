@@ -43,6 +43,23 @@ export interface TerminalSink {
   setError: (message: string | null) => void;
 }
 
+/** What GET /threads/:id/terminal says about the thread's shell. */
+interface ShellInfo {
+  open: boolean;
+  running?: boolean;
+  cols?: number;
+  rows?: number;
+}
+
+/**
+ * Start the thread's shell if it has none, with a deliberate POST: the stream only attaches (PRD #667, no GET starts a
+ * process). A shell that exited stays exited until Ben presses Restart, so this leaves an open one alone.
+ */
+export async function ensureShell(base: string, size: { cols: number; rows: number }): Promise<void> {
+  const info = await api.get<ShellInfo>(base);
+  if (!info.open) await api.post(base, size);
+}
+
 /** Watch the shell without typing: it keeps the shell's own size, so the terminal is resized to the server's. Returns the cleanup. */
 export function attachReadOnly(term: Terminal, base: string, { setState, setError }: TerminalSink): () => void {
   let closed = false;
@@ -65,9 +82,16 @@ export function attachReadOnly(term: Terminal, base: string, { setState, setErro
     { onDown: () => setError('Terminal disconnected. Reconnecting.') },
   );
   void api
-    .get<{ open: boolean; cols?: number; rows?: number }>(base)
+    .get<ShellInfo>(base)
     .then((info) => {
-      if (!closed && info.cols && info.rows) term.resize(info.cols, info.rows);
+      if (closed) return;
+      // The phone only watches: it never starts a shell, and the stream has nothing to attach to.
+      if (!info.open) {
+        sse.close();
+        setError('No shell is running in this thread. Open the Terminal tab on the desktop to start one.');
+        return;
+      }
+      if (info.cols && info.rows) term.resize(info.cols, info.rows);
     })
     .catch(() => {});
   return () => {
@@ -124,31 +148,48 @@ export function attachInteractive(term: Terminal, fit: FitAddon, el: HTMLElement
   });
   ro.observe(el);
 
-  const sse = openSSE(
-    () => `/api${base}/stream?cols=${term.cols}&rows=${term.rows}`,
-    (d) => {
-      const m = d as TerminalMessage;
-      if (m.kind === 'snapshot') {
-        term.reset();
-        term.write(m.data);
-        if (!m.running) term.write(exitLine(m.code));
-        setState({ running: m.running, code: m.code });
-        setError(null);
-        // The server's size may be stale from another client; tell it ours.
-        if (m.running) void api.post(`${base}/resize`, { cols: term.cols, rows: term.rows }).catch(() => {});
-      } else if (m.kind === 'data') term.write(m.data);
-      else if (m.kind === 'exit') {
-        setState({ running: false, code: m.code });
-        term.write(exitLine(m.code));
-      }
-    },
-    { onDown: () => setError('Terminal disconnected. Reconnecting.') },
-  );
+  // Open the shell with a POST before attaching, and again if the server restarted under a live view. Until the
+  // first POST lands the stream waits, so it never asks the server to start one.
+  let sse: { close: () => void } | null = null;
+  const ensure = () => ensureShell(base, { cols: term.cols, rows: term.rows });
+  const attach = () => {
+    if (closed || sse) return;
+    sse = openSSE(
+      () => `/api${base}/stream?cols=${term.cols}&rows=${term.rows}`,
+      (d) => {
+        const m = d as TerminalMessage;
+        if (m.kind === 'snapshot') {
+          term.reset();
+          term.write(m.data);
+          if (!m.running) term.write(exitLine(m.code));
+          setState({ running: m.running, code: m.code });
+          setError(null);
+          // The server's size may be stale from another client; tell it ours.
+          if (m.running) void api.post(`${base}/resize`, { cols: term.cols, rows: term.rows }).catch(() => {});
+        } else if (m.kind === 'data') term.write(m.data);
+        else if (m.kind === 'exit') {
+          setState({ running: false, code: m.code });
+          term.write(exitLine(m.code));
+        }
+      },
+      {
+        onDown: () => {
+          setError('Terminal disconnected. Reconnecting.');
+          void ensure().catch(() => {});
+        },
+      },
+    );
+  };
+  void ensure()
+    .then(attach)
+    .catch((e) => {
+      if (!closed) setError(errorText(e));
+    });
   term.focus();
 
   return () => {
     closed = true;
-    sse.close();
+    sse?.close();
     ro.disconnect();
     clearTimeout(resizeTimer);
     input.dispose();

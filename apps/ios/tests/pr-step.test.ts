@@ -1,5 +1,5 @@
 import type { PendingMsg } from '@omni/client-core';
-import { FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT } from '@omni/shared/thread-glance.ts';
+import { FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, stepPrompts } from '@omni/shared/thread-glance.ts';
 import { describe, expect, it } from 'vitest';
 
 import { agentOffersPR, resumes, stepChip, stepState, stepWorking } from '../src/pr/step';
@@ -45,5 +45,13 @@ describe('the branch steps on iOS', () => {
     expect(stepChip(null, { step: 'conflicts' }, true)).toMatchObject({ kind: 'ask', label: 'Fix conflicts', prompt: FIX_CONFLICTS_PROMPT });
     expect(stepChip(null, null, true)).toMatchObject({ kind: 'ask', label: 'Open PR', prompt: OPEN_PR_PROMPT });
     expect(stepChip(null, null, false)).toBeNull();
+  });
+
+  it("sends and recognizes the channel's own step prompts", () => {
+    const prompts = stepPrompts({ prompt_open_pr: 'Use the pr-writer skill.' });
+    expect(stepChip(null, null, true, prompts)).toMatchObject({ kind: 'ask', label: 'Open PR', prompt: 'Use the pr-writer skill.' });
+    expect(stepState({ rows: [user('Use the pr-writer skill.')], pending: [], busy: true }, prompts).underway).toBe('open');
+    expect(stepState({ rows: [user('Use the pr-writer skill.')], pending: [], busy: true }).underway).toBeNull();
+    expect(resumes({ step: 'open' }, 'Use the pr-writer skill.', prompts)).toBe(true);
   });
 });

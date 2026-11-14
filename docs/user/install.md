@@ -1,20 +1,20 @@
 # Install and first run
 
-Omni runs on the computer where your agents work. Set that machine up first; the Web UI on your phone talks to it later.
+Omni runs on the computer where your agents work. Set that machine up first. Later, the Web UI on your phone talks to it.
 
 Run it one of two ways: the desktop app, or the server from a checkout with `npm run dev` and the Web UI in a browser.
 
 ## The desktop app
 
-The desktop app (`apps/desktop`, [ADR 0010](../adr/0010-desktop-app-is-electron.md)) is the Web UI in a window of its own, with the Omni server inside: no repo checkout or Node to install. You still need Claude Code signed in, and `gh` for the GitHub panel ([What you need](#what-you-need)).
+The desktop app (`apps/desktop`, [ADR 0010](../adr/0010-desktop-app-is-electron.md)) is the Web UI in a window of its own, with the Omni server inside, so there is no repo checkout or Node to install. You still need Claude Code signed in, and `gh` for the GitHub panel ([What you need](#what-you-need)).
 
 Download it from the [latest release](https://github.com/ben-askphill/omni-os/releases/latest). It updates itself from there ([Updating](#updating)).
 
-- **Mac:** open `Omni-<version>-mac-universal.dmg` and drag Omni to Applications. It runs on Apple silicon and Intel, and is signed and notarized, so it opens without a warning. Run it from Applications: from the disk image it cannot update itself.
+- **Mac:** open `Omni-<version>-mac-universal.dmg` and drag Omni to Applications. It runs on Apple silicon and Intel, and is signed and notarized, so it opens without a warning. Run it from Applications. From the disk image it cannot update itself.
 - **Linux:** make the AppImage executable and run it: `chmod +x Omni-*.AppImage && ./Omni-*.AppImage`. It adds no launcher entry by itself.
 - **Build it yourself** from a checkout: `cd apps/desktop && npx tsx scripts/dist.ts --platform mac --arch arm64` (or `x64`, `universal`; `--platform linux --arch x64` for the AppImage). The build lands in `apps/desktop/release/`. A Linux build needs a working docker unless this machine's glibc is 2.28 or older, or you pass `--host-glibc` for a build that only runs here. On a Mac, `npm run build:desktop` (`scripts/build-desktop.sh`) builds for this Mac, installs to `~/Applications/Omni.app` and opens it. [apps/desktop/README.md](../../apps/desktop/README.md) has the details.
 
-Opening the app starts the server on port 4747, or attaches to one this install already runs there. Quitting stops a server the app started; quitting while turns run asks whether to keep the server running for them. On a Mac the server keeps the machine from idle-sleeping while it runs (`OMNI_CAFFEINATE=0` turns that off). Kept in a checkout's `data/` (below), the server still reads the checkout's `.env` for its server options. Variables exported in your shell do not reach the app's server.
+Opening the app starts the server on port 4747, or attaches to one this install already runs there. Quitting stops a server the app started. Quitting while turns run asks whether to keep the server running for them. On a Mac the server keeps the machine from idle-sleeping while it runs (`OMNI_CAFFEINATE=0` turns that off). If you keep using a checkout's `data/` (below), the server still reads the checkout's `.env` for its server options. Variables exported in your shell do not reach the app's server.
 
 | | Mac | Linux |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ The desktop app replaced both, and the repo no longer has them.
 
 - On its first launch, when one of them kept an `omni.db` in a checkout's `data/` (the SwiftUI app's repo path, or `~/omni-os`), the desktop app asks once whether to keep using that folder where it is or start fresh. Keep it and your channels, threads and settings carry over. The app only reads the old folder to decide, and never copies or moves it.
 - Mac: the SwiftUI app lived at `~/Applications/Omni.app` too. `npm run build:desktop` refuses to replace an app with another bundle id, so move the old one away first.
-- Linux: the launcher's `~/.local/share/applications/omni-os.desktop` runs `scripts/omni-linux.sh`, which is deleted. The desktop app reads that entry on its first launch to find your checkout, so remove it after that: `rm ~/.local/share/applications/omni-os.desktop`.
+- Linux: the launcher's `~/.local/share/applications/omni-os.desktop` runs `scripts/omni-linux.sh`, which the repo no longer has. The desktop app reads that entry on its first launch to find your checkout, so remove it after that: `rm ~/.local/share/applications/omni-os.desktop`.
 
 ## What you need
 
@@ -40,11 +40,13 @@ The desktop app replaced both, and the repo no longer has them.
 | Claude Code, signed in | `claude --version` | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` |
 | `gh`, signed in (GitHub panel, PR automations) | `gh auth status` | `brew install gh && gh auth login` |
 
-Secrets go in the Keychain on a Mac and in `data/secrets.json` on Linux ([Configuration](configuration.md#secrets)). Codex and Cursor Agent are optional; see [Harnesses](harnesses.md).
+Signing Claude Code in over ssh works too. The login keychain is locked there, so `claude` saves the login to `~/.claude/.credentials.json`. Before each Claude Code thread starts, Omni copies that login into the Keychain when it is newer than the one there, because the desktop session reads the Keychain first and would otherwise fail with "OAuth session expired". `OMNI_CLAUDE_LOGIN_SYNC=0` in `.env` turns this off.
+
+Secrets go in the Keychain on a Mac and in `data/secrets.json` on Linux ([Configuration](configuration.md#secrets)). Codex and Cursor Agent are optional (see [Harnesses](harnesses.md)).
 
 ## Agent instructions
 
-For an agent doing the setup (the README has the prompt to paste). Run each step, run its check, and stop on a failed check instead of working around it. Don't run `sudo`, and never write secret values anywhere but the secret store (Keychain on a Mac, `data/secrets.json` on Linux).
+This section is for an agent doing the setup (the README has the prompt to paste). Run each step, run its check, and stop on a failed check instead of working around it. Don't run `sudo`, and never write secret values anywhere but the secret store (Keychain on a Mac, `data/secrets.json` on Linux).
 
 1. **Prerequisites.** Run every check in [What you need](#what-you-need). On a miss, give the user the fix and wait.
 
@@ -61,7 +63,7 @@ For an agent doing the setup (the README has the prompt to paste). Run each step
    npm install --include=dev
    ```
 
-   `--include=dev` matters: with `NODE_ENV=production` in the shell (common in agent shells), a plain `npm install` skips dev dependencies like Turborepo, Vite and Electron, so the builds and `npm test` fail later. Check: `npx turbo --version` prints a version.
+   `--include=dev` matters. With `NODE_ENV=production` in the shell (common in agent shells), a plain `npm install` skips dev dependencies like Turborepo, Vite and Electron, so the builds and `npm test` fail later. Check: `npx turbo --version` prints a version.
 
 4. **Build and open the desktop app.**
 
@@ -71,7 +73,7 @@ For an agent doing the setup (the README has the prompt to paste). Run each step
    npm run build:desktop
    ```
 
-   It builds the app for this Mac, installs it to `~/Applications/Omni.app` and opens it. Check: the script prints `==> Installed` with that path. If it stops with "is not this app", an older Omni app is at that path: tell the user and wait rather than moving it yourself.
+   It builds the app for this Mac, installs it to `~/Applications/Omni.app` and opens it. Check: the script prints `==> Installed` with that path. If it stops with "is not this app", an older Omni app is at that path. Tell the user and wait rather than moving it yourself.
 
    On Linux:
 
@@ -82,13 +84,13 @@ For an agent doing the setup (the README has the prompt to paste). Run each step
    chmod +x apps/desktop/release/Omni-*-linux-x86_64.AppImage
    ```
 
-   The first two lines compile node-pty for this machine and fetch Electron, in case npm skipped their install scripts. `--host-glibc` builds for this machine only, without docker. Check: the AppImage exists. Tell the user to open it and wait until they have; it adds no launcher entry.
+   The first two lines compile node-pty for this machine and fetch Electron, in case npm skipped their install scripts. `--host-glibc` builds for this machine only, without docker. Check: the AppImage exists. Tell the user to open it and wait until they have. It adds no launcher entry.
 
-5. **Confirm it runs.** The app starts the server itself. Check: `curl -s 'http://127.0.0.1:4747/api/auth/proof?nonce=0123456789abcdef0123456789abcdef'` returns JSON with a `proof` field. If nothing answers yet, wait a few seconds and try again. An answer without `proof` means something else holds port 4747: stop and tell the user rather than killing it.
+5. **Confirm it runs.** The app starts the server itself. Check: `curl -s 'http://127.0.0.1:4747/api/auth/proof?nonce=0123456789abcdef0123456789abcdef'` returns JSON with a `proof` field. If nothing answers yet, wait a few seconds and try again. An answer without `proof` means something else holds port 4747. Stop and tell the user rather than killing it.
 
 6. **Hand over.** Tell the user the app is open and that its first-run screens ask who they are and where their work lives. After a `git pull`, the command in step 4 builds it again.
 
-Prefer the browser? Steps 1 to 3 are the same; then `npm run setup` ([Set up by hand](#set-up-by-hand)), `npm run dev`, and open http://localhost:4748.
+Prefer the browser? Steps 1 to 3 are the same. Then run `npm run setup` ([Set up by hand](#set-up-by-hand)) and `npm run dev`, and open http://localhost:4748.
 
 ## Set up by hand
 
@@ -107,7 +109,7 @@ npm run setup
 4. **First channel**: a client or project with an optional repo and Shopify store, or skip
 5. **Done**: saves `data/omni.config.json` and, in the Web UI, opens #conductor with a welcome message
 
-Running it again is safe: every answer defaults to what is saved. `npm run setup -- --yes --name Ada --email ada@example.com` answers it without prompts (`--help` lists the flags). Skip it and the Web UI asks on first open instead. `npm run setup` writes the checkout's `data/`, which the packaged desktop app does not use unless you keep it there, so set up the desktop app in its own first-run screens. Change anything later in **Settings > General** and **Workspace** on any surface; General has **Run setup again**, which walks the screens once more. What the file holds: [Configuration](configuration.md).
+Running it again is safe, because every answer defaults to what is saved. `npm run setup -- --yes --name Ada --email ada@example.com` answers it without prompts (`--help` lists the flags). Skip it and the Web UI asks on first open instead. `npm run setup` writes the checkout's `data/`, which the packaged desktop app does not use unless you keep it there, so set up the desktop app in its own first-run screens. Change anything later in **Settings > General** and **Workspace** on any surface; General has **Run setup again**, which walks the screens once more. [Configuration](configuration.md) describes what the file holds.
 
 ## Start it
 
@@ -117,7 +119,7 @@ Running it again is safe: every answer defaults to what is saved. `npm run setup
 | Development | `npm run dev` | Server on :4747, Web UI with hot reload on http://localhost:4748 |
 | Production | `npm run build && npm start` | One process, serves the built Web UI on http://127.0.0.1:4747 |
 
-Reaching it from your phone: [Remote access](remote-access.md).
+To reach it from your phone, see [Remote access](remote-access.md).
 
 ## Bring in your history
 
@@ -125,7 +127,7 @@ Reaching it from your phone: [Remote access](remote-access.md).
 npm run import-history -- --days 30
 ```
 
-Pulls your existing Claude Code sessions into Omni as resumable threads.
+This pulls your existing Claude Code sessions into Omni as resumable threads.
 
 ## Updating
 
@@ -135,9 +137,9 @@ Click **Update**. A server run from a checkout checks origin's `main` every 15 m
 2. runs `scripts/sync-main.sh`, which puts the main checkout on `main`, level with origin (it refuses when tracked files have changes, leaves worktrees alone, and runs `npm install` when `package-lock.json` changed),
 3. rebuilds the Web UI and restarts the server.
 
-The packaged desktop app updates itself instead: it checks the GitHub Releases of the repo it was built from, downloads a new version in the background and offers to relaunch into it. Settings > Machines > This app's updates shows its version, Check for updates, the download's progress, Relaunch to update and what the coming release changed. Turn off **Check automatically** there and it looks only when you press Check for updates, and downloads only when you press Download. It installs a downloaded version when you quit, unless you keep the server running for turns: then it waits for a later quit. Relaunch to update with turns running offers to update once they finish or stop them now. A copy that cannot update itself says why in that card: a development build, a build made with `scripts/build-desktop.sh` (which rebuilding updates instead), a Mac app run from its disk image, or an AppImage in a folder it cannot write. Install the new DMG or AppImage over it by hand.
+The packaged desktop app updates itself instead. It checks the GitHub Releases of the repo it was built from, downloads a new version in the background and offers to relaunch into it. Settings > Machines > This app's updates shows its version, Check for updates, the download's progress, Relaunch to update and what the coming release changed. Turn off **Check automatically** there and it looks only when you press Check for updates, and downloads only when you press Download. It installs a downloaded version when you quit, unless you keep the server running for turns. In that case it waits for a later quit. Relaunch to update with turns running offers to update once they finish or stop them now. A copy that cannot update itself says why in that card: a development build, a build made with `scripts/build-desktop.sh` (which rebuilding updates instead), a Mac app run from its disk image, or an AppImage in a folder it cannot write. Install the new DMG or AppImage over it by hand.
 
-Update needs something that starts the server again after it exits: the desktop app run with `--dev`, or a service manager (below). A server you run with `npm run dev` or `npm start` shows the notice without the button; update it by hand:
+Update needs something that starts the server again after it exits: the desktop app run with `--dev`, or a service manager (below). A server you run with `npm run dev` or `npm start` shows the notice without the button. Update it by hand:
 
 ```bash
 git pull                  # a fork: git fetch upstream && git merge upstream/main
@@ -154,10 +156,10 @@ Environment=OMNI_SUPERVISOR=systemd
 Restart=always
 ```
 
-The Conductor reaches the same button through its `omni_update` tool. `OMNI_UPDATE_CHECK=0` turns the check off. A fork merges cleanly as long as your settings stay in `data/`; see [FORKING.md](../../FORKING.md).
+The Conductor reaches the same button through its `omni_update` tool. `OMNI_UPDATE_CHECK=0` turns the check off. A fork merges cleanly as long as your settings stay in `data/` (see [FORKING.md](../../FORKING.md)).
 
 ### Every machine at once
 
-With [sync](sync.md) on, Settings > Machines > Your machines and updates, on the computer (Update all machines in the iOS app), lists every synced machine with what it runs and where its update stands. **Check**, **Download all** and **Update all** ask them all in one go, and Update all first lists who it will ask and who it leaves out. The asks travel over sync, and each machine runs its own updater when it next syncs: a checkout as above, the packaged desktop app by downloading the release and relaunching itself. Update waits on each machine until no turn runs there. Machines run on their own, so one that fails shows its error in its row while the others go on; Retry on that row asks it again.
+With [sync](sync.md) on, Settings > Machines > Your machines and updates, on the computer (Update all machines in the iOS app), lists every synced machine with what it runs and where its update stands. **Check**, **Download all** and **Update all** ask them all in one go, and Update all first lists who it will ask and who it leaves out. The asks travel over sync, and each machine runs its own updater when it next syncs. A checkout updates as above, and the packaged desktop app downloads the release and relaunches itself. Update waits on each machine until no turn runs there. Each machine updates on its own, so one that fails shows its error in its row while the others go on. Retry on that row asks it again.
 
-A machine that Omni Connect, or Tailscale without it, says is offline is skipped and says so. Retry on its row asks it anyway, and it takes the ask when it next syncs, within 30 minutes. A checkout that nothing restarts checks and downloads from here and says to apply its update there by hand. A machine that still runs an Omni from before this list shows as not reporting: update it there once, and it joins. The Conductor does the same with `omni_update` and its `machines`.
+A machine that Omni Connect, or Tailscale without it, says is offline is skipped and says so. Retry on its row asks it anyway, and it takes the ask when it next syncs, within 30 minutes. A checkout that nothing restarts checks and downloads from here and says to apply its update there by hand. A machine that still runs an Omni from before this list shows as not reporting. Update it there once, and it joins the list. The Conductor does the same with `omni_update` and its `machines`.

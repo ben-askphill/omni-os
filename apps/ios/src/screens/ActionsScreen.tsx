@@ -124,7 +124,7 @@ function ActionLine({ action }: { action: ChannelAction }) {
       <Text numberOfLines={1} style={[styles.command, { color: colors.fg3 }]}>
         {action.command}
       </Text>
-      <Text style={[styles.meta, { color: colors.fg4 }]}>{[actionDetail(action), action.setup && SETUP_MODE_LABEL[action.setup]].filter(Boolean).join(' · ')}</Text>
+      <Text style={[styles.meta, { color: colors.fg4 }]}>{[actionDetail(action), action.setup && SETUP_MODE_LABEL[action.setup], action.teardown && 'Before removal'].filter(Boolean).join(' · ')}</Text>
     </View>
   );
 }

@@ -252,4 +252,20 @@ describe('the setting', () => {
     ]);
     expect((await call('POST', `/channels/${ch.id}/actions`, { name: 'Bad', command: 'x', setup: 'sometimes' })).status).toBe(400);
   });
+
+  it('keeps the teardown role on one action per channel, apart from setup', async () => {
+    const ch = channel();
+    const first = await setupAction(ch.id, 'echo one', 'blocking', { teardown: true });
+    expect(first).toMatchObject({ setup: 'blocking', teardown: true });
+    const second = await setupAction(ch.id, 'echo two', null);
+    expect(second.teardown).toBe(false);
+    const patched = await call<ChannelAction>('PATCH', `/channels/${ch.id}/actions/${second.id}`, { name: second.name, command: 'echo two', teardown: true });
+    expect(patched.body.teardown).toBe(true);
+    const list = (await call<ChannelAction[]>('GET', `/channels/${ch.id}/actions`)).body;
+    expect(list.map((a) => [a.id, a.setup, a.teardown])).toEqual([
+      [first.id, 'blocking', false],
+      [second.id, null, true],
+    ]);
+    expect((await call('POST', `/channels/${ch.id}/actions`, { name: 'Bad', command: 'x', teardown: 'yes' })).status).toBe(400);
+  });
 });

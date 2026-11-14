@@ -99,7 +99,7 @@ function ThreadActionsView({ threadId, channelId }: { threadId: string; channelI
 }
 
 /** Name, command and port of an action, shared with the channel settings editor. */
-export function ActionLine({ action }: { action: Pick<ChannelAction, 'name' | 'command' | 'port' | 'setup'> }) {
+export function ActionLine({ action }: { action: Pick<ChannelAction, 'name' | 'command' | 'port' | 'setup' | 'teardown'> }) {
   return (
     <div className="min-w-0 flex-1">
       <div className="flex min-w-0 items-center gap-1.5">
@@ -107,6 +107,11 @@ export function ActionLine({ action }: { action: Pick<ChannelAction, 'name' | 'c
         {action.setup && (
           <Chip tone="outline" title={`Runs in each new worktree, ${SETUP_MODE_LABEL[action.setup].toLowerCase()}`}>
             Setup
+          </Chip>
+        )}
+        {action.teardown && (
+          <Chip tone="outline" title="Runs in the worktree right before a cleanup removes it">
+            Teardown
           </Chip>
         )}
       </div>

@@ -36,7 +36,7 @@ The iOS app has the same features and mostly the same words as phone web, but it
 - Phone web is one list of thread rows: avatar, title, channel, a status word or age on the right, then trailing pin and check buttons. Pinned threads sit at the top with a pin mark.
 - iOS has a segmented filter (All / Needs you / Running / Done), usage meters (Claude, Codex, Cursor), uppercase section headers, a reply preview ("ack: ...") and two big pill buttons per row ("Open", "Mark read", or a black "Answer").
 - The iOS segmented control cuts off "Needs you..." at 390pt.
-- To match: drop the per-row Open/Mark read pills for phone web's trailing check icon (tapping the row already opens it), use avatar rows, and move or drop the filter and the meters. The usage meters are not on phone web's Activity; decide whether they stay on iOS or move to both.
+- To match phone web, drop the per-row Open/Mark read pills for its trailing check icon (tapping the row already opens it), use avatar rows, and move or drop the filter and the meters. The usage meters are not on phone web's Activity; decide whether they stay on iOS or move to both.
 
 ## Channels
 
@@ -51,7 +51,7 @@ The iOS app has the same features and mostly the same words as phone web, but it
 
 - Phone web: Active / Recent segmented control with counts, a "Needs you and running" label, avatar rows whose subtitle says what is happening ("#Volero · 4 questions wait on your answer"), a ⋯ channel menu, and a full-width black "+ New thread in #Volero" button at the bottom.
 - iOS: Active and Recent as two stacked sections, rows say only "Running · 4m", no channel menu, "New" in the header.
-- **Data gap, not only looks:** iOS builds the channel list from `/channels` `active` + `recent` (`apps/ios/src/live/channel-model.ts:173`), and the server caps `recent` at 5 per channel (`RECENT_PER_CHANNEL`, `apps/server/channels-api.ts:80`). #Inbox shows 8 threads on phone web and 5 on iOS (threads 4, 5 and 7 are missing). The two also disagree on "Active": phone web counts unread finished threads, iOS only running ones.
+- **This is also a data gap.** iOS builds the channel list from `/channels` `active` + `recent` (`apps/ios/src/live/channel-model.ts:173`), and the server caps `recent` at 5 per channel (`RECENT_PER_CHANNEL`, `apps/server/channels-api.ts:80`). #Inbox shows 8 threads on phone web and 5 on iOS (threads 4, 5 and 7 are missing). The two also disagree on "Active": phone web counts unread finished threads, iOS only running ones.
 
 ![Inbox](2026-11-07-ios-visual-parity/13-channel-inbox.png)
 
@@ -60,7 +60,7 @@ The iOS app has the same features and mostly the same words as phone web, but it
 ![Thread](2026-11-07-ios-visual-parity/05-thread-rich-top.png)
 
 - Header: phone web has the title, "#Volero · Claude Code" under it and a lime **Done** pill. iOS has the title in the nav bar, then "● Live", "Done · Volero" and three chips (model, Changes, Pull request) under it, which take about 130pt before the transcript starts.
-- To match: put the status pill in the header. Move model, Changes and PR into the ⋯ menu or a single row, the way phone web does (Details, Browser, Terminal, Actions in the menu).
+- To match phone web, put the status pill in the header. Move model, Changes and PR into the ⋯ menu or a single row, the way phone web does (Details, Browser, Terminal, Actions in the menu).
 - Transcript: phone web starts at the top. iOS bottom-aligns a short thread under a "Start of thread" label, which leaves a large gap under the chips.
 - Turn footer: phone web's "Done in 0s" dot is lime and "1 failed" has a red diamond and a wrench icon. On iOS both are grey.
 - Under the composer, phone web offers "Ask the Conductor" and "+ New thread" after a finished turn; iOS has neither.
@@ -77,7 +77,7 @@ The iOS app has the same features and mostly the same words as phone web, but it
 
 ![Question](2026-11-07-ios-visual-parity/08-thread-question.png)
 
-- Closest screen of the lot. Differences: phone web has a "Q4 focus" tag chip and a "1 of 4" pager with arrows in the card header; iOS has the tag as plain text and no pager. Phone web options are rows with dividers; iOS options are separate bordered cards with a heavier selected border. Phone web shows the red "Needs your input" pill in the header and under the card.
+- This is the closest screen of the lot. The differences: phone web has a "Q4 focus" tag chip and a "1 of 4" pager with arrows in the card header; iOS has the tag as plain text and no pager. Phone web options are rows with dividers; iOS options are separate bordered cards with a heavier selected border. Phone web shows the red "Needs your input" pill in the header and under the card.
 
 ### Thread menu
 
@@ -163,7 +163,7 @@ Same stack, plus an `Acme Shop` channel backed by a throwaway git repo (`use_wor
 - Phone web: a sheet with a round × close button, the file name in mono with "#Acme Shop" under it, and a round share icon.
 - iOS: a pushed page with a round back chevron, the file name truncated, "claude.ai" and "Share" text pills, and a meta line ("markdown · 249 B · published 2m ago").
 - Markdown styling differs: phone web uses a smaller heading and a light table (muted header, row lines only); iOS a larger heading and a fully bordered table with a bold header.
-- The first time it opened, the iOS back button drew as an empty circle with no chevron and no accessibility label, and the simulator could not go back. Reopening it later, in light and dark, showed a working chevron. Seen once, not reproduced; worth a look if it shows up on a device.
+- The first time it opened, the iOS back button drew as an empty circle with no chevron and no accessibility label, and the simulator could not go back. Reopening it later, in light and dark, showed a working chevron. It happened once and did not reproduce. Check it if it shows up on a device.
 
 ### Turn while streaming
 
@@ -172,16 +172,16 @@ Same stack, plus an `Acme Shop` channel backed by a throwaway git repo (`use_wor
 - Phone web: blue "Running" pill in the header; a status line with a spinner ring, the agent's status text in vermilion ("Looking for the cart code") and the elapsed time (5m 11s); plan items with lime rings; "10 steps so far · ◆ 1 failed" with a wrench icon; and "Review #12" / "New thread" chips above the composer.
 - iOS: "Running · Acme Shop" as grey text under the header; a "● Running `sleep 1800` · step 3/3" line that shows the raw command instead of the status and no elapsed time; plan items struck through in grey; no chips.
 - Both swap the send button for a black stop button.
-- Neither client can show a half-written answer: the server never asks the CLI for partial messages (no `include-partial-messages` in `apps/server/`), so a reply lands whole. The tool-running state above is what streaming looks like in Omni.
+- Neither client can show a half-written answer, because the server never asks the CLI for partial messages (no `include-partial-messages` in `apps/server/`), so a reply lands whole. The tool-running state above is what streaming looks like in Omni.
 
 ![Steer while running](2026-11-07-ios-visual-parity/33b-steer-settled.png)
 
-- A message sent during the turn (a steer, sent from the iOS composer). Phone web shows it as the user's own bubble, right-aligned with a dashed border, under "Sent, waiting for the agent". iOS shows a full-width grey card titled "Sent, the agent reads it next". Same state, different wording and a different shape.
+- A message sent during the turn (a steer, sent from the iOS composer). Phone web shows it as the user's own bubble, right-aligned with a dashed border, under "Sent, waiting for the agent". iOS shows a full-width grey card titled "Sent, the agent reads it next". The state is the same, but the wording and the shape differ.
 - The iOS keyboard stayed up after sending; synthetic drags in the simulator did not trigger the transcript's interactive dismiss, so check this by hand on a device before calling it a bug.
 
 ![Streaming steps](2026-11-07-ios-visual-parity/25b-streaming-steps.png)
 
-- Same gaps as the finished Steps screen (cards vs inline, colour). While running, phone web marks the live step with a blue dot; iOS writes "Running" after the tool name with a black dot.
+- The gaps are the same as on the finished Steps screen (cards vs inline, colour). While running, phone web marks the live step with a blue dot; iOS writes "Running" after the tool name with a black dot.
 
 ### Settings pages
 
@@ -223,11 +223,11 @@ The QA server kept running. Phone web lost it through blocked `/api` requests pl
 
 ### What the second pass adds to the list
 
-- **Settings pages share one frame on phone web**: round back button, small title in the bar, then a large title and a one-line description in the page. iOS uses the native bar title and no in-page title. One shared page header component on iOS fixes all four.
-- **Status pills**: Running (blue), Done and Succeeded (lime), Open, draft. iOS writes these as grey text. Same fix as the status colours in the first pass.
-- **Under-turn cards and chips**: artifact card, Changes card, follow-up chips. iOS has none of these.
-- **Bugs found on the way**: phone web's squashed "Ask builder to review" button. Possibly the iOS artifact viewer's back button (seen blank once, not reproduced).
-- **Where iOS is ahead**: the offline line under the header and the failed-send bubble with Retry and Edit. Keep both through the redesign.
+- **Settings page frame.** Phone web gives every Settings page the same frame: a round back button, a small title in the bar, then a large title and a one-line description in the page. iOS uses the native bar title and no in-page title. One shared page header component on iOS fixes all four.
+- **Status pills.** Phone web shows Running (blue), Done and Succeeded (lime), Open and draft as pills. iOS writes these as grey text. Same fix as the status colours in the first pass.
+- **Under-turn cards and chips.** Phone web shows the artifact card, the Changes card and follow-up chips under a turn. iOS has none of these.
+- **Bugs found on the way.** Phone web's squashed "Ask builder to review" button. Possibly the iOS artifact viewer's back button (seen blank once, not reproduced).
+- **Where iOS is ahead.** iOS has the offline line under the header and the failed-send bubble with Retry and Edit. Keep both through the redesign.
 
 ### Dark mode, second pass
 
@@ -242,7 +242,7 @@ The QA server kept running. Phone web lost it through blocked `/api` requests pl
 
 ![Pull request dark](2026-11-07-ios-visual-parity/22-pr-dark.png)
 
-- Matches closely; the check marks (lime, red diamond, blue) are on both here. iOS's "1 of 4 checks failing" line is vermilion, one of the few places iOS already uses a status colour.
+- The two match closely; the check marks (lime, red diamond, blue) are on both here. iOS's "1 of 4 checks failing" line is vermilion, one of the few places iOS already uses a status colour.
 
 ![Actions dark](2026-11-07-ios-visual-parity/23b-actions-running-dark.png)
 
@@ -264,7 +264,7 @@ The QA server kept running. Phone web lost it through blocked `/api` requests pl
 
 ![Automations dark](2026-11-07-ios-visual-parity/29-automations-dark.png)
 
-- The Settings pages hold up in dark: page background, card surface and the secondary button fill match. The light-mode gaps (no in-page title or description, plain empty states, no icon) carry over unchanged.
+- The Settings pages look right in dark: page background, card surface and the secondary button fill match. The light-mode gaps (no in-page title or description, plain empty states, no icon) carry over unchanged.
 - Phone web's only colour here is the lime "Connected" dot on Machines. iOS has no status row to put one on.
 - The iOS back button on Notifications reads "Back" while Servers, Devices and Automations read "Settings" (`headerBackTitle: 'Back'` in `apps/ios/src/navigation/detail-screens.tsx`, likely because Servers opens it too). Phone web shows an icon-only round back button on every page, so this goes away with the shared page header.
 

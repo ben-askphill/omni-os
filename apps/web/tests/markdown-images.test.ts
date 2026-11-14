@@ -17,3 +17,35 @@ describe('markdown images', () => {
     expect(render('![x](javascript:alert(1))')).not.toContain('cursor-zoom-in');
   });
 });
+
+describe('markdown images that would act (S18)', () => {
+  const gated = (text: string) => renderToStaticMarkup(createElement(Markdown, { text, gateRemoteImages: true }));
+
+  it.each([
+    '/api/threads/t1/terminal/stream',
+    '/api/channels/omni/browser/stream',
+    'http://localhost:4747/api/threads/t1/terminal/stream',
+    'http://127.0.0.1:4748/api/threads/t1/terminal/stream',
+    '/api/channels/c/prs/1/image/../../../../threads/t/terminal/stream',
+    'http://127.0.0.1:4748/%61pi/threads/t/terminal/stream',
+    'https://other.example/API/threads/t/terminal/stream',
+    'http://localhost:3000/a.png',
+  ])('never renders an <img> for %s, in replies or PR text', (src) => {
+    for (const html of [render(`![shot](${src})`), gated(`![shot](${src})`)]) {
+      expect(html).not.toContain('<img');
+      expect(html).toContain('[image: shot]');
+    }
+  });
+
+  it('loads another site image in replies, and waits for a click in PR text', () => {
+    expect(render('![shot](https://example.com/a.png)')).toContain('<img src="https://example.com/a.png"');
+    const html = gated('![shot](https://example.com/a.png)');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('Load image &quot;shot&quot; from example.com');
+  });
+
+  it('still loads the PR image proxy in PR text', () => {
+    const src = '/api/channels/omni-os/prs/271/image?src=https%3A%2F%2Fgithub.com%2Fo%2Fr%2Fa.png';
+    expect(gated(`![shot](${src})`)).toContain(`<img src="${src.replace(/&/g, '&amp;')}"`);
+  });
+});

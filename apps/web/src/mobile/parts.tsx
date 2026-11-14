@@ -183,10 +183,13 @@ export function MoListRow({
   chevron = true,
   last,
   disabled,
+  wrapSub,
 }: {
   icon?: IconName | ReactNode;
   label: ReactNode;
   sub?: ReactNode;
+  /** Let the sub line wrap instead of cutting it off, for a row whose sub must be read whole. */
+  wrapSub?: boolean;
   right?: ReactNode;
   onClick?: () => void;
   chevron?: boolean;
@@ -199,7 +202,7 @@ export function MoListRow({
       <span className={`flex min-w-0 flex-1 items-center gap-2.5 self-stretch ${last ? '' : 'border-b border-line'}`}>
         <span className="flex min-w-0 flex-1 flex-col gap-px py-2.5">
           <span className="truncate text-[15px] leading-[1.3]">{label}</span>
-          {sub && <span className="truncate text-[12.5px] leading-[1.35] text-fg-3">{sub}</span>}
+          {sub && <span className={`${wrapSub ? 'text-pretty' : 'truncate'} text-[12.5px] leading-[1.35] text-fg-3`}>{sub}</span>}
         </span>
         {right && <span className="flex items-center gap-1.5 text-[13px] leading-none text-fg-3 tabular-nums">{right}</span>}
         {chevron && onClick && (

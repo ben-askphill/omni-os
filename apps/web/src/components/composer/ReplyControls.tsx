@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent }
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../../api.ts';
 import { Icon, Kbd, Loader, type IconName } from '../ui.tsx';
 import { ModelPicker } from '../ModelPicker.tsx';
+import { pickerAccounts, useAccounts } from '../../accounts.ts';
 import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels, type RunPick } from '@omni/shared/thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
 
@@ -171,6 +172,8 @@ export function ThreadRunPills({
     }
   };
   const pick = (p: RunPick) => void post(pickedRun(shown, harnesses, p));
+  // A thread's page shows it as this machine's (its quick card names this machine too), so the list names this machine's accounts.
+  const accounts = useAccounts();
 
   if (!harnesses) return null;
   const now = threadRunLabels(thread, harnesses);
@@ -194,7 +197,11 @@ export function ThreadRunPills({
       )}
       <ModelPicker
         harnesses={harnesses}
-        onOpen={reload}
+        onOpen={() => {
+          reload();
+          accounts.reload();
+        }}
+        accounts={pickerAccounts(accounts.data, 'here')}
         openRequest={openRequest}
         offerAuto={false}
         label={labels.model}

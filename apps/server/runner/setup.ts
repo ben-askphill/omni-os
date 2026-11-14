@@ -1,16 +1,19 @@
 // A worktree thread's preparation: its worktree is made and checked before any harness runs, and a failure waits
 // for Retry with the first prompt and its files saved. Nothing runs in the channel's own checkout instead.
 import { channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+import { ensureRepo } from '../repo-clone.ts';
 import { prepareWorktree } from '../sandbox.ts';
 import { followBranch } from '../branch-follow.ts';
 import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
 import { baseFor } from '../worktree-base.ts';
+import { channelExtras } from '../worktree-include.ts';
 import { carryInto } from '../continue-carry.ts';
 import { notifyEnded } from '../push-sender.ts';
+import type { MessageContext } from '@omni/shared/message-context.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
-import { beginAttempt, endAttempt, runSetupAction } from './setup-action.ts';
+import { attemptSignal, beginAttempt, endAttempt, runSetupAction, STOPPED, stopRequested } from './setup-action.ts';
 import { emitThread, refusal, runsHere } from './state.ts';
 
 /** The request id a worktree thread's first prompt is saved under. One per thread, so it is saved once. */
@@ -21,7 +24,7 @@ export const START_REQUEST = 'thread-start';
  * Save a new worktree thread's first prompt and files as its first request before the worktree is made, so a
  * failure or a restart keeps them for Retry (db/repos/requests.ts). It runs once the worktree is ready.
  */
-export function saveStart(thread: Thread, prompt: string, attachments: Attachment[] | undefined) {
+export function saveStart(thread: Thread, prompt: string, attachments: Attachment[] | undefined, context?: MessageContext[]) {
   const source = thread.source === 'conductor' ? 'conductor' : 'ben';
   messageRequests.accept({
     thread_id: thread.id,
@@ -30,7 +33,8 @@ export function saveStart(thread: Thread, prompt: string, attachments: Attachmen
     mode: 'steer',
     source,
     attachments: attachments ?? null,
-    fingerprint: requestFingerprint({ prompt, mode: 'steer', source, files: (attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' })) }),
+    context: context ?? null,
+    fingerprint: requestFingerprint({ prompt, mode: 'steer', source, files: (attachments ?? []).map((a) => ({ name: a.name, size: a.size, sha256: '' })), context }),
     machine_id: outbox.machineId(),
   });
 }
@@ -77,24 +81,29 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
 }
 
 async function prepare(t: Thread): Promise<Thread | undefined> {
-  const repo = channels.get(t.channel_id)?.repo_path ?? null;
   // A worktree its agent moved to another branch keeps that branch: only a detached HEAD or the default branch is
   // switched back (sandbox.ts prepareWorktree).
   if (await followBranch(t.id).catch(() => false)) t = threads.get(t.id) ?? t;
   try {
     if (!t.branch) throw new Error('The thread has no branch to check out.');
     const branch = t.branch;
+    // A channel repo that is not on this machine is cloned first, and may land at a new path here (repo-clone.ts).
+    // Stop ends the wait at once; the clone itself finishes for the next try.
+    await ensureRepo(t.channel_id, attemptSignal(t.id));
+    if (stopRequested(t.id)) throw new Error(STOPPED);
+    const repo = channels.get(t.channel_id)?.repo_path ?? null;
     // A continued thread's branch starts at its source's HEAD, with the source's changes laid in (continue-carry.ts),
     // so only a new thread's branch is cut from the base Ben picked.
     const base = continuations.get(t.id) ? undefined : () => baseFor(t.id, repo!);
     await withWorkspace(t.cwd, async () => {
       await carryInto(t);
-      await prepareWorktree(repo, t.cwd, branch, base);
+      await prepareWorktree(repo, t.cwd, branch, base, channelExtras(channels.get(t.channel_id)));
     });
     // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
     await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));
   } catch (err) {
-    failSetup(t.id, (err as Error).message);
+    if (stopRequested(t.id)) failSetup(t.id, STOPPED, true);
+    else failSetup(t.id, (err as Error).message);
     return threads.get(t.id);
   }
   // The channel's setup action, in the verified checkout: a blocking one holds the agent until it succeeds.

@@ -10,6 +10,7 @@ import type { Run } from '@omni/shared/run-switch.ts';
 import { useDictation, withPhrase } from './dictation.ts';
 import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
 import { ModelSheet } from './ModelSheet.tsx';
+import { pickerAccounts, useAccounts } from '../accounts.ts';
 import { MoDiff, MoRound } from './parts.tsx';
 
 export interface ComposerChip {
@@ -53,6 +54,8 @@ export function MoComposer({
   const [error, setError] = useState<string | null>(null);
   const [plus, setPlus] = useState(false);
   const [runSheet, setRunSheet] = useState(false);
+  // The thread shows as this machine's, as on the desktop reply box: its run sheet names this machine's accounts.
+  const accounts = useAccounts();
   const [switching, setSwitching] = useState(false);
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
   const att = useAttachments();
@@ -234,6 +237,7 @@ export function MoComposer({
           effort={shown.effort}
           onChange={(c, e) => void switchRun(c, e)}
           onClose={() => setRunSheet(false)}
+          accounts={pickerAccounts(accounts.data, 'here')}
         />
       )}
     </div>

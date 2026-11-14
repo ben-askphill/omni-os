@@ -96,6 +96,29 @@ describe('last writer wins: channels, threads, kv, artifacts', () => {
     expect(b.db.kv.get('usage.claude-code')).toEqual({ n: 2 });
   });
 
+  it('a rename on one Mac and a pin on the other near the same time keep both (F6)', async () => {
+    at('2030-03-01T16:00:00.000Z', () => a.db.threads.update('t', { title: 'renamed on A' }));
+    at('2030-03-01T16:00:00.001Z', () => b.db.threads.setPinned('t', true));
+    await exchange();
+    for (const m of [a, b]) {
+      expect(m.db.threads.get('t')).toMatchObject({ title: 'renamed on A' });
+      expect(m.db.threads.get('t')!.pinned_at).not.toBeNull();
+    }
+    at('2030-03-01T16:00:01.000Z', () => b.db.threads.setPinned('t', false));
+    await exchange();
+  });
+
+  it("a stale copy from a Mac that does not run the thread never replaces the owner's session (F6)", async () => {
+    a.db.threads.create(thread('t-own'));
+    a.db.threads.update('t-own', { status: 'running' });
+    await exchange();
+    // B holds an old copy; A runs a turn and moves the session on.
+    a.db.threads.update('t-own', { status: 'done', session_id: 'sess-2', last_text: 'second reply' });
+    b.db.threads.update('t-own', { title: 'renamed on B' });
+    await exchange();
+    for (const m of [a, b]) expect(m.db.threads.get('t-own')).toMatchObject({ title: 'renamed on B', session_id: 'sess-2', last_text: 'second reply', status: 'done' });
+  });
+
   it('a write after one from a Mac whose clock runs ahead still wins, on both', async () => {
     at('2031-01-01T00:00:00.000Z', () => b.db.threads.update('t', { title: 'from the future' }));
     await exchange();

@@ -70,10 +70,15 @@ const idleThread = async () => {
 };
 
 describe('thread terminal', () => {
-  it('opens a shell in the thread cwd on first stream, runs input, and knows the thread', async () => {
+  it('starts a shell on POST in the thread cwd, never on a stream GET, runs input, and knows the thread', async () => {
     const t = await idleThread();
     expect((await call(`/${t.id}/terminal`)).body).toMatchObject({ open: false, running: false });
+    // A GET only attaches: an <img> pointed at the stream cannot start a login shell (S18).
+    const early = await terminalApi.request(`/${t.id}/terminal/stream`);
+    expect(early.status).toBe(409);
+    expect(getTerminal(t.id)).toBeUndefined();
 
+    await call(`/${t.id}/terminal`, 'POST', { cols: 100, rows: 30 });
     const pending = readStream(t.id, (m) => output(m).includes('OUT:'), '?cols=100&rows=30');
     await r.until('the shell', () => getTerminal(t.id));
     expect((await call(`/${t.id}/terminal/input`, 'POST', { data: 'echo "OUT:$(pwd)|$OMNI_THREAD_ID|$(tput cols)"\n' })).status).toBe(200);

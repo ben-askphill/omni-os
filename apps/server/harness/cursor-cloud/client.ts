@@ -113,6 +113,11 @@ export class CursorCloudClient {
     return this.call<{ items: { id: string; displayName: string }[] }>('GET', '/v1/models', undefined, signal);
   }
 
+  /** Who the key belongs to (GET /v1/me): the user's email and name, and the key's own name. */
+  me(signal?: AbortSignal) {
+    return this.call<{ apiKeyName?: unknown; userEmail?: unknown; userFirstName?: unknown; userLastName?: unknown }>('GET', '/v1/me', undefined, signal);
+  }
+
   createAgent(body: CreateAgentBody, signal?: AbortSignal) {
     return this.call<{ agent: CursorAgent; run: CursorRun }>('POST', '/v1/agents', body, signal);
   }

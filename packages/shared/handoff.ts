@@ -19,6 +19,10 @@ export interface DeviceRecord {
   tailscale: { nodeId: string; dnsName: string } | null;
   /** Its public key for secrets sent to it (apps/server/secret-drop.ts), base64url raw X25519. Missing before that build. */
   sealKey?: string;
+  /** Its public key for the sync changes it signs (apps/server/sync/signing.ts), base64url raw Ed25519. Missing before that build. */
+  signKey?: string;
+  /** Its concurrency cap per harness, for the dashboard's machine tiles (apps/server/machines.ts). Missing before that build. */
+  caps?: Record<string, number>;
   at: string;
 }
 

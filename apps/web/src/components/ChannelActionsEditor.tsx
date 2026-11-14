@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { ACTION_PORT_HINT, ACTION_SETUP_HINT, actionInput, draftOf, type ActionDraft, type ChannelAction } from '@omni/shared/channel-actions.ts';
+import { ACTION_PORT_HINT, ACTION_SETUP_HINT, ACTION_TEARDOWN_HINT, actionInput, draftOf, type ActionDraft, type ChannelAction } from '@omni/shared/channel-actions.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { href } from '../router.ts';
 import { ActionLine } from './thread/panel/ActionsTab.tsx';
@@ -21,8 +21,8 @@ export function ChannelActionsEditor({ channelId }: { channelId: string }) {
 
   const saved = (a: ChannelAction) => {
     setData((list = []) => {
-      // The server takes setup off every other action when one gets it.
-      const rest = a.setup ? list.map((x) => (x.setup ? { ...x, setup: null } : x)) : list;
+      // The server takes setup and teardown off every other action when one gets them.
+      const rest = list.map((x) => (x.id === a.id ? x : { ...x, setup: a.setup ? null : x.setup, teardown: a.teardown ? false : x.teardown }));
       return rest.some((x) => x.id === a.id) ? rest.map((x) => (x.id === a.id ? a : x)) : [...rest, a];
     });
     setEditing(null);
@@ -186,6 +186,20 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
             { id: 'off', label: 'Off' },
             { id: 'blocking', label: 'Before the agent', title: 'Before the agent starts' },
             { id: 'background', label: 'Alongside', title: 'Alongside the agent' },
+          ]}
+        />
+      </div>
+      <div>
+        <Label hint={ACTION_TEARDOWN_HINT[d.teardown ? 'on' : 'off']}>Run before a worktree is removed</Label>
+        <Segmented
+          radio
+          size="sm"
+          label="Run before a worktree is removed"
+          value={d.teardown ? 'on' : 'off'}
+          onChange={(m) => set('teardown', m === 'on')}
+          options={[
+            { id: 'off', label: 'Off' },
+            { id: 'on', label: 'Before removal', title: 'Runs in the worktree right before a cleanup removes it' },
           ]}
         />
       </div>

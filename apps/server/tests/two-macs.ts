@@ -7,7 +7,8 @@ import { FAKE_TAILSCALE } from './support.ts';
 
 // One synced Mac of several in one process: the real server (runner, API, sync worker, file hooks) on its own data and
 // home dirs, with fake claude and a fake tailscale CLI whose status the test sets. Every Mac given the same relay sees
-// the others' pushes. Boot them one after another: each boot loads fresh copies of the server modules.
+// the others' pushes. Boot them one after another: each boot loads fresh copies of the server modules. Macs on one
+// relay trust each other from the first signed change each pulls from the other, as paired Macs do (sync/keyring.ts).
 
 export async function bootMac(id: string, name: string, relay: MemoryTransport, env: Record<string, string> = {}) {
   vi.resetModules();
@@ -16,6 +17,7 @@ export async function bootMac(id: string, name: string, relay: MemoryTransport, 
   const files = await import('../sync/files.ts');
   const devices = await import('../sync/devices.ts');
   const tailscale = await import('../tailscale.ts');
+  const stats = await import('../machine-stats.ts');
   const { app } = await import('../app.ts');
   const home = join(r.tmp, 'home');
   mkdirSync(home);
@@ -44,7 +46,7 @@ export async function bootMac(id: string, name: string, relay: MemoryTransport, 
     if (res.error) throw new Error(`${id} sync failed: ${res.error}`);
     return res;
   };
-  return { ...r, id, name, home, worker, files, devices, app, json, tailnet, sync: sync1 };
+  return { ...r, id, name, home, worker, files, devices, stats, app, json, tailnet, sync: sync1 };
 }
 
 export type Mac = Awaited<ReturnType<typeof bootMac>>;

@@ -6,7 +6,7 @@ import { readContexts } from '@omni/shared/message-context-kinds.ts';
 import type { Thread } from '../src/api.ts';
 import { attachReference, type ReferenceCandidate } from '../src/message-context/thread-picker.ts';
 
-vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], status: null }) }));
+vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], status: null }), useFeed: () => {} }));
 
 import { ReplyComposer } from '../src/components/Composer.tsx';
 import { ThreadReferencePanel } from '../src/components/ThreadReference.tsx';

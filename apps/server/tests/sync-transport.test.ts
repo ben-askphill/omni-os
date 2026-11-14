@@ -36,6 +36,20 @@ describe('relay transport', () => {
     expect(got).toEqual([{ seq: 3, machine_id: 'b', entity: 'thread', entity_id: 't', op: 'upsert', data: { a: 1 }, ts: '2026-11-01T12:00:00.000Z' }]);
   });
 
+  it('reads Connect registrations with the relay token, without claiming they contain token bindings', async () => {
+    const f = fakeFetch(() => Response.json({ machines: [{ id: 'paired-b', name: 'B', hostname: 'b.example.dev' }] }));
+    expect(await relay(f.fn).pairedMachines!()).toEqual(new Set(['paired-b']));
+    expect(f.calls).toEqual([expect.objectContaining({ url: 'https://relay.example.dev/v1/connect/machines', method: 'GET', headers: { authorization: `Bearer ${TOKEN}` } })]);
+  });
+
+  it.each([{}, { machines: null }, { machines: [{}] }, { machines: [{ id: '' }] }])('fails closed on a malformed registration response %j', async (body) => {
+    await expect(relay(fakeFetch(() => Response.json(body)).fn).pairedMachines!()).rejects.toThrow('Invalid paired machines response');
+  });
+
+  it.each([401, 404, 503])('fails closed when registrations return HTTP %s', async (status) => {
+    await expect(relay(fakeFetch(() => Response.json({ error: 'unavailable' }, { status })).fn).pairedMachines!()).rejects.toThrow();
+  });
+
   it('a 401 is signed out, which takes a new sign-in; any other failure is retried', async () => {
     const dead = relay(fakeFetch(() => Response.json({ error: 'This machine is signed out of the relay', code: 'signed_out' }, { status: 401 })).fn);
     const out = await dead.pull({ after: 0, excludeMachine: 'a', limit: 1 }).catch((e) => e);

@@ -14,6 +14,7 @@ import { branchPRs } from './github.ts';
 import { lives, waitingMsgs } from './runner/state.ts';
 import { getTerminal } from './terminal.ts';
 import { hasLiveRun } from './actions.ts';
+import { sameAsMain } from './worktree-include.ts';
 import { busy, candidate, currentSignal, git, localWork, owningRepo, real, withSignal } from './worktree-sweep.ts';
 
 const run = promisify(execFile);
@@ -21,7 +22,10 @@ const run = promisify(execFile);
 /** Folders inspected at once. Each runs a few git commands and a `du`, so two keep the scan out of the way of running threads. */
 const CONCURRENCY = 2;
 
-/** Ignored files that a build or install makes again. Anything else ignored (.env, local config) is kept as a reason. */
+/**
+ * Ignored files that a build or install makes again. Anything else ignored (.env, local config) is kept as a reason,
+ * unless it is the same as the main checkout's copy (worktree-include.ts).
+ */
 const REGENERABLE = new Set([
   'node_modules', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', '.parcel-cache', '.vite',
   '__pycache__', '.pytest_cache', '.mypy_cache', '.venv', '.build', 'DerivedData', '.gradle', 'target', '.DS_Store',
@@ -243,7 +247,8 @@ async function inspect(id: string, dir: string, opts: InspectOptions, ctx: Known
   if (w.untracked) keep('untracked', `${plural(w.untracked, 'untracked file')}.`);
   if (w.unpushed > 0) keep('unpushed', `${plural(w.unpushed, 'commit')} no remote has.`);
   const entries = await ignoredEntries(dir);
-  const ignored = entries?.other ?? null;
+  // A copy the main checkout still has the same (a .worktreeinclude file such as .env) loses nothing on removal.
+  const ignored = entries?.other.filter((p) => !sameAsMain(repo, dir, p)) ?? null;
   if (ignored === null) (errors.push('could not list ignored files'), safety++);
   else if (ignored.length) {
     const shown = ignored.slice(0, NAMES_SHOWN).join(', ');

@@ -32,7 +32,7 @@ The crew role the user talks to, which delegates work to crew threads in other c
 A cron schedule, or an event (`on:`), that starts a new thread on every run. Events can be GitHub PR changes, a page a thread published, or a signed GitHub webhook.
 
 **Request**:
-A message sent to a thread through the API, saved before the client hears it was accepted. It carries the client's request id, kept across retries: a retry with the same id gets the first acceptance back, and the same id with another message is refused. Local to the Mac that accepted it (`message_requests`, `apps/server/db/repos/requests.ts`).
+A message sent to a thread through the API, saved before the client hears it was accepted. It carries the client's request id, which stays the same across retries. A retry with the same id gets the first acceptance back, and Omni refuses the same id with a different message. It is local to the Mac that accepted it (`message_requests`, `apps/server/db/repos/requests.ts`).
 _Avoid_: Job, task
 
 **Message context**:
@@ -40,23 +40,23 @@ Typed records a **Request** carries next to its text, each with the user's note:
 _Avoid_: Context (alone, which is the context window), attachment (a file)
 
 **Crew report**:
-A child thread's reply to the thread that delegated it, sent when its turn ends. Saved as a **Request** on the parent before the parent is woken, once per child turn, so a restart before the parent reads it keeps it for Resume. A team's go to its lead is saved the same way. Omni wrote both, so the user can resume or discard them but not edit or move them.
+A child thread's reply to the thread that delegated it, sent when its turn ends. Omni saves it as a **Request** on the parent, once per child turn, before it wakes the parent. If Omni restarts before the parent reads it, the report waits for Resume. Omni saves a team's go to its lead the same way. Omni wrote both, so the user can resume or discard them but not edit or move them.
 _Avoid_: Result, callback
 
 **Delivery state**:
-Where a **Request** is. `accepted` (saved), `waiting` (for a slot), `held` (runs after this turn), `sent` (written to the harness), then `delivered` (the harness read it; the transcript keeps it where it did), `dropped` (stopped first), `discarded` (the user chose not to send it) or `cancelled` (the user removed it from the queue; the row is the record, the transcript never shows it). A restart parks the rest: `recovered` when no harness got it, held with Resume, and `uncertain` when one may have, sent again only when the user says so.
+Where a **Request** is. `accepted` (saved), `waiting` (for a slot), `held` (runs after this turn), `sent` (written to the harness), then `delivered` (the harness read it; the transcript keeps it where it did), `dropped` (stopped first), `discarded` (the user chose not to send it) or `cancelled` (the user removed it from the queue; the row is the record, the transcript never shows it). A restart parks the rest. A request is `recovered` when no harness got it and waits for Resume. It is `uncertain` when a harness may have got it, and Omni sends it again only when the user says so.
 _Avoid_: Status (a thread's), queue state
 
 **Setup**:
-Making and checking a **Thread**'s own git worktree at its chosen base, then running the **Channel**'s setup action if it has one, before the agent starts or alongside it. Only for a channel with a worktree per thread. `preparing`, then ready, or `failed` with the checkout or setup command's reason until the user presses Retry, which uses the same thread, branch and **Session**. A worktree thread's first prompt and files are saved as its first **Request**, so they survive a restart while it waits.
+Making and checking a **Thread**'s own git worktree at its chosen base, then running the **Channel**'s setup action if it has one, before the agent starts or alongside it. Only for a channel with a worktree per thread. Its state is `preparing`, then ready, or `failed` with the reason from the checkout or setup command. A failed setup stays failed until the user presses Retry, which uses the same thread, branch and **Session**. Omni saves a worktree thread's first prompt and files as its first **Request**, so they survive a restart while it waits.
 _Avoid_: Provisioning, bootstrap
 
 **Result**:
-How a **Turn** ended: `done`, `failed` or `stopped`. Each one is saved with an id of its own (`completions`), whatever ended the turn: the harness, the user's stop, a restart or a failed **Setup**. Only the Mac that ran the turn saves it; the other Mac gets that same row by sync, so a **Result** has one id on both.
+How a **Turn** ended: `done`, `failed` or `stopped`. Omni saves each one with an id of its own (`completions`), whatever ended the turn: the harness, the user's stop, a restart or a failed **Setup**. Only the Mac that ran the turn saves it; the other Mac gets that same row by sync, so a **Result** has one id on both.
 _Avoid_: Completion (in UI text), outcome
 
 **Limit stop**:
-A **Turn** its **Harness** ended because the plan's usage limit refused it, as Claude Code or Codex reports it. A full usage meter is not one, and neither is any other failure or Hermes being at its run cap. The thread fails as usual and keeps the stop, with the reset time the harness gave if it gave one. The stop syncs, so both Macs list it in Needs you, but only the Mac that ran the turn resumes or schedules it. The user resumes it now, or, with a reset time, picks Resume at reset: one **Continuation** then, never automatic. A message, Stop or archiving the thread clears it. In the UI the shared status label is **Limited** (for example "Limited · resets 13:00"), not a separate kind of stop.
+A **Turn** its **Harness** ended because the plan's usage limit refused it, as Claude Code or Codex reports it. A full usage meter is not one, and neither is any other failure or Hermes being at its run cap. The thread fails as usual and keeps the stop, with the reset time the harness gave if it gave one. The stop syncs, so both Macs list it in Needs you, but only the Mac that ran the turn resumes or schedules it. The user resumes it now or, when the harness gave a reset time, picks Resume at reset, which sends one **Continuation** at that time. Nothing resumes on its own. A message, Stop or archiving the thread clears it. In the UI the shared status label is **Limited** (for example "Limited · resets 13:00"), not a separate kind of stop.
 _Avoid_: Rate limit (the meter), quota error
 
 **Quick-actions card**:
@@ -64,19 +64,19 @@ The compact card a **Thread** opens on beside the transcript on desktop web and 
 _Avoid_: Side panel (the full inspector), Details tab
 
 **Continuation**:
-What resuming a **Limit stop** sends: Omni's "continue where you left off", saved as a **Request** keyed by the stop before the thread is woken, so it goes once, through the slots, even when it came due while Omni was down.
+What resuming a **Limit stop** sends: Omni's "continue where you left off". Omni saves it as a **Request** keyed by the stop before it wakes the thread, so it goes once, through the slots, even when it came due while Omni was down.
 _Avoid_: Retry, auto-resume
 
 **Question card**:
-Questions an agent asks the user with Omni's `ask_user_question` tool: one to four, each with two to four options plus a free-text Other. It sits in the thread where the agent asked, and in **Needs you** until the user answers, skips or writes a message instead, which dismisses it. The first of those wins. The answers go back as the waiting tool call's result; when that call is gone (a restart, Stop, the harness's own timeout), they reach the thread as a message. A thread that runs on another machine still takes the answer from the hub (its own card or a parent's), including one the Conductor delegated there: the call returns there while a turn runs, or the answer is forwarded as a message between turns.
+Questions an agent asks the user with Omni's `ask_user_question` tool: one to four, each with two to four options plus a free-text Other. It sits in the thread where the agent asked, and in **Needs you** until the user answers, skips or writes a message instead, which dismisses it. The first of those wins. The answers go back as the waiting tool call's result; when that call is gone (a restart, Stop, the harness's own timeout), they reach the thread as a message. A thread that runs on another machine still takes the answer from the hub (its own card or a parent's), including one the Conductor delegated there. While a turn runs, the waiting call returns on that machine; between turns, the hub forwards the answer as a message.
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
 **Inbox**:
-The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. With Channel rail (Beta) on, the same list fills the panel beside the rail from the Inbox disc (Home's place). On a phone, Activity shows the same list. Press `i` outside a text field opens it when Appearance's **Press I for the Inbox** is on. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Home (and the rail's Inbox landing) is the usage dashboard, not this list.
+The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. With Channel rail (Beta) on, the same list fills the panel beside the rail from the Inbox disc (Home's place). On a phone, Activity shows the same list. When Appearance's **Press I for the Inbox** is on, pressing `i` outside a text field opens it. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Home (and the rail's Inbox landing) is the usage dashboard, not this list.
 _Avoid_: Needs you (the reasons a thread waits), notifications, Home (the dashboard)
 
 **Needs you**:
-One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Read state is its own (`result_reads`): it never changes a thread's status, place in the lists or folder. It syncs, and only moves forward: each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock. The **Inbox** view and phone Activity list these threads among others.
+One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Omni keeps read state separately (`result_reads`), and it never changes a thread's status, place in the lists or folder. It syncs and only moves forward. Each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock. The **Inbox** view and phone Activity list these threads among others.
 _Avoid_: notifications, unread thread
 
 **Marked done**:
@@ -92,6 +92,10 @@ _Avoid_: Request (a message), delivery state (a request's state)
 **Harness**:
 The agent a thread runs in, together with what it bills: Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan), Hermes (Anthropic API on the user's server, not their Claude, ChatGPT or Cursor plan) or Cursor Cloud (a Cursor cloud agent on Cursor's machines, Cursor plan).
 _Avoid_: Provider, engine, backend, runtime
+
+**Account**:
+Who a **Harness** is signed in as on one machine: an email or name, with its org and plan when the harness says them. Each machine reads its own and syncs it. A **Thread** keeps the account its harness ran as.
+_Avoid_: Login, profile, user (Ben, who may have several accounts per harness)
 
 **Model**:
 The LLM a harness runs for a thread, picked from that harness's own model list.
@@ -110,11 +114,11 @@ The harness's own record of a thread's conversation, which Omni resumes on every
 _Avoid_: Codex "thread", Cursor "chat" (their names for the same thing)
 
 **Handover**:
-What a thread's next **Session** reads ahead of the user's message after the thread moved to another **Harness**: the thread's facts and its transcript, built by Omni, since no harness reads another's session. A harness the thread never ran on gets the whole thread in a new **Session**; one it ran on before resumes its own **Session** and gets only what happened since. Pending until that session starts.
+What a thread's next **Session** reads ahead of the user's message after the thread moved to another **Harness**: the thread's facts and its transcript, built by Omni, since no harness reads another's session. A harness the thread never ran on gets the whole thread in a new **Session**; one it ran on before resumes its own **Session** and gets only what happened since. It stays pending until that session starts.
 _Avoid_: Context transfer, migration
 
 **Handoff**:
-Moving a **Thread** to another synced Mac on the same **Harness** and **Session**, whether a turn is running or the thread is idle. A running turn is stopped here, the session and files move, and the other Mac resumes it; an idle thread moves the same way and waits there for the next message. Tailscale checks reachability; the sync relay carries the handoff.
+Moving a **Thread** to another synced Mac on the same **Harness** and **Session**, whether a turn is running or the thread is idle. Omni stops a running turn on this Mac and moves the session and files, and the other Mac resumes it; an idle thread moves the same way and waits there for the next message. Tailscale checks reachability; the sync relay carries the handoff.
 _Avoid_: Handover (a harness switch), continued thread (a new thread)
 
 **Take over**:
@@ -182,7 +186,7 @@ _Avoid_: Funnel, public tunnel (alone), Tailscale Serve
 - A **Request** belongs to one **Thread** and the Mac that accepted it; only that Mac resumes it, through the same slots as any message, so each **Harness**'s concurrency cap holds
 - A **Thread** in a **Channel** with a worktree per thread runs only in its own worktree, on its own branch. When **Setup** fails, nothing runs in the channel's repo or the brain instead; channels with worktrees off still run in the repo, and a Hermes **Thread** never gets one
 - Resume sends a **Thread**'s `recovered` **Requests** in their saved order; an `uncertain` one is never sent again on its own
-- The user can edit, reorder or remove a **Request** while it is `waiting`, `held`, `recovered` or `uncertain`; once the runner starts sending it, a change is refused and the client keeps their edited text. Editing or reordering never resumes anything. A `held` **Request** can also be steered now: sent into the running turn instead of after it
+- The user can edit, reorder or remove a **Request** while it is `waiting`, `held`, `recovered` or `uncertain`; once the runner starts sending it, Omni refuses a change and the client keeps the edited text. Editing or reordering never resumes anything. A `held` **Request** can also be steered now: sent into the running turn instead of after it
 - A **Crew report** for a parent the user stopped waits as `recovered` with Resume instead of starting it again; a team lead still waits for every member's report before it runs
 - A **Thread** has at most one **Limit stop**, its last turn's. Messages queued behind that turn wait as `recovered` rather than running into the same limit, so the **Continuation** never has follow-ups ahead of it
 - A **Thread** has many **Results** and at most one unread one in **Needs you**: its newest, while the thread is not running again. A delegated thread's `done` **Result** went to its parent as a **Crew report**, so only its failures and stops are listed

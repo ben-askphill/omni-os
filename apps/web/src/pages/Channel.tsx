@@ -4,7 +4,8 @@ import { CHANNEL_KIND } from '../format.ts';
 import { NewThreadComposer } from '../components/Composer.tsx';
 import { EmptyNote, NeedsYouSection } from '../components/NeedsYou.tsx';
 import { inChannel } from '../needs-you.ts';
-import { ArchivedThreads, ThreadGroups, useLiveThreads, useThreadPRs } from '../components/ThreadList.tsx';
+import { ArchivedThreads, ThreadGroups, useThreadPRs } from '../components/ThreadList.tsx';
+import { useChannelThreads } from '../app/useChannelThreads.ts';
 import { Avatar, Button, Empty, StatusDot, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { href, usePresetSeq, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -16,7 +17,7 @@ import { PRDetail, PRList } from './PRs.tsx';
 
 function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
-  const list = useLiveThreads(`/channels/${encodeURIComponent(id)}/threads`, accept);
+  const list = useChannelThreads(id, accept);
   const prs = useThreadPRs(id);
   const presetSeq = usePresetSeq();
   const { channel, needsYou } = useApp();
@@ -34,6 +35,13 @@ function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
           channel={channel(id)}
           empty={<EmptyNote icon="message">No threads in this channel yet. Start one above. Crew threads that the Conductor delegates land here too.</EmptyNote>}
         />
+        {list.more && (
+          <div className="mt-3 flex justify-center">
+            <Button variant="secondary" size="sm" busy={list.loadingMore} onClick={() => void list.loadMore()}>
+              Show older threads
+            </Button>
+          </div>
+        )}
         <ArchivedThreads channelId={id} />
       </div>
     </div>

@@ -53,6 +53,13 @@
       "scoped": true
     },
     {
+      "id": "accounts",
+      "group": "agents",
+      "title": "Accounts",
+      "icon": "user",
+      "blurb": "Which account each harness is signed in to, on each of your machines."
+    },
+    {
       "id": "threads",
       "group": "agents",
       "title": "Threads",
@@ -298,6 +305,27 @@
       ]
     },
     {
+      "id": "harness-accounts",
+      "section": "accounts",
+      "title": "Harness accounts on each machine",
+      "keywords": [
+        "account",
+        "email",
+        "login",
+        "signed in",
+        "sign in",
+        "subscription",
+        "plan",
+        "switch",
+        "org",
+        "who",
+        "claude code",
+        "codex",
+        "cursor",
+        "devices"
+      ]
+    },
+    {
       "id": "run-on",
       "section": "threads",
       "title": "Run new threads on",
@@ -393,7 +421,7 @@
     {
       "id": "channel-code",
       "section": "channels",
-      "title": "Channel repo and browser",
+      "title": "Channel repo, worktrees and browser",
       "keywords": [
         "repo path",
         "github repo",
@@ -401,7 +429,13 @@
         "browser window",
         "headless",
         "store domain",
-        "shopify"
+        "shopify",
+        "worktreeinclude",
+        ".env",
+        "copy into new worktrees",
+        "shared directories",
+        "node_modules",
+        "symlink"
       ]
     },
     {
@@ -533,6 +567,33 @@
       ]
     },
     {
+      "id": "sync-keys",
+      "section": "sync",
+      "title": "Signing keys",
+      "keywords": [
+        "key",
+        "fingerprint",
+        "key changed",
+        "confirm new key",
+        "pin",
+        "trust",
+        "signature"
+      ]
+    },
+    {
+      "id": "sync-refused",
+      "section": "sync",
+      "title": "Refused changes",
+      "keywords": [
+        "refused",
+        "rejected",
+        "unsigned",
+        "tampering",
+        "blocked",
+        "signature"
+      ]
+    },
+    {
       "id": "google",
       "section": "access",
       "title": "Google account and signed-in devices",
@@ -568,6 +629,35 @@
         "remote",
         "phone",
         "other machines"
+      ]
+    },
+    {
+      "id": "mcp-clients",
+      "section": "access",
+      "title": "MCP clients",
+      "keywords": [
+        "mcp",
+        "oauth",
+        "claude.ai",
+        "chatgpt",
+        "approve",
+        "remove",
+        "connected apps",
+        "assistants"
+      ]
+    },
+    {
+      "id": "install-token",
+      "section": "access",
+      "title": "Rotate install token",
+      "keywords": [
+        "token",
+        "rotate",
+        "leak",
+        "reset",
+        "sign out all",
+        "api token",
+        "credential"
       ]
     },
     {

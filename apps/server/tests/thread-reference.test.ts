@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
 import { newContext, type MessageContext } from '@omni/shared/message-context.ts';
 import { referenceBody, threadReference } from '@omni/shared/message-context-thread.ts';
 import { startRunner } from './runner-boot.ts';
@@ -17,11 +18,11 @@ const { PICK_LIMIT } = await import('../thread-references-api.ts');
 const { db } = H;
 
 for (const [id, name] of [['shop', 'Shop'], ['pink', 'Pink Gellac'], ['find', 'Find'], ['find-other', 'Find Other']]) {
-  H.db.channels.create({ id, name, kind: 'internal', use_worktree: 0, base_dir: H.paths.data });
+  H.db.channels.create({ id, name, kind: 'internal', use_worktree: 0, base_dir: tmpdir() });
 }
 
 const make = (channel: string, title: string, status: 'done' | 'running' = 'done') =>
-  db.threads.create({ id: randomUUID(), channel_id: channel, title, status, role: null, model: null, session_id: randomUUID(), cwd: H.paths.data, branch: null, parent_id: null, task_id: null, source: 'manual', automation: null });
+  db.threads.create({ id: randomUUID(), channel_id: channel, title, status, role: null, model: null, session_id: randomUUID(), cwd: tmpdir(), branch: null, parent_id: null, task_id: null, source: 'manual', automation: null });
 const say = (id: string, kind: 'user' | 'assistant_text', text: string, extra: Record<string, unknown> = {}) => db.events.add(id, kind, { text, ...extra });
 const SAME_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const AT = new Date('2026-10-25T08:15:30.125Z');

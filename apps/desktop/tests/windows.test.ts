@@ -8,6 +8,8 @@ import {
   nextWindowState,
   parseWindowState,
   recentGesture,
+  mayPairAgain,
+  PAIR_AGAIN_MS,
   restoreBounds,
   staysInWindow,
   subframeNavigationAllowed,
@@ -155,5 +157,15 @@ describe('gestures', () => {
     expect(recentGesture(5000, 5000 + GESTURE_MS)).toBe(true);
     expect(recentGesture(5000, 5000 + GESTURE_MS + 1)).toBe(false);
     expect(recentGesture(5000, 4000)).toBe(false);
+  });
+});
+
+describe('pairing a window again', () => {
+  it('pairs on the first ask, then waits before another so a refusing server cannot loop the window', () => {
+    expect(mayPairAgain(null, 5000)).toBe(true);
+    expect(mayPairAgain(5000, 5000 + PAIR_AGAIN_MS - 1)).toBe(false);
+    expect(mayPairAgain(5000, 5000 + PAIR_AGAIN_MS)).toBe(true);
+    // A clock that went back never locks the window out.
+    expect(mayPairAgain(5000, 1000)).toBe(true);
   });
 });

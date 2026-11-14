@@ -1,8 +1,13 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Thread } from '../src/api.ts';
 import { ThreadQuickCard } from '../src/components/thread/ThreadQuickCard.tsx';
+
+vi.mock('../src/store.tsx', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/store.tsx')>()),
+  useFeed: () => {},
+}));
 
 const thread = (over: Partial<Thread> = {}) =>
   ({

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, errorText, type Channel, type PRDetail as PRDetailT } from '../api.ts';
 import { Chip, ErrorNote, Picker, SlideToConfirm, StatusDot, Toggle, type PickerOption } from '../components/ui.tsx';
 import { checkTone } from '@omni/shared/thread-glance.ts';
+import { PRAutoMerge } from './PRAutoMerge.tsx';
 
 type MergeMethod = 'squash' | 'merge' | 'rebase';
 
@@ -79,6 +80,7 @@ export function PRMergePanel({ channel, p, n, onMerged }: { channel: Channel; p:
             onConfirm={doMerge}
           />
           {mergeError && <ErrorNote className="mt-3">{mergeError}</ErrorNote>}
+          <PRAutoMerge channelId={channel.id} n={n} p={p} method={method} onChanged={onMerged} />
         </section>
       )}
       {merged && (

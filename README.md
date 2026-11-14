@@ -7,9 +7,9 @@
 
 # Omni OS
 
-One local workspace for all agent work. Channels per client or project, a thread per task, a Conductor that hands work to a crew, and automations on a schedule or on GitHub PR events. Replaces hopping between Claude Desktop, Cursor cloud agents and a separate conductor bot.
+One local workspace for all agent work. Channels per client or project, a thread per task, a Conductor that hands work to a crew, and automations on a schedule or on GitHub PR events. It replaces hopping between Claude Desktop, Cursor cloud agents and a separate conductor bot.
 
-One Node server runs everything (threads, harnesses, database, secrets, automations). The clients sit on top of its `/api` and show the same channels and threads:
+One Node server runs everything (threads, harnesses, database, secrets, automations). The clients use its `/api` and show the same channels and threads:
 
 | Client | What | Where |
 | --- | --- | --- |
@@ -70,20 +70,20 @@ Forking it for yourself? Read [FORKING.md](FORKING.md): everything personal live
 ## What you get
 
 - **Channels** per client or project, each with its own icon and avatar background, default harness, model and effort, a design system file for the agent, and facts like the repo, Shopify store and Portal slug
-- **Threads** per task, dated, full-text searchable and resumable. Running and Pinned keep work reachable across channels; the sidebar Inbox (Activity on a phone, or the Channel rail Beta's Inbox disc) lists pinned, waiting, Working and Done; Mark done clears a thread from Needs you until something new happens. Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
-- **Composer**: `/` menu for skills, slash commands and MCP prompts per harness, `@` to mention artifacts and repo files, attachments, and chips for diff lines, terminal output, browser annotations and other threads, plus suggested next replies
-- **Sandbox per thread**: its own git worktree in repo channels, a choice of base commit, channel setup and named actions, a persistent browser shown live in the Browser panel, a real terminal, and secrets from the Keychain (or a 0600 file on Linux) as env. Hermes and Cursor Cloud run remotely without these local tools
-- **Artifacts** listed in each thread, an Artifacts page across channels (Files / claude.ai, with list or grid), cards for pages a thread published to claude.ai, and the same claude.ai list in the phone and iOS Library. With `html_render`, an agent shows a chart, diagram or mockup right in the transcript above its reply: sandboxed, interactive, sized to fit and drawn in Omni's theme
-- **PRs** per repo channel and in each thread's panel: checks, diff and merge in place from the panel (phone keeps its merge slide). A Pull requests page across every channel (search, sort, filters; Authored, Review requested, Others). Watch PR in the thread's PRs tab wakes the thread for failing checks or new review feedback. When the agent asks whether to open a PR, the composer offers Open PR
+- **Threads** per task, dated, full-text searchable and resumable. Running and Pinned list threads from every channel; the sidebar Inbox (Activity on a phone, or the Channel rail Beta's Inbox disc) lists pinned, waiting, Working and Done; Mark done clears a thread from Needs you until something new happens. With sync on, Home and phone Activity show a tile per machine (running threads, harness slots, live CPU and RAM). Steer, queue or interrupt while one runs, or pick a model or harness for its next turn
+- **Composer**: `/` menu for skills, slash commands and MCP prompts per harness, `@` to mention artifacts and repo files, attachments, and chips for diff lines, terminal output, browser annotations and other threads, plus suggested next replies. The Machine chip can send a new message straight to Grok Bot when its webhook is set
+- **Sandbox per thread**: its own git worktree in repo channels (with `.worktreeinclude` or a channel copy list for ignored files, optional shared directories, setup and teardown actions), a choice of base commit, named actions, a persistent browser shown live in the Browser panel, a real terminal, and secrets from the Keychain (or a 0600 file on Linux) as env. Hermes and Cursor Cloud run remotely without these local tools
+- **Artifacts** listed in each thread, an Artifacts page across channels (Files / claude.ai, with list or grid), cards for pages a thread published to claude.ai, and the same claude.ai list in the phone and iOS Library. With `html_render`, an agent shows a chart, diagram or mockup in the transcript above its reply. The render is sandboxed, interactive, sized to fit and drawn in Omni's theme
+- **PRs** per repo channel and in each thread's panel: checks, diff and merge in place from the panel (phone keeps its merge slide), plus Auto-merge and Rerun failed checks. Changes can pin review notes on the diff and send the open ones as one message (to this thread or a delegate). A Pull requests page across every channel (search, sort, filters; Authored, Review requested, Others). Watch PR in the thread's PRs tab wakes the thread for failing checks or new review feedback. When the agent asks whether to open a PR, the composer offers Open PR; Fix checks includes failing log tails. Branch steps in Channel Settings set the Open PR, Fix conflicts and Fix checks prompts per channel
 - **Quick-actions card** on a thread (desktop web, phone web popover, desktop app): machine, branch, lineage and a one-click path into the full inspector
 - **Conductor and crew**: one front agent that delegates to roles (builder, researcher, store-ops, inbox), alone or as a team
-- **Automations**: YAML on a cron schedule, GitHub PR event, published page or signed GitHub webhook; every run is its own thread
-- **Sync** between two Macs through a relay on your own Cloudflare account (optional), with handoff of a running thread to the other Mac
+- **Automations**: YAML on a cron schedule, GitHub PR event, published page or signed GitHub webhook; every run is its own thread. A scheduled run can skip with a `precheck` or a stale `catchup_max_age`. The Conductor can list, run, toggle and delete them
+- **Sync** between two Macs through a relay on your own Cloudflare account (optional), with signed changes and handoff of a running thread to the other Mac. A machine paired through Omni Connect is trusted with its first signing key ([ADR 0013](docs/adr/0013-paired-machines-are-trusted.md))
 - **Omni Connect**: open any synced machine from a phone through that relay, without Tailscale
 - **Update**: one button in the desktop sidebar and phone Activity when origin's `main` is ahead of a checkout; syncs, rebuilds and restarts. The packaged desktop app updates itself from its GitHub Releases. With sync on, Settings > Machines (web, phone, desktop app and iOS) checks, downloads and updates every synced machine in one place
 - **Phone layout** with Activity, Channels, Library and PRs tabs, a new-thread sheet and full-screen thread panels. Save it to the iPhone home screen over Tailscale
-- **Channel rail (Beta)** in Settings > Appearance on desktop web and the desktop app: a disc rail and list panel instead of the classic sidebar, with optional full-colour discs and Press I for the Inbox. Classic stays the default; phone and iOS keep their own layouts
-- **Native iOS app** that pairs with a server over HTTPS: Activity (the same Inbox list as phone web), Channels with emoji/icon/SVG avatars and avatar backgrounds, Library (including claude.ai Artifacts), a New tab item, Settings and Channel Settings from the shared catalog (including Update all machines), the thinking line while a turn runs, send, attachments, handoff, Changes and PR review (including PRs from delegated threads, Open PR when the agent asks, working Open PR / Fix conflicts / Fix checks states, and forwarded-message waiting rows), and shared line icons. See [Remote access](docs/user/remote-access.md#pair-the-native-ios-app) and [apps/ios/README.md](apps/ios/README.md)
+- **Channel rail (Beta)** in Settings > Appearance on desktop web and the desktop app: a disc rail and list panel instead of the classic sidebar, with optional full-colour discs, Press I for the Inbox and Press E to mark done. Classic stays the default; phone and iOS keep their own layouts
+- **Native iOS app** that pairs with a server over HTTPS: Activity (the same Inbox list as phone web, with machine tiles when sync is on), Channels with emoji/icon/SVG avatars and avatar backgrounds, Library (including claude.ai Artifacts), a New tab item, Settings and Channel Settings from the shared catalog (including Update all machines, Accounts, Branch steps, and worktree copy/shared directories), the thinking line while a turn runs, send, attachments, handoff, Changes (review notes) and PR review (including PRs from delegated threads, Open PR when the agent asks, working Open PR / Fix conflicts / Fix checks states, Auto-merge, Rerun failed checks, and forwarded-message waiting rows), and shared line icons. See [Remote access](docs/user/remote-access.md#pair-the-native-ios-app) and [apps/ios/README.md](apps/ios/README.md)
 
 ## Documentation
 
@@ -91,7 +91,7 @@ Start at [docs/](docs/README.md). The most used pages:
 
 - [Install and first run](docs/user/install.md), including the agent instructions
 - [Your config, `.env` and secrets](docs/user/configuration.md)
-- [Threads: Inbox, Needs you, sending, context chips and Watch PR](docs/user/threads.md)
+- [Threads: Inbox, machine tiles, Needs you, sending, context chips, review notes, Auto-merge and Watch PR](docs/user/threads.md)
 - [Harnesses](docs/user/harnesses.md) · [Crew and Conductor](docs/user/crew.md) · [Automations](docs/user/automations.md)
 - [Sync between two Macs](docs/user/sync.md), with the one-time relay setup
 - [Remote access and security](docs/user/remote-access.md)

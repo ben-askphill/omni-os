@@ -11,8 +11,7 @@ const BASE = (process.env.OMNI_URL || 'http://127.0.0.1:4747').replace(/\/+$/, '
 const DATA = process.env.OMNI_DATA_DIR || join(import.meta.dirname, '../../../data');
 const TOKEN_FILE = process.env.OMNI_TOKEN_FILE || join(DATA, 'api-token');
 
-function token(): string {
-  if (process.env.OMNI_TOKEN) return process.env.OMNI_TOKEN.trim();
+function readToken(): string {
   try {
     return readFileSync(TOKEN_FILE, 'utf8').trim();
   } catch {
@@ -21,8 +20,20 @@ function token(): string {
   }
 }
 
-const TOKEN = token();
-const call = callOver((path, init) => fetch(`${BASE}${path}`, { ...init, headers: { ...init.headers, authorization: `Bearer ${TOKEN}` } }));
+// Rotating the install token rewrites the file, so a 401 reads it again and retries once with what it holds now.
+let token = process.env.OMNI_TOKEN?.trim() || readToken();
+const REREAD = !process.env.OMNI_TOKEN?.trim() || !!process.env.OMNI_TOKEN_FILE;
+const call = callOver(async (path, init) => {
+  const send = (bearer: string) => fetch(`${BASE}${path}`, { ...init, headers: { ...init.headers, authorization: `Bearer ${bearer}` } });
+  // Compare against the token this request sent, not the shared one: a parallel call may have swapped it already.
+  const sent = token;
+  const res = await send(sent);
+  if (res.status !== 401 || !REREAD) return res;
+  const fresh = readToken();
+  if (!fresh || fresh === sent) return res;
+  token = fresh;
+  return send(fresh);
+});
 
 // The client closed our stdin: it is gone.
 process.stdin.on('end', () => process.exit(0));

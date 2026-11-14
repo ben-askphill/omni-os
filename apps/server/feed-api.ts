@@ -1,4 +1,4 @@
-// /api/feed, /status, /tasks, /recent, /needs-you, /search, /insights: the global views across threads.
+// /api/feed, /status, /machines, /tasks, /recent, /needs-you, /search, /insights: the global views across threads.
 import { Hono } from 'hono';
 import { sessionSSE } from './sse.ts';
 import { about } from './about.ts';
@@ -14,6 +14,7 @@ import { getProfile } from './profile.ts';
 import { activeMods, activeTasks, queuedCount, runningCount, slotsByHarness } from './runner.ts';
 import { usageByHarness } from './usage.ts';
 import { getInsights, validTimeZone } from './insights.ts';
+import { machinesView } from './machines.ts';
 import { isInsightRange } from '@omni/shared/insights.ts';
 
 export const feedApi = new Hono();
@@ -63,6 +64,13 @@ feedApi.get('/status', (c) =>
     grokBot: grokBotConfigured(),
   }),
 );
+
+/**
+ * What each machine under this account runs now: this one, then every synced one with whether Tailscale sees it up,
+ * and each one's CPU and memory. Clients ask again on the feed's thread and tasks events, which a synced machine's runs
+ * raise here too; samples arrive as machine_stats events. `?stats=1` samples this machine even when it is the only one.
+ */
+feedApi.get('/machines', async (c) => c.json(await machinesView({ stats: c.req.query('stats') === '1' })));
 
 /** Free space on the disk with Omni's data and the temp folder, as last checked (every 10 minutes); checks now before the first. */
 feedApi.get('/disk', async (c) => c.json(diskView().checkedAt ? diskView() : await refreshDisk()));

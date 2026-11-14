@@ -9,12 +9,14 @@ interface RunData {
   thread_id: string | null;
   trigger: string;
   created_at: string;
+  /** Set for a skipped run (precheck failed, catch-up too old). Absent from an older Mac. */
+  skip_reason?: string | null;
 }
 
 registerHandler('automation_run', {
   serialize(uid) {
     return (
-      (db.prepare('SELECT uid, automation, thread_id, trigger, created_at FROM automation_runs WHERE uid = ?').get(uid) as unknown as
+      (db.prepare('SELECT uid, automation, thread_id, trigger, created_at, skip_reason FROM automation_runs WHERE uid = ?').get(uid) as unknown as
         | RunData
         | undefined) ?? null
     );
@@ -25,9 +27,9 @@ registerHandler('automation_run', {
     return (
       db
         .prepare(
-          'INSERT INTO automation_runs (uid, automation, thread_id, trigger, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(uid) DO NOTHING',
+          'INSERT INTO automation_runs (uid, automation, thread_id, trigger, created_at, skip_reason) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(uid) DO NOTHING',
         )
-        .run(change.entity_id, r.automation, r.thread_id ?? null, r.trigger, r.created_at ?? change.ts).changes > 0
+        .run(change.entity_id, r.automation, r.thread_id ?? null, r.trigger, r.created_at ?? change.ts, r.skip_reason ?? null).changes > 0
     );
   },
 });

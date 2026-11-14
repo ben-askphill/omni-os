@@ -10,6 +10,8 @@ import { networkInterfaces } from 'node:os';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { cookieName, sessionCookieName, tokenMatches } from './api-token.ts';
+import { nonceLive } from './desktop-pairing.ts';
+import { decideRequest, type Credential, type RouteClass } from './request-trust.ts';
 import { config } from './config.ts';
 import { resolved } from './user-config.ts';
 
@@ -80,9 +82,9 @@ const refuse = (reason: string, status = 403) =>
 export const PROOF_PATH = '/api/auth/proof';
 
 /**
- * The desktop app opens this once, in its own window, and the response sets the pairing cookie.
- * No token in the URL. Only a request from this machine that did not come through a proxy (so Tailscale
- * and a forwarded client still have to pair with the token).
+ * The desktop app's window opens this with a one-time nonce (desktop-pairing.ts), and the response sets the pairing
+ * cookie. No token in the URL. Only a request from this machine that did not come through a proxy (so Tailscale and a
+ * forwarded client still have to pair with the token).
  */
 export const DESKTOP_PAIR_PATH = '/api/auth/desktop-pair';
 
@@ -113,7 +115,7 @@ const isConnectRoute = (c: Context) => CONNECT_OPEN_ROUTES.some(([m, p]) => c.re
  * How a request proved itself: the install's token, a device's session (`method`: signed in with Google, or an app
  * that redeemed a pairing code), or neither (the open routes).
  */
-export type OmniAuth = { via: 'token' } | { via: 'session'; session: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' } | { via: 'none' };
+export type OmniAuth = { via: 'token' } | { via: 'session'; session: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token' } | { via: 'none' };
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -122,7 +124,7 @@ declare module 'hono' {
 }
 
 /** Looks a session token up (google-auth.ts sessionFor). app.ts sets it, so this module and its tests never open the db. */
-let sessionCheck: (token: string) => { id: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' } | null = () => null;
+let sessionCheck: (token: string) => { id: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token' } | null = () => null;
 export const useSessionCheck = (fn: typeof sessionCheck) => {
   sessionCheck = fn;
 };
@@ -160,11 +162,9 @@ function fromConnectTunnel(c: Context, host: string): boolean {
 /** The request came in through tailscale serve (or another proxy), whatever Host it names. */
 const cameThroughProxy = (c: Context, host: string) => viaTailnet(hostnameOf(host)) || PROXY_HEADERS.some((h) => c.req.header(h) !== undefined);
 
-/** True only for GET desktop-pair from this machine, with no proxy in front. The handler sets the cookie. */
-export function desktopPairAllowed(c: Context): boolean {
-  if (c.req.method !== 'GET' || c.req.path !== DESKTOP_PAIR_PATH) return false;
-  return fromThisMac(c) && !cameThroughProxy(c, requestHost(c));
-}
+/** From a process on this machine, straight to the server: no tailscale serve, tunnel or other proxy in front. */
+export const directFromThisMac = (c: Context) => fromThisMac(c) && !cameThroughProxy(c, requestHost(c));
+
 
 const requestHost = (c: Context) => c.req.header('host') ?? new URL(c.req.url).host;
 
@@ -200,56 +200,95 @@ export function clientKey(c: Context): string {
   return `direct:${(c.env as { incoming?: IncomingMessage } | undefined)?.incoming?.socket.remoteAddress ?? 'local'}`;
 }
 
-/** Body types a cross-site page can send without a CORS preflight. JSON routes never take them. */
-const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
+/** A thread's terminal: opening, typing into or watching its shell (terminal-api.ts). */
+const TERMINAL_PATH = /^\/api\/threads\/[^/]+\/terminal(?:\/|$)/;
+
+/** The desktop app's main process asks this for a one-time nonce (desktop-pairing.ts). It checks its own secret. */
+export const DESKTOP_NONCE_PATH = '/api/auth/desktop-nonce';
+
+/** Swaps a raw-token cookie an older build set for a session (browser-session.ts). app.ts sets it, so the tests never open the db. */
+let legacyUpgrade: ((c: Context) => { id: string; token: string }) | null = null;
+export const useLegacyUpgrade = (fn: typeof legacyUpgrade) => {
+  legacyUpgrade = fn;
+};
+
+const routeClass = (c: Context): RouteClass => {
+  if (c.req.method === 'GET' && c.req.path === DESKTOP_PAIR_PATH) return 'pairing';
+  if (TERMINAL_PATH.test(c.req.path)) return 'terminal';
+  return c.req.method === 'GET' || c.req.method === 'HEAD' ? 'read' : 'act';
+};
+
+const credentialOf = (auth: OmniAuth): Credential =>
+  auth.via === 'token' ? 'token' : auth.via === 'session' ? (auth.method === 'token' ? 'session-token' : 'session') : 'none';
 
 /**
- * Lets through what Omni's own clients send and refuses what a browser sends on another site's behalf:
+ * Lets through what Omni's own clients send and refuses what a browser sends on another site's behalf, as
+ * request-trust.ts decides:
  * - a Host outside hostAllowed (DNS rebinding);
- * - Sec-Fetch-Site: cross-site (any request a page on another site made);
+ * - Sec-Fetch-Site: cross-site or same-site (a page on another site, or on another port of this host);
  * - an Origin, `null` included, that is not the Host the request came in on;
  * - a text/plain or form-urlencoded body, the content types that skip the preflight;
- * - no token, or the wrong one (401), in the Authorization header or the paired browser's cookie, and no live
- *   device session in either, except on the proof route, a GitHub webhook post (its own signature), GET desktop-pair
- *   from this machine, the Google sign-in routes, redeeming an app pairing code, and Omni Connect's signed routes (CONNECT_OPEN_ROUTES);
+ * - no token, or the wrong one (401), in the Authorization header, and no live device session in it or the paired
+ *   browser's cookie, except on the proof route, a GitHub webhook post (its own signature), the desktop app's nonce
+ *   and pairing routes from this machine, the Google sign-in routes, redeeming an app pairing code, and Omni
+ *   Connect's signed routes (CONNECT_OPEN_ROUTES);
+ * - the terminal, for anything but the token or a session paired with it;
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set.
+ * A raw-token cookie an older build set still works once, and is swapped for a session cookie once the request is let through.
  * The desktop app's main process, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
  */
 export const requestGuard: MiddlewareHandler = async (c, next) => {
   const host = requestHost(c);
-  if (!hostAllowed(hostnameOf(host))) return refuse('host not allowed');
-  if (c.req.header('sec-fetch-site') === 'cross-site') return refuse('cross-site request');
-  const origin = c.req.header('origin');
-  if (origin !== undefined) {
-    let originHost = '';
-    try {
-      originHost = new URL(origin).host;
-    } catch {
-      // `null` and anything else that is not a URL.
-    }
-    // tailscale serve keeps the Host, and names the original one in X-Forwarded-Host if a proxy does not.
-    const seen = [host, c.req.header('x-forwarded-host') ?? ''].map((h) => h.toLowerCase());
-    if (!hostAllowed(hostnameOf(originHost)) || !seen.includes(originHost.toLowerCase())) return refuse('origin not allowed');
-  }
-  const type = (c.req.header('content-type') ?? '').split(';')[0].trim().toLowerCase();
-  if (SIMPLE_TYPES.includes(type)) return refuse('send JSON', 415);
-  const desktop = c.req.method === 'GET' && c.req.path === DESKTOP_PAIR_PATH;
-  if (desktop && !desktopPairAllowed(c)) return refuse('desktop pairing is only from this machine');
+  const route = routeClass(c);
+  const desktop = route === 'pairing' || (c.req.method === 'POST' && c.req.path === DESKTOP_NONCE_PATH);
+  if (desktop && hostAllowed(hostnameOf(host)) && !directFromThisMac(c)) return refuse('desktop pairing is only from this machine');
   const open = desktop || (c.req.method === 'GET' && c.req.path === PROOF_PATH) || isWebhookPost(c) || isSignInRoute(c) || isAppPairingRoute(c) || isConnectRoute(c);
   const given = bearer(c);
   let auth: OmniAuth = { via: 'none' };
-  if (tokenMatches(given ?? getCookie(c, cookieName()))) auth = { via: 'token' };
+  let legacy = false;
+  if (tokenMatches(given)) auth = { via: 'token' };
   else {
     const session = sessionCheck(given ?? getCookie(c, sessionCookieName()) ?? '');
     if (session) auth = { via: 'session', session: session.id, kind: session.kind, method: session.method };
+    // An older build's cookie held the token itself. It counts as a token-paired session, and is traded for one below.
+    else legacy = !given && !!legacyUpgrade && tokenMatches(getCookie(c, cookieName()));
   }
-  if (auth.via === 'none' && !open) return refuse("Unauthorized: send this install's token (data/api-token), pair this browser, or sign in with Google", 401);
-  c.set('omniAuth', auth);
+  const origin = c.req.header('origin');
+  let originHost = '';
+  try {
+    originHost = origin === undefined ? '' : new URL(origin).host;
+  } catch {
+    // `null` and anything else that is not a URL.
+  }
+  const credential = route === 'pairing' && nonceLive(c.req.query('nonce')) ? 'nonce' : legacy ? 'session-token' : credentialOf(auth);
+  const decision = decideRequest({
+    method: c.req.method,
+    route,
+    hostAllowed: hostAllowed(hostnameOf(host)),
+    fetchSite: c.req.header('sec-fetch-site'),
+    origin,
+    // tailscale serve keeps the Host, and names the original one in X-Forwarded-Host if a proxy does not.
+    hosts: [host, c.req.header('x-forwarded-host') ?? ''],
+    originAllowed: origin !== undefined && hostAllowed(hostnameOf(originHost)),
+    contentType: c.req.header('content-type'),
+    credential,
+    open,
+  });
+  if (!decision.ok) {
+    // A stale or missing nonce sends the window to the pairing screen, which says what to do, instead of raw JSON.
+    if (route === 'pairing' && decision.status === 403 && /nonce/.test(decision.reason)) return c.redirect('/#/pair?desktop=expired', 303);
+    return refuse(decision.reason, decision.status);
+  }
   const owners = resolved.tailscaleLogins();
   // Through the Connect tunnel there is no Tailscale login to check: the token or a session is the control there.
   if (owners.length && cameThroughProxy(c, host) && !fromConnectTunnel(c, host) && !owners.includes((c.req.header('tailscale-user-login') ?? '').trim().toLowerCase())) {
     return refuse('this Tailscale login is not the owner');
   }
+  if (legacy && legacyUpgrade) {
+    const s = legacyUpgrade(c);
+    auth = { via: 'session', session: s.id, kind: 'browser', method: 'token' };
+  }
+  c.set('omniAuth', auth);
   await next();
 };

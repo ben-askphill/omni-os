@@ -23,7 +23,8 @@ async function machine(name: string) {
     bus.on(`thread:${threadId}`, (e) => got.push(e));
     return got;
   };
-  return { name, db, sync, guard, feed, streamed, worker: null as unknown as ReturnType<typeof sync.createSyncWorker> };
+  const signKey = await (await import('../sync/sign-key.ts')).signPublicKey();
+  return { name, db, sync, guard, feed, streamed, signKey, worker: null as unknown as ReturnType<typeof sync.createSyncWorker> };
 }
 
 const relay = new MemoryTransport();

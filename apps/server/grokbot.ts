@@ -135,6 +135,46 @@ function authSecrets(header: string): string[] {
   return key && key !== header ? [header, key] : [header];
 }
 
+/** The system error code under a failed fetch: undici puts it on `cause`, or on each of an AggregateError's `errors`. */
+function errorCode(err: unknown): string | null {
+  const seen = new Set<unknown>();
+  const queue: unknown[] = [err];
+  while (queue.length) {
+    const e = queue.shift();
+    if (!e || typeof e !== 'object' || seen.has(e)) continue;
+    seen.add(e);
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === 'string' && /^[A-Z][A-Z0-9_]{1,40}$/.test(code)) return code;
+    queue.push((e as { cause?: unknown }).cause);
+    const errors = (e as { errors?: unknown }).errors;
+    if (Array.isArray(errors)) queue.push(...errors);
+  }
+  return null;
+}
+
+const UNREACHABLE: Record<string, string> = {
+  ENOTFOUND: "the webhook's host name did not resolve",
+  EAI_AGAIN: "the webhook's host name did not resolve",
+  ECONNREFUSED: 'the connection was refused',
+  ECONNRESET: 'the connection was reset',
+  EHOSTUNREACH: 'the host is unreachable',
+  ENETUNREACH: 'this machine has no route to it',
+  ETIMEDOUT: 'the connection timed out',
+  UND_ERR_CONNECT_TIMEOUT: 'the connection timed out',
+  UND_ERR_SOCKET: 'the connection closed early',
+};
+
+/**
+ * "Could not reach Grok Bot", with why when the failure carries a system code (ENOTFOUND, ECONNREFUSED, a TLS
+ * certificate code). Only the code goes in: a message can name the webhook's host, and the URL is a secret.
+ */
+function unreachable(err: unknown): string {
+  const code = errorCode(err);
+  if (!code) return 'Could not reach Grok Bot.';
+  const why = UNREACHABLE[code] ?? (/CERT|TLS|SSL|SIGNATURE/.test(code) ? 'its TLS certificate was refused' : null);
+  return why ? `Could not reach Grok Bot: ${why} (${code}).` : `Could not reach Grok Bot (${code}).`;
+}
+
 function webhookUrl(raw: string): URL | null {
   let url: URL;
   try {
@@ -197,7 +237,7 @@ export async function sendToGrokBot(input: GrokBotInput, deps: GrokBotDeps = {})
   } catch (err) {
     const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : '';
     const timedOut = name === 'TimeoutError' || name === 'AbortError';
-    return fail('network', timedOut ? 'Grok Bot did not answer in time.' : 'Could not reach Grok Bot.');
+    return fail('network', timedOut ? 'Grok Bot did not answer in time.' : unreachable(err));
   }
 
   if (res.status >= 300 && res.status < 400) {

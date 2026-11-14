@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createActionsLive, POLL_MS } from '../src/live/actions';
 
-const action = (id: string): ChannelAction => ({ id, channel_id: 'c', name: id, command: `echo ${id}`, secrets: [], port: null, setup: null, position: 0, created_at: '', updated_at: '' });
+const action = (id: string): ChannelAction => ({ id, channel_id: 'c', name: id, command: `echo ${id}`, secrets: [], port: null, setup: null, teardown: false, position: 0, created_at: '', updated_at: '' });
 const run = (id: string, state: ActionRun['state'], action_id: string | null = 'a'): ActionRun => ({
   id, thread_id: 't', action_id, name: id, command: '', cwd: '', port: null, state, exit_code: null, error: null, output: '', output_bytes: 0, started_at: '', ended_at: null,
 });
-const data = (runs: ActionRun[], over: Partial<ThreadActions> = {}): ThreadActions => ({ actions: [action('a')], runs, blocked: null, setup_run: null, ...over });
+const data = (runs: ActionRun[], over: Partial<ThreadActions> = {}): ThreadActions => ({ actions: [action('a')], runs, blocked: null, setup_run: null, clone: null, ...over });
 
 function setup(initial: ThreadActions) {
   let server = initial;

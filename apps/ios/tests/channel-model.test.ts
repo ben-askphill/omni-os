@@ -127,6 +127,44 @@ describe('thread rows for the menu', () => {
   });
 });
 
+describe('channelThreads from the paged list (U3)', () => {
+  const folders = [
+    { id: 'f1', name: 'Launch', collapsed: 0, threads: [] },
+  ] as unknown as ChannelWithRunning['folders'];
+  // The previews hold one thread; the channel has many more, and a running one filed past the folder preview.
+  const previews = channel({ id: 'c', recent: [stub({ id: 'newest' })], folders });
+
+  it('lists every paged thread, each in its folder, not just the previews', () => {
+    const paged = [
+      stub({ id: 'newest' }),
+      stub({ id: 'filed-running', status: 'running', folder_id: 'f1' }),
+      ...Array.from({ length: 30 }, (_, i) => stub({ id: `old-${i}` })),
+    ];
+    const model = channelThreads(previews, NOW, undefined, paged);
+    expect(model.recent).toHaveLength(31);
+    expect(model.folders[0]?.active.map((r) => r.id)).toEqual(['filed-running']);
+  });
+
+  it('puts a thread whose folder is gone with the ungrouped ones', () => {
+    const model = channelThreads(previews, NOW, undefined, [stub({ id: 'orphan', folder_id: 'deleted' })]);
+    expect(model.recent.map((r) => r.id)).toEqual(['orphan']);
+    expect(model.folders).toEqual([]);
+  });
+
+  it('does the same for previews while the list loads', () => {
+    const model = channelThreads(channel({ id: 'c', recent: [stub({ id: 'orphan', folder_id: 'deleted' })], folders }), NOW);
+    expect(model.recent.map((r) => r.id)).toEqual(['orphan']);
+  });
+
+  it('still leaves out team members and nests Conductor delegations', () => {
+    const parent = stub({ id: 'p', channel_id: 'conductor' });
+    const kid = stub({ id: 'k', status: 'running', channel_id: 'acme' });
+    const conductor = channel({ id: 'conductor', handoffs: [{ parent, children: [kid] }] });
+    const model = channelThreads(conductor, NOW, undefined, [parent, kid, stub({ id: 'team', source: 'team' })]);
+    expect([...model.active, ...model.recent].map((r) => r.id)).toEqual(['p']);
+  });
+});
+
 describe('folder counts', () => {
   const folders = [
     {

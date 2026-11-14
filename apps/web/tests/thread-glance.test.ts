@@ -57,6 +57,9 @@ describe('the step a branch PR calls for', () => {
     expect(stepUnderway([said(OPEN_PR_PROMPT), said('Also fix the typo')], [], true)).toBeNull();
     expect(stepUnderway([said('Build it')], [{ kind: 'user', text: FIX_CHECKS_PROMPT }], true)).toBe('checks');
     expect(stepUnderway([], [{ kind: 'user', text: FIX_CONFLICTS_PROMPT }], false)).toBe('conflicts');
+    // The server adds the failing checks to a Fix checks message (apps/server/fix-checks.ts); it is still that step.
+    expect(stepUnderway([said(`${FIX_CHECKS_PROMPT}\n\nFailing checks on PR #9 (1). Start here.\n\n- CI / build: failure`)], [], true)).toBe('checks');
+    expect(stepUnderway([said(`${FIX_CHECKS_PROMPT}\n\nAlso bump the version`)], [], true)).toBeNull();
   });
 
   it('does not count a parked step as underway, and offers to resume it', () => {

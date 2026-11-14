@@ -60,7 +60,7 @@ beforeAll(async () => {
   const macB = await bootMac('mac-b', 'Mac B', relay, { OMNI_AUTOMATIONS_DIR: automationsDir() });
   b = { ...macB, triggers: await import('../automation-triggers.ts') };
   // Both Macs find B's stub first on PATH: a Keychain that holds the signing secret.
-  writeFileSync(join(b.tmp, 'bin', 'security'), `#!/bin/sh\ncase "$*" in *find-generic-password*OMNI_WEBHOOK_CI*) echo '${SECRET}'; exit 0;; esac\nexit 44\n`, { mode: 0o755 });
+  writeFileSync(join(b.tmp, 'bin', 'security'), `#!/bin/sh\n[ "$1" = "-i" ] && grep -q '"global/OMNI_SIGN_KEY"' && exit 0\ncase "$*" in *find-generic-password*OMNI_WEBHOOK_CI*) echo '${SECRET}'; exit 0;; esac\nexit 44\n`, { mode: 0o755 });
   for (const m of [a, b]) m.triggers.startTriggerDeliveries();
   await both();
   await b.sync();

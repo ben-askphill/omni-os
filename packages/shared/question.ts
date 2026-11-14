@@ -189,10 +189,10 @@ export interface Draft {
   skipped: boolean[];
 }
 
-/** A fresh card: the first option picked on a single choice question, nothing on a multi select one. */
+/** A fresh card: nothing picked, so Send (and Cmd+Enter) waits for Ben to choose an answer himself. */
 export const newDraft = (questions: Question[]): Draft => ({
   page: 0,
-  picks: questions.map((q) => ({ selected: q.multiSelect ? [] : [q.options[0].label], otherOn: false, other: '' })),
+  picks: questions.map(() => ({ selected: [], otherOn: false, other: '' })),
   skipped: questions.map(() => false),
 });
 

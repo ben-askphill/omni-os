@@ -10,4 +10,4 @@ Besides the two clients:
 - Desktop app Go > Home (Shift+Cmd+H / Shift+Ctrl+H): opens Home in the classic layout, or the Inbox when Channel rail (Beta) is on
 - Desktop app Activity Monitor (macOS Window menu): live token throughput and system resources from `prototypes/activity-monitor`. It reads Claude transcripts from `~/.claude/projects` only, because Omni strips `CLAUDE_CONFIG_DIR` from Claude Code threads so they always write there
 - `npm run import-history -- --days 30`: pull existing Claude Code sessions into Omni as resumable threads
-- `npm run brain-export -- [--channel <id>] [--since <YYYY-MM-DD>] [--dry-run]`: write threads as markdown digests into your central brain's `raw/omni/<channel>/` for ingestion. Tool calls never leave Omni, and secrets and token-shaped strings are redacted. Run it on one Mac only
+- `npm run brain-export -- [--channel <id>] [--since <YYYY-MM-DD>] [--dry-run]`: write threads as markdown digests into your central brain's `raw/omni/<channel>/` for ingestion. Tool calls never leave Omni, and it redacts secrets and token-shaped strings. Run it on one Mac only

@@ -1,5 +1,5 @@
 import { OmniHttpError } from '@omni/client-core';
-import { newDraft, choose, type Answer, type Question } from '@omni/shared/question.ts';
+import { newDraft, choose, type Answer, type Draft, type Question } from '@omni/shared/question.ts';
 import { describe, expect, it } from 'vitest';
 
 import { advance, ASKING, elsewhereLabel, goBack, phaseAfter, SENDING, submitAnswers } from '../src/questions/card-state';
@@ -22,11 +22,14 @@ const multi: Question = {
   ],
 };
 
+/** The draft with `label` picked on page `page`. */
+const picking = (d: Draft, q: Question, page: number, label: string): Draft => ({ ...d, picks: d.picks.map((p, i) => (i === page ? choose(q, p, label) : p)) });
+
 const http = (status: number, body: unknown) => new OmniHttpError({ kind: 'http', status, message: 'refused', body, retryAfter: null });
 
 describe('advance', () => {
   it('moves to the next page, and sends the answers from the last one', () => {
-    const draft = newDraft([single, multi]);
+    const draft = picking(newDraft([single, multi]), single, 0, 'Ship');
     const first = advance(draft, false);
     expect(first).toMatchObject({ kind: 'page', draft: { page: 1 } });
     if (first.kind !== 'page') throw new Error('expected a page');
@@ -34,6 +37,12 @@ describe('advance', () => {
     const picked = { ...first.draft, picks: first.draft.picks.map((p, i) => (i === 1 ? choose(multi, p, 'B') : p)) };
     const last = advance(picked, false);
     expect(last).toMatchObject({ kind: 'send', answers: [{ selected: ['Ship'], other: null }, { selected: ['B'], other: null }] });
+  });
+
+  it('holds a single choice question until Ben picks, so nothing is answered for him', () => {
+    const draft = newDraft([single]);
+    expect(advance(draft, false)).toEqual({ kind: 'blocked' });
+    expect(advance(picking(draft, single, 0, 'Test'), false)).toMatchObject({ kind: 'send', answers: [{ selected: ['Test'], other: null }] });
   });
 
   it('holds on a question with no answer until one is chosen', () => {
@@ -46,7 +55,8 @@ describe('advance', () => {
     const step = advance(newDraft([single, single]), true);
     if (step.kind !== 'page') throw new Error('expected a page');
     expect(step.draft.skipped).toEqual([true, false]);
-    const last = advance(step.draft, false);
+    expect(advance(step.draft, false)).toEqual({ kind: 'blocked' });
+    const last = advance(picking(step.draft, single, 1, 'Ship'), false);
     expect(last).toMatchObject({ kind: 'send', answers: [null, { selected: ['Ship'], other: null }] });
   });
 

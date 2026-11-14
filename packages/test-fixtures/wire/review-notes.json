@@ -1,0 +1,104 @@
+{
+  "notes": [
+    {
+      "id": "00000000-0000-4000-8000-000000000064",
+      "thread_id": "00000000-0000-4000-8000-000000000033",
+      "body": "name these sum and price",
+      "resolved_at": null,
+      "sent_at": null,
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "updated_at": "2026-01-05T09:00:00.000Z",
+      "anchor": {
+        "path": "src/cart.ts",
+        "old_path": null,
+        "side": "new",
+        "start": 1,
+        "end": 3,
+        "rows": [
+          {
+            "kind": "context",
+            "text": "export function total(items: number[]) {",
+            "old": 1,
+            "new": 1
+          },
+          {
+            "kind": "del",
+            "text": "  return items.reduce((a, b) => a + b, 0);",
+            "old": 2,
+            "new": null
+          },
+          {
+            "kind": "add",
+            "text": "  return items.reduce((sum, n) => sum + n, 0);",
+            "old": null,
+            "new": 2
+          },
+          {
+            "kind": "context",
+            "text": "}",
+            "old": 3,
+            "new": 3
+          }
+        ],
+        "source": {
+          "group": "unstaged",
+          "from": "ccccccccccccccccccccccccccccccccccccccc2",
+          "to": "ccccccccccccccccccccccccccccccccccccccc1",
+          "turn": null,
+          "blob_old": "fa9fb2e",
+          "blob_new": "a31fcc1"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000065",
+      "thread_id": "00000000-0000-4000-8000-000000000033",
+      "body": "already fixed",
+      "resolved_at": "2026-01-05T09:00:00.000Z",
+      "sent_at": null,
+      "created_at": "2026-01-05T09:00:00.000Z",
+      "updated_at": "2026-01-05T09:00:00.000Z",
+      "anchor": {
+        "path": "src/cart.ts",
+        "old_path": null,
+        "side": "new",
+        "start": 1,
+        "end": 3,
+        "rows": [
+          {
+            "kind": "context",
+            "text": "export function total(items: number[]) {",
+            "old": 1,
+            "new": 1
+          },
+          {
+            "kind": "del",
+            "text": "  return items.reduce((a, b) => a + b, 0);",
+            "old": 2,
+            "new": null
+          },
+          {
+            "kind": "add",
+            "text": "  return items.reduce((sum, n) => sum + n, 0);",
+            "old": null,
+            "new": 2
+          },
+          {
+            "kind": "context",
+            "text": "}",
+            "old": 3,
+            "new": 3
+          }
+        ],
+        "source": {
+          "group": "unstaged",
+          "from": "ccccccccccccccccccccccccccccccccccccccc2",
+          "to": "ccccccccccccccccccccccccccccccccccccccc1",
+          "turn": null,
+          "blob_old": "fa9fb2e",
+          "blob_new": "a31fcc1"
+        }
+      }
+    }
+  ]
+}

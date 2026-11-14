@@ -2,9 +2,10 @@ import type { BranchChanges, ChangedFile } from '@omni/shared/changes.ts';
 import { changesView } from '@omni/shared/changes-view.ts';
 import { MAX_LINES } from '@omni/shared/diff.ts';
 import { holdPress, noPick } from '@omni/shared/diff-pick.ts';
+import type { ReviewNote } from '@omni/shared/review-notes.ts';
 import { describe, expect, it } from 'vitest';
 
-import { changeRows, FRESH_ROWS, pickable, pickedRange, showAll, toggleFile } from '../../src/changes/rows';
+import { changeRows, FRESH_ROWS, notesOnScreen, pickable, pickedRange, showAll, toggleFile } from '../../src/changes/rows';
 
 const diffOf = (path: string, adds: number) =>
   [`diff --git a/${path} b/${path}`, 'index 1111111..2222222 100644', `--- a/${path}`, `+++ b/${path}`, `@@ -1,1 +1,${adds} @@`, ' keep', ...Array.from({ length: adds - 1 }, (_, i) => `+line ${i}`)].join('\n') + '\n';
@@ -116,5 +117,49 @@ describe('picking lines', () => {
   it('does not offer the hunk header', () => {
     expect(pickable(f.diff.lines[0])).toBe(false);
     expect(pickable(f.diff.lines[1])).toBe(true);
+  });
+});
+
+describe('review notes on the rows', () => {
+  const note = (id: string, text: string, over: Partial<ReviewNote> = {}): ReviewNote => ({
+    id,
+    thread_id: 't',
+    body: `note ${id}`,
+    resolved_at: null,
+    sent_at: null,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    anchor: {
+      path: 'big.ts',
+      old_path: null,
+      side: 'new',
+      start: 2,
+      end: 2,
+      rows: [{ kind: 'add', text, old: null, new: 2 }],
+      source: { group: 'unstaged', from: 'a', to: 'b', turn: null, blob_old: null, blob_new: null },
+    },
+    ...over,
+  });
+
+  it('marks the noted line, puts the card under it, and opens a file a note is on even when it starts closed', () => {
+    const v = view([{ kind: 'unstaged', files: [file('big.ts', 400)] }]);
+    expect(changeRows(v.groups, 20, FRESH_ROWS).filter((r) => r.type === 'line')).toHaveLength(0);
+    const { byFile, placed } = notesOnScreen([note('n1', 'line 0'), note('gone', 'not there'), note('done', 'line 0', { resolved_at: '2026-01-02T00:00:00.000Z' })], v.groups);
+    expect([...placed.keys()]).toEqual(['n1']);
+    const rows = changeRows(v.groups, 20, FRESH_ROWS, byFile);
+    const at = rows.findIndex((r) => r.type === 'reviewNote');
+    expect(rows[at - 1]).toMatchObject({ type: 'line', index: 2, noted: true });
+    expect(rows.filter((r) => r.type === 'reviewNote')).toHaveLength(1);
+    // One tap collapses it.
+    const big = v.groups[0]!.files[0]!;
+    expect(changeRows(v.groups, 20, toggleFile(FRESH_ROWS, big, 20, true), byFile).filter((r) => r.type === 'line')).toHaveLength(0);
+  });
+
+  it('shows every line of a file when a note sits past the first MAX_LINES', () => {
+    const v = view([{ kind: 'unstaged', files: [file('big.ts', MAX_LINES + 50)] }]);
+    const { byFile } = notesOnScreen([note('far', `line ${MAX_LINES + 10}`)], v.groups);
+    const rows = changeRows(v.groups, 1, FRESH_ROWS, byFile);
+    expect(rows.some((r) => r.type === 'more')).toBe(false);
+    expect(rows.some((r) => r.type === 'reviewNote')).toBe(true);
   });
 });

@@ -1,5 +1,7 @@
 import type { Automation } from '@omni/client-core';
 import { describeCron } from '@omni/shared/cron.ts';
+import { relTime } from '@omni/shared/format.ts';
+import { statusLabel } from '@omni/shared/status.ts';
 
 const EVENT_LABELS: Record<string, string> = {
   pr_opened: 'When a PR opens',
@@ -73,9 +75,21 @@ function statusLine(a: Automation, now: number): string {
   return next ? `Next ${next}` : '';
 }
 
+/**
+ * The newest run, as the web card's run list shows it: when, then its status, or Skipped with the reason for a
+ * scheduled run that never started (failed precheck, catch-up past catchup_max_age). Empty before the first run.
+ */
+export function lastRunLine(a: Pick<Automation, 'runs'>, now: number): string {
+  const r = a.runs?.[0];
+  if (!r) return '';
+  const when = relTime(r.created_at, now);
+  if (r.skip_reason) return `Skipped ${when}: ${r.skip_reason}`;
+  return `Last run ${when} · ${r.thread_id ? statusLabel(r.status) : 'Thread removed'}`;
+}
+
 export function automationRows(list: readonly Automation[], now: number): AutomationRow[] {
   return list.map((a) => {
-    const detail = [`${triggerLabel(a)} · #${a.channel}`, statusLine(a, now)].filter(Boolean).join('\n');
+    const detail = [`${triggerLabel(a)} · #${a.channel}`, statusLine(a, now), lastRunLine(a, now)].filter(Boolean).join('\n');
     return {
       id: a.id,
       name: a.name,

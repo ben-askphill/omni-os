@@ -7,7 +7,7 @@ vi.mock('../db.ts', () => {
   throw new Error('db.ts must not be imported by github tests');
 });
 
-import { allPRs, markBranches, pickBranchPR, summarizeChecks } from '../github.ts';
+import { allPRs, markBranches, pickBranchPR, pickMergeMethod, summarizeChecks } from '../github.ts';
 
 describe('summarizeChecks', () => {
   it('returns zeros for null, undefined and empty rollups', () => {
@@ -110,5 +110,18 @@ describe('allPRs', () => {
 
   it('asks nothing with no repos', async () => {
     expect(await allPRs([])).toEqual({ repos: [], prs: [], failed: [] });
+  });
+});
+
+describe('pickMergeMethod', () => {
+  it("takes the asked method when the repo allows it, else the repo's first of squash, merge and rebase", () => {
+    const all = { squashMergeAllowed: true, mergeCommitAllowed: true, rebaseMergeAllowed: true };
+    expect(pickMergeMethod(all, 'rebase')).toBe('rebase');
+    expect(pickMergeMethod(all)).toBe('squash');
+    expect(pickMergeMethod({ mergeCommitAllowed: true, rebaseMergeAllowed: true }, 'squash')).toBe('merge');
+    expect(pickMergeMethod({ rebaseMergeAllowed: true })).toBe('rebase');
+    // A repo that allows none (gh said nothing) leaves it to GitHub to refuse.
+    expect(pickMergeMethod({}, 'merge')).toBe('merge');
+    expect(pickMergeMethod({})).toBe('squash');
   });
 });

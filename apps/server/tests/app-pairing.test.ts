@@ -117,7 +117,9 @@ describe('minting a code', () => {
   it('still pairs a browser that submits the install token', async () => {
     const res = await req('POST', '/auth/pair', {}, as(MASTER));
     expect(res.status).toBe(200);
-    expect(res.headers.get('set-cookie')).toContain(MASTER);
+    // A session paired with the token, never the token itself (S11).
+    expect(res.headers.get('set-cookie')).toMatch(/omni_session_\d+=omni_s_/);
+    expect(res.headers.get('set-cookie')).not.toContain(MASTER);
     expect((await req('POST', '/auth/pair', {}, NONE)).status).toBe(401);
   });
 

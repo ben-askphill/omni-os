@@ -94,6 +94,9 @@ export async function startFakeCursorApi({ port = 0 } = {}) {
     if (!key || key === 'bad-key') return json(res, 401, { code: 'error', message: 'Invalid User API Key' });
 
     const p = url.pathname.split('/').filter(Boolean);
+    if (req.method === 'GET' && url.pathname === '/v1/me') {
+      return json(res, 200, { apiKeyName: 'qa', userId: 1, createdAt: '2026-10-01T00:00:00.000Z', userEmail: 'dev@example.com', userFirstName: 'Dev', userLastName: 'Example' });
+    }
     if (req.method === 'GET' && url.pathname === '/v1/models') {
       return json(res, 200, { items: [{ id: 'composer-2', displayName: 'Composer 2' }, { id: 'claude-4.5-sonnet', displayName: 'Sonnet 4.5' }] });
     }

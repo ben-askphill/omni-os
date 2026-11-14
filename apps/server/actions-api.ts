@@ -2,7 +2,7 @@
 // without starting the server.
 //
 // GET    /channels/:id/actions                  the channel's actions
-// POST   /channels/:id/actions                  add one: { name, command, secrets, port, setup }
+// POST   /channels/:id/actions                  add one: { name, command, secrets, port, setup, teardown }
 // PATCH  /channels/:id/actions/:action          change one, same body
 // DELETE /channels/:id/actions/:action          remove one; its past runs stay
 // GET    /threads/:id/actions                   ThreadActions: the actions, the thread's runs, why none can run now
@@ -37,6 +37,7 @@ const actionInput = z
       .transform((names) => [...new Set(names)]),
     port: z.number().int().min(0).max(65535).nullable().default(null),
     setup: z.enum(['blocking', 'background']).nullable().default(null),
+    teardown: z.boolean().default(false),
   })
   .superRefine((a, ctx) => {
     for (const name of a.secrets) {

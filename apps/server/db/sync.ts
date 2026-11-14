@@ -4,10 +4,11 @@ import { db, now, tx } from './connection.ts';
 /**
  * What the sync relay carries. Events, artifacts, automation runs, completions and trigger deliveries are keyed by their uid, a
  * result_read, a limit_stop and an assignment by their thread's id, a remote_command by its command id, the rest by id or key.
+ * A review_note is keyed by its id.
  */
 export type SyncEntity =
   | 'channel' | 'folder' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv' | 'completion' | 'result_read' | 'limit_stop'
-  | 'trigger_delivery' | 'remote_command' | 'assignment';
+  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note';
 export type SyncOp = 'upsert' | 'delete';
 
 export interface OutboxRow {
@@ -25,7 +26,7 @@ export interface OutboxRow {
  * the newest result read, whenever the write was (db/repos/needs-you.ts). A limit_stop is a thread's limit stop
  * alone, apart from the row, so a write to either never undoes the other.
  */
-const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop']);
+const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note']);
 /** kv keys that stay on this machine: the sync cursor, machine id, switches and path map. */
 export const localKey = (key: string) => key.startsWith('sync.');
 
@@ -79,10 +80,11 @@ function seed(machineId: string) {
   q('trigger_delivery', 'SELECT uid AS k FROM trigger_deliveries ORDER BY created_at, uid');
   q('remote_command', 'SELECT id AS k FROM remote_commands ORDER BY created_at, id');
   q('assignment', 'SELECT thread_id AS k FROM assignments ORDER BY at, thread_id');
+  q('review_note', 'SELECT id AS k FROM review_notes ORDER BY created_at, id');
   q('kv', `SELECT key AS k FROM kv WHERE key NOT LIKE 'sync.%' ORDER BY key`);
   db.prepare(
     `INSERT OR REPLACE INTO sync_meta (entity, entity_id, ts, machine_id)
-     SELECT entity, entity_id, ts, ? FROM sync_outbox WHERE entity IN ('channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop')`,
+     SELECT entity, entity_id, ts, ? FROM sync_outbox WHERE entity IN ('channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note')`,
   ).run(machineId);
 }
 

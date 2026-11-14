@@ -16,6 +16,8 @@ describe('settings contract', () => {
       ['mcpPublicUrl', true],
       ['clerkPublishableKey', true],
       ['clerkClientId', true],
+      ['mcpClients', true],
+      ['syncSignatures', true],
     ]);
   });
 

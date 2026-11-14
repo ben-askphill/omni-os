@@ -17,6 +17,19 @@ export interface Automation {
   error?: string;
   /** The next scheduled run, as an ISO time. */
   next?: string | null;
+  /** The last runs, newest first (at most 5). */
+  runs?: AutomationRun[];
+}
+
+/** One run in an automation's history. A skipped scheduled run has no thread, status `skipped` and its reason. */
+export interface AutomationRun {
+  thread_id: string | null;
+  trigger: string;
+  created_at: string;
+  status: string | null;
+  title: string | null;
+  /** Why a scheduled run was skipped (failed precheck, catch-up past catchup_max_age). Older servers leave it out. */
+  skip_reason?: string | null;
 }
 
 export function automationsApi(http: HttpClient) {

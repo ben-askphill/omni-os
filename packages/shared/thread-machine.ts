@@ -1,5 +1,6 @@
 import { canTake, handoffText, machineLabel, type Device, type HandoffView, type Takeover } from './handoff.ts';
 import { relTime } from './format.ts';
+import type { IconName } from './icons.ts';
 
 // What a client shows for handing a running thread to another synced Mac, for taking one over from the Mac that holds
 // it, and for choosing where a thread runs (apps/server/run-on.ts). packages/shared/handoff.ts owns the shapes and the
@@ -151,12 +152,13 @@ export const HERE = 'here';
 /** This machine's row label: its name from GET /api/status `device`, never "This Mac" or "This machine". */
 export const hereLabel = (name: string | null | undefined) => machineLabel(name);
 
-/** One machine in the Run on list. `disabled` for a machine Tailscale sees offline. */
+/** One machine in the Run on list. `disabled` for a machine Tailscale sees offline. `icon` is Grok Bot's mark; a machine has none and shows the monitor. */
 export interface RunOnRow {
   value: string;
   label: string;
   sub: string;
   disabled: boolean;
+  icon?: IconName;
 }
 
 /**
@@ -231,4 +233,70 @@ export function threadMachine(
   rows[0] = { ...rows[0]!, sub: v.running ? 'Running here now' : 'Runs here' };
   for (const r of rows.slice(1)) if (!r.disabled) r.sub = `Hand off: ${r.sub}`;
   return { kind: 'holds', value: HERE, rows };
+}
+
+// ---------- Grok Bot as a new thread's target ----------
+
+/**
+ * Grok Bot in the new-thread composer's Machine chip. Sending with it posts the text to Grok Bot's webhook
+ * (POST /api/grokbot, the route Send to Grok Bot uses) and nothing starts or runs on any machine. It is not a sync
+ * machine id, so it never goes to POST /api/threads.
+ */
+export const GROK_BOT = 'grok-bot';
+
+export const GROK_BOT_LABEL = 'Grok Bot';
+
+/** What the composer says once Grok Bot took the message, the same words as the thread menu's Send to Grok Bot. */
+export const GROK_BOT_SENT = 'Sent to Grok Bot';
+
+/** The empty box while Grok Bot is picked: its reply comes back in Grok Bot, so say so before the send. */
+export const GROK_BOT_PLACEHOLDER = 'Message Grok Bot. Its reply comes back in Grok Bot, not here.';
+
+/** The note under the box while Grok Bot is picked. */
+export const GROK_BOT_NOTE = 'Grok Bot gets the text and the channel id. No thread starts in Omni.';
+
+/**
+ * Grok Bot's row. `configured`: GET /api/status `grokBot`, a webhook URL is set on this server. Without one the row is
+ * listed but disabled, naming the machine to set it up on. Short enough for the desktop picker's one-line sub.
+ */
+export function grokBotRow(configured: boolean, hereName?: string | null): RunOnRow {
+  return {
+    value: GROK_BOT,
+    label: GROK_BOT_LABEL,
+    sub: configured ? 'Sends the text. No thread here' : `Not set up on ${hereLabel(hereName)}`,
+    disabled: !configured,
+    icon: 'grok',
+  };
+}
+
+/**
+ * The new-thread chip's rows: Run on's machines, then Grok Bot. Null, so the chip hides, while there is no other
+ * machine and no Grok Bot webhook here. When another machine shows the chip anyway, an unset Grok Bot is listed
+ * disabled rather than left out, so a server without the webhook says where it is missing.
+ */
+export function newThreadRows(
+  devices: Device[] | null | undefined,
+  { grokBot, now = Date.now(), hereName }: { grokBot: boolean; now?: number; hereName?: string | null },
+): RunOnRow[] | null {
+  const machines = offersRunOn(devices);
+  if (!machines && !grokBot) return null;
+  return [...runOnRows(machines ? devices : [], { now, hereName }), grokBotRow(grokBot, hereName)];
+}
+
+/** The new-thread chip's pick: Grok Bot while its webhook is set, else Run on's pick. Grok Bot is never a default. */
+export function newThreadPick(picked: string | null, setting: string | null | undefined, devices: Device[] | null | undefined, grokBot: boolean): string {
+  if (picked === GROK_BOT) return grokBot ? GROK_BOT : runOnDefault(setting, devices ?? []);
+  return runOnPick(picked, setting, devices ?? []);
+}
+
+/** The chip's word before the pick: a machine runs the thread ("On omarchy"), Grok Bot gets the message ("To Grok Bot"). */
+export const runOnPrefix = (pick: string) => (pick === GROK_BOT ? 'To' : 'On');
+
+/**
+ * Why the message cannot go to Grok Bot as it stands, or null. Its webhook takes JSON text, the same as Send to
+ * Grok Bot, so attachments stop the send instead of being dropped on the way.
+ */
+export function grokBotBlock(files: number): string | null {
+  if (files <= 0) return null;
+  return `Grok Bot takes text only. Remove ${files === 1 ? 'the attachment' : `the ${files} attachments`} to send.`;
 }

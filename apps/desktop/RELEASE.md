@@ -40,7 +40,7 @@ Or open the Actions tab, choose **Desktop release** and **Run workflow**. A run 
 | Linux | Builds the x64 AppImage, with node-pty compiled for glibc 2.28 in docker, and uploads it with `latest-linux.yml` |
 | Publish | Checks that both feeds and all three downloads are attached, that every file a feed names is there and that the Mac feed points at the zip, then publishes the release as the latest |
 
-Installed apps see a release only once it is published, so a failed run never offers a half-built update. When a build job fails for a cause outside the code, such as a secret or the runner, fix it and choose **Re-run failed jobs** on the same run: the version, tag and draft stay, and the uploads replace what the failed attempt left. The build jobs check out the tag, so a fix merged to `main` never reaches a re-run. For a cause in the code, and to abandon a release, delete the draft and its tag (`gh release delete v<version> --cleanup-tag`) and run the workflow again with the next version.
+Installed apps see a release only once it is published, so a failed run never offers a half-built update. When a build job fails for a cause outside the code, such as a secret or the runner, fix it and choose **Re-run failed jobs** on the same run. The version, tag and draft stay, and the uploads replace what the failed attempt left. The build jobs check out the tag, so a fix merged to `main` never reaches a re-run. For a cause in the code, and to abandon a release, delete the draft and its tag (`gh release delete v<version> --cleanup-tag`) and run the workflow again with the next version.
 
 Any agent with `gh` can start a release the same way. Starting one is a deploy to every installed copy, so an agent asks first.
 
@@ -48,22 +48,22 @@ Any agent with `gh` can start a release the same way. Starting one is a deploy t
 
 `apps/desktop/package.json` holds the app's version, and only the release workflow changes it. Each release tag is `v<version>`. electron-updater installs only a higher version than the running one, so a release never goes back. To pull a bad release, publish a fixed higher version. Turning the bad release back into a draft stops new downloads but not the copies that already downloaded it.
 
-A build from `scripts/build-desktop.sh` (what omni-reload runs) is an unpacked `--dir` build, and electron-builder writes no update feed into one. It does not update itself: Settings > Desktop app > Updates says it updates by rebuilding. To follow releases instead, install the DMG from a release. Squirrel.Mac installs an update only over an app signed like it (the same Developer ID team), so a release could not update a copy signed ad hoc or with an Apple Development identity anyway.
+A build from `scripts/build-desktop.sh` (what omni-reload runs) is an unpacked `--dir` build, and electron-builder writes no update feed into one. It does not update itself, and Settings > Desktop app > Updates says it updates by rebuilding. To follow releases instead, install the DMG from a release. Squirrel.Mac installs an update only over an app signed like it (the same Developer ID team), so a release could not update a copy signed ad hoc or with an Apple Development identity anyway.
 
 ## Updates and the update feed
 
-Installed apps read the latest published release's `latest-mac.yml` (or `latest-linux.yml`) and download the file it names. On a Mac that is the zip: Squirrel.Mac installs from it, checks that the new app is signed by the same team as the running one, and swaps the bundle. The Publish job refuses a release whose feeds name a file it does not have, or whose Mac feed does not point at the zip. The repo is public, so the app reads releases without a token; a private repo would need one built into every copy, which anyone with the app could read.
+Installed apps read the latest published release's `latest-mac.yml` (or `latest-linux.yml`) and download the file it names. On a Mac that is the zip. Squirrel.Mac installs from it, checks that the new app is signed by the same team as the running one, and swaps the bundle. The Publish job refuses a release whose feeds name a file it does not have, or whose Mac feed does not point at the zip. The repo is public, so the app reads releases without a token. A private repo would need one built into every copy, which anyone with the app could read.
 
 The release body is GitHub's generated notes. The app shows the first 8 items of the coming release as plain text in Settings > Desktop app > Updates, with a link to the release, so a PR title is what a user reads there.
 
 ## First update test
 
-What CI and the tests cannot show: a signed, notarized release replacing an older signed, notarized release on a real Mac. Run this once on the Mac, after this change is merged. It uses its own folder, port and data, so your Omni keeps running.
+CI and the tests cannot show a signed, notarized release replacing an older signed, notarized release on a real Mac. Run this once on the Mac, after this change is merged. It uses its own folder, port and data, so your Omni keeps running.
 
 **Test A: 0.1.1 updates to the next release.** 0.1.1 has the updater without the Updates card, so this proves the feed, the signature chain and the install.
 
 1. Download the 0.1.1 DMG: `gh release download v0.1.1 -R ben-askphill/omni-os -p 'Omni-0.1.1-mac-universal.dmg' -D ~/Downloads`
-2. Open it and, in Finder, drag Omni into a new folder `~/OmniUpdateTest`. Dragging in Finder matters: a copy made with `cp` or `ditto` keeps the quarantine flag, runs translocated and cannot update.
+2. Open it and, in Finder, drag Omni into a new folder `~/OmniUpdateTest`. Drag it in Finder, because a copy made with `cp` or `ditto` keeps the quarantine flag, runs translocated and cannot update.
 3. Open it on its own port, data and settings:
    `open -n ~/OmniUpdateTest/Omni.app --args --user-data-dir="$HOME/OmniUpdateTest/user-data" --port 4799 --data-dir "$HOME/OmniUpdateTest/data"`
    Skip setup. Settings > Desktop app > This app shows Version 0.1.1 and Updates "Up to date".

@@ -2,13 +2,14 @@ import { eventSourceTransport, xhrUploadTransport, type NeedsYou } from '@omni/c
 import { useIsFocused } from '@react-navigation/native';
 import { addNetworkStateListener } from 'expo-network';
 import * as SecureStore from 'expo-secure-store';
-import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import EventSource from 'react-native-sse';
 
 import { clearArtifactCache } from '../artifacts/files';
 import { shownResult } from '../needs/inbox';
 import type { ActionsLive, ActionsView } from './actions';
+import { afterFirstPage, afterNextPage, type ChannelPages } from './channel-pages';
 import { createHandoffPrefs, type HandoffPrefs } from './handoff-prefs';
 import { createLiveHub, type LiveHub, type ThreadLive, type ThreadView } from './hub';
 import type { Link } from './connection';
@@ -105,6 +106,47 @@ export function usePullRefresh(load: (hub: LiveHub) => Promise<unknown> = (hub) 
     void load(hub).finally(() => setRefreshing(false));
   };
   return { refreshing, onRefresh };
+}
+
+/**
+ * A channel's own thread list, page by page (U3). The first page loads on open and again each time the channel list
+ * refetches after a feed change; `loadMore` adds the next older page. Null until the first page arrives.
+ */
+export function useChannelThreadPages(channelId: string) {
+  const hub = useLiveHub();
+  const { loadedAt } = useChannels();
+  const [pages, setPages] = useState<ChannelPages | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const latest = useRef(pages);
+  latest.current = pages;
+
+  useEffect(() => {
+    let live = true;
+    hub
+      .request((api) => api.channelThreadsPage(channelId))
+      .then((page) => live && setPages((prev) => afterFirstPage(prev, channelId, page)))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [hub, channelId, loadedAt]);
+
+  const loadMore = useCallback(async () => {
+    const cursor = latest.current?.channelId === channelId ? latest.current.next : null;
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await hub.request((api) => api.channelThreadsPage(channelId, cursor));
+      setPages((prev) => afterNextPage(prev, channelId, cursor, page));
+    } catch {
+      // The list stays as it is; scrolling to the end asks again.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hub, channelId, loadingMore]);
+
+  const mine = pages?.channelId === channelId ? pages : null;
+  return { threads: mine?.threads ?? null, more: !!mine?.next, loadingMore, loadMore };
 }
 
 export function useLibrary() {

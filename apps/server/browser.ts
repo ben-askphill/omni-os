@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,7 +42,10 @@ class ChannelBrowser {
   private navigations = 0;
   /** The viewer's size while one is watching; null lays the page out at the window's size. */
   private viewport: { width: number; height: number; scale: number } | null = null;
-  /** Threads whose MCP is attached. The browser stays up while any is. */
+  /**
+   * One token per attach (attachThread), not per thread: a spawn that a newer one replaced lets go of its own hold
+   * only, so it cannot close the browser the replacement's turn is using.
+   */
   holders = new Set<string>();
 
   constructor(
@@ -493,23 +497,26 @@ export function existingBrowser(channelId: string) {
 }
 
 /** For a thread's MCP: the channel browser's CDP endpoint, launching it if needed. Null when it cannot start. */
-export async function attachThread(channelId: string, threadId: string, headless: boolean): Promise<string | null> {
+/** Starts the channel's browser for a thread's process. `hold` is what detachThread takes back. */
+export async function attachThread(channelId: string, threadId: string, headless: boolean): Promise<{ endpoint: string; hold: string } | null> {
   if (!config.browser || !config.browserLive) return null;
   const b = channelBrowser(channelId, headless);
   try {
     const endpoint = await b.start();
-    b.holders.add(threadId);
-    return endpoint;
+    const hold = `${threadId}:${randomUUID()}`;
+    b.holders.add(hold);
+    return { endpoint, hold };
   } catch (err) {
     console.warn(`[browser] ${channelId}: ${(err as Error).message}`);
     return null;
   }
 }
 
-export function detachThread(channelId: string, threadId: string) {
+/** Lets go of one attach's hold. Other holds, a newer spawn's of the same thread included, keep the browser up. */
+export function detachThread(channelId: string, hold: string) {
   const b = browsers.get(channelId);
   if (!b) return;
-  b.holders.delete(threadId);
+  b.holders.delete(hold);
   b.touch();
 }
 

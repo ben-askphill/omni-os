@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { agentStatus, splitGroup } from '../src/transcript/delegation.ts';
-import type { ToolCall } from '@omni/shared/transcript-fold.ts';
+import { agentStatus, mergeTasks, splitGroup } from '../src/transcript/delegation.ts';
+import type { TaskView, ToolCall } from '@omni/shared/transcript-fold.ts';
+import type { BackgroundTask } from '../src/api.ts';
 
 const call = (id: string, name: string, result?: { text: string; is_error?: boolean }): ToolCall => ({
   id,
@@ -44,5 +45,42 @@ describe('sub-agent delegation cards', () => {
     expect(agentStatus(call('a', 'Agent', { text: 'ok' }), undefined, false, false)).toBe('done');
     expect(agentStatus(call('a', 'Agent', { text: 'boom', is_error: true }), undefined, false, false)).toBe('failed');
     expect(agentStatus(call('a', 'Agent', { text: '[Request interrupted by user]', is_error: true }), undefined, false, true)).toBe('stopped');
+  });
+});
+
+describe('sub-agent state from the live task list', () => {
+  const running: TaskView = { running: true, background: true, tool_uses: 41, started: '2026-11-14T17:58:46Z' };
+  const stored = () => new Map([['toolu_a', running]]);
+  const liveTask = (thread_id: string): BackgroundTask => ({
+    thread_id,
+    channel_id: 'c',
+    task_id: 'task-a',
+    tool_use_id: 'toolu_a',
+    description: 'Implement',
+    subagent: true,
+    background: true,
+    tool_uses: 54,
+    started_at: '2026-11-14T17:58:47Z',
+  });
+
+  it('ends a stored running task this server no longer runs', () => {
+    const t = mergeTasks(stored(), [], 't1', { feedLive: true, here: true }).get('toolu_a')!;
+    expect(t.running).toBe(false);
+    expect(agentStatus({ id: 'toolu_a', name: 'Agent', input: {}, parent: null, at: '', children: [], orphan: false, event: 1 }, t, false, false)).toBe('stopped');
+  });
+
+  it('keeps a task the live list still runs, with its newest count', () => {
+    const t = mergeTasks(stored(), [liveTask('t1')], 't1', { feedLive: true, here: true }).get('toolu_a')!;
+    expect(t).toMatchObject({ running: true, tool_uses: 54, started: '2026-11-14T17:58:46Z' });
+  });
+
+  it('trusts the stored rows while another Mac holds the thread', () => {
+    // This server runs nothing for a thread the other Mac holds: an empty live list says nothing about its agents.
+    const t = mergeTasks(stored(), [], 't1', { feedLive: true, here: false }).get('toolu_a')!;
+    expect(t.running).toBe(true);
+  });
+
+  it('leaves stored rows alone until the feed is live', () => {
+    expect(mergeTasks(stored(), [], 't1', { feedLive: false, here: true }).get('toolu_a')!.running).toBe(true);
   });
 });

@@ -23,7 +23,7 @@ import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { buildItems, buildTasks, keepSame, same, type FoldPlan, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type Todo, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
-import { delegations, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
+import { delegations, mergeTasks, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
 import { clock, toDate } from '@omni/shared/format.ts';
 import type { ThreadHistory } from '../pages/useThreadHistory.ts';
@@ -439,6 +439,7 @@ export const Transcript = memo(function Transcript({
   history = null,
   delegated = false,
   limit = null,
+  elsewhere = false,
 }: {
   threadId: string;
   /** Every row held, anchors included. */
@@ -459,6 +460,8 @@ export const Transcript = memo(function Transcript({
   delegated?: boolean;
   /** The thread's limit line (limits.ts `limitLabel`) while a usage limit holds it: the last result says it. */
   limit?: string | null;
+  /** Another Mac holds the thread and runs its process, so this server's live task list knows nothing of it. */
+  elsewhere?: boolean;
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
   const spans = history?.history.spans;
@@ -475,19 +478,7 @@ export const Transcript = memo(function Transcript({
   const pages = useMemo(() => publishedByGroup(items), [items]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
-  // The server's live list wins: a task it no longer runs has ended, even if no end row was stored.
-  const tasks = useMemo(() => {
-    const mine = live.filter((t) => t.thread_id === threadId && t.tool_use_id);
-    const out = new Map(stored);
-    for (const [id, t] of out) {
-      if (t.running && feedLive && !mine.some((m) => m.tool_use_id === id)) out.set(id, { ...t, running: false, status: t.status ?? 'stopped' });
-    }
-    for (const m of mine) {
-      const prev = out.get(m.tool_use_id!);
-      out.set(m.tool_use_id!, { running: true, background: m.background, tool_uses: m.tool_uses ?? prev?.tool_uses, started: prev?.started ?? m.started_at });
-    }
-    return out;
-  }, [stored, live, feedLive, threadId]);
+  const tasks = useMemo(() => mergeTasks(stored, live, threadId, { feedLive, here: !elsewhere }), [stored, live, feedLive, threadId, elsewhere]);
   const latestStatus = useMemo(() => (running ? statusLabel(events) : null), [events, running]);
   const since = useMemo(() => (running ? turnStart(events) : null), [events, running]);
 

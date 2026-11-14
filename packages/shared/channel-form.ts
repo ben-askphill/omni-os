@@ -1,6 +1,8 @@
 // A channel's settings as a form edits them, and the body POST or PATCH /api/channels takes. The Web UI's channel
 // settings and the iOS app's Channel Settings both build their request here, so a value saved on one reads back the
 // same on the other.
+import { storedList, worktreeListProblem } from './worktree-lists.ts';
+import { STEP_PROMPT_FIELD, type PRStep, type StepPromptOverrides } from './thread-glance.ts';
 
 export type ChannelKind = 'client' | 'internal' | 'personal';
 
@@ -29,6 +31,14 @@ export interface ChannelRecord {
   default_harness: string | null;
   default_model: string | null;
   default_effort: string | null;
+  /** Gitignore patterns copied into each new worktree on top of the repo's .worktreeinclude, one per line. */
+  worktree_include?: string | null;
+  /** Folders linked from the main checkout into each new worktree (node_modules), one per line. */
+  worktree_shared?: string | null;
+  /** The channel's own Open PR, Fix conflicts and Fix checks prompts, null for the built-in ones. Missing from an older server. */
+  prompt_open_pr?: string | null;
+  prompt_fix_conflicts?: string | null;
+  prompt_fix_checks?: string | null;
 }
 
 /** A channel's default run as a picker choice: model '' is the harness default, model "auto" is Auto. All '' is no default, which runs Auto too. */
@@ -54,6 +64,10 @@ export interface ChannelForm {
   avatar_bg: string;
   avatar_bg_manual: number;
   run: ChannelRun;
+  worktree_include: string;
+  worktree_shared: string;
+  /** The channel's own prompt per branch step, '' for the built-in one. */
+  prompts: Record<PRStep, string>;
 }
 
 /** A new channel's form when `c` is left out. */
@@ -74,8 +88,18 @@ export function channelForm(c?: ChannelRecord): ChannelForm {
     avatar_bg: c?.avatar_bg ?? '',
     avatar_bg_manual: c?.avatar_bg_manual ?? 0,
     run: { harness: c?.default_harness ?? '', model: c?.default_model ?? '', effort: c?.default_effort ?? '' },
+    worktree_include: c?.worktree_include ?? '',
+    worktree_shared: c?.worktree_shared ?? '',
+    prompts: { open: c?.prompt_open_pr ?? '', conflicts: c?.prompt_fix_conflicts ?? '', checks: c?.prompt_fix_checks ?? '' },
   };
 }
+
+/** The body for the step prompts: '' goes as null, which clears it back to the built-in prompt. */
+export const promptsBody = (prompts: Record<PRStep, string>): Required<StepPromptOverrides> => ({
+  [STEP_PROMPT_FIELD.open]: orNull(prompts.open),
+  [STEP_PROMPT_FIELD.conflicts]: orNull(prompts.conflicts),
+  [STEP_PROMPT_FIELD.checks]: orNull(prompts.checks),
+});
 
 /** The PATCH body for a default run: '' fields go as null, which clears them. */
 export const runBody = (run: ChannelRun) => ({
@@ -108,7 +132,7 @@ export function channelFormProblem(f: ChannelForm, isNew: boolean): string | nul
   if (f.avatar_bg && !/^#[0-9a-f]{6}$/i.test(f.avatar_bg)) return 'Use a six-digit hex color for the avatar background.';
   if (!f.name.trim()) return 'Give the channel a name.';
   if (isNew && !CHANNEL_ID.test(f.id)) return 'The id needs 2 to 40 lowercase letters, digits or dashes.';
-  return null;
+  return worktreeListProblem(f.worktree_include) ?? worktreeListProblem(f.worktree_shared, { shared: true });
 }
 
 /**
@@ -130,6 +154,9 @@ export function channelBody(f: ChannelForm, opts: { system: boolean; github: boo
     avatar_bg: orNull(f.avatar_bg),
     avatar_bg_manual: f.avatar_bg_manual,
     ...runBody(f.run),
+    worktree_include: storedList(f.worktree_include),
+    worktree_shared: storedList(f.worktree_shared),
+    ...promptsBody(f.prompts),
   };
   if (!opts.system) body.kind = f.kind;
   if (opts.github) body.github_repo = orNull(f.github_repo);

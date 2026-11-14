@@ -81,7 +81,7 @@ export interface WatchSource {
   section(events: WatchEvent[], obs: PRObservation, deps: EvidenceDeps): Promise<string>;
 }
 
-const FAILED = new Set(['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE']);
+export const FAILED = new Set(['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE']);
 /** Checks listed in one wake, and those of them whose logs ride along. */
 export const MAX_LISTED = 15;
 export const MAX_LOGS = 4;

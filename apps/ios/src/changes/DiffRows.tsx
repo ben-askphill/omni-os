@@ -20,16 +20,18 @@ interface LineRowProps {
   line: DiffLine;
   width: number;
   picked: boolean;
+  /** A review note is pinned to this line (ReviewNotes.tsx). */
+  noted?: boolean;
   onPress: (fileKey: string, index: number) => void;
 }
 
-export const LineRow = memo(function LineRow({ fileKey, index, line, width, picked, onPress }: LineRowProps) {
+export const LineRow = memo(function LineRow({ fileKey, index, line, width, picked, noted = false, onPress }: LineRowProps) {
   const { colors } = useOmniTheme();
   const canPick = pickable(line);
   const tint = picked ? colors.mark : line.kind === 'add' ? colors.diffAddBg : line.kind === 'del' ? colors.diffDelBg : line.kind === 'hunk' ? colors.surface2 : 'transparent';
   const number = line.new ?? line.old;
   const body = (
-    <View style={[styles.line, { backgroundColor: tint, borderLeftColor: picked ? colors.fg : 'transparent' }]}>
+    <View style={[styles.line, { backgroundColor: tint, borderLeftColor: picked ? colors.fg : noted ? colors.live : 'transparent' }]}>
       <Text style={[styles.gutter, { width: width * DIGIT + space.s2, color: colors.fg4 }]}>{number ?? ''}</Text>
       <Text style={[styles.text, { color: line.kind === 'hunk' || line.kind === 'note' ? colors.fg3 : colors.fg }]}>{line.text || ' '}</Text>
     </View>

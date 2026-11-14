@@ -4,6 +4,7 @@
 // "<user>/files/". Sign-in is Clerk (auth.ts): only the users on ALLOWED_USERS get a token.
 // Omni Connect (connect.ts, docs/adr/0009-omni-connect.md) lives in the same objects: a Cloudflare tunnel per
 // machine, and the /connect page that signs in once and opens any of them.
+import { conditionalPut, conditionOf, KeyLock } from './objects.ts';
 import { DurableObject } from 'cloudflare:workers';
 import { allowedUsers, CLIENT_PREFIX, newToken, RelayError, tokenUser, verifyIdToken, type ClerkTrust } from './auth.ts';
 import { CloudflareApi } from './cloudflare.ts';
@@ -195,6 +196,8 @@ export class Relay extends DurableObject<Env> {
   private connectStore: ConnectStore | null = null;
   private upkeep: Maintenance | null = null;
   private kicking: Promise<void> | null = null;
+  /** One write at a time per file object, so a conditional write checks and writes with nothing in between (objects.ts). */
+  private objectLock = new KeyLock();
   /** The change log needs no more background work. */
   private idle = false;
 
@@ -323,7 +326,7 @@ export class Relay extends DurableObject<Env> {
       const path = url.pathname;
 
       if (path === '/v1/changes' && req.method === 'POST') {
-        const pushers = await store.push(await req.json().catch(() => null));
+        const pushers = await store.push(await req.json().catch(() => null), tokenId);
         this.nudge(pushers);
         return json({ ok: true });
       }
@@ -371,14 +374,19 @@ export class Relay extends DurableObject<Env> {
         const key = `${user}/files/${rel}`;
         const bucket = this.env.BUCKET;
         if (req.method === 'PUT') {
-          await bucket.put(key, await req.arrayBuffer(), { httpMetadata: { contentType: req.headers.get('content-type') ?? 'application/octet-stream' } });
-          return json({ ok: true });
+          const contentType = req.headers.get('content-type') ?? 'application/octet-stream';
+          const etag = await conditionalPut(bucket, this.objectLock, key, await req.arrayBuffer(), contentType, conditionOf(req.headers));
+          if (etag === null) return json({ error: 'The object changed since it was read' }, 412);
+          return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json', ...(etag ? { etag } : {}) } });
         }
-        if (req.method === 'HEAD') return new Response(null, { status: (await bucket.head(key)) ? 200 : 404 });
+        if (req.method === 'HEAD') {
+          const head = await bucket.head(key);
+          return new Response(null, { status: head ? 200 : 404, headers: head ? { etag: head.httpEtag } : {} });
+        }
         if (req.method === 'GET') {
           const obj = await bucket.get(key);
           if (!obj) return json({ error: 'No such object' }, 404);
-          return new Response(obj.body, { headers: { 'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream' } });
+          return new Response(obj.body, { headers: { 'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream', etag: obj.httpEtag } });
         }
       }
 

@@ -16,9 +16,10 @@ export type SessionKind = 'browser' | 'app';
 /**
  * How a session was granted. `google`: the owner signed in with Google, and it ends when the owner changes or is
  * unlinked. `pairing`: an app redeemed a one-time code (apps/server/app-pairing.ts) from an already authenticated
- * device, and it needs no Google owner.
+ * device, and it needs no Google owner. `token`: a browser or the desktop app's window paired with the install's token
+ * (auth-api.ts /pair, /desktop-pair); it needs no owner either, and only it, besides the token, may use a terminal.
  */
-export type SessionMethod = 'google' | 'pairing';
+export type SessionMethod = 'google' | 'pairing' | 'token';
 
 export interface Owner {
   issuer: string;
@@ -127,7 +128,7 @@ interface SessionRow {
 function liveRow(r: SessionRow | undefined, at: number): r is SessionRow {
   if (!r || r.revoked_at) return false;
   if (at - Date.parse(r.last_seen_at) > IDLE_DAYS * 86_400_000) return false;
-  return r.method === 'pairing' || owner()?.sub === r.sub;
+  return r.method !== 'google' || owner()?.sub === r.sub;
 }
 
 /** The session a token names, while it is live. */
@@ -150,7 +151,7 @@ export function listSessions(): DeviceSession[] {
   const rows = db
     .prepare(
       `SELECT id, name, kind, method, created_at, last_seen_at FROM device_sessions
-       WHERE revoked_at IS NULL AND last_seen_at > ? AND (method = 'pairing' OR sub = ?) ORDER BY last_seen_at DESC`,
+       WHERE revoked_at IS NULL AND last_seen_at > ? AND (method != 'google' OR sub = ?) ORDER BY last_seen_at DESC`,
     )
     .all(cutoff, o?.sub ?? null) as { id: string; name: string; kind: SessionKind; method: SessionMethod; created_at: string; last_seen_at: string }[];
   return rows.map((r) => ({ id: r.id, name: r.name, kind: r.kind, method: r.method, createdAt: r.created_at, lastSeenAt: r.last_seen_at }));
@@ -161,6 +162,9 @@ export function pairedSessionCount(): number {
   const cutoff = new Date(Date.now() - IDLE_DAYS * 86_400_000).toISOString();
   return (db.prepare(`SELECT COUNT(*) AS n FROM device_sessions WHERE revoked_at IS NULL AND method = 'pairing' AND last_seen_at > ?`).get(cutoff) as { n: number }).n;
 }
+
+/** End every device's session, of every kind: rotating the install's token (auth-api.ts) starts again from nothing. */
+export const endAllSessions = (): number => endSessions('1 = 1').length;
 
 /** End one session and its streams and push token. False when there was no live one by that id. */
 export function revokeSession(id: string): boolean {

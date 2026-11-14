@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HarnessWithRunning } from '../api.ts';
+import type { PickerAccounts } from '../accounts.ts';
 import { Icon, Picker, type PickerOption } from './ui.tsx';
 import { HarnessLogo } from './brand.tsx';
 import { ModelList } from './model-picker/ModelList.tsx';
@@ -39,6 +40,7 @@ export function ModelPicker({
   disabled,
   className = '',
   effort,
+  accounts,
 }: {
   harnesses: HarnessWithRunning[];
   value: ModelChoice;
@@ -59,6 +61,8 @@ export function ModelPicker({
   className?: string;
   /** The effort picked for `value`, "" for the model's default, and where a pick goes. */
   effort?: { value: string; onChange: (v: string) => void };
+  /** Who each harness runs as on the machine the thread runs on (GET /api/accounts). */
+  accounts?: PickerAccounts | null;
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const [up, setUp] = useState(false);
@@ -169,7 +173,7 @@ export function ModelPicker({
               className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
             />
           </label>
-          <ModelList groups={groups} showAuto={showAuto} auto={auto} value={value} query={q} onPick={pick} />
+          <ModelList groups={groups} showAuto={showAuto} auto={auto} value={value} query={q} onPick={pick} accounts={accounts} />
           {levels && levels.efforts.length > 0 && (
             <div className="mt-1 border-t border-line px-2 pt-2 pb-1">
               <div className="caption mb-1.5 px-1">Effort for {levels.model?.label ?? 'this model'}</div>

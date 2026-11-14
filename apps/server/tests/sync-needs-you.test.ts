@@ -18,7 +18,8 @@ async function machine(name: string) {
   const feed: any[] = [];
   bus.on('feed', (e) => feed.push(e));
   const worker = sync.createSyncWorker({ transport: relay, machineId: name });
-  return { name, db, feed, worker };
+  const signKey = await (await import('../sync/sign-key.ts')).signPublicKey();
+  return { name, db, feed, worker, signKey };
 }
 type Mac = Awaited<ReturnType<typeof machine>>;
 

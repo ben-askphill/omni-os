@@ -1,5 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
+import { failedRunIds, type RerunResult } from '@omni/shared/pr-rerun.ts';
+import { checkTone } from '@omni/shared/thread-glance.ts';
 
 const run = promisify(execFile);
 
@@ -100,7 +103,7 @@ export async function mergedBranchPRs(repo: string, branch: string): Promise<{ n
 
 export async function getPR(repo: string, n: number) {
   const [view, diff] = await Promise.all([
-    gh(['pr', 'view', String(n), '--repo', repo, '--json', `${PR_FIELDS},isCrossRepository,body,files,reviews,comments`]),
+    gh(['pr', 'view', String(n), '--repo', repo, '--json', `${PR_FIELDS},isCrossRepository,body,files,reviews,comments,autoMergeRequest`]),
     gh(['pr', 'diff', String(n), '--repo', repo]).catch((e) => `Could not load diff: ${e.message}`),
   ]);
   const pr = JSON.parse(view);
@@ -117,12 +120,80 @@ export async function getPR(repo: string, n: number) {
   };
 }
 
-export async function mergePR(repo: string, n: number, method: 'squash' | 'merge' | 'rebase', deleteBranch: boolean) {
+export async function mergePR(repo: string, n: number, method: MergeMethod, deleteBranch: boolean) {
   const args = ['pr', 'merge', String(n), '--repo', repo, `--${method}`];
   if (deleteBranch) args.push('--delete-branch');
   const out = await gh(args);
   markMerged(repo, n);
   return out;
+}
+
+export type MergeMethod = 'squash' | 'merge' | 'rebase';
+
+/** What a repo allows, as `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed` says it. */
+export interface RepoMergeMethods {
+  squashMergeAllowed?: boolean;
+  mergeCommitAllowed?: boolean;
+  rebaseMergeAllowed?: boolean;
+}
+
+/** `wanted` when the repo allows it, else the first it allows of squash, merge and rebase. `wanted`, else squash, when it allows none. */
+export function pickMergeMethod(allowed: RepoMergeMethods, wanted?: MergeMethod): MergeMethod {
+  const ok: Record<MergeMethod, boolean> = { squash: !!allowed.squashMergeAllowed, merge: !!allowed.mergeCommitAllowed, rebase: !!allowed.rebaseMergeAllowed };
+  if (wanted && ok[wanted]) return wanted;
+  return (['squash', 'merge', 'rebase'] as const).find((m) => ok[m]) ?? wanted ?? 'squash';
+}
+
+/** gh's own words for a refusal (its stderr), as a 422, so the app shows them in place of the control. */
+function ghRefusal(e: unknown) {
+  const err = e as { stderr?: string; message?: string };
+  return Object.assign(new Error((err.stderr || err.message || String(e)).trim() || 'gh failed'), { status: 422 });
+}
+
+/**
+ * Turns auto-merge on (`gh pr merge --auto`) with the repo's merge method, `method` when the repo allows it, or off
+ * (`--disable-auto`). Returns what gh printed, the method used, and the PR's state and auto-merge read back after the
+ * change: a PR that can merge already may merge at once instead.
+ */
+export async function setAutoMerge(repo: string, n: number, enabled: boolean, method?: MergeMethod) {
+  try {
+    let used: MergeMethod | null = null;
+    let output: string;
+    if (enabled) {
+      used = pickMergeMethod(JSON.parse(await gh(['repo', 'view', repo, '--json', 'squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed'])), method);
+      output = await gh(['pr', 'merge', String(n), '--repo', repo, '--auto', `--${used}`]);
+    } else output = await gh(['pr', 'merge', String(n), '--repo', repo, '--disable-auto']);
+    const after = JSON.parse(await gh(['pr', 'view', String(n), '--repo', repo, '--json', 'state,autoMergeRequest']));
+    if (after.state === 'MERGED') markMerged(repo, n);
+    return { ok: true as const, output, method: used, state: after.state as string, autoMergeRequest: (after.autoMergeRequest ?? null) as AutoMergeRequest | null };
+  } catch (e) {
+    throw ghRefusal(e);
+  }
+}
+
+/**
+ * `gh run rerun --failed` for each workflow run behind the PR's failing checks, read fresh from GitHub. Refused (409) when
+ * no failing check is a GitHub Actions job, and with gh's message (502) when not one run started again. A partial rerun
+ * answers with each run's outcome.
+ */
+export async function rerunFailedChecks(repo: string, n: number): Promise<RerunResult> {
+  const pr = JSON.parse(await gh(['pr', 'view', String(n), '--repo', repo, '--json', 'statusCheckRollup'], undefined, CHECK_TIMEOUT));
+  const checks = ((pr.statusCheckRollup ?? []) as any[]).map((c) => ({ state: String(c.conclusion || c.state || c.status || '').toUpperCase(), url: c.detailsUrl || c.targetUrl || null }));
+  const ids = failedRunIds(checks);
+  const skipped = checks.filter((c) => checkTone(c.state) === 'needs' && failedRunIds([c]).length === 0).length;
+  if (!ids.length) throw Object.assign(new Error(skipped ? 'None of the failing checks is a GitHub Actions run, so there is nothing to rerun from here.' : 'No checks are failing.'), { status: 409 });
+  const runs = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        await gh(['run', 'rerun', id, '--failed', '--repo', repo], undefined, CHECK_TIMEOUT);
+        return { id, ok: true };
+      } catch (e) {
+        return { id, ok: false, error: ghError(e) };
+      }
+    }),
+  );
+  if (!runs.some((r) => r.ok)) throw Object.assign(new Error(runs.map((r) => (runs.length > 1 ? `Run ${r.id}: ${r.error}` : r.error)).join(' ')), { status: 502 });
+  return { runs, skipped };
 }
 
 export interface BranchPRMark {

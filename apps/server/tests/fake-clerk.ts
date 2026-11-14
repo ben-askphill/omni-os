@@ -108,5 +108,13 @@ export function fakeClerk(opts: { interval?: number; issuer?: string; clientId?:
   };
   const revoke = (token: string) => accessTokens.delete(token);
 
-  return { issuer, clientId, fetch, approve, deny, sign, idToken, accessToken, revoke, calls };
+  /** A new JWT OAuth access token for `who`, issued to `client`, with `aud` when given. Userinfo answers for it too. */
+  const jwtAccessToken = (who: Who, opts: { client?: string; aud?: string | string[]; exp?: number } = {}) => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = sign({ iss: issuer, sub: who.sub, jti: randomBytes(8).toString('hex'), client_id: opts.client ?? 'client_dcr', ...(opts.aud ? { aud: opts.aud } : {}), iat: now, exp: opts.exp ?? now + 3600 });
+    accessTokens.set(token, who);
+    return token;
+  };
+
+  return { issuer, clientId, fetch, approve, deny, sign, idToken, accessToken, jwtAccessToken, revoke, calls, privateKey, jwk };
 }

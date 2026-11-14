@@ -31,7 +31,7 @@ export function PRDetailTabBody({ tab, p, onFiles }: { tab: DetailTab; p: PRDeta
           {tab === 'conversation' && (
             <div className="space-y-4">
               <div className="rounded-[var(--r-xl)] bg-surface px-5 py-4">
-                {ghBody(p.body) ? <Markdown text={ghBody(p.body)} /> : <div className="text-[13px] text-fg-3">No description.</div>}
+                {ghBody(p.body) ? <Markdown text={ghBody(p.body)} gateRemoteImages /> : <div className="text-[13px] text-fg-3">No description.</div>}
               </div>
               {[...(p.reviews ?? []).filter((r) => r.body?.trim() || r.state !== 'COMMENTED').map((r) => ({ kind: 'review' as const, who: r.author?.login, at: r.submittedAt, body: r.body, state: r.state })),
                 ...(p.comments ?? []).map((c) => ({ kind: 'comment' as const, who: c.author?.login, at: c.createdAt, body: c.body, state: '' }))]
@@ -46,7 +46,7 @@ export function PRDetailTabBody({ tab, p, onFiles }: { tab: DetailTab; p: PRDeta
                     </div>
                     {ghBody(c.body) && (
                       <div className="px-4 pt-2 pb-3.5">
-                        <Markdown text={ghBody(c.body)} />
+                        <Markdown text={ghBody(c.body)} gateRemoteImages />
                       </div>
                     )}
                   </div>

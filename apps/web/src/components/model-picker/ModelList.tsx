@@ -1,4 +1,6 @@
 import type { HarnessWithRunning } from '../../api.ts';
+import type { PickerAccounts } from '../../accounts.ts';
+import { accountLine } from '@omni/shared/harness-accounts.ts';
 import { AUTO_CHOICE } from '@omni/shared/thread-run.ts';
 import { HarnessLogo } from '../brand.tsx';
 import { Icon } from '../ui.tsx';
@@ -14,6 +16,7 @@ export function ModelList({
   value,
   query,
   onPick,
+  accounts,
 }: {
   groups: { harness: HarnessWithRunning; models: HarnessWithRunning['models'] }[];
   showAuto: boolean;
@@ -21,6 +24,8 @@ export function ModelList({
   value: ModelChoice;
   query: string;
   onPick: (v: ModelChoice) => void;
+  /** Who each harness runs as on the machine the thread runs on. Its header names the account instead of the plan. */
+  accounts?: PickerAccounts | null;
 }) {
   const pick = onPick;
   return (
@@ -37,57 +42,70 @@ export function ModelList({
           <span className="pik-mark">{auto && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
         </button>
       )}
-      {groups.map(({ harness, models }) => (
-        <div key={harness.id}>
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-elev px-3 pt-2 pb-1">
-            <span className="caption flex min-w-0 items-center gap-1.5">
-              <HarnessLogo harness={harness.id} size={12} />
-              <span className="truncate">{harness.name}</span>
-            </span>
-            <span className="shrink-0 text-[11.5px] text-fg-3">
-              {harness.available ? (harness.plan.endsWith('plan') ? `Bills your ${harness.plan}` : harness.plan) : 'Unavailable'}
-            </span>
-          </div>
-          {!harness.available ? (
-            <div className="px-3 pb-2 text-[11.5px] text-fg-3">
-              {harness.fix && harness.fix.split(/\s+/).length <= 3 ? (
-                <>
-                  Not available. Run <code className="font-mono text-fg-2">{harness.fix}</code>.
-                </>
+      {accounts && !accounts.current && <div className="px-3 pt-2 text-[11.5px] text-fg-3">Accounts on {accounts.machine}</div>}
+      {groups.map(({ harness, models }) => {
+        const plan = harness.plan.endsWith('plan') ? `Bills your ${harness.plan}` : harness.plan;
+        const account = harness.available ? accounts?.byHarness[harness.id] : undefined;
+        return (
+          <div key={harness.id}>
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-elev px-3 pt-2 pb-1">
+              <span className="caption flex shrink-0 items-center gap-1.5">
+                <HarnessLogo harness={harness.id} size={12} />
+                <span className="truncate">{harness.name}</span>
+              </span>
+              {account ? (
+                <span
+                  title={`${plan}. Signed in on ${accounts!.machine}${account.notice ? ': switched since you last looked' : ''}`}
+                  className={`flex min-w-0 items-center gap-1 text-[11.5px] ${account.notice ? 'text-warn' : 'text-fg-3'}`}
+                >
+                  {account.notice && <Icon name="alert" size={11} className="shrink-0" />}
+                  <span className="truncate">{accountLine(account)}</span>
+                </span>
               ) : (
-                <>Not available. {harness.fix}</>
+                <span className="shrink-0 text-[11.5px] text-fg-3">{harness.available ? plan : 'Unavailable'}</span>
               )}
             </div>
-          ) : models.length ? (
-            models.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                role="option"
-                aria-selected={harness.id === value.harness && m.id === value.model}
-                onClick={() => pick({ harness: harness.id, model: m.id })}
-                className="pik-row"
-              >
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
-                  <HarnessLogo harness={harness.id} size={13} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[13px] text-fg">
-                    {m.label}
-                    {m.default && <span className="text-fg-3"> (default)</span>}
+            {!harness.available ? (
+              <div className="px-3 pb-2 text-[11.5px] text-fg-3">
+                {harness.fix && harness.fix.split(/\s+/).length <= 3 ? (
+                  <>
+                    Not available. Run <code className="font-mono text-fg-2">{harness.fix}</code>.
+                  </>
+                ) : (
+                  <>Not available. {harness.fix}</>
+                )}
+              </div>
+            ) : models.length ? (
+              models.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="option"
+                  aria-selected={harness.id === value.harness && m.id === value.model}
+                  onClick={() => pick({ harness: harness.id, model: m.id })}
+                  className="pik-row"
+                >
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">
+                    <HarnessLogo harness={harness.id} size={13} />
                   </span>
-                  {m.note && <span className="truncate text-[11.5px] text-fg-3">{m.note}</span>}
-                </span>
-                <span className="pik-mark">
-                  {harness.id === value.harness && m.id === value.model && <Icon name="check" size={12} strokeWidth={2.6} />}
-                </span>
-              </button>
-            ))
-          ) : query.trim() ? (
-            <div className="px-3 pb-2 text-[11.5px] text-fg-3">No match</div>
-          ) : null}
-        </div>
-      ))}
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[13px] text-fg">
+                      {m.label}
+                      {m.default && <span className="text-fg-3"> (default)</span>}
+                    </span>
+                    {m.note && <span className="truncate text-[11.5px] text-fg-3">{m.note}</span>}
+                  </span>
+                  <span className="pik-mark">
+                    {harness.id === value.harness && m.id === value.model && <Icon name="check" size={12} strokeWidth={2.6} />}
+                  </span>
+                </button>
+              ))
+            ) : query.trim() ? (
+              <div className="px-3 pb-2 text-[11.5px] text-fg-3">No match</div>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }

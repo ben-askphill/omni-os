@@ -1,5 +1,6 @@
 import type { Device, HandoffView } from '@omni/shared/handoff.ts';
 import type { FleetRequest, FleetResult, FleetView } from '@omni/shared/update-fleet.ts';
+import type { AccountsView } from '@omni/shared/harness-accounts.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 import type { Thread } from './threads.ts';
 
@@ -29,6 +30,34 @@ export interface SyncStatus {
   automations: { owner: string | null; isThisMac: boolean };
 }
 
+/** A synced machine and its signing key, as this machine pinned it. `keyChanged`: it now signs with a key other than the pinned one. */
+export interface SyncDeviceKey {
+  id: string;
+  name: string;
+  /** The machine the server runs on. */
+  current: boolean;
+  /** The key it signs with now. Null until it has sent one. */
+  fingerprint: string | null;
+  /** The key this machine pinned at pairing. Null until one was pinned. */
+  pinnedFingerprint: string | null;
+  keyChanged: boolean;
+  /** It may make this machine act: a paired machine is, from its first pinned key. Missing on a server from before machines needed trusting. */
+  trusted?: boolean;
+  /** Its actions this machine holds until Ben confirms. Missing on an older server. */
+  held?: number;
+}
+
+/** A synced change this machine refused to apply, and why. */
+export interface RefusedChange {
+  id: string | number;
+  at: string;
+  /** The machine the change said it came from. */
+  machine: string;
+  entity: string;
+  entityId: string;
+  reason: string;
+}
+
 /** What POST /threads/:id/handoff, /takeover and /handoff/cancel answer: the thread, and its handoff as it stands. */
 export interface HandoffAnswer {
   thread: Thread;
@@ -52,6 +81,16 @@ export function machinesApi(http: HttpClient) {
     updateFleet: () => http.request<FleetView>('GET', apiPath`/update/fleet`),
     /** Asks machines to check, download or update. Every machine when `machines` is left out; `force` asks offline ones too. */
     askFleet: (request: FleetRequest) => http.request<FleetResult>('POST', apiPath`/update/fleet`, { body: request }),
+    /** Every synced machine with its signing-key fingerprint. A 404 means the server predates signed sync. */
+    syncDevices: () => http.request<SyncDeviceKey[]>('GET', apiPath`/sync/devices`),
+    /** Pins the key a machine signs with now, after it was reinstalled or paired again. */
+    confirmSyncKey: (id: string) => http.request<{ ok: true }>('POST', apiPath`/sync/devices/${id}/confirm-key`, { body: {} }),
+    /** Synced changes this machine refused, newest first. A 404 means the server predates signed sync. */
+    refusedChanges: (limit = 50) => http.request<RefusedChange[]>('GET', apiPath`/sync/refused`, { query: { limit } }),
+    /** Which account each harness is signed in to, here and on every synced machine (apps/server/harness-accounts.ts). `refresh` reads this machine again. */
+    accounts: (refresh = false) => http.request<AccountsView>('GET', apiPath`/accounts`, { query: { refresh: refresh ? 1 : undefined } }),
+    /** Acknowledges the account switch shown for a harness on a machine, for every client. */
+    acknowledgeAccountSwitch: (machine: string, harness: string) => http.request<AccountsView>('POST', apiPath`/accounts/seen`, { body: { machine, harness } }),
     cancelHandoff: (threadId: string) => http.request<HandoffAnswer>('POST', apiPath`/threads/${threadId}/handoff/cancel`, { body: {} }),
   };
 }

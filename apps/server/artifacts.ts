@@ -3,6 +3,7 @@ import { join, sep, extname, basename } from 'node:path';
 import { paths } from './config.ts';
 import { artifacts, threads, type Artifact } from './db.ts';
 import { bus, publishFeed, publishThread } from './bus.ts';
+import { landedBySync } from './sync/landed.ts';
 
 const KINDS: Record<string, string> = {
   '.html': 'html', '.htm': 'html', '.md': 'markdown', '.svg': 'svg', '.png': 'image', '.jpg': 'image',
@@ -47,6 +48,8 @@ export function register(rel: string) {
   }
   const st = statSync(full);
   if (!st.isFile()) return;
+  // A download from another Mac, not a write here: its artifact row syncs on its own (sync/landed.ts).
+  if (landedBySync(full, st)) return artifacts.byThread(c.threadId).find((a) => a.path === full);
   const row = artifacts.upsert({ thread_id: c.threadId, path: full, name: basename(full), kind: c.kind, size: st.size });
   announceArtifact(row);
   // Written here, not synced in: sync/files.ts uploads it without waiting for the turn to end.

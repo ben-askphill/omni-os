@@ -1,18 +1,18 @@
 # Auto routing
 
-Auto picks a new thread's harness, model and effort from its first prompt (`apps/server/harness/auto.ts`). This page says what it rests on, how it was checked, and how to check it again. The user-facing account is in [Harnesses](../user/harnesses.md#auto).
+Auto picks a new thread's harness, model and effort from its first prompt (`apps/server/harness/auto.ts`). This page says what it is based on, how it was checked, and how to check it again. The user-facing account is in [Harnesses](../user/harnesses.md#auto).
 
 ## Shape
 
 - `profileTask(prompt)` gives a kind (code, math, research, writing, ops, chat), a score from the brief's size and cues, and a tier: light (Haiku, low), standard (Sonnet, medium), heavy (Opus, high), max (Opus, xhigh).
 - `profileTask` also reads `needs` (`detectNeeds`): image generation, connectors, review, bulk, speed.
-- `routeTask(profile, { catalog, usage, images })` walks `LANES`, first match wins, else Claude Code's tier model. See [Lanes](#lanes). Speed lowers the effort a step wherever the thread lands.
+- `routeTask(profile, { catalog, usage, images })` walks `LANES` and takes the first lane that matches, or Claude Code's tier model when none does. See [Lanes](#lanes). Speed lowers the effort a step on whichever harness Auto picks.
 - `resolveRun` returns `{ auto: true }` for model `"auto"` with no harness, or when the thread, role and channel set nothing. `openThread` then routes and stores `auto_reason`. `{ harness: 'cursor', model: 'auto' }` is Cursor's own model and is not Auto.
 - The weights are data: `harness/auto-weights.json`, written by `scripts/route-eval/fit.ts`.
 
 ## Lanes
 
-Each lane is a reason to leave Claude Code's tier model. A lane whose harness is signed out or at 90% of a plan window yields, and the next is tried.
+Each lane is a reason to leave Claude Code's tier model. Auto skips a lane whose harness is signed out or at 90% of a plan window and tries the next one.
 
 1. **Image generation: Codex**, busy or not, since nothing else here makes images. Codex's `imageGeneration` item carries the PNG as base64; `codex/images.ts` writes it to the thread's artifacts and the transcript row keeps only the file name.
 2. **Connectors: Claude Code**, busy or not. Gmail, Calendar, Notion, Slack, Productive and the Portal are claude.ai connectors, which only Claude Code loads. Omni's own MCP servers reach Claude Code, Codex and Cursor Agent. Hermes and Cursor Cloud have no Omni MCP servers.
@@ -32,7 +32,7 @@ Not given a lane:
 
 ## What the benchmarks say
 
-Two public benchmarks, each with per-prompt results for a cheap, a middle and a strong model. `apps/server/scripts/route-eval/fetch.sh` downloads both at pinned revisions; from `apps/server`, `npm run route-eval -- <file> --split test` prints everything below. Halves are split by id hash; only the dev half is fitted.
+Two public benchmarks, each with per-prompt results for a cheap, a middle and a strong model. `apps/server/scripts/route-eval/fetch.sh` downloads both at pinned revisions; from `apps/server`, `npm run route-eval -- <file> --split test` prints everything below. The eval splits each set into halves by id hash and fits only the dev half.
 
 - **RouterBench** (Hu et al. 2024, arXiv:2403.12031): 36,497 single-turn prompts, Mixtral 8x7B / GPT-3.5 / GPT-4 as light / standard / heavy.
 - **SWE-bench Verified**: 500 GitHub issues with a human time-to-fix estimate, and the same Anthropic tool scaffold run with Claude 3.5 Haiku (40.6% resolved), 3.5 Sonnet (49.0%) and 4 Opus (73.2%).
@@ -60,7 +60,7 @@ What follows from them:
 
 ## Not taken
 
-- **A Haiku judge** (`claude -p --model haiku` rating 1 to 10). It ranks SWE issues by time-to-fix better (AUC 0.652 against 0.535) but routed no better, since code goes to the strong tier either way, and every call takes about 3s before the thread can start, more under load. Worth another look if the cheaper tiers for code come back into play.
+- **A Haiku judge** (`claude -p --model haiku` rating 1 to 10). It ranks SWE issues by time-to-fix better (AUC 0.652 against 0.535) but routed no better, since code goes to the strong tier either way, and every call takes about 3s before the thread can start, more under load. It is worth another look if the cheaper tiers for code come back into play.
 - **A model trained on RouterBench.** It would learn which benchmark a prompt came from, which is no use on Omni's briefs.
 
 ## Checking a change

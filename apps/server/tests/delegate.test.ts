@@ -42,6 +42,27 @@ describe('conductor delegates on any harness', () => {
     expect(big).toMatchObject({ harness: 'claude-code', model: 'claude-opus-5-5' });
   });
 
+  it("runs Claude Code's default model, not --model auto, when only the harness is named over the builder's Auto", async () => {
+    const t = await H.runner.createThread({ channel: 'scratch', prompt: 'say hi', role: 'builder', harness: 'claude-code', source: 'conductor' });
+    expect(t).toMatchObject({ harness: 'claude-code', model: null });
+    await H.untilResults(t.id, 1);
+    const model = H.byKind(t.id, 'init')[0]?.p.model;
+    const { config } = await import('../config.ts');
+    expect(model).not.toBe('auto');
+    expect(model).toBe(config.defaultModel);
+  });
+
+  it('never hands Claude Code "auto" as its model', async () => {
+    const { claudeModel } = await import('../harness/claude/adapter.ts');
+    const { defaultModel } = (await import('../config.ts')).config;
+    expect(claudeModel('auto', undefined)).toBe(defaultModel);
+    expect(claudeModel(null, { model: 'auto' })).toBe(defaultModel);
+    expect(claudeModel(null, { harness: 'auto' })).toBe(defaultModel);
+    expect(claudeModel('', { model: 'opus' })).toBe('opus');
+    expect(claudeModel(null, { harness: 'codex', model: 'gpt-5.6-sol' })).toBe(defaultModel);
+    expect(claudeModel('claude-opus-5-5', { model: 'auto' })).toBe('claude-opus-5-5');
+  });
+
   it('rejects an unknown model with the valid options', async () => {
     await expect(H.runner.createThread({ channel: 'scratch', prompt: 'x', harness: 'codex', model: 'gpt-9' })).rejects.toThrow(/gpt-5.6-sol/);
   });

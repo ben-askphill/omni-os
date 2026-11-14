@@ -104,6 +104,16 @@ describe('Hermes through the runner', () => {
     expect(H.texts(t.id, 'user')).toEqual(['say hi', 'and this']);
   });
 
+  it('delivers two messages sent while the thread starts, both of them, and ends the turn (F5)', async () => {
+    const t = await H.runner.createThread({ channel: 'repo', prompt: 'first of two', harness: 'hermes', model: 'hermes', source: 'conductor', task_id: 'T-10' });
+    // Before the process is up: the message joins the first one in flight, and both go in as the session starts.
+    H.runner.sendMessage(t.id, 'second of two');
+    await H.untilResults(t.id, 2, 15000);
+    expect(H.texts(t.id, 'user')).toEqual(['first of two', 'second of two']);
+    expect(creates(`omni-${t.id}`).map((c) => (c.body as { input: string }).input)).toEqual(['first of two', 'second of two']);
+    await H.untilStatus(t.id, 'done');
+  });
+
   it('fails a run Hermes refuses at its concurrent run cap as an error, not a usage limit stop', async () => {
     fake.failPosts = 99;
     try {

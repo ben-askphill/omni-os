@@ -10,7 +10,7 @@ const state = (over: Partial<SetupState['config']> = {}, env: Record<string, str
     version: 1,
     user: { name: 'Ben', pronouns: 'they/them', timezone: '', email: '' },
     workspace: { root: '', reposDir: '~/code', githubOwner: 'askphill' },
-    integrations: { hermesUrl: '', centralBrainDir: '', tailscaleLogin: '', mcpPublicUrl: '', clerkPublishableKey: '', clerkClientId: '' },
+    integrations: { hermesUrl: '', centralBrainDir: '', tailscaleLogin: '', mcpPublicUrl: '', clerkPublishableKey: '', clerkClientId: '', mcpClients: '', syncSignatures: 'actions' },
     runOn: { device: '' },
     automations: {},
     worktrees: { retention: { enabled: false, idleDays: 14 }, slim: { enabled: false, idleDays: 7 } },

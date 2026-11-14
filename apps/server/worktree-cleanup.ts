@@ -1,8 +1,9 @@
 // Removes worktrees from data/worktrees: the ones Ben confirms after reviewing them in Settings > Worktrees and, when
 // this Mac's retention policy is on, the ones a daily pass finds idle long enough. Each is checked again right before
 // it goes, with its folder held (workspace.ts) the way a turn, a terminal or a checkout holds it, so whichever starts
-// first wins. Removal is a `git worktree move` aside, then (after deleting untracked copies of main's harness config,
-// worktree-sweep.ts) `git worktree remove` without --force: the branch stays, and
+// first wins. The channel's teardown action, if it has one, runs in the folder first (runner/teardown-action.ts); a
+// failure is noted and never stops the removal. Removal is a `git worktree move` aside, then (after deleting untracked
+// copies of main's harness config, worktree-sweep.ts) `git worktree remove` without --force: the branch stays, and
 // its last commit is kept as refs/omni/removed/<thread>, so the next turn checks it out again. Nothing here syncs: the
 // policy is in this Mac's omni.config.json and the runs live in memory.
 import { execFile } from 'node:child_process';
@@ -25,7 +26,9 @@ import {
 import { config, paths } from './config.ts';
 import { userConfig, writeUserConfig } from './user-config.ts';
 import { currentWorktreeScan, inspectWorktree, lastLook, ownership, scanToEnd, text, updateScanItem, type InspectOptions } from './worktree-inventory.ts';
-import { git, harnessCopies, owningRepo } from './worktree-sweep.ts';
+import { git, harnessCopies, owningRepo, real } from './worktree-sweep.ts';
+import { threads } from './db.ts';
+import { runTeardownAction } from './runner/teardown-action.ts';
 import { slimPass } from './worktree-slim.ts';
 import { keptRef, trashOf, withWorkspace } from './workspace.ts';
 
@@ -188,18 +191,28 @@ async function removeOne(c: CleanupCandidate, trigger: CleanupTrigger, policy: R
       }
       const head = await git(dir, 'rev-parse', 'HEAD');
       if (!head || (await git(item.repo, 'update-ref', keptRef(c.id), head)) === null) return out('kept', [], ['could not keep its last commit, so it was left in place']);
+      const early = lastLook(c.id, dir, before);
+      if (early) return keptBy(early);
+      // The channel's teardown action (runner/teardown-action.ts), in the folder while it is still there. One that
+      // fails or runs too long is noted on the result, and the removal goes on.
+      const thread = item.threadId ? threads.get(item.threadId) : undefined;
+      const teardown = thread && real(thread.cwd) === real(dir) ? await runTeardownAction(thread, dir) : null;
+      const notes = teardown ? [teardown] : [];
       // Nothing is awaited from here to the move, so whatever starts after this look waits for the folder.
       const late = lastLook(c.id, dir, before);
-      if (late) return keptBy(late);
+      if (late) {
+        updateScanItem(c.id, { ...item, verdict: 'kept', reasons: [late], eligibleBecause: null });
+        return out('kept', [late], notes);
+      }
       const trash = trashOf(dir);
       const unmoved = await gitRun(item.repo, 'worktree', 'move', dir, trash);
-      if (unmoved) return out('failed', [], [unmoved]);
+      if (unmoved) return out('failed', [], [...notes, unmoved]);
       updateScanItem(c.id, null);
       // Copies of main's harness config are not work, but git refuses to remove a worktree with untracked files.
       for (const p of await harnessCopies(trash)) rmSync(join(trash, p), { force: true });
       const refusal = await gitRun(item.repo, 'worktree', 'remove', trash);
-      if (refusal) return out('failed', [], [`It was moved to ${trash} to be removed, and git would not remove it there: ${refusal}`]);
-      return out('removed');
+      if (refusal) return out('failed', [], [...notes, `It was moved to ${trash} to be removed, and git would not remove it there: ${refusal}`]);
+      return out('removed', [], notes);
     });
   } catch (err) {
     return out('failed', [], [text(err)]);
@@ -210,7 +223,7 @@ const size = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toF
 
 function log(r: CleanupRun) {
   for (const it of r.items) {
-    if (it.outcome === 'removed') console.log(`[worktrees] removed ${it.id} (${it.because}, ${size(it.bytes ?? 0)})`);
+    if (it.outcome === 'removed') console.log(`[worktrees] removed ${it.id} (${it.because}, ${size(it.bytes ?? 0)})${it.errors.length ? `: ${it.errors.join(' ')}` : ''}`);
     else console.log(`[worktrees] ${it.outcome} ${it.id}: ${[...it.reasons.map((x) => x.message), ...it.errors].join(' ')}`);
   }
   if (r.error) console.error(`[worktrees] ${r.trigger} cleanup failed: ${r.error}`);

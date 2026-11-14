@@ -9,6 +9,9 @@ import { ThreadGroups, useLiveThreads } from '../components/ThreadList.tsx';
 import { OmniWordmark } from '../components/brand.tsx';
 import { AutomationsCard, BusiestCard, ChannelAvatar, KpiTiles, LIST_TITLE, NeedsYouCard, PRsCard, type ListKind } from '../components/dashboard/Cards.tsx';
 import { UsageSection } from '../components/dashboard/UsageSection.tsx';
+import { MachineTiles } from '../components/dashboard/MachineTiles.tsx';
+import { useMachines } from '../app/useMachines.ts';
+import type { MachinesView } from '@omni/shared/machines.ts';
 import { Button, ErrorNote, Segmented, StatusDot } from '../components/ui.tsx';
 import { greeting } from '../greeting.ts';
 import { isFresh, keepInsights, keptInsights } from '../insights-cache.ts';
@@ -32,8 +35,11 @@ function Pulse() {
   );
 }
 
-/** The list a KPI tile opened, from `#/?list=`: a link Ben can share or go back to. */
-function useOpenList(): ListKind | null {
+/**
+ * The list a KPI or machine tile opened, from `#/?list=` and `&machine=`: a link Ben can share or go back to. A
+ * machine narrows only the Running list.
+ */
+function useOpenList(): { kind: ListKind | null; machine: string | null } {
   const hash = useSyncExternalStore(
     (cb) => {
       window.addEventListener('hashchange', cb);
@@ -41,8 +47,10 @@ function useOpenList(): ListKind | null {
     },
     () => window.location.hash,
   );
-  const v = new URLSearchParams(hash.split('?')[1] ?? '').get('list');
-  return (LISTS as string[]).includes(v ?? '') ? (v as ListKind) : null;
+  const q = new URLSearchParams(hash.split('?')[1] ?? '');
+  const v = q.get('list');
+  const kind = (LISTS as string[]).includes(v ?? '') ? (v as ListKind) : null;
+  return { kind, machine: kind === 'running' ? q.get('machine') || null : null };
 }
 
 /**
@@ -123,8 +131,11 @@ function Freshness({ at, refreshing, onRefresh }: { at: number | undefined; refr
   );
 }
 
-function OpenList({ kind, insights }: { kind: ListKind; insights: Insights | undefined }) {
+function OpenList({ kind, insights, machine, machines }: { kind: ListKind; insights: Insights | undefined; machine: string | null; machines: MachinesView | undefined }) {
   const { needsYou } = useApp();
+  const on = machine ? machines?.machines.find((m) => m.id === machine) : undefined;
+  const onIds = new Set(on?.threadIds ?? []);
+  const running = (t: Thread) => isWorking(t) && (!machine || onIds.has(t.id));
   const recent = useLiveThreads('/recent?limit=200', acceptAll, 200);
   const { needs, unread } = splitNeeds(needsYou?.items ?? []);
   const meta = LIST_TITLE[kind];
@@ -137,7 +148,7 @@ function OpenList({ kind, insights }: { kind: ListKind; insights: Insights | und
   return (
     <section aria-label={meta.title} className="mt-4">
       <div className="mb-1 flex items-center justify-between px-1">
-        <h2 className="font-display text-[length:var(--fs-heading)]">{meta.title}</h2>
+        <h2 className="font-display text-[length:var(--fs-heading)]">{machine ? `${meta.title} on ${on?.name ?? 'that machine'}` : meta.title}</h2>
         <a href="#/" className="text-[12px] text-fg-3 hover:text-fg">
           Close
         </a>
@@ -154,7 +165,7 @@ function OpenList({ kind, insights }: { kind: ListKind; insights: Insights | und
         )
       ) : (
         <ThreadGroups
-          threads={recent.data?.filter(kind === 'running' ? isWorking : doneInRange)}
+          threads={recent.data?.filter(kind === 'running' ? running : doneInRange)}
           loading={recent.loading}
           error={recent.error}
           onRetry={recent.reload}
@@ -177,7 +188,8 @@ export function HomePage() {
     setRangeState(r);
   };
   const [startIn, setStartIn] = useState<string | null>(null);
-  const open = useOpenList();
+  const { kind: open, machine } = useOpenList();
+  const machines = useMachines();
   const insights = useInsights(range);
   const data = insights.data?.range === range ? insights.data : undefined;
   const split = needsYou ? splitNeeds(needsYou.items) : null;
@@ -233,8 +245,9 @@ export function HomePage() {
         )}
 
         <div className="mt-8">
-          <KpiTiles needs={split?.needs ?? null} unread={split?.unread.length ?? null} done={data?.done ?? null} open={open} />
-          {open && <OpenList kind={open} insights={data} />}
+          <KpiTiles needs={split?.needs ?? null} unread={split?.unread.length ?? null} done={data?.done ?? null} open={machine ? null : open} />
+          <MachineTiles view={machines.data} open={machine} />
+          {open && <OpenList kind={open} insights={data} machine={machine} machines={machines.data} />}
         </div>
 
         <div className="mt-8">

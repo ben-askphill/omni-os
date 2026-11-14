@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import type { CleanupRun, CleanupState } from '@omni/shared/worktree-cleanup.ts';
 import type { WorktreeScan } from '@omni/shared/worktree-inventory.ts';
 import { startRunner } from './runner-boot.ts';
@@ -12,7 +12,8 @@ import { sleep } from './support.ts';
 // keeps a worktree: changes after the review, a turn, message or terminal that comes in during the checks, held
 // input, and anything the review did not list. A merged branch counts only when origin's default branch has it.
 
-const r = await startRunner({ OMNI_KEEPALIVE_SECONDS: '0' });
+// Teardown actions get a short limit, so the timeout case does not wait minutes.
+const r = await startRunner({ OMNI_KEEPALIVE_SECONDS: '0', OMNI_TEARDOWN_TIMEOUT_MS: '1500' });
 // Each test makes a few worktree threads in real repos, which takes seconds when the whole suite runs at once.
 const T = { timeout: 60_000 };
 const { app } = await import('../app.ts');
@@ -23,7 +24,7 @@ const { cleanupState, retentionPass, setRetentionPolicy, startCleanup } = await 
 const { withWorkspace, keptRef, trashOf } = await import('../workspace.ts');
 const { closeTerminal, openTerminal } = await import('../terminal.ts');
 const { runsHere } = await import('../runner/state.ts');
-const { startRun, stopRun } = await import('../actions.ts');
+const { runsFor, startRun, stopRun } = await import('../actions.ts');
 const { channelActions } = await import('../db.ts');
 
 const git = (cwd: string, ...args: string[]) =>
@@ -448,13 +449,13 @@ describe('cleanup: what it keeps', T, () => {
   it('keeps it while a channel action runs in it, and an action started during a removal checks the branch out again', async () => {
     const { t, wt } = await worktreeThread();
     r.db.threads.update(t.id, { archived: 1 });
-    const serve = channelActions.create(t.channel_id, { name: 'Serve', command: 'sleep 30', secrets: [], port: null, setup: null });
+    const serve = channelActions.create(t.channel_id, { name: 'Serve', command: 'sleep 30', secrets: [], port: null, setup: null, teardown: false });
     const { run: serving } = await startRun(r.thread(t.id), serve);
     await scanned();
     expect(currentWorktreeScan()!.items.find((i) => i.id === t.id)!.reasons.map((x) => x.code)).toContain('action');
     await stopRun(serving.id);
 
-    const check = channelActions.create(t.channel_id, { name: 'Check', command: 'git branch --show-current', secrets: [], port: null, setup: null });
+    const check = channelActions.create(t.channel_id, { name: 'Check', command: 'git branch --show-current', secrets: [], port: null, setup: null, teardown: false });
     const late: ReturnType<typeof startRun>[] = [];
     const run = await cleanUp([t.id], { between: (id) => void late.push(startRun(r.thread(id), check)) });
     expect(outcomes(run)).toEqual({ [t.id]: 'removed' });
@@ -463,6 +464,65 @@ describe('cleanup: what it keeps', T, () => {
     expect(done.state).toBe('succeeded');
     expect(done.output.trim()).toBe(t.branch);
     expect(existsSync(wt)).toBe(true);
+  });
+});
+
+describe('teardown: the channel action run before removal', T, () => {
+  /** An archived worktree thread whose channel's teardown action runs `command`. */
+  async function withTeardown(command: string) {
+    const x = await worktreeThread();
+    r.db.threads.update(x.t.id, { archived: 1 });
+    const action = channelActions.create(x.t.channel_id, { name: 'Delete preview', command, secrets: [], port: null, setup: null, teardown: true });
+    return { ...x, action };
+  }
+  const teardownRun = (threadId: string, actionId: string) => runsFor(threadId).find((x) => x.action_id === actionId);
+
+  it('runs in the worktree, with the action environment, before a reviewed cleanup removes it', async () => {
+    const seen = join(r.tmp, `teardown-${n + 1}.txt`);
+    const x = await withTeardown(`test -f README.md && echo "$PWD|$OMNI_THREAD_ID|$OMNI_BRANCH" > '${seen}'`);
+    const run = await cleanUp([x.t.id]);
+    expect(outcomes(run)).toEqual({ [x.t.id]: 'removed' });
+    expect(run.items[0].errors).toEqual([]);
+    expect(existsSync(x.wt)).toBe(false);
+    const [cwd, thread, branch] = readFileSync(seen, 'utf8').trim().split('|');
+    const at = (p: string) => join(realpathSync(dirname(p)), basename(p));
+    expect(at(cwd)).toBe(at(x.wt));
+    expect([thread, branch]).toEqual([x.t.id, x.t.branch]);
+    expect(teardownRun(x.t.id, x.action.id)).toMatchObject({ state: 'succeeded', name: 'Delete preview' });
+  });
+
+  it('notes a failed teardown on the thread and the result, and removes the worktree anyway', async () => {
+    const x = await withTeardown('echo "theme not found" >&2; exit 3');
+    const run = await cleanUp([x.t.id]);
+    expect(outcomes(run)).toEqual({ [x.t.id]: 'removed' });
+    expect(run.items[0].errors.join(' ')).toMatch(/"Delete preview" failed with exit code 3/);
+    expect(existsSync(x.wt)).toBe(false);
+    expect(teardownRun(x.t.id, x.action.id)).toMatchObject({ state: 'failed', exit_code: 3, output: expect.stringContaining('theme not found') });
+  });
+
+  it('stops a teardown that runs past the limit and removes the worktree anyway', async () => {
+    const x = await withTeardown('echo stopping; sleep 30');
+    const run = await cleanUp([x.t.id]);
+    expect(outcomes(run)).toEqual({ [x.t.id]: 'removed' });
+    expect(run.items[0].errors.join(' ')).toMatch(/ran past 2 seconds and was stopped/);
+    expect(existsSync(x.wt)).toBe(false);
+    expect(teardownRun(x.t.id, x.action.id)).toMatchObject({ state: 'stopped', error: expect.stringMatching(/ran past/) });
+  });
+
+  it('runs before the retention pass removes a worktree too', async () => {
+    const seen = join(r.tmp, `teardown-retention-${n + 1}.txt`);
+    const x = await withTeardown(`echo "$OMNI_THREAD_ID" > '${seen}'`);
+    r.db.threads.update(x.t.id, { updated_at: daysAgo(20) });
+    setRetentionPolicy({ enabled: true, idleDays: 10 });
+    try {
+      await scanned();
+      const run = (await retentionPass())!;
+      expect(run.items.find((i) => i.id === x.t.id)).toMatchObject({ outcome: 'removed', errors: [] });
+      expect(existsSync(x.wt)).toBe(false);
+      expect(readFileSync(seen, 'utf8').trim()).toBe(x.t.id);
+    } finally {
+      setRetentionPolicy({ enabled: false, idleDays: 14 });
+    }
   });
 });
 

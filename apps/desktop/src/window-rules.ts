@@ -87,6 +87,14 @@ export function isGesture(type: string): boolean {
   return GESTURES.has(type);
 }
 
+/** The least time between two re-pairs of one window, so a server that keeps refusing cannot loop the window. */
+export const PAIR_AGAIN_MS = 10_000;
+
+/** Whether a window may pair again now, given when it last did (null: never). */
+export function mayPairAgain(last: number | null, now: number): boolean {
+  return last === null || now - last >= PAIR_AGAIN_MS || now < last;
+}
+
 /** True when the page's last click or key press was recent enough to open something. */
 export function recentGesture(lastGesture: number | null, now: number): boolean {
   return lastGesture !== null && now - lastGesture >= 0 && now - lastGesture <= GESTURE_MS;
