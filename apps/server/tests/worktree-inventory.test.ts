@@ -102,6 +102,17 @@ describe('worktree inventory: verdicts', T, () => {
     expect(msg('ignored')).not.toContain('node_modules');
   });
 
+  it('does not keep a worktree for an ignored file that is the same as the main checkout\'s, as .worktreeinclude copies are', async () => {
+    const { t, repo: main, wt } = await worktreeThread();
+    r.db.threads.update(t.id, { archived: 1 });
+    writeFileSync(join(main, '.env'), 'SECRET=1\n');
+    writeFileSync(join(wt, '.env'), 'SECRET=1\n');
+    expect(codes(await inspectWorktree(t.id))).not.toContain('ignored');
+    // Edited in the worktree: the only copy of that edit, so it keeps the folder.
+    writeFileSync(join(wt, '.env'), 'SECRET=2\n');
+    expect(codes(await inspectWorktree(t.id))).toContain('ignored');
+  });
+
   it('does not keep a worktree for SwiftPM, Expo, prebuild, release or Playwright output, or a server run\'s data folder', async () => {
     // The app folders are tracked, as in Omni's repo, so git lists only the output inside them.
     const main = repo();

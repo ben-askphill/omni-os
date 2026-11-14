@@ -339,9 +339,13 @@ export function migrate() {
   ensureColumn('threads', 'done_at', 'TEXT');
   // What a new thread in the channel runs on when neither the thread nor its role picks (apps/server/harness/resolve.ts).
   for (const col of ['default_harness', 'default_model', 'default_effort']) ensureColumn('channels', col, 'TEXT');
+  // The channel's own worktree lists, one entry per line (worktree-include.ts): files to copy, folders to share.
+  for (const col of ['worktree_include', 'worktree_shared']) ensureColumn('channels', col, 'TEXT');
   // The channel's design system: one standalone HTML file for the pages its threads write, and the file's name.
   ensureColumn('channels', 'design_system', 'TEXT');
   ensureColumn('channels', 'design_system_name', 'TEXT');
+  // The channel's own Open PR, Fix conflicts and Fix checks prompts (packages/shared/thread-glance.ts stepPrompts). Null is the built-in one.
+  for (const col of ['prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks']) ensureColumn('channels', col, 'TEXT');
   // The claude.ai page an artifact was published as (packages/shared/published.ts), and what the publish said it was.
   ensureColumn('artifacts', 'url', 'TEXT');
   ensureColumn('artifacts', 'description', 'TEXT');
@@ -357,6 +361,8 @@ export function migrate() {
   // Crew reports and a team's go to its lead are durable requests too, with the transcript payload Omni wrote.
   ensureColumn('message_requests', 'kind', `TEXT NOT NULL DEFAULT 'user'`);
   ensureColumn('message_requests', 'payload', 'TEXT');
+  // #679/#680: why a scheduled run was skipped (failed precheck, catch-up past catchup_max_age); null for a run that started.
+  ensureColumn('automation_runs', 'skip_reason', 'TEXT');
   for (const table of ['events', 'artifacts', 'automation_runs']) {
     ensureColumn(table, 'uid', 'TEXT');
     db.exec(`UPDATE ${table} SET uid = ${UUID_SQL} WHERE uid IS NULL`);
@@ -436,6 +442,9 @@ export function migrate() {
     thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
     run_id TEXT NOT NULL
   );`);
+  // #678: the one action a channel runs in a worktree right before a cleanup removes it. Local, not synced.
+  ensureColumn('channel_actions', 'teardown', 'INTEGER NOT NULL DEFAULT 0');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS channel_actions_teardown ON channel_actions(channel_id) WHERE teardown = 1');
   // #221: a thread continued on another harness names its source (synced with the row; the source is never written).
   // Its Carryover is a synced `carryover` event. This Mac keeps what cut its worktree (the source's HEAD and snapshot
   // tree, the ref that holds them) and the client's request id, so a retried start gets the same thread back.
@@ -605,9 +614,8 @@ export function migrate() {
     seen_seal_key TEXT,
     seen_at TEXT
   );`);
-  // The other machines Ben trusts to make this one act (sync/keyring.ts), each with the signing key he trusted. A new
-  // machine syncs ordinary data at once, but its commands, assignments, update asks, owner claims and secrets wait in
-  // sync_deferred until he clicks Trust in Settings > Sync. Local, never synced.
+  // The other machines trusted to make this one act (sync/keyring.ts), each with the signing key it is trusted with: the
+  // first one pinned for it, or one Ben confirmed after a key change. Local, never synced.
   db.exec(`CREATE TABLE IF NOT EXISTS sync_trusted (machine_id TEXT PRIMARY KEY, sign_key TEXT NOT NULL, trusted_at TEXT NOT NULL);`);
   // Synced changes whose signature did not check out (sync/verify.ts): refused, or applied while that entity still
   // takes unsigned changes. One row per machine, entity, reason and (for a refused one) entity id.
@@ -623,4 +631,26 @@ export function migrate() {
     at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sync_refused_at ON sync_refused(at);`);
+  // Review notes on a thread's Changes diff (db/repos/review-notes.ts): the lines as Ben picked them (`anchor`, a
+  // diff_selection body as JSON) and his note. Synced, last writer wins on the whole row (sync/handlers/review-note.ts).
+  db.exec(`CREATE TABLE IF NOT EXISTS review_notes (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    anchor TEXT NOT NULL,
+    body TEXT NOT NULL,
+    resolved_at TEXT,
+    sent_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS review_notes_thread ON review_notes(thread_id, created_at);`);
+  // Builds before trust on first pin (ADR 0013) left paired machines untrusted until a Trust click, so their commands
+  // sat in sync_deferred. Trust every machine with a pinned signing key and no changed key waiting, with that key; the
+  // next sync applies what was held. One trusted with another key keeps that. Safe to run again: it is the same rule.
+  db.exec(`INSERT INTO sync_trusted (machine_id, sign_key, trusted_at)
+    SELECT machine_id, sign_key, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM sync_keys WHERE sign_key IS NOT NULL AND seen_sign_key IS NULL
+    ON CONFLICT(machine_id) DO NOTHING;
+  DELETE FROM sync_refused WHERE reason = 'waiting for Trust' AND machine IN
+    (SELECT t.machine_id FROM sync_trusted t JOIN sync_keys k ON k.machine_id = t.machine_id AND k.sign_key = t.sign_key);`);
 }

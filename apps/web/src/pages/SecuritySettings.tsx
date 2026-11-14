@@ -91,8 +91,9 @@ export function McpClientsCard() {
 }
 
 /**
- * Sync: each machine's signing key. Trust this machine for one new to this Mac, Confirm new key for one whose key changed
- * since it was trusted. Until then its commands, assignments, update requests and secrets wait.
+ * Sync: each machine's signing key. A paired machine is trusted with the first key this Mac pins, so it needs nothing.
+ * Confirm new key for one whose key changed, Trust this machine for one that is still not trusted; until then its
+ * commands, assignments, update requests and secrets wait, and the row says how many.
  */
 export function SyncKeysCard() {
   const res = useApi<SyncDeviceKey[]>('/sync/devices');
@@ -111,7 +112,7 @@ export function SyncKeysCard() {
     }
   };
   return (
-    <Card entry="sync-keys" title="Signing keys" subtitle="Each machine signs what it syncs. A change that makes this Mac act needs a machine you trust and the key this Mac pinned.">
+    <Card entry="sync-keys" title="Signing keys" subtitle="Each machine signs what it syncs. Machines you pair through Omni Connect are trusted automatically with the first key this Mac pins. Only a changed key needs you.">
       <ul className="divide-y divide-line">
         {list.map((d) => {
           const action = syncKeyAction(d);
@@ -123,6 +124,7 @@ export function SyncKeysCard() {
                   {d.current && <Chip tone="outline">This machine</Chip>}
                   {isNewMachine(d) && <Chip tone="needs">New machine</Chip>}
                   {action === 'confirm' && <Chip tone="needs">Key changed</Chip>}
+                  {!!d.held && <Chip tone="outline">{d.held === 1 ? '1 action waiting' : `${d.held} actions waiting`}</Chip>}
                 </div>
                 <div className="font-mono text-[12px] break-all text-fg-3">{fingerprintLabel(d.fingerprint)}</div>
                 {action === 'confirm' && <div className="font-mono text-[12px] break-all text-fg-3">Pinned: {fingerprintLabel(d.pinnedFingerprint)}</div>}
@@ -135,7 +137,7 @@ export function SyncKeysCard() {
       </ul>
       {list.some((d) => syncKeyAction(d)) && (
         <p className="text-[12.5px] text-fg-3">
-          Trust only a machine you paired or reinstalled yourself. Compare the key with the one its own Settings shows. Until then, its commands, assignments, update requests and secrets wait.
+          Confirm only a key from a machine you reinstalled or paired again yourself. Compare it with the key that machine's own Settings shows. Until then, its commands, assignments, update requests and secrets wait here.
         </p>
       )}
       {error && <ErrorNote>{error}</ErrorNote>}

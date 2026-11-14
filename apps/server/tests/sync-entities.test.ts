@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { trustEachOther } from './sync-sign.ts';
 import { MemoryTransport, type Change } from '../sync/transport.ts';
 
 // Channels, artifacts, automation runs and kv between two Macs in one process, each with its own data dir,
@@ -41,7 +40,6 @@ const thread = (id: string, patch: Record<string, unknown> = {}) => ({
 beforeAll(async () => {
   a = await machine('mac-a');
   b = await machine('mac-b');
-  trustEachOther([a, b]);
 });
 
 describe('channels', () => {
@@ -96,6 +94,15 @@ describe('channels', () => {
     expect(b.feed).toContainEqual({ type: 'channel', id: 'volero' });
   });
 
+  it('the worktree copy list and shared directories set on one Mac reach the other', async () => {
+    a.db.channels.update('volero', { worktree_include: '.env\nshopify.theme.toml', worktree_shared: 'node_modules' });
+    await exchange();
+    expect(b.db.channels.get('volero')).toMatchObject({ worktree_include: '.env\nshopify.theme.toml', worktree_shared: 'node_modules' });
+    b.db.channels.update('volero', { worktree_shared: null });
+    await exchange();
+    expect(a.db.channels.get('volero')).toMatchObject({ worktree_include: '.env\nshopify.theme.toml', worktree_shared: null });
+  });
+
   it('syncs a manual background and keeps it when the icon changes', async () => {
     a.db.channels.update('volero', { avatar_bg: '#123456' });
     await exchange();
@@ -112,6 +119,19 @@ describe('channels', () => {
     await relay.push([{ machine_id: 'mac-old', entity: 'channel', entity_id: 'volero', op: 'upsert', ts: new Date(Date.now() + 1000).toISOString(), data: { ...row, notes: 'from an old Mac' } }]);
     await exchange();
     for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'from an old Mac', icon, avatar_bg: bg });
+  });
+
+  it("syncs the channel's own branch step prompts, a clear back to the built-in one, and keeps them from an older Mac's change", async () => {
+    a.db.channels.update('volero', { prompt_open_pr: 'Use the pr-writer skill and the repo template.', prompt_fix_checks: 'Fix the checks.' });
+    await exchange();
+    expect(b.db.channels.get('volero')).toMatchObject({ prompt_open_pr: 'Use the pr-writer skill and the repo template.', prompt_fix_conflicts: null, prompt_fix_checks: 'Fix the checks.' });
+    b.db.channels.update('volero', { prompt_fix_checks: null });
+    await exchange();
+    expect(a.db.channels.get('volero')!.prompt_fix_checks).toBeNull();
+    const { prompt_open_pr: _o, prompt_fix_conflicts: _c, prompt_fix_checks: _k, ...row } = relay.changes.findLast((c) => c.entity === 'channel' && c.entity_id === 'volero')!.data as any;
+    await relay.push([{ machine_id: 'mac-old', entity: 'channel', entity_id: 'volero', op: 'upsert', ts: new Date(Date.now() + 2000).toISOString(), data: { ...row, notes: 'old Mac again' } }]);
+    await exchange();
+    for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'old Mac again', prompt_open_pr: 'Use the pr-writer skill and the repo template.' });
   });
 
   it('a color a Mac on an older build dropped reaches it once it updates', async () => {
@@ -183,6 +203,12 @@ describe('automation runs', () => {
     await exchange();
     expect(b.worker.status().deferred).toBe(0);
     expect(runs(b).map((r: any) => r.uid)).toContain('run-early');
+  });
+
+  it('a skipped run reaches B with its reason and no thread', async () => {
+    const { uid } = a.db.automationRuns.skip('quiet', 'cron', 'precheck exited 1');
+    await exchange();
+    expect(b.db.db.prepare('SELECT thread_id, skip_reason FROM automation_runs WHERE uid = ?').get(uid)).toEqual({ thread_id: null, skip_reason: 'precheck exited 1' });
   });
 
   it("lists an automation's runs newest first by when they ran, not by when they arrived", async () => {

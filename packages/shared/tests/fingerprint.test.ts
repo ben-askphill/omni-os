@@ -34,8 +34,10 @@ describe('syncKeyAction', () => {
     expect(isNewMachine(d({ current: true, trusted: false }))).toBe(false);
     expect(isNewMachine(d())).toBe(false);
   });
-  it('asks to confirm a trusted machine whose key changed', () => {
+  it('asks to confirm a machine whose key changed, trusted with the old key or not, and never calls it new', () => {
     expect(syncKeyAction(d({ keyChanged: true }))).toBe('confirm');
+    expect(syncKeyAction(d({ keyChanged: true, trusted: false }))).toBe('confirm');
+    expect(isNewMachine(d({ keyChanged: true, trusted: false }))).toBe(false);
   });
   it('asks nothing for a steady machine, this machine, or one from a server without trusted', () => {
     expect(syncKeyAction(d())).toBeNull();

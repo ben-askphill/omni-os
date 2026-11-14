@@ -67,6 +67,13 @@ describe('syncKeyRows', () => {
     expect(withKeyConfirmed([device({ trusted: false })], 'air')[0]).toMatchObject({ trusted: true });
   });
 
+  it('asks to confirm a changed key even when the machine is not trusted, and says what waits', () => {
+    const [d, quiet] = syncKeyRows([device({ keyChanged: true, trusted: false, fingerprint: '1111', pinnedFingerprint: '2222', held: 3 }), device({ id: 'b', name: 'B', trusted: true, held: 0 })]);
+    expect(d).toMatchObject({ untrusted: false, keyChanged: true, buttonLabel: 'Confirm new key', held: '3 actions waiting' });
+    expect(quiet).toMatchObject({ held: null, buttonLabel: null });
+    expect(withKeyConfirmed([device({ held: 3 })], 'air')[0]).toMatchObject({ held: 0 });
+  });
+
   it('never offers Confirm new key for this machine', () => {
     const [here] = syncKeyRows([device({ current: true, keyChanged: true })]);
     expect(here).toMatchObject({ keyChanged: false, confirmLabel: null });

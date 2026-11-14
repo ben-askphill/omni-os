@@ -421,7 +421,7 @@
     {
       "id": "channel-code",
       "section": "channels",
-      "title": "Channel repo and browser",
+      "title": "Channel repo, worktrees and browser",
       "keywords": [
         "repo path",
         "github repo",
@@ -429,7 +429,13 @@
         "browser window",
         "headless",
         "store domain",
-        "shopify"
+        "shopify",
+        "worktreeinclude",
+        ".env",
+        "copy into new worktrees",
+        "shared directories",
+        "node_modules",
+        "symlink"
       ]
     },
     {

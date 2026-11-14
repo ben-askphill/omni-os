@@ -10,6 +10,7 @@ import { promisify } from 'node:util';
 import { paths } from './config.ts';
 import { channels, threads, type Thread } from './db.ts';
 import { restoreWorktree } from './sandbox.ts';
+import { channelExtras } from './worktree-include.ts';
 
 const run = promisify(execFile);
 
@@ -55,7 +56,9 @@ async function restore(repo: string, dir: string, branch: string) {
     if (!(await succeeds(git(repo, 'merge-base', '--is-ancestor', kept, local)))) await git(repo, 'branch', '--force', branch, kept);
   }
   try {
-    await restoreWorktree(repo, dir, branch);
+    // The channel's own files and shared folders again, for the thread the folder belongs to.
+    const owner = threads.get(basename(dir));
+    await restoreWorktree(repo, dir, branch, channelExtras(owner && channels.get(owner.channel_id)));
   } catch (err) {
     if (await succeeds(git(repo, 'rev-parse', '--verify', '--quiet', local))) throw err;
     throw new Error(

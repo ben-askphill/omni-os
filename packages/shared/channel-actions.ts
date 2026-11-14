@@ -24,6 +24,12 @@ export interface ChannelAction {
    * agent starts, which waits for it to succeed, or `background` alongside the agent. Null on every other action.
    */
   setup: SetupMode | null;
+  /**
+   * Set on the one action the channel runs in a thread's worktree right before Omni removes it (a cleanup in
+   * Settings > Worktrees or the retention pass), to stop a preview or delete a preview theme. A failure or a run past
+   * the time limit is recorded on the thread, and the worktree is removed anyway.
+   */
+  teardown: boolean;
   position: number;
   created_at: string;
   updated_at: string;
@@ -45,6 +51,8 @@ export interface ChannelActionInput {
   port?: number | null;
   /** Make it the channel's setup action, or not. Setting it on one action takes it off any other. */
   setup?: SetupMode | null;
+  /** Make it the channel's teardown action, or not. Setting it on one action takes it off any other. */
+  teardown?: boolean;
 }
 
 export type ActionRunState = 'running' | 'succeeded' | 'failed' | 'stopped';
@@ -134,6 +142,7 @@ export interface ActionDraft {
   portMode: PortMode;
   port: string;
   setup: SetupMode | null;
+  teardown: boolean;
 }
 
 export function draftOf(a?: ChannelAction): ActionDraft {
@@ -144,6 +153,7 @@ export function draftOf(a?: ChannelAction): ActionDraft {
     portMode: a?.port == null ? 'none' : a.port === 0 ? 'free' : 'fixed',
     port: a?.port ? String(a.port) : '',
     setup: a?.setup ?? null,
+    teardown: a?.teardown ?? false,
   };
 }
 
@@ -151,7 +161,7 @@ export function draftOf(a?: ChannelAction): ActionDraft {
 export const parseSecrets = (text: string) => [...new Set(text.toUpperCase().split(/[\s,]+/).filter(Boolean))];
 
 /**
- * What POST or PATCH sends, always with `setup`: PATCH replaces the whole action, so leaving it out would clear it.
+ * What POST or PATCH sends, always with `setup` and `teardown`: PATCH replaces the whole action, so leaving it out would clear it.
  * The server checks the rest; this only catches a fixed port with no number, which would read as 0.
  */
 export function actionInput(d: ActionDraft): { input: ChannelActionInput } | { error: string } {
@@ -161,7 +171,7 @@ export function actionInput(d: ActionDraft): { input: ChannelActionInput } | { e
     if (!/^\d+$/.test(d.port.trim()) || Number(d.port) === 0) return { error: 'Give the fixed port a number, like 9292.' };
     port = Number(d.port);
   }
-  return { input: { name: d.name.trim(), command: d.command.trim(), secrets: parseSecrets(d.secrets), port, setup: d.setup } };
+  return { input: { name: d.name.trim(), command: d.command.trim(), secrets: parseSecrets(d.secrets), port, setup: d.setup, teardown: d.teardown } };
 }
 
 /** What each "Run in new worktrees" choice does, under the editor's picker. */
@@ -170,6 +180,15 @@ export const ACTION_SETUP_HINT: Record<SetupMode | 'off', string> = {
   blocking:
     'Runs once in each new worktree and holds the agent until it succeeds. If it fails, the thread stops at Setup failed with Retry setup. Never on Hermes, Cursor Cloud or a shared checkout.',
   background: 'Runs once in each new worktree while the agent starts. If it fails, the thread says so and the agent keeps going. Never on Hermes, Cursor Cloud or a shared checkout.',
+};
+
+/** How long a teardown action may run before Omni stops it and removes the worktree anyway. */
+export const TEARDOWN_LIMIT_MINUTES = 5;
+
+/** What each "Run before removal" choice does, under the editor's picker. */
+export const ACTION_TEARDOWN_HINT: Record<'off' | 'on', string> = {
+  off: 'One action in the channel can run in a worktree right before Omni removes it, to stop a preview or delete a preview theme.',
+  on: `Runs in the worktree right before a cleanup or the retention pass removes it. If it fails or runs past ${TEARDOWN_LIMIT_MINUTES} minutes, the thread's Actions tab says so and the worktree is removed anyway.`,
 };
 
 /** What each port choice does, under the editor's picker. */

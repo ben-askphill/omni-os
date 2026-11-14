@@ -28,6 +28,16 @@ export function computerName(): Promise<string> {
   );
 }
 
+/** The caps a record carries, when they are a harness-to-count map. Anything else is dropped. */
+function parseCaps(v: unknown): Record<string, number> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out = Object.entries(v as Record<string, unknown>).filter(([, n]) => typeof n === 'number' && Number.isInteger(n) && n >= 0);
+  return out.length ? (Object.fromEntries(out) as Record<string, number>) : undefined;
+}
+
+const sameCaps = (a: Record<string, number> | undefined, b: Record<string, number>) =>
+  !!a && Object.keys(a).length === Object.keys(b).length && Object.entries(b).every(([h, n]) => a[h] === n);
+
 /** A record as the other Mac wrote it, if it is one. Its id is the key's, whatever the value says. */
 function parse(key: string, v: unknown): DeviceRecord | null {
   const r = v as Partial<DeviceRecord> | null;
@@ -36,7 +46,8 @@ function parse(key: string, v: unknown): DeviceRecord | null {
   if (typeof r?.name !== 'string' || !r.name || !node || typeof r.at !== 'string') return null;
   const sealKey = typeof r.sealKey === 'string' && r.sealKey ? { sealKey: r.sealKey } : {};
   const signKey = typeof r.signKey === 'string' && r.signKey ? { signKey: r.signKey } : {};
-  return { id: key.slice(PREFIX.length), name: r.name, tailscale: ts ? { nodeId: ts.nodeId, dnsName: ts.dnsName } : null, ...sealKey, ...signKey, at: r.at };
+  const caps = parseCaps(r.caps);
+  return { id: key.slice(PREFIX.length), name: r.name, tailscale: ts ? { nodeId: ts.nodeId, dnsName: ts.dnsName } : null, ...sealKey, ...signKey, ...(caps && { caps }), at: r.at };
 }
 
 export const deviceRecords = (): DeviceRecord[] =>
@@ -86,7 +97,7 @@ async function ownSignKey(): Promise<string | undefined> {
   }
 }
 
-/** Write this Mac's record when its name, node or keys changed. A no-op while sync is off. */
+/** Write this Mac's record when its name, node, keys or slot caps changed. A no-op while sync is off. */
 export async function announceDevice(now = Date.now()): Promise<void> {
   const self = outbox.machineId();
   if (!self || now - announcedAt < ANNOUNCE_EVERY_MS) return;
@@ -95,10 +106,11 @@ export async function announceDevice(now = Date.now()): Promise<void> {
   const tailscale = net ? net.self : null;
   const had = deviceRecord(self);
   const same = had && had.name === name && had.tailscale?.nodeId === tailscale?.nodeId && had.tailscale?.dnsName === tailscale?.dnsName;
-  if (same && had.sealKey === (sealKey ?? had.sealKey) && had.signKey === (signKey ?? had.signKey)) return;
+  const caps = (await import('../runner/state.ts')).slotCaps();
+  if (same && had.sealKey === (sealKey ?? had.sealKey) && had.signKey === (signKey ?? had.signKey) && sameCaps(had.caps, caps)) return;
   const seal = sealKey ?? had?.sealKey;
   const sign = signKey ?? had?.signKey;
-  kv.set(PREFIX + self, { id: self, name, tailscale, ...(seal && { sealKey: seal }), ...(sign && { signKey: sign }), at: new Date(now).toISOString() } satisfies DeviceRecord);
+  kv.set(PREFIX + self, { id: self, name, tailscale, ...(seal && { sealKey: seal }), ...(sign && { signKey: sign }), caps, at: new Date(now).toISOString() } satisfies DeviceRecord);
 }
 
 /**

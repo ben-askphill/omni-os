@@ -41,8 +41,10 @@ export interface SyncDeviceKey {
   /** The key this machine pinned at pairing. Null until one was pinned. */
   pinnedFingerprint: string | null;
   keyChanged: boolean;
-  /** Ben trusts it to make this machine act. Missing on a server from before machines needed trusting. */
+  /** It may make this machine act: a paired machine is, from its first pinned key. Missing on a server from before machines needed trusting. */
   trusted?: boolean;
+  /** Its actions this machine holds until Ben confirms. Missing on an older server. */
+  held?: number;
 }
 
 /** A synced change this machine refused to apply, and why. */
