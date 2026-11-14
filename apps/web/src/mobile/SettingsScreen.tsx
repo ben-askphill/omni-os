@@ -8,6 +8,8 @@ import { Icon, type IconName } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { useApp, useNow, useSecretStoreLabel } from '../store.tsx';
 import { MoGroup, MoHeader, MoListRow, MoScroll, MoSection } from './parts.tsx';
+import { useAccounts } from '../accounts.ts';
+import { accountNotices } from '@omni/shared/harness-accounts.ts';
 import { useShell } from './shell.tsx';
 
 function syncSub(s: SyncStatus | undefined, now: number) {
@@ -31,6 +33,8 @@ export function SettingsScreen() {
   const automations = useApi<Automation[]>('/automations');
   const host = status?.device?.name || location.hostname;
   const secretStore = useSecretStoreLabel();
+  const accounts = useAccounts();
+  const switches = accountNotices(accounts.data).length;
   const [q, setQ] = useState('');
   const hits = searchSettings(q, desktop ? 'desktop' : 'web', { loginItem: desktop?.loginItemSupported });
   const open = (section: SettingsSectionId, focus?: string) => shell.open(href.settingsSection(section, focus));
@@ -39,6 +43,7 @@ export function SettingsScreen() {
   // A live line for the sections that have one; the rest show their blurb.
   const live: Partial<Record<SettingsSectionId, string>> = {
     general: profile?.name ? `${profile.name} · setup` : undefined,
+    accounts: switches ? `${switches} switched since you last looked` : undefined,
     machines: host || undefined,
     sync: syncSub(sync.data, now),
     secrets: `Names only; values stay in ${secretStore}`,

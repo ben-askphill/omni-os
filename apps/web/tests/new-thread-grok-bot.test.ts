@@ -14,7 +14,7 @@ const state = vi.hoisted(() => ({
   toasts: [] as string[],
   sheet: vi.fn(),
 }));
-vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: state.channels, crew: state.crew, status: state.status }), useHereName: () => 'omarchy' }));
+vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: state.channels, crew: state.crew, status: state.status }), useHereName: () => 'omarchy', useFeed: () => {} }));
 vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: vi.fn(), sheet: state.sheet, toast: (t: string) => state.toasts.push(t) }) }));
 vi.mock('../src/components/Toaster.tsx', () => ({ useToast: () => (t: { title: string }) => state.toasts.push(t.title) }));
 

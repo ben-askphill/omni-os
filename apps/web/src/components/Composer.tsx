@@ -9,6 +9,10 @@ import { RunOnPicker, useRunOn } from './RunOnPicker.tsx';
 import { useToast } from './Toaster.tsx';
 import { sendMessageToGrokBot } from '../grokbot.ts';
 import { GROK_BOT_NOTE, GROK_BOT_PLACEHOLDER, GROK_BOT_SENT, grokBotBlock } from '@omni/shared/thread-machine.ts';
+import { ComposerAccountNotice } from './AccountNotice.tsx';
+import { pickerAccounts, useAccounts } from '../accounts.ts';
+import { accountLine } from '@omni/shared/harness-accounts.ts';
+import { asksAuto } from '@omni/shared/thread-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { SlashMenu, useCommands } from './SlashMenu.tsx';
 import { FileMenu, useFileMenu } from './FileMenu.tsx';
@@ -82,6 +86,19 @@ export function NewThreadComposer({
   const toGrok = runOn.grokBot;
   const grokBlock = toGrok ? grokBotBlock(att.files.length) : null;
   const { choice, effort } = draftRun(picked, crew.find((r) => r.id === role), channels.find((c) => c.id === channel), harnesses ?? []);
+  // Who the picked harness runs as on the machine the thread will run on: in the model list, the machine rows, and a
+  // notice when it switched since anyone last looked. Auto picks the harness later, so it shows none.
+  const accounts = useAccounts();
+  const target = pickerAccounts(accounts.data, runOn.pick);
+  const picksHarness = !asksAuto(choice);
+  const accountFor = useCallback(
+    (pick: string) => {
+      const a = picksHarness ? pickerAccounts(accounts.data, pick)?.byHarness[choice.harness] : undefined;
+      return a ? accountLine(a) : null;
+    },
+    [accounts.data, choice.harness, picksHarness],
+  );
+  const switched = picksHarness ? target?.byHarness[choice.harness] : undefined;
 
   // Default the role once crew loads, if the conductor channel is selected. A preset keeps its own.
   useEffect(() => {
@@ -191,7 +208,11 @@ export function NewThreadComposer({
         {harnesses && !toGrok && (
           <ModelPicker
             harnesses={harnesses}
-            onOpen={reloadHarnesses}
+            onOpen={() => {
+              reloadHarnesses();
+              accounts.reload();
+            }}
+            accounts={target}
             defaultOpen={preset?.pickModel}
             value={choice}
             onChange={(c) => {
@@ -201,7 +222,7 @@ export function NewThreadComposer({
           />
         )}
         {!toGrok && <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />}
-        <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} />
+        <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} />
         <AttachButton onPick={att.add} disabled={busy} />
         {folder && channel === preset?.channel && !toGrok && (
           <button
@@ -227,6 +248,7 @@ export function NewThreadComposer({
       {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
       {toGrok && !grokBlock && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{GROK_BOT_NOTE}</div>}
       {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
+      {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
       {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
     </div>
   );

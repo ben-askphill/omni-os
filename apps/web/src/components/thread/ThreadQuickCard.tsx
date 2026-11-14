@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import type { BackgroundTask, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
-import { HarnessMark, Loader } from '../brand.tsx';
+import { HarnessMark, harnessLabel, Loader } from '../brand.tsx';
+import { useThreadAccount } from '../../accounts.ts';
+import { threadAccountLine } from '@omni/shared/harness-accounts.ts';
 import { Chip, copyText, Icon, IconButton, StatusDot, type Glyph, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
@@ -10,7 +12,7 @@ import { isWorking } from '@omni/shared/delegate-count.ts';
 import { threadPill } from './thread-state.ts';
 import { toDate } from '@omni/shared/format.ts';
 import { duration } from '../../format.ts';
-import { useNow } from '../../store.tsx';
+import { useHereName, useNow } from '../../store.tsx';
 import { subagentKind, subagentTip } from '../../subagents.ts';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
@@ -119,6 +121,9 @@ export function ThreadQuickCard({
   const pill = threadPill(thread, { asking, reconnecting, now });
   const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? 'Waiting on you' : pill.label } : { glyph: 'running' as const, label: 'Turn running' };
   const branchDisabled = !thread.branch;
+  // The account its harness ran as when its process last started (apps/server/harness-accounts.ts), here or elsewhere.
+  const ran = useThreadAccount(thread.id, thread.status);
+  const hereName = useHereName();
 
   return (
     <section
@@ -151,6 +156,13 @@ export function ThreadQuickCard({
         </span>
         {model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
       </QuickRow>
+      {ran && (
+        <QuickRow icon="user">
+          <span className="min-w-0 truncate" title={`${harnessLabel(ran.harness)} ran as ${ran.label}${ran.org ? ` (${ran.org})` : ''} on ${ran.machineName}`}>
+            {threadAccountLine(ran, hereName)}
+          </span>
+        </QuickRow>
+      )}
       <QuickRow icon={run.glyph === 'running' ? 'zap' : 'clock'}>
         <StatusDot status={run.glyph} size={8} />
         <span className="truncate">

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { paths } from './config.ts';
 // The runner's ports are bound before any route can reach it (apps/server/compose.ts).
 import './compose.ts';
+import { accountsApi } from './accounts-api.ts';
 import { artifactsApi } from './artifacts-api.ts';
 import { claudeArtifactsApi } from './claude-artifacts-api.ts';
 import { authApi } from './auth-api.ts';
@@ -110,6 +111,7 @@ api.route('/setup', setupApi);
 api.route('/tool-failures', toolFailuresApi);
 api.route('/worktrees', worktreesApi);
 api.route('/update', updateApi);
+api.route('/accounts', accountsApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));

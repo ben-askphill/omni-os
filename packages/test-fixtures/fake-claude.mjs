@@ -176,6 +176,18 @@ function parseArgs(argv) {
   return { opts, unknown, positional };
 }
 
+// `claude auth status --json`: who is signed in. FAKE_CLAUDE_AUTH names a JSON file to print instead, else
+// $HOME/.fake-claude-auth.json when there is one (each server of scripts/qa-handoff-stack.sh has its own HOME). Read on
+// every call, so a test or a QA stack can sign in as someone else (or out) while the server runs.
+if (process.argv[2] === 'auth' && process.argv[3] === 'status') {
+  const file = process.env.FAKE_CLAUDE_AUTH || join(process.env.HOME ?? '', '.fake-claude-auth.json');
+  const status = file && existsSync(file)
+    ? readFileSync(file, 'utf8')
+    : JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', email: 'dev@example.com', orgName: 'Example Org', subscriptionType: 'max' }, null, 2);
+  process.stdout.write(status + '\n');
+  process.exit(JSON.parse(status).loggedIn ? 0 : 1);
+}
+
 const { opts, unknown, positional } = parseArgs(process.argv.slice(2));
 const print = !!(opts['-p'] || opts['--print']);
 const resumeArg = opts['-r'] ?? opts['--resume'];

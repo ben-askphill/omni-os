@@ -1,6 +1,6 @@
 # Harnesses
 
-A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to. Hermes and Cursor Cloud are the exceptions: they run off the Mac and Omni talks to them over HTTP.
+A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to. Hermes and Cursor Cloud are the exceptions: they run off the Mac and Omni talks to them over HTTP. [Accounts](#accounts) shows which account each one is signed in to on each machine.
 
 | Harness | Bills | Install and sign in | Runs as |
 | --- | --- | --- | --- |
@@ -17,6 +17,25 @@ A harness is the agent CLI a thread runs on. Pick one per channel (its default) 
 - Cursor Agent streams partial reply text into one Markdown message as it writes, and tool rows show the call name and path, command or pattern when they start. It still cannot steer or interrupt a running turn: messages sent mid-turn wait for the next one ([Sending while a thread is busy](threads.md#sending-while-a-thread-is-busy)).
 - Some features are Claude Code only: published artifact cards and [mods](mods.md).
 - Claude Code's model picker includes Fable 5.2 (`claude-fable-5-2`, between Sonnet 5 and Fable 5.1). The `fable` alias resolves to 5.2.
+
+## Accounts
+
+Settings > Accounts lists every synced machine, each harness on it, and the account it is signed in to. The model picker names the account in each harness's heading, for the machine the new thread will run on, and the Machine chip adds it to each machine's row. Each machine reads its own harnesses and syncs the result, so a row for another machine is as that machine last reported it.
+
+| Harness | Read from | Shows |
+| --- | --- | --- |
+| Claude Code | `claude auth status --json` | Email, organization, plan (`Max`, `Team`) |
+| Codex | `codex app-server`'s `account/read` | Email, plan, workspace. An API key login reads as signed out: Omni runs Codex on the ChatGPT plan only |
+| Cursor Agent | `cursor-agent about --format json` | Email, tier |
+| Cursor Cloud | `GET /v1/me` with the global `CURSOR_API_KEY` | The email the key belongs to, and the key's name |
+| Hermes | Nothing | The server it bills. It bills an Anthropic key set on that server, which Omni cannot see |
+
+- Every check runs with the environment the harness itself gets, so it reports the account a thread would bill. A check is read-only: it never logs in, refreshes a token or writes a file.
+- Only the email or name, org and plan leave a check. A field shaped like a token or key is dropped before it reaches a response, a log or the synced record (`apps/server/harness/accounts-parse.ts`).
+- A machine reads again when the list is opened after a minute, on Check again, and after a sync once ten minutes have passed.
+- When a harness signs in as another account than the last one it had, Omni shows the switch: in the sidebar (Activity on a phone), at the top of Settings > Accounts, and under the new-thread composer when that harness is picked for that machine. Got it clears it on every client and machine. Signing out and back in to the same account is not a switch. Neither is a new plan on the same account.
+- A thread keeps the account its harness ran as when its process last started. The quick-actions card shows it, with the machine when it ran on another one. Cursor Cloud on a channel's own key is not stamped, since that key is not the machine's.
+- The Conductor reads the same list with `harness_accounts`.
 
 ## Switching mid-thread
 

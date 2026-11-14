@@ -93,6 +93,10 @@ _Avoid_: Request (a message), delivery state (a request's state)
 The agent a thread runs in, together with what it bills: Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan), Hermes (Anthropic API on the user's server, not their Claude, ChatGPT or Cursor plan) or Cursor Cloud (a Cursor cloud agent on Cursor's machines, Cursor plan).
 _Avoid_: Provider, engine, backend, runtime
 
+**Account**:
+Who a **Harness** is signed in as on one machine: an email or name, with its org and plan when the harness says them. Each machine reads its own and syncs it. A **Thread** keeps the account its harness ran as.
+_Avoid_: Login, profile, user (Ben, who may have several accounts per harness)
+
 **Model**:
 The LLM a harness runs for a thread, picked from that harness's own model list.
 _Avoid_: Provider

@@ -53,6 +53,13 @@
       "scoped": true
     },
     {
+      "id": "accounts",
+      "group": "agents",
+      "title": "Accounts",
+      "icon": "user",
+      "blurb": "Which account each harness is signed in to, on each of your machines."
+    },
+    {
       "id": "threads",
       "group": "agents",
       "title": "Threads",
@@ -295,6 +302,27 @@
         "binary",
         "path",
         ".env"
+      ]
+    },
+    {
+      "id": "harness-accounts",
+      "section": "accounts",
+      "title": "Harness accounts on each machine",
+      "keywords": [
+        "account",
+        "email",
+        "login",
+        "signed in",
+        "sign in",
+        "subscription",
+        "plan",
+        "switch",
+        "org",
+        "who",
+        "claude code",
+        "codex",
+        "cursor",
+        "devices"
       ]
     },
     {

@@ -7,7 +7,7 @@ import { newContext } from '@omni/shared/message-context.ts';
 import type { Thread } from '../src/api.ts';
 import { parseDiff } from '@omni/shared/diff.ts';
 
-vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], status: null }) }));
+vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], status: null }), useFeed: () => {} }));
 
 import { ReplyComposer } from '../src/components/Composer.tsx';
 import { MoComposer } from '../src/mobile/MoComposer.tsx';

@@ -17,7 +17,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | Group | Sections |
 | --- | --- |
 | | General (you, run setup again), Appearance, Notifications |
-| Agents | Harnesses & models (each harness, the Hermes URL, the default model per channel, the model options from `.env`), Threads (run new threads on, sessions and usage limits from `.env`, a link to Automations) |
+| Agents | Harnesses & models (each harness, the Hermes URL, the default model per channel, the model options from `.env`), Accounts (each machine's harnesses and the account each is signed in to, see [Harnesses](harnesses.md#accounts)), Threads (run new threads on, sessions and usage limits from `.env`, a link to Automations) |
 | Code | Channels (each channel's settings and actions), Workspace (your folders, GitHub owner, central brain folder), Worktrees (storage, cleanup now and Automatic cleanup) |
 | Connections | Machines (this machine, your machines and their updates, the desktop app's own updates, the machines Omni Connect reaches), Sync, Sharing & access (Google account, signed-in devices, Omni Connect, Tailscale logins, public MCP URL), Secrets |
 | | Desktop app, only in the desktop app (Quick Prompt and its shortcut, Wispr Flow on a Mac, open at login, and links to zoom, updates and the server); About on every surface (version, build, the server's address, port and log, where the files live, the port and host from `.env`; on iOS also runtime and the running update) |

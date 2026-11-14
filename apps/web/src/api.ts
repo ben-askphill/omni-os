@@ -403,6 +403,8 @@ export type FeedEvent =
   | { type: 'claude_artifacts'; state: ClaudeArtifactsState }
   /** Free disk space crossed a warning level: refetch GET /api/disk. */
   | { type: 'disk'; level: DiskLevel }
+  /** A harness account changed, here or on another machine, or a switch was acknowledged: refetch GET /api/accounts. */
+  | { type: 'accounts' }
   | { type: 'reconnect' };
 
 /** GET /api/update (apps/server/update.ts): how far this server is behind main, and where Update is. */
