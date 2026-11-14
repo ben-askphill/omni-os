@@ -25,7 +25,8 @@ writeFileSync(
   `#!/bin/sh
 [ "$1" = repo ] && [ "$2" = clone ] || { echo "unexpected gh $*" >&2; exit 2; }
 echo "$3 $4" >> '${cloneLog}'
-if [ -f '${fake}/fail' ]; then echo "GraphQL: Could not resolve to a Repository with the name '$3'." >&2; exit 1; fi
+# A clone that dies part way: something written, then the error.
+if [ -f '${fake}/fail' ]; then mkdir -p "$4/.git" && echo partial > "$4/.git/HEAD"; echo "GraphQL: Could not resolve to a Repository with the name '$3'." >&2; exit 1; fi
 [ -f '${fake}/delay' ] && sleep "$(cat '${fake}/delay')"
 exec git clone --quiet '${sources}'/"$3" "$4"
 `,
@@ -35,15 +36,15 @@ const clones = () => (existsSync(cloneLog) ? readFileSync(cloneLog, 'utf8').spli
 
 let n = 0;
 /** A GitHub repo the fake gh can clone, with one commit. */
-function source(name = `shop-${++n}`) {
-  const repo = `acme/${name}`;
-  const work = join(r.tmp, `work-${name}`);
+function source(name = `shop-${++n}`, owner = 'acme') {
+  const repo = `${owner}/${name}`;
+  const work = join(r.tmp, `work-${owner}-${name}`);
   mkdirSync(work);
   git(work, 'init', '-q', '-b', 'main');
   writeFileSync(join(work, 'README.md'), `${name}\n`);
   git(work, 'add', '.');
   git(work, 'commit', '-q', '-m', 'first');
-  mkdirSync(join(sources, 'acme'), { recursive: true });
+  mkdirSync(join(sources, owner), { recursive: true });
   execFileSync('git', ['clone', '-q', '--bare', work, join(sources, repo)]);
   return { repo, name };
 }
@@ -148,6 +149,32 @@ describe('a worktree thread whose channel repository is not on this machine', ()
     expect(existsSync(join(path, 'README.md'))).toBe(true);
   });
 
+  it('stops at once when Stop is pressed during the clone, and Retry uses that clone', async () => {
+    const { repo, name } = source();
+    const path = missing(name);
+    writeFileSync(join(fake, 'delay'), '2');
+    const t = await r.runner.createThread({ channel: channel(path, repo), prompt: 'go' });
+    await cloneShown(t.id);
+    expect((await app.request(`/api/threads/${t.id}/stop`, { method: 'POST' })).status).toBe(200);
+    const f = await r.until('the stop, before the clone ends', () => r.thread(t.id).setup === 'failed' && r.thread(t.id), 1500);
+    expect(f).toMatchObject({ status: 'stopped', setup_error: 'Stopped by Ben before the agent started.' });
+    expect(existsSync(t.cwd)).toBe(false);
+    await r.until('the clone to land', () => existsSync(join(path, 'README.md')), 10_000);
+    await retry(t.id);
+    await r.untilResults(t.id, 1);
+    expect(clones()).toHaveLength(1);
+  });
+
+  it('does not clone elsewhere when a folder under a top folder that is here is missing, like an unplugged drive', async () => {
+    const { repo, name } = source();
+    const path = join(r.tmp, `drive-${++n}`, 'code', name);
+    const ch = channel(path, repo);
+    const t = await r.runner.createThread({ channel: ch, prompt: 'go' });
+    expect((await failed(t.id)).setup_error).toMatch(/is missing too \(a drive that is not connected\?\)/);
+    expect(clones()).toEqual([]);
+    expect(r.db.channels.get(ch)!.repo_path).toBe(path);
+  });
+
   it('fails, without cloning, when the channel has no GitHub repo to clone from', async () => {
     const t = await r.runner.createThread({ channel: channel(missing('lost'), null), prompt: 'go' });
     expect((await failed(t.id)).setup_error).toMatch(/not on this machine.*Set the channel's GitHub repo/);
@@ -196,6 +223,43 @@ describe('a channel path that cannot be made on this machine', () => {
     expect(r.db.channels.get(ch)!.repo_path).toBe(ours);
   });
 
+  it('never hands a channel the clone of another repo with the same name', async () => {
+    const mine = source(`web-${++n}`, 'acme');
+    const theirs = source(mine.name, 'client');
+    const [pathA, pathB] = [elsewhere(mine.name), elsewhere(theirs.name)];
+    writeFileSync(join(fake, 'delay'), '1');
+    const a = channel(pathA, mine.repo);
+    const b = channel(pathB, theirs.repo);
+    const ta = await r.runner.createThread({ channel: a, prompt: 'mine' });
+    await cloneShown(ta.id);
+    const tb = await r.runner.createThread({ channel: b, prompt: 'theirs' });
+    expect((await failed(tb.id)).setup_error).toMatch(`Omni is cloning ${mine.repo} into ${join(repos, mine.name)} for another channel`);
+    await r.untilResults(ta.id, 1);
+    // Once that clone is there, the path map keeps the folder for the first channel.
+    await retry(tb.id);
+    expect((await failed(tb.id)).setup_error).toMatch(`this machine's path map already uses that folder for ${pathA}`);
+    expect(clones()).toHaveLength(1);
+    expect(r.db.channels.get(b)!.repo_path).toBe(pathB);
+    expect(r.spawns(tb.id)).toEqual([]);
+  });
+
+  it('leaves a repo path set during the clone as it was set', async () => {
+    const { repo, name } = source();
+    const theirs = elsewhere(name);
+    writeFileSync(join(fake, 'delay'), '1');
+    const ch = channel(theirs, repo);
+    const t = await r.runner.createThread({ channel: ch, prompt: 'go' });
+    await cloneShown(t.id);
+    const own = join(r.tmp, `own-${++n}`, name);
+    mkdirSync(join(own, '..'));
+    git(join(own, '..'), 'clone', '-q', join(sources, repo), own);
+    r.db.channels.update(ch, { repo_path: own });
+    await r.untilResults(t.id, 1);
+    expect(r.db.channels.get(ch)!.repo_path).toBe(own);
+    expect(r.db.kv.get('sync.path_map') ?? {}).not.toHaveProperty(theirs);
+    expect(realpathSync(git(t.cwd, 'rev-parse', '--git-common-dir'))).toBe(realpathSync(join(own, '.git')));
+  });
+
   it('never clones over a folder there that is not the repo', async () => {
     const { repo, name } = source();
     const ours = join(repos, name);
@@ -207,6 +271,21 @@ describe('a channel path that cannot be made on this machine', () => {
     expect(readdirSync(ours)).toEqual(['mine.txt']);
     expect(clones()).toEqual([]);
     expect(r.db.channels.get(ch)!.repo_path).not.toBe(ours);
+  });
+});
+
+describe('with sync on', () => {
+  it('moves the channel to its clone on this machine only', async () => {
+    updateUserConfig({ workspace: { reposDir: join(r.tmp, 'synced-repos') } });
+    r.db.outbox.arm('mac-test');
+    const { repo, name } = source();
+    const ch = channel(`/no-such-root-${++n}/ben/${name}`, repo);
+    const queued = () => (r.db.db.prepare(`SELECT count(*) AS n FROM sync_outbox WHERE entity = 'channel' AND entity_id = ?`).get(ch) as { n: number }).n;
+    const before = queued();
+    const t = await r.runner.createThread({ channel: ch, prompt: 'go' });
+    await r.untilResults(t.id, 1);
+    expect(r.db.channels.get(ch)!.repo_path).toBe(join(r.tmp, 'synced-repos', name));
+    expect(queued()).toBe(before);
   });
 });
 

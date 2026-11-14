@@ -11,7 +11,7 @@ import { carryInto } from '../continue-carry.ts';
 import { notifyEnded } from '../push-sender.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
-import { beginAttempt, endAttempt, runSetupAction } from './setup-action.ts';
+import { attemptSignal, beginAttempt, endAttempt, runSetupAction, STOPPED, stopRequested } from './setup-action.ts';
 import { emitThread, refusal, runsHere } from './state.ts';
 
 /** The request id a worktree thread's first prompt is saved under. One per thread, so it is saved once. */
@@ -85,7 +85,9 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
     if (!t.branch) throw new Error('The thread has no branch to check out.');
     const branch = t.branch;
     // A channel repo that is not on this machine is cloned first, and may land at a new path here (repo-clone.ts).
-    await ensureRepo(t.channel_id);
+    // Stop ends the wait at once; the clone itself finishes for the next try.
+    await ensureRepo(t.channel_id, attemptSignal(t.id));
+    if (stopRequested(t.id)) throw new Error(STOPPED);
     const repo = channels.get(t.channel_id)?.repo_path ?? null;
     // A continued thread's branch starts at its source's HEAD, with the source's changes laid in (continue-carry.ts),
     // so only a new thread's branch is cut from the base Ben picked.
@@ -97,7 +99,8 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
     // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
     await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));
   } catch (err) {
-    failSetup(t.id, (err as Error).message);
+    if (stopRequested(t.id)) failSetup(t.id, STOPPED, true);
+    else failSetup(t.id, (err as Error).message);
     return threads.get(t.id);
   }
   // The channel's setup action, in the verified checkout: a blocking one holds the agent until it succeeds.
