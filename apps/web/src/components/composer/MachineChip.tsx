@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import { takeoverNote } from '@omni/shared/handoff.ts';
-import { HERE, threadMachine, type RunOnRow } from '@omni/shared/thread-machine.ts';
+import { HERE, runOnPrefix, threadMachine, type RunOnRow } from '@omni/shared/thread-machine.ts';
 import { errorText, type Thread } from '../../api.ts';
 import { useHereName } from '../../store.tsx';
 import { handOff, useHandoffTargets, type HandoffAnswer } from '../thread/Handoff.tsx';
@@ -14,15 +14,15 @@ import { Picker, type PickerOption } from '../ui.tsx';
 // from a chip.
 
 export const machineOptions = (rows: RunOnRow[]): PickerOption<string>[] =>
-  rows.map((r) => ({ value: r.value, label: r.label, sub: r.sub, icon: 'monitor', avatar: false, disabled: r.disabled }));
+  rows.map((r) => ({ value: r.value, label: r.label, sub: r.sub, icon: r.icon ?? 'monitor', avatar: false, disabled: r.disabled }));
 
-/** "On Ben's MacBook Pro" or "On omarchy", with the rows to pick from. Renders nothing without rows: one machine. */
+/** "On Ben's MacBook Pro", "On omarchy" or "To Grok Bot", with the rows to pick from. Renders nothing without rows. */
 export function MachineChip({ rows, value, onChange, disabled, title }: { rows: RunOnRow[] | null; value: string; onChange: (pick: string) => void; disabled?: boolean; title?: string }) {
   const options = useMemo(() => (rows ? machineOptions(rows) : []), [rows]);
   if (!rows) return null;
   return (
     <span title={title} className="inline-flex max-w-full">
-      <Picker label="Run on" prefix="On" value={value} options={options} onChange={onChange} disabled={disabled} />
+      <Picker label="Run on" prefix={runOnPrefix(value)} value={value} options={options} onChange={onChange} disabled={disabled} />
     </span>
   );
 }

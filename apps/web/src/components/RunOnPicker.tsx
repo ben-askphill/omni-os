@@ -1,24 +1,27 @@
 import { useMemo, useState } from 'react';
 import type { Device } from '@omni/shared/handoff.ts';
-import { offersRunOn, runOnPick, runOnRequest, runOnRows, runOnSetting, settingPick, type RunOnRow } from '@omni/shared/thread-machine.ts';
+import { GROK_BOT, newThreadPick, newThreadRows, offersRunOn, runOnRequest, runOnRows, runOnSetting, settingPick, type RunOnRow } from '@omni/shared/thread-machine.ts';
 import { api, errorText, useApi, type SetupState } from '../api.ts';
-import { useHereName } from '../store.tsx';
+import { useApp, useHereName } from '../store.tsx';
 import { MachineChip, machineOptions } from './composer/MachineChip.tsx';
 
 /**
- * The new-thread composer's Machine chip: the other synced machines (GET /api/devices) and Settings' default
- * (`runOn.device`). `rows` is null while there is nothing to pick, so the chip hides: sync off, or no other machine.
- * `request` is what POST /api/threads takes for it.
+ * The new-thread composer's Machine chip: the other synced machines (GET /api/devices), Settings' default
+ * (`runOn.device`), and Grok Bot (GET /api/status `grokBot`). `rows` is null while there is nothing to pick, so the chip
+ * hides: no other machine and no Grok Bot webhook. `request` is what POST /api/threads takes for it. `grokBot` is true
+ * while the pick is Grok Bot: the composer posts the text to /api/grokbot instead, and starts no thread.
  */
 export function useRunOn() {
   const devices = useApi<Device[]>('/devices');
   const setup = useApi<SetupState>('/setup');
   const hereName = useHereName();
+  const grokBotSet = !!useApp().status?.grokBot;
   const [picked, setPicked] = useState<string | null>(null);
   const list = offersRunOn(devices.data) ? devices.data : null;
-  const pick = runOnPick(picked, setup.data?.config.runOn?.device, list ?? []);
-  const rows = useMemo(() => (list ? runOnRows(list, { hereName }) : null), [list, hereName]);
-  return { rows, pick, setPick: setPicked, request: runOnRequest(pick, list), reload: devices.reload };
+  const pick = newThreadPick(picked, setup.data?.config.runOn?.device, list, grokBotSet);
+  const rows = useMemo(() => newThreadRows(list, { grokBot: grokBotSet, hereName }), [list, grokBotSet, hereName]);
+  const grokBot = pick === GROK_BOT;
+  return { rows, pick, setPick: setPicked, grokBot, request: grokBot ? {} : runOnRequest(pick, list), reload: devices.reload };
 }
 
 export const runOnOptions = machineOptions;

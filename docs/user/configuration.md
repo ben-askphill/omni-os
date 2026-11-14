@@ -88,9 +88,9 @@ Settings > Worktrees inventories worktrees and explains why each is kept or elig
 
 Send to Grok Bot posts a thread's title and messages to a webhook. The context is the channel id and the thread id. That only goes one way. For Grok Bot to read threads and start work in Omni, connect it to Omni's MCP server: see [Connect Grok Bot](external-mcp.md#connect-grok-bot).
 
-The action is in the thread's menu on desktop web and in the desktop app: the ⋯ in the thread header, or a right-click on the thread. On a phone it is in Thread options. The Conductor calls `send_to_grok_bot`.
+The action is in the thread's menu on desktop web and in the desktop app: the ⋯ in the thread header, or a right-click on the thread. On a phone it is in Thread options. The Conductor calls `send_to_grok_bot`. A new message can go straight to Grok Bot too: pick Grok Bot in the new-thread composer's Machine chip (see [Send to Grok Bot](threads.md#send-to-grok-bot)).
 
-The menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a global secret or in `.env`. `GET /api/status` reports this as `grokBot`. Without it nothing of Grok Bot shows.
+The menu items show only once `GROKBOT_WEBHOOK_URL` is set, as a global secret or in `.env`. `GET /api/status` reports this as `grokBot`. Without it, the Machine chip lists Grok Bot disabled ("Not set up on" this machine's name) when it shows for other machines, and nothing else of Grok Bot shows. Secrets are per machine, so set them on each machine whose composer should offer Grok Bot.
 
 The URL and the Authorization value come from the Omni OS requests routine, on Grok Bot's Routines tab. Paste each one in either place.
 
