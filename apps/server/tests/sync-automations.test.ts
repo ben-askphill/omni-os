@@ -138,7 +138,7 @@ describe('a Mac joining a relay that already has an owner', () => {
     await sync.setActiveWorker(null);
   });
 
-  it('with the owner not trusted yet, holds its claim, does not claim either, and takes it on Trust', async () => {
+  it('holds an untrusted owner claim, discards it on Trust and takes only a fresh claim', async () => {
     r.db.db.prepare(`DELETE FROM sync_trusted WHERE machine_id = 'mac-b'`).run();
     r.db.db.prepare(`DELETE FROM kv WHERE key = 'automations.owner'`).run();
     r.db.db.prepare(`DELETE FROM sync_meta WHERE entity = 'kv' AND entity_id = 'automations.owner'`).run();
@@ -149,6 +149,10 @@ describe('a Mac joining a relay that already has an owner', () => {
     expect(r.db.kv.get('automations.owner')).toBeUndefined();
     expect(r.db.outbox.pending(100, ['kv']).filter((row) => row.entity_id === 'automations.owner')).toEqual([]);
     expect((await app.request('/api/sync/devices/mac-b/confirm-key', { method: 'POST' })).status).toBe(200);
+    expect((await joined.syncNow()).error).toBeUndefined();
+    expect(r.db.kv.get('automations.owner')).toBe('mac-a');
+    // The held claim was discarded. A new claim after confirmation can move the owner.
+    await fromB('mac-b');
     expect((await joined.syncNow()).error).toBeUndefined();
     expect(r.db.kv.get('automations.owner')).toBe('mac-b');
     await sync.setActiveWorker(null);

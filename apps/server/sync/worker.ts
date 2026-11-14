@@ -1,13 +1,14 @@
 import { kv, outbox, type OutboxRow } from '../db.ts';
 import { globalSecret, LEGACY_SYNC_SECRETS, listSecrets, SYNC_SECRETS } from '../secrets.ts';
-import { applyBatch, deferredCount, getHandler, registeredEntities, retryDeferred, type ApplyContext } from './apply.ts';
+import { applyBatch, deferredChanges, deferredCount, getHandler, registeredEntities, retryDeferred, type ApplyContext } from './apply.ts';
 import { createRelayTransport, isoTs, isSignedOut, type Change, type SyncTransport } from './transport.ts';
 import { watchNetwork, type NetworkWatch } from './network.ts';
 import { automationsOwner, claimIfUnowned, type AutomationsOwner } from './owner.ts';
 import { hardwareId } from './hardware.ts';
 import { resendChannelColors } from './resend-channel-colors.ts';
-import { signChange } from './signing.ts';
+import { signChange, unsigned } from './signing.ts';
 import { signingKey } from './sign-key.ts';
+import { keyring } from './keyring.ts';
 import './handlers/index.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
@@ -130,7 +131,6 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   const machineId = outbox.arm(opts.machineId, hardwareId());
   if (copiedFrom && copiedFrom !== machineId)
     console.warn(`[sync] this data folder was copied from another machine (sync id ${copiedFrom}): this machine is now ${machineId} and pulls the history again`);
-  const ctx: ApplyContext = { machineId };
   // Made or read now, so the first push does not wait on the secret store.
   signingKey().catch(() => {});
   const batch = opts.batchSize ?? 200;
@@ -180,6 +180,15 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   }
 
   async function pull(result: SyncResult) {
+    // Fail closed on an unavailable list or an older transport. A cached device record is synced data, not evidence
+    // of pairing. This API proves registration only; token bindings remain private to the relay (ADR 0013).
+    const ctx: ApplyContext = { machineId };
+    let checked = false;
+    const checkFirstKeys = async (changes: Change[]) => {
+      if (checked || !changes.some((c) => unsigned(c).signature && !keyring.get(c.machine_id)?.signKey)) return;
+      ctx.pairedMachines = await transport.pairedMachines?.() ?? new Set();
+      checked = true;
+    };
     for (;;) {
       const after = kv.get<number>('sync.cursor') ?? 0;
       const changes = await transport.pull({ after, excludeMachine: machineId, limit: batch });
@@ -187,6 +196,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       // changes and this cursor belong to the sync that is over.
       if (stopped) return;
       if (!changes.length) break;
+      await checkFirstKeys(changes);
+      if (stopped) return;
       const stats = applyBatch(changes.map((c) => ({ ...c, ts: isoTs(c.ts) })), ctx);
       result.pulled += changes.length;
       result.applied += stats.applied;
@@ -196,6 +207,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       kv.set('sync.cursor', last);
       if (changes.length < batch) break;
     }
+    await checkFirstKeys(deferredChanges());
+    if (stopped) return;
     const retried = retryDeferred(ctx);
     result.applied += retried.applied;
     result.skipped += retried.skipped;

@@ -30,6 +30,8 @@ export interface PullOptions {
 }
 
 export interface SyncTransport {
+  /** Connect registrations only. The relay does not expose token bindings or per-change token provenance. */
+  pairedMachines?(): Promise<ReadonlySet<string>>;
   /** Append changes in order. Throws when the relay did not take them, so the outbox keeps them. */
   push(changes: Change[]): Promise<void>;
   /** Changes after a seq from other machines, oldest first. */
@@ -101,6 +103,12 @@ export class MemoryTransport implements SyncTransport {
       machines.add(c.machine_id);
     }
     for (const l of this.listeners) if ([...machines].some((m) => m !== l.exclude)) queueMicrotask(l.fn);
+  }
+
+  /** Tests model a registered machine for each sender, unless they override this boundary. */
+  async pairedMachines(): Promise<ReadonlySet<string>> {
+    this.check();
+    return new Set(this.changes.map((c) => c.machine_id));
   }
 
   async pull({ after, excludeMachine, limit }: PullOptions) {
@@ -217,6 +225,15 @@ export function createRelayTransport(opts: RelayTransportOptions): SyncTransport
   }
 
   return {
+    async pairedMachines() {
+      const res = await ok(await call('/v1/connect/machines'), 'list paired machines');
+      const body: unknown = await res.json();
+      const machines = (body as { machines?: unknown } | null)?.machines;
+      if (!Array.isArray(machines) || machines.some((m) => !m || typeof m.id !== 'string' || !m.id))
+        throw new Error('Invalid paired machines response from relay');
+      return new Set(machines.map((m) => m.id as string));
+    },
+
     async push(changes) {
       await ok(await call('/v1/changes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ changes }) }), 'push');
     },

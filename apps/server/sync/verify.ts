@@ -17,7 +17,7 @@ import type { Change, RemoteChange } from './transport.ts';
 //   One that is still not trusted (keyring.trusted) syncs everything else, but its signed actions wait in sync_deferred,
 //   listed in sync_refused, until Ben trusts it in Sync settings (POST /api/sync/devices/:id/confirm-key).
 // - A machine whose key changed: its actions signed with the new key wait the same way until Ben confirms that key, the
-//   same call. The next sync applies them in order; a command or secret past its expiry lapses there as it would anyway.
+//   same call. Confirming discards held actions, so confirmation never runs actions Ben has not reviewed.
 // Refusals, and changes applied without a valid signature, go in sync_refused for Sync settings.
 
 export type SignatureMode = 'actions' | 'strict' | 'log';
@@ -92,7 +92,7 @@ const REASONS: Record<Exclude<Verdict, 'valid'>, string> = {
 const UNTRUSTED = 'waiting for Trust';
 const KEY_CHANGED = 'waiting for the new key to be confirmed';
 
-export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syncSignatures()): Gate {
+export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syncSignatures(), pairedMachines?: ReadonlySet<string>): Gate {
   // A machine describes only itself.
   // The relay never hands a machine its own changes back: one that names this machine is forged.
   if (raw.machine_id === outbox.machineId()) return { kind: 'refuse', reason: 'names this machine', change: unsigned(raw).change };
@@ -103,6 +103,7 @@ export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syn
   // automations owner claim goes out in its first sync).
   const carried = unsigned(raw).signature;
   if (carried && carried.signer === raw.machine_id && !signKeyOf(raw.machine_id) && verifyChange(raw, () => carried.key).verdict === 'valid') {
+    if (!pairedMachines?.has(raw.machine_id)) return { kind: 'defer', reason: `waiting for relay Connect registration (${raw.machine_id})` };
     keyring.observe(raw.machine_id, { signKey: carried.key });
   }
   const { verdict, change } = verifyChange(raw, signKeyOf);
@@ -121,8 +122,8 @@ export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syn
     }
     return { kind: 'apply', change };
   }
-  // Signed by the machine with the new key its record announced: held, not refused, so it applies once Ben confirms that
-  // key. Nothing applies before then: the pinned key still decides.
+  // Signed by the machine with the new key its record announced: held until Ben confirms, then discarded.
+  // Nothing applies before then: the pinned key still decides.
   if (action && verdict === 'bad-signature' && carried?.signer === raw.machine_id && carried.key === keyring.get(raw.machine_id)?.seenSignKey) {
     if (verifyChange(raw, () => carried.key).verdict === 'valid') {
       logHeld(change, KEY_CHANGED);
@@ -161,9 +162,17 @@ function logHeld(c: Pick<Change, 'machine_id' | 'entity' | 'entity_id'>, reason:
   ).run(key, c.machine_id, c.entity, c.entity_id, reason, now);
 }
 
-/** Once a machine is trusted with its key, its held actions apply with the next sync: drop them from the log. */
-export function clearHeld(machine: string) {
+/** Confirming a key never authorizes unseen actions. Called in the confirmation transaction, before sync resumes. */
+export function discardHeld(machine: string) {
+  const rows = db.prepare('SELECT seq, change FROM sync_deferred').all() as { seq: number; change: string }[];
   db.prepare('DELETE FROM sync_refused WHERE machine = ? AND reason IN (?, ?)').run(machine, UNTRUSTED, KEY_CHANGED);
+  for (const row of rows) {
+    const change = JSON.parse(row.change) as RemoteChange;
+    // Include actions waiting on dependencies or an unknown handler, not just those logged as waiting for a key.
+    if (change.machine_id !== machine || !isActionChange(change)) continue;
+    logRefused(change, 'discarded when the key was confirmed; send again if still needed', false);
+    db.prepare('DELETE FROM sync_deferred WHERE seq = ?').run(row.seq);
+  }
 }
 
 /** The machines whose actions this one holds, and how many, for the Inbox and Sync settings. */

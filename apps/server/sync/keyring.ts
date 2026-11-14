@@ -8,8 +8,8 @@ import { fingerprint } from './signing.ts';
 // until Ben confirms the new key (a re-paired or reinstalled Mac).
 //
 // Trust on first pin: a machine id this machine has never seen is pinned with the key its first signed record or change
-// carries, and trusted with that key at once, so its commands, assignments and the rest apply (sync/verify.ts). The
-// relay only takes changes from a machine paired through Omni Connect and binds each to the token that pushed it, so
+// carries, after sync/verify.ts checks its relay Connect registration, and trusted with that key at once. The
+// relay checks token bindings on push, but exposes only Connect registrations to receivers, so
 // that pairing is the trust step (ADR 0013). A changed key is the one thing Ben confirms: trust stays bound to the key
 // pinned before it, and Sync settings shows the change until he confirms the new one.
 

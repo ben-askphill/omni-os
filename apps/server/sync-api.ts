@@ -1,11 +1,11 @@
 // /api/sync: the sync status, a manual sync, and sign-in from Settings. Its own app so tests can call it without starting the server.
 import { Hono, type Context } from 'hono';
-import { kv, outbox } from './db.ts';
+import { kv, outbox, tx } from './db.ts';
 import { claimAutomations, OWNER_KEY } from './sync/owner.ts';
 import { currentRecords, deviceRecord, deviceRecords } from './sync/devices.ts';
 import { fingerprintOf, keyring } from './sync/keyring.ts';
 import { signPublicKey } from './sync/sign-key.ts';
-import { clearHeld, heldActions, refusedChanges } from './sync/verify.ts';
+import { discardHeld, heldActions, refusedChanges } from './sync/verify.ts';
 import { pathMap } from './sync/paths.ts';
 import { checkPathMap, checkRelayUrl, defaultSetupDeps, disableSync, enableSync, pollRelaySignIn, SetupError, startRelaySignIn, type SetupDeps } from './sync/setup.ts';
 import { activeWorker, syncNow, syncStatus } from './sync/worker.ts';
@@ -97,17 +97,21 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
 
   /**
    * Confirm a machine's new key, or trust one that is not trusted yet: pin the keys it announces now and let its commands, assignments, update asks, owner claims and
-   * secrets apply, the held ones with the sync this starts. 404 for a machine this one has not seen, or one already
+   * secrets apply from now on. Discard held actions instead of replaying them unseen. 404 for a machine this one has not seen, or one already
    * trusted with no new key waiting; 409 for one that has not sent a signed key yet.
    */
   app.post('/devices/:id/confirm-key', (c) => {
     const id = c.req.param('id');
     if (id === outbox.machineId() || (!deviceRecord(id) && !keyring.get(id))) return c.json({ error: 'Nothing waits for confirmation for that machine' }, 404);
-    const confirmed = keyring.confirm(id);
-    if (!keyring.get(id)?.signKey) return c.json({ error: `${deviceRecord(id)?.name ?? id} has not sent a signed key yet. Update Omni there and let it sync once.` }, 409);
-    const trusted = keyring.trust(id);
-    if (!confirmed && !trusted) return c.json({ error: 'Nothing waits for confirmation for that machine' }, 404);
-    clearHeld(id);
+    if (!keyring.get(id)?.signKey && !keyring.get(id)?.seenSignKey) return c.json({ error: `${deviceRecord(id)?.name ?? id} has not sent a signed key yet. Update Omni there and let it sync once.` }, 409);
+    const changed = tx(() => {
+      const confirmed = keyring.confirm(id);
+      const trusted = keyring.trust(id);
+      if (!confirmed && !trusted) return false;
+      discardHeld(id);
+      return true;
+    });
+    if (!changed) return c.json({ error: 'Nothing waits for confirmation for that machine' }, 404);
     void activeWorker()?.syncNow();
     return c.json({ ok: true });
   });

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, symlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -95,7 +95,7 @@ describe('a paired machine is trusted with its first key', () => {
     expect((await sendSecret('mac-n')).status).toBe(200);
   });
 
-  it('holds the actions of a machine trusted with another key until Ben trusts it, then applies them', async () => {
+  it('holds the actions of a machine trusted with another key and discards them when Ben trusts it', async () => {
     await pull(record('mac-s', rawPublicKey(keyOf('mac-s'))));
     // Trusted once with a key that is not the pinned one, as a confirmed-but-not-trusted key could leave it.
     r.db.db.prepare('UPDATE sync_trusted SET sign_key = ? WHERE machine_id = ?').run('an-older-key', 'mac-s');
@@ -109,8 +109,8 @@ describe('a paired machine is trusted with its first key', () => {
     expect((await sendSecret('mac-s')).status).toBe(409);
     expect((await trust('mac-s')).status).toBe(200);
     await pull();
-    expect(stored('cmd-stale')).toBe(true);
-    expect((await refused()).filter((e) => e.entityId === 'cmd-stale')).toEqual([]);
+    expect(stored('cmd-stale')).toBe(false);
+    expect(await refused()).toContainEqual(expect.objectContaining({ entityId: 'cmd-stale', reason: 'discarded when the key was confirmed; send again if still needed', applied: false }));
   });
 
   it('the migration trusts machines already pinned before this build and lets their held commands apply', async () => {
@@ -131,6 +131,44 @@ describe('a paired machine is trusted with its first key', () => {
     expect((await refused()).filter((e) => e.entityId === 'cmd-held')).toEqual([]);
     await pull();
     expect(stored('cmd-held')).toBe(true);
+  });
+});
+
+describe('first-key pairing evidence from the relay', () => {
+  it('does not pin or trust a signed machine missing from Connect, including after a restart migration', async () => {
+    const list = vi.spyOn(relay, 'pairedMachines').mockResolvedValue(new Set());
+    try {
+      await pull(signAs(commandFrom('not-paired', 'cmd-not-paired')), record('not-paired', rawPublicKey(keyOf('not-paired'))));
+      const { keyring } = await import('../sync/keyring.ts');
+      expect(keyring.get('not-paired')).toBeNull();
+      expect(trusted('not-paired')).toBeUndefined();
+      expect(stored('cmd-not-paired')).toBe(false);
+      r.db.migrate();
+      await pull();
+      expect(trusted('not-paired')).toBeUndefined();
+      expect(stored('cmd-not-paired')).toBe(false);
+      // A later relay registration is enough. The first signed action can still precede the device record.
+      list.mockResolvedValue(new Set(['not-paired']));
+      await pull();
+      expect(stored('cmd-not-paired')).toBe(true);
+      expect(trusted('not-paired')).toEqual({ sign_key: rawPublicKey(keyOf('not-paired')) });
+    } finally {
+      list.mockRestore();
+    }
+  });
+
+  it('does not auto-trust when the relay registration list is unavailable, then retries', async () => {
+    const list = vi.spyOn(relay, 'pairedMachines').mockRejectedValue(new Error('registration list unavailable'));
+    try {
+      await relay.push([signAs(commandFrom('offline-list', 'cmd-offline-list'))]);
+      expect((await worker.syncNow()).error).toBe('registration list unavailable');
+      expect(trusted('offline-list')).toBeUndefined();
+      expect(stored('cmd-offline-list')).toBe(false);
+    } finally {
+      list.mockRestore();
+    }
+    await pull();
+    expect(stored('cmd-offline-list')).toBe(true);
   });
 });
 
@@ -262,7 +300,7 @@ describe('signing keys in Sync settings', () => {
     wireFixture('sync-refused.json', (await refused()).slice(0, 3));
   });
 
-  it('flags a new key until Ben confirms it: changes signed with it wait, then apply', async () => {
+  it('flags a new key until Ben confirms it, discards held actions and accepts future actions', async () => {
     const before = trusted('mac-b');
     const next = generateKeyPairSync('ed25519').privateKey;
     await pull(recordB(rawPublicKey(next)));
@@ -283,9 +321,55 @@ describe('signing keys in Sync settings', () => {
     expect(trusted('mac-b')).toEqual({ sign_key: rawPublicKey(next) });
     expect((await devices()).find((d) => d.id === 'mac-b')).toMatchObject({ keyChanged: false, trusted: true, held: 0 });
     await pull(signChange(command('cmd-after-confirm'), next));
-    expect(stored('cmd-new-key')).toBe(true);
+    expect(stored('cmd-new-key')).toBe(false);
+    expect(await refused()).toContainEqual(expect.objectContaining({ entityId: 'cmd-new-key', reason: 'discarded when the key was confirmed; send again if still needed', applied: false }));
     expect(stored('cmd-after-confirm')).toBe(true);
     expect(stored('cmd-other-key')).toBe(false);
     expect((await trust('mac-b')).status).toBe(404);
+  });
+
+  it('discards every held action for the confirmed machine, keeping other machines and ordinary deferred data', async () => {
+    const { applyChange, getHandler, registerHandler, unregisterHandler } = await import('../sync/apply.ts');
+    const { keyring } = await import('../sync/keyring.ts');
+    const machine = 'discard-all';
+    const other = 'discard-other';
+    await pull(record(machine, rawPublicKey(keyOf(machine))), record(other, rawPublicKey(keyOf(other))));
+    const next = generateKeyPairSync('ed25519').privateKey;
+    await pull(record(machine, rawPublicKey(next)));
+    // A different machine has its own held action. Confirming this one must not discard it.
+    r.db.db.prepare('DELETE FROM sync_trusted WHERE machine_id = ?').run(other);
+    await pull(signAs(commandFrom(other, 'cmd-keep-other')));
+    const actions: Change[] = [
+      commandFrom(machine, 'cmd-discard-all'),
+      { machine_id: machine, entity: 'assignment', entity_id: 't-held-assignment', op: 'upsert', data: {}, ts: later() },
+      ...['update.ask.discard', 'automations.owner', 'secretdrop.discard', 'secretack.discard'].map((entity_id): Change =>
+        ({ machine_id: machine, entity: 'kv', entity_id, op: 'upsert', data: { value: { sender: machine } }, ts: later() })),
+    ];
+    await pull(...actions.map((c) => signChange(c, next)));
+    // Also cover an action signed with the old pinned key but held on a missing thread, not on the key gate.
+    const missing = commandFrom(machine, 'cmd-missing-thread');
+    missing.data = { ...(missing.data as object), thread_id: 'not-here' };
+    await pull(signAs(missing));
+    // An ordinary change held for a missing handler must survive confirmation.
+    const artifactHandler = getHandler('artifact')!;
+    unregisterHandler('artifact');
+    const ordinary = { machine_id: machine, entity: 'artifact', entity_id: 'held-artifact', op: 'upsert', data: {}, ts: later() } as const;
+    expect(applyChange({ ...signChange(ordinary, next), seq: 900_000 }, { machineId: 'this-mac' })).toBe('deferred');
+    expect((await trust(machine)).status).toBe(200);
+    // Checking the persisted queue also proves these drops survive worker restarts.
+    const deferred = () => (r.db.db.prepare('SELECT change FROM sync_deferred').all() as { change: string }[]).map((r) => JSON.parse(r.change));
+    expect(deferred().filter((c) => c.machine_id === machine)).toEqual([expect.objectContaining({ entity: 'artifact' })]);
+    expect(deferred()).toContainEqual(expect.objectContaining({ entity_id: 'cmd-keep-other' }));
+    expect(keyring.trusted(machine)).toBe(true);
+    const log = await refused();
+    for (const c of [...actions, missing]) expect(log).toContainEqual(expect.objectContaining({ machine, entityId: c.entity_id, applied: false, reason: 'discarded when the key was confirmed; send again if still needed' }));
+    // Repeated confirmation is a no-op and cannot start anything either.
+    expect((await trust(machine)).status).toBe(404);
+    await pull(signChange(commandFrom(machine, 'cmd-future'), next));
+    expect(stored('cmd-discard-all')).toBe(false);
+    expect(stored('cmd-missing-thread')).toBe(false);
+    expect(stored('cmd-future')).toBe(true);
+    // Restore the handler registration for any later sync.
+    registerHandler('artifact', artifactHandler);
   });
 });
