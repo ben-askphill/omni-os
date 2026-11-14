@@ -1,11 +1,13 @@
 // The ignored files a repo lists in `.worktreeinclude` (.env, shopify.theme.toml and the like), copied from the main
 // checkout into each new thread worktree before anything runs there. The file uses gitignore syntax, and git itself
 // does the matching: only files that exist in the main checkout, are untracked and are ignored get copied. A copy
-// never overwrites a file the worktree already has, and stays inside a file and byte budget.
+// never overwrites a file the worktree already has, and stays inside a file and byte budget. A channel can add its
+// own patterns, and name shared folders (node_modules) that are linked from the main checkout instead of copied.
 import { execFile } from 'node:child_process';
-import { constants, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
+import { appendFileSync, constants, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, symlinkSync, unlinkSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
-import { dirname, join, sep } from 'node:path';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
+import { listLines, sharedDirProblem, sharedPath } from '@omni/shared/worktree-lists.ts';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -192,7 +194,8 @@ export function sameAsMain(repo: string, dir: string, path: string): boolean {
     try {
       const sa = lstatSync(a);
       const sb = lstatSync(b);
-      if (sa.isSymbolicLink()) return sb.isSymbolicLink() && readlinkSync(a) === readlinkSync(b);
+      // A shared folder (linkShared) is a link to the main checkout's own copy: nothing of it lives in the worktree.
+      if (sa.isSymbolicLink()) return (sb.isSymbolicLink() && readlinkSync(a) === readlinkSync(b)) || linksTo(a, b);
       if (sa.isDirectory()) {
         if (!sb.isDirectory()) return false;
         const names = readdirSync(a);
@@ -206,4 +209,148 @@ export function sameAsMain(repo: string, dir: string, path: string): boolean {
     }
   };
   return same(path.replace(/\/$/, ''));
+}
+
+/** Whether the symlink at link points at target's own folder, as an absolute path. */
+const linksTo = (link: string, target: string) => {
+  try {
+    const to = readlinkSync(link);
+    return isAbsolute(to) && !!real(to) && real(to) === real(resolve(target));
+  } catch {
+    return false;
+  }
+};
+
+/** What a channel adds to its worktrees: its own include patterns and its shared folders, as stored (one per line). */
+export interface WorktreeExtras {
+  include?: string | null;
+  shared?: string | null;
+}
+
+/** A channel's worktree lists, or none for a channel that is gone. */
+export const channelExtras = (c?: { worktree_include?: string | null; worktree_shared?: string | null } | null): WorktreeExtras => ({
+  include: c?.worktree_include,
+  shared: c?.worktree_shared,
+});
+
+export interface SharedResult {
+  linked: string[];
+  /** Entries left alone, and why: already in the worktree, a symlink leads out of a checkout, not ignored. */
+  skipped: { path: string; why: string }[];
+  /** Folders the main checkout does not have (not installed yet, or a run-on machine's clone). */
+  missing: string[];
+}
+
+/** The comment above the lines linkShared adds to the repo's info/exclude. */
+const EXCLUDE_MARK = '# Omni shared directories (channel settings)';
+
+/**
+ * Link each shared folder of the main checkout at repo into the worktree at dir, as a symlink to the main checkout's
+ * own copy, so a worktree uses node_modules and the like without installing them again. A folder the main checkout
+ * lacks is skipped, and so is one the repo does not ignore (the link would show as a change in every thread). The
+ * link's target must resolve inside the main checkout, and nothing is made through a symlink in the worktree. Never
+ * throws for an entry: what was linked, skipped or missing is returned and logged.
+ */
+export async function linkShared(repo: string, dir: string, shared: string[]): Promise<SharedResult> {
+  const result: SharedResult = { linked: [], skipped: [], missing: [] };
+  if (!shared.length) return result;
+  const repoReal = realpathSync(repo);
+  const dirReal = realpathSync(dir);
+  for (const entry of shared) {
+    const problem = sharedDirProblem(entry);
+    if (problem) {
+      result.skipped.push({ path: entry, why: problem });
+      continue;
+    }
+    const path = sharedPath(entry);
+    const src = join(repoReal, path);
+    const dst = join(dir, path);
+    if (!exists(join(repo, path))) {
+      result.missing.push(path);
+      continue;
+    }
+    // The link leads to the main checkout's own copy: never through, or to, a symlink that leaves it.
+    if (linkOnPath(repo, path) || !inside(repoReal, real(src))) {
+      result.skipped.push({ path, why: 'a symlink in the main checkout leads out of it' });
+      continue;
+    }
+    if (!lstatSync(src).isDirectory()) {
+      result.skipped.push({ path, why: 'not a folder in the main checkout' });
+      continue;
+    }
+    if (linkOnPath(dir, dirname(path))) {
+      result.skipped.push({ path, why: 'a symlink in the worktree is on its path' });
+      continue;
+    }
+    if (exists(dst)) {
+      result.skipped.push({ path, why: 'already in the worktree' });
+      continue;
+    }
+    if (!(await ignoredIn(repo, `${path}/`))) {
+      result.skipped.push({ path, why: 'the repo does not ignore it, so the link would show as a change' });
+      continue;
+    }
+    try {
+      mkdirSync(dirname(dst), { recursive: true });
+      if (!inside(dirReal, real(dirname(dst)))) {
+        result.skipped.push({ path, why: 'its folder resolves outside the worktree' });
+        continue;
+      }
+      symlinkSync(src, dst, 'dir');
+      // A folder-only rule (node_modules/) does not match a symlink, so git would list the link as untracked. The
+      // repo's info/exclude, which every worktree reads, gets the path the repo already ignores as a plain one.
+      if (!(await ignoredIn(dir, path))) await excludeLink(dir, path);
+      if (!(await ignoredIn(dir, path))) {
+        unlinkSync(dst);
+        result.skipped.push({ path, why: 'git would list the link as a change' });
+        continue;
+      }
+      result.linked.push(path);
+    } catch (err) {
+      result.skipped.push({ path, why: (err as Error).message });
+    }
+  }
+  logShared(dir, result);
+  return result;
+}
+
+/** Whether git ignores path (from the top of the checkout at cwd). */
+const ignoredIn = (cwd: string, path: string) =>
+  git(cwd, ['check-ignore', '-q', '--no-index', '--', path]).then(
+    () => true,
+    () => false,
+  );
+
+/** Add /path to the info/exclude of the repo dir is a worktree of, under Omni's comment, once. */
+async function excludeLink(dir: string, path: string) {
+  const common = (await git(dir, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).trim();
+  const file = join(common, 'info', 'exclude');
+  const line = `/${path}`;
+  let text = '';
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch {
+    mkdirSync(dirname(file), { recursive: true });
+  }
+  const lines = text.split(/\r?\n/);
+  if (lines.includes(line)) return;
+  const head = lines.includes(EXCLUDE_MARK) ? '' : `${text && !text.endsWith('\n') ? '\n' : ''}${EXCLUDE_MARK}\n`;
+  appendFileSync(file, `${head}${line}\n`);
+}
+
+function logShared(dir: string, r: SharedResult) {
+  if (r.linked.length) console.log(`[setup] ${dir}: linked ${r.linked.length} shared folder(s) from the main checkout: ${listed(r.linked)}`);
+  if (r.missing.length) console.log(`[setup] ${dir}: shared folder(s) not in the main checkout, skipped: ${listed(r.missing)}`);
+  for (const s of r.skipped.filter((s) => s.why !== 'already in the worktree').slice(0, LOGGED)) console.log(`[setup] ${dir}: ${s.path} not linked: ${s.why}`);
+}
+
+/**
+ * What a new worktree gets from the main checkout: the files the repo's `.worktreeinclude` and the channel's own
+ * patterns name, copied, then the channel's shared folders, linked. A failure is logged and never thrown.
+ */
+export async function fillWorktree(repo: string, dir: string, extras: WorktreeExtras = {}): Promise<void> {
+  await copyIncludes(repo, dir, { extra: listLines(extras.include) }).catch((err) =>
+    console.error(`[setup] ${dir}: could not copy the ${INCLUDE_FILE} files: ${(err as Error).message}`),
+  );
+  await linkShared(repo, dir, listLines(extras.shared)).catch((err) => console.error(`[setup] ${dir}: could not link the shared folders: ${(err as Error).message}`));
 }

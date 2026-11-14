@@ -45,7 +45,7 @@ server.registerTool(
   'list_channels',
   {
     description:
-      'List Omni channels (one per client or project) with repo, store, running thread count and sidebar folders. ' +
+      'List Omni channels (one per client or project) with repo, store, running thread count, sidebar folders and, when set, what new worktrees copy or share from the main checkout. ' +
       'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in.',
   },
   async () => {
@@ -59,6 +59,9 @@ server.registerTool(
         repo: c.github_repo,
         running: c.running,
         notes: c.notes,
+        // What each new worktree gets from the main checkout beyond the repo's .worktreeinclude: copied files, linked folders.
+        ...(c.worktree_include ? { copy_into_worktrees: c.worktree_include.split('\n') } : {}),
+        ...(c.worktree_shared ? { shared_directories: c.worktree_shared.split('\n') } : {}),
         folders: folderSummary(c.folders),
       })),
     );

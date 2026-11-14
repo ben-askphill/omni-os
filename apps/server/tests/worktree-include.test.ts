@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { copyIncludes, includedFiles, includePatterns, linkOnPath, sameAsMain } from '../worktree-include.ts';
+import { copyIncludes, fillWorktree, includedFiles, includePatterns, linkOnPath, linkShared, sameAsMain } from '../worktree-include.ts';
 
 // .worktreeinclude: which ignored files of the main checkout a new thread worktree gets, against real temp repos.
 
@@ -192,5 +192,74 @@ describe('sameAsMain', () => {
     expect(sameAsMain(dir, wt, 'secrets/')).toBe(false);
     write(join(wt, 'only-here.toml'), 'x');
     expect(sameAsMain(dir, wt, 'only-here.toml')).toBe(false);
+  });
+});
+
+describe('linkShared', () => {
+  const status = (wt: string) => git(wt, 'status', '--porcelain');
+
+  it('links a shared folder to the main checkout, which git still ignores in the worktree', async () => {
+    const { dir, wt } = repo(null, { 'node_modules/pkg/index.js': 'x', 'apps/web/node_modules/a.js': 'y' });
+    const r = await linkShared(dir, wt, ['node_modules', '/apps/web/node_modules/']);
+    expect(r.linked).toEqual(['node_modules', 'apps/web/node_modules']);
+    expect(lstatSync(join(wt, 'node_modules')).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(join(wt, 'node_modules'))).toBe(join(realpathSync(dir), 'node_modules'));
+    expect(readFileSync(join(wt, 'node_modules/pkg/index.js'), 'utf8')).toBe('x');
+    // node_modules/ matches only folders, so the plain path went into the repo's info/exclude.
+    expect(status(wt)).toBe('');
+    expect(readFileSync(join(dir, '.git/info/exclude'), 'utf8')).toContain('/node_modules\n');
+    expect(status(dir)).toBe('');
+    // Linked, not copied: what the worktree installs lands in the main checkout's folder.
+    writeFileSync(join(wt, 'node_modules/new.js'), 'z');
+    expect(existsSync(join(dir, 'node_modules/new.js'))).toBe(true);
+    // The inventory sees nothing of its own in it.
+    expect(sameAsMain(dir, wt, 'node_modules/')).toBe(true);
+  });
+
+  it('skips a folder the main checkout lacks, and one the worktree already has', async () => {
+    const { dir, wt } = repo(null, { 'node_modules/a.js': 'x' });
+    write(join(wt, 'node_modules/own.js'), 'mine');
+    const r = await linkShared(dir, wt, ['.venv', 'node_modules']);
+    expect(r.missing).toEqual(['.venv']);
+    expect(r.linked).toEqual([]);
+    expect(r.skipped).toEqual([{ path: 'node_modules', why: 'already in the worktree' }]);
+    expect(lstatSync(join(wt, 'node_modules')).isSymbolicLink()).toBe(false);
+  });
+
+  it('refuses a folder the repo does not ignore, a file, a pattern and a path out of the repo', async () => {
+    const { dir, wt } = repo(null, { 'vendor/a.rb': 'x', '.env': 'A=1' });
+    const r = await linkShared(dir, wt, ['vendor', '.env', 'packages/*/node_modules', '../other']);
+    expect(r.linked).toEqual([]);
+    expect(r.skipped.map((s) => s.path)).toEqual(['vendor', '.env', 'packages/*/node_modules', '../other']);
+    expect(existsSync(join(wt, 'vendor'))).toBe(false);
+  });
+
+  it('never links to a folder a symlink in the main checkout sends out of it', async () => {
+    const { dir, wt } = repo(null);
+    const outside = join(root, `outside-${n}`);
+    mkdirSync(outside);
+    symlinkSync(outside, join(dir, 'node_modules'));
+    const r = await linkShared(dir, wt, ['node_modules']);
+    expect(r.linked).toEqual([]);
+    expect(r.skipped[0].why).toMatch(/leads out of it/);
+  });
+
+  it('never makes a link through a symlinked folder in the worktree', async () => {
+    const { dir, wt } = repo(null, { 'apps/web/node_modules/a.js': 'x' });
+    const elsewhere = join(root, `elsewhere-${n}`);
+    mkdirSync(elsewhere);
+    symlinkSync(elsewhere, join(wt, 'apps'));
+    const r = await linkShared(dir, wt, ['apps/web/node_modules']);
+    expect(r.linked).toEqual([]);
+    expect(readdirSync(elsewhere)).toEqual([]);
+  });
+
+  it('fillWorktree merges the channel patterns with the repo file and links the shared folders', async () => {
+    const { dir, wt } = repo('.env\n', { '.env': 'A=1', 'shopify.theme.toml': 's', 'node_modules/a.js': 'x' });
+    await fillWorktree(dir, wt, { include: 'shopify.theme.toml\n', shared: 'node_modules\n.venv' });
+    expect(readFileSync(join(wt, '.env'), 'utf8')).toBe('A=1');
+    expect(readFileSync(join(wt, 'shopify.theme.toml'), 'utf8')).toBe('s');
+    expect(lstatSync(join(wt, 'node_modules')).isSymbolicLink()).toBe(true);
+    expect(status(wt)).toBe('');
   });
 });
