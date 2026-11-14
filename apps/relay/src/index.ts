@@ -326,7 +326,7 @@ export class Relay extends DurableObject<Env> {
       const path = url.pathname;
 
       if (path === '/v1/changes' && req.method === 'POST') {
-        const pushers = await store.push(await req.json().catch(() => null));
+        const pushers = await store.push(await req.json().catch(() => null), tokenId);
         this.nudge(pushers);
         return json({ ok: true });
       }

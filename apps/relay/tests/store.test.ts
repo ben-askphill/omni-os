@@ -124,3 +124,18 @@ describe('objectPath', () => {
     for (const bad of ['', '/blobs/x', 'blobs//x', 'blobs/', '../x', 'a/../b', 'a/./b', 'a\u0000b', 'a\nb', 'x'.repeat(901)]) expect(objectPath(bad)).toBe(false);
   });
 });
+
+describe('RelayStore: a token pushes as one machine (PRD #667, S9)', () => {
+  it('binds a token to the machine it first pushes as, and signs out a push in another machine\'s name', async () => {
+    const { store } = setup();
+    const tokA = await store.addToken('token-a', 'Mac A');
+    const tokB = await store.addToken('token-b', 'Mac B');
+    await store.push({ changes: [change('a', 't1')] }, tokA);
+    await store.push({ changes: [change('a', 't2')] }, tokA);
+    await expect(store.push({ changes: [change('b', 't3')] }, tokA)).rejects.toMatchObject({ status: 401 });
+    await expect(store.push({ changes: [change('a', 't4'), change('b', 't5')] }, tokB)).rejects.toMatchObject({ status: 403 });
+    await store.push({ changes: [change('b', 't6')] }, tokB);
+    await expect(store.push({ changes: [change('a', 't7')] }, tokB)).rejects.toMatchObject({ status: 401 });
+    expect((await store.pull(0, 'nobody', 100)).map((c) => [c.machine_id, c.entity_id])).toEqual([['a', 't1'], ['a', 't2'], ['b', 't6']]);
+  });
+});
