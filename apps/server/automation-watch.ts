@@ -8,7 +8,7 @@ import { config } from './config.ts';
 import { channels, kv } from './db.ts';
 import { detect, eventPrompt, isPrTrigger, type AutomationEventState, type PRInfo, type PrTrigger } from './automation-events.ts';
 import { loadAutomations, runAutomation, type Automation } from './automations.ts';
-import { runsAutomationsHere } from './sync/owner.ts';
+import { runsHere } from './sync/owner.ts';
 
 const run = promisify(execFile);
 // Reviews and comments carry authorAssociation; the PR's own does not come from gh pr list, so ASSOCIATIONS fetches it.
@@ -60,8 +60,9 @@ export const pollErrors = new Map<string, string>();
 
 /** One poll of every enabled event automation. One gh call per repo, however many automations watch it. */
 export async function pollOnce(deps: WatchDeps = ghDeps): Promise<number> {
-  if (!runsAutomationsHere()) return 0;
-  const watching = loadAutomations().filter((a): a is Automation & { on: PrTrigger } => isPrTrigger(a.on) && a.enabled && !a.error);
+  const watching = loadAutomations().filter((a): a is Automation & { on: PrTrigger } => isPrTrigger(a.on) && a.enabled && !a.error && runsHere(a));
+  // One that moved to another machine, or was paused, keeps no error from when this one polled it.
+  for (const id of pollErrors.keys()) if (!watching.some((a) => a.id === id)) pollErrors.delete(id);
   const byRepo = new Map<string, (Automation & { on: PrTrigger })[]>();
   for (const a of watching) {
     const repo = watchedRepo(a);

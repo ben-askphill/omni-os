@@ -13,6 +13,7 @@ const shared = mkdtempSync(join(tmpdir(), 'omni-automations-shared-'));
 const r = await startRunner({ OMNI_AUTOMATIONS_DIR: shared });
 const { paths } = await import('../config.ts');
 const automations = await import('../automations.ts');
+const files = await import('../automation-files.ts');
 const { app } = await import('../app.ts');
 mkdirSync(paths.personalAutomations, { recursive: true });
 
@@ -41,7 +42,7 @@ function scheduledAfter(action: () => Promise<unknown>) {
 
 describe('DELETE /api/automations/:id', () => {
   it('removes your own automation: the file, its override and its schedule', async () => {
-    automations.setEnabled('mine', true);
+    files.setAutomationEnabled('mine', true);
     expect(ids()).toEqual(['digest', 'mine', 'nightly', 'weekly']);
     let res!: Response;
     const left = await scheduledAfter(async () => (res = await del('mine')));

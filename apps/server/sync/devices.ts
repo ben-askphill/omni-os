@@ -4,11 +4,13 @@ import type { Device, DeviceRecord } from '@omni/shared/handoff.ts';
 import { kv, outbox } from '../db.ts';
 import { reachabilityOf, tailnet } from '../tailscale.ts';
 import { onSynced } from './worker.ts';
+import { currentRecords, deviceRecord, deviceRecords, PREFIX } from './device-records.ts';
+
+export { currentRecords, deviceRecord, deviceRecords };
 
 // The synced Macs, as each describes itself in kv `devices.<sync id>`: its name and its Tailscale node. Each Mac writes
 // only its own key, after a sync, and only when something in it changed, since the relay keeps every write.
 
-const PREFIX = 'devices.';
 /** How often a Mac looks at its own name and node again. Syncs come every few seconds while a thread runs. */
 const ANNOUNCE_EVERY_MS = 60_000;
 
@@ -28,32 +30,8 @@ export function computerName(): Promise<string> {
   );
 }
 
-/** The caps a record carries, when they are a harness-to-count map. Anything else is dropped. */
-function parseCaps(v: unknown): Record<string, number> | undefined {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
-  const out = Object.entries(v as Record<string, unknown>).filter(([, n]) => typeof n === 'number' && Number.isInteger(n) && n >= 0);
-  return out.length ? (Object.fromEntries(out) as Record<string, number>) : undefined;
-}
-
 const sameCaps = (a: Record<string, number> | undefined, b: Record<string, number>) =>
   !!a && Object.keys(a).length === Object.keys(b).length && Object.entries(b).every(([h, n]) => a[h] === n);
-
-/** A record as the other Mac wrote it, if it is one. Its id is the key's, whatever the value says. */
-function parse(key: string, v: unknown): DeviceRecord | null {
-  const r = v as Partial<DeviceRecord> | null;
-  const ts = r?.tailscale;
-  const node = ts === null || (typeof ts?.nodeId === 'string' && typeof ts.dnsName === 'string');
-  if (typeof r?.name !== 'string' || !r.name || !node || typeof r.at !== 'string') return null;
-  const sealKey = typeof r.sealKey === 'string' && r.sealKey ? { sealKey: r.sealKey } : {};
-  const signKey = typeof r.signKey === 'string' && r.signKey ? { signKey: r.signKey } : {};
-  const caps = parseCaps(r.caps);
-  return { id: key.slice(PREFIX.length), name: r.name, tailscale: ts ? { nodeId: ts.nodeId, dnsName: ts.dnsName } : null, ...sealKey, ...signKey, ...(caps && { caps }), at: r.at };
-}
-
-export const deviceRecords = (): DeviceRecord[] =>
-  kv.list<unknown>(PREFIX).flatMap(([key, v]) => parse(key, v) ?? []);
-
-export const deviceRecord = (id: string): DeviceRecord | null => parse(PREFIX + id, kv.get<unknown>(PREFIX + id));
 
 /** The name a synced Mac gave itself, or null before it has synced since this build. */
 export const deviceName = (id: string): string | null => deviceRecord(id)?.name ?? null;
@@ -113,20 +91,6 @@ export async function announceDevice(now = Date.now()): Promise<void> {
   kv.set(PREFIX + self, { id: self, name, tailscale, ...(seal && { sealKey: seal }), ...(sign && { signKey: sign }), caps, at: new Date(now).toISOString() } satisfies DeviceRecord);
 }
 
-/**
- * One record per Tailscale node. A machine whose sync state was reset comes back under a new id and leaves its old
- * record behind; the newest record for a node is the live one. Records without a node are never merged.
- */
-export function currentRecords(records: DeviceRecord[]): DeviceRecord[] {
-  const newest = new Map<string, DeviceRecord>();
-  for (const d of records) {
-    const node = d.tailscale?.nodeId;
-    if (!node) continue;
-    const had = newest.get(node);
-    if (!had || d.at > had.at || (d.at === had.at && d.id > had.id)) newest.set(node, d);
-  }
-  return records.filter((d) => !d.tailscale?.nodeId || newest.get(d.tailscale.nodeId) === d);
-}
 
 /** The other synced Macs, never this one, with whether this Mac's Tailscale sees each up. Empty while sync is off. */
 export async function listDevices(): Promise<Device[]> {

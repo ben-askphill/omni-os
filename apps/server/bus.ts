@@ -17,6 +17,8 @@ export type FeedEvent =
   | { type: 'needs_you'; thread_id: string }
   /** An event automation's delivery was saved or moved on (automation-triggers.ts). Clients refetch the automations. */
   | { type: 'automation_delivery'; automation: string }
+  /** The automations were loaded again: a file changed here, through the editor, or from another machine (sync). Clients refetch them. */
+  | { type: 'automations' }
   /** The update check or Update moved on (update.ts). Clients refetch GET /api/update. */
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed (claude-artifacts.ts). Clients refetch the list when it ends. */

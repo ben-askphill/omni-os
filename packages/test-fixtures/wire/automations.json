@@ -10,6 +10,11 @@
     "file": "/tmp/omni-fixtures/automations/broken.yaml",
     "catchup": false,
     "error": "invalid schedule (cron \"61 8 * * *\", timezone \"Europe/Amsterdam\"): CronPattern: Invalid value for minute: 61",
+    "runs_on": {
+      "owner": null,
+      "isThisMac": true
+    },
+    "source": "shipped",
     "runs": [],
     "deliveries": [],
     "deliveries_more": false
@@ -38,6 +43,11 @@
       "secret": "OMNI_WEBHOOK_CI_FIXER",
       "secret_set": true
     },
+    "runs_on": {
+      "owner": null,
+      "isThisMac": true
+    },
+    "source": "shipped",
     "runs": [
       {
         "id": 3,
@@ -98,6 +108,11 @@
     "file": "/tmp/omni-fixtures/automations/daily-digest.yaml",
     "catchup": false,
     "next": "2026-01-05T09:00:00.000Z",
+    "runs_on": {
+      "owner": null,
+      "isThisMac": true
+    },
+    "source": "shipped",
     "runs": [
       {
         "id": 1,
@@ -139,6 +154,11 @@
       "secret": "OMNI_WEBHOOK_FLAKY_HOOK",
       "secret_set": true
     },
+    "runs_on": {
+      "owner": null,
+      "isThisMac": true
+    },
+    "source": "shipped",
     "runs": [],
     "deliveries": [
       {
@@ -224,6 +244,11 @@
       "updates": false
     },
     "next": null,
+    "runs_on": {
+      "owner": null,
+      "isThisMac": true
+    },
+    "source": "shipped",
     "runs": [
       {
         "id": 2,

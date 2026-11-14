@@ -1,7 +1,9 @@
 // /api/crew, /harnesses, /secrets, /automations, /profile, /devices.
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { deleteAutomation, lastRuns, loadAutomations, runAutomation, setEnabled } from './automations.ts';
+import { deleteAutomation, lastRuns, loadAutomations, runAutomation } from './automations.ts';
+import { automationFields, createAutomation, definitionOf, resetAutomation, saveAutomation, setAutomationEnabled, sourceKind } from './automation-files.ts';
+import { ownerOf } from './sync/owner.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
 import { isPrTrigger } from './automation-events.ts';
 import { recentDeliveries } from './automation-deliveries.ts';
@@ -90,6 +92,9 @@ metaApi.get('/automations', (c) => {
       ...(isPrTrigger(a.on) && { repo: watchedRepo({ ...a, on: a.on }), poll_error: pollErrors.get(a.id) ?? null }),
       // Webhook automations: where GitHub posts, and whether this Mac holds the signing secret (never its value).
       ...webhookInfo(a),
+      // The machine that runs it, by sync id (null before any machine claimed automations), and whether that is this one.
+      runs_on: ownerOf(a),
+      source: sourceKind(a.id),
       runs: lastRuns(a.id, 5),
       // What events reached it and what became of each, newest first, and whether the history has older ones.
       ...recentDeliveries(a.id),
@@ -116,8 +121,40 @@ metaApi.delete('/automations/:id', async (c) => {
     await deleteSecret('global', secret).catch((err) => console.error(`[automations] could not remove ${secret}:`, err));
   return c.json({ ok: true, removed });
 });
+// On or off, written into its YAML (automation-files.ts): a shipped one becomes the user's own copy first.
 metaApi.post('/automations/:id/enabled', async (c) => {
   const { enabled } = z.object({ enabled: z.boolean() }).parse(await c.req.json());
-  setEnabled(c.req.param('id'), enabled);
-  return c.json({ ok: true });
+  return edit(c, () => (setAutomationEnabled(c.req.param('id'), enabled), { ok: true }));
 });
+
+// The editor: the file's text and its fields as written (the prompt with its {{placeholders}}).
+metaApi.get('/automations/:id/definition', (c) => {
+  const d = definitionOf(c.req.param('id'));
+  return d ? c.json(d) : c.json({ error: 'not found' }, 404);
+});
+// Save the editor's fields over the file, keeping its comments, or its raw text: { fields } or { yaml }.
+const saveInput = z.union([z.object({ fields: automationFields }).strict(), z.object({ yaml: z.string().min(1).max(200_000) }).strict()]);
+metaApi.put('/automations/:id', async (c) => {
+  const parsed = saveInput.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid automation' }, 400);
+  return edit(c, () => saveAutomation(c.req.param('id'), parsed.data));
+});
+// A new automation in data/automations/<id>.yaml. `id` is optional: one is made from the name.
+metaApi.post('/automations', async (c) => {
+  const parsed = z.object({ id: z.string().max(64).optional(), fields: automationFields }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid automation' }, 400);
+  return edit(c, () => createAutomation(parsed.data.fields, parsed.data.id), 201);
+});
+// Drop the user's copy of a shipped automation, so the shipped YAML loads again.
+metaApi.post('/automations/:id/reset', (c) => edit(c, () => resetAutomation(c.req.param('id'))));
+
+/** A refused edit's message and status (automation-files.ts sets one), else a 500. */
+function edit(c: Context, run: () => unknown, ok: 200 | 201 = 200) {
+  try {
+    return c.json(run() as object, ok);
+  } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status === 400 || status === 404 || status === 409) return c.json({ error: (err as Error).message }, status);
+    throw err;
+  }
+}

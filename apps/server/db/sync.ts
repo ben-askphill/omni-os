@@ -4,11 +4,11 @@ import { db, now, tx } from './connection.ts';
 /**
  * What the sync relay carries. Events, artifacts, automation runs, completions and trigger deliveries are keyed by their uid, a
  * result_read, a limit_stop and an assignment by their thread's id, a remote_command by its command id, the rest by id or key.
- * A review_note is keyed by its id.
+ * A review_note is keyed by its id, an automation_file (a YAML in data/automations/) by its automation id.
  */
 export type SyncEntity =
   | 'channel' | 'folder' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv' | 'completion' | 'result_read' | 'limit_stop'
-  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note';
+  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file';
 export type SyncOp = 'upsert' | 'delete';
 
 export interface OutboxRow {
@@ -26,7 +26,7 @@ export interface OutboxRow {
  * the newest result read, whenever the write was (db/repos/needs-you.ts). A limit_stop is a thread's limit stop
  * alone, apart from the row, so a write to either never undoes the other.
  */
-const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note']);
+const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note', 'automation_file']);
 /** kv keys that stay on this machine: the sync cursor, machine id, switches and path map. */
 export const localKey = (key: string) => key.startsWith('sync.');
 

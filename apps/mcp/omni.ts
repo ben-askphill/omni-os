@@ -572,10 +572,61 @@ async function deviceId(device: string | undefined): Promise<string | undefined>
 server.registerTool(
   'set_automations_machine',
   {
-    description: 'Choose the synced machine for all scheduled and event-triggered automations. The choice syncs to other machines. Run now still uses the connected machine.',
+    description:
+      'Choose the synced machine for scheduled and event-triggered automations that do not name their own (save_automation fields.machine). The choice syncs to other machines. Run now still uses the connected machine.',
     inputSchema: { device: z.string().trim().min(1).describe('Machine id or name from list_devices, or here.') },
   },
   async ({ device }) => text(await call('/sync/automations-owner', { method: 'POST', body: JSON.stringify({ device: await deviceId(device) }) })),
+);
+
+server.registerTool(
+  'get_automation',
+  {
+    description: "One automation's YAML as written and its fields (the prompt with its {{placeholders}}), to edit with save_automation.",
+    inputSchema: { id: z.string().trim().min(1).max(64) },
+  },
+  async ({ id }) => text(await call(`/automations/${encodeURIComponent(id)}/definition`)),
+);
+
+server.registerTool(
+  'save_automation',
+  {
+    description:
+      `Create or change an automation, only when ${USER} asks. Writes its YAML in data/automations/ (a shipped one becomes ${USER}'s own copy, comments kept) and syncs it to the other machines. ` +
+      'Pass fields (all of them: start from get_automation) or yaml (the whole file). Without id it creates one, its id made from the name. ' +
+      'fields.machine picks the synced machine that runs it: an id or name from list_devices, here, or empty to follow set_automations_machine. Set cron or on, not both.',
+    inputSchema: {
+      id: z.string().trim().min(1).max(64).optional(),
+      create: z.boolean().optional().describe('Make a new one. Needs fields.'),
+      yaml: z.string().min(1).max(200_000).optional(),
+      fields: z
+        .object({
+          name: z.string(),
+          enabled: z.boolean(),
+          cron: z.string().optional(),
+          on: z.unknown().optional().describe('An event name or { event, repo, ... } as automations/*.yaml takes it.'),
+          timezone: z.string().optional(),
+          catchup: z.boolean().optional(),
+          channel: z.string(),
+          machine: z.string().optional(),
+          role: z.string().optional(),
+          harness: z.string().optional(),
+          model: z.string().optional(),
+          effort: z.string().optional(),
+          prompt: z.string(),
+        })
+        .optional(),
+    },
+  },
+  async ({ id, create, yaml, fields }) => {
+    if (!!yaml === !!fields) throw new Error('Pass fields or yaml, one of them.');
+    const f = fields && { ...fields, machine: fields.machine && fields.machine !== 'here' ? await deviceId(fields.machine) : fields.machine };
+    if (create || !id) {
+      if (!f) throw new Error('A new automation needs fields.');
+      return text(await call('/automations', { method: 'POST', body: JSON.stringify({ ...(id && { id }), fields: f }) }));
+    }
+    return text(await call(`/automations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(f ? { fields: f } : { yaml }) }));
+  },
 );
 
 server.registerTool(
@@ -848,6 +899,10 @@ const automationSummary = (a: any) => ({
   enabled: a.enabled,
   ...(a.on ? { on: a.on } : { cron: a.cron, timezone: a.timezone, next: a.next ?? null }),
   channel: a.channel,
+  // The machine its YAML names, where it runs now (a sync id, and whether that is this machine), and where its YAML comes from.
+  ...(a.machine && { machine: a.machine }),
+  ...(a.runs_on && { runs_on: a.runs_on }),
+  ...(a.source && { source: a.source }),
   ...(a.role && { role: a.role }),
   ...(a.harness && { harness: a.harness }),
   ...(a.model && { model: a.model }),
@@ -887,8 +942,8 @@ server.registerTool(
   'set_automation_enabled',
   {
     description:
-      `Turn an automation's schedule or event trigger on or off on this machine, only when ${USER} asks. ` +
-      'The YAML is not edited: the choice is saved in data/omni.config.json. Threads it already started are untouched.',
+      `Turn an automation's schedule or event trigger on or off, only when ${USER} asks. ` +
+      "It writes enabled into the automation's YAML in data/automations/ (a shipped one becomes the user's own copy), which syncs to the other machines. Threads it already started are untouched.",
     inputSchema: { automation: z.string().min(1).max(200).describe('Automation id from list_automations.'), enabled: z.boolean() },
   },
   async ({ automation, enabled }) => {

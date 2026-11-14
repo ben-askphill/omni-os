@@ -1,4 +1,5 @@
 import { db, kv, outbox } from '../db.ts';
+import { currentRecords, deviceRecords } from './device-records.ts';
 
 // Which Mac runs the scheduled (cron) automations once sync is on, so a nightly job does not run on both.
 // kv `automations.owner` holds that Mac's sync id. It is not a sync.* key, so it syncs, last writer wins,
@@ -42,3 +43,30 @@ export function claimIfUnowned(): boolean {
     .get(OWNER_KEY);
   return !held && claimAutomations();
 }
+
+/**
+ * A synced machine named by an automation's `machine:`: its sync id, matched by id first, then by name (any case) when
+ * one machine has it. Null when no synced machine matches, or two share the name.
+ */
+export function resolveMachine(asked: string): string | null {
+  const want = asked.trim();
+  if (!want) return null;
+  const all = currentRecords(deviceRecords());
+  if (all.some((d) => d.id === want)) return want;
+  const named = all.filter((d) => d.name.toLowerCase() === want.toLowerCase());
+  return named.length === 1 ? named[0].id : null;
+}
+
+/**
+ * Where one automation runs. Its own `machine:` wins over the shared choice above; one that names no synced machine
+ * runs nowhere until that machine syncs, so a typo never makes it run twice. Without sync every automation runs here.
+ */
+export function ownerOf(a: { machine?: string } | undefined): AutomationsOwner {
+  const self = outbox.machineId();
+  if (!a?.machine || !self) return automationsOwner();
+  const id = resolveMachine(a.machine) ?? a.machine;
+  return { owner: id, isThisMac: id === self };
+}
+
+/** One automation fires here: see ownerOf. */
+export const runsHere = (a: { machine?: string } | undefined) => ownerOf(a).isThisMac;

@@ -10,7 +10,7 @@ import { threads } from './db.ts';
 import { triggerDeliveries } from './db/repos/trigger-deliveries.ts';
 import { expiresAt, holdReason, isExpired, maxAgeMs, span } from './delivery-policy.ts';
 import { loadAutomations, type Automation } from './automations.ts';
-import { automationsOwner } from './sync/owner.ts';
+import { ownerOf } from './sync/owner.ts';
 
 /** The reason a skipped-by-hand delivery carries, on both Macs. */
 export const SKIPPED_BY_HAND = 'Skipped by hand';
@@ -24,7 +24,7 @@ function retryBlock(d: TriggerDelivery, a: Automation | undefined, made: boolean
   if (triggerDeliveries.isStarting(d.id)) return 'It is being started right now.';
   if (!a) return 'No automation with this id on this machine.';
   if (a.error) return `The automation is invalid: ${a.error}`;
-  if (!a.enabled && automationsOwner().isThisMac) return 'The automation is paused.';
+  if (!a.enabled && ownerOf(a).isThisMac) return 'The automation is paused.';
   if (isExpired(d.created_at, limitsOf(a), now)) return `The event is older than the automation's ${span(maxAgeMs(limitsOf(a)))} limit.`;
   return null;
 }
@@ -36,7 +36,7 @@ const HELD_FOR_OWNER = 'Held for the machine that runs automations. Skip it ther
 export function viewOf(d: TriggerDelivery, a: Automation | undefined, live: Map<string, number> = new Map(), now = Date.now()): DeliveryView {
   const limits = limitsOf(a);
   const pending = isPendingDelivery(d.state);
-  const owns = automationsOwner().isThisMac;
+  const owns = ownerOf(a).isThisMac;
   const made = !!triggerDeliveries.admitted(d.id, d.attempt);
   const retryable = d.state === 'failed' && !d.thread_id;
   const runs = (id: string) => live.get(id) ?? live.set(id, triggerDeliveries.liveRuns(id)).get(id)!;
@@ -88,7 +88,7 @@ export function retryDelivery(id: string, attempt: number): DeliveryAction {
   const view = viewsOf([d])[0];
   if (d.attempt !== attempt) return moved(view);
   if (!view.can_retry) return { ok: false, status: 409, error: view.retry_blocked ?? `Only a failed delivery can be retried, and this one is ${d.state}.`, delivery: view };
-  const owner = automationsOwner();
+  const owner = ownerOf(loadAutomations().find((a) => a.id === d.automation));
   // Checked and set in this one tick: no thread can appear between the checks above and the update.
   if (!triggerDeliveries.retry(id, attempt, owner.isThisMac ? 'accepted' : 'queued', owner.owner)) return moved(viewById(id)!);
   publishFeed({ type: 'automation_delivery', automation: d.automation });

@@ -14,7 +14,8 @@ const { app } = await import('../app.ts');
 const { configPath, userConfig, resolved, updateUserConfig } = await import('../user-config.ts');
 const { legacyConfig, migrateLegacyConfig } = await import('../config-migrate.ts');
 const { listCrew } = await import('../crew.ts');
-const { loadAutomations, setEnabled } = await import('../automations.ts');
+const { loadAutomations } = await import('../automations.ts');
+const { setAutomationEnabled, resetAutomation } = await import('../automation-files.ts');
 const { paths } = await import('../config.ts');
 
 const send = (method: string, path: string, body?: unknown) =>
@@ -124,14 +125,18 @@ describe('personal overrides', () => {
     expect(listCrew().find((c) => c.id === 'inbox')!.charter).not.toMatch(/\{\{|phillbert/);
   });
 
-  it('toggling a shared automation writes the user config, never the YAML', () => {
+  it('toggling a shared automation writes your own copy of its YAML, never the shipped file', () => {
     const before = loadAutomations().find((a) => a.id === 'weekly-review')!;
     const yaml = readFileSync(before.file, 'utf8');
-    setEnabled('weekly-review', !before.enabled);
-    expect(loadAutomations().find((a) => a.id === 'weekly-review')!.enabled).toBe(!before.enabled);
-    expect(userConfig().automations['weekly-review']).toEqual({ enabled: !before.enabled });
+    setAutomationEnabled('weekly-review', !before.enabled);
+    const after = loadAutomations().find((a) => a.id === 'weekly-review')!;
+    expect(after.enabled).toBe(!before.enabled);
+    expect(after.file).toBe(join(paths.personalAutomations, 'weekly-review.yaml'));
+    expect(readFileSync(after.file, 'utf8')).toContain(`enabled: ${!before.enabled}`);
+    expect(userConfig().automations['weekly-review']).toBeUndefined();
     expect(readFileSync(before.file, 'utf8')).toBe(yaml);
-    setEnabled('weekly-review', before.enabled);
+    resetAutomation('weekly-review');
+    expect(loadAutomations().find((a) => a.id === 'weekly-review')!.file).toBe(before.file);
   });
 
   it('an automation in data/automations wins over the shared one with the same id', () => {

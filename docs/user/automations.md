@@ -1,20 +1,30 @@
 # Automations
 
-`automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`, `tool-failure-triage`, `docs-daily`), all off until you turn them on. Turning one on or off in the UI writes `automations.<id>.enabled` to `data/omni.config.json`, never the YAML, and `automations.<id>.channel` there moves it to another channel. Your own automations go in `data/automations/`.
+`automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`, `tool-failure-triage`, `docs-daily`), all off until you turn them on. Your own automations go in `data/automations/`; the same id there wins over the shared one.
 
-Delete on an automation's card removes it from this machine after a confirmation. One of your own in `data/automations/` loses its YAML file. A shared one stays in `automations/`. Omni hides it with `automations.<id>.deleted` in `data/omni.config.json`, so an update cannot bring it back, and removing that key restores it. Either way its schedule stops at once, a webhook automation's signing secret goes with it, and threads it already started stay. The hide is per machine, like the on/off override. With sync on, delete it on the machine that runs automations too. Desktop web, phone web and the desktop app all have Delete. The native iOS Automations screen can only toggle.
+## Edit in Omni
 
-The Conductor manages them too: `list_automations` lists each one with its schedule or trigger, error and last runs; `run_automation` starts one now on this machine; `set_automation_enabled` writes the same on/off override; `delete_automation` deletes like the card does. Creating one is still a YAML file.
+The Automations page edits every field of an automation and writes the result into its YAML. New makes one, Edit on a card opens it, and the toggle turns it on or off. Desktop web, phone web and the desktop app share the editor.
+
+- The Form tab covers name, on or off, a schedule (cron, timezone, catch-up) or an event with its options, channel, machine, role, harness, model, effort and prompt. The YAML tab edits the file as text.
+- Every save, the toggle included, writes `data/automations/<id>.yaml`. Editing a shared one writes your own copy there first, with the file's comments and any keys the form does not know kept. Its card then says Edited, and updates to the shared file stop reaching it until Reset to shipped in the editor drops your copy.
+- Omni refuses a save it would load as invalid (a bad cron, both `cron` and `on`, an unknown channel, harness or model), and writes nothing.
+- With sync on, a file saved in Omni reaches your other machines too, and so does a Delete of it. A file you edit by hand stays on its machine until the next save in Omni.
+- An old per-machine on/off or channel override in `data/omni.config.json` (`automations.<id>.enabled`, `.channel`) is folded into the file on its first save and removed.
+- The Conductor has the same: `list_automations` lists each one with where it runs, `get_automation` reads its file and fields, `save_automation` creates or changes one, `set_automation_enabled` turns it on or off in its YAML, `run_automation` starts one now on this machine and `delete_automation` deletes like the card does.
+
+Delete on an automation's card removes it from this machine after a confirmation. One of your own in `data/automations/` loses its YAML file. A shared one stays in `automations/`, Omni hides it with `automations.<id>.deleted` in `data/omni.config.json`, so an update cannot bring it back, and removing that key restores it. Either way its schedule stops at once, a webhook automation's signing secret goes with it, and threads it already started stay. Hiding a shared one is per machine. With sync on, delete it on the machine that runs it too. Desktop web, phone web and the desktop app all have Delete. The native iOS Automations screen can only toggle, which writes the YAML the same way.
 
 ```yaml
 name: Morning coffee
-enabled: false          # the default; the UI toggle overrides it per machine
+enabled: false          # the default; the UI toggle writes it here
 cron: "0 8 * * 1-5"
 timezone: Europe/Amsterdam  # optional, defaults to your timezone
 channel: inbox          # default inbox
 role: inbox
 harness: claude         # optional, like model and effort
 model: sonnet
+machine: omarchy        # optional: the synced machine that runs it, by name or sync id
 prompt: |
   Run the morning-coffee skill for today.
 ```
@@ -42,9 +52,13 @@ catchup_max_age: 6h     # seconds, or 45s, 90m, 6h, 2d
 
 ## Choose a machine
 
-In Automations, use "Run automations on" to choose this machine or another synced machine. The choice applies to all scheduled and event-triggered automations and reaches the other machines through sync. The selected machine needs the automation definitions, channel folders and credentials it uses, and must be awake with Omni running. Offline machines can be selected for future runs. This does not move a running thread. "Run now" runs on the connected machine.
+In Automations, "Run automations on" picks this machine or another synced machine for every scheduled and event-triggered automation that does not name its own. The choice reaches the other machines through sync.
 
-The Conductor can make the same choice with `set_automations_machine`, using an id or name from `list_devices`, or `here`.
+One automation can pick its own under Edit, Machine. That writes `machine:` into its YAML, by the machine's name (its sync id when two machines share a name), and the file syncs, so every machine agrees on where it runs. Same as Run automations on removes the key. A `machine:` that names no synced machine runs nowhere until that machine syncs, and its card shows the name with a warning. Without sync every automation runs here and the picker is off.
+
+The chosen machine needs the channel folders and credentials the automation uses, and must be awake with Omni running. Offline machines can be picked for future runs. This does not move a running thread. "Run now" runs on the connected machine. The card's machine chip says where each one runs.
+
+The Conductor makes the shared choice with `set_automations_machine`, and one automation's with `save_automation` (`fields.machine`), using an id or name from `list_devices`, or `here`.
 
 ## Tool-failure triage
 
@@ -113,7 +127,7 @@ prompt: |
 - A publish from one of the automation's own runs, from a thread under one, or from a run whose page started it is skipped, so two automations cannot start each other forever.
 - The run's prompt is the automation's prompt plus an `## Event` section with the page's URL, and its title, file, description and the thread and channel that published it, in a code fence, as data. Its title is `<name> · <page>`, and its trigger is `event`.
 - The Automations page lists the last deliveries with their outcome: Started (with a link to the run), Held for owner, Failed or Skipped, with the reason. [Deliveries](#deliveries-history-retry-and-skip) says what you can do with one.
-- With sync on, only the Mac that runs automations starts a run. The other Mac holds each delivery for it, whatever its own toggle says, and sync carries it over. That Mac skips it if the automation is paused there or it has no automation with that id. Personal automations in `data/automations/` only exist on their Mac, so a publish on the other Mac does not reach them.
+- With sync on, only the machine that runs the automation (its own `machine:`, else Run automations on) starts a run. The other Mac holds each delivery for it, whatever its own toggle says, and sync carries it over. That Mac skips it if the automation is paused there or it has no automation with that id. A file in `data/automations/` that you only edited by hand exists on its Mac alone, so a publish on the other Mac does not reach it. A save in Omni syncs it.
 
 ### GitHub webhooks
 

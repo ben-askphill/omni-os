@@ -295,6 +295,34 @@ export type {
   TurnView,
 } from '@omni/shared/changes.ts';
 
+/** What the Automations editor sends (PUT /automations/:id, POST /automations). Empty optional text clears the key. */
+export interface AutomationFields {
+  name: string;
+  enabled: boolean;
+  cron?: string;
+  on?: unknown;
+  timezone?: string;
+  catchup?: boolean;
+  channel: string;
+  /** A sync machine id, `here`, or empty for "Run automations on". */
+  machine?: string;
+  role?: string;
+  harness?: string;
+  model?: string;
+  effort?: string;
+  prompt: string;
+}
+
+/** GET /automations/:id/definition: the YAML as written, and its fields (the prompt with its {{placeholders}}). */
+export interface AutomationDefinition {
+  id: string;
+  file: string;
+  shipped: boolean;
+  personal: boolean;
+  yaml: string;
+  fields: AutomationFields & { machine_id: string | null };
+}
+
 export interface AutomationRun {
   thread_id: string | null;
   trigger: string;
@@ -321,9 +349,18 @@ export interface Automation {
   timezone: string;
   channel: string;
   role?: string;
+  harness?: string;
   model?: string;
+  effort?: string;
   prompt: string;
   enabled: boolean;
+  catchup?: boolean;
+  /** The synced machine its YAML names, by name or id. Unset, it follows "Run automations on". */
+  machine?: string;
+  /** Where it runs: a machine's sync id (null before any machine claimed automations), and whether that is this one. */
+  runs_on: { owner: string | null; isThisMac: boolean };
+  /** `shipped`: automations/ as it came. `edited`: your copy of a shipped one in data/automations/. `own`: yours alone. */
+  source: 'shipped' | 'edited' | 'own';
   file?: string;
   error?: string;
   next?: string | null;
@@ -404,6 +441,7 @@ export type FeedEvent =
   | { type: 'needs_you'; thread_id: string }
   /** A delivery to this automation was saved or changed state. */
   | { type: 'automation_delivery'; automation: string }
+  | { type: 'automations' }
   /** The update check or Update moved on: refetch GET /api/update. */
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed. Refetch the list once `refreshing` is false. */

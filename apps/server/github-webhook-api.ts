@@ -16,7 +16,7 @@ import { publishFeed } from './bus.ts';
 import { deliveryId, triggerDeliveries } from './db/repos/trigger-deliveries.ts';
 import { DELIVERY_ID, isWebhookEvent, readWebhook, signatureValid, WEBHOOK_MAX_BYTES, webhookPath, webhookSecretName } from './github-webhook.ts';
 import { deleteSecret, globalSecret, hasSecret, setSecret } from './secrets.ts';
-import { automationsOwner } from './sync/owner.ts';
+import { ownerOf } from './sync/owner.ts';
 
 export const githubWebhookApi = new Hono();
 
@@ -63,7 +63,7 @@ githubWebhookApi.post(
     const reading = readWebhook(a.on, wanted, payload, wanted === 'pull_request_review' ? await ghLogin() : null);
     if (reading.kind === 'reject') return c.json({ error: reading.error }, 400);
     if (reading.kind === 'ignore') return c.json({ ignored: reading.reason }, 202);
-    const owner = automationsOwner();
+    const owner = ownerOf(a);
     // Another Mac cannot tell whether it is on there, so it holds the event and that Mac decides.
     if (owner.isThisMac && !a.enabled) return c.json({ error: 'the automation is paused' }, 409);
     const { delivery, fresh } = triggerDeliveries.add({

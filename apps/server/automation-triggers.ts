@@ -13,7 +13,7 @@ import { fenced, isPrTrigger, type ArtifactTrigger } from './automation-events.t
 import { clearBackoff, holdReason, isExpired, maxAgeMs, recordFailedStart, span } from './delivery-policy.ts';
 import { webhookPrompt } from './github-webhook.ts';
 import { loadAutomations, runAutomation, type Automation } from './automations.ts';
-import { automationsOwner, runsAutomationsHere } from './sync/owner.ts';
+import { ownerOf, runsHere } from './sync/owner.ts';
 import type { TriggerDelivery, TriggerDeliveryState } from '@omni/shared/automation-triggers.ts';
 
 /** Each captured field is cut to this, so a long title or description cannot flood the run's prompt or the list. */
@@ -50,9 +50,9 @@ export function startedBy(automation: string, threadId: string): boolean {
 export function observePublication(threadId: string, toolUseId: string, p: Published): TriggerDelivery[] {
   const thread = threads.get(threadId);
   if (!thread) return [];
-  const owner = automationsOwner();
   const saved: TriggerDelivery[] = [];
   for (const a of loadAutomations().filter(isArtifactAutomation)) {
+    const owner = ownerOf(a);
     if (owner.isThisMac && !a.enabled) continue;
     if (a.on.channels && !a.on.channels.includes(thread.channel_id)) continue;
     if (p.update && !a.on.updates) continue;
@@ -171,10 +171,10 @@ export function admitPending(): Promise<number> {
     let settled = 0;
     do {
       again = false;
-      if (!runsAutomationsHere()) break;
-      const pending = triggerDeliveries.pending();
-      if (!pending.length) break;
       const automations = loadAutomations();
+      // Each delivery waits for the machine that runs its automation; one with no automation here goes to the shared owner.
+      const pending = triggerDeliveries.pending().filter((d) => runsHere(automations.find((a) => a.id === d.automation)));
+      if (!pending.length) break;
       for (const d of pending) {
         if (!(await admit(d, automations))) continue;
         settled++;

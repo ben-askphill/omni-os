@@ -1,9 +1,10 @@
 import type { Device } from '@omni/shared/handoff.ts';
 import { runOnRows } from '@omni/shared/thread-machine.ts';
 import { runOnOptions } from '../components/RunOnPicker.tsx';
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { api, errorText, useApi, type Automation, type Thread, type SyncStatus } from '../api.ts';
 import { DeliveryHistory } from '../components/DeliveryHistory.tsx';
+import { AutomationEditor, type EditorTarget } from '../components/AutomationEditor.tsx';
 import { Button, Chip, ConfirmDialog, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, Picker, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { pageColumn, PageToolbar, RefreshButton, SearchField } from '../components/ui/feedback.tsx';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
@@ -13,7 +14,7 @@ import { relTime } from '@omni/shared/format.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
 import { artifactChannels, describeArtifactSource, describeEvent, describeWebhookSource, nextRunLabel } from '../format.ts';
 import { href, navigate } from '../router.ts';
-import { useApp, useFeed } from '../store.tsx';
+import { useApp, useFeed, useHereName } from '../store.tsx';
 
 const RUN_TONE: Record<string, string> = {
   done: 'var(--done)',
@@ -210,8 +211,20 @@ function WebhookPanel({ id, webhook, onChanged }: { id: string; webhook: NonNull
   );
 }
 
-function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: () => void; onDelete: () => void }) {
+/** Which machine runs it: its own `machine:`, else the shared pick. Null with one machine and nothing picked. */
+function machineChip(a: Automation, devices: Device[] | null | undefined, hereName: string | undefined): { label: string; title: string; missing: boolean } | null {
+  if (!a.machine && !devices?.length) return null;
+  const own = a.machine ? 'Its own pick' : 'Follows Run automations on';
+  if (a.runs_on.isThisMac) return { label: hereName ?? 'This machine', title: `${own}: runs on the machine you talk to`, missing: false };
+  const d = devices?.find((x) => x.id === a.runs_on.owner);
+  if (d) return { label: d.name, title: `${own}: runs on ${d.name}`, missing: false };
+  return { label: a.machine ?? 'Unknown machine', title: 'No synced machine has this name, so it runs nowhere until one does', missing: true };
+}
+
+function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automation; devices: Device[] | null | undefined; onChanged: () => void; onDelete: () => void; onEdit: () => void }) {
   const { channel } = useApp();
+  const hereName = useHereName();
+  const machine = machineChip(a, devices, hereName);
   const [enabled, setEnabled] = useState(a.enabled);
   const [toggling, setToggling] = useState(false);
   const [running, setRunning] = useState(false);
@@ -286,7 +299,14 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
                 {a.role}
               </span>
             )}
+            {machine && (
+              <span className={`inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 ${machine.missing ? 'text-warn' : ''}`} title={machine.title}>
+                <Icon name={machine.missing ? 'alert' : 'monitor'} size={12} className={machine.missing ? '' : 'text-fg-3'} />
+                {machine.label}
+              </span>
+            )}
             {a.model && <span className="inline-flex h-6 items-center rounded-full bg-bg px-2.5 font-num text-[11px]">{a.model}</span>}
+            {a.source === 'edited' && <Chip tone="outline" title="Your copy of a shipped automation, in data/automations/">Edited</Chip>}
           </div>
           {enabled && a.on?.event === 'artifact_published' && !a.error && (
             <div className="mt-2.5 text-[12.5px] text-fg-3">
@@ -305,7 +325,19 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
             </div>
           )}
           {enabled && a.on && a.on.event !== 'artifact_published' && a.on.event !== 'github_webhook' && !a.error && (
-            <div className="mt-2.5 text-[12.5px] text-fg-3">{a.poll_error ? <span className="text-fg-2">{a.poll_error}</span> : <>Watching <span className="font-medium text-fg">{a.repo}</span>, one run per event</>}</div>
+            <div className="mt-2.5 text-[12.5px] text-fg-3">
+              {!a.runs_on.isThisMac ? (
+                <>
+                  Watches <span className="font-medium text-fg">{a.repo}</span> from {machine?.missing ? 'the machine it names, once that one syncs' : (machine?.label ?? 'the machine that runs it')}
+                </>
+              ) : a.poll_error ? (
+                <span className="text-fg-2">{a.poll_error}</span>
+              ) : (
+                <>
+                  Watching <span className="font-medium text-fg">{a.repo}</span>, one run per event
+                </>
+              )}
+            </div>
           )}
           {enabled && a.next && !a.error && (
             <div className="mt-2.5 text-[12.5px] text-fg-3">
@@ -319,7 +351,7 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
       {a.error && (
         <div className="mx-4 mb-4 md:mx-5">
           <ErrorNote>
-            {a.error}. Fix it in <span className="font-mono text-[12px]">{shortPath(a.file ?? `automations/${a.id}.yaml`)}</span>.
+            {a.error}. Fix it with Edit, or in <span className="font-mono text-[12px]">{shortPath(a.file ?? `automations/${a.id}.yaml`)}</span>.
           </ErrorNote>
         </div>
       )}
@@ -336,9 +368,14 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
           <button type="button" onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt} className="hov flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-fg-3 [--hov:var(--surface-2)] hover:text-fg">
             <Icon name="chevronRight" size={12} className={`transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${showPrompt ? 'rotate-90' : ''}`} /> Prompt
           </button>
-          <Button size="sm" variant="danger" icon="trash" className="[--hov:var(--surface-2)]" onClick={onDelete} aria-label={`Delete ${a.name}`}>
-            Delete
-          </Button>
+          <span className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" icon="pencil" className="[--hov:var(--surface-2)]" onClick={onEdit} aria-label={`Edit ${a.name}`}>
+              Edit
+            </Button>
+            <Button size="sm" variant="danger" icon="trash" className="[--hov:var(--surface-2)]" onClick={onDelete} aria-label={`Delete ${a.name}`}>
+              Delete
+            </Button>
+          </span>
         </div>
         {showPrompt && <pre className="fade-in mx-2.5 mt-1 mb-2 rounded-2xl bg-bg px-3.5 py-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-fg-2">{a.prompt || '(empty)'}</pre>}
       </div>
@@ -463,7 +500,7 @@ function AutomationMachine({ refreshing }: { refreshing: boolean }) {
     <div className="relative z-10 rounded-[var(--r-xl)] bg-surface p-4 md:p-5">
       <div className="mb-2 text-[13px] font-medium">Run automations on</div>
       <Picker label="Run automations on" value={pick} options={options} onChange={(v) => void save(v)} disabled={saving || !status.data?.machineId || !devices.data} />
-      <p className="mt-2 text-[12.5px] text-fg-3">Scheduled and event-triggered runs use the machine picked here after sync. It must be awake with Omni running. Run now uses the connected machine.</p>
+      <p className="mt-2 text-[12.5px] text-fg-3">Scheduled and event-triggered runs use the machine picked here after sync, unless an automation picks its own under Edit. It must be awake with Omni running. Run now uses the connected machine.</p>
       {status.data && !status.data.machineId && <p className="mt-2 text-[12.5px] text-fg-3">Sync another machine to choose where automations run.</p>}
       {(error || status.error || devices.error) && <ErrorNote className="mt-2">{error || status.error || devices.error}</ErrorNote>}
     </div>
@@ -486,12 +523,20 @@ const matchesSearch = (a: Automation, q: string) => {
 
 export function AutomationsPage() {
   const res = useApi<Automation[]>('/automations');
-  const { reload } = res;
+  const devices = useApi<Device[]>('/devices');
+  const reloadList = res.reload;
+  const reloadDevices = devices.reload;
+  // The machine chips name devices: a machine that synced since the page opened shows by name.
+  const reload = useCallback(() => {
+    reloadList();
+    reloadDevices();
+  }, [reloadList, reloadDevices]);
   const [deleting, setDeleting] = useState<Automation | null>(null);
+  const [editing, setEditing] = useState<EditorTarget | null>(null);
   // Keep run and delivery statuses fresh when an automation thread or delivery changes state (debounced, threads update often).
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useFeed((e) => {
-    if (e.type !== 'reconnect' && e.type !== 'automation_delivery' && !(e.type === 'thread' && e.thread.automation)) return;
+    if (e.type !== 'reconnect' && e.type !== 'automation_delivery' && e.type !== 'automations' && !(e.type === 'thread' && e.thread.automation)) return;
     if (timer.current) return;
     timer.current = setTimeout(() => {
       timer.current = undefined;
@@ -514,12 +559,22 @@ export function AutomationsPage() {
         title="Automations"
         subtitle={
           <>
-            Prompts that run on a schedule or when something happens. Each run becomes a thread in its channel. Definitions live in <span className="font-mono text-[length:var(--fs-code)] text-fg-2">automations/*.yaml</span> and reload when you save.
+            Prompts that run on a schedule or when something happens. Each run becomes a thread in its channel. Edits here write the YAML in <span className="font-mono text-[length:var(--fs-code)] text-fg-2">data/automations/</span>, and hand edits to it or to <span className="font-mono text-[length:var(--fs-code)] text-fg-2">automations/*.yaml</span> reload when you save.
           </>
         }
       />
       <div className={`${pageColumn('page')} rise space-y-3 pb-16`}>
-        <PageToolbar className="mb-4" right={<RefreshButton onClick={reload} busy={res.loading && !!res.data} label="Reload automations" />}>
+        <PageToolbar
+          className="mb-4"
+          right={
+            <span className="flex items-center gap-2">
+              <Button size="sm" variant="primary" icon="plus" onClick={() => setEditing({ id: null })}>
+                New
+              </Button>
+              <RefreshButton onClick={reload} busy={res.loading && !!res.data} label="Reload automations" />
+            </span>
+          }
+        >
           <SearchField value={q} onChange={setQ} placeholder="Search automations" label="Search automations" />
           <Segmented
             label="Trigger"
@@ -540,7 +595,7 @@ export function AutomationsPage() {
           <Loading />
         ) : res.data.length === 0 ? (
           <Empty icon="clock" title="No automations yet">
-            Add a YAML file to <span className="font-mono text-[12px]">automations/</span> with name, cron, channel and prompt. It shows up here right away.
+            Make one with New, or add a YAML file to <span className="font-mono text-[12px]">data/automations/</span> with name, cron, channel and prompt. It shows up here right away.
           </Empty>
         ) : list.length === 0 ? (
           <Empty icon="search" title="No match">
@@ -549,12 +604,13 @@ export function AutomationsPage() {
         ) : (
           list.map((a, i) => (
             <div key={a.id} style={{ '--i': i } as CSSProperties}>
-              <AutomationCard a={a} onChanged={reload} onDelete={() => setDeleting(a)} />
+              <AutomationCard a={a} devices={devices.data} onChanged={reload} onDelete={() => setDeleting(a)} onEdit={() => setEditing({ id: a.id, name: a.name })} />
             </div>
           ))
         )}
       </div>
       <DeleteAutomationDialog a={deleting} onClose={() => setDeleting(null)} onDeleted={reload} />
+      <AutomationEditor target={editing} onClose={() => setEditing(null)} onSaved={reload} />
     </div>
   );
 }

@@ -22,6 +22,7 @@ const LABEL: Record<BackfillCount['entity'], string> = {
   remote_command: 'commands for threads on other machines',
   assignment: 'which machine runs each thread',
   review_note: 'review notes on Changes diffs',
+  automation_file: 'automation files you edited in Omni',
   kv: 'settings (kv)',
 };
 
