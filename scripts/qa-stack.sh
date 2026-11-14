@@ -76,7 +76,7 @@ SH
   # OMNI_TOKEN cleared: an agent's shell carries the live server's, and this stack makes its own.
   OMNI_TOKEN= OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="${QA_CLAUDE_BIN:-$fx/fake-claude.mjs}" OMNI_CODEX_BIN="${QA_CODEX_BIN:-$fx/fake-codex.mjs}" OMNI_CURSOR_BIN="${QA_CURSOR_BIN:-$fx/fake-cursor.mjs}" \
-    OMNI_BROWSER="${QA_BROWSER:-0}" OMNI_SUGGESTIONS=0 OMNI_UPDATE_CHECK="${QA_UPDATE_CHECK:-0}" OMNI_SUPERVISOR="${QA_SUPERVISOR:-}" OMNI_CAFFEINATE=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
+    OMNI_BROWSER="${QA_BROWSER:-0}" OMNI_SUGGESTIONS=0 OMNI_UPDATE_CHECK="${QA_UPDATE_CHECK:-0}" OMNI_SUPERVISOR="${QA_SUPERVISOR:-}" OMNI_CAFFEINATE=0 OMNI_CLAUDE_LOGIN_SYNC=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
     OMNI_CURSOR_API_URL="$cursor_api" OMNI_CURSOR_CLOUD_POLL_MS=1500 PATH="$DIR/bin:$PATH" \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     detach npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &

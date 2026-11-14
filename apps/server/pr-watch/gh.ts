@@ -1,6 +1,7 @@
 // The gh reads a PR watch makes: one view of the PR per poll, and a failing check's log only when a wake needs it.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { trustedPR, type PRInfo } from '../automation-events.ts';
 import { MAX_BODY, type CheckObservation, type FeedbackObservation, type PRObservation } from './sources.ts';
 
 const run = promisify(execFile);
@@ -99,4 +100,44 @@ export async function checkLog(repo: string, check: CheckObservation): Promise<s
   if (!m) return null;
   const { stdout } = await run('gh', ['run', 'view', m[1], '--repo', repo, '--job', m[2], '--log-failed'], { maxBuffer: 32 * 1024 * 1024 });
   return logTail(stdout);
+}
+
+/**
+ * The PR a branch name means in `repo`: the first open one whose head lives in the repo itself. A fork can open a PR
+ * from a branch of the same name, and its checks run the fork's code, so its PRs never count.
+ */
+export function ownBranchPR(repo: string, list: any[]): number | null {
+  const owner = repo.split('/')[0].toLowerCase();
+  const pr = list.find((p) => !p.isCrossRepository && String(p.headRepositoryOwner?.login ?? '').toLowerCase() === owner);
+  return pr ? Number(pr.number) : null;
+}
+
+/**
+ * A PR's checks, when they are safe to hand an agent: the PR is open, its head is in the repo itself and its author has
+ * a role on the repo (the trustedPR rule in automation-events.ts). Null otherwise.
+ */
+export function trustedChecks(repo: string, view: any, association: string | undefined): { number: number; checks: CheckObservation[] } | null {
+  if ((view.state ?? 'OPEN') !== 'OPEN') return null;
+  if (!trustedPR({ isCrossRepository: view.isCrossRepository, authorAssociation: association } as PRInfo)) return null;
+  return { number: view.number, checks: parseObservation(repo, view).checks };
+}
+
+/**
+ * The checks on the open PR `number` names, else on the branch's own open PR (`ownBranchPR`). Null when there is none,
+ * or it fails `trustedChecks`.
+ */
+export async function branchChecks(repo: string, branch: string, number?: number | null): Promise<{ number: number; checks: CheckObservation[] } | null> {
+  const opts = { maxBuffer: 8 * 1024 * 1024, timeout: 30_000 };
+  let n = number ?? null;
+  if (!n) {
+    const { stdout } = await run('gh', ['pr', 'list', '--repo', repo, '--head', branch, '--state', 'open', '--limit', '10', '--json', 'number,isCrossRepository,headRepositoryOwner,author'], opts);
+    n = ownBranchPR(repo, JSON.parse(stdout));
+    if (!n) return null;
+  }
+  // gh pr view has no authorAssociation, so it comes from the REST answer.
+  const [view, assoc] = await Promise.all([
+    run('gh', ['pr', 'view', String(n), '--repo', repo, '--json', 'number,state,isCrossRepository,headRefOid,statusCheckRollup'], opts),
+    run('gh', ['api', `repos/${repo}/pulls/${n}`, '--jq', '.author_association'], opts),
+  ]);
+  return trustedChecks(repo, JSON.parse(view.stdout), assoc.stdout.trim());
 }
