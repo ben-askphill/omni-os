@@ -25,8 +25,10 @@ export interface SyncDeviceKey {
   pinnedFingerprint: string | null;
   /** Both set and different: changes that make this Mac act wait until Ben confirms the new key. */
   keyChanged: boolean;
-  /** Ben trusts it to make this Mac act. Until then its commands, assignments, update requests and secrets wait. */
+  /** It may make this Mac act. A paired machine is, from the first key this Mac pinned; otherwise its actions wait. */
   trusted?: boolean;
+  /** Its commands, assignments, update requests and secrets this Mac holds until Ben confirms. Missing on an older server. */
+  held?: number;
 }
 
 /** GET /api/sync/refused: a change this Mac would not apply. */

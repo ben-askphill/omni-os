@@ -76,7 +76,7 @@ Settings opens with Servers, then a search over every setting and the same group
 - Workspace: the GitHub owner. Folders, the central brain folder included, show their value, since they are paths on the server's machine. The Hermes URL is under Harnesses & models.
 - Worktrees: automatic cleanup and its idle days (`PUT /worktrees/retention`).
 - Machines: the server's machine, read-only, and Update all machines, which checks, downloads and updates every synced machine through `/update/fleet` as the Web UI's card does.
-- Sync: what the server reports, plus each machine's signing key (Trust this machine for a machine new to this one, Confirm new key when a trusted machine's key changed) and the changes this server refused.
+- Sync: what the server reports, plus each machine's signing key (paired machines are trusted with their first key; Confirm new key when a machine's key changed, with how many of its actions wait, and Trust this machine only for one still not trusted) and the changes this server refused.
 - Sharing & access: Devices, Rotate install token and the MCP clients that reached `/mcp` (Approve, Remove).
 - About: what the server reports, read-only.
 - Secrets: names by scope, add or replace a value, delete one. A value is never shown again.

@@ -14,8 +14,8 @@ import { loadOptional, optionalView, type Optional } from './optional-remote';
 import { Group } from './parts';
 import { confirmKeyConfirmation, refusedRows, syncKeyRows, withKeyConfirmed, type SyncKeyRow } from './sync-keys-model';
 
-// Settings, Sync: each synced machine's signing-key fingerprint, with Trust this machine for a new one and Confirm new key
-// when a trusted one's key changed, and the changes
+// Settings, Sync: each synced machine's signing-key fingerprint, with Confirm new key when a machine's key changed and
+// Trust this machine for one still not trusted (a paired machine is trusted with its first key), and the changes
 // this machine refused. Both hide on a server that predates signed sync (a 404).
 
 export const loadSyncKeys = (api: OmniApi) => loadOptional(api.syncDevices());
@@ -67,7 +67,7 @@ export function SyncKeysGroup({ remote }: { remote: Remote<Optional<SyncDeviceKe
 
   return (
     <View style={styles.stack}>
-      <Group title="Signing keys" footer="Each machine signs the changes it syncs. A new machine's commands, assignments, update requests and secrets wait until you trust it, and a changed key's until you confirm it.">
+      <Group title="Signing keys" footer="Each machine signs the changes it syncs. Machines you pair through Omni Connect are trusted automatically with their first key. Only a changed key needs you: that machine's commands, assignments, update requests and secrets wait until you confirm it.">
         {rows.length ? (
           rows.map((row, i) => <KeyRow key={row.id} row={row} first={i === 0} busy={confirming === row.id} disabled={confirming !== null} onConfirm={() => ask(row)} />)
         ) : (
@@ -90,6 +90,7 @@ function KeyRow({ row, first, busy, disabled, onConfirm }: { row: SyncKeyRow; fi
         {row.current ? <Chip label="This machine" tone="outline" /> : null}
         {row.untrusted ? <Chip label="New machine" tone="needs" /> : null}
         {row.keyChanged ? <Chip label="Key changed" tone="needs" /> : null}
+        {row.held ? <Chip label={row.held} tone="outline" /> : null}
       </View>
       <Text selectable accessibilityLabel={`Key fingerprint ${row.fingerprint}`} style={[styles.fingerprint, { color: colors.fg2 }]}>
         {row.fingerprint}

@@ -132,6 +132,18 @@ describe('signing keys card', () => {
     await act(async () => {});
     expect(posts).toEqual(['/sync/devices/mini/confirm-key']);
   });
+  it('asks only to confirm a changed key, never to trust it as new, and says what waits for it', async () => {
+    replies['/sync/devices'] = [
+      { id: 'mac', name: 'MacBook', current: false, fingerprint: 'dddd3333', pinnedFingerprint: '00009999', keyChanged: true, trusted: false, held: 2 },
+      { id: 'pro', name: 'Pro', current: false, fingerprint: 'eeee4444', pinnedFingerprint: 'eeee4444', keyChanged: false, trusted: true, held: 0 },
+    ];
+    await mount(createElement(SyncKeysCard));
+    expect(host.textContent).toContain('trusted automatically');
+    expect(host.textContent).toContain('2 actions waiting');
+    expect(host.textContent).not.toContain('New machine');
+    expect(button('Trust this machine')).toBeFalsy();
+    expect([...host.querySelectorAll('button')].filter((b) => b.textContent?.includes('Confirm new key'))).toHaveLength(1);
+  });
   it('shows a new machine with no key yet as new, with no Trust button until its key arrives', async () => {
     replies['/sync/devices'] = [{ id: 'mini', name: 'Mac mini', current: false, fingerprint: null, pinnedFingerprint: null, keyChanged: false, trusted: false }];
     await mount(createElement(SyncKeysCard));

@@ -1,5 +1,7 @@
 # Machines sign what they push, and only signed changes make a machine act
 
+> The per-machine Trust click below is superseded by [ADR 0013](0013-paired-machines-are-trusted.md): a machine is trusted with the first key pinned for it, and only a changed key needs Ben. The rest of this ADR stands.
+
 ADR 0004 and ADR 0008 treat the relay as trusted: every machine applies whatever change the relay hands it. ADR 0009 adds that the relay can mint a Connect session. The adversarial review of 2026-11-14 (issue #667, findings S9, S20, S3 and S13) showed what that trust covers in practice. Anyone who can write to the relay's change log, with a stolen relay token, a relay bug or a compromised Cloudflare account, can:
 
 - make any synced machine run a prompt as Ben, through a `remote_command`, an `assignment` or an `update.ask.*` record;
