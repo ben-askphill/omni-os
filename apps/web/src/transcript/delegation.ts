@@ -1,6 +1,6 @@
 // Delegation cards: the threads the Conductor's delegate and delegate_team calls started, and the sub-agents
 // any thread's own run launched with the harness's Agent tool.
-import type { Thread } from '../api.ts';
+import type { BackgroundTask, Thread } from '../api.ts';
 import { str, type TaskView, type ToolCall } from '@omni/shared/transcript-fold.ts';
 
 /** One delegated thread as a card row. Live fields come from the thread itself once it is known. */
@@ -38,6 +38,25 @@ export function agentStatus(c: ToolCall, task: TaskView | undefined, running: bo
   if (!c.result) return running ? 'running' : 'stopped';
   if (stopped) return 'stopped';
   return c.result.is_error ? 'failed' : 'done';
+}
+
+/**
+ * Stored task rows merged with the server's live list. The live list wins where it can know: a task it no longer runs
+ * has ended, even if no end row was stored. `here`: this server runs the thread's process. While another Mac holds the
+ * thread, this server's list never has its tasks, so the stored rows (synced from that Mac) decide.
+ */
+export function mergeTasks(stored: Map<string, TaskView>, live: BackgroundTask[], threadId: string, opts: { feedLive: boolean; here: boolean }): Map<string, TaskView> {
+  if (!opts.here) return stored;
+  const mine = live.filter((t) => t.thread_id === threadId && t.tool_use_id);
+  const out = new Map(stored);
+  for (const [id, t] of out) {
+    if (t.running && opts.feedLive && !mine.some((m) => m.tool_use_id === id)) out.set(id, { ...t, running: false, status: t.status ?? 'stopped' });
+  }
+  for (const m of mine) {
+    const prev = out.get(m.tool_use_id!);
+    out.set(m.tool_use_id!, { running: true, background: m.background, tool_uses: m.tool_uses ?? prev?.tool_uses, started: prev?.started ?? m.started_at });
+  }
+  return out;
 }
 
 /** A tool group split for display: its sub-agents, its delegations, and every other call. */
