@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
+import { failedRunIds, type RerunResult } from '@omni/shared/pr-rerun.ts';
+import { checkTone } from '@omni/shared/thread-glance.ts';
 
 const run = promisify(execFile);
 
@@ -167,6 +169,31 @@ export async function setAutoMerge(repo: string, n: number, enabled: boolean, me
   } catch (e) {
     throw ghRefusal(e);
   }
+}
+
+/**
+ * `gh run rerun --failed` for each workflow run behind the PR's failing checks, read fresh from GitHub. Refused (409) when
+ * no failing check is a GitHub Actions job, and with gh's message (502) when not one run started again. A partial rerun
+ * answers with each run's outcome.
+ */
+export async function rerunFailedChecks(repo: string, n: number): Promise<RerunResult> {
+  const pr = JSON.parse(await gh(['pr', 'view', String(n), '--repo', repo, '--json', 'statusCheckRollup'], undefined, CHECK_TIMEOUT));
+  const checks = ((pr.statusCheckRollup ?? []) as any[]).map((c) => ({ state: String(c.conclusion || c.state || c.status || '').toUpperCase(), url: c.detailsUrl || c.targetUrl || null }));
+  const ids = failedRunIds(checks);
+  const skipped = checks.filter((c) => checkTone(c.state) === 'needs' && failedRunIds([c]).length === 0).length;
+  if (!ids.length) throw Object.assign(new Error(skipped ? 'None of the failing checks is a GitHub Actions run, so there is nothing to rerun from here.' : 'No checks are failing.'), { status: 409 });
+  const runs = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        await gh(['run', 'rerun', id, '--failed', '--repo', repo], undefined, CHECK_TIMEOUT);
+        return { id, ok: true };
+      } catch (e) {
+        return { id, ok: false, error: ghError(e) };
+      }
+    }),
+  );
+  if (!runs.some((r) => r.ok)) throw Object.assign(new Error(runs.map((r) => (runs.length > 1 ? `Run ${r.id}: ${r.error}` : r.error)).join(' ')), { status: 502 });
+  return { runs, skipped };
 }
 
 export interface BranchPRMark {

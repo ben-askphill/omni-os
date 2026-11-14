@@ -61,6 +61,24 @@ describe('channel run defaults', () => {
   });
 });
 
+describe('channel worktree lists', () => {
+  it('stores one entry per line, keeps them on other saves and clears them when empty', async () => {
+    const set = await patch({ worktree_include: ' .env \n\n# local\nconfig/*.json\n.env', worktree_shared: 'node_modules\napps/web/node_modules/' });
+    expect(set.status).toBe(200);
+    expect(set.body).toMatchObject({ worktree_include: '.env\nconfig/*.json', worktree_shared: 'node_modules\napps/web/node_modules/' });
+    expect((await patch({ notes: 'z' })).body.worktree_shared).toBe('node_modules\napps/web/node_modules/');
+    expect((await patch({ worktree_include: '  \n' })).body.worktree_include).toBeNull();
+  });
+
+  it('refuses a shared directory that is a pattern or leaves the repo', async () => {
+    const pattern = await patch({ worktree_shared: 'packages/*/node_modules' });
+    expect(pattern.status).toBe(400);
+    expect(pattern.body.error).toMatch(/^Shared directories: .* is a pattern/);
+    expect((await patch({ worktree_shared: '../../elsewhere' })).status).toBe(400);
+    expect((await patch({ worktree_shared: '.git/hooks' })).status).toBe(400);
+  });
+});
+
 describe('Auto', () => {
   it('picks the run for a thread that sets nothing, and says why', async () => {
     H.db.channels.create({ id: 'plain', name: 'Plain', kind: 'internal', use_worktree: 0, base_dir: H.tmp });
@@ -125,5 +143,16 @@ describe('Conductor channel defaults', () => {
     expect(H.thread(unset.id)).toMatchObject({ model: 'claude-sonnet-5-5', auto_reason: expect.any(String) });
     const other = await start({ channel: 'tuned' });
     expect(H.thread(other.id)).toMatchObject({ model: 'claude-sonnet-5-5', auto_reason: expect.any(String) });
+  });
+});
+
+describe('channel step prompts', () => {
+  it('sets, keeps and clears them; blank goes back to the built-in prompt', async () => {
+    const set = await patch({ prompt_open_pr: '  Use the pr-writer skill and the repo template.  ', prompt_fix_conflicts: 'Rebase and push.' });
+    expect(set.status).toBe(200);
+    expect(set.body).toMatchObject({ prompt_open_pr: 'Use the pr-writer skill and the repo template.', prompt_fix_conflicts: 'Rebase and push.', prompt_fix_checks: null });
+    expect((await patch({ notes: 'z' })).body.prompt_open_pr).toBe('Use the pr-writer skill and the repo template.');
+    expect((await patch({ prompt_open_pr: '   ' })).body.prompt_open_pr).toBeNull();
+    expect((await patch({ prompt_fix_conflicts: null })).body.prompt_fix_conflicts).toBeNull();
   });
 });

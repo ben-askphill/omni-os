@@ -1,5 +1,5 @@
 import { LinkBrand } from '../ui/Brand';
-import { FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, stepParkedText, type PRStep } from '@omni/shared/thread-glance.ts';
+import { stepParkedText, type PRStep } from '@omni/shared/thread-glance.ts';
 import { watchCopy } from '@omni/shared/pr-watch.ts';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -11,7 +11,7 @@ import { Notice } from '../components/Notice';
 import { useThreadLive, useThreadView } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { MERGE_ADVICE, prContent, type PRContent } from '../pr/model';
-import { useMerge, usePRWatch, useThreadPR } from '../pr/hooks';
+import { useMerge, usePRWatch, useRerunChecks, useThreadPR } from '../pr/hooks';
 import type { MergeOutcome } from '../pr/actions';
 import { CheckDot } from '../pr/CheckDot';
 import { stepWorking } from '../pr/step';
@@ -39,12 +39,14 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
   // A delegated thread's PR is watched from that thread, so the watch here is for this thread's own PR only.
   const watch = usePRWatch(id, pr.number !== null && !pr.from, pr.page.kind === 'pr' && !pr.from ? pr.page.pr : null);
   const merge = useMerge(pr.channelId, pr.number, pr.refresh);
+  const rerun = useRerunChecks(pr.channelId, pr.number, pr.page.kind === 'pr' ? pr.page.pr : null);
   const [asked, setAsked] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<MergeOutcome | null>(null);
   const insets = useSafeAreaInsets();
 
+  const step = usePRStep(live, view);
   const page = pr.page;
-  const content = page.kind === 'pr' ? prContent(page.pr) : null;
+  const content = page.kind === 'pr' ? prContent(page.pr, step.prompts) : null;
   const url = content?.url;
   const crewOnly = page.kind === 'empty' && !thread?.branch && page.crew.length > 0;
   useEffect(() => {
@@ -54,7 +56,6 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
     });
   }, [navigation, content?.number, url, crewOnly]);
 
-  const step = usePRStep(live, view);
   const ask = useCallback(
     async (prompt: string) => {
       setAsked(null);
@@ -104,7 +105,7 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
           </>
         ) : null}
         {page.canOpen ? (
-          <Button {...stepButton('open', 'Open PR')} disabled={step.working !== null} accessibilityHint="Asks the agent to push the branch and open a pull request" onPress={() => void ask(OPEN_PR_PROMPT)} />
+          <Button {...stepButton('open', 'Open PR')} disabled={step.working !== null} accessibilityHint="Asks the agent to push the branch and open a pull request" onPress={() => void ask(step.prompts.open)} />
         ) : null}
         {parkedNote('open') ? <Text style={[styles.meta, { color: colors.fg3 }]}>{parkedNote('open')}</Text> : null}
         {asked ? <Text style={[styles.meta, { color: colors.fg3 }]}>{asked}</Text> : null}
@@ -140,6 +141,19 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
           ) : null}
           {fix && parkedNote(fix.kind) ? <Text style={[styles.meta, { color: colors.fg3 }]}>{parkedNote(fix.kind)}</Text> : null}
           {asked ? <Text style={[styles.meta, { color: colors.fg3 }]}>{asked}</Text> : null}
+          {rerun.can ? (
+            <View style={styles.inline}>
+              <Button
+                variant="secondary"
+                label="Rerun failed checks"
+                busy={rerun.busy}
+                accessibilityHint="Starts the failed GitHub Actions jobs again, with no message to the agent"
+                onPress={() => void rerun.run()}
+              />
+            </View>
+          ) : null}
+          {rerun.outcome?.kind === 'started' ? <Text accessibilityLiveRegion="polite" style={[styles.meta, { color: colors.fg2 }]}>{rerun.outcome.text}</Text> : null}
+          {rerun.outcome?.kind === 'failed' ? <Callout message={rerun.outcome.message} /> : null}
         </View>
 
         {from ? (
@@ -230,7 +244,7 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
       {c.open ? (
         <View style={[styles.merge, { paddingBottom: Math.max(insets.bottom, space.s8), borderTopColor: colors.line }]}>
           {c.note ? <Text style={[styles.note, { color: colors.fg3 }]}>{c.note}</Text> : null}
-          {outcome ? <MergeOutcomeNote outcome={outcome} onAsk={from ? undefined : ask} /> : null}
+          {outcome ? <MergeOutcomeNote outcome={outcome} fixPrompt={step.prompts.conflicts} onAsk={from ? undefined : ask} /> : null}
           <SlideToConfirm label="Slide to squash and merge" doneLabel={`Merged #${c.number}`} busyLabel="Merging" disabled={!c.canMerge} onConfirm={slide} />
           {!c.canMerge ? <Text style={[styles.note, { color: colors.fg3 }]}>A draft cannot be merged. Mark it ready for review on GitHub.</Text> : null}
         </View>
@@ -240,7 +254,7 @@ export function PullRequestScreen({ route, navigation }: RootScreenProps<'PullRe
 }
 
 /** `onAsk` is left out for a delegated thread's PR: Fix conflicts would ask this thread, not the one on the PR's branch. */
-function MergeOutcomeNote({ outcome, onAsk }: { outcome: MergeOutcome; onAsk?: (prompt: string) => Promise<void> }) {
+function MergeOutcomeNote({ outcome, fixPrompt, onAsk }: { outcome: MergeOutcome; fixPrompt: string; onAsk?: (prompt: string) => Promise<void> }) {
   const { colors } = useOmniTheme();
   if (outcome.kind === 'merged') return null;
   if (outcome.kind === 'refused') {
@@ -249,7 +263,7 @@ function MergeOutcomeNote({ outcome, onAsk }: { outcome: MergeOutcome; onAsk?: (
       <Callout message={failure.title}>
         <Text style={[styles.meta, { color: colors.fg2 }]}>{failure.detail}</Text>
         <Text style={[styles.meta, { color: colors.fg3 }]}>{MERGE_ADVICE[failure.kind]}</Text>
-        {failure.kind === 'conflict' && onAsk ? <Button variant="secondary" label="Fix conflicts" onPress={() => void onAsk(FIX_CONFLICTS_PROMPT)} /> : null}
+        {failure.kind === 'conflict' && onAsk ? <Button variant="secondary" label="Fix conflicts" onPress={() => void onAsk(fixPrompt)} /> : null}
       </Callout>
     );
   }

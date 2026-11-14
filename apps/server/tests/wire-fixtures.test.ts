@@ -805,7 +805,7 @@ async function scenario() {
   expect(continued.continued_from?.id).toBe(id);
   expect(continued.continued_in).toHaveLength(1);
 
-  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null, setup: 'background' });
+  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null, setup: 'background', teardown: true });
   const check = keep('channel-action.json', await call('POST', '/channels/acme/actions', actionBody)) as { id: string };
   const preview = (await call('POST', '/channels/acme/actions', { name: 'Theme preview', command: 'echo "Previewing on $OMNI_PORT"; sleep 30', port: 0 })) as { id: string };
   const tests = (await call('POST', '/channels/acme/actions', { name: 'Tests', command: 'echo "1 failing" >&2; exit 1' })) as { id: string };

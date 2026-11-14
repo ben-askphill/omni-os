@@ -298,8 +298,11 @@ export interface AutomationRun {
   thread_id: string | null;
   trigger: string;
   created_at: string;
+  /** The thread's status; `skipped` for a scheduled run that never started (see skip_reason). */
   status: string | null;
   title: string | null;
+  /** Why a scheduled run was skipped: its precheck failed, or a catch-up was older than catchup_max_age. Older servers leave it out. */
+  skip_reason?: string | null;
 }
 /** A PR change on GitHub, a page a thread published (`artifact_published`), or a signed GitHub webhook (`github_webhook`). */
 export type AutomationTrigger = PrTrigger | ArtifactTrigger | WebhookTrigger;

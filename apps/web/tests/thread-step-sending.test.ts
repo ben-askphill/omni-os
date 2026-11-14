@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { FIX_CONFLICTS_PROMPT, type PRStep } from '@omni/shared/thread-glance.ts';
+import { FIX_CONFLICTS_PROMPT, STEP_PROMPTS, type PRStep } from '@omni/shared/thread-glance.ts';
 
 // Fix conflicts turns to "Fixing conflicts…" at the click and must stay that way until the turn it started ends. It
 // used to drop back to "Fix conflicts" when the POST returned, before the stream caught up, and again for the frame
@@ -37,6 +37,7 @@ function Probe({ underway, busy, parked }: { underway: PRStep | null; busy: bool
     slotBusy: busy,
     underway,
     parked,
+    prompts: STEP_PROMPTS,
     applyThread: () => {},
     setQueued: (p) => queuedSets.push(p),
     setActionError: (e) => errors.push(e),

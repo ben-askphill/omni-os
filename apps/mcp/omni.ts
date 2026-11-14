@@ -45,7 +45,7 @@ server.registerTool(
   'list_channels',
   {
     description:
-      'List Omni channels (one per client or project) with repo, store, running thread count and sidebar folders. ' +
+      'List Omni channels (one per client or project) with repo, store, running thread count, sidebar folders and, when set, what new worktrees copy or share from the main checkout. ' +
       'Each folder shows its thread count and a few recent thread titles, so you can pick the one a task belongs in.',
   },
   async () => {
@@ -59,6 +59,9 @@ server.registerTool(
         repo: c.github_repo,
         running: c.running,
         notes: c.notes,
+        // What each new worktree gets from the main checkout beyond the repo's .worktreeinclude: copied files, linked folders.
+        ...(c.worktree_include ? { copy_into_worktrees: c.worktree_include.split('\n') } : {}),
+        ...(c.worktree_shared ? { shared_directories: c.worktree_shared.split('\n') } : {}),
         folders: folderSummary(c.folders),
       })),
     );
@@ -371,6 +374,33 @@ server.registerTool(
     const id = thread_id ?? SELF;
     if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
     return text((await call(`/threads/${encodeURIComponent(id)}/pr`)).crew ?? []);
+  },
+);
+
+server.registerTool(
+  'rerun_failed_checks',
+  {
+    description:
+      "Start a PR's failed GitHub Actions jobs again (`gh run rerun --failed` for each failing workflow run), with no agent " +
+      'turn. Use it for a flaky or infrastructure failure; a real failure needs a fix pushed instead. Name the PR by `repo` ' +
+      '(owner/name, as list_pull_requests and crew_prs give it) or `channel`, plus `number`. Answers each run with ok or ' +
+      "gh's error, and `skipped`, the failing checks that are not Actions runs. Refused when no failing check is an Actions run.",
+    inputSchema: {
+      repo: z.string().optional().describe('owner/name of the GitHub repo.'),
+      channel: z.string().optional().describe('An Omni channel id whose GitHub repo holds the PR. Pass this or repo.'),
+      number: z.number().int().positive(),
+    },
+  },
+  async ({ repo, channel, number }) => {
+    let id = channel;
+    if (!id) {
+      if (!repo) throw new Error('Pass repo (owner/name) or channel.');
+      const list: any[] = await call('/channels');
+      const hit = list.find((c) => c.github_repo?.toLowerCase() === repo.trim().toLowerCase());
+      if (!hit) throw new Error(`No channel has ${repo} as its GitHub repo. Channels with a repo: ${list.flatMap((c) => (c.github_repo ? [c.github_repo] : [])).join(', ') || 'none'}.`);
+      id = hit.id as string;
+    }
+    return refused(() => call(`/channels/${encodeURIComponent(id)}/prs/${number}/rerun-failed`, { method: 'POST', body: '{}' }));
   },
 );
 
@@ -763,6 +793,137 @@ server.registerTool(
   },
   async ({ delivery_id, attempt }) =>
     refused(() => call(`/deliveries/${encodeURIComponent(delivery_id)}/skip`, { method: 'POST', body: JSON.stringify(attempt === undefined ? {} : { attempt }) })),
+);
+
+/** An automation as list_automations shows it: what it runs, when, and how its last runs went. No YAML path, no deliveries. */
+const automationSummary = (a: any) => ({
+  id: a.id,
+  name: a.name,
+  enabled: a.enabled,
+  ...(a.on ? { on: a.on } : { cron: a.cron, timezone: a.timezone, next: a.next ?? null }),
+  channel: a.channel,
+  ...(a.role && { role: a.role }),
+  ...(a.harness && { harness: a.harness }),
+  ...(a.model && { model: a.model }),
+  ...(a.effort && { effort: a.effort }),
+  prompt: a.prompt.length > 200 ? `${a.prompt.slice(0, 200)}…` : a.prompt,
+  ...(a.error && { error: a.error }),
+  ...(a.poll_error && { poll_error: a.poll_error }),
+  last_runs: (a.runs ?? []).slice(0, 3).map((r: any) => ({ thread_id: r.thread_id, trigger: r.trigger, at: r.created_at, status: r.status })),
+});
+
+server.registerTool(
+  'list_automations',
+  {
+    description:
+      'List the automations on this machine: id, name, enabled, its schedule (cron, timezone, next run) or event trigger (on), channel, role and run defaults, ' +
+      'the start of its prompt, any error that stops it running, and its last three runs with their thread ids. Event deliveries are list_automation_deliveries.',
+    inputSchema: {},
+  },
+  async () => text((await call('/automations')).map(automationSummary)),
+);
+
+server.registerTool(
+  'run_automation',
+  {
+    description:
+      `Run an automation now, once, only when ${USER} asks. It starts a new thread on this machine with the automation's prompt and defaults, ` +
+      'even when the automation is disabled or another machine runs the schedule. An automation with an error is refused with the reason. Returns the new thread id.',
+    inputSchema: { automation: z.string().min(1).max(200).describe('Automation id from list_automations.') },
+  },
+  async ({ automation }) => {
+    const t = await call(`/automations/${encodeURIComponent(automation)}/run`, { method: 'POST' });
+    return text({ automation, thread_id: t.id, title: t.title, channel: t.channel_id, status: t.status });
+  },
+);
+
+server.registerTool(
+  'set_automation_enabled',
+  {
+    description:
+      `Turn an automation's schedule or event trigger on or off on this machine, only when ${USER} asks. ` +
+      'The YAML is not edited: the choice is saved in data/omni.config.json. Threads it already started are untouched.',
+    inputSchema: { automation: z.string().min(1).max(200).describe('Automation id from list_automations.'), enabled: z.boolean() },
+  },
+  async ({ automation, enabled }) => {
+    await call(`/automations/${encodeURIComponent(automation)}/enabled`, { method: 'POST', body: JSON.stringify({ enabled }) });
+    return text({ automation, enabled });
+  },
+);
+
+server.registerTool(
+  'delete_automation',
+  {
+    description:
+      `Destructive: delete an automation on this machine, only when ${USER} asks for that automation to be deleted. It cannot be undone from Omni. ` +
+      "The user's own YAML in data/automations/ is removed (removed: file); a shipped one is hidden on this machine (removed: hidden). " +
+      'Its schedule stops now, a webhook automation loses its signing secret, and threads it already started stay. To pause one instead, use set_automation_enabled.',
+    inputSchema: { automation: z.string().min(1).max(200).describe('Automation id from list_automations.') },
+  },
+  async ({ automation }) => {
+    const res = await call(`/automations/${encodeURIComponent(automation)}`, { method: 'DELETE' });
+    return text({ deleted: automation, removed: res.removed });
+  },
+);
+
+/** A channel action without its timestamps and sort position. */
+const actionSummary = (a: any) => ({ id: a.id, name: a.name, command: a.command, port: a.port, setup: a.setup, secrets: a.secrets });
+/** Most of a run's output an agent needs is the end: the error, or the URL a server printed. */
+const RUN_OUTPUT_TAIL = 1500;
+const runSummary = (r: any, withOutput = false) => ({
+  run_id: r.id,
+  action_id: r.action_id,
+  name: r.name,
+  state: r.state,
+  port: r.port,
+  exit_code: r.exit_code,
+  ...(r.error && { error: r.error }),
+  started_at: r.started_at,
+  ended_at: r.ended_at,
+  ...(withOutput && r.output !== undefined && { output: r.output.length > RUN_OUTPUT_TAIL ? `…${r.output.slice(-RUN_OUTPUT_TAIL)}` : r.output }),
+});
+
+server.registerTool(
+  'list_channel_actions',
+  {
+    description:
+      "A channel's actions: named commands (a dev server, a theme preview, tests) that run in a thread's checkout, with their command, port and setup mode. " +
+      'Pass channel for the channel\'s list. Pass thread_id instead to also get that thread\'s runs (state, port, exit code) ' +
+      'and blocked: why no action can run in it right now, or null. include_output: true adds the end of each run\'s output, with the values of its secrets masked; ask for it only when you need it.',
+    inputSchema: {
+      channel: z.string().optional().describe('Channel id. Use list_channels.'),
+      thread_id: z.string().optional().describe('A thread whose channel actions and runs to list.'),
+      include_output: z.boolean().optional().describe('With thread_id: add the last 1,500 characters of each run\'s output.'),
+    },
+  },
+  async ({ channel, thread_id, include_output }) => {
+    if (!channel === !thread_id) throw new Error('Pass channel or thread_id, not both.');
+    if (channel) return text((await call(`/channels/${encodeURIComponent(channel)}/actions`)).map(actionSummary));
+    const res = await call(`/threads/${encodeURIComponent(thread_id!)}/actions`);
+    return text({ actions: res.actions.map(actionSummary), runs: res.runs.map((r: any) => runSummary(r, include_output === true)), blocked: res.blocked });
+  },
+);
+
+server.registerTool(
+  'run_channel_action',
+  {
+    description:
+      `Start one of a channel's actions in a thread's checkout, by action id or name, only when ${USER} asks or the thread's work needs it (a preview to share, say). ` +
+      'It runs in the background through the login shell; the result is the started run. Read its state later with list_channel_actions and thread_id (include_output: true for its output). ' +
+      'Refused with the reason while the worktree is being prepared, for a thread that runs off this machine, or when its fixed port is taken.',
+    inputSchema: {
+      thread_id: z.string().describe('The thread whose checkout it runs in.'),
+      action: z.string().min(1).describe('Action id or name (any case) from list_channel_actions.'),
+    },
+  },
+  async ({ thread_id, action }) => {
+    const { actions } = await call(`/threads/${encodeURIComponent(thread_id)}/actions`);
+    const want = action.trim().toLowerCase();
+    const hit = actions.find((a: any) => a.id === action) ?? actions.find((a: any) => a.name.toLowerCase() === want);
+    if (!hit) throw new Error(`The thread's channel has no action "${action}" (actions: ${actions.map((a: any) => `"${a.name}"`).join(', ') || 'none'}).`);
+    const run = await call(`/threads/${encodeURIComponent(thread_id)}/actions/${encodeURIComponent(hit.id)}/run`, { method: 'POST' });
+    return text(runSummary(run));
+  },
 );
 
 server.registerTool('disk_space', {

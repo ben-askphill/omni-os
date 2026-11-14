@@ -21,6 +21,7 @@ const RUN_TONE: Record<string, string> = {
   stopped: 'var(--fg-4)',
   running: 'var(--live)',
   queued: 'var(--fg-4)',
+  skipped: 'var(--line-strong)',
 };
 
 /** Recent runs as a row of bars, oldest left: a glance at reliability. */
@@ -30,9 +31,26 @@ function RunStrip({ runs }: { runs: Automation['runs'] }) {
   return (
     <span className="flex h-3.5 items-end gap-[3px]" role="img" aria-label={`${runs.filter((r) => r.status === 'done').length} of ${runs.length} recent runs finished`}>
       {bars.map((r, i) => (
-        <i key={i} title={`${r.status ?? 'removed'} · ${relTime(r.created_at)}`} className={`block w-[5px] rounded-full ${r.status === 'running' ? 'pulse' : ''}`} style={{ height: r.status === 'done' ? '100%' : '70%', background: RUN_TONE[r.status ?? ''] ?? 'var(--line-strong)' }} />
+        <i key={i} title={`${r.status ?? 'removed'} · ${relTime(r.created_at)}`} className={`block w-[5px] rounded-full ${r.status === 'running' ? 'pulse' : ''}`} style={{ height: r.status === 'done' ? '100%' : r.status === 'skipped' ? '35%' : '70%', background: RUN_TONE[r.status ?? ''] ?? 'var(--line-strong)' }} />
       ))}
     </span>
+  );
+}
+
+/** A scheduled run skipped before it started (failed precheck, stale catch-up): no thread to open, so the reason shows under it. */
+function SkippedRun({ run }: { run: Automation['runs'][number] }) {
+  return (
+    <li className="flex min-w-0 items-start gap-2.5 px-2 py-1.5 text-[12.5px] text-fg-3">
+      <StatusDot status="idle" size={7} className="mt-[5px]" />
+      <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="min-w-0 flex-1 truncate font-num">{relTime(run.created_at)}</span>
+          {run.trigger !== 'cron' && <span className="shrink-0 font-num text-[length:var(--fs-meta)]">{run.trigger}</span>}
+          <span className="shrink-0 text-right text-[length:var(--fs-12)]">Skipped</span>
+        </span>
+        <span className="mt-0.5 block font-mono text-[11px] leading-snug break-words">{run.skip_reason}</span>
+      </span>
+    </li>
   );
 }
 
@@ -348,6 +366,7 @@ function AutomationCard({ a, onChanged, onDelete }: { a: Automation; onChanged: 
         ) : (
           <ul className="-mx-2">
             {a.runs.map((r, i) => {
+              if (r.skip_reason) return <SkippedRun key={`skip-${r.created_at}-${i}`} run={r} />;
               const inner = (
                 <>
                   <StatusDot status={r.status ?? 'failed'} size={7} />

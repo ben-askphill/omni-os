@@ -6,7 +6,7 @@ import { crewPRs, prThread } from './crew-prs.ts';
 import { followBranch } from './branch-follow.ts';
 import { channels, threads } from './db.ts';
 import { emitThread } from './runner/state.ts';
-import { allPRs, branchPRs, getPR, listPRs, mergePR, setAutoMerge, threadPRMarks } from './github.ts';
+import { allPRs, branchPRs, getPR, listPRs, mergePR, rerunFailedChecks, setAutoMerge, threadPRMarks } from './github.ts';
 import { requestPRReview } from './pr-review.ts';
 import { fetchPRImage, githubImage, proxyPRImages } from './github-images.ts';
 
@@ -100,6 +100,12 @@ githubApi.post('/channels/:id/prs/:n/auto-merge', async (c) => {
     return c.json({ error: 'Only a paired device can turn auto-merge on. Arm it with the slide in the PR view.' }, 403);
   }
   return c.json(await setAutoMerge(repoOf(c.req.param('id')), Number(c.req.param('n')), enabled, method));
+});
+
+// Starts the failed jobs of each failing workflow run again, with no agent turn (github.ts rerunFailedChecks).
+githubApi.post('/channels/:id/prs/:n/rerun-failed', async (c) => {
+  const number = z.coerce.number().int().positive().parse(c.req.param('n'));
+  return c.json(await rerunFailedChecks(repoOf(c.req.param('id')), number));
 });
 
 // Resolve the PR's origin on the server so every client delegates to the same parent.

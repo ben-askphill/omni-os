@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // A stand-in for the gh CLI, for QA runs that need pull requests without GitHub. Put a `gh` link to it first on PATH.
-// It answers the calls apps/server/github.ts and apps/server/pr-watch/gh.ts make with fixed PRs; `pr merge` prints what gh prints and changes nothing,
+// It answers the calls apps/server/github.ts and apps/server/pr-watch/gh.ts make with fixed PRs; `pr merge` and `run rerun` print what gh prints and change nothing,
 // except that `--auto` and `--disable-auto` turn the PR's auto-merge on and off.
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -130,6 +130,8 @@ if (has('api')) {
 } else if (has('pr', 'merge') && args.includes('--disable-auto')) {
   rmSync(armedFile(args[2]), { force: true });
   console.log(`✓ Auto-merge disabled for pull request acme/shop#${args[2]}`);
+} else if (has('run', 'rerun')) {
+  console.log(`✓ Requested rerun (failed jobs) of run ${args[2]}`);
 } else if (has('pr', 'merge')) {
   console.log(`Merged pull request #${args[2]} (${args.filter((a) => a.startsWith('--')).join(' ')})`);
 } else {
