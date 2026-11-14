@@ -83,9 +83,17 @@ export type PRStep = 'open' | 'conflicts' | 'checks';
 
 const STEP_OF: Record<string, PRStep> = { [OPEN_PR_PROMPT]: 'open', [FIX_CONFLICTS_PROMPT]: 'conflicts', [FIX_CHECKS_PROMPT]: 'checks' };
 
-/** The step a message asks for, when it is one of the step prompts. */
+/**
+ * Where the server's list of failing checks starts in a Fix checks message (apps/server/fix-checks.ts). The step prompt
+ * is what comes before it.
+ */
+export const FAILING_CHECKS_MARK = '\n\nFailing checks on PR #';
+
+/** The step a message asks for, when it is one of the step prompts, with or without the failing checks after it. */
 export function stepOf(text: string | null | undefined): PRStep | null {
-  return STEP_OF[(text ?? '').trim()] ?? null;
+  const t = text ?? '';
+  const cut = t.indexOf(FAILING_CHECKS_MARK);
+  return STEP_OF[(cut >= 0 ? t.slice(0, cut) : t).trim()] ?? null;
 }
 
 /** What a step's button says while the agent works on it. */

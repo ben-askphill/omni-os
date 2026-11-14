@@ -75,11 +75,37 @@ Values live in the server's secret store under service `omni-os`, account `<scop
 
 A channel's settings list its named actions: a name, a command, the secrets it needs (names only) and a port. Each thread runs them from its Actions tab. They are kept on this Mac and not synced.
 
-- The command runs with your login shell in the thread's checkout, with the terminal's environment plus `OMNI_THREAD_ID`, `OMNI_BRANCH` and `OMNI_ARTIFACTS_DIR`.
-- Secrets: only the names listed reach the run, read from the secret store (the channel's value, else the global one). A missing one stops the run before it starts. Billing, sync and Grok Bot keys can't be listed.
+- The command runs with your login shell in the thread's checkout, with the terminal's environment plus `OMNI_THREAD_ID`, `OMNI_BRANCH` and `OMNI_ARTIFACTS_DIR`. `OMNI_REPO_ROOT` is the channel's repo (the main checkout) and `OMNI_WORKTREE` the thread's own worktree, set only for a worktree thread. The setup action gets them too.
+- Secrets: only the names listed reach the run, read from the secret store (the channel's value, else the global one). A missing one stops the run before it starts. Their values are masked as `[redacted]` in the run's stored output (values under 4 characters are not). Billing, sync and Grok Bot keys can't be listed.
 - Port: none, a free one per run, or a fixed one. A free one comes from 9300 to 9399, as `$OMNI_PORT` and `$PORT`, so two threads previewing at once never share one: `shopify theme dev --port $OMNI_PORT`. A fixed port that another run or another program holds stops the run with a message naming it. A command with `--port 9292` written in it is refused unless the action's port is set to 9292, so Omni knows about it.
 - Setup: one action per channel can run in every new worktree, once each time the worktree is prepared. Pick "Before the agent starts" to hold the agent until it succeeds, or "Alongside the agent" to start both together. A blocking setup that fails, or one you stop, leaves the thread at Setup failed with its output and your first message kept, and Retry setup runs it again. Opening a thread or sending it a follow-up never reruns it. Threads in the channel's own checkout, Hermes and Cursor Cloud threads get no setup.
 - Teardown: one action per channel can run in a thread's worktree right before a cleanup or the retention pass removes it (Run before a worktree is removed), to stop a preview or delete a Shopify preview theme. It gets the same environment as any other run, and its run shows in the thread's Actions tab. If it fails, can't start or runs past 5 minutes (`OMNI_TEARDOWN_TIMEOUT_MS`), Omni stops it, notes why on the cleanup's result and removes the worktree anyway. A deleted thread's worktree gets no teardown, since there is no thread to record it on.
+
+The Conductor reads a channel's actions, or a thread's actions and runs, with `list_channel_actions` (run output only with `include_output: true`), and starts one in a thread with `run_channel_action` (by id or name). Adding, editing and stopping actions stay in the UI.
+
+## Worktree files
+
+A new worktree has only what git tracks, so ignored files such as `.env` or `shopify.theme.toml` are missing. List them in a `.worktreeinclude` file in the repo's root, in `.gitignore` syntax, and Omni copies them from the main checkout into each thread worktree it makes, before the setup action and the agent start:
+
+```
+# .worktreeinclude
+.env
+shopify.theme.toml
+config/*.local.json
+```
+
+- Only files that exist in the main checkout, are untracked and that the repo ignores are copied. A tracked file or one the repo does not ignore is skipped.
+- On APFS the copy is a clone (as `cp -c`), so it takes no extra space until one side changes. Elsewhere it is a plain copy. Symlinks are skipped.
+- A file the worktree already has is never overwritten. A worktree checked out again after a cleanup gets the files again.
+- At most 200 files and 50 MB per worktree; the rest is skipped. The server log lists what was copied, what was over the budget and listed paths the main checkout lacks (a repo another machine cloned for a run-on thread has no `.env`). None of these stop the thread.
+- A copy that is still the same as the main checkout's does not keep the worktree from cleanup ([Known limits](limits.md)).
+
+For a client repo that can't take a committed `.worktreeinclude`, put the same lines in the channel's settings under **Copy into new worktrees** (Advanced, shown while Worktree per thread is on). They are added to the repo's file, if it has one, with the same rules. **Shared directories** lists folders, one path per line such as `node_modules` or `apps/web/node_modules`, that each new worktree links to in the main checkout instead of installing again:
+
+- Each becomes a symlink to the main checkout's folder, so an install in the worktree changes the main checkout's copy too. A folder the main checkout lacks is skipped.
+- Only a folder the repo ignores is linked. A rule such as `node_modules/` matches folders only, not a link, so Omni adds `/node_modules` to the repo's `.git/info/exclude` under an `# Omni shared directories` comment. The repo ignored that path already.
+- Paths only: no patterns, nothing outside the repo or in `.git`, and never a folder that is itself a symlink leading out of the main checkout. A worktree that already has the folder keeps its own.
+- Both lists sync to your other Macs with the channel and can be edited on the web, the phone layout and the iOS app. The Conductor sees them in `list_channels`.
 
 ## Worktree storage
 

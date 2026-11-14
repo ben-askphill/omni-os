@@ -196,6 +196,13 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         <SwitchRow title="Show the browser window" detail="Off runs the channel browser headless. On, to watch it or log in by hand. Logins stay per channel." value={form.showBrowser} onValueChange={(v) => set('showBrowser', v)} />
       </Group>
 
+      {hasRepo && form.use_worktree ? (
+        <Group title="New worktrees" footer="What each new thread worktree gets from the main checkout. One entry per line.">
+          <InputRow first label="Copy into new worktrees" value={form.worktree_include} code multiline placeholder={'.env\nshopify.theme.toml'} hint="Ignored files, in .gitignore syntax. Added to the repo's own .worktreeinclude." onChangeText={(t) => set('worktree_include', t)} />
+          <InputRow label="Shared directories" value={form.worktree_shared} code multiline placeholder="node_modules" hint="Folders linked to the main checkout instead of installed again. One the main checkout lacks is skipped." onChangeText={(t) => set('worktree_shared', t)} />
+        </Group>
+      ) : null}
+
       <Group title="Store">
         <InputRow first label="Store domain" value={form.store_domain} code keyboardType="url" placeholder="acme.myshopify.com" onChangeText={(t) => set('store_domain', t)} />
         <InputRow label="Portal slug" value={form.portal_slug} code placeholder="acme" hint="Ask Phill Portal company slug, for client context." onChangeText={(t) => set('portal_slug', t)} />

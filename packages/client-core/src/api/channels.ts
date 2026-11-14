@@ -21,6 +21,10 @@ export interface Channel {
   default_harness: string | null;
   default_model: string | null;
   default_effort: string | null;
+  /** Ignored files copied into each new worktree, one gitignore pattern per line. */
+  worktree_include: string | null;
+  /** Folders linked from the main checkout into each new worktree, one per line. */
+  worktree_shared: string | null;
   design_system_name: string | null;
   design_system_size: number;
   archived: number;

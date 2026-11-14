@@ -339,6 +339,8 @@ export function migrate() {
   ensureColumn('threads', 'done_at', 'TEXT');
   // What a new thread in the channel runs on when neither the thread nor its role picks (apps/server/harness/resolve.ts).
   for (const col of ['default_harness', 'default_model', 'default_effort']) ensureColumn('channels', col, 'TEXT');
+  // The channel's own worktree lists, one entry per line (worktree-include.ts): files to copy, folders to share.
+  for (const col of ['worktree_include', 'worktree_shared']) ensureColumn('channels', col, 'TEXT');
   // The channel's design system: one standalone HTML file for the pages its threads write, and the file's name.
   ensureColumn('channels', 'design_system', 'TEXT');
   ensureColumn('channels', 'design_system_name', 'TEXT');
