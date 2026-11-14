@@ -30,7 +30,13 @@ export function gateReplyImages(markdown: string, origin: string): string {
       refused.set(token.raw, placeholder(''));
     }
   });
+  if ([...refused.keys()].some((raw) => !markdown.includes(raw))) return withoutImages(markdown);
   let out = markdown;
   for (const [raw, text] of refused) out = out.split(raw).join(text);
   return out;
+}
+
+/** Every image syntax in the reply escaped, for a refused image whose source text the reply does not hold as is. */
+function withoutImages(markdown: string): string {
+  return markdown.replace(/!\[/g, '!\\[').replace(/<(img\b)/gi, '\\<$1');
 }

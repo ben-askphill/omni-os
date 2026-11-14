@@ -1,3 +1,4 @@
+import { Marked } from 'marked';
 import { describe, expect, it } from 'vitest';
 
 import { gateReplyImages, replyImageAllowed } from '../../src/thread/images';
@@ -32,6 +33,20 @@ describe('agent reply images (S18)', () => {
     expect(out).not.toContain('![x][r]');
     expect(out).not.toContain('<img');
     expect(out).toContain('\\[image: x\\]');
+  });
+
+  it.each([
+    ['a list item with alt text over two lines', '- ![a\n b](http://127.0.0.1:4747/api/x)'],
+    ['a blockquote with alt text over two lines', '> ![a\n> b](http://127.0.0.1:4747/api/x)'],
+    ['a list item with a title over two lines', '- ![a](http://127.0.0.1:4747/api/x\n "t\n u")'],
+  ])('leaves no loadable image in %s', (_, md) => {
+    const out = gateReplyImages(md, ORIGIN);
+    const images: string[] = [];
+    new Marked({ gfm: true }).walkTokens(new Marked({ gfm: true }).lexer(out), (t) => {
+      if (t.type === 'image') images.push(t.href);
+    });
+    expect(images).toEqual([]);
+    expect(out).not.toBe(md);
   });
 
   it('leaves text without images alone', () => {
