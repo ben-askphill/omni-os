@@ -99,6 +99,13 @@ config/*.local.json
 - At most 200 files and 50 MB per worktree; the rest is skipped. The server log lists what was copied, what was over the budget and listed paths the main checkout lacks (a repo another machine cloned for a run-on thread has no `.env`). None of these stop the thread.
 - A copy that is still the same as the main checkout's does not keep the worktree from cleanup ([Known limits](limits.md)).
 
+For a client repo that can't take a committed `.worktreeinclude`, put the same lines in the channel's settings under **Copy into new worktrees** (Advanced, shown while Worktree per thread is on). They are added to the repo's file, if it has one, with the same rules. **Shared directories** lists folders, one path per line such as `node_modules` or `apps/web/node_modules`, that each new worktree links to in the main checkout instead of installing again:
+
+- Each becomes a symlink to the main checkout's folder, so an install in the worktree changes the main checkout's copy too. A folder the main checkout lacks is skipped.
+- Only a folder the repo ignores is linked. A rule such as `node_modules/` matches folders only, not a link, so Omni adds `/node_modules` to the repo's `.git/info/exclude` under an `# Omni shared directories` comment. The repo ignored that path already.
+- Paths only: no patterns, nothing outside the repo or in `.git`, and never a folder that is itself a symlink leading out of the main checkout. A worktree that already has the folder keeps its own.
+- Both lists sync to your other Macs with the channel and can be edited on the web, the phone layout and the iOS app. The Conductor sees them in `list_channels`.
+
 ## Worktree storage
 
 Settings > Worktrees inventories worktrees and explains why each is kept or eligible for cleanup. Review the scan before removing them, or turn on automatic retention for this Mac. Retention is off by default and stays local in `data/omni.config.json`; the old `OMNI_WORKTREE_SWEEP` option no longer controls cleanup. The guards and what survives removal are in [Known limits](limits.md).

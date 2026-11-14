@@ -399,6 +399,38 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           </div>
           <Toggle checked={f.use_worktree} onChange={(v) => set('use_worktree', v)} label="Worktree per thread" disabled={!hasRepo} />
         </div>
+        {hasRepo && f.use_worktree && (
+          <>
+            <Field
+              label="Copy into new worktrees"
+              htmlFor="ch-wt-include"
+              hint="Ignored files each new worktree gets from the main checkout, one per line in .gitignore syntax, such as .env. Added to the repo's own .worktreeinclude."
+            >
+              <textarea
+                id="ch-wt-include"
+                className="field min-h-[68px] resize-y font-mono !text-[13px]"
+                value={f.worktree_include}
+                onChange={(e) => set('worktree_include', e.target.value)}
+                placeholder={'.env\nshopify.theme.toml'}
+                spellCheck={false}
+              />
+            </Field>
+            <Field
+              label="Shared directories"
+              htmlFor="ch-wt-shared"
+              hint="Folders each new worktree links to in the main checkout instead of installing again, one path per line, such as node_modules. A folder the main checkout lacks is skipped."
+            >
+              <textarea
+                id="ch-wt-shared"
+                className="field min-h-[68px] resize-y font-mono !text-[13px]"
+                value={f.worktree_shared}
+                onChange={(e) => set('worktree_shared', e.target.value)}
+                placeholder="node_modules"
+                spellCheck={false}
+              />
+            </Field>
+          </>
+        )}
         <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
           <div>
             <div className="text-[13px] font-medium text-fg">Show the browser window</div>

@@ -13,6 +13,7 @@ import { allWithDelegating, delegatingIds } from './delegating.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { publishFeed } from './bus.ts';
 import { baseOptions } from './worktree-base.ts';
+import { storedList, worktreeListProblem } from '@omni/shared/worktree-lists.ts';
 
 export const channelsApi = new Hono();
 
@@ -57,6 +58,17 @@ function runDefaultsError(body: { default_harness?: string | null; default_model
   return err ? `Default model: ${err}` : undefined;
 }
 
+/** A worktree list, one entry per line: blanks, comments and repeats dropped, empty clears it. Checked by listsError. */
+const worktreeList = z
+  .string()
+  .max(64 * 1024)
+  .nullish()
+  .transform((s) => (s === undefined ? undefined : storedList(s)));
+
+/** Why the worktree lists a body sets are refused, as one sentence. */
+const listsError = (body: { worktree_include?: string | null; worktree_shared?: string | null }) =>
+  worktreeListProblem(body.worktree_include) ?? worktreeListProblem(body.worktree_shared, { shared: true });
+
 const channelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{2,40}$/, 'lowercase letters, digits and dashes'),
   name: z.string().min(1),
@@ -76,6 +88,8 @@ const channelSchema = z.object({
   default_harness: runDefault,
   default_model: runDefault,
   default_effort: runDefault,
+  worktree_include: worktreeList,
+  worktree_shared: worktreeList,
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */
@@ -186,7 +200,7 @@ channelsApi.post('/', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   if (channels.get(body.id)) return c.json({ error: 'channel exists' }, 409);
-  const runError = runDefaultsError(body);
+  const runError = runDefaultsError(body) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);
   if (body.repo_path && !existsSync(body.repo_path)) return c.json({ error: `repo path not found: ${body.repo_path}` }, 400);
   if (body.repo_path && !body.github_repo) body.github_repo = await detectRepo(body.repo_path);
@@ -201,7 +215,7 @@ channelsApi.patch('/:id', async (c) => {
   if ('error' in parsed) return c.json(parsed, 400);
   const body = parsed;
   delete (body as any).id;
-  const runError = runDefaultsError(body, current);
+  const runError = runDefaultsError(body, current) ?? listsError(body);
   if (runError) return c.json({ error: runError }, 400);
   // Read the GitHub repo from the path when none is typed and there is none yet, or when the path moves without one
   // typed (the clients leave it out unless detection failed or it was edited, #405).
