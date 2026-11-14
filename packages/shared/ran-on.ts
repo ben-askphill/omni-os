@@ -69,13 +69,11 @@ export function ranOnTitle(t: RanOnFields & { status?: string; branch?: string |
 }
 
 /**
- * What a row's machine line shows: the machine, the elapsed time while it runs, and the branch only when no machine is
- * known (a thread from before sync, or a single machine without it). Null fields are left out; all null hides the line.
+ * What a row's machine line shows: the machine, and the branch only when no machine is known (a thread from before
+ * sync, or a single machine without it). Null fields are left out.
  */
 export interface RanOnLine {
   machine: string | null;
-  /** Shown on its own so it never truncates away. */
-  elapsed: string | null;
   branch: string | null;
   title: string;
 }
@@ -84,7 +82,6 @@ export function ranOnLine(t: RanOnFields & { status?: string; branch?: string | 
   const machine = t.ran_on ? machineName(t.ran_on) : null;
   return {
     machine,
-    elapsed: runElapsed(t, now),
     branch: machine ? null : (t.branch ?? null),
     title: ranOnTitle(t, now),
   };

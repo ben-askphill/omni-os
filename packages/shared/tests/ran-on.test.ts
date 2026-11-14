@@ -36,16 +36,16 @@ describe('runElapsed', () => {
 });
 
 describe('ranOnLine', () => {
-  it('shows the machine and the run time, and keeps the branch for the tooltip', () => {
+  it('shows the machine, and keeps the branch for the tooltip', () => {
     const line = ranOnLine({ status: 'running', ran_on: air, run_started_at: '2026-11-14T21:48:00.000Z', branch: 'omni/f3c516ac' }, NOW);
-    expect(line).toMatchObject({ machine: 'MacBook Air', elapsed: '12m', branch: null });
+    expect(line).toMatchObject({ machine: 'MacBook Air', branch: null });
     expect(line.title).toBe('Running on MacBook Air · Branch omni/f3c516ac');
   });
 
   it('falls back to the branch when no machine is known, and shows nothing for a legacy thread with neither', () => {
-    expect(ranOnLine({ status: 'idle', ran_on: null, branch: 'omni/x' }, NOW)).toMatchObject({ machine: null, branch: 'omni/x', elapsed: null });
+    expect(ranOnLine({ status: 'idle', ran_on: null, branch: 'omni/x' }, NOW)).toMatchObject({ machine: null, branch: 'omni/x' });
     const bare = ranOnLine({ status: 'idle' }, NOW);
-    expect(bare).toMatchObject({ machine: null, branch: null, elapsed: null, title: '' });
+    expect(bare).toMatchObject({ machine: null, branch: null, title: '' });
     expect(JSON.stringify(bare)).not.toContain('undefined');
   });
 
