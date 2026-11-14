@@ -18,17 +18,19 @@ describe("a channel's own step prompts", () => {
     expect(prNext(null, true)).toMatchObject({ prompt: OPEN_PR_PROMPT });
   });
 
-  it('reads as its step, as do the built-in prompts and a prompt with context appended', () => {
+  it("reads as its step, as do the built-in prompts and a prompt with the server's failing checks appended", () => {
     expect(stepOf('Use the pr-writer skill and the repo template.', own)).toBe('open');
     expect(stepOf('Use the pr-writer skill and the repo template.')).toBeNull();
     expect(stepOf(OPEN_PR_PROMPT, own)).toBe('open');
-    expect(stepOf(`${FIX_CHECKS_PROMPT}\n\nFailing logs:\nlint: 2 errors`, own)).toBe('checks');
+    expect(stepOf(`${FIX_CHECKS_PROMPT}\n\nFailing checks on PR #9 (1).\n\n- lint: failure`, own)).toBe('checks');
+    expect(stepOf(`${own.checks}\n\nFailing checks on PR #9 (1).\n\n- lint: failure`, own)).toBe('checks');
+    expect(stepOf(`${FIX_CHECKS_PROMPT}\n\nAlso bump the version`, own)).toBeNull();
     expect(stepOf(`${FIX_CHECKS_PROMPT}ish`, own)).toBeNull();
     expect(stepUnderway([], [{ kind: 'user', text: own.open }], false, own)).toBe('open');
     expect(stepParked([{ kind: 'user', text: own.open, uuid: 'p', delivery: 'recovered' }], own)).toEqual({ step: 'open', uuid: 'p' });
   });
 
-  it('takes the longest match when a channel prompt extends a built-in one', () => {
+  it('reads a channel prompt that extends a built-in one as its own step', () => {
     const extended = stepPrompts({ prompt_fix_conflicts: `${OPEN_PR_PROMPT} Then also rebase.` });
     expect(stepOf(`${OPEN_PR_PROMPT} Then also rebase.`, extended)).toBe('conflicts');
   });

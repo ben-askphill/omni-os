@@ -107,29 +107,26 @@ export type PRStep = 'open' | 'conflicts' | 'checks';
 export const PR_STEPS: readonly PRStep[] = ['open', 'conflicts', 'checks'];
 
 /**
- * The step a message asks for: it is one of the step prompts, the channel's own (`prompts`) or the built-in ones, or
- * starts with one and adds more after a line break or a space (context a step appends, such as failing check logs).
- * The longest match wins, so a channel prompt that extends a built-in one still reads as its own step.
- */
-export function stepOf(text: string | null | undefined, prompts: StepPrompts = STEP_PROMPTS): PRStep | null {
-  const t = (text ?? '').trim();
-  if (!t) return null;
-  let best: { step: PRStep; len: number } | null = null;
-  for (const set of [prompts, STEP_PROMPTS]) {
-    for (const step of PR_STEPS) {
-      const p = set[step].trim();
-      if (!p || (best && best.len >= p.length)) continue;
-      if (t === p || (t.startsWith(p) && /\s/.test(t[p.length]))) best = { step, len: p.length };
-    }
-  }
-  return best?.step ?? null;
-}
-
-/**
  * Where the server's list of failing checks starts in a Fix checks message (apps/server/fix-checks.ts). The step prompt
  * is what comes before it.
  */
 export const FAILING_CHECKS_MARK = '\n\nFailing checks on PR #';
+
+/**
+ * The step a message asks for: it is one of the step prompts, the channel's own (`prompts`) or the built-in ones, with
+ * or without the failing checks the server adds after it. A prompt with Ben's own words added is a plain message, so
+ * the server never swaps it for the failing-checks version. The channel's prompts win over the built-in ones.
+ */
+export function stepOf(text: string | null | undefined, prompts: StepPrompts = STEP_PROMPTS): PRStep | null {
+  const raw = text ?? '';
+  const cut = raw.indexOf(FAILING_CHECKS_MARK);
+  const t = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
+  if (!t) return null;
+  for (const set of [prompts, STEP_PROMPTS]) {
+    for (const step of PR_STEPS) if (set[step].trim() === t) return step;
+  }
+  return null;
+}
 
 /** What a step's button says while the agent works on it. */
 export const STEP_WORKING: Record<PRStep, string> = { open: 'Opening PR', conflicts: 'Fixing conflicts', checks: 'Fixing checks' };
