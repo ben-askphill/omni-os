@@ -9,7 +9,7 @@ import { PRONOUNS } from '../components/onboarding-parts.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
 import { useTheme } from '../components/theme.tsx';
 import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
-import { setInboxKeyOn, useInboxKeyOn } from '../inbox-key.ts';
+import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
 import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
@@ -663,6 +663,7 @@ function AppearanceCard() {
   const [theme, setTheme] = useTheme();
   const layout = useLayout();
   const inboxKey = useInboxKeyOn();
+  const doneKey = useDoneKeyOn();
   const railColor = useRailColor();
   const mobile = useIsMobile();
   const thisBrowser = <Origin of="device" label="This browser" />;
@@ -721,6 +722,15 @@ function AppearanceCard() {
           checked={inboxKey}
           onChange={setInboxKeyOn}
         />
+        {!mobile && (
+          <SwitchRow
+            title="Press E to mark done"
+            origin={thisBrowser}
+            detail="In the Inbox, marks the selected thread done: the card you focused, or the thread you have open."
+            checked={doneKey}
+            onChange={setDoneKeyOn}
+          />
+        )}
       </Card>
       <Card entry="zoom" title="Text size">
         {desktop ? (
