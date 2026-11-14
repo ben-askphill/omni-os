@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { copyIncludes, includedFiles, includePatterns, sameAsMain } from '../worktree-include.ts';
+import { copyIncludes, includedFiles, includePatterns, linkOnPath, sameAsMain } from '../worktree-include.ts';
 
 // .worktreeinclude: which ignored files of the main checkout a new thread worktree gets, against real temp repos.
 
@@ -125,6 +125,41 @@ describe('copyIncludes', () => {
     const r = await copyIncludes(dir, wt);
     expect(r.copied).toEqual(['secrets/a.json']);
     expect(r.skipped).toEqual([{ path: 'secrets/link.json', why: 'not a regular file' }]);
+  });
+
+  it('never writes through a symlinked folder in the worktree (one a branch commits), even a dangling one', async () => {
+    const { dir, wt } = repo('secrets/\n.env\n', { 'secrets/a.json': '{}', 'apps/web/.env': 'A' });
+    const outside = join(root, `outside-${n}`);
+    mkdirSync(outside);
+    symlinkSync(outside, join(wt, 'secrets'));
+    symlinkSync(join(root, `nowhere-${n}`), join(wt, 'apps'));
+    const r = await copyIncludes(dir, wt);
+    expect(r.copied).toEqual([]);
+    expect(r.skipped).toEqual([
+      { path: 'apps/web/.env', why: 'a symlink in the worktree is on its path' },
+      { path: 'secrets/a.json', why: 'a symlink in the worktree is on its path' },
+    ]);
+    expect(readdirSync(outside)).toEqual([]);
+    expect(existsSync(join(root, `nowhere-${n}`))).toBe(false);
+  });
+
+  it('never reads through a symlinked folder in the main checkout', async () => {
+    const { dir, wt } = repo('secrets/\nsecrets/a.json\n');
+    const outside = join(root, `outside-src-${n}`);
+    write(join(outside, 'a.json'), 'private');
+    symlinkSync(outside, join(dir, 'secrets'));
+    const r = await copyIncludes(dir, wt);
+    expect(r.copied).toEqual([]);
+    expect(existsSync(join(wt, 'secrets'))).toBe(false);
+  });
+
+  it('linkOnPath finds a symlink at any depth and ignores missing parts', () => {
+    const { dir } = repo(null, { 'a/b/c.txt': 'x' });
+    symlinkSync(join(dir, 'a'), join(dir, 'link'));
+    expect(linkOnPath(dir, 'a/b/c.txt')).toBe(false);
+    expect(linkOnPath(dir, 'link/b/c.txt')).toBe(true);
+    expect(linkOnPath(dir, 'missing/x')).toBe(false);
+    expect(linkOnPath(dir, '.')).toBe(false);
   });
 
   it('stops at the file and byte budget and logs what it left out', async () => {

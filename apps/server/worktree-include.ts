@@ -3,9 +3,9 @@
 // does the matching: only files that exist in the main checkout, are untracked and are ignored get copied. A copy
 // never overwrites a file the worktree already has, and stays inside a file and byte budget.
 import { execFile } from 'node:child_process';
-import { constants, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync } from 'node:fs';
+import { constants, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -78,9 +78,20 @@ export async function copyIncludes(repo: string, dir: string, opts: { extra?: st
   const result: IncludeResult = { copied: [], bytes: 0, skipped: [], missing: [] };
   if (!patterns.length) return result;
   result.missing = patterns.filter((p) => literal(p) && !existsSync(join(repo, p.replace(/^\/|\/$/g, ''))));
+  const repoReal = realpathSync(repo);
+  const dirReal = realpathSync(dir);
   for (const path of await includedFiles(repo, patterns)) {
     const src = join(repo, path);
     const dst = join(dir, path);
+    // A symlink on either side (one the branch commits, say) must never send the copy outside the two checkouts.
+    if (linkOnPath(repo, dirname(path)) || !inside(repoReal, real(dirname(src)))) {
+      result.skipped.push({ path, why: 'a symlink in the main checkout leads out of it' });
+      continue;
+    }
+    if (linkOnPath(dir, path)) {
+      result.skipped.push({ path, why: 'a symlink in the worktree is on its path' });
+      continue;
+    }
     let size: number;
     try {
       const st = lstatSync(src);
@@ -93,7 +104,7 @@ export async function copyIncludes(repo: string, dir: string, opts: { extra?: st
       result.skipped.push({ path, why: 'gone before it was copied' });
       continue;
     }
-    if (existsSync(dst)) {
+    if (exists(dst)) {
       result.skipped.push({ path, why: 'already in the worktree' });
       continue;
     }
@@ -103,6 +114,10 @@ export async function copyIncludes(repo: string, dir: string, opts: { extra?: st
     }
     try {
       mkdirSync(dirname(dst), { recursive: true });
+      if (!inside(dirReal, real(dirname(dst)))) {
+        result.skipped.push({ path, why: 'its folder resolves outside the worktree' });
+        continue;
+      }
       // FICLONE is clonefile on APFS and a plain copy where the file system cannot clone. EXCL never overwrites.
       await copyFile(src, dst, constants.COPYFILE_FICLONE | constants.COPYFILE_EXCL);
       result.copied.push(path);
@@ -113,6 +128,42 @@ export async function copyIncludes(repo: string, dir: string, opts: { extra?: st
   }
   logIncludes(dir, result);
   return result;
+}
+
+/** Whether something is at path, a dangling symlink included. */
+const exists = (path: string) => {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** The real path, or '' when it cannot be resolved (which is inside nothing). */
+const real = (p: string) => {
+  try {
+    return realpathSync(p);
+  } catch {
+    return '';
+  }
+};
+
+/** Whether real path p is root or under it. Both resolved already. */
+const inside = (root: string, p: string) => !!p && (p === root || p.startsWith(root + sep));
+
+/** Whether any folder on rel's way down from root (rel's own name included) is a symlink. Missing parts are not. */
+export function linkOnPath(root: string, rel: string): boolean {
+  let at = root;
+  for (const part of rel.split('/').filter((x) => x && x !== '.')) {
+    at = join(at, part);
+    try {
+      if (lstatSync(at).isSymbolicLink()) return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 const LOGGED = 20;
