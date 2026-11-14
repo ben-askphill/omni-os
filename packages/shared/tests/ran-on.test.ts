@@ -38,14 +38,14 @@ describe('runElapsed', () => {
 describe('ranOnLine', () => {
   it('shows the machine and the run time, and keeps the branch for the tooltip', () => {
     const line = ranOnLine({ status: 'running', ran_on: air, run_started_at: '2026-11-14T21:48:00.000Z', branch: 'omni/f3c516ac' }, NOW);
-    expect(line).toMatchObject({ machine: 'MacBook Air', elapsed: '12m', moved: 0, branch: null });
+    expect(line).toMatchObject({ machine: 'MacBook Air', elapsed: '12m', branch: null });
     expect(line.title).toBe('Running on MacBook Air · Branch omni/f3c516ac');
   });
 
   it('falls back to the branch when no machine is known, and shows nothing for a legacy thread with neither', () => {
     expect(ranOnLine({ status: 'idle', ran_on: null, branch: 'omni/x' }, NOW)).toMatchObject({ machine: null, branch: 'omni/x', elapsed: null });
     const bare = ranOnLine({ status: 'idle' }, NOW);
-    expect(bare).toMatchObject({ machine: null, branch: null, elapsed: null, moved: 0, title: '' });
+    expect(bare).toMatchObject({ machine: null, branch: null, elapsed: null, title: '' });
     expect(JSON.stringify(bare)).not.toContain('undefined');
   });
 
@@ -61,5 +61,9 @@ describe('ranOnTitle', () => {
 
   it('says queued for a thread waiting for a slot', () => {
     expect(ranOnTitle({ status: 'queued', ran_on: air }, NOW)).toBe('Queued on MacBook Air');
+  });
+
+  it('says running for a delegating thread whose own status is done, since its run time is ticking', () => {
+    expect(ranOnTitle({ status: 'done', ran_on: air, run_started_at: '2026-11-14T21:48:00.000Z' }, NOW)).toBe('Running on MacBook Air');
   });
 });

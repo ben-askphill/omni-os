@@ -57,8 +57,8 @@ export function ranOnTitle(t: RanOnFields & { status?: string; branch?: string |
   const parts: string[] = [];
   const r = t.ran_on;
   if (r) {
-    const running = t.status === 'running' || t.status === 'queued';
-    parts.push(`${running ? (t.status === 'queued' ? 'Queued on' : 'Running on') : 'Last ran on'} ${machineName(r)}`);
+    const verb = t.run_started_at || t.status === 'running' ? 'Running on' : t.status === 'queued' ? 'Queued on' : 'Last ran on';
+    parts.push(`${verb} ${machineName(r)}`);
     if (r.before.length) {
       const stops = [...r.before].reverse().map((s) => (s.at ? `${machineName(s)} (${relTime(s.at, now)})` : machineName(s)));
       parts.push(`before: ${stops.join(', ')}`);
@@ -76,8 +76,6 @@ export interface RanOnLine {
   machine: string | null;
   /** Shown on its own so it never truncates away. */
   elapsed: string | null;
-  /** More machines than this one: the tooltip lists them. */
-  moved: number;
   branch: string | null;
   title: string;
 }
@@ -87,7 +85,6 @@ export function ranOnLine(t: RanOnFields & { status?: string; branch?: string | 
   return {
     machine,
     elapsed: runElapsed(t, now),
-    moved: t.ran_on?.before.length ?? 0,
     branch: machine ? null : (t.branch ?? null),
     title: ranOnTitle(t, now),
   };
