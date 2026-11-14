@@ -759,7 +759,7 @@ server.registerTool('rotate_install_token', {
 server.registerTool('mcp_clients', {
   description:
     `Read-only: the OAuth clients (claude.ai, ChatGPT, Grok and others) that connected to this Omni's /mcp with ${USER}'s Google sign-in, ` +
-    'with status (approved, pending, removed), when each was first and last seen, and how it was matched (token audience or client id).',
+    'with status (approved, bound, pending, removed; bound means its token names this Omni\'s /mcp resource; removed wins over the rest), when each was first and last seen, and how it was matched (token audience or client id).',
   inputSchema: {},
 }, async () => text(await call('/mcp/clients')));
 
