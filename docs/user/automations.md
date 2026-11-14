@@ -4,6 +4,8 @@
 
 Delete on an automation's card removes it from this machine after a confirmation. One of your own in `data/automations/` loses its YAML file. A shared one stays in `automations/`, so an update cannot bring it back: Omni hides it with `automations.<id>.deleted` in `data/omni.config.json`, and removing that key restores it. Either way its schedule stops at once, a webhook automation's signing secret goes with it, and threads it already started stay. The hide is per machine, like the on/off override: with sync on, delete it on the machine that runs automations too. Desktop web, phone web and the desktop app all have Delete. The native iOS Automations screen can only toggle.
 
+The Conductor manages them too: `list_automations` lists each one with its schedule or trigger, error and last runs; `run_automation` starts one now on this machine; `set_automation_enabled` writes the same on/off override; `delete_automation` deletes like the card does. Creating one is still a YAML file.
+
 ```yaml
 name: Morning coffee
 enabled: false          # the default; the UI toggle overrides it per machine
