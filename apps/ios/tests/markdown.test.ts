@@ -41,4 +41,10 @@ describe('markdownDocument', () => {
       expect(render(`![a](${src})`)).not.toContain(`src="${src}"`);
     }
   });
+
+  it('never loads a picture from an Omni API route', () => {
+    for (const src of ['https://omarchy-1.omni-os.app/api/threads/t1/terminal/stream', 'https://mac.tail.ts.net/api/channels/c/browser/stream']) {
+      expect(render(`![a](${src})`)).not.toContain(`src="${src}"`);
+    }
+  });
 });

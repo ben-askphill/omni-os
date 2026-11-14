@@ -43,8 +43,9 @@ describe('the question card, pending', () => {
     expect(count(out, 'role="radio"')).toBe(3);
     expect(out).toContain('Other');
     expect(out).toContain('The one the app already runs');
-    // A single choice question starts on its first option.
-    expect(out).toMatch(/role="radio" aria-checked="true"[^>]*>.*?Postgres/);
+    // Nothing is picked yet, so Next waits for a choice.
+    expect(out).not.toContain('aria-checked="true"');
+    expect(out).toMatch(/<button[^>]*disabled=""[^>]*>Next/);
     expect(out).toContain('1 of 2');
     expect(out).toContain('Next');
     expect(out).not.toContain('Send');

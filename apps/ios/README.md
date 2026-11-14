@@ -76,7 +76,9 @@ Settings opens with Servers, then a search over every setting and the same group
 - Workspace: the GitHub owner. Folders, the central brain folder included, show their value, since they are paths on the server's machine. The Hermes URL is under Harnesses & models.
 - Worktrees: automatic cleanup and its idle days (`PUT /worktrees/retention`).
 - Machines: the server's machine, read-only, and Update all machines, which checks, downloads and updates every synced machine through `/update/fleet` as the Web UI's card does.
-- Sync, Sharing & access and About: what the server reports, read-only, with Devices under Sharing & access.
+- Sync: what the server reports, plus each machine's signing key (Confirm new key when it changed) and the changes this server refused.
+- Sharing & access: Devices, Rotate install token and the MCP clients that reached `/mcp` (Approve, Remove).
+- About: what the server reports, read-only.
 - Secrets: names by scope, add or replace a value, delete one. A value is never shown again.
 
 Channel Settings opens from the gear on a channel's header, from holding a channel in Channels, and from Settings › Channels. It edits the fields the Web UI's channel settings edit: name, icon (an emoji or one of the design system's icons), kind, default model, notes, the design system file (picked from Files), the GitHub repo, worktree per thread, the browser window, store domain, portal slug, the channel's actions (each saved on its own), its secrets, and Archive. Save sends `PATCH /channels/:id` with the body `@omni/shared/channel-form.ts` builds, the same one the Web UI sends. The repo path and the base directory show their value: they are paths on the server's machine. An uploaded SVG icon shows and can be cleared, but is uploaded on the computer.

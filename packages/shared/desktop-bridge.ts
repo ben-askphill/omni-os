@@ -170,6 +170,11 @@ export interface DesktopBridge {
    * beside the wordmark in the classic sidebar, or inside the channel rail. Older app builds lack it.
    */
   setLayout?(layout: DesktopLayout): void;
+  /**
+   * Pairs this window with the server again: main mints a fresh one-time nonce and loads the desktop pairing page,
+   * then `route`. For a 401 after the install token rotated or the session ended. Older app builds lack it.
+   */
+  pairAgain?(route?: string): void;
   settings: {
     get(): Promise<DesktopSettings>;
     set(patch: DesktopSettingsPatch): Promise<DesktopSettings>;

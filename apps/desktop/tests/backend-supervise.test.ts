@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Backend, isRecordedServer, parseRecord, type BackendState } from '../src/backend/index.ts';
 import { exitMessage, probePort, proofFor } from '../src/backend/launch.ts';
+import { PairingError } from '../src/backend/pairing.ts';
 import { exitCode, stopGroup } from '../src/backend/process.ts';
 
 const TOKEN = 'e'.repeat(64);
@@ -31,6 +32,11 @@ createServer((req, res) => {
   if (url.pathname === '/api/auth/proof') {
     const proof = createHmac('sha256', token).update('omni-proof:' + port + ':' + url.searchParams.get('nonce')).digest('hex');
     res.end(JSON.stringify({ proof }));
+    return;
+  }
+  if (url.pathname === '/api/auth/desktop-nonce' && req.method === 'POST') {
+    if (req.headers['x-omni-desktop-secret'] !== process.env.OMNI_DESKTOP_PAIR_SECRET) { res.statusCode = 403; res.end('{}'); return; }
+    res.end(JSON.stringify({ nonce: 'n' + Date.now() + Math.random().toString(16).slice(2), expiresIn: 60 }));
     return;
   }
   if (url.pathname === '/api/status') {
@@ -294,6 +300,62 @@ describe('Backend', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await r.backend.start();
     expect(readFileSync(join(r.shimDir, 'node'), 'utf8')).toContain(process.execPath);
+  });
+
+  it('gives each server it starts a pairing secret of its own, and pairs with it', async () => {
+    const r = await rig();
+    await r.backend.start();
+    const secret = r.backend.pairSecret();
+    expect(secret).toMatch(/^[0-9a-f]{64}$/);
+    const first = await r.backend.desktopPairUrl();
+    const second = await r.backend.desktopPairUrl();
+    expect(first).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${r.port}/api/auth/desktop-pair\\?nonce=n`));
+    expect(second).not.toBe(first);
+    for (const url of [first, second]) {
+      expect(url).not.toContain(secret);
+      expect(url).not.toContain(TOKEN);
+    }
+
+    // Update's restart spawns a new server, with a new secret.
+    r.advance(60_000);
+    const ready = next(r.backend, 'ready');
+    await exitWith(r, 75);
+    await ready;
+    expect(r.backend.pairSecret()).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.backend.pairSecret()).not.toBe(secret);
+    expect(await r.backend.desktopPairUrl()).toContain('desktop-pair?nonce=');
+
+    await r.backend.stop();
+    expect(r.backend.pairSecret()).toBeNull();
+  });
+
+  it('does not know the secret of a server an earlier launch started, and does not pair without one', async () => {
+    const r = await rig();
+    await r.backend.start();
+    const later = r.relaunch();
+    await later.start();
+    expect(later.info().startedHere).toBe(true);
+    expect(later.pairSecret()).toBeNull();
+    // The fake demands the secret; the real server may take the token instead (an open question for its owner).
+    await expect(later.desktopPairUrl()).rejects.toBeInstanceOf(PairingError);
+  });
+
+  it('pairs without a nonce on a server from before nonces', async () => {
+    const r = await rig();
+    const server: Server = createServer((req, res) => {
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+      if (url.pathname !== '/api/auth/proof') {
+        res.statusCode = 404;
+        res.end('{"error":"Not found"}');
+        return;
+      }
+      res.end(JSON.stringify({ proof: proofFor(TOKEN, r.port, url.searchParams.get('nonce') ?? '') }));
+    });
+    await new Promise<void>((resolve) => server.listen(r.port, '127.0.0.1', () => resolve()));
+    cleanups.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+    await r.backend.start();
+    expect(r.backend.pairSecret()).toBeNull();
+    expect(await r.backend.desktopPairUrl()).toBe(`http://127.0.0.1:${r.port}/api/auth/desktop-pair`);
   });
 
   it('says a server killed by a signal was killed, not that it stopped', async () => {

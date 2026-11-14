@@ -23,7 +23,7 @@ import { focusServerScreen, showServerFailure } from './server-screen.ts';
 import { openSettings } from './settings.ts';
 import { installSystemEvents } from './system.ts';
 import { installUpdates } from './updates.ts';
-import { bringForward, createOmniWindow, reloadIfFailed, routeUrl, secureAppSession, setWindowLayout } from './windows.ts';
+import { bringForward, createOmniWindow, pairWindowAgain, reloadIfFailed, routeUrl, secureAppSession, setWindowLayout } from './windows.ts';
 
 app.setName('Omni');
 
@@ -147,6 +147,10 @@ async function boot(): Promise<void> {
   on('omni:layout', (event, layout) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) setWindowLayout(ctx, win, layout);
+  });
+  on('omni:pair-again', (event, route) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) pairWindowAgain(ctx, win, safeRoute(route));
   });
   on('omni:focus', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);

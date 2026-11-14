@@ -16,6 +16,7 @@ import {
   tokenFile,
   waitForReady,
 } from './launch.ts';
+import { desktopPairUrl, newPairSecret } from './pairing.ts';
 import { writeJsonAtomic } from '../settings.ts';
 import { readLoginPath, readTail, spawnServer, stopGroup, writeNodeShim, type Spawned } from './process.ts';
 
@@ -58,7 +59,7 @@ export interface ServerRecord {
  * The server this app answers for: the child it started on this launch, or one an earlier launch started and left
  * running. Quit stops or asks about it, and Restart Server restarts it. One that someone else started is not.
  */
-type Owned = { pid: number; child: Spawned | null };
+type Owned = { pid: number; child: Spawned | null; pairSecret: string | null };
 
 export type BackendState =
   | { kind: 'idle' }
@@ -149,6 +150,16 @@ export class Backend {
     }
   }
 
+  /** The secret the server this launch spawned holds, if it did spawn the one it is on. Never leaves this process. */
+  pairSecret(): string | null {
+    return this.owned?.pairSecret ?? null;
+  }
+
+  /** desktop-pair with a fresh nonce, for a window about to pair (pairing.ts). Throws a PairingError when refused. */
+  desktopPairUrl(fetchImpl: typeof fetch = fetch): Promise<string> {
+    return desktopPairUrl({ origin: this.origin(), secret: this.pairSecret(), token: this.token(), fetch: fetchImpl });
+  }
+
   /** A call to the server's API from this process, with the install's token. */
   async api<T>(path: string, init: RequestInit = {}): Promise<T> {
     const token = this.token();
@@ -237,10 +248,12 @@ export class Backend {
     if (generation !== this.generation) return this.state;
     this.writeShim();
     const { args, cwd } = serverCommand({ bundled: this.config.bundled, appRoot: this.config.appRoot });
-    const env = childEnv(process.env, { path: this.path, port: this.config.port, dataDir: this.config.dataDir });
+    // A new secret for each spawn, a restart after Update's exit included.
+    const pairSecret = newPairSecret();
+    const env = childEnv(process.env, { path: this.path, port: this.config.port, dataDir: this.config.dataDir, pairSecret });
     const child = spawnServer({ command: this.config.binary, args, cwd, env, logFile: this.config.logFile });
     const startedAt = this.deps.now();
-    this.owned = { pid: child.pid, child };
+    this.owned = { pid: child.pid, child, pairSecret };
     this.writeRecord(child.pid);
     const ours = () => this.owned?.child === child;
     child.onExit((code, signal) => this.exited(child, code, signal, startedAt));
@@ -292,7 +305,8 @@ export class Backend {
       // Too busy to say: treated as someone else's for this launch, which leaves it running.
       return null;
     }
-    if (isRecordedServer(record, { port: this.config.port, dataDir: this.config.dataDir, pid })) return { pid: record.pid, child: null };
+    // An earlier launch gave it its secret, which this one never knew: it pairs with the token alone.
+    if (isRecordedServer(record, { port: this.config.port, dataDir: this.config.dataDir, pid })) return { pid: record.pid, child: null, pairSecret: null };
     if (record.port === this.config.port && record.dataDir === this.config.dataDir) this.forgetRecord(record.pid);
     return null;
   }

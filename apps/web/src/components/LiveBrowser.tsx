@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
-import { api, errorText, openSSE } from '../api.ts';
+import { api, ApiError, errorText, openSSE } from '../api.ts';
 import { AnnotateButton, AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from './BrowserAnnotate.tsx';
 import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from './BrowserAnnotationOverlay.tsx';
 import { Button, Icon, IconButton } from './ui.tsx';
@@ -122,6 +122,14 @@ export function useChannelBrowser(channelId: string) {
       decoding = false;
       void decode();
     };
+    // Start Chrome with a deliberate POST (PRD #667: the stream only attaches). A server from before that route has no
+    // /start, and its stream starts Chrome itself.
+    void api
+      .post<BrowserState>(`${base}/start`, {})
+      .then((st) => alive && setState(st))
+      .catch((e) => {
+        if (alive && !(e instanceof ApiError && e.status === 404)) setError(errorText(e));
+      });
     const h = openSSE(
       () => `/api${base}/stream`,
       (d) => {

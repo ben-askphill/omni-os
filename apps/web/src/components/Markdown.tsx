@@ -1,4 +1,5 @@
-import { memo, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
+import { imageSource } from '@omni/shared/markdown-image.ts';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ExternalLink } from './LinkChip.tsx';
@@ -56,28 +57,62 @@ const components: Components = {
     }
     return <code className={className}>{children as ReactNode}</code>;
   },
-  // Screenshots in PR bodies: fit the column, click for full size (unless the image is a link already).
   img({ src, alt, title }) {
-    const open = typeof src === 'string' && /^(https?:\/\/|\/api\/)/i.test(src);
-    return (
-      <img
-        src={src}
-        alt={alt ?? ''}
-        title={title}
-        loading="lazy"
-        className={open ? 'cursor-zoom-in' : undefined}
-        onClick={(e) => {
-          if (open && !e.currentTarget.closest('a')) window.open(src as string, '_blank', 'noopener,noreferrer');
-        }}
-      />
-    );
+    return <MarkdownImage src={typeof src === 'string' ? src : undefined} alt={alt ?? ''} title={title} remote="load" />;
   },
 };
 
-export const Markdown = memo(function Markdown({ text, className = '' }: { text: string; className?: string }) {
+/** The same, for text from GitHub (PR bodies, reviews, comments): another site's image waits for a click. */
+const gatedComponents: Components = {
+  ...components,
+  img({ src, alt, title }) {
+    return <MarkdownImage src={typeof src === 'string' ? src : undefined} alt={alt ?? ''} title={title} remote="gate" />;
+  },
+};
+
+const pageOrigin = () => (typeof window === 'undefined' ? 'http://localhost' : window.location.origin);
+
+/**
+ * One Markdown image, sorted by packages/shared/markdown-image.ts: never one that points at Omni's API (it would act
+ * with Ben's cookie), and with `remote="gate"` another site's image only after a click. Screenshots fit the column and
+ * open full size on click, unless the image is a link already.
+ */
+function MarkdownImage({ src, alt, title, remote }: { src: string | undefined; alt: string; title?: string; remote: 'load' | 'gate' }) {
+  const [shown, setShown] = useState(false);
+  const source = imageSource(src, pageOrigin());
+  if (source.kind === 'refused') {
+    return (
+      <span className="text-fg-3" title={source.reason === 'api' ? "Not loaded: it points at Omni's API" : 'Not loaded'}>
+        [image{alt ? `: ${alt}` : ''}]
+      </span>
+    );
+  }
+  if (source.kind === 'remote' && remote === 'gate' && !shown) {
+    return (
+      <button type="button" className="text-fg-3 underline decoration-dotted underline-offset-2 hover:text-fg-2" onClick={() => setShown(true)}>
+        Load image{alt ? ` "${alt}"` : ''} from {source.host}
+      </button>
+    );
+  }
+  const url = source.src;
+  return (
+    <img
+      src={url}
+      alt={alt}
+      title={title}
+      loading="lazy"
+      className="cursor-zoom-in"
+      onClick={(e) => {
+        if (!e.currentTarget.closest('a')) window.open(url, '_blank', 'noopener,noreferrer');
+      }}
+    />
+  );
+}
+
+export const Markdown = memo(function Markdown({ text, className = '', gateRemoteImages = false }: { text: string; className?: string; gateRemoteImages?: boolean }) {
   return (
     <div className={`md ${className}`}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={gateRemoteImages ? gatedComponents : components}>
         {linkThreadIds(text)}
       </ReactMarkdown>
     </div>

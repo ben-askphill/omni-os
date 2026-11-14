@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, UNPAIRED, errorText, isPaired, pairBrowser } from '../api.ts';
+import { desktop } from '../desktop.ts';
 import { isConnectLanding, openWithConnect, redeemConnectCode, takeConnectCode, type ConnectMethod } from '../connect-key.ts';
 import { OmniMark } from './brand.tsx';
 import { GoogleSignIn } from './GoogleSignIn.tsx';
@@ -40,6 +41,20 @@ const pairFromLink = () =>
     return null;
   })());
 
+let askedDesktop = false;
+/**
+ * In the desktop app, ask the main process to pair this window again with a fresh one-time nonce (the install token
+ * rotated, or the session ended), once per page load. True when it was asked: the window reloads, so the pairing screen
+ * need not show. An older app, or a second loss, gets the pairing screen.
+ */
+export function askDesktopToPair(bridge = desktop): boolean {
+  if (!bridge?.pairAgain || askedDesktop) return false;
+  askedDesktop = true;
+  const hash = window.location.hash;
+  bridge.pairAgain(hash.startsWith('#/') && !hash.startsWith('#/pair') ? hash : '#/');
+  return true;
+}
+
 type State = 'checking' | 'paired' | 'unpaired' | 'offline';
 
 /** Shows `children` once this browser is paired, the pairing screen until then, and again if the cookie stops working. */
@@ -55,18 +70,27 @@ export function PairGate({ children }: { children: ReactNode }) {
         const paired = await isPaired();
         // #/connect from the Omni Connect page, already in: nothing to do but go home.
         if (paired && isConnectLanding()) history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}#/`);
-        setState(paired ? 'paired' : 'unpaired');
+        setState(paired ? 'paired' : desktopPairing() ? 'checking' : 'unpaired');
       } catch (err) {
-        setState(err instanceof ApiError ? 'unpaired' : 'offline');
+        setState(err instanceof ApiError ? (desktopPairing() ? 'checking' : 'unpaired') : 'offline');
         // The server is down: look again until it answers.
         if (!(err instanceof ApiError)) retry = setTimeout(check, 3000);
       }
     };
+    // The desktop app reloads the window once it paired; if it does not (it declined, or pairing failed), fall back to
+    // the pairing screen rather than a blank window.
+    let fallback: ReturnType<typeof setTimeout> | undefined;
+    const desktopPairing = () => {
+      if (!askDesktopToPair()) return false;
+      fallback = setTimeout(() => setState((s) => (s === 'checking' ? 'unpaired' : s)), 5000);
+      return true;
+    };
     void check();
-    const lost = () => setState('unpaired');
+    const lost = () => setState(desktopPairing() ? 'checking' : 'unpaired');
     window.addEventListener(UNPAIRED, lost);
     return () => {
       clearTimeout(retry);
+      clearTimeout(fallback);
       window.removeEventListener(UNPAIRED, lost);
     };
   }, []);

@@ -533,6 +533,33 @@
       ]
     },
     {
+      "id": "sync-keys",
+      "section": "sync",
+      "title": "Signing keys",
+      "keywords": [
+        "key",
+        "fingerprint",
+        "key changed",
+        "confirm new key",
+        "pin",
+        "trust",
+        "signature"
+      ]
+    },
+    {
+      "id": "sync-refused",
+      "section": "sync",
+      "title": "Refused changes",
+      "keywords": [
+        "refused",
+        "rejected",
+        "unsigned",
+        "tampering",
+        "blocked",
+        "signature"
+      ]
+    },
+    {
       "id": "google",
       "section": "access",
       "title": "Google account and signed-in devices",
@@ -568,6 +595,35 @@
         "remote",
         "phone",
         "other machines"
+      ]
+    },
+    {
+      "id": "mcp-clients",
+      "section": "access",
+      "title": "MCP clients",
+      "keywords": [
+        "mcp",
+        "oauth",
+        "claude.ai",
+        "chatgpt",
+        "approve",
+        "remove",
+        "connected apps",
+        "assistants"
+      ]
+    },
+    {
+      "id": "install-token",
+      "section": "access",
+      "title": "Rotate install token",
+      "keywords": [
+        "token",
+        "rotate",
+        "leak",
+        "reset",
+        "sign out all",
+        "api token",
+        "credential"
       ]
     },
     {

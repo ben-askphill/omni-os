@@ -26,6 +26,20 @@ const answeredAlready = (body: unknown) => !!body && typeof body === 'object' &&
 type Settled = { state: Exclude<QuestionState, 'pending'>; answers: Answer[] | null };
 
 /**
+ * Whether Ben is typing somewhere outside the card: a text field, a select or an editable region has focus. The card
+ * leaves focus alone then, so a new question never takes keystrokes meant for the reply box.
+ */
+export function typingElsewhere(active: Element | null, card: Element | null): boolean {
+  if (!active || (card && card.contains(active))) return false;
+  if (active instanceof HTMLElement && active.isContentEditable) return true;
+  const tag = active.tagName;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag !== 'INPUT') return false;
+  const type = (active.getAttribute('type') ?? 'text').toLowerCase();
+  return !['button', 'checkbox', 'radio', 'submit', 'reset', 'image', 'file', 'range', 'color'].includes(type);
+}
+
+/**
  * A question the agent asked with ask_user_question (packages/shared/question.ts): Ben answers it in place, one question
  * a page. Once answered, skipped or dismissed it folds to what he said. `touch` gives the phone 44px targets.
  */
@@ -62,6 +76,7 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rows = useRef<(HTMLButtonElement | null)[]>([]);
+  const card = useRef<HTMLElement>(null);
   const otherField = useRef<HTMLInputElement>(null);
   const shown = questions[draft.page];
   const pick = draft.picks[draft.page];
@@ -72,8 +87,10 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
   const ready = canAdvance(draft);
   const last = isLastPage(draft);
 
-  // The card takes focus when it appears and on each page, on the row that is chosen.
+  // The card takes focus when it appears and on each page, on the row that is chosen, unless Ben is typing elsewhere.
+  // Tab or a click still reaches it on purpose.
   useEffect(() => {
+    if (typingElsewhere(document.activeElement, card.current)) return;
     rows.current[current]?.focus({ preventScroll: true });
   }, [draft.page]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -128,7 +145,7 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
   const nav = touch ? 'h-11 w-11' : '';
   return (
     <div className="flex w-full flex-col items-start gap-2">
-      <section aria-label="Question from the agent" onKeyDown={onKey} className="pop-in w-full overflow-hidden rounded-[22px] bg-surface">
+      <section ref={card} aria-label="Question from the agent" onKeyDown={onKey} className="pop-in w-full overflow-hidden rounded-[22px] bg-surface">
         <div className="flex items-start gap-2 bg-surface-2 px-4 py-3">
           <div className="min-w-0 flex-1 py-1">
             {shown.header && (

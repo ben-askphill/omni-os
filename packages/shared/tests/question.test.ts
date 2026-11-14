@@ -91,11 +91,12 @@ describe('the card draft', () => {
   const single = q();
   const multi = q({ question: 'Which stores?', multiSelect: true, options: [opt('NL'), opt('DE'), opt('FR')] });
 
-  it('preselects the first option on a single choice question only', () => {
+  it('starts with nothing picked, so neither question can advance until Ben chooses', () => {
     const d = newDraft([single, multi]);
-    expect(answersOf(d)).toEqual([{ selected: ['Acne'], other: null }, null]);
-    expect(canAdvance(d)).toBe(true);
+    expect(answersOf(d)).toEqual([null, null]);
+    expect(canAdvance(d)).toBe(false);
     expect(canAdvance({ ...d, page: 1 })).toBe(false);
+    expect(canAdvance({ ...d, picks: [choose(single, d.picks[0], 'Acne'), d.picks[1]] })).toBe(true);
   });
 
   it('swaps on single choice and toggles on multi select, keeping option order', () => {
