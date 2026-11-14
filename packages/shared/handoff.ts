@@ -21,6 +21,8 @@ export interface DeviceRecord {
   sealKey?: string;
   /** Its public key for the sync changes it signs (apps/server/sync/signing.ts), base64url raw Ed25519. Missing before that build. */
   signKey?: string;
+  /** Its concurrency cap per harness, for the dashboard's machine tiles (apps/server/machines.ts). Missing before that build. */
+  caps?: Record<string, number>;
   at: string;
 }
 
