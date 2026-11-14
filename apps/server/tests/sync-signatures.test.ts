@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
-import { homedir } from 'node:os';
+import { mkdtempSync, symlinkSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { startRunner } from './runner-boot.ts';
+import { startRunner, stopRunners } from './runner-boot.ts';
 import { MemoryTransport, type Change } from '../sync/transport.ts';
 import { signChange, rawPublicKey } from '../sync/signing.ts';
 import { keyOf, signAs } from './sync-sign.ts';
@@ -40,6 +41,14 @@ const pull = async (...changes: Change[]) => {
 
 afterEach(() => {
   delete process.env.OMNI_SYNC_SIGNATURES;
+});
+afterAll(async () => {
+  // A sync's device announcement runs after it, on its own (sync/devices.ts): let the last one end before the db closes.
+  await r.until('the last device announcement', () => r.db.kv.get('devices.this-mac') !== undefined, 5_000).catch(() => {});
+  await new Promise((done) => setTimeout(done, 300));
+  worker.stop();
+  await sync.setActiveWorker(null);
+  await stopRunners();
 });
 
 describe('action entities need a valid signature', () => {
@@ -82,6 +91,28 @@ describe('action entities need a valid signature', () => {
   });
 });
 
+describe('keys and deletes', () => {
+  it('an unsigned record never pins a key: it waits for Ben, and no secret is sealed to it', async () => {
+    const forged = rawPublicKey(generateKeyPairSync('ed25519').privateKey);
+    await pull({ machine_id: 'mac-f', entity: 'kv', entity_id: 'devices.mac-f', op: 'upsert', ts: later(), data: { value: { id: 'mac-f', name: 'Mac F', tailscale: null, signKey: forged, sealKey: 'x'.repeat(43), at: later() } } });
+    expect(r.db.db.prepare('SELECT sign_key, seen_sign_key FROM sync_keys WHERE machine_id = ?').get('mac-f')).toEqual({ sign_key: null, seen_sign_key: forged });
+    expect((await devices()).find((d) => d.id === 'mac-f')).toMatchObject({ keyChanged: true, pinnedFingerprint: null });
+    const res = await app.request('/api/secrets/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ machine: 'mac-f', scope: 'global', name: 'SOME_KEY', value: 'v' }) });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toMatch(/not confirmed/);
+  });
+
+  it('a remote command is deleted only by its sender or target', async () => {
+    await pull(signAs({ ...command('cmd-del'), op: 'delete', machine_id: 'mac-d', data: null }));
+    expect(stored('cmd-signed')).toBe(true);
+    await pull(signAs({ ...command('cmd-signed'), op: 'delete', machine_id: 'mac-d', data: null }));
+    expect(stored('cmd-signed')).toBe(true);
+    expect((await refused())[0]).toMatchObject({ entityId: 'cmd-signed', reason: 'deleted by a machine that had no part in it' });
+    await pull(signAs({ ...command('cmd-signed'), op: 'delete', data: null }));
+    expect(stored('cmd-signed')).toBe(false);
+  });
+});
+
 describe('other entities', () => {
   it('an unsigned change from an older build still applies, and is logged once per machine and entity', async () => {
     await pull(
@@ -113,6 +144,13 @@ describe('synced paths', () => {
     expect(r.db.threads.get('t-ssh')).toBeUndefined();
     expect(r.db.threads.get('t-home')?.cwd).toBe(join(homedir(), 'work', 'volero'));
     expect(await refused()).toContainEqual(expect.objectContaining({ entity: 'thread', entityId: 't-ssh', reason: 'cwd inside ~/.ssh' }));
+  });
+
+  it("a folder that leads into Omni's data folder through a symlink is refused", async () => {
+    const link = join(mkdtempSync(join(tmpdir(), 'omni-link-')), 'data');
+    symlinkSync(process.env.OMNI_DATA_DIR!, link);
+    await pull(signAs({ machine_id: 'mac-b', entity: 'thread', entity_id: 't-link', op: 'upsert', ts: later(), data: { id: 't-link', channel_id: 'inbox', title: 'link', status: 'done', model: 'sonnet', session_id: 't-link', source: 'manual', cwd: link, created_at: later(), updated_at: later() } }));
+    expect(r.db.threads.get('t-link')).toBeUndefined();
   });
 
   it("a channel moved into Omni's data folder is refused", async () => {

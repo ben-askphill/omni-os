@@ -105,3 +105,12 @@ describe('checkSyncedPath', () => {
   ];
   for (const [p, ok] of cases) it(`${ok ? 'allows' : 'refuses'} ${JSON.stringify(p)}`, () => expect(checkSyncedPath(p, policy).ok).toBe(ok));
 });
+
+describe('checkSyncedPath on a file system that ignores case', () => {
+  const home = '/Users/ben';
+  const policy: PathPolicy = { home, dataDir: '/Users/ben/omni-os/data', roots: [], caseInsensitive: true };
+  for (const p of ['/Users/ben/.SSH', '/users/BEN/.Ssh/keys', '/Users/ben/Omni-OS/Data/secrets.json'])
+    it(`refuses ${p}`, () => expect(checkSyncedPath(p, policy).ok).toBe(false));
+  it('allows another case of a folder under home', () => expect(checkSyncedPath('/USERS/ben/Work', policy).ok).toBe(true));
+  it('tells case apart when the file system does', () => expect(checkSyncedPath('/home/ben/.SSH', { home: '/home/ben', dataDir: '/home/ben/data', roots: [] }).ok).toBe(true));
+});

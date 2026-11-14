@@ -207,13 +207,15 @@ export function sendSecret(machine: string, scope: string, name: string, value: 
   if (!self || !activeWorker()) throw refused(syncProblem(SECRET_DROP_NEEDS));
   const target = machineFor(machine);
   if (target.id === self) throw refused('That is this machine. Leave machine out to set it here.', 400);
-  // Sealed only to the key this machine pinned for the target (sync/keyring.ts), never to whatever its record says now.
-  const announced = deviceRecord(target.id)?.sealKey;
-  if (announced) keyring.observe(target.id, { sealKey: announced });
+  // Sealed only to the key this machine pinned for the target (sync/keyring.ts): one its signed device record carried,
+  // or one Ben confirmed. Never to whatever its record says now.
   const pin = keyring.get(target.id);
-  if (pin?.seenSealKey) throw refused(`${target.name} announces a new key for secrets. Check it and confirm it in Settings > Sync before sending it secrets.`);
+  if (pin?.seenSealKey) throw refused(`${target.name} announces a key for secrets this Mac has not confirmed. Check its fingerprint and confirm it in Settings > Sync first.`);
   const key = pin?.sealKey;
-  if (!key) throw refused(`${target.name} has not published a key for secrets yet. Update Omni there and let it sync once.`);
+  if (!key) {
+    const why = deviceRecord(target.id)?.sealKey ? 'has not sent a signed key for secrets yet' : 'has not published a key for secrets yet';
+    throw refused(`${target.name} ${why}. Update Omni there and let it sync once.`);
+  }
   const id = randomUUID();
   const now = Date.now();
   const meta = { id, sender: self, target: target.id, scope, name };

@@ -14,6 +14,8 @@ export interface PathPolicy {
   dataDir: string;
   /** Extra roots: this machine's channel checkouts and base folders, the repos folder and the temp folder. */
   roots: readonly string[];
+  /** The file system ignores case (macOS, Windows): ~/.SSH is ~/.ssh. */
+  caseInsensitive?: boolean;
 }
 
 export type PathVerdict = { ok: true } | { ok: false; reason: string };
@@ -33,14 +35,16 @@ export function checkSyncedPath(raw: string | null | undefined, policy: PathPoli
   if (raw == null || raw === '') return { ok: true };
   if (raw.includes('\0')) return { ok: false, reason: 'not a path' };
   if (!isAbsolute(raw)) return { ok: false, reason: 'not an absolute path' };
-  const p = clean(raw);
-  const home = clean(policy.home);
-  const data = clean(policy.dataDir);
-  for (const d of DENIED_IN_HOME) if (under(p, `${home}${sep}${d}`)) return { ok: false, reason: `inside ~/${d}` };
+  const fold = (x: string) => (policy.caseInsensitive ? x.toLowerCase() : x);
+  const p = fold(clean(raw));
+  const home = fold(clean(policy.home));
+  const data = fold(clean(policy.dataDir));
+  const roots = policy.roots.filter((r) => r && isAbsolute(r)).map(fold);
+  for (const d of DENIED_IN_HOME) if (under(p, fold(`${home}${sep}${d}`))) return { ok: false, reason: `inside ~/${d}` };
   if (under(p, data) && !DATA_ALLOWED.some((d) => under(p, `${data}${sep}${d}`) && p !== `${data}${sep}${d}`)) {
     return { ok: false, reason: "inside Omni's data folder" };
   }
   if (under(p, data)) return { ok: true };
-  if (under(p, home) || policy.roots.some((r) => r && isAbsolute(r) && under(p, r))) return { ok: true };
+  if (under(p, home) || roots.some((r) => under(p, r))) return { ok: true };
   return { ok: false, reason: 'outside the home folder and the channel checkouts' };
 }

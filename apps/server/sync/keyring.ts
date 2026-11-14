@@ -56,22 +56,29 @@ export const keyring = {
   },
 
   /**
-   * What a machine's record says its keys are now. A key with nothing pinned yet is pinned. One that differs from the
-   * pinned key is kept as seen, and one that matches again clears it. Returns whether either pinned key disagrees.
+   * What a machine's record says its keys are now. With `pin`, a key with nothing pinned yet is pinned; without it
+   * (the key came on a change that did not verify), it is only seen. One that differs from the pinned key is kept as
+   * seen, and one that matches again clears it. Returns whether a seen key waits for confirmation.
    */
-  observe(machine: string, keys: { signKey?: string | null; sealKey?: string | null }, now = new Date().toISOString()): boolean {
+  observe(
+    machine: string,
+    keys: { signKey?: string | null; sealKey?: string | null },
+    { pin = true, now = new Date().toISOString() }: { pin?: boolean; now?: string } = {},
+  ): boolean {
     const sign = keys.signKey || null;
     const seal = keys.sealKey || null;
-    const r = rowOf(machine);
+    if (!sign && !seal) return false;
+    let r = rowOf(machine);
     if (!r) {
-      if (!sign && !seal) return false;
-      db.prepare('INSERT INTO sync_keys (machine_id, sign_key, seal_key, pinned_at) VALUES (?, ?, ?, ?)').run(machine, sign, seal, now);
-      return false;
+      db.prepare('INSERT INTO sync_keys (machine_id, sign_key, seal_key, pinned_at) VALUES (?, ?, ?, ?)').run(machine, pin ? sign : null, pin ? seal : null, now);
+      if (pin) return false;
+      r = rowOf(machine)!;
     }
-    const pinSign = r.sign_key ?? sign;
-    const pinSeal = r.seal_key ?? seal;
-    const seenSign = sign && pinSign && sign !== pinSign ? sign : null;
-    const seenSeal = seal && pinSeal && seal !== pinSeal ? seal : null;
+    // Keys that come from a change that did not verify are only ever seen, never pinned: Ben confirms them.
+    const pinSign = r.sign_key ?? (pin ? sign : null);
+    const pinSeal = r.seal_key ?? (pin ? seal : null);
+    const seenSign = sign && sign !== pinSign ? sign : null;
+    const seenSeal = seal && seal !== pinSeal ? seal : null;
     const changed = !!(seenSign || seenSeal);
     const seenAt = changed ? (seenSign === r.seen_sign_key && seenSeal === r.seen_seal_key && r.seen_at ? r.seen_at : now) : null;
     db.prepare(

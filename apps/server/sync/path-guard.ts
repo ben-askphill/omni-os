@@ -1,3 +1,4 @@
+import { existsSync, realpathSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { config, paths } from '../config.ts';
 import { db } from '../db.ts';
@@ -14,14 +15,33 @@ const TEMP = ['/tmp', '/private/tmp', '/var/tmp'];
 export function localPathPolicy(): PathPolicy {
   const rows = db.prepare('SELECT repo_path, base_dir FROM channels').all() as { repo_path: string | null; base_dir: string | null }[];
   const roots = [tmpdir(), ...TEMP, resolved.reposDir(), config.brainDir, ...rows.flatMap((r) => [r.repo_path, r.base_dir])].filter((r): r is string => !!r);
-  return { home: homedir(), dataDir: paths.data, roots };
+  return { home: homedir(), dataDir: paths.data, roots, caseInsensitive: process.platform === 'darwin' || process.platform === 'win32' };
 }
 
-/** The first of these fields whose path is not allowed, with why, or null when all are. */
+/** Where a path that exists here really is, through any symlink, or null when it does not exist. */
+function real(p: string): string | null {
+  try {
+    return existsSync(p) ? realpathSync(p) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The first of these fields whose path is not allowed, with why, or null when all are. A path that exists here is
+ * checked where it really is too, so a symlink under home cannot lead into ~/.ssh.
+ */
 export function pathProblem(fields: Record<string, string | null | undefined>, policy = localPathPolicy()): string | null {
+  // The real path is checked against the real folders: a data folder reached through a symlink is still the data folder.
+  const resolved = { ...policy, home: real(policy.home) ?? policy.home, dataDir: real(policy.dataDir) ?? policy.dataDir, roots: policy.roots.map((r) => real(r) ?? r) };
   for (const [field, value] of Object.entries(fields)) {
-    const v: PathVerdict = checkSyncedPath(value, policy);
-    if (!v.ok) return `${field} ${v.reason}`;
+    const checks: [string | null | undefined, PathPolicy][] = [[value, policy]];
+    const r = value ? real(value) : null;
+    if (r) checks.push([r, resolved]);
+    for (const [p, pol] of checks) {
+      const v: PathVerdict = checkSyncedPath(p, pol);
+      if (!v.ok) return `${field} ${v.reason}`;
+    }
   }
   return null;
 }

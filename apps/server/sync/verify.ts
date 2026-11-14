@@ -36,8 +36,8 @@ const valueOf = (c: Change) => (c.data as { value?: unknown } | null)?.value as 
 
 /** Why the signer may not write this change even with a good signature, or null when it may. */
 function roleProblem(c: Change): string | null {
-  if (c.op === 'delete') return null;
   const signer = c.machine_id;
+  if (c.op === 'delete') return deleteProblem(c);
   if (c.entity === 'remote_command') {
     const d = (c.data ?? {}) as Record<string, unknown>;
     return signer === d.sender || signer === d.target ? null : 'signed by a machine that neither sent nor received the command';
@@ -52,15 +52,30 @@ function roleProblem(c: Change): string | null {
   return null;
 }
 
-/** The pinned signing key, pinning the one its device record (sync/devices.ts) carries the first time the machine is seen. */
-function signKeyOf(machine: string): string | null {
-  const pinned = keyring.get(machine)?.signKey;
-  if (pinned) return pinned;
-  const rec = kv.get<{ signKey?: unknown; sealKey?: unknown }>(DEVICE + machine);
-  if (!str(rec?.signKey)) return null;
-  keyring.observe(machine, { signKey: str(rec?.signKey), sealKey: str(rec?.sealKey) });
-  return keyring.get(machine)?.signKey ?? null;
+/**
+ * A delete of an action entity: only a machine that had a part in it. An assignment is never deleted, and the
+ * automations owner and update asks have no delete. Nothing here to compare with leaves it to the handler.
+ */
+function deleteProblem(c: Change): string | null {
+  const signer = c.machine_id;
+  const no = 'deleted by a machine that had no part in it';
+  if (c.entity === 'remote_command') {
+    const row = db.prepare('SELECT sender, target FROM remote_commands WHERE id = ?').get(c.entity_id) as { sender: string; target: string } | undefined;
+    return !row || row.sender === signer || row.target === signer ? null : no;
+  }
+  if (c.entity === 'assignment') return 'assignments are never deleted';
+  if (c.entity !== 'kv') return null;
+  const k = c.entity_id;
+  if (k.startsWith(SECRET_DROP)) {
+    const d = kv.get<{ sender?: unknown; target?: unknown }>(k);
+    return !d || d.sender === signer || d.target === signer ? null : no;
+  }
+  if (k === OWNER_KEY || k.startsWith(ASK_PREFIX)) return 'nothing deletes it';
+  return null;
 }
+
+/** The signing key pinned for a machine, or null before one is. */
+const signKeyOf = (machine: string): string | null => keyring.get(machine)?.signKey ?? null;
 
 const REASONS: Record<Exclude<Verdict, 'valid'>, string> = {
   unsigned: 'unsigned',
@@ -70,19 +85,22 @@ const REASONS: Record<Exclude<Verdict, 'valid'>, string> = {
 };
 
 export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syncSignatures()): Gate {
-  // A machine describes only itself. Its record is where its keys come from, so they are noted before the check.
-  // The first record seen for a machine pins its keys; a later one with other keys is kept as seen (sync/keyring.ts).
+  // A machine describes only itself.
   const described = raw.entity === 'kv' && raw.entity_id.startsWith(DEVICE) ? raw.entity_id.slice(DEVICE.length) : null;
   if (described !== null && described !== raw.machine_id) return { kind: 'refuse', reason: "another machine's record", change: unsigned(raw).change };
-  if (described && raw.op === 'upsert') {
-    const v = valueOf(raw);
-    keyring.observe(described, { signKey: str(v?.signKey), sealKey: str(v?.sealKey) });
-  }
-  // A machine seen for the first time is pinned with the key its first signed change carries: its device record may
-  // come later than the changes it signs (an automations owner claim goes out in its first sync).
+  // Trust on first sight: a machine with no signing key here yet is pinned with the key its first signed change
+  // carries, when that change verifies with it. Its device record may come later than the changes it signs (an
+  // automations owner claim goes out in its first sync).
   const carried = unsigned(raw).signature;
-  if (carried && carried.signer === raw.machine_id && !signKeyOf(raw.machine_id)) keyring.observe(raw.machine_id, { signKey: carried.key });
+  if (carried && carried.signer === raw.machine_id && !signKeyOf(raw.machine_id) && verifyChange(raw, () => carried.key).verdict === 'valid') {
+    keyring.observe(raw.machine_id, { signKey: carried.key });
+  }
   const { verdict, change } = verifyChange(raw, signKeyOf);
+  // The keys a record announces: pinned only from a record that verifies, else kept as seen for Ben to confirm.
+  if (described && change.op === 'upsert') {
+    const v = valueOf(change);
+    keyring.observe(described, { signKey: str(v?.signKey), sealKey: str(v?.sealKey) }, { pin: verdict === 'valid' });
+  }
   const action = isActionChange(change);
   if (verdict === 'valid') {
     const role = action ? roleProblem(change) : null;
