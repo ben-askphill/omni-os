@@ -378,6 +378,33 @@ server.registerTool(
 );
 
 server.registerTool(
+  'rerun_failed_checks',
+  {
+    description:
+      "Start a PR's failed GitHub Actions jobs again (`gh run rerun --failed` for each failing workflow run), with no agent " +
+      'turn. Use it for a flaky or infrastructure failure; a real failure needs a fix pushed instead. Name the PR by `repo` ' +
+      '(owner/name, as list_pull_requests and crew_prs give it) or `channel`, plus `number`. Answers each run with ok or ' +
+      "gh's error, and `skipped`, the failing checks that are not Actions runs. Refused when no failing check is an Actions run.",
+    inputSchema: {
+      repo: z.string().optional().describe('owner/name of the GitHub repo.'),
+      channel: z.string().optional().describe('An Omni channel id whose GitHub repo holds the PR. Pass this or repo.'),
+      number: z.number().int().positive(),
+    },
+  },
+  async ({ repo, channel, number }) => {
+    let id = channel;
+    if (!id) {
+      if (!repo) throw new Error('Pass repo (owner/name) or channel.');
+      const list: any[] = await call('/channels');
+      const hit = list.find((c) => c.github_repo?.toLowerCase() === repo.trim().toLowerCase());
+      if (!hit) throw new Error(`No channel has ${repo} as its GitHub repo. Channels with a repo: ${list.flatMap((c) => (c.github_repo ? [c.github_repo] : [])).join(', ') || 'none'}.`);
+      id = hit.id as string;
+    }
+    return refused(() => call(`/channels/${encodeURIComponent(id)}/prs/${number}/rerun-failed`, { method: 'POST', body: '{}' }));
+  },
+);
+
+server.registerTool(
   'crew_questions',
   {
     description:

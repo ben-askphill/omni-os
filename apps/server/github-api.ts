@@ -6,7 +6,7 @@ import { crewPRs, prThread } from './crew-prs.ts';
 import { followBranch } from './branch-follow.ts';
 import { channels, threads } from './db.ts';
 import { emitThread } from './runner/state.ts';
-import { allPRs, branchPRs, getPR, listPRs, mergePR, threadPRMarks } from './github.ts';
+import { allPRs, branchPRs, getPR, listPRs, mergePR, rerunFailedChecks, threadPRMarks } from './github.ts';
 import { requestPRReview } from './pr-review.ts';
 import { fetchPRImage, githubImage, proxyPRImages } from './github-images.ts';
 
@@ -85,6 +85,12 @@ githubApi.post('/channels/:id/prs/:n/merge', async (c) => {
   void confirm;
   const out = await mergePR(repoOf(c.req.param('id')), Number(c.req.param('n')), method, delete_branch);
   return c.json({ ok: true, output: out });
+});
+
+// Starts the failed jobs of each failing workflow run again, with no agent turn (github.ts rerunFailedChecks).
+githubApi.post('/channels/:id/prs/:n/rerun-failed', async (c) => {
+  const number = z.coerce.number().int().positive().parse(c.req.param('n'));
+  return c.json(await rerunFailedChecks(repoOf(c.req.param('id')), number));
 });
 
 // Resolve the PR's origin on the server so every client delegates to the same parent.

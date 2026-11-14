@@ -1,4 +1,5 @@
 import type { PRWatchView } from '@omni/shared/pr-watch.ts';
+import type { RerunResult } from '@omni/shared/pr-rerun.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 
 export interface PRChecks {
@@ -92,6 +93,11 @@ export function pullsApi(http: HttpClient) {
       http.request<MergeResult>('POST', apiPath`/channels/${channelId}/prs/${number}/merge`, {
         body: { method: options.method ?? 'squash', delete_branch: options.delete_branch ?? true, confirm: true },
       }),
+    /**
+     * `gh run rerun --failed` for each workflow run behind the PR's failing checks, with no agent turn. A 409 says there is
+     * nothing to rerun; a 502 carries gh's message when no run started again.
+     */
+    rerunFailedChecks: (channelId: string, number: number) => http.request<RerunResult>('POST', apiPath`/channels/${channelId}/prs/${number}/rerun-failed`, { body: {} }),
     /** The thread's PR watch, or null when it never had one. */
     prWatch: (id: string) => http.request<PRWatchView | null>('GET', apiPath`/threads/${id}/pr-watch`),
     /** Watches the branch's open PR, or PR `number`. Starting a stopped watch again resets its wake budget. A 409 says why it cannot start. */

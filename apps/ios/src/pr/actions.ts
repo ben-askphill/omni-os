@@ -1,11 +1,13 @@
 import { OmniHttpError, type OmniApi } from '@omni/client-core';
 import { classifyMergeFailure, type MergeFailure } from '@omni/shared/pr-merge.ts';
 import type { PRWatchView } from '@omni/shared/pr-watch.ts';
+import { rerunText } from '@omni/shared/pr-rerun.ts';
 
 import { describeFailure } from '../review/failure';
 
 export type MergeApi = Pick<OmniApi, 'mergePullRequest'>;
 export type WatchApi = Pick<OmniApi, 'watchPR' | 'stopPRWatch'>;
+export type RerunApi = Pick<OmniApi, 'rerunFailedChecks'>;
 
 export type MergeOutcome =
   | { kind: 'merged' }
@@ -40,6 +42,17 @@ export type WatchOutcome = { kind: 'set'; watch: PRWatchView | null } | { kind: 
 export async function setWatch(call: <T>(fn: (api: WatchApi) => Promise<T>) => Promise<T>, threadId: string, on: boolean): Promise<WatchOutcome> {
   try {
     return { kind: 'set', watch: await call((api) => (on ? api.watchPR(threadId) : api.stopPRWatch(threadId))) };
+  } catch (e) {
+    return { kind: 'failed', message: describeFailure(e).message };
+  }
+}
+
+export type RerunOutcome = { kind: 'started'; text: string } | { kind: 'failed'; message: string };
+
+/** `gh run rerun --failed` for each failing workflow run, through the server. A refusal comes back with the server's or gh's reason. */
+export async function rerunChecks(call: <T>(fn: (api: RerunApi) => Promise<T>) => Promise<T>, channelId: string, number: number): Promise<RerunOutcome> {
+  try {
+    return { kind: 'started', text: rerunText(await call((api) => api.rerunFailedChecks(channelId, number))) };
   } catch (e) {
     return { kind: 'failed', message: describeFailure(e).message };
   }
