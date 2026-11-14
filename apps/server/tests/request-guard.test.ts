@@ -61,6 +61,13 @@ describe('requestGuard: the token', () => {
     expect(upgraded).toEqual(['/api/threads']);
   });
 
+  it("makes no session from an older build's cookie on a request it refuses", async () => {
+    upgraded.length = 0;
+    expect((await get('/api/threads', { cookie: `${cookieName()}=${TOKEN}`, 'sec-fetch-site': 'same-site' })).status).toBe(403);
+    expect((await get('/api/threads', { cookie: `${cookieName()}=${TOKEN}`, host: 'evil.example' })).status).toBe(403);
+    expect(upgraded).toEqual([]);
+  });
+
   it('takes no cookie of another name, like another port\'s', async () => {
     expect((await get('/api/threads', { cookie: `omni_token_1=${TOKEN}` })).status).toBe(401);
     expect((await get('/api/threads', { cookie: `${cookieName()}=nope` })).status).toBe(401);

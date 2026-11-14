@@ -16,9 +16,6 @@ export function signingKey(): Promise<KeyObject> {
     await setSecret('global', SIGN_SECRET_NAME, privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64url'));
     return privateKey;
   })().catch((err) => {
-    // The test runner's Keychain stub stores nothing (tests/runner-boot.ts). Each machine a test plays loads its own
-    // copy of this module, so a key kept here is still one per machine.
-    if (process.env.VITEST) return generateKeyPairSync('ed25519').privateKey;
     own = null;
     throw err;
   });

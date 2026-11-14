@@ -5,7 +5,7 @@
 // nonce (desktop-pairing.ts), and the token never appears in the URL. A paired browser holds a session, never the token.
 // App pairing (app-pairing.ts) gives a native app its own revocable session; push-tokens.ts keeps its push token.
 import { Hono, type Context } from 'hono';
-import { deleteCookie } from 'hono/cookie';
+import { deleteCookie, getCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { proofFor, rotateToken, sessionCookieName, TokenPinned } from './api-token.ts';
 import { setSessionCookie } from './browser-session.ts';
@@ -21,6 +21,7 @@ import {
   owner,
   pollFlow,
   revokeSession,
+  sessionFor,
   sessionIsLive,
   SignInError,
   startFlow,
@@ -40,9 +41,12 @@ authApi.get('/', (c) => c.json({ ok: true }));
 /**
  * Called with `Authorization: Bearer <token>`: hands the browser a device session paired with the token (method
  * `token`) as an HttpOnly, SameSite=Strict cookie on /api (browser-session.ts). Never the token itself: a session
- * can be revoked in Settings, Devices, and ends when the token is rotated.
+ * can be revoked in Settings, Devices, and ends when the token is rotated. A browser that already holds a live session
+ * paired with the token keeps it, so each reload of the desktop window does not add another device.
  */
 function pairCookie(c: Context, name: string) {
+  const held = sessionFor(getCookie(c, sessionCookieName()));
+  if (held?.kind === 'browser' && held.method === 'token') return;
   const s = createSession(name, 'browser', '', 'token');
   setSessionCookie(c, s.token);
 }

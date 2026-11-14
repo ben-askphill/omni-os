@@ -207,7 +207,7 @@ const TERMINAL_PATH = /^\/api\/threads\/[^/]+\/terminal(?:\/|$)/;
 export const DESKTOP_NONCE_PATH = '/api/auth/desktop-nonce';
 
 /** Swaps a raw-token cookie an older build set for a session (browser-session.ts). app.ts sets it, so the tests never open the db. */
-let legacyUpgrade: ((c: Context) => { id: string; token: string } | null) | null = null;
+let legacyUpgrade: ((c: Context) => { id: string; token: string }) | null = null;
 export const useLegacyUpgrade = (fn: typeof legacyUpgrade) => {
   legacyUpgrade = fn;
 };
@@ -235,7 +235,7 @@ const credentialOf = (auth: OmniAuth): Credential =>
  * - the terminal, for anything but the token or a session paired with it;
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set.
- * A raw-token cookie an older build set still works once, and is swapped for a session cookie on the way.
+ * A raw-token cookie an older build set still works once, and is swapped for a session cookie once the request is let through.
  * The desktop app's main process, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
  */
 export const requestGuard: MiddlewareHandler = async (c, next) => {
@@ -246,15 +246,13 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   const open = desktop || (c.req.method === 'GET' && c.req.path === PROOF_PATH) || isWebhookPost(c) || isSignInRoute(c) || isAppPairingRoute(c) || isConnectRoute(c);
   const given = bearer(c);
   let auth: OmniAuth = { via: 'none' };
+  let legacy = false;
   if (tokenMatches(given)) auth = { via: 'token' };
   else {
     const session = sessionCheck(given ?? getCookie(c, sessionCookieName()) ?? '');
     if (session) auth = { via: 'session', session: session.id, kind: session.kind, method: session.method };
-    else if (!given && legacyUpgrade && tokenMatches(getCookie(c, cookieName()))) {
-      // An older build's cookie held the token itself. Trade it for a revocable session, once.
-      const s = legacyUpgrade(c);
-      if (s) auth = { via: 'session', session: s.id, kind: 'browser', method: 'token' };
-    }
+    // An older build's cookie held the token itself. It counts as a token-paired session, and is traded for one below.
+    else legacy = !given && !!legacyUpgrade && tokenMatches(getCookie(c, cookieName()));
   }
   const origin = c.req.header('origin');
   let originHost = '';
@@ -263,7 +261,7 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   } catch {
     // `null` and anything else that is not a URL.
   }
-  const credential = route === 'pairing' && nonceLive(c.req.query('nonce')) ? 'nonce' : credentialOf(auth);
+  const credential = route === 'pairing' && nonceLive(c.req.query('nonce')) ? 'nonce' : legacy ? 'session-token' : credentialOf(auth);
   const decision = decideRequest({
     method: c.req.method,
     route,
@@ -282,11 +280,15 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
     if (route === 'pairing' && decision.status === 403 && /nonce/.test(decision.reason)) return c.redirect('/#/pair?desktop=expired', 303);
     return refuse(decision.reason, decision.status);
   }
-  c.set('omniAuth', auth);
   const owners = resolved.tailscaleLogins();
   // Through the Connect tunnel there is no Tailscale login to check: the token or a session is the control there.
   if (owners.length && cameThroughProxy(c, host) && !fromConnectTunnel(c, host) && !owners.includes((c.req.header('tailscale-user-login') ?? '').trim().toLowerCase())) {
     return refuse('this Tailscale login is not the owner');
   }
+  if (legacy && legacyUpgrade) {
+    const s = legacyUpgrade(c);
+    auth = { via: 'session', session: s.id, kind: 'browser', method: 'token' };
+  }
+  c.set('omniAuth', auth);
   await next();
 };

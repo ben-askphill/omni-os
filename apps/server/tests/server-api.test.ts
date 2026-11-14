@@ -193,6 +193,26 @@ describe('/api/auth', () => {
     }
   });
 
+  it('keeps the session a desktop window already holds when it pairs again, instead of adding a device', async () => {
+    const { listSessions } = await import('../google-auth.ts');
+    const desktopRows = () => listSessions().filter((s) => s.name === 'Desktop app').length;
+    const pair = async (cookie?: string) => {
+      const { nonce } = (await (await app.request('/api/auth/desktop-nonce', { method: 'POST' })).json()) as { nonce: string };
+      return app.request(`/api/auth/desktop-pair?nonce=${nonce}`, { headers: { authorization: '', ...(cookie ? { cookie } : {}) } });
+    };
+    const before = desktopRows();
+    const first = await pair();
+    const held = /omni_s_[0-9a-f]+/.exec(first.headers.get('set-cookie') ?? '')?.[0];
+    expect(held).toBeTruthy();
+    for (let i = 0; i < 3; i++) {
+      const again = await pair(`${sessionCookieName()}=${held}`);
+      expect(again.status).toBe(302);
+    }
+    expect(desktopRows()).toBe(before + 1);
+    const after = await app.request('/api/auth', { headers: { authorization: '', cookie: `${sessionCookieName()}=${held}` } });
+    expect(after.status).toBe(200);
+  });
+
   it('pairs the desktop app window with no Secure flag over plain http', async () => {
     const minted = (await (await app.request('/api/auth/desktop-nonce', { method: 'POST' })).json()) as { nonce: string };
     wireFixture('desktop-nonce.json', { ...minted, nonce: '0'.repeat(64) });
