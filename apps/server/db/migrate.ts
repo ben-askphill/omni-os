@@ -576,4 +576,13 @@ export function migrate() {
     crew_report INTEGER NOT NULL DEFAULT 1,
     updated_at TEXT NOT NULL
   );`);
+  // OAuth clients that reached /mcp with a Clerk JWT for the owner (apps/server/mcp-clients.ts): which Ben approved,
+  // which wait for approval and which he removed. Local, never synced: a forged sync change must not approve a client.
+  db.exec(`CREATE TABLE IF NOT EXISTS mcp_clients (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    via TEXT,
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL
+  );`);
 }

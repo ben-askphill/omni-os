@@ -232,6 +232,7 @@ export const resolved = {
   mcpPublicUrl: () => (process.env.OMNI_MCP_PUBLIC_URL ?? userConfig().integrations.mcpPublicUrl).trim().replace(/\/+$/, ''),
   clerkPublishableKey: () => (process.env.OMNI_CLERK_PUBLISHABLE_KEY ?? userConfig().integrations.clerkPublishableKey).trim(),
   clerkClientId: () => (process.env.OMNI_CLERK_CLIENT_ID ?? userConfig().integrations.clerkClientId).trim(),
+  mcpClients: () => (process.env.OMNI_MCP_CLIENTS ?? userConfig().integrations.mcpClients).trim(),
 };
 
 /**

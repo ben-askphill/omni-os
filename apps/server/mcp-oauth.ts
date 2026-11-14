@@ -3,14 +3,17 @@
 // is the authorization server. A client finds Clerk through the metadata here (RFC 9728), registers and signs in there,
 // and sends the access token it gets to /mcp.
 //
-// Omni holds no Clerk secret key, so it cannot introspect a token. It asks Clerk's userinfo endpoint instead, which
-// answers for opaque and JWT access tokens alike, and takes the token only when its user is this install's owner
-// (google-auth.ts). Answers are cached briefly, so a busy client costs one Clerk call a minute.
+// A token gets in only when it is the owner's (google-auth.ts) and bound to this install: mcp-token.ts decides, with
+// the instance's JWKS for the signature and Clerk's userinfo endpoint for revocation. Userinfo answers are cached
+// briefly, so a busy client costs one Clerk call a minute. The resource URL comes from configuration and the Host,
+// never X-Forwarded-*, so a proxy header cannot point a client at another host.
 import { createHash } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_CLERK_PUBLISHABLE_KEY, issuerFromKey } from './clerk.ts';
 import { owner } from './google-auth.ts';
-import { mcpHostAllowed } from './request-guard.ts';
+import { mcpClients } from './mcp-clients.ts';
+import { verifyMcpToken, type Jwk, type Verdict } from './mcp-token.ts';
+import { mcpHostAllowed, mcpPublicHost, viaConnect, viaTailnet } from './request-guard.ts';
 import { resolved } from './user-config.ts';
 
 /** What a client asks Clerk for: enough for userinfo to name the user. */
@@ -40,6 +43,7 @@ export function setOAuthFetch(f?: typeof fetch) {
   fetchImpl = f ?? ((...args) => fetch(...args));
   answers.clear();
   asMetadata = null;
+  jwks = null;
 }
 
 /** Clerk did not answer, so a token could not be checked either way. */
@@ -59,30 +63,77 @@ async function userinfoSub(issuer: string, token: string): Promise<string | null
   return typeof body.sub === 'string' && body.sub ? body.sub : null;
 }
 
-/**
- * Whether `token` is a Clerk OAuth access token for this install's owner. False while OAuth is off.
- * Throws ClerkUnreachable when Clerk could not be asked.
- */
-export async function isOwnerToken(token: string, now = Date.now()): Promise<boolean> {
-  const issuer = mcpIssuer();
-  if (!issuer || !token) return false;
-  const key = createHash('sha256').update(`${issuer}\n${token}`).digest('hex');
-  const hit = answers.get(key);
-  let sub = hit && now - hit.at < (hit.sub ? OK_MS : NO_MS) ? hit.sub : undefined;
-  if (sub === undefined) {
-    sub = await userinfoSub(issuer, token);
-    if (answers.size >= CACHE_MAX) for (const [k, v] of answers) if (now - v.at >= OK_MS) answers.delete(k);
-    if (answers.size < CACHE_MAX) answers.set(key, { at: now, sub });
+let jwks: { issuer: string; at: number; keys: Map<string, Jwk> } | null = null;
+
+/** The instance's signing key for `kid`, reading the JWKS again once for a kid it has not seen (a key rotation). */
+async function keyFor(issuer: string, kid: string, now: number): Promise<Jwk | null> {
+  if (jwks?.issuer === issuer && now - jwks.at < META_MS && jwks.keys.has(kid)) return jwks.keys.get(kid)!;
+  let res: Response;
+  try {
+    res = await fetchImpl(`${issuer}/.well-known/jwks.json`, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+  } catch (err) {
+    throw new ClerkUnreachable(`Cannot reach Clerk (${(err as Error).message})`);
   }
-  return sub !== null && sub === owner()?.sub;
+  if (!res.ok) throw new ClerkUnreachable(`Clerk answered HTTP ${res.status}`);
+  const { keys = [] } = (await res.json().catch(() => ({}))) as { keys?: Jwk[] };
+  jwks = { issuer, at: now, keys: new Map(keys.filter((k) => k.kid).map((k) => [k.kid!, k])) };
+  return jwks.keys.get(kid) ?? null;
 }
 
-/** The address a client reached this server on: through a Cloudflare Tunnel, the https public name cloudflared passes on. */
+/** Clerk's userinfo answer for a token, cached briefly. */
+async function cachedSub(issuer: string, token: string, now: number): Promise<string | null> {
+  const key = createHash('sha256').update(`${issuer}\n${token}`).digest('hex');
+  const hit = answers.get(key);
+  if (hit && now - hit.at < (hit.sub ? OK_MS : NO_MS)) return hit.sub;
+  const sub = await userinfoSub(issuer, token);
+  if (answers.size >= CACHE_MAX) for (const [k, v] of answers) if (now - v.at >= OK_MS) answers.delete(k);
+  if (answers.size < CACHE_MAX) answers.set(key, { at: now, sub });
+  return sub;
+}
+
+/** This install's /mcp resource URLs: the configured public one, the Connect hostname's, and the one `c` reached. */
+export function mcpResources(c: Context): string[] {
+  const out = new Set<string>([`${publicBase(c)}/mcp`]);
+  const configured = resolved.mcpPublicUrl();
+  if (configured) out.add(`${configured}/mcp`);
+  return [...out];
+}
+
+/**
+ * Whether `token` is a Clerk OAuth access token for this install's owner, bound to this install (mcp-token.ts).
+ * Null while OAuth is off. Throws ClerkUnreachable when Clerk could not be asked. Records the client it names.
+ */
+export async function mcpTokenVerdict(token: string, c: Context, now = Date.now()): Promise<Verdict | null> {
+  const issuer = mcpIssuer();
+  const ownerSub = owner()?.sub;
+  if (!issuer || !ownerSub || !token) return null;
+  const verdict = await verifyMcpToken(token, {
+    issuer,
+    ownerSub,
+    resources: mcpResources(c),
+    clientStatus: mcpClients.status,
+    allowOpaque: process.env.OMNI_MCP_ALLOW_OPAQUE === '1',
+    keyFor: (kid) => keyFor(issuer, kid, now),
+    userinfoSub: (t) => cachedSub(issuer, t, now),
+    now,
+  });
+  if (verdict.ok && verdict.client && verdict.via !== 'opaque') mcpClients.seen(verdict.client, verdict.via);
+  else if (!verdict.ok && verdict.kind === 'unbound' && verdict.client) mcpClients.seen(verdict.client, null);
+  return verdict;
+}
+
+/**
+ * The address a client reached this server on, from configuration and the Host it named, never X-Forwarded-*:
+ * the configured public URL for its hostname, https for the Connect and tailnet names, http for loopback.
+ */
 export function publicBase(c: Context): string {
   const url = new URL(c.req.url);
-  const proto = c.req.header('x-forwarded-proto')?.split(',')[0].trim() || url.protocol.replace(':', '');
-  const host = c.req.header('x-forwarded-host')?.split(',')[0].trim() || c.req.header('host') || url.host;
-  return `${proto}://${host}`;
+  const host = c.req.header('host') || url.host;
+  const name = hostnameOf(host).toLowerCase().replace(/\.$/, '');
+  const configured = resolved.mcpPublicUrl();
+  if (configured && name === mcpPublicHost()) return configured;
+  if (viaConnect(name) || viaTailnet(name)) return `https://${host}`;
+  return `${url.protocol}//${host}`;
 }
 
 /** The metadata URL a 401 from /mcp points clients at. */

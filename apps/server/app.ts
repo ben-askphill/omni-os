@@ -27,6 +27,7 @@ import { prWatchApi } from './pr-watch/api.ts';
 import { grokbotApi } from './grokbot.ts';
 import { linksApi } from './links-api.ts';
 import { mcpApi } from './mcp-api.ts';
+import { mcpClientsApi } from './mcp-clients.ts';
 import { oauthMetadataApi } from './mcp-oauth.ts';
 import { metaApi } from './meta-api.ts';
 import { setupApi } from './setup-api.ts';
@@ -65,6 +66,7 @@ api.use('*', requestGuard);
 // Mounted in the same order the handlers used to be registered. Hono runs the first match, so
 // threadsApi and terminalApi stay between the thread reads and the message, upload, stop, and stream routes.
 api.route('/auth', authApi);
+api.route('/mcp/clients', mcpClientsApi);
 api.route('/capabilities', capabilitiesApi);
 api.route('/channels', channelsApi);
 api.route('/channels', browserApi);
