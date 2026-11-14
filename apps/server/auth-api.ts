@@ -82,11 +82,15 @@ authApi.get('/desktop-pair', (c) => {
 
 /**
  * A new install token (PRD #667, story 10): data/api-token is rewritten and every device session ends, so every
- * browser, app and the desktop window pairs again. Token only. Running threads keep the old one until their next turn.
+ * browser, app and the desktop window pairs again. The token or a session paired with it (Settings in a paired
+ * browser or the desktop app): a Google or app session cannot, so a stolen one cannot lock Ben out of everything.
+ * Running threads keep the old one until their next turn.
  */
 authApi.post('/rotate-token', (c) => {
-  const refused = tokenOnlyCookie(c);
-  if (refused) return c.json({ error: "Forbidden: only the install's token can rotate it" }, 403);
+  const auth = c.get('omniAuth');
+  if (auth?.via !== 'token' && !(auth?.via === 'session' && auth.method === 'token')) {
+    return c.json({ error: 'Forbidden: rotate from this Mac or a device paired with the install token' }, 403);
+  }
   try {
     rotateToken();
   } catch (err) {

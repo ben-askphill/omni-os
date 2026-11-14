@@ -214,9 +214,9 @@ describe('/api/auth', () => {
     expect(((await pinned.json()) as { error: string }).error).toMatch(/OMNI_TOKEN/);
     const paired = (await app.request('/api/auth/pair', { method: 'POST' })).headers.get('set-cookie') ?? '';
     const session = paired.match(new RegExp(`${sessionCookieName()}=(omni_s_[0-9a-f]+)`))![1];
-    // A session cannot rotate it.
+    // A browser paired with the token may rotate it too (Settings); here the pin answers the same.
     const bySession = await app.request('/api/auth/rotate-token', { method: 'POST', headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } });
-    expect(bySession.status).toBe(403);
+    expect(bySession.status).toBe(409);
   });
 
   it('will not pair without the token', async () => {
