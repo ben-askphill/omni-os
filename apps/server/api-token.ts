@@ -1,6 +1,6 @@
 // The per-install secret every /api request carries (apps/server/request-guard.ts). It lives in the data dir as
 // `api-token`, mode 0600, so only Ben's account can read it: the desktop app, scripts/omni.sh and apps/mcp/omni.ts
-// read the file, threads get it as OMNI_TOKEN, and a browser pairs once and then holds it in an HttpOnly cookie.
+// read the file, threads get it as OMNI_TOKEN, and a browser pairs with it once and then holds a device session (browser-session.ts).
 // A file rather than the Keychain: shell scripts and the desktop app read it without a Keychain prompt, and the
 // Keychain would guard it from the same account the file's mode already admits, and from no one else.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
