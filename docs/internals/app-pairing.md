@@ -37,10 +37,10 @@ For install-token authentication, `auth.via` is `token`, and `auth.method` and `
 The desktop app pairs its window with no clicks and without putting the install token in the browser.
 
 1. When the Electron main process spawns the server, it generates a random secret and passes it in the server's environment as `OMNI_DESKTOP_PAIR_SECRET`. Only the app and the server process know it.
-2. Before every window load, main calls `POST /api/auth/desktop-nonce` with the header `X-Omni-Desktop-Secret: <secret>` and no body. The answer is `{ "nonce": "...", "expiresIn": 60 }`.
+2. Before every window load, main calls `POST /api/auth/desktop-nonce` with the header `X-Omni-Desktop-Secret: <secret>` (or `Authorization: Bearer <install token>`; either is enough) and no body. The answer is `{ "nonce": "...", "expiresIn": 60 }`.
 3. The window loads `GET /api/auth/desktop-pair?nonce=<nonce>`. The nonce works once, within 60 seconds, and only when `Sec-Fetch-Site` is absent or `none`, so a page cannot trigger it. The server creates a `token` session, sets its cookie (`omni_session_<port>`, `HttpOnly`, `SameSite=Strict`) and redirects to `/`. A missing, used or expired nonce gets 401.
 
-A reload or a second window asks for a new nonce. The route still refuses a request through a proxy or from another machine. `GET /api/auth/proof` keeps guarding which server main attaches to, before any of this.
+A reload or a second window asks for a new nonce. After a 401 (a rotation or a revoked session) the page asks main to pair again through the bridge (`pairAgain`), at most once every 10 seconds per window. A server too old to have the nonce route answers 404, and main falls back to the plain `desktop-pair`. The route still refuses a request through a proxy or from another machine. `GET /api/auth/proof` keeps guarding which server main attaches to, before any of this.
 
 ## Rotating the install token
 
