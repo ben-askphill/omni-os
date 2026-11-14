@@ -51,8 +51,12 @@ describe('channel reloads are latest-only', () => {
     act(() => hook.setChannels([channel('Renamed')]));
     await answer('/channels', [channel('Old name')]);
     await answer('/pinned', []);
-    await act(() => reload);
     expect(folderName()).toBe('Renamed');
+    // The dropped pass loads again, and that answer started after the rename.
+    await answer('/channels', [channel('Renamed on server')]);
+    await answer('/pinned', []);
+    await act(() => reload);
+    expect(folderName()).toBe('Renamed on server');
   });
 
   it('applies a reload that started after the edit', async () => {
@@ -63,13 +67,21 @@ describe('channel reloads are latest-only', () => {
     expect(hook.channelsLoaded).toBe(true);
   });
 
-  it('keeps the newer of two overlapping reloads', async () => {
+  it('runs one reload at a time and one more for any calls meanwhile, so a burst still lands', async () => {
     act(() => void hook.reloadChannels());
     act(() => void hook.reloadChannels());
-    const [first, second] = pending.filter((p) => p.path === '/channels');
-    await act(async () => second.resolve([channel('Newer')]));
-    await act(async () => first.resolve([channel('Older')]));
-    expect(folderName()).toBe('Newer');
+    act(() => void hook.reloadChannels());
+    expect(pending.filter((p) => p.path === '/channels')).toHaveLength(1);
+    await answer('/channels', [channel('First')]);
+    expect(hook.channelsLoaded).toBe(true);
+    expect(folderName()).toBe('First');
+    act(() => void hook.reloadChannels());
+    await answer('/pinned', []);
+    expect(pending.filter((p) => p.path === '/channels')).toHaveLength(1);
+    await answer('/channels', [channel('Second')]);
+    expect(folderName()).toBe('Second');
+    await answer('/pinned', []);
+    expect(pending.filter((p) => p.path === '/channels')).toHaveLength(0);
   });
 
   it('drops a pinned reload that started before a pin', async () => {
