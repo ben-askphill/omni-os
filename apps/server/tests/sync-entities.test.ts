@@ -194,6 +194,12 @@ describe('automation runs', () => {
     expect(runs(b).map((r: any) => r.uid)).toContain('run-early');
   });
 
+  it('a skipped run reaches B with its reason and no thread', async () => {
+    const { uid } = a.db.automationRuns.skip('quiet', 'cron', 'precheck exited 1');
+    await exchange();
+    expect(b.db.db.prepare('SELECT thread_id, skip_reason FROM automation_runs WHERE uid = ?').get(uid)).toEqual({ thread_id: null, skip_reason: 'precheck exited 1' });
+  });
+
   it("lists an automation's runs newest first by when they ran, not by when they arrived", async () => {
     const ts = '2020-06-01T08:00:00.000Z';
     await relay.push([

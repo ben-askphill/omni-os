@@ -21,6 +21,25 @@ prompt: |
 
 `timezone` defaults to your timezone from the config (`OMNI_TZ` wins, else the system's). Both folders are watched; edits apply without a restart. The Mac has to be awake at the scheduled time, unless the automation sets `catchup: true`: then a missed slot runs once Omni is back.
 
+## Skipping runs with nothing to do
+
+Two optional fields keep a scheduled automation from spending plan usage on a run it does not need:
+
+```yaml
+precheck:
+  command: gh pr list --author @me --json number --jq 'length > 0' | grep -q true
+  timeout: 30           # seconds, default 30, at most 600
+catchup: true
+catchup_max_age: 6h     # seconds, or 45s, 90m, 6h, 2d
+```
+
+- `precheck` is a shell command (a plain string works too) run in the channel's folder through your login shell, before any thread or harness starts. Exit 0 runs the automation. A non-zero exit, a timeout or a shell that cannot start skips the run. `{{omniRoot}}` and the other prompt placeholders work in it.
+- It runs for scheduled runs only: cron ticks and catch-ups. Run now and event runs ignore it.
+- `catchup_max_age` caps a catch-up: when the missed slot is older than this, Omni skips it instead of starting a stale run after the Mac wakes. A missed slot within the age still runs once.
+- A skipped run makes no thread and nothing in the Inbox. It shows in the automation's run history as Skipped with its reason (the precheck's exit code and last line of stderr, the timeout, or the missed slot's time) on desktop web, phone web, the desktop app and iOS, and it counts as that slot's run, so a catch-up does not try it again.
+
+`pr-babysitter` skips when you have no open PR on the repo, and `docs-daily` skips when `scripts/docs-daily.sh preflight` finds nothing that needs docs.
+
 ## Choose a machine
 
 In Automations, use "Run automations on" to choose this machine or another synced machine. The choice applies to all scheduled and event-triggered automations and reaches the other machines through sync. The selected machine needs the automation definitions, channel folders and credentials it uses, and must be awake with Omni running. Offline machines can be selected for future runs. This does not move a running thread. "Run now" runs on the connected machine.

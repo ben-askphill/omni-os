@@ -359,6 +359,8 @@ export function migrate() {
   // Crew reports and a team's go to its lead are durable requests too, with the transcript payload Omni wrote.
   ensureColumn('message_requests', 'kind', `TEXT NOT NULL DEFAULT 'user'`);
   ensureColumn('message_requests', 'payload', 'TEXT');
+  // #679/#680: why a scheduled run was skipped (failed precheck, catch-up past catchup_max_age); null for a run that started.
+  ensureColumn('automation_runs', 'skip_reason', 'TEXT');
   for (const table of ['events', 'artifacts', 'automation_runs']) {
     ensureColumn(table, 'uid', 'TEXT');
     db.exec(`UPDATE ${table} SET uid = ${UUID_SQL} WHERE uid IS NULL`);
