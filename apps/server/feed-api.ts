@@ -66,10 +66,11 @@ feedApi.get('/status', (c) =>
 );
 
 /**
- * What each machine under this account runs now: this one, then every synced one with whether Tailscale sees it up.
- * Clients ask again on the feed's thread and tasks events, which a synced machine's runs raise here too.
+ * What each machine under this account runs now: this one, then every synced one with whether Tailscale sees it up,
+ * and each one's CPU and memory. Clients ask again on the feed's thread and tasks events, which a synced machine's runs
+ * raise here too; samples arrive as machine_stats events. `?stats=1` samples this machine even when it is the only one.
  */
-feedApi.get('/machines', async (c) => c.json(await machinesView()));
+feedApi.get('/machines', async (c) => c.json(await machinesView({ stats: c.req.query('stats') === '1' })));
 
 /** Free space on the disk with Omni's data and the temp folder, as last checked (every 10 minutes); checks now before the first. */
 feedApi.get('/disk', async (c) => c.json(diskView().checkedAt ? diskView() : await refreshDisk()));

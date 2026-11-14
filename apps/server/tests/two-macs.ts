@@ -19,6 +19,7 @@ export async function bootMac(id: string, name: string, relay: MemoryTransport, 
   const files = await import('../sync/files.ts');
   const devices = await import('../sync/devices.ts');
   const tailscale = await import('../tailscale.ts');
+  const stats = await import('../machine-stats.ts');
   const { app } = await import('../app.ts');
   const home = join(r.tmp, 'home');
   mkdirSync(home);
@@ -56,7 +57,7 @@ export async function bootMac(id: string, name: string, relay: MemoryTransport, 
     trust(p.id, p.key);
   }
   onRelay.set(relay, [...peers, { id, key, trust }]);
-  return { ...r, id, name, home, worker, files, devices, app, json, tailnet, sync: sync1 };
+  return { ...r, id, name, home, worker, files, devices, stats, app, json, tailnet, sync: sync1 };
 }
 
 export type Mac = Awaited<ReturnType<typeof bootMac>>;

@@ -26,7 +26,9 @@ export type FeedEvent =
   /** A harness account changed on this machine, or another machine's record or an acknowledged switch synced in (harness-accounts.ts). Clients refetch GET /api/accounts. */
   | { type: 'accounts' }
   /** A thread's review notes changed, here or on another Mac (db/repos/review-notes.ts). Its open Changes panels refetch them. */
-  | { type: 'review_notes'; thread_id: string };
+  | { type: 'review_notes'; thread_id: string }
+  /** A machine's CPU and memory sample: this one's while a client watches, another's as sync brings it (machine-stats.ts). Id null is this machine with sync off. */
+  | { type: 'machine_stats'; id: string | null; stats: unknown };
 
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);

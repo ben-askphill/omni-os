@@ -1,6 +1,7 @@
 import type { ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
 import type { DiskLevel } from '@omni/shared/disk-space.ts';
 import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
+import type { MachineStats } from '@omni/shared/machines.ts';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
@@ -413,6 +414,8 @@ export type FeedEvent =
   | { type: 'accounts' }
   /** A thread's review notes changed, here or on another Mac: refetch GET /api/threads/:id/review-notes. */
   | { type: 'review_notes'; thread_id: string }
+  /** A machine's CPU and memory sample, while the machine tiles are watched (apps/server/machine-stats.ts). Id null is this machine with sync off. */
+  | { type: 'machine_stats'; id: string | null; stats: MachineStats }
   | { type: 'reconnect' };
 
 /** GET /api/update (apps/server/update.ts): how far this server is behind main, and where Update is. */

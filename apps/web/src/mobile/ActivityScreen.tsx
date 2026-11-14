@@ -46,7 +46,7 @@ export function ActivityScreen() {
           {machines && machines.machines.length > 1 && (
             <section aria-label="Machines" className="scroll-thin mb-1 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1">
               {machines.machines.map((m) => (
-                <div key={m.id ?? 'here'} className="w-[236px] shrink-0 snap-start">
+                <div key={m.id ?? 'here'} className="grid w-[236px] shrink-0 snap-start">
                   <MachineTile machine={m} view={machines} />
                 </div>
               ))}
