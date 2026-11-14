@@ -100,3 +100,13 @@ export async function checkLog(repo: string, check: CheckObservation): Promise<s
   const { stdout } = await run('gh', ['run', 'view', m[1], '--repo', repo, '--job', m[2], '--log-failed'], { maxBuffer: 32 * 1024 * 1024 });
   return logTail(stdout);
 }
+
+/** The open PR from a branch and the checks on its head. Null when the branch has no open PR. */
+export async function branchChecks(repo: string, branch: string): Promise<{ number: number; checks: CheckObservation[] } | null> {
+  const { stdout } = await run('gh', ['pr', 'list', '--repo', repo, '--head', branch, '--state', 'open', '--limit', '1', '--json', 'number,state,headRefOid,statusCheckRollup'], {
+    maxBuffer: 8 * 1024 * 1024,
+    timeout: 30_000,
+  });
+  const raw = (JSON.parse(stdout) as any[])[0];
+  return raw ? { number: raw.number, checks: parseObservation(repo, raw).checks } : null;
+}
