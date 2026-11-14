@@ -2,8 +2,8 @@
 // rather than starting a process here: claude.ai, ChatGPT, Grok, or Cursor and Claude Code on another machine.
 //
 // Three ways in:
-// - Google sign-in through Clerk (mcp-oauth.ts): a Clerk OAuth access token for this install's owner, as
-//   `Authorization: Bearer`. A 401 names the protected resource metadata, so claude.ai, ChatGPT and other OAuth
+// - Google sign-in through Clerk (mcp-oauth.ts): a Clerk OAuth access token for this install's owner, bound to this
+//   install by its audience or an approved client (mcp-token.ts), as `Authorization: Bearer`. A 401 names the protected resource metadata, so claude.ai, ChatGPT and other OAuth
 //   clients find Clerk and sign in by themselves. On only while a Google account is linked (Settings, Sharing & access).
 // - data/mcp-token, apart from the API token: the URL goes into other companies' connector settings, and rotating it
 //   (delete the file, restart) must not unpair every browser. As a Bearer header, or in the path as /mcp/<mcp-token>
@@ -19,8 +19,8 @@ import { callOver } from '@omni/mcp/external/tools.ts';
 import { mcpHttp } from '@omni/mcp/external/http.ts';
 import { apiToken, loadToken, tokenMatches } from './api-token.ts';
 import { paths } from './config.ts';
-import { ClerkUnreachable, isOwnerToken, mcpIssuer, resourceMetadataUrl } from './mcp-oauth.ts';
-import { mcpHostAllowed } from './request-guard.ts';
+import { ClerkUnreachable, mcpIssuer, mcpTokenVerdict, resourceMetadataUrl } from './mcp-oauth.ts';
+import { directFromThisMac, mcpHostAllowed } from './request-guard.ts';
 
 export const mcpTokenPath = () => join(paths.data, 'mcp-token');
 
@@ -53,11 +53,12 @@ const refuse = (message: string, status: 401 | 403 | 503, headers: Record<string
  * The 401 for /mcp. With Google sign-in on, its challenge names the resource metadata (RFC 9728), which is how an
  * OAuth client learns to sign in with Clerk; `invalid_token` tells one holding a stale token to sign in again.
  */
-function challenge(c: Context, sentToken: boolean) {
+function challenge(c: Context, sentToken: boolean, why?: string) {
   const oauth = !!mcpIssuer();
   const params = [...(sentToken ? ['error="invalid_token"'] : []), ...(oauth ? [`resource_metadata="${resourceMetadataUrl(c)}"`] : [])];
   const how = oauth ? 'sign in with the Google account linked to this Omni, or send' : 'send';
-  return refuse(`Unauthorized: ${how} this install's MCP token (data/mcp-token) as a Bearer header or in the URL as /mcp/<token>`, 401, {
+  const message = why ? `Unauthorized: ${why}` : `Unauthorized: ${how} this install's MCP token (data/mcp-token) as a Bearer header or in the URL as /mcp/<token>`;
+  return refuse(message, 401, {
     'www-authenticate': params.length ? `Bearer ${params.join(', ')}` : 'Bearer',
   });
 }
@@ -87,7 +88,10 @@ export function mcpApi(request: (path: string, init: RequestInit) => Response | 
     if (mcpTokenMatches(bearer) || tokenMatches(bearer)) return answer(c.req.raw);
     if (bearer) {
       try {
-        if (await isOwnerToken(bearer)) return answer(c.req.raw);
+        const verdict = await mcpTokenVerdict(bearer, directFromThisMac(c));
+        if (verdict?.ok) return answer(c.req.raw);
+        // A real owner token for a client this install does not take: say why, so the client's user can approve or reconnect.
+        if (verdict && verdict.kind !== 'invalid') return challenge(c, true, verdict.reason);
       } catch (err) {
         if (err instanceof ClerkUnreachable) return refuse(`Could not check the sign-in: ${err.message}. Try again shortly`, 503, { 'retry-after': '10' });
         throw err;

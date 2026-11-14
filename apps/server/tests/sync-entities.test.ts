@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { trustEachOther } from './sync-sign.ts';
 import { MemoryTransport, type Change } from '../sync/transport.ts';
 
 // Channels, artifacts, automation runs and kv between two Macs in one process, each with its own data dir,
@@ -18,7 +19,8 @@ async function machine(name: string) {
   const feed: any[] = [];
   bus.on('feed', (e) => feed.push(e));
   const worker = sync.createSyncWorker({ transport: relay, machineId: name });
-  return { name, db, paths, bus, feed, worker, automations };
+  const signKey = await (await import('../sync/sign-key.ts')).signPublicKey();
+  return { name, db, paths, bus, feed, worker, automations, signKey };
 }
 
 const relay = new MemoryTransport();
@@ -39,6 +41,7 @@ const thread = (id: string, patch: Record<string, unknown> = {}) => ({
 beforeAll(async () => {
   a = await machine('mac-a');
   b = await machine('mac-b');
+  trustEachOther([a, b]);
 });
 
 describe('channels', () => {

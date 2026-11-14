@@ -108,6 +108,32 @@ describe('cursor tracer', () => {
     await H.untilResults(t.id, 2, 12000);
     expect(turns(t.id).at(-1).prompt).toBe('follow up after resume');
   });
+
+  it('delivers a held message and an interrupt sent after it, both, in order (F22)', async () => {
+    const t = await H.start('HANG busy turn', cursor);
+    await H.until('turn running', () => turns(t.id).length >= 1);
+    H.runner.sendMessage(t.id, 'held for after', { mode: 'queue' });
+    // Cursor cannot steer: an interrupt stops the process, and both messages wait for the next one.
+    H.runner.sendMessage(t.id, 'interrupting now', { mode: 'interrupt' });
+    await H.until('both delivered', () => turns(t.id).length >= 3, 12000);
+    await H.untilStatus(t.id, 'done');
+    expect(turns(t.id).slice(1).map((r: any) => r.prompt.split('\n\n---\n\n').at(-1))).toEqual(['held for after', 'interrupting now']);
+    expect(H.texts(t.id, 'user')).toEqual(['HANG busy turn', 'held for after', 'interrupting now']);
+  });
+
+  it('hands Cursor the prompt on stdin, so leading dashes, command names and long pastes arrive as text (F16)', async () => {
+    const t = await H.start('CMD first', cursor);
+    await H.untilResults(t.id, 1);
+    const stdin = () => H.cursorRequests().filter((r: any) => r.method === 'stdin' && r.thread_id === t.id).length;
+    expect(stdin()).toBeGreaterThan(0);
+    const cases = ['--version please', 'status', `long ${'x'.repeat(300_000)}`];
+    for (const [i, text] of cases.entries()) {
+      H.runner.sendMessage(t.id, text, { mode: 'queue' });
+      await H.untilResults(t.id, i + 2, 12000);
+      expect(turns(t.id).at(-1).prompt).toBe(text);
+    }
+    expect(H.thread(t.id).status).toBe('done');
+  });
 });
 
 describe('cursor usage', () => {

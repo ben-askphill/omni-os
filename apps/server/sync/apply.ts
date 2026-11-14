@@ -1,5 +1,6 @@
 import { db, SEED_TS, syncMeta, tx, type SyncEntity } from '../db.ts';
 import type { RemoteChange } from './transport.ts';
+import { gateChange, logRefused } from './verify.ts';
 
 // Remote changes into the local db. Each entity has a handler; apps/server/sync/handlers/ registers them.
 // Handlers write with plain SQL, never through the db.ts repos, so an applied change is not queued to go back out.
@@ -68,19 +69,34 @@ function defer(change: RemoteChange, err: unknown) {
   ).run(change.seq, JSON.stringify(change), (err as Error)?.message ?? String(err));
 }
 
-/** Apply one remote change. A change that fails is kept in sync_deferred and retried, never lost or fatal. */
-export function applyChange(change: RemoteChange, ctx: ApplyContext): ApplyOutcome {
-  const handler = handlers.get(change.entity);
+/**
+ * Apply one remote change. A change that fails is kept in sync_deferred and retried, never lost or fatal. Its
+ * signature is checked first (sync/verify.ts): a refused one is logged and skipped, and the handler sees the change
+ * without its signature.
+ */
+export function applyChange(signed: RemoteChange, ctx: ApplyContext): ApplyOutcome {
+  const handler = handlers.get(signed.entity);
   let applied: boolean;
+  let change = signed;
   try {
-    if (!handler) throw new Error(`no handler for ${change.entity}`);
+    if (!handler) throw new Error(`no handler for ${signed.entity}`);
+    const gate = gateChange(signed);
+    if (gate.kind === 'defer') throw new Error(gate.reason);
+    if (gate.kind === 'refuse') {
+      tx(() => {
+        logRefused(gate.change, gate.reason, false);
+        db.prepare('DELETE FROM sync_deferred WHERE seq = ?').run(signed.seq);
+      });
+      return 'skipped';
+    }
+    change = gate.change;
     applied = tx(() => {
       const ok = handler.apply(change, ctx);
       db.prepare('DELETE FROM sync_deferred WHERE seq = ?').run(change.seq);
       return ok;
     });
   } catch (err) {
-    defer(change, err);
+    defer(signed, err);
     return 'deferred';
   }
   if (applied) {

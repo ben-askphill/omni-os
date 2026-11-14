@@ -97,7 +97,7 @@ describe('folders', () => {
     const f = a.db.folders.create({ channel_id: 'volero', name: 'Kept' });
     a.db.folders.moveThread('t-1', f.id);
     await exchange();
-    const { folder_id: _drop, ...row } = relay.changes.findLast((c) => c.entity === 'thread' && c.entity_id === 't-1')!.data as any;
+    const { folder_id: _drop, edited: _edits, ...row } = relay.changes.findLast((c) => c.entity === 'thread' && c.entity_id === 't-1')!.data as any;
     await relay.push([{ machine_id: 'mac-old', entity: 'thread', entity_id: 't-1', op: 'upsert', ts: new Date(Date.now() + 1000).toISOString(), data: { ...row, title: 'from an old Mac' } }]);
     await exchange();
     expect(b.db.threads.get('t-1')).toMatchObject({ title: 'from an old Mac', folder_id: f.id });

@@ -41,6 +41,13 @@ export interface SyncTransport {
   /** The object's bytes, or null when there is none. */
   getObject(path: string): Promise<Uint8Array | null>;
   hasObject(path: string): Promise<boolean>;
+  /** The object's bytes and its version tag, or null when there is none. Optional: an older relay has no versions. */
+  getObjectVersion?(path: string): Promise<{ body: Uint8Array; etag: string | null } | null>;
+  /**
+   * Write the object only while it is still the version `ifMatch` names, or, with null, only while there is none.
+   * False when another write came first (HTTP 412). A relay that predates conditional writes writes it anyway.
+   */
+  putObjectIf?(path: string, body: Uint8Array, ifMatch: string | null, contentType?: string): Promise<boolean>;
 }
 
 /** Normalize a timestamp from anywhere ("+00:00", no milliseconds) to the local ISO form. */
@@ -52,6 +59,10 @@ export const isoTs = (ts: string) => new Date(ts).toISOString();
 export class MemoryTransport implements SyncTransport {
   readonly changes: RemoteChange[] = [];
   readonly objects = new Map<string, Uint8Array>();
+  private versions = new Map<string, number>();
+  private version = 0;
+  /** Runs once, just before the next conditional write checks its version: tests slip another Mac's write in there. */
+  beforeConditionalPut: (() => Promise<void> | void) | null = null;
   /** Each push's changes, so tests can check batching. */
   readonly pushCalls: Change[][] = [];
   pullCalls = 0;
@@ -107,6 +118,23 @@ export class MemoryTransport implements SyncTransport {
   async putObject(path: string, body: Uint8Array) {
     this.check();
     this.objects.set(path, new Uint8Array(body));
+    this.versions.set(path, ++this.version);
+  }
+
+  async getObjectVersion(path: string) {
+    const body = await this.getObject(path);
+    return body ? { body, etag: `v${this.versions.get(path)}` } : null;
+  }
+
+  async putObjectIf(path: string, body: Uint8Array, ifMatch: string | null) {
+    this.check();
+    const hook = this.beforeConditionalPut;
+    this.beforeConditionalPut = null;
+    await hook?.();
+    const current = this.objects.has(path) ? `v${this.versions.get(path)}` : null;
+    if (current !== ifMatch) return false;
+    await this.putObject(path, body);
+    return true;
   }
 
   async getObject(path: string) {
@@ -281,6 +309,21 @@ export function createRelayTransport(opts: RelayTransportOptions): SyncTransport
       const res = await call(objectUrl(path), { method: 'HEAD' });
       if (res.status === 404) return false;
       await ok(res, 'check');
+      return true;
+    },
+
+    async getObjectVersion(path) {
+      const res = await call(objectUrl(path), { timeoutMs: 10 * 60_000 });
+      if (res.status === 404) return null;
+      await ok(res, 'download');
+      return { body: new Uint8Array(await res.arrayBuffer()), etag: res.headers.get('etag') };
+    },
+
+    async putObjectIf(path, body, ifMatch, contentType = 'application/octet-stream') {
+      const cond: Record<string, string> = ifMatch === null ? { 'if-none-match': '*' } : { 'if-match': ifMatch };
+      const res = await call(objectUrl(path), { method: 'PUT', headers: { 'content-type': contentType, ...cond }, body: body as BodyInit, timeoutMs: 10 * 60_000 });
+      if (res.status === 412) return false;
+      await ok(res, 'upload');
       return true;
     },
   };

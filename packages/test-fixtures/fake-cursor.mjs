@@ -5,7 +5,7 @@
 // Modes:
 //   create-chat            print a chat id, exit 0
 //   --list-models          print "id - Label" lines, exit 0
-//   -p ... "<prompt>"      run one turn: stream-json events, exit 0
+//   -p ...                 run one turn with the prompt on stdin (or as the prompt argument): stream-json events, exit 0
 //   acp                    the ACP server, JSON-RPC over stdio: answers initialize and
 //                          session/new, sends the folder's commands in an
 //                          available_commands_update, then waits to be killed
@@ -75,11 +75,36 @@ function log(method, extra) {
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** All of stdin, as print mode reads a prompt given no prompt argument. Empty when stdin is closed or ignored. */
+async function readStdin() {
+  if (process.stdin.isTTY) return '';
+  let text = '';
+  process.stdin.setEncoding('utf8');
+  for await (const chunk of process.stdin) text += chunk;
+  return text;
+}
+
+/** Flags that take a value, so the value is not mistaken for a prompt argument. */
+const VALUE_FLAGS = new Set(['--output-format', '--model', '--resume', '--plugin-dir', '--sandbox', '--mode', '--api-key', '-H', '--header', '-e', '--endpoint']);
+
+/** The positional prompt argument, if any, as commander reads it: after `--`, or the first non-flag argument. */
+function promptArg() {
+  const dd = argv.indexOf('--');
+  if (dd >= 0) return argv.slice(dd + 1).join(' ') || null;
+  for (let i = 0; i < argv.length; i++) {
+    if (VALUE_FLAGS.has(argv[i])) i++;
+    else if (!argv[i].startsWith('-')) return argv[i];
+  }
+  return null;
+}
+
 async function runTurn() {
   const model = flagVal('--model') ?? 'auto';
   const resume = flagVal('--resume');
-  // The prompt is the last argument.
-  const prompt = argv[argv.length - 1] ?? '';
+  // A prompt argument, as older Omni passed it, or stdin, as cursor-agent reads it in print mode without one.
+  const arg = promptArg();
+  const prompt = arg ?? (await readStdin());
+  if (arg === null) log('stdin', { bytes: Buffer.byteLength(prompt) });
   const sessionId = resume || `chat_${randomUUID().slice(0, 8)}`;
   log('turn', { model, resume: resume ?? null, prompt, plugin_dir: flagVal('--plugin-dir') ?? null, stream_partial: argv.includes('--stream-partial-output') });
   if (process.env.FAKE_CURSOR_TURN_FAIL === '1') {
@@ -132,7 +157,8 @@ async function runTurn() {
   await delay(3);
   write({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: reply }] } });
   write({ type: 'result', subtype: 'success', is_error: false, result: reply, session_id: sessionId, request_id: 'req_1', usage: { inputTokens: 24000, outputTokens: 120, cacheReadTokens: 6000, cacheWriteTokens: 0 } });
-  process.exit(0);
+  // Exit once stdout has drained: a long reply is still queued for the pipe when the last write returns.
+  process.stdout.write('', () => process.exit(0));
 }
 
 /** ORPHAN: this script again, as a child that inherits our stdout and idles until killed (two minutes at most). */

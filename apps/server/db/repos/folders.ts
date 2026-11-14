@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { db, now, tx } from '../connection.ts';
 import { record } from '../sync.ts';
+import { stampEdits } from './threads.ts';
 
 /**
  * A folder groups a channel's threads in the sidebar. It belongs to exactly one channel; a thread sits in at most
@@ -140,6 +141,8 @@ export const folders = {
   remove(id: string) {
     return tx(() => {
       mustGet(id);
+      const filed = db.prepare('SELECT id FROM threads WHERE folder_id = ?').all(id) as { id: string }[];
+      for (const t of filed) stampEdits(t.id, ['folder_id']);
       const moved = db.prepare('UPDATE threads SET folder_id = NULL WHERE folder_id = ?').run(id).changes;
       db.prepare('DELETE FROM folders WHERE id = ?').run(id);
       record('folder', id, 'delete');
@@ -174,6 +177,7 @@ export const folders = {
         if (f.channel_id !== t.channel_id) throw new FolderError("a thread can only go in a folder of its own channel");
       }
       db.prepare('UPDATE threads SET folder_id = ? WHERE id = ?').run(folderId, threadId);
+      stampEdits(threadId, ['folder_id']);
       // A folder the other Mac named for it and that never came no longer matters: this move is newer.
       db.prepare('DELETE FROM sync_folder_wait WHERE thread_id = ?').run(threadId);
       record('thread', threadId);

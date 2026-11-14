@@ -18,7 +18,9 @@
     "tailscaleLogin": "ada@example.com",
     "mcpPublicUrl": "",
     "clerkPublishableKey": "",
-    "clerkClientId": ""
+    "clerkClientId": "",
+    "mcpClients": "",
+    "syncSignatures": "actions"
   },
   "automations": {
     "weekly-review": { "enabled": true },

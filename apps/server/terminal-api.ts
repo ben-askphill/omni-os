@@ -71,12 +71,13 @@ terminalApi.post('/:id/terminal/resize', async (c) => {
 terminalApi.get('/:id/terminal/stream', async (c) => {
   const thread = threadOr404(c);
   if (!thread) return c.json({ error: 'not found' }, 404);
-  // An exited shell stays exited until Ben restarts it, so a reconnect never starts one behind his back.
+  // Only attaches: POST /:id/terminal starts the shell. A GET never starts a process, so an <img> pointed here in a PR
+  // body or a reply cannot open one (PRD #667, S18). An exited shell stays exited until Ben restarts it.
   const size = sizeSchema.safeParse(c.req.query());
-  let term = getTerminal(thread.id);
-  if (!term) term = await openIn(thread, size.success ? size.data : {});
+  const term = getTerminal(thread.id);
+  if (!term) return c.json({ error: 'no shell running' }, 409);
   // Reflow to this client's size before the snapshot, so it fits.
-  else if (size.success) resizeTerminal(thread.id, size.data.cols, size.data.rows);
+  if (size.success) resizeTerminal(thread.id, size.data.cols, size.data.rows);
   const t = term;
   return sessionSSE(c, async (stream) => {
     // Subscribe before the snapshot is taken, in the same tick, so no output falls between them.

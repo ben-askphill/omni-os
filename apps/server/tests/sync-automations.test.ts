@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 import { MemoryTransport } from '../sync/transport.ts';
+import { keyOf, signAs } from './sync-sign.ts';
+import { rawPublicKey } from '../sync/signing.ts';
 
 // With sync on, one Mac runs the scheduled automations: the one kv `automations.owner` names, a synced key, so
 // both Macs agree. A Mac claims it when no owner has reached it by the end of its first sync, and can take it
@@ -11,6 +13,8 @@ import { MemoryTransport } from '../sync/transport.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'omni-automations-'));
 const r = await startRunner({ OMNI_AUTOMATIONS_DIR: dir });
+// The other Mac's owner claims apply only from a machine Ben trusts (sync/keyring.ts).
+r.db.db.prepare('INSERT INTO sync_trusted (machine_id, sign_key, trusted_at) VALUES (?, ?, ?)').run('mac-b', rawPublicKey(keyOf('mac-b')), new Date().toISOString());
 writeFileSync(join(dir, 'nightly.yaml'), 'name: Nightly\nenabled: true\ncron: "0 2 * * *"\nchannel: scratch\nprompt: tidy up\n');
 const automations = await import('../automations.ts');
 const sync = await import('../sync/worker.ts');
@@ -23,7 +27,7 @@ const status = async () => (await (await app.request('/api/sync/status')).json()
 const takeOver = () => app.request('/api/sync/automations-owner', { method: 'POST' });
 /** mac-b's write of the owner key, as it would reach the relay. */
 const fromB = (owner: string, ts = new Date(Date.now() + 1_000).toISOString()) =>
-  relay.push([{ machine_id: 'mac-b', entity: 'kv', entity_id: 'automations.owner', op: 'upsert', data: { value: owner }, ts }]);
+  relay.push([signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'automations.owner', op: 'upsert', data: { value: owner }, ts })]);
 
 describe('with sync off', () => {
   it('scheduled automations run here, as before', async () => {
@@ -45,6 +49,9 @@ describe('with sync on', () => {
     await sync.setActiveWorker(worker);
     expect(r.db.kv.get('automations.owner')).toBeUndefined();
     expect(await automations.fireScheduled(nightly())).not.toBeNull();
+    // Its turn ends before the first sync, so the events it writes are all in that sync's push.
+    const busy = () => r.db.db.prepare(`SELECT COUNT(*) AS n FROM threads WHERE status IN ('running', 'queued')`).get() as { n: number };
+    await r.until('the nightly run to end', () => busy().n === 0);
   });
 
   it('claims them on its first sync when no other Mac has, and the claim goes to the relay in that sync', async () => {
@@ -86,7 +93,7 @@ describe('with sync on', () => {
     expect(((await res.json()) as any).status.automations).toEqual({ owner: 'mac-b', isThisMac: false });
     expect(await automations.fireScheduled(nightly())).toBeNull();
     await worker.syncNow();
-    expect(relay.changes.filter((c) => c.entity_id === 'automations.owner').at(-1)?.data).toEqual({ value: 'mac-b' });
+    expect(relay.changes.filter((c) => c.entity_id === 'automations.owner').at(-1)?.data).toMatchObject({ value: 'mac-b' });
     await takeOver();
   });
 
@@ -128,6 +135,22 @@ describe('a Mac joining a relay that already has an owner', () => {
     expect((await joined.syncNow()).error).toBeUndefined();
     expect(r.db.kv.get('automations.owner')).toBe('mac-b');
     expect(r.db.outbox.pending(100, ['kv']).filter((row) => row.entity_id === 'automations.owner')).toEqual([]);
+    await sync.setActiveWorker(null);
+  });
+
+  it('with the owner not trusted yet, holds its claim, does not claim either, and takes it on Trust', async () => {
+    r.db.db.prepare(`DELETE FROM sync_trusted WHERE machine_id = 'mac-b'`).run();
+    r.db.db.prepare(`DELETE FROM kv WHERE key = 'automations.owner'`).run();
+    r.db.db.prepare(`DELETE FROM sync_meta WHERE entity = 'kv' AND entity_id = 'automations.owner'`).run();
+    r.db.kv.set('sync.cursor', 0);
+    const joined = sync.createSyncWorker({ transport: relay, machineId: 'mac-a' });
+    await sync.setActiveWorker(joined);
+    expect((await joined.syncNow()).error).toBeUndefined();
+    expect(r.db.kv.get('automations.owner')).toBeUndefined();
+    expect(r.db.outbox.pending(100, ['kv']).filter((row) => row.entity_id === 'automations.owner')).toEqual([]);
+    expect((await app.request('/api/sync/devices/mac-b/confirm-key', { method: 'POST' })).status).toBe(200);
+    expect((await joined.syncNow()).error).toBeUndefined();
+    expect(r.db.kv.get('automations.owner')).toBe('mac-b');
     await sync.setActiveWorker(null);
   });
 });

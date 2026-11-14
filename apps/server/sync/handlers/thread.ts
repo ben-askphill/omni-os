@@ -1,9 +1,15 @@
-import { db, outbox, syncMeta, threads, type StoredSessionState, type Thread } from '../../db.ts';
+import { db, outbox, SEED_TS, syncMeta, threads, type StoredSessionState, type Thread } from '../../db.ts';
 import { publishFeed } from '../../bus.ts';
+import { ownerOf } from '../../ownership.ts';
 import { claim, registerHandler } from '../apply.ts';
+import { mergeThread, type FieldEdits, type MergeRow } from '../thread-merge.ts';
 import { fromPortable, safeSegment, toRemote } from '../paths.ts';
+import { pathProblem } from '../path-guard.ts';
+import { logRefused } from '../verify.ts';
 
-// Threads: last writer wins on the whole row, except who runs it. cwd travels with the home dir as "~", through
+// Threads merge by field (sync/thread-merge.ts): the owner machine's copy keeps the execution fields (session id,
+// sessions, handover, has_run, last_text), metadata (title, archived, folder, pinned, done) merges by each field's
+// edit time, the rest follows the newer row. status and run_machine keep their own rule below. cwd travels with the home dir as "~", through
 // each Mac's path map. run_machine names the Mac running or queueing the thread (db.ts sets it with the status).
 // folder_id travels with the row. A folder that has not arrived yet waits in sync_folder_wait, and the folder's own
 // change files the thread (handlers/folder.ts). A change from an older build carries no folder_id: this Mac's stays,
@@ -37,6 +43,31 @@ const setAutoReason = db.prepare('UPDATE threads SET auto_reason = ? WHERE id = 
 const setSessionState = db.prepare('UPDATE threads SET sessions = ?, handover = ? WHERE id = ?');
 const setQueuedRun = db.prepare('UPDATE threads SET queued_harness = ?, queued_model = ?, queued_effort = ? WHERE id = ?');
 const setContinuedFrom = db.prepare('UPDATE threads SET continued_from = ? WHERE id = ?');
+const editsOf = db.prepare('SELECT field_edits FROM threads WHERE id = ?');
+const setEdits = db.prepare('UPDATE threads SET field_edits = ? WHERE id = ?');
+const readEdits = (id: string): FieldEdits | null => {
+  const raw = (editsOf.get(id) as { field_edits: string | null } | undefined)?.field_edits;
+  try {
+    return raw ? (JSON.parse(raw) as FieldEdits) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The thread's owner for the merge: this Mac's assignment, or the sender's when that is a later generation. The row
+ * and its assignment are separate changes, and the row can arrive first. The rule is the assignment's own (ADR 0005):
+ * the higher generation wins, a tie goes to the lower machine id.
+ */
+function effectiveOwner(id: string, claimed: unknown): string | null {
+  const local = ownerOf(id);
+  const c = claimed as { machine?: unknown; generation?: unknown } | null | undefined;
+  const theirs = c && typeof c.machine === 'string' && typeof c.generation === 'number' ? { machine: c.machine, generation: c.generation } : null;
+  if (!theirs) return local?.machine ?? null;
+  if (!local) return theirs.machine;
+  if (theirs.generation !== local.generation) return theirs.generation > local.generation ? theirs.machine : local.machine;
+  return theirs.machine < local.machine ? theirs.machine : local.machine;
+}
 
 /** Threads whose folder an applied change moved, so notify tells sidebars to regroup. */
 const regrouped = new Set<string>();
@@ -59,42 +90,81 @@ registerHandler('thread', {
     if (!t) return null;
     // A folder still on its way here is where the thread is, as far as the other Mac knows.
     const waiting = (waitingFor.get(id) as { folder_id: string } | undefined)?.folder_id;
-    return { ...t, ...threads.storedSessionState(id), folder_id: t.folder_id ?? waiting ?? null, cwd: toRemote(t.cwd), run_machine: threads.runMachine(id) };
+    return {
+      ...t,
+      ...threads.storedSessionState(id),
+      folder_id: t.folder_id ?? waiting ?? null,
+      cwd: toRemote(t.cwd),
+      run_machine: threads.runMachine(id),
+      edited: readEdits(id) ?? {},
+      // Who this Mac thinks owns it: the row can land before the assignment change that came with it (thread-merge.ts).
+      assignment: ownerOf(id) && { machine: ownerOf(id)!.machine, generation: ownerOf(id)!.generation },
+    };
   },
   apply(change, ctx) {
     // The id names the thread's folder here: one that would leave data/threads is dropped, not retried.
-    if (!safeSegment(change.entity_id) || !claim(change)) return false;
+    if (!safeSegment(change.entity_id)) return false;
+    const data = (change.data ?? {}) as MergeRow;
+    // An older change can still carry a later edit of one field (two Macs editing near the same time), so a change with
+    // edit times is merged even when the row has seen a newer write. One without them is dropped then, as before, and
+    // so is a seeded copy (another Mac's first arm), which only ever fills a gap.
+    const newer = claim(change);
+    if (!newer && (change.op === 'delete' || !data.edited || change.ts === SEED_TS)) return false;
     if (change.op === 'delete') {
       unwait.run(change.entity_id);
       return db.prepare('DELETE FROM threads WHERE id = ?').run(change.entity_id).changes > 0;
     }
+    const current = threads.get(change.entity_id);
+    const here: MergeRow | undefined = current && {
+      ...current,
+      ...threads.storedSessionState(change.entity_id),
+      run_machine: threads.runMachine(change.entity_id),
+      edited: readEdits(change.entity_id),
+    };
+    const incoming: MergeRow = { ...data, cwd: data.cwd === undefined ? undefined : fromPortable(String(data.cwd)) };
+    if (data.cwd === undefined) delete incoming.cwd;
+    // A folder the thread would run in that this Mac does not allow (sync/path-policy.ts) refuses the change. The one
+    // it has already is kept as it is.
+    if (typeof incoming.cwd === 'string' && incoming.cwd !== current?.cwd) {
+      const problem = pathProblem({ cwd: incoming.cwd });
+      if (problem) {
+        logRefused(change, problem, false);
+        return false;
+      }
+    }
+    delete incoming.assignment;
+    const merged = mergeThread({ here, incoming, newer, from: change.machine_id, owner: effectiveOwner(change.entity_id, data.assignment), self: ctx.machineId });
+    // An older change none of whose edits are newer than this Mac's changes nothing.
+    if (!newer && !merged.taken.size) {
+      if (merged.sendBack) outbox.requeue('thread', change.entity_id);
+      return false;
+    }
     // The row is the one the change names, which is also the one claim just stamped.
-    const t = { harness: 'claude-code', effort: '', archived: 0, has_run: 0, run_machine: null, ...(change.data as Partial<Row>), id: change.entity_id } as Row;
+    const t = { harness: 'claude-code', effort: '', archived: 0, has_run: 0, run_machine: null, ...(merged.row as Partial<Row>), id: change.entity_id } as Row;
     // A run this Mac has (or the other Mac thinks it has) is this Mac's to report: an edit from over there carries
     // the status it last saw, which is stale by the time it lands. Keep this Mac's status and send the row back.
-    const here = runOf.get(change.entity_id) as Pick<Row, 'status' | 'run_machine'> | undefined;
-    const kept = here && (t.run_machine === ctx.machineId || here.run_machine === ctx.machineId);
-    const differs = kept && (t.status !== here.status || t.run_machine !== here.run_machine);
-    if (kept) (t.status = here.status), (t.run_machine = here.run_machine);
+    const run = runOf.get(change.entity_id) as Pick<Row, 'status' | 'run_machine'> | undefined;
+    const incomingRun = (data.run_machine ?? null) as string | null;
+    const kept = run && (incomingRun === ctx.machineId || run.run_machine === ctx.machineId);
+    const differs = kept && ((data.status ?? t.status) !== run.status || incomingRun !== run.run_machine);
+    if (kept) (t.status = run.status), (t.run_machine = run.run_machine);
     const before = (folderOf.get(change.entity_id) as { folder_id: string | null } | undefined)?.folder_id ?? null;
-    upsert.run(
-      ...COLUMNS.map((c) => (c === 'cwd' ? fromPortable(t.cwd) : ((t[c] ?? null) as string | number | null))),
-    );
-    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'folder_id')) file(change.entity_id, t.channel_id, t.folder_id ?? null);
-    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'pinned_at')) setPinned.run(t.pinned_at ?? null, change.entity_id);
-    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'done_at')) setDone.run(t.done_at ?? null, change.entity_id);
-    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'auto_reason')) setAutoReason.run(t.auto_reason ?? null, change.entity_id);
-    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'sessions')) {
-      const s = change.data as Partial<StoredSessionState>;
+    upsert.run(...COLUMNS.map((c) => (t[c] ?? null) as string | number | null));
+    const took = (k: string) => merged.taken.has(k);
+    if (took('folder_id')) file(change.entity_id, t.channel_id, t.folder_id ?? null);
+    if (took('pinned_at')) setPinned.run(t.pinned_at ?? null, change.entity_id);
+    if (took('done_at')) setDone.run(t.done_at ?? null, change.entity_id);
+    if (took('auto_reason')) setAutoReason.run(t.auto_reason ?? null, change.entity_id);
+    if (took('sessions') || took('handover')) {
+      const s = merged.row as Partial<StoredSessionState>;
       setSessionState.run(s.sessions ? JSON.stringify(s.sessions) : null, s.handover ? JSON.stringify(s.handover) : null, change.entity_id);
     }
-    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'queued_harness')) {
-      setQueuedRun.run(t.queued_harness ?? null, t.queued_model ?? null, t.queued_effort ?? null, change.entity_id);
-    }
-    if (Object.prototype.hasOwnProperty.call(change.data ?? {}, 'continued_from')) setContinuedFrom.run(t.continued_from ?? null, change.entity_id);
+    if (took('queued_harness')) setQueuedRun.run(t.queued_harness ?? null, t.queued_model ?? null, t.queued_effort ?? null, change.entity_id);
+    if (took('continued_from')) setContinuedFrom.run(t.continued_from ?? null, change.entity_id);
+    if (data.edited) setEdits.run(JSON.stringify(merged.edited), change.entity_id);
     const after = (folderOf.get(change.entity_id) as { folder_id: string | null }).folder_id;
     if (after !== before) regrouped.add(change.entity_id);
-    if (differs) outbox.requeue('thread', change.entity_id);
+    if (differs || merged.sendBack) outbox.requeue('thread', change.entity_id);
     return true;
   },
   notify(change) {

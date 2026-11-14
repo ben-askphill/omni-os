@@ -1,0 +1,20 @@
+[
+  {
+    "id": "this-mac",
+    "name": "this-mac",
+    "current": true,
+    "fingerprint": "A498 DEE2 7D31 6CC2 E844 B348 1F6F FE34",
+    "pinnedFingerprint": "A498 DEE2 7D31 6CC2 E844 B348 1F6F FE34",
+    "keyChanged": false,
+    "trusted": true
+  },
+  {
+    "id": "mac-b",
+    "name": "Mac B",
+    "current": false,
+    "fingerprint": "1BC2 9051 EB66 8C55 ECFA 5AD3 0792 EABE",
+    "pinnedFingerprint": "1BC2 9051 EB66 8C55 ECFA 5AD3 0792 EABE",
+    "keyChanged": false,
+    "trusted": true
+  }
+]

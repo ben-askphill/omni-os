@@ -134,6 +134,36 @@ const readSessions = (s: StoredSessionState['sessions']): Sessions =>
 const readHandover = (h: StoredSessionState['handover']): PendingHandover | null => (h ? { from: h.from, since: h.since ? idOf(h.since) : 0, ...(h.started && { started: true }), ...(h.fresh && { fresh: true }) } : null);
 const json = (v: object | null) => (v ? JSON.stringify(v) : null);
 
+/**
+ * Metadata fields a sync change merges one by one, by the time each was last edited, and `exec` and `session` for
+ * the execution and session fields as groups (sync/thread-merge.ts).
+ */
+export type EditedField = 'title' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'exec' | 'session';
+
+/**
+ * Note that these fields of the thread were edited here now, so a sync change with an older edit of one of them
+ * leaves it alone. Call it inside the write's tx. `where` narrows it, e.g. to a row whose done_at is still set.
+ */
+export function stampEdits(id: string, fields: readonly EditedField[], where = '') {
+  if (!fields.length) return;
+  const row = db.prepare(`SELECT field_edits FROM threads WHERE id = ? ${where}`).get(id) as { field_edits: string | null } | undefined;
+  if (!row) return;
+  let edits: Partial<Record<EditedField, string>> = {};
+  try {
+    edits = row.field_edits ? JSON.parse(row.field_edits) : {};
+  } catch {
+    // A broken record starts again from this edit.
+  }
+  const at = now();
+  // An edit here always comes after the last one the field took, as record() does for the row: one from a Mac whose
+  // clock runs ahead would otherwise keep winning over the edit made after it.
+  for (const f of fields) {
+    const last = edits[f];
+    edits[f] = last && at <= last ? new Date(Date.parse(last) + 1).toISOString() : at;
+  }
+  db.prepare('UPDATE threads SET field_edits = ? WHERE id = ?').run(JSON.stringify(edits), id);
+}
+
 /** The columns clients read, without sync's run_machine, the limit stop's id and owner, or the session state. */
 export const THREAD_COLUMNS =
   'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, continued_from, created_at, updated_at';
@@ -159,6 +189,19 @@ export const threads = {
     db
       .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND archived = ? ORDER BY updated_at DESC LIMIT ?`)
       .all(channelId, archived ? 1 : 0, limit) as unknown as Thread[],
+  /**
+   * One page of a channel's threads, newest first, after `after` (the last row of the page before). The clients page
+   * a channel screen with it (GET /api/channels/:id/threads?paged=1), so threads past the sidebar's preview are there.
+   */
+  byChannelPage: (channelId: string, opts: { limit: number; archived?: boolean; after?: { updated_at: string; id: string } | null }) => {
+    const after = opts.after ?? null;
+    return db
+      .prepare(
+        `SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND archived = ?
+         AND (? IS NULL OR updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
+      )
+      .all(channelId, opts.archived ? 1 : 0, after?.updated_at ?? null, after?.updated_at ?? null, after?.updated_at ?? null, after?.id ?? null, opts.limit) as unknown as Thread[];
+  },
   recent: (limit = 50) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
@@ -318,7 +361,16 @@ export const threads = {
     // A run starting, or Ben retrying its setup, is news: a thread marked done comes back to Needs you when it ends.
     if (patch.status === 'running' || patch.status === 'queued' || patch.setup === 'preparing') sets.push('done_at = NULL');
     tx(() => {
+      // Clearing done_at for a run is an edit of it, but only when it was set.
+      if (sets.includes('done_at = NULL')) stampEdits(id, ['done_at'], 'AND done_at IS NOT NULL');
       if (!db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes) return;
+      const exec = ['status', 'has_run', 'last_text'].some((k) => k in patch);
+      const session = ['session_id', 'sessions', 'handover'].some((k) => k in patch);
+      stampEdits(id, [
+        ...(['title', 'archived'] as const).filter((k) => k in patch),
+        ...(exec ? (['exec'] as const) : []),
+        ...(session ? (['session'] as const) : []),
+      ]);
       record('thread', id);
       // A turn starting here makes this machine the thread's owner (the same machine again changes nothing).
       if (patch.status && runMachine(patch.status)) assignments.claim(id);
@@ -333,7 +385,7 @@ export const threads = {
     return tx(() => {
       const changed =
         db.prepare(`UPDATE threads SET pinned_at = ? WHERE id = ? AND (pinned_at IS NULL) = ?`).run(pinned ? now() : null, id, pinned ? 1 : 0).changes > 0;
-      if (changed) record('thread', id);
+      if (changed) (stampEdits(id, ['pinned_at']), record('thread', id));
       return changed;
     });
   },
@@ -345,7 +397,7 @@ export const threads = {
     return tx(() => {
       const changed =
         db.prepare(`UPDATE threads SET done_at = ? WHERE id = ? AND (done_at IS NULL) = ?`).run(done ? now() : null, id, done ? 1 : 0).changes > 0;
-      if (changed) record('thread', id);
+      if (changed) (stampEdits(id, ['done_at']), record('thread', id));
       return changed;
     });
   },
@@ -425,7 +477,7 @@ export const threads = {
   setChannel(id: string, channelId: string) {
     tx(() => {
       // A folder belongs to one channel, so the thread leaves it.
-      if (db.prepare('UPDATE threads SET channel_id = ?, folder_id = NULL WHERE id = ?').run(channelId, id).changes) record('thread', id);
+      if (db.prepare('UPDATE threads SET channel_id = ?, folder_id = NULL WHERE id = ?').run(channelId, id).changes) (stampEdits(id, ['folder_id']), record('thread', id));
     });
   },
   /**
@@ -442,7 +494,7 @@ export const threads = {
         .prepare(`SELECT id FROM threads WHERE status IN ('running','queued') AND (run_machine IS NULL OR run_machine = ?)`)
         .all(outbox.machineId() ?? '') as { id: string }[];
       const fail = db.prepare(`UPDATE threads SET status = 'failed', run_machine = NULL WHERE id = ?`);
-      for (const { id } of ids) (fail.run(id), record('thread', id));
+      for (const { id } of ids) (fail.run(id), stampEdits(id, ['exec']), record('thread', id));
       return ids.length;
     });
   },

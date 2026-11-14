@@ -6,6 +6,8 @@ import { watchNetwork, type NetworkWatch } from './network.ts';
 import { automationsOwner, claimIfUnowned, type AutomationsOwner } from './owner.ts';
 import { hardwareId } from './hardware.ts';
 import { resendChannelColors } from './resend-channel-colors.ts';
+import { signChange } from './signing.ts';
+import { signingKey } from './sign-key.ts';
 import './handlers/index.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
@@ -129,6 +131,8 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   if (copiedFrom && copiedFrom !== machineId)
     console.warn(`[sync] this data folder was copied from another machine (sync id ${copiedFrom}): this machine is now ${machineId} and pulls the history again`);
   const ctx: ApplyContext = { machineId };
+  // Made or read now, so the first push does not wait on the secret store.
+  signingKey().catch(() => {});
   const batch = opts.batchSize ?? 200;
   const interval = opts.intervalMs ?? 60_000;
 
@@ -147,6 +151,20 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   let inflight: Promise<SyncResult> | null = null;
   let queued: Promise<SyncResult> | null = null;
 
+  /**
+   * Every change signed with this machine's key (sync/signing.ts). Without the key (a locked Keychain), nothing goes
+   * out: the other machines would refuse its commands and assignments. The sync fails, says why and tries again.
+   */
+  async function signed(changes: Change[]): Promise<Change[]> {
+    let key;
+    try {
+      key = await signingKey();
+    } catch (err) {
+      throw new Error(`This Mac's sync signing key could not be read from the secret store: ${(err as Error).message}`);
+    }
+    return changes.map((c) => signChange(c, key));
+  }
+
   async function push(): Promise<number> {
     let pushed = 0;
     for (;;) {
@@ -154,7 +172,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
       const rows = outbox.pending(batch, registeredEntities());
       if (!rows.length) return pushed;
       const changes = toChanges(rows, machineId);
-      if (changes.length) await transport.push(changes);
+      if (changes.length) await transport.push(await signed(changes));
       outbox.ack(rows.map((r) => r.id));
       pushed += changes.length;
       if (rows.length < batch) return pushed;

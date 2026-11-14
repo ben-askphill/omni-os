@@ -14,9 +14,11 @@ export const LEGACY_SYNC_SECRETS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABA
 export const CONNECT_SECRET_NAMES = ['OMNI_CONNECT_KEY', 'OMNI_CONNECT_TUNNEL_TOKEN'] as const;
 /** This machine's key for secrets other machines send it (secret-drop.ts). Global, and never handed to an agent. */
 export const SEAL_SECRET_NAME = 'OMNI_SEAL_KEY';
+/** This machine's key for signing the sync changes it pushes (sync/sign-key.ts). Global, and never handed to an agent. */
+export const SIGN_SECRET_NAME = 'OMNI_SIGN_KEY';
 /** The APNs signing key push-sender.ts reads. Global, and never handed to an agent. */
 export const APNS_KEY_SECRET = 'APNS_AUTH_KEY';
-const PRIVATE = new Set<string>([...Object.values(SYNC_SECRETS), ...LEGACY_SYNC_SECRETS, ...CONNECT_SECRET_NAMES, SEAL_SECRET_NAME, APNS_KEY_SECRET]);
+const PRIVATE = new Set<string>([...Object.values(SYNC_SECRETS), ...LEGACY_SYNC_SECRETS, ...CONNECT_SECRET_NAMES, SEAL_SECRET_NAME, SIGN_SECRET_NAME, APNS_KEY_SECRET]);
 const SERVER_ONLY = new Set<string>(SERVER_ONLY_VARS);
 
 /** False for Omni's sync, Connect and seal credentials (global only), the Grok Bot webhook and webhook signing secrets (any scope). */

@@ -100,6 +100,10 @@ export class RelayStore {
       created_at TEXT NOT NULL,
       last_seen_at TEXT NOT NULL
     )`);
+    // The sync id a token pushes as (PRD #667, S9): set by its first push, and every later push must name it, so one
+    // machine's token cannot push changes in another machine's name.
+    const cols = sql.exec('PRAGMA table_info(tokens)').toArray() as { name: string }[];
+    if (!cols.some((c) => c.name === 'machine_id')) sql.exec('ALTER TABLE tokens ADD COLUMN machine_id TEXT');
   }
 
   // ---------- tokens ----------
@@ -121,17 +125,43 @@ export class RelayStore {
     return row.id;
   }
 
+  /**
+   * The token pushes as one machine: the one it first pushed as. A push in another machine's name is 401 signed_out:
+   * a data folder copied to another Mac gets a new sync id (db/sync.ts arm) and may carry the old token with it, and
+   * that Mac signs in again for a token of its own.
+   */
+  private bindMachine(tokenId: string, machines: string[]) {
+    const ids = new Set(machines);
+    if (ids.size !== 1) throw new RelayError(403, 'A push carries changes from one machine only');
+    const [machine] = ids;
+    this.transaction(() => {
+      const [row] = this.sql.exec('SELECT machine_id FROM tokens WHERE id = ?', tokenId).toArray() as { machine_id: string | null }[];
+      if (!row) throw new RelayError(401, 'This machine is signed out of the relay', 'signed_out');
+      if (row.machine_id === null) {
+        // One token per machine: a machine that signed in again (a new token) takes its id over, and the token it had
+        // before is signed out, so an old or stolen copy of it pushes nothing more.
+        this.sql.exec('DELETE FROM tokens WHERE machine_id = ? AND id != ?', machine, tokenId);
+        this.sql.exec('UPDATE tokens SET machine_id = ? WHERE id = ?', machine, tokenId);
+      }
+      else if (row.machine_id !== machine) throw new RelayError(401, 'This token belongs to another machine: sign in again', 'signed_out');
+    });
+  }
+
   revokeToken(id: string) {
     this.sql.exec('DELETE FROM tokens WHERE id = ?', id);
   }
 
   // ---------- changes ----------
 
-  /** Append changes in order. Returns the machines that pushed, for the nudge. */
-  async push(raw: unknown): Promise<Set<string>> {
+  /**
+   * Append changes in order. Returns the machines that pushed, for the nudge. With `tokenId`, every change must name
+   * the machine that token pushes as: the first push binds it, and a change in another machine's name is refused.
+   */
+  async push(raw: unknown, tokenId?: string): Promise<Set<string>> {
     const list = (raw as { changes?: unknown } | null)?.changes;
     if (!Array.isArray(list) || list.length > MAX_BATCH) throw new RelayError(400, `Send {changes: [...]}, at most ${MAX_BATCH}`);
     const changes = list.map(checkChange);
+    if (tokenId !== undefined && changes.length) this.bindMachine(tokenId, changes.map((c) => c.machine_id));
     const data = changes.map((c) => (c.data === null ? null : JSON.stringify(c.data)));
     // Written before the transaction, which cannot wait on R2. A push that fails after this leaves an unread object.
     const blob = data.some((d) => d !== null) ? await this.putBatch(data.filter((d) => d !== null)) : null;

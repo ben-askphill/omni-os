@@ -14,6 +14,7 @@ import { createCipheriv, createDecipheriv, createPrivateKey, createPublicKey, di
 import { kv, outbox } from './db.ts';
 import { globalSecret, secretReachesThread, setSecret, NAME_RE, SCOPE_RE, SEAL_SECRET_NAME } from './secrets.ts';
 import { deviceRecord, machineFor } from './sync/devices.ts';
+import { keyring } from './sync/keyring.ts';
 import { syncProblem, type SyncNeed } from './sync/problem.ts';
 import { activeWorker, onSynced } from './sync/worker.ts';
 
@@ -206,8 +207,16 @@ export function sendSecret(machine: string, scope: string, name: string, value: 
   if (!self || !activeWorker()) throw refused(syncProblem(SECRET_DROP_NEEDS));
   const target = machineFor(machine);
   if (target.id === self) throw refused('That is this machine. Leave machine out to set it here.', 400);
-  const key = deviceRecord(target.id)?.sealKey;
-  if (!key) throw refused(`${target.name} has not published a key for secrets yet. Update Omni there and let it sync once.`);
+  // Sealed only to the key this machine pinned for the target (sync/keyring.ts): one its signed device record carried,
+  // or one Ben confirmed. Never to whatever its record says now.
+  const pin = keyring.get(target.id);
+  if (pin?.seenSealKey) throw refused(`${target.name} announces a key for secrets this Mac has not confirmed. Check its fingerprint and confirm it in Settings > Sync first.`);
+  if (!keyring.trusted(target.id)) throw refused(`${target.name} is new to this Mac. Check its fingerprint and trust it in Settings > Sync first.`);
+  const key = pin?.sealKey;
+  if (!key) {
+    const why = deviceRecord(target.id)?.sealKey ? 'has not sent a signed key for secrets yet' : 'has not published a key for secrets yet';
+    throw refused(`${target.name} ${why}. Update Omni there and let it sync once.`);
+  }
   const id = randomUUID();
   const now = Date.now();
   const meta = { id, sender: self, target: target.id, scope, name };

@@ -576,4 +576,51 @@ export function migrate() {
     crew_report INTEGER NOT NULL DEFAULT 1,
     updated_at TEXT NOT NULL
   );`);
+  // OAuth clients that reached /mcp with a Clerk JWT for the owner (apps/server/mcp-clients.ts): which Ben approved,
+  // which wait for approval and which he removed. Local, never synced: a forged sync change must not approve a client.
+  db.exec(`CREATE TABLE IF NOT EXISTS mcp_clients (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    via TEXT,
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL
+  );`);
+  // When each metadata field of a thread was last edited, for the field-by-field merge of synced rows
+  // (sync/thread-merge.ts). Rows from before it are seeded once with their updated_at (pinned_at and done_at with
+  // their own times when set), which is what whole-row last-writer-wins compared before.
+  const seedEdits = !(db.prepare('PRAGMA table_info(threads)').all() as unknown as { name: string }[]).some((c) => c.name === 'field_edits');
+  ensureColumn('threads', 'field_edits', 'TEXT');
+  if (seedEdits) {
+    db.exec(`UPDATE threads SET field_edits = json_object('title', updated_at, 'archived', updated_at, 'folder_id', updated_at,
+      'pinned_at', COALESCE(pinned_at, updated_at), 'done_at', COALESCE(done_at, updated_at))`);
+  }
+  // The other machines' public keys (sync/keyring.ts), pinned the first time each is seen. A key that changes later is
+  // kept as seen_*, and only Ben's confirmation pins it. Local, never synced: a forged change must not pin a key.
+  db.exec(`CREATE TABLE IF NOT EXISTS sync_keys (
+    machine_id TEXT PRIMARY KEY,
+    sign_key TEXT,
+    seal_key TEXT,
+    pinned_at TEXT NOT NULL,
+    seen_sign_key TEXT,
+    seen_seal_key TEXT,
+    seen_at TEXT
+  );`);
+  // The other machines Ben trusts to make this one act (sync/keyring.ts), each with the signing key he trusted. A new
+  // machine syncs ordinary data at once, but its commands, assignments, update asks, owner claims and secrets wait in
+  // sync_deferred until he clicks Trust in Settings > Sync. Local, never synced.
+  db.exec(`CREATE TABLE IF NOT EXISTS sync_trusted (machine_id TEXT PRIMARY KEY, sign_key TEXT NOT NULL, trusted_at TEXT NOT NULL);`);
+  // Synced changes whose signature did not check out (sync/verify.ts): refused, or applied while that entity still
+  // takes unsigned changes. One row per machine, entity, reason and (for a refused one) entity id.
+  db.exec(`CREATE TABLE IF NOT EXISTS sync_refused (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    machine TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    applied INTEGER NOT NULL,
+    count INTEGER NOT NULL DEFAULT 1,
+    at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS sync_refused_at ON sync_refused(at);`);
 }

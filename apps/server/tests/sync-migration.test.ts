@@ -60,3 +60,21 @@ describe('uid backfill', () => {
     expect(() => db.db.prepare(`INSERT INTO events (uid, thread_id, kind, payload) VALUES (?, 'old-1', 'user', '{}')`).run(u)).toThrow(/UNIQUE/);
   });
 });
+
+describe('field edit times (PRD #667, F6)', () => {
+  const edits = (id: string) => JSON.parse((db.db.prepare('SELECT field_edits FROM threads WHERE id = ?').get(id) as { field_edits: string }).field_edits);
+
+  it('seeds an old thread with its updated_at for every metadata field', () => {
+    const t = db.threads.get('old-1')!;
+    expect(edits('old-1')).toEqual({ title: t.updated_at, archived: t.updated_at, folder_id: t.updated_at, pinned_at: t.updated_at, done_at: t.updated_at });
+  });
+
+  it('seeds once: a second migrate keeps the times a local edit wrote', async () => {
+    db.threads.update('old-1', { title: 'Renamed' });
+    const after = edits('old-1');
+    expect(after.title > db.threads.get('old-1')!.created_at).toBe(true);
+    const { migrate } = await import('../db/migrate.ts');
+    migrate();
+    expect(edits('old-1')).toEqual(after);
+  });
+});

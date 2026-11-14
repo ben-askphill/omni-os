@@ -35,7 +35,8 @@ function parse(key: string, v: unknown): DeviceRecord | null {
   const node = ts === null || (typeof ts?.nodeId === 'string' && typeof ts.dnsName === 'string');
   if (typeof r?.name !== 'string' || !r.name || !node || typeof r.at !== 'string') return null;
   const sealKey = typeof r.sealKey === 'string' && r.sealKey ? { sealKey: r.sealKey } : {};
-  return { id: key.slice(PREFIX.length), name: r.name, tailscale: ts ? { nodeId: ts.nodeId, dnsName: ts.dnsName } : null, ...sealKey, at: r.at };
+  const signKey = typeof r.signKey === 'string' && r.signKey ? { signKey: r.signKey } : {};
+  return { id: key.slice(PREFIX.length), name: r.name, tailscale: ts ? { nodeId: ts.nodeId, dnsName: ts.dnsName } : null, ...sealKey, ...signKey, at: r.at };
 }
 
 export const deviceRecords = (): DeviceRecord[] =>
@@ -75,18 +76,29 @@ async function ownSealKey(): Promise<string | undefined> {
   }
 }
 
-/** Write this Mac's record when its name or node changed. A no-op while sync is off. */
+/** This machine's public key for the sync changes it signs, or undefined when its secret store cannot be reached now. */
+async function ownSignKey(): Promise<string | undefined> {
+  try {
+    return await (await import('./sign-key.ts')).signPublicKey();
+  } catch (err) {
+    console.error('[sync] no key to sign changes with:', (err as Error).message);
+    return undefined;
+  }
+}
+
+/** Write this Mac's record when its name, node or keys changed. A no-op while sync is off. */
 export async function announceDevice(now = Date.now()): Promise<void> {
   const self = outbox.machineId();
   if (!self || now - announcedAt < ANNOUNCE_EVERY_MS) return;
   announcedAt = now;
-  const [name, net, sealKey] = await Promise.all([computerName(), tailnet(), ownSealKey()]);
+  const [name, net, sealKey, signKey] = await Promise.all([computerName(), tailnet(), ownSealKey(), ownSignKey()]);
   const tailscale = net ? net.self : null;
   const had = deviceRecord(self);
   const same = had && had.name === name && had.tailscale?.nodeId === tailscale?.nodeId && had.tailscale?.dnsName === tailscale?.dnsName;
-  if (same && had.sealKey === (sealKey ?? had.sealKey)) return;
-  const key = sealKey ?? had?.sealKey;
-  kv.set(PREFIX + self, { id: self, name, tailscale, ...(key && { sealKey: key }), at: new Date(now).toISOString() } satisfies DeviceRecord);
+  if (same && had.sealKey === (sealKey ?? had.sealKey) && had.signKey === (signKey ?? had.signKey)) return;
+  const seal = sealKey ?? had?.sealKey;
+  const sign = signKey ?? had?.signKey;
+  kv.set(PREFIX + self, { id: self, name, tailscale, ...(seal && { sealKey: seal }), ...(sign && { signKey: sign }), at: new Date(now).toISOString() } satisfies DeviceRecord);
 }
 
 /**

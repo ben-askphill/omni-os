@@ -245,4 +245,32 @@ channelsApi.get('/:id/bases', async (c) => {
   return channel ? c.json(await baseOptions(channel)) : c.json({ error: 'not found' }, 404);
 });
 
-channelsApi.get('/:id/threads', (c) => c.json(allWithDelegating(threads.byChannel(c.req.param('id'), 200, c.req.query('archived') === '1'))));
+const PAGE_MAX = 200;
+
+/** A page's opaque cursor: where the next page starts. */
+const cursorOf = (t: { updated_at: string; id: string }) => Buffer.from(JSON.stringify([t.updated_at, t.id])).toString('base64url');
+function readCursor(raw: string | undefined): { updated_at: string; id: string } | null | undefined {
+  if (!raw) return null;
+  try {
+    const [updated_at, id] = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as unknown[];
+    return typeof updated_at === 'string' && typeof id === 'string' ? { updated_at, id } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The channel's threads, newest first. Without `paged`, the newest 200 as an array, as before. With `paged=1`, one page
+ * of `limit` (default 50, at most 200) as `{threads, next}`, where `next` is the cursor for the page after it (`cursor`,
+ * or `before` as its alias) or null at the end (PRD #667, story 41).
+ */
+channelsApi.get('/:id/threads', (c) => {
+  const archived = c.req.query('archived') === '1';
+  if (c.req.query('paged') !== '1') return c.json(allWithDelegating(threads.byChannel(c.req.param('id'), PAGE_MAX, archived)));
+  const after = readCursor(c.req.query('cursor') ?? c.req.query('before'));
+  if (after === undefined) return c.json({ error: 'bad cursor' }, 400);
+  const limit = Math.min(PAGE_MAX, Math.max(1, Number(c.req.query('limit')) || 50));
+  const rows = threads.byChannelPage(c.req.param('id'), { limit: limit + 1, archived, after });
+  const page = rows.slice(0, limit);
+  return c.json({ threads: allWithDelegating(page), next: rows.length > limit ? cursorOf(page.at(-1)!) : null });
+});
