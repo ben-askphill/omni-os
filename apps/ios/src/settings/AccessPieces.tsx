@@ -89,7 +89,7 @@ export function McpClientsGroup({ remote }: { remote: Remote<Optional<McpClient[
   const { colors } = useOmniTheme();
   const hub = useLiveHub();
   const { data, reload, setData } = remote;
-  const [acting, setActing] = useState<string | null>(null);
+  const [acting, setActing] = useState<{ id: string; action: 'approve' | 'remove' } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const clients = data && !data.missing ? data.value : null;
   const rows = useMemo(() => mcpClientRows(clients ?? [], Date.now()), [clients]);
@@ -104,8 +104,8 @@ export function McpClientsGroup({ remote }: { remote: Remote<Optional<McpClient[
       </Group>
     );
 
-  async function act(row: McpClientRow, call: (api: OmniApi) => Promise<McpClient[]>) {
-    setActing(row.id);
+  async function act(row: McpClientRow, action: 'approve' | 'remove', call: (api: OmniApi) => Promise<McpClient[]>) {
+    setActing({ id: row.id, action });
     setError(null);
     try {
       const next = await hub.request(call);
@@ -119,7 +119,7 @@ export function McpClientsGroup({ remote }: { remote: Remote<Optional<McpClient[
   }
 
   const approve = (row: McpClientRow) =>
-    void act(row, async (api) => withClient(clients ?? [], await api.approveMcpClient(row.id)));
+    void act(row, 'approve', async (api) => withClient(clients ?? [], await api.approveMcpClient(row.id)));
 
   function remove(row: McpClientRow) {
     const { title, message } = removeClientConfirmation(row);
@@ -129,7 +129,7 @@ export function McpClientsGroup({ remote }: { remote: Remote<Optional<McpClient[
         text: 'Remove',
         style: 'destructive',
         onPress: () =>
-          void act(row, async (api) => {
+          void act(row, 'remove', async (api) => {
             await api.removeMcpClient(row.id);
             return withoutClient(clients ?? [], row.id);
           }),
@@ -155,7 +155,7 @@ export function McpClientsGroup({ remote }: { remote: Remote<Optional<McpClient[
                       variant="secondary"
                       size="small"
                       accessibilityLabel={row.approveLabel}
-                      busy={acting === row.id}
+                      busy={acting?.id === row.id && acting.action === 'approve'}
                       disabled={acting !== null}
                       onPress={() => approve(row)}
                     />
@@ -165,7 +165,7 @@ export function McpClientsGroup({ remote }: { remote: Remote<Optional<McpClient[
                     variant="ghost"
                     size="small"
                     accessibilityLabel={row.removeLabel}
-                    busy={acting === row.id && !row.approveLabel}
+                    busy={acting?.id === row.id && acting.action === 'remove'}
                     disabled={acting !== null}
                     onPress={() => remove(row)}
                   />
