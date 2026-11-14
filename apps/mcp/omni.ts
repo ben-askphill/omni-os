@@ -752,7 +752,7 @@ server.registerTool('rotate_install_token', {
   description:
     `Replace this Omni's install token (data/api-token), only when ${USER} asks, for instance after it leaked. ` +
     'Every signed-in device session ends (browsers, phones, the iOS app), so each signs in or pairs again; the desktop app re-pairs by itself. ' +
-    'Omni MCP servers read the new token on their next call. A running agent\'s own $OMNI_TOKEN in its shell stays the old one until its agent process starts again.',
+    'Omni MCP servers, in threads and the local stdio one other clients start, read the new token on their next call. A running agent\'s own $OMNI_TOKEN in its shell stays the old one until its agent process starts again.',
   inputSchema: {},
 }, async () => text(await call('/auth/rotate-token', { method: 'POST' })));
 

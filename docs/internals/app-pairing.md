@@ -46,7 +46,7 @@ A reload or a second window asks for a new nonce. The route still refuses a requ
 
 `POST /api/auth/rotate-token` requires the install token itself; a session gets 403. It writes a new `data/api-token`, revokes every device session of every method (closing their SSE streams), and answers `{ "ok": true }`. The desktop app sees its session end and pairs again through the nonce flow, reading the new token from the file. A native app gets 401 and shows the pairing screen.
 
-Running threads keep the old token in `OMNI_TOKEN` until their agent process starts again. Omni's own MCP servers re-read `OMNI_TOKEN_FILE` after a 401, so Conductor tools recover on their next call; a `curl` from an agent's shell does not.
+Running threads keep the old token in `OMNI_TOKEN` until their agent process starts again. Omni's own MCP servers, the per-thread ones and the local `apps/mcp/external/stdio.ts`, re-read their token file (`OMNI_TOKEN_FILE`, else `data/api-token`) after a 401, so Conductor tools and local MCP clients recover on their next call; a `curl` from an agent's shell does not.
 
 ## Push registration
 
