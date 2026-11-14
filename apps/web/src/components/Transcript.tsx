@@ -439,7 +439,7 @@ export const Transcript = memo(function Transcript({
   history = null,
   delegated = false,
   limit = null,
-  elsewhere = null,
+  elsewhere = false,
 }: {
   threadId: string;
   /** Every row held, anchors included. */
@@ -460,8 +460,8 @@ export const Transcript = memo(function Transcript({
   delegated?: boolean;
   /** The thread's limit line (limits.ts `limitLabel`) while a usage limit holds it: the last result says it. */
   limit?: string | null;
-  /** Another Mac holds the thread and runs its process, so this server's live task list knows nothing of it. `running`: a turn runs there now. */
-  elsewhere?: { running: boolean } | null;
+  /** Another Mac holds the thread and runs its process, so this server's live task list knows nothing of it. */
+  elsewhere?: boolean;
 }) {
   const byId = useMemo(() => new Map(known.map((t) => [t.id, t])), [known]);
   const spans = history?.history.spans;
@@ -478,7 +478,7 @@ export const Transcript = memo(function Transcript({
   const pages = useMemo(() => publishedByGroup(items), [items]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
-  const tasks = useMemo(() => mergeTasks(stored, live, threadId, { feedLive, elsewhere }), [stored, live, feedLive, threadId, elsewhere]);
+  const tasks = useMemo(() => mergeTasks(stored, live, threadId, { feedLive, here: !elsewhere }), [stored, live, feedLive, threadId, elsewhere]);
   const latestStatus = useMemo(() => (running ? statusLabel(events) : null), [events, running]);
   const since = useMemo(() => (running ? turnStart(events) : null), [events, running]);
 
