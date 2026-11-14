@@ -8,8 +8,9 @@
 // - A thread's terminal: only the install's token, or a session paired with the token (a browser or the desktop app's
 //   window), may open, type into or watch a shell. A Google or app session cannot, so a stolen session cannot read
 //   data/api-token through a shell.
-// - No GET starts a process: the terminal and channel browser start on POST, and their streams only attach
-//   (terminal-api.ts, browser-api.ts), so an <img> in a PR body cannot open a shell or start Chrome.
+// - No GET opens a shell or starts Chrome: the terminal and channel browser start on POST, and their streams only
+//   attach (terminal-api.ts, browser-api.ts), so an <img> in a PR body cannot do either. Reads that run git (the PR
+//   lookup's branch follow) stay GETs.
 // - The desktop pairing link takes a one-time nonce and only a top-level navigation the app's main process made
 //   (Sec-Fetch-Site absent or none).
 

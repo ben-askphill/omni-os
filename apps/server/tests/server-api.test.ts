@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { hostname, networkInterfaces, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { startRunner } from './runner-boot.ts';
+import { wireFixture } from './fixture-shape.ts';
 
 // The app around the API routes: GET /api/status saying which server this is, a JSON 404 for any
 // unknown /api request, and the Web UI served from its build folder with index.html for its own paths.
@@ -194,6 +195,7 @@ describe('/api/auth', () => {
 
   it('pairs the desktop app window with no Secure flag over plain http', async () => {
     const minted = (await (await app.request('/api/auth/desktop-nonce', { method: 'POST' })).json()) as { nonce: string };
+    wireFixture('desktop-nonce.json', { ...minted, nonce: '0'.repeat(64) });
     const res = await app.request(`/api/auth/desktop-pair?nonce=${minted.nonce}`, { headers: { authorization: '' } });
     const cookie = res.headers.get('set-cookie') ?? '';
     expect(cookie).toContain('HttpOnly');

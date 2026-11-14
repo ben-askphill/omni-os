@@ -5,6 +5,7 @@ import { getCrew } from '../crew.ts';
 import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
 import { inWorkspace } from '../workspace.ts';
 import { followBranch } from '../branch-follow.ts';
+import { pathProblem } from '../sync/path-guard.ts';
 import { attachThread, detachThread } from '../browser.ts';
 import { globalSecret, secretsEnv } from '../secrets.ts';
 import { recordUsage } from '../usage.ts';
@@ -47,12 +48,15 @@ export function launch(threadId: string, first: Msg): Live | undefined {
 }
 
 /**
- * Why a local thread on a branch cannot start in its folder, or null when it can: a worktree thread runs only in its
- * own worktree, on its branch, never in the channel's checkout or the brain. A thread with no branch runs where it
- * always has.
+ * Why a local thread cannot start in its folder, or null when it can: a worktree thread runs only in its own worktree,
+ * on its branch, never in the channel's checkout or the brain. A thread with no branch runs only in a folder the synced
+ * path policy allows (sync/path-policy.ts), so clearing the branch on a synced row cannot skip the check (S20).
  */
 async function workdirProblem(thread: Thread, repo: string | null): Promise<string | null> {
-  if (!thread.branch) return null;
+  if (!thread.branch) {
+    const problem = pathProblem({ folder: thread.cwd });
+    return problem && `This thread's ${problem}, so it does not start there. Move it to a channel checkout or a folder in your home folder.`;
+  }
   if (!repo) return 'The channel has no repository set.';
   return worktreeProblem(repo, thread.cwd, thread.branch);
 }

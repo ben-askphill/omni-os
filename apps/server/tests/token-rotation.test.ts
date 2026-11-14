@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { wireFixture } from './fixture-shape.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'omni-rotate-'));
 process.env.OMNI_DATA_DIR = dir;
@@ -35,6 +36,7 @@ describe('POST /api/auth/rotate-token', () => {
 
     const res = await call('/auth/rotate-token', cookie, 'POST');
     expect(res.status).toBe(200);
+    wireFixture('rotate-token.json', await res.clone().json());
     const fresh = readFileSync(tokenPath(), 'utf8').trim();
     expect(fresh).not.toBe(old);
     expect(fresh).toHaveLength(64);

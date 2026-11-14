@@ -139,3 +139,16 @@ describe('RelayStore: a token pushes as one machine (PRD #667, S9)', () => {
     expect((await store.pull(0, 'nobody', 100)).map((c) => [c.machine_id, c.entity_id])).toEqual([['a', 't1'], ['a', 't2'], ['b', 't6']]);
   });
 });
+
+describe('RelayStore: a machine that signs in again (PRD #667, S9)', () => {
+  it("takes its machine id over with the new token and signs the old one out", async () => {
+    const { store } = setup();
+    const old = await store.addToken('token-old', 'Mac A');
+    await store.push({ changes: [change('a', 't1')] }, old);
+    const fresh = await store.addToken('token-new', 'Mac A');
+    await store.push({ changes: [change('a', 't2')] }, fresh);
+    await expect(store.checkToken('token-old')).rejects.toMatchObject({ status: 401 });
+    await expect(store.push({ changes: [change('a', 't3')] }, old)).rejects.toMatchObject({ status: 401 });
+    await store.push({ changes: [change('a', 't4')] }, fresh);
+  });
+});

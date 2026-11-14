@@ -2,7 +2,10 @@
 import { Hono, type Context } from 'hono';
 import { kv, outbox } from './db.ts';
 import { claimAutomations, OWNER_KEY } from './sync/owner.ts';
-import { deviceRecord } from './sync/devices.ts';
+import { currentRecords, deviceRecord, deviceRecords } from './sync/devices.ts';
+import { fingerprintOf, keyring } from './sync/keyring.ts';
+import { signPublicKey } from './sync/sign-key.ts';
+import { refusedChanges } from './sync/verify.ts';
 import { pathMap } from './sync/paths.ts';
 import { checkPathMap, checkRelayUrl, defaultSetupDeps, disableSync, enableSync, pollRelaySignIn, SetupError, startRelaySignIn, type SetupDeps } from './sync/setup.ts';
 import { syncNow, syncStatus } from './sync/worker.ts';
@@ -82,6 +85,25 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
 
   /** This Mac's path map (kv sync.path_map): where another Mac's folders live here. */
   app.get('/path-map', (c) => c.json({ map: pathMap() }));
+
+  /**
+   * The synced machines with their signing keys (sync/keyring.ts), this one first. `fingerprint`: the key the machine
+   * announces now; `pinnedFingerprint`: the one this machine checks its changes with. `keyChanged`: they differ (or
+   * its seal key does), and changes and secrets wait for POST /devices/:id/confirm-key.
+   */
+  app.get('/devices', async (c) => c.json(await syncDevices()));
+
+  /** Pin the keys a machine announces now. 404 when none wait for confirmation. */
+  app.post('/devices/:id/confirm-key', (c) => {
+    if (!keyring.confirm(c.req.param('id'))) return c.json({ error: 'No new key waits for confirmation for that machine' }, 404);
+    return c.json({ ok: true });
+  });
+
+  /** Synced changes refused for their signature or a path, and ones applied without a valid signature, newest first. */
+  app.get('/refused', (c) => {
+    const limit = Number(c.req.query('limit') ?? 50);
+    return c.json(refusedChanges(Number.isFinite(limit) ? limit : 50));
+  });
   app.put('/path-map', async (c) => {
     const map = checkPathMap(await body(c));
     kv.set('sync.path_map', map);
@@ -92,3 +114,39 @@ export function createSyncApi(deps: SetupDeps = defaultSetupDeps) {
 }
 
 export const syncApi = createSyncApi();
+
+/** GET /api/sync/devices: one synced machine and its signing key. */
+export interface SyncDevice {
+  id: string;
+  name: string;
+  /** This machine. */
+  current: boolean;
+  fingerprint: string | null;
+  pinnedFingerprint: string | null;
+  keyChanged: boolean;
+}
+
+export async function syncDevices(): Promise<SyncDevice[]> {
+  const self = outbox.machineId();
+  if (!self) return [];
+  const own = await signPublicKey().catch(() => null);
+  const records = currentRecords(deviceRecords());
+  const pins = keyring.list();
+  const ids = [...new Set([self, ...records.map((r) => r.id), ...pins.filter((p) => p.seenSignKey || p.seenSealKey).map((p) => p.machine)])];
+  return ids.map((id) => {
+    const rec = records.find((r) => r.id === id) ?? deviceRecord(id);
+    if (id === self) {
+      const fp = fingerprintOf(own ?? rec?.signKey);
+      return { id, name: rec?.name ?? id, current: true, fingerprint: fp, pinnedFingerprint: fp, keyChanged: false };
+    }
+    const pin = pins.find((p) => p.machine === id);
+    return {
+      id,
+      name: rec?.name ?? id,
+      current: false,
+      fingerprint: fingerprintOf(pin?.seenSignKey ?? rec?.signKey ?? pin?.signKey),
+      pinnedFingerprint: fingerprintOf(pin?.signKey),
+      keyChanged: !!(pin?.seenSignKey || pin?.seenSealKey),
+    };
+  });
+}

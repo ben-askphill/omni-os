@@ -4,6 +4,8 @@ import { ownerOf } from '../../ownership.ts';
 import { claim, registerHandler } from '../apply.ts';
 import { mergeThread, type FieldEdits, type MergeRow } from '../thread-merge.ts';
 import { fromPortable, safeSegment, toRemote } from '../paths.ts';
+import { pathProblem } from '../path-guard.ts';
+import { logRefused } from '../verify.ts';
 
 // Threads merge by field (sync/thread-merge.ts): the owner machine's copy keeps the execution fields (session id,
 // sessions, handover, has_run, last_text), metadata (title, archived, folder, pinned, done) merges by each field's
@@ -121,6 +123,15 @@ registerHandler('thread', {
     };
     const incoming: MergeRow = { ...data, cwd: data.cwd === undefined ? undefined : fromPortable(String(data.cwd)) };
     if (data.cwd === undefined) delete incoming.cwd;
+    // A folder the thread would run in that this Mac does not allow (sync/path-policy.ts) refuses the change. The one
+    // it has already is kept as it is.
+    if (typeof incoming.cwd === 'string' && incoming.cwd !== current?.cwd) {
+      const problem = pathProblem({ cwd: incoming.cwd });
+      if (problem) {
+        logRefused(change, problem, false);
+        return false;
+      }
+    }
     delete incoming.assignment;
     const merged = mergeThread({ here, incoming, newer, from: change.machine_id, owner: effectiveOwner(change.entity_id, data.assignment), self: ctx.machineId });
     // An older change none of whose edits are newer than this Mac's changes nothing.

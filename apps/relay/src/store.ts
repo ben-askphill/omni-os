@@ -137,7 +137,12 @@ export class RelayStore {
     this.transaction(() => {
       const [row] = this.sql.exec('SELECT machine_id FROM tokens WHERE id = ?', tokenId).toArray() as { machine_id: string | null }[];
       if (!row) throw new RelayError(401, 'This machine is signed out of the relay', 'signed_out');
-      if (row.machine_id === null) this.sql.exec('UPDATE tokens SET machine_id = ? WHERE id = ?', machine, tokenId);
+      if (row.machine_id === null) {
+        // One token per machine: a machine that signed in again (a new token) takes its id over, and the token it had
+        // before is signed out, so an old or stolen copy of it pushes nothing more.
+        this.sql.exec('DELETE FROM tokens WHERE machine_id = ? AND id != ?', machine, tokenId);
+        this.sql.exec('UPDATE tokens SET machine_id = ? WHERE id = ?', machine, tokenId);
+      }
       else if (row.machine_id !== machine) throw new RelayError(401, 'This token belongs to another machine: sign in again', 'signed_out');
     });
   }

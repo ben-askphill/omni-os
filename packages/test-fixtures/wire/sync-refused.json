@@ -1,0 +1,32 @@
+[
+  {
+    "id": 11,
+    "at": "2026-01-05T09:00:00.000Z",
+    "machine": "mac-b",
+    "entity": "channel",
+    "entityId": "inbox",
+    "reason": "repo_path inside Omni's data folder",
+    "applied": false,
+    "count": 1
+  },
+  {
+    "id": 10,
+    "at": "2026-01-05T09:00:00.000Z",
+    "machine": "mac-b",
+    "entity": "thread",
+    "entityId": "t-ssh",
+    "reason": "cwd inside ~/.ssh",
+    "applied": false,
+    "count": 1
+  },
+  {
+    "id": 9,
+    "at": "2026-01-05T09:00:00.000Z",
+    "machine": "mac-b",
+    "entity": "kv",
+    "entityId": "devices.mac-e",
+    "reason": "another machine's record",
+    "applied": false,
+    "count": 1
+  }
+]

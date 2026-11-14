@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 import { MemoryTransport } from '../sync/transport.ts';
+import { signAs } from './sync-sign.ts';
 
 // With sync on, one Mac runs the scheduled automations: the one kv `automations.owner` names, a synced key, so
 // both Macs agree. A Mac claims it when no owner has reached it by the end of its first sync, and can take it
@@ -23,7 +24,7 @@ const status = async () => (await (await app.request('/api/sync/status')).json()
 const takeOver = () => app.request('/api/sync/automations-owner', { method: 'POST' });
 /** mac-b's write of the owner key, as it would reach the relay. */
 const fromB = (owner: string, ts = new Date(Date.now() + 1_000).toISOString()) =>
-  relay.push([{ machine_id: 'mac-b', entity: 'kv', entity_id: 'automations.owner', op: 'upsert', data: { value: owner }, ts }]);
+  relay.push([signAs({ machine_id: 'mac-b', entity: 'kv', entity_id: 'automations.owner', op: 'upsert', data: { value: owner }, ts })]);
 
 describe('with sync off', () => {
   it('scheduled automations run here, as before', async () => {
@@ -45,6 +46,9 @@ describe('with sync on', () => {
     await sync.setActiveWorker(worker);
     expect(r.db.kv.get('automations.owner')).toBeUndefined();
     expect(await automations.fireScheduled(nightly())).not.toBeNull();
+    // Its turn ends before the first sync, so the events it writes are all in that sync's push.
+    const busy = () => r.db.db.prepare(`SELECT COUNT(*) AS n FROM threads WHERE status IN ('running', 'queued')`).get() as { n: number };
+    await r.until('the nightly run to end', () => busy().n === 0);
   });
 
   it('claims them on its first sync when no other Mac has, and the claim goes to the relay in that sync', async () => {
@@ -86,7 +90,7 @@ describe('with sync on', () => {
     expect(((await res.json()) as any).status.automations).toEqual({ owner: 'mac-b', isThisMac: false });
     expect(await automations.fireScheduled(nightly())).toBeNull();
     await worker.syncNow();
-    expect(relay.changes.filter((c) => c.entity_id === 'automations.owner').at(-1)?.data).toEqual({ value: 'mac-b' });
+    expect(relay.changes.filter((c) => c.entity_id === 'automations.owner').at(-1)?.data).toMatchObject({ value: 'mac-b' });
     await takeOver();
   });
 

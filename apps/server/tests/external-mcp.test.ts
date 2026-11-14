@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { FAKE_ISSUER, FAKE_PUBLISHABLE_KEY, fakeClerk } from './fake-clerk.ts';
 import { startRunner } from './runner-boot.ts';
+import { wireFixture } from './fixture-shape.ts';
 
 // The external Omni MCP server (apps/mcp/external/) as clients outside Omni reach it: /mcp over Streamable HTTP with
 // the MCP token in the URL or a header, and the stdio entry started with plain `node`, both against the real API.
@@ -354,6 +355,7 @@ describe('/mcp: Google sign-in through Clerk', () => {
     expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_bound', aud: RESOURCE }))).status).toBe(200);
     const list = (await (await api('GET', '/mcp/clients')).json()) as { id: string; status: string; via: string }[];
     expect(list.find((c) => c.id === 'client_bound')).toMatchObject({ status: 'bound', via: 'audience' });
+    wireFixture('mcp-clients.json', list);
     // Bound is not approved: the same client's token without the audience still waits for Ben.
     expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_bound' }))).status).toBe(401);
   });

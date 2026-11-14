@@ -233,6 +233,11 @@ export const resolved = {
   clerkPublishableKey: () => (process.env.OMNI_CLERK_PUBLISHABLE_KEY ?? userConfig().integrations.clerkPublishableKey).trim(),
   clerkClientId: () => (process.env.OMNI_CLERK_CLIENT_ID ?? userConfig().integrations.clerkClientId).trim(),
   mcpClients: () => (process.env.OMNI_MCP_CLIENTS ?? userConfig().integrations.mcpClients).trim(),
+  /** Which synced changes need a valid signature (sync/verify.ts). Anything but strict or log reads as actions. */
+  syncSignatures: (): 'actions' | 'strict' | 'log' => {
+    const v = (process.env.OMNI_SYNC_SIGNATURES || userConfig().integrations.syncSignatures).trim().toLowerCase();
+    return v === 'strict' || v === 'log' ? v : 'actions';
+  },
 };
 
 /**

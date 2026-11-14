@@ -19,7 +19,8 @@
     "mcpPublicUrl": "",
     "clerkPublishableKey": "",
     "clerkClientId": "",
-    "mcpClients": ""
+    "mcpClients": "",
+    "syncSignatures": "actions"
   },
   "automations": {
     "weekly-review": { "enabled": true },

@@ -594,4 +594,29 @@ export function migrate() {
     db.exec(`UPDATE threads SET field_edits = json_object('title', updated_at, 'archived', updated_at, 'folder_id', updated_at,
       'pinned_at', COALESCE(pinned_at, updated_at), 'done_at', COALESCE(done_at, updated_at))`);
   }
+  // The other machines' public keys (sync/keyring.ts), pinned the first time each is seen. A key that changes later is
+  // kept as seen_*, and only Ben's confirmation pins it. Local, never synced: a forged change must not pin a key.
+  db.exec(`CREATE TABLE IF NOT EXISTS sync_keys (
+    machine_id TEXT PRIMARY KEY,
+    sign_key TEXT,
+    seal_key TEXT,
+    pinned_at TEXT NOT NULL,
+    seen_sign_key TEXT,
+    seen_seal_key TEXT,
+    seen_at TEXT
+  );`);
+  // Synced changes whose signature did not check out (sync/verify.ts): refused, or applied while that entity still
+  // takes unsigned changes. One row per machine, entity, reason and (for a refused one) entity id.
+  db.exec(`CREATE TABLE IF NOT EXISTS sync_refused (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    machine TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    applied INTEGER NOT NULL,
+    count INTEGER NOT NULL DEFAULT 1,
+    at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS sync_refused_at ON sync_refused(at);`);
 }

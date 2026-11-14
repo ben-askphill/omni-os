@@ -2,6 +2,8 @@ import { publishFeed } from '../../bus.ts';
 import { channels, db, type Channel } from '../../db.ts';
 import { claim, registerHandler } from '../apply.ts';
 import { fromPortable, safeSegment, toRemote } from '../paths.ts';
+import { pathProblem } from '../path-guard.ts';
+import { logRefused } from '../verify.ts';
 
 // Channels: last writer wins on the whole row. repo_path and base_dir travel with the home dir as "~", through
 // each Mac's path map. A folder that is not on this Mac is fine: new threads fall back as prepareWorkdir does.
@@ -27,7 +29,24 @@ registerHandler('channel', {
   },
   apply(change) {
     // Channel ids end up in secret scopes and folder names: one that is not a plain name is dropped.
-    if (!safeSegment(change.entity_id) || !claim(change)) return false;
+    if (!safeSegment(change.entity_id)) return false;
+    // A checkout or base folder this Mac does not allow (sync/path-policy.ts) refuses the change; one it has is kept.
+    if (change.op === 'upsert') {
+      const d = (change.data ?? {}) as Partial<Channel>;
+      const here = channels.get(change.entity_id);
+      const moved: Record<string, string> = {};
+      for (const c of PATHS) {
+        const v = (d as Record<string, unknown>)[c];
+        const local = typeof v === 'string' ? fromPortable(v) : null;
+        if (local && local !== here?.[c as 'repo_path' | 'base_dir']) moved[c] = local;
+      }
+      const problem = pathProblem(moved);
+      if (problem) {
+        logRefused(change, problem, false);
+        return false;
+      }
+    }
+    if (!claim(change)) return false;
     // Nothing deletes a channel today. One that still has threads here fails on them and waits in sync_deferred.
     if (change.op === 'delete') return db.prepare('DELETE FROM channels WHERE id = ?').run(change.entity_id).changes > 0;
     const data = (change.data ?? {}) as Partial<Channel>;
