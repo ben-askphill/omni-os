@@ -14,7 +14,8 @@ import { loadOptional, optionalView, type Optional } from './optional-remote';
 import { Group } from './parts';
 import { confirmKeyConfirmation, refusedRows, syncKeyRows, withKeyConfirmed, type SyncKeyRow } from './sync-keys-model';
 
-// Settings, Sync: each synced machine's signing-key fingerprint with Confirm new key when it changed, and the changes
+// Settings, Sync: each synced machine's signing-key fingerprint, with Trust this machine for a new one and Confirm new key
+// when a trusted one's key changed, and the changes
 // this machine refused. Both hide on a server that predates signed sync (a 404).
 
 export const loadSyncKeys = (api: OmniApi) => loadOptional(api.syncDevices());
@@ -66,7 +67,7 @@ export function SyncKeysGroup({ remote }: { remote: Remote<Optional<SyncDeviceKe
 
   return (
     <View style={styles.stack}>
-      <Group title="Signing keys" footer="Each machine signs the changes it syncs. When a machine's key changes, what it signs is refused until you confirm the new key.">
+      <Group title="Signing keys" footer="Each machine signs the changes it syncs. A new machine's commands, assignments, update requests and secrets wait until you trust it, and a changed key's until you confirm it.">
         {rows.length ? (
           rows.map((row, i) => <KeyRow key={row.id} row={row} first={i === 0} busy={confirming === row.id} disabled={confirming !== null} onConfirm={() => ask(row)} />)
         ) : (
@@ -87,6 +88,7 @@ function KeyRow({ row, first, busy, disabled, onConfirm }: { row: SyncKeyRow; fi
           {row.name}
         </Text>
         {row.current ? <Chip label="This machine" tone="outline" /> : null}
+        {row.untrusted ? <Chip label="New machine" tone="needs" /> : null}
         {row.keyChanged ? <Chip label="Key changed" tone="needs" /> : null}
       </View>
       <Text selectable accessibilityLabel={`Key fingerprint ${row.fingerprint}`} style={[styles.fingerprint, { color: colors.fg2 }]}>
@@ -97,9 +99,9 @@ function KeyRow({ row, first, busy, disabled, onConfirm }: { row: SyncKeyRow; fi
           Pinned key: <Text style={[styles.fingerprint, { color: colors.fg3 }]}>{row.pinned}</Text>
         </Text>
       ) : null}
-      {row.confirmLabel ? (
+      {row.buttonLabel ? (
         <View style={styles.action}>
-          <Button label="Confirm new key" variant="secondary" size="compact" accessibilityLabel={row.confirmLabel} busy={busy} disabled={disabled} onPress={onConfirm} />
+          <Button label={row.buttonLabel} variant="secondary" size="compact" accessibilityLabel={row.confirmLabel ?? undefined} busy={busy} disabled={disabled} onPress={onConfirm} />
         </View>
       ) : null}
     </View>

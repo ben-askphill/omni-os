@@ -25,8 +25,12 @@ describe('Rotate install token', () => {
     expect(ROTATE_CONFIRMATION.message).toBe('Every signed-in device, this iPhone included, has to pair again.');
   });
 
-  it("shows the server's own words for a 403", () => {
-    expect(rotateFailure(httpError(403, 'Only the install token can rotate it.'))).toEqual({ kind: 'refused', message: 'Only the install token can rotate it.' });
+  it('tells an app or Google session where to rotate from on a 403', () => {
+    expect(rotateFailure(httpError(403, 'Forbidden'))).toEqual({ kind: 'refused', message: 'Rotate from this Mac or a token-paired device.' });
+  });
+
+  it("shows the server's own words for any other failure", () => {
+    expect(rotateFailure(httpError(500, 'Disk full'))).toEqual({ kind: 'refused', message: 'Disk full' });
   });
 
   it('treats a 404 as an older server, so the button goes', () => {

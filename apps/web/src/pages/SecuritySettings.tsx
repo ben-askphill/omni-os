@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { syncKeyAction } from '@omni/shared/fingerprint.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, ApiError, errorText, useApi } from '../api.ts';
 import { Button, Chip, ErrorNote, InlineConfirm } from '../components/ui.tsx';
-import { entityLabel, fingerprintLabel, listedMcpClients, mcpClientName, type McpClient, type RefusedChange, type SyncDeviceKey } from '../security-settings.ts';
+import { entityLabel, fingerprintLabel, listedMcpClients, mcpClientName, ROTATE_FORBIDDEN, type McpClient, type RefusedChange, type SyncDeviceKey } from '../security-settings.ts';
 import { Card, DangerRow } from './settings-parts.tsx';
 
 // Settings cards for PRD #667: rotating the install token and the MCP clients (Sharing & access), the machines' signing
@@ -21,7 +22,8 @@ export function InstallTokenCard() {
       await api.post('/auth/rotate-token', {});
       setDone(true);
     } catch (e) {
-      setError(missing(e) ? 'This Omni is on a build without token rotation. Update it first.' : errorText(e));
+      const forbidden = e instanceof ApiError && e.status === 403;
+      setError(missing(e) ? 'This Omni is on a build without token rotation. Update it first.' : forbidden ? ROTATE_FORBIDDEN : errorText(e));
       throw e;
     }
   };
@@ -88,7 +90,10 @@ export function McpClientsCard() {
   );
 }
 
-/** Sync: each machine's signing key, and Confirm new key for one whose key changed since this Mac pinned it. */
+/**
+ * Sync: each machine's signing key. Trust this machine for one new to this Mac, Confirm new key for one whose key changed
+ * since it was trusted. Until then its commands, assignments, update requests and secrets wait.
+ */
 export function SyncKeysCard() {
   const res = useApi<SyncDeviceKey[]>('/sync/devices');
   const [error, setError] = useState<string | null>(null);
@@ -108,25 +113,30 @@ export function SyncKeysCard() {
   return (
     <Card entry="sync-keys" title="Signing keys" subtitle="Each machine signs what it syncs. A change that makes this Mac act needs a key it pinned.">
       <ul className="divide-y divide-line">
-        {list.map((d) => (
-          <li key={d.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 py-2 text-[13px]">
-            <div className="min-w-0 flex-1 basis-48">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate">{d.name}</span>
-                {d.current && <Chip tone="outline">This machine</Chip>}
-                {d.keyChanged && <Chip tone="needs">Key changed</Chip>}
+        {list.map((d) => {
+          const action = syncKeyAction(d);
+          return (
+            <li key={d.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 py-2 text-[13px]">
+              <div className="min-w-0 flex-1 basis-48">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate">{d.name}</span>
+                  {d.current && <Chip tone="outline">This machine</Chip>}
+                  {action === 'trust' && <Chip tone="needs">New machine</Chip>}
+                  {action === 'confirm' && <Chip tone="needs">Key changed</Chip>}
+                </div>
+                <div className="font-mono text-[12px] break-all text-fg-3">{fingerprintLabel(d.fingerprint)}</div>
+                {action === 'confirm' && <div className="font-mono text-[12px] break-all text-fg-3">Pinned: {fingerprintLabel(d.pinnedFingerprint)}</div>}
               </div>
-              <div className="font-mono text-[12px] break-all text-fg-3">{fingerprintLabel(d.fingerprint)}</div>
-              {d.keyChanged && <div className="font-mono text-[12px] break-all text-fg-3">Pinned: {fingerprintLabel(d.pinnedFingerprint)}</div>}
-            </div>
-            {d.keyChanged && (
-              <InlineConfirm label="Confirm new key" confirmLabel="Trust this key" busyLabel="Confirming" onConfirm={() => confirm(d.id)} />
-            )}
-          </li>
-        ))}
+              {action === 'trust' && <InlineConfirm label="Trust this machine" confirmLabel={`Trust ${d.name}`} busyLabel="Trusting" onConfirm={() => confirm(d.id)} />}
+              {action === 'confirm' && <InlineConfirm label="Confirm new key" confirmLabel="Trust this key" busyLabel="Confirming" onConfirm={() => confirm(d.id)} />}
+            </li>
+          );
+        })}
       </ul>
-      {list.some((d) => d.keyChanged) && (
-        <p className="text-[12.5px] text-fg-3">Confirm only a machine you reinstalled or paired again. Compare the key with the one its own Settings shows.</p>
+      {list.some((d) => syncKeyAction(d)) && (
+        <p className="text-[12.5px] text-fg-3">
+          Trust only a machine you paired or reinstalled yourself. Compare the key with the one its own Settings shows. Until then, its commands, assignments, update requests and secrets wait.
+        </p>
       )}
       {error && <ErrorNote>{error}</ErrorNote>}
     </Card>

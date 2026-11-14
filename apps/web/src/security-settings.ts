@@ -25,6 +25,8 @@ export interface SyncDeviceKey {
   pinnedFingerprint: string | null;
   /** Both set and different: changes that make this Mac act wait until Ben confirms the new key. */
   keyChanged: boolean;
+  /** Ben trusts it to make this Mac act. Until then its commands, assignments, update requests and secrets wait. */
+  trusted?: boolean;
 }
 
 /** GET /api/sync/refused: a change this Mac would not apply. */
@@ -36,6 +38,12 @@ export interface RefusedChange {
   entityId: string;
   reason: string;
 }
+
+/**
+ * A 403 from POST /api/auth/rotate-token: only the install token or a session paired with it may rotate. Google and app
+ * sessions get this by design.
+ */
+export const ROTATE_FORBIDDEN = 'Rotate from this Mac or a token-paired device.';
 
 /** The clients to list: removed ones stay out. Pending ones first, so an approval is never below the fold, then bound, then approved. */
 export function listedMcpClients(list: McpClient[]): McpClient[] {

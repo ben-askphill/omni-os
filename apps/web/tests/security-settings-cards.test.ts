@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let replies: Record<string, unknown> = {};
 let failures: Record<string, number> = {};
+let postFailures: Record<string, number> = {};
 const posts: string[] = [];
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
@@ -18,6 +19,7 @@ vi.mock('../src/api.ts', async (importActual) => {
   }) as typeof actual.api.get;
   actual.api.post = vi.fn(async (path: string) => {
     posts.push(path);
+    if (path in postFailures) throw new actual.ApiError('Forbidden', postFailures[path]);
     return { ok: true };
   }) as typeof actual.api.post;
   return actual;
@@ -30,6 +32,7 @@ let root: Root;
 beforeEach(() => {
   replies = {};
   failures = {};
+  postFailures = {};
   posts.length = 0;
   host = document.createElement('div');
   document.body.append(host);
@@ -114,6 +117,21 @@ describe('signing keys card', () => {
     expect(host.textContent).toContain('Pinned: 0000 9999 8888 7777');
     expect([...host.querySelectorAll('button')].filter((b) => b.textContent?.includes('Confirm new key'))).toHaveLength(1);
   });
+  it('offers Trust this machine for a new machine and posts confirm-key after the second step', async () => {
+    replies['/sync/devices'] = [
+      { id: 'here', name: 'omarchy', current: true, fingerprint: 'aaaa1111', pinnedFingerprint: 'aaaa1111', keyChanged: false, trusted: true },
+      { id: 'mini', name: 'Mac mini', current: false, fingerprint: 'dddd3333', pinnedFingerprint: 'dddd3333', keyChanged: false, trusted: false },
+    ];
+    await mount(createElement(SyncKeysCard));
+    expect(host.textContent).toContain('New machine');
+    expect(host.textContent).not.toContain('Key changed');
+    expect(host.textContent).toContain('update requests and secrets wait');
+    await act(async () => button('Trust this machine')!.click());
+    expect(posts).toEqual([]);
+    await act(async () => button('Trust Mac mini')!.click());
+    await act(async () => {});
+    expect(posts).toEqual(['/sync/devices/mini/confirm-key']);
+  });
 });
 
 describe('refused changes card', () => {
@@ -135,5 +153,14 @@ describe('install token card', () => {
     await act(async () => button('Rotate and sign out all')!.click());
     await act(async () => {});
     expect(posts).toEqual(['/auth/rotate-token']);
+  });
+
+  it('tells an app or Google session where to rotate from on a 403', async () => {
+    postFailures['/auth/rotate-token'] = 403;
+    await mount(createElement(InstallTokenCard));
+    await act(async () => button('Rotate install token')!.click());
+    await act(async () => button('Rotate and sign out all')!.click());
+    await act(async () => {});
+    expect(host.textContent).toContain('Rotate from this Mac or a token-paired device.');
   });
 });

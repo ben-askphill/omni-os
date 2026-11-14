@@ -43,6 +43,25 @@ describe('syncKeyRows', () => {
     expect(steady).toMatchObject({ keyChanged: false, pinned: null, confirmLabel: null });
   });
 
+  it('offers Trust this machine for a new machine, and for a changed key with nothing pinned', () => {
+    const [fresh, unpinned] = syncKeyRows([device({ trusted: false }), device({ id: 'b', name: 'B', keyChanged: true, pinnedFingerprint: null })]);
+    expect(fresh).toMatchObject({ untrusted: true, keyChanged: false, pinned: null, buttonLabel: 'Trust this machine', confirmLabel: 'Trust Air' });
+    expect(unpinned).toMatchObject({ untrusted: true, keyChanged: false, buttonLabel: 'Trust this machine' });
+  });
+
+  it('treats a machine from a server without the trusted field as trusted', () => {
+    const [d] = syncKeyRows([device()]);
+    expect(d).toMatchObject({ untrusted: false, buttonLabel: null });
+  });
+
+  it('says what waits in the Trust confirm, and trusts it after', () => {
+    const c = confirmKeyConfirmation({ name: 'Air', fingerprint: '1111 2222', untrusted: true });
+    expect(c.title).toBe('Trust Air?');
+    expect(c.message).toContain('1111 2222');
+    expect(c.message).toContain('commands, assignments, update requests and secrets wait');
+    expect(withKeyConfirmed([device({ trusted: false })], 'air')[0]).toMatchObject({ trusted: true });
+  });
+
   it('never offers Confirm new key for this machine', () => {
     const [here] = syncKeyRows([device({ current: true, keyChanged: true })]);
     expect(here).toMatchObject({ keyChanged: false, confirmLabel: null });
@@ -54,7 +73,7 @@ describe('syncKeyRows', () => {
   });
 
   it('names the fingerprint to compare in the confirm', () => {
-    const c = confirmKeyConfirmation({ name: 'Air', fingerprint: '1111 2222' });
+    const c = confirmKeyConfirmation({ name: 'Air', fingerprint: '1111 2222', untrusted: false });
     expect(c.title).toBe('Confirm new key for Air?');
     expect(c.message).toContain('1111 2222');
     expect(c.confirmLabel).toBe('Confirm new key');

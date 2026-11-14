@@ -27,6 +27,7 @@ import {
 import type { ClaudeArtifactsSchedule } from '@omni/shared/claude-artifacts.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
 import { earlierCursor, type HistoryPage } from '@omni/shared/history.ts';
+import { latestOnly } from '@omni/shared/latest.ts';
 import type { Answer } from '@omni/shared/question.ts';
 import type { OutputChunk } from '@omni/shared/tool-output.ts';
 
@@ -233,7 +234,9 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
 
   const pendingFolders = createPendingFolders();
 
-  // One refetch at a time. A call that arrives meanwhile asks for one more pass, so the last state wins.
+  // One refetch at a time. A call that arrives meanwhile asks for one more pass, so the last state wins. A pass that
+  // started before a local rename, pin or move is not applied: it would show the old row until the next pass lands.
+  const channelReads = latestOnly();
   let refreshing: Promise<void> | null = null;
   let refreshAgain = false;
   function refreshChannels(): Promise<void> {
@@ -247,7 +250,12 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       do {
         refreshAgain = false;
         try {
+          const token = channelReads.begin();
           const list = await withAuth(() => requireApi().channels());
+          if (!channelReads.holds(token)) {
+            refreshAgain = true;
+            continue;
+          }
           channels.set({ channels: pendingFolders.apply(list), loading: false, error: null, loadedAt: now() });
         } catch (e) {
           channels.set((s) => ({ ...s, loading: false, error: messageOf(e) }));
@@ -526,6 +534,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     fileSource,
     applyThread(thread) {
       for (const t of openThreads) t.applyThread(thread);
+      channelReads.edit();
+      activity.applyThread(thread);
       void refreshChannels();
     },
     refreshNeedsYou,

@@ -1,4 +1,4 @@
-import type { McpClient } from '@omni/client-core';
+import { OmniHttpError, type McpClient } from '@omni/client-core';
 
 import { shortAgo } from '../live/channel-model';
 import { isNotFound } from './optional-remote';
@@ -8,6 +8,9 @@ import { isNotFound } from './optional-remote';
 
 export const ROTATE_LABEL = 'Rotate install token';
 
+/** The same words as the Web UI (apps/web/src/security-settings.ts). */
+export const ROTATE_FORBIDDEN = 'Rotate from this Mac or a token-paired device.';
+
 export const ROTATE_CONFIRMATION = {
   title: 'Rotate install token?',
   message: 'Every signed-in device, this iPhone included, has to pair again.',
@@ -15,11 +18,12 @@ export const ROTATE_CONFIRMATION = {
 } as const;
 
 /**
- * What a failed rotation leaves on screen. `missing`: the server predates rotation, so the button goes. `refused`: the
- * server's own sentence, as for a 403 when this phone's session may not rotate it.
+ * What a failed rotation leaves on screen. `missing`: the server predates rotation, so the button goes. `refused`: why
+ * not. A 403 is by design for an app or Google session: only the install token or a session paired with it may rotate.
  */
 export function rotateFailure(error: unknown): { kind: 'missing'; message: string } | { kind: 'refused'; message: string } {
   if (isNotFound(error)) return { kind: 'missing', message: 'This server is older and cannot rotate its install token. Update it, or rotate the token on the computer.' };
+  if (error instanceof OmniHttpError && error.failure.kind === 'http' && error.failure.status === 403) return { kind: 'refused', message: ROTATE_FORBIDDEN };
   return { kind: 'refused', message: error instanceof Error && error.message ? error.message : 'Something went wrong. Try again.' };
 }
 

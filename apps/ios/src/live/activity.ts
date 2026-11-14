@@ -1,4 +1,5 @@
 import type { OmniApi, PinnedThread, Thread } from '@omni/client-core';
+import { latestOnly } from '@omni/shared/latest.ts';
 
 import { serial } from './serial';
 import { createStore, type Store } from './store';
@@ -22,6 +23,8 @@ export interface ActivityLive {
   readonly state: Store<ActivityState>;
   /** Loads everything again: on open, on every feed reconnect and on return to the front. */
   refresh(): Promise<void>;
+  /** A thread Ben just changed here (pin, rename): it goes in now, and a load already in flight cannot put the old copy back. */
+  applyThread(thread: Thread): void;
   applyFeed(message: unknown): void;
 }
 
@@ -35,19 +38,24 @@ export interface ActivityLiveOptions {
 export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions): ActivityLive {
   const state = createStore<ActivityState>({ recent: null, pinned: [], maxUploadMb: null, loading: false, error: null, loadedAt: null });
   const failed = (e: unknown) => state.set((s) => ({ ...s, error: messageOf(e) }));
+  // A load that started before a local change or a feed update answers with the older lists (@omni/shared/latest.ts).
+  const reads = latestOnly();
 
   const refresh = serial(async () => {
     if (!api) return;
     state.set((s) => ({ ...s, loading: true }));
+    const token = reads.begin();
     const [recent, pinned, status] = await Promise.allSettled([
       withAuth(() => api.recent(RECENT_LIMIT)),
       withAuth(() => api.pinned()),
       withAuth(() => api.status()),
     ]);
     const failure = [recent, pinned, status].find((r) => r.status === 'rejected');
+    const fresh = reads.holds(token);
+    if (!fresh) void refreshPinned();
     state.set((s) => ({
-      recent: recent.status === 'fulfilled' ? recent.value : s.recent,
-      pinned: pinned.status === 'fulfilled' ? pinned.value : s.pinned,
+      recent: fresh && recent.status === 'fulfilled' ? recent.value : s.recent,
+      pinned: fresh && pinned.status === 'fulfilled' ? pinned.value : s.pinned,
       maxUploadMb: status.status === 'fulfilled' ? (status.value.maxUploadMb ?? null) : s.maxUploadMb,
       loading: false,
       error: failure ? messageOf(failure.reason) : null,
@@ -58,8 +66,9 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
   const refreshPinned = serial(async () => {
     if (!api) return;
     try {
+      const token = reads.begin();
       const pinned = await withAuth(() => api.pinned());
-      state.set((s) => ({ ...s, pinned }));
+      if (reads.holds(token)) state.set((s) => ({ ...s, pinned }));
     } catch (e) {
       failed(e);
     }
@@ -68,7 +77,12 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
   function applyFeed(message: unknown) {
     if (!isRecord(message)) return;
     if (message.type !== 'thread' || !isRecord(message.thread) || typeof message.thread.id !== 'string') return;
-    patchRecent(message.thread as unknown as Thread);
+    applyThread(message.thread as unknown as Thread);
+  }
+
+  function applyThread(thread: Thread) {
+    reads.edit();
+    patchRecent(thread);
     void refreshPinned();
   }
 
@@ -83,7 +97,7 @@ export function createActivityLive({ api, withAuth, now }: ActivityLiveOptions):
     });
   }
 
-  return { state, refresh, applyFeed };
+  return { state, refresh, applyFeed, applyThread };
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
