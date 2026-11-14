@@ -118,7 +118,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'automations', section: 'threads', title: 'Automations', keywords: ['scheduled', 'schedule', 'cron', 'webhook', 'tasks', 'recurring'] },
   { id: 'channel-list', section: 'channels', title: 'Channels', keywords: ['projects', 'clients', 'new channel', 'archive'] },
   { id: 'channel-basics', section: 'channels', title: 'Channel name, icon, notes and design system', keywords: ['emoji', 'kind', 'notes', 'system prompt', 'instructions', 'design system'] },
-  { id: 'channel-code', section: 'channels', title: 'Channel repo and browser', keywords: ['repo path', 'github repo', 'git', 'browser window', 'headless', 'store domain', 'shopify'] },
+  { id: 'channel-code', section: 'channels', title: 'Channel repo, worktrees and browser', keywords: ['repo path', 'github repo', 'git', 'browser window', 'headless', 'store domain', 'shopify', 'worktreeinclude', '.env', 'copy into new worktrees', 'shared directories', 'node_modules', 'symlink'] },
   { id: 'channel-actions', section: 'channels', title: 'Channel actions', keywords: ['commands', 'scripts', 'setup', 'port', 'preview', 'dev server'] },
   { id: 'folders', section: 'workspace', title: 'Workspace folder, repos folder and GitHub owner', keywords: ['workspace', 'repos', 'folder', 'github owner', 'org', 'CLAUDE.md', 'skills', 'base directory'] },
   { id: 'brain', section: 'workspace', title: 'Central brain folder', keywords: ['notes', 'brain-nightly', 'export', 'digests'] },

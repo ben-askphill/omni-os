@@ -13,7 +13,8 @@ import { logRefused } from '../verify.ts';
 const COLUMNS = [
   'id', 'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir', 'store_domain', 'portal_slug',
   'browser_headless', 'notes', 'icon', 'avatar_bg', 'avatar_bg_manual', 'design_system', 'design_system_name', 'archived', 'created_at',
-  'default_harness', 'default_model', 'default_effort',
+  'default_harness', 'default_model', 'default_effort', 'worktree_include', 'worktree_shared',
+  'prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks',
 ] as const;
 const PATHS = new Set<string>(['repo_path', 'base_dir']);
 

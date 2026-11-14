@@ -162,6 +162,11 @@ const NAMES = [
   'pr-watch-stopped.json',
   // Every channel's PRs, with one repo gh cannot read.
   'all-prs.json',
+  // Auto-merge turned on for a PR with the repo's merge method, then off (#685).
+  'pr-auto-merge-request.json',
+  'pr-auto-merge.json',
+  'pr-auto-merge-off-request.json',
+  'pr-auto-merge-off.json',
   // A question a delegated thread asked, as the thread that delegated it lists it.
   'crew-questions.json',
 ] as const;
@@ -241,7 +246,18 @@ function fakeGh(bin: string) {
     labels: [{ id: 'L1', name: 'feature', description: '', color: '0e8a16' }], reviewRequests: [{ __typename: 'User', login: 'ben' }, { __typename: 'Team', name: 'Theme', slug: 'theme' }],
   };
   const list = `if [ "$1 $2 $8" = "pr list 40" ]; then [ "$4" = "acme/shop" ] && echo '${JSON.stringify([listed])}' && exit 0; echo "GraphQL: Could not resolve to a Repository with the name '$4'." >&2; exit 1; fi\n`;
-  writeFileSync(join(bin, 'gh'), `#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify(pr)}'; exit 0; fi\n${list}if [ "$1 $2" = "api user" ]; then echo ben; exit 0; fi\nif [ "$1" = "api" ]; then exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
+  // Auto-merge on acme/shop, which allows squash only: `--auto` arms it until `--disable-auto`, and `pr view` shows it.
+  // acme/gone has auto-merge off, so arming there fails with gh's words.
+  const armed = join(bin, 'auto-merge-armed');
+  const autoMerge = { enabledAt: '2026-11-01T10:00:00Z', enabledBy: { login: 'ben' }, mergeMethod: 'SQUASH', commitHeadline: '', commitBody: '', authorEmail: null };
+  const auto =
+    `if [ "$1 $2 $3" = "repo view acme/shop" ]; then echo '{"squashMergeAllowed":true,"mergeCommitAllowed":false,"rebaseMergeAllowed":false}'; exit 0; fi\n` +
+    `if [ "$1 $2 $3" = "repo view acme/gone" ]; then echo '{"squashMergeAllowed":true,"mergeCommitAllowed":true,"rebaseMergeAllowed":true}'; exit 0; fi\n` +
+    `if [ "$1 $2 $5" = "pr merge acme/gone" ]; then echo "GraphQL: Auto merge is not allowed for this repository (enablePullRequestAutoMerge)" >&2; exit 1; fi\n` +
+    `if [ "$1 $2 $6" = "pr merge --auto" ]; then touch '${armed}'; echo "! Pull request $5#$3 will be automatically merged via $7 when all requirements are met"; exit 0; fi\n` +
+    `if [ "$1 $2 $6" = "pr merge --disable-auto" ]; then rm -f '${armed}'; echo "✓ Auto-merge disabled for pull request $5#$3"; exit 0; fi\n` +
+    `if [ "$1 $2" = "pr view" ] && [ -f '${armed}' ]; then echo '${JSON.stringify({ ...pr, autoMergeRequest: autoMerge })}'; exit 0; fi\n`;
+  writeFileSync(join(bin, 'gh'), `#!/bin/sh\n${auto}if [ "$1 $2" = "pr view" ]; then echo '${JSON.stringify({ ...pr, autoMergeRequest: null })}'; exit 0; fi\n${list}if [ "$1 $2" = "api user" ]; then echo ben; exit 0; fi\nif [ "$1" = "api" ]; then exit 0; fi\necho "fake gh: $*" >&2\nexit 1\n`);
   chmodSync(join(bin, 'gh'), 0o755);
 }
 
@@ -808,7 +824,7 @@ async function scenario() {
   expect(continued.continued_from?.id).toBe(id);
   expect(continued.continued_in).toHaveLength(1);
 
-  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null, setup: 'background' });
+  const actionBody = request('channel-action-request.json', { name: 'Theme check', command: 'echo "Theme check passed"', secrets: [], port: null, setup: 'background', teardown: true });
   const check = keep('channel-action.json', await call('POST', '/channels/acme/actions', actionBody)) as { id: string };
   const preview = (await call('POST', '/channels/acme/actions', { name: 'Theme preview', command: 'echo "Previewing on $OMNI_PORT"; sleep 30', port: 0 })) as { id: string };
   const tests = (await call('POST', '/channels/acme/actions', { name: 'Tests', command: 'echo "1 failing" >&2; exit 1' })) as { id: string };
@@ -899,6 +915,28 @@ async function scenario() {
   expect(all.prs[0]).toMatchObject({ labels: ['feature'], reviewRequests: ['ben'] });
   expect(all.viewer).toBe('ben');
   expect(all.failed.map((f) => f.repo)).toEqual(['acme/gone']);
+
+  // Auto-merge: the app asks for rebase, the repo allows squash only, so it arms with squash; the PR view shows it
+  // armed, then off. A repo with auto-merge turned off answers with gh's words.
+  // Only a paired device arms it: the install token, which agents hold, is refused even with confirm: true.
+  const armBody = request('pr-auto-merge-request.json', { enabled: true, method: 'rebase', confirm: true });
+  expect(await call('POST', '/channels/acme/prs/7/auto-merge', armBody, false)).toEqual({ error: 'Only a paired device can turn auto-merge on. Arm it with the slide in the PR view.' });
+  const { code } = (await call('POST', '/auth/app-pairings', {})) as { code: string };
+  const { token: device } = (await call('POST', '/auth/app-pairings/redeem', { code, name: 'Fixture iPhone' })) as { token: string };
+  const asDevice = async (path: string, body: unknown, ok = true) => {
+    const res = await fetch(`${base}/api${path}`, { method: 'POST', headers: { authorization: `Bearer ${device}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const text = await res.text();
+    if (res.ok !== ok) throw new Error(`POST ${path}: ${res.status} ${text}`);
+    return JSON.parse(text);
+  };
+  const armed = keep('pr-auto-merge.json', await asDevice('/channels/acme/prs/7/auto-merge', armBody));
+  expect(armed).toMatchObject({ ok: true, method: 'squash', state: 'OPEN', autoMergeRequest: { mergeMethod: 'SQUASH', enabledBy: { login: 'ben' } } });
+  expect(((await get('/channels/acme/prs/7')) as { autoMergeRequest: unknown }).autoMergeRequest).toMatchObject({ mergeMethod: 'SQUASH' });
+  const offBody = request('pr-auto-merge-off-request.json', { enabled: false });
+  expect(keep('pr-auto-merge-off.json', await call('POST', '/channels/acme/prs/7/auto-merge', offBody))).toMatchObject({ ok: true, method: null, autoMergeRequest: null });
+  expect(((await get('/channels/acme/prs/7')) as { autoMergeRequest: unknown }).autoMergeRequest).toBeNull();
+  expect(await asDevice('/channels/gadgets/prs/7/auto-merge', armBody, false)).toEqual({ error: 'GraphQL: Auto merge is not allowed for this repository (enablePullRequestAutoMerge)' });
+  expect(JSON.stringify(await asDevice('/channels/acme/prs/7/auto-merge', { enabled: true }, false))).toContain('needs confirm: true');
 
   // A delegated thread asks: the thread above it lists the question, with the asking thread's id for the answer.
   const conductor = (await call('POST', '/threads', { channel: 'acme', prompt: 'plan the launch week', title: 'Plan the launch week' })) as Thread;
