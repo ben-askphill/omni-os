@@ -20,6 +20,7 @@ import { readBody } from './read-body.ts';
 import { compactBlocked, contextView } from './context.ts';
 import { continueLinks } from './continue.ts';
 import { allWithDelegating, delegatingIds, withDelegating } from './delegating.ts';
+import { machineNames } from './ran-on.ts';
 import { coldRefusal, sessionWarmth } from './session-warmth.ts';
 import {
   acceptedAgain,
@@ -177,11 +178,12 @@ function openingOf(id: string, pending: PendingMsg[]): Opening | null {
 function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
   const pending = pendingFor(t.id);
   const ids = delegatingIds();
-  const shown = <T extends { id: string }>(list: T[]) => list.map((x) => withDelegating(x, ids));
+  const names = machineNames();
+  const shown = <T extends { id: string; status?: string }>(list: T[]) => list.map((x) => withDelegating(x, ids, names));
   const children = threads.children(t.id);
   const parent = t.parent_id ? threads.get(t.parent_id) : null;
   const detail = {
-    thread: withDelegating(t, ids),
+    thread: withDelegating(t, ids, names),
     channel: (ch => ch && publicChannel(ch))(channels.get(t.channel_id)),
     events: page.events,
     ...(page.history && { history: page.history }),
@@ -192,7 +194,7 @@ function threadDetail(t: Thread, page: Parameters<DetailOf>[0]) {
     children: shown(children),
     // Members of the teams this thread started, so its delegation cards can show their state.
     team: shown(children.flatMap((ch) => threads.team(ch.id))),
-    parent: parent ? withDelegating(parent, ids) : null,
+    parent: parent ? withDelegating(parent, ids, names) : null,
     pending,
     opening: openingOf(t.id, pending),
     live: isLive(t.id),

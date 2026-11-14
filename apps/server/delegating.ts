@@ -11,8 +11,11 @@
 import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { threads } from './db.ts';
 import { activeTasks } from './runner/state.ts';
+import { machineNames, ranOnFields, type MachineNames } from './ran-on.ts';
+import type { RanOnFields } from '@omni/shared/ran-on.ts';
 
-export type WithDelegating<T> = T & { delegating: boolean };
+/** With `delegating`, and where it runs or ran and when its run started (ran-on.ts), for the Inbox rows. */
+export type WithDelegating<T> = T & { delegating: boolean } & Required<RanOnFields>;
 
 /** The threads whose own sub-agents still run. A team member's count for its lead too, the thread above it. */
 const agentHosts = () => [...new Set(activeTasks().filter((t) => t.subagent).map((t) => t.thread_id))];
@@ -20,13 +23,17 @@ const agentHosts = () => [...new Set(activeTasks().filter((t) => t.subagent).map
 /** The ids of the threads with a delegated thread or sub-agent working below them. */
 export const delegatingIds = (): ReadonlySet<string> => new Set(threads.delegating(agentHosts()));
 
-/** The thread as the clients get it. Pass `ids` to read many with one query. */
-export const withDelegating = <T extends { id: string }>(t: T, ids = delegatingIds()): WithDelegating<T> => ({ ...t, delegating: ids.has(t.id) });
+/** The thread as the clients get it. Pass `ids` and `names` to read many with one query each. */
+export const withDelegating = <T extends { id: string; status?: string }>(t: T, ids = delegatingIds(), names: MachineNames = machineNames()): WithDelegating<T> => {
+  const delegating = ids.has(t.id);
+  return { ...t, delegating, ...ranOnFields(t, delegating, names) };
+};
 
 /** Every thread as the clients get it, with one query. */
-export function allWithDelegating<T extends { id: string }>(list: readonly T[]): WithDelegating<T>[] {
+export function allWithDelegating<T extends { id: string; status?: string }>(list: readonly T[]): WithDelegating<T>[] {
   const ids = delegatingIds();
-  return list.map((t) => withDelegating(t, ids));
+  const names = machineNames();
+  return list.map((t) => withDelegating(t, ids, names));
 }
 
 /**

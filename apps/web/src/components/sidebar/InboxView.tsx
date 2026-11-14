@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
+import { ranOnLine } from '@omni/shared/ran-on.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { Thread, ThreadStub } from '../../api.ts';
 import { useInbox } from '../../app/useInbox.ts';
@@ -13,6 +14,7 @@ import { HarnessLogo, Loader, OmniMark } from '../brand.tsx';
 import { Avatar, ChannelMark, DoneMark, Icon, StatusDot } from '../ui.tsx';
 import { DelegateCount, DelegateCountSpace } from '../DelegateCount.tsx';
 import { useRowDelegates } from './SidebarRows.tsx';
+import { RunElapsed } from '../RunElapsed.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
 
 /**
@@ -108,7 +110,10 @@ function ChannelLead({ channel }: { channel: ReturnType<typeof useApp>['channels
   return <span className="font-num text-[11px] leading-none text-fg-3">#</span>;
 }
 
-/** T3's card: the channel on top with the status or the time on its right, the title, then the branch and harness. */
+/**
+ * T3's card: the channel on top with the status or the time on its right, the title, then the machine it runs or ran
+ * on with the run's time, and the harness. The branch and the machines before are in that line's tooltip.
+ */
 function InboxCard({
   t,
   channel,
@@ -131,6 +136,10 @@ function InboxCard({
   const delegates = useRowDelegates(t.id, delegated, onNavigate);
   const title = t.title || 'Untitled';
   const channelName = channel?.id === 'conductor' ? 'Conductor' : (channel?.name ?? t.channel_id);
+  // The machine it runs on or last ran on, with the run's time while it runs; the branch only without a machine.
+  const where = ranOnLine(t, now);
+  const label = where.machine ?? where.branch;
+  const line = !!label || !!t.run_started_at;
   const harness = t.harness && !delegates && (
     <span className="shrink-0 text-fg-3">
       <HarnessLogo harness={t.harness} size={11} />
@@ -165,13 +174,16 @@ function InboxCard({
         </span>
         <span className={`mt-1 flex items-center gap-1.5 text-[13px] leading-5 ${active ? 'font-medium text-fg' : 'font-medium text-fg-2'}`}>
           <span className="min-w-0 flex-1 truncate">{title}</span>
-          {!t.branch && harness}
-          {!t.branch && delegates && <DelegateCountSpace summary={delegates.summary} />}
+          {!line && harness}
+          {!line && delegates && <DelegateCountSpace summary={delegates.summary} />}
         </span>
-        {t.branch && (
-          <span className="mt-0.5 flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3">
-            <Icon name="branch" size={11} className="shrink-0" />
-            <span className="min-w-0 flex-1 truncate">{t.branch}</span>
+        {line && (
+          <span className="mt-0.5 flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3" title={where.title || undefined} data-ran-on={where.machine ?? undefined}>
+            {label && <Icon name={where.machine ? 'monitor' : 'branch'} size={11} className="shrink-0" />}
+            {label && <span className="min-w-0 truncate">{label}</span>}
+            {label && t.run_started_at && <span aria-hidden className="shrink-0">·</span>}
+            <RunElapsed since={t.run_started_at} />
+            <span className="min-w-0 flex-1" />
             {harness}
             {delegates && <DelegateCountSpace summary={delegates.summary} />}
           </span>

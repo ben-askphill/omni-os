@@ -21,14 +21,50 @@ export interface Assignment {
   /** The thread was sent to run on another machine (run-on.ts) or delegated: messages follow the holder wherever it goes. */
   routed: boolean;
   at: string;
+  /** The machines that held it before, oldest first, each with when it moved there. Capped at TRAIL_MAX. */
+  trail: TrailStop[];
 }
+
+/** An earlier holder: the machine and when the thread moved there ('' when an older build did not say). */
+export interface TrailStop {
+  machine: string;
+  at: string;
+}
+
+/** How many earlier holders a row keeps. Enough for the tooltip; a thread rarely moves more. */
+export const TRAIL_MAX = 8;
 
 const HOLDER = 'handoff.holder.';
 const ROUTED = 'runon.thread.';
 const isMachineId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(v);
 
-type Row = { thread_id: string; machine: string; generation: number; routed: number; at: string };
-const parse = (r: Row | undefined): Assignment | null => (r ? { ...r, routed: r.routed === 1 } : null);
+type Row = { thread_id: string; machine: string; generation: number; routed: number; at: string; trail: string | null };
+
+/** A trail as stored or synced, if it is one; anything else reads as empty. */
+export function parseTrail(v: unknown): TrailStop[] {
+  let list = v;
+  if (typeof v === 'string') {
+    try {
+      list = JSON.parse(v);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((s): s is TrailStop => isMachineId(s?.machine) && typeof s.at === 'string')
+    .map((s) => ({ machine: s.machine, at: s.at }))
+    .slice(-TRAIL_MAX);
+}
+
+/** The trail once the thread leaves `from` for `to`: `from` goes on the end. The same machine again changes nothing. */
+const leaving = (from: Assignment | null, to: string): TrailStop[] =>
+  !from ? [] : from.machine === to ? from.trail : [...from.trail, { machine: from.machine, at: from.at }].slice(-TRAIL_MAX);
+
+const parse = (r: Row | undefined): Assignment | null => (r ? { ...r, routed: r.routed === 1, trail: parseTrail(r.trail) } : null);
+const COLUMNS = 'thread_id, machine, generation, routed, at, trail';
+const UPSERT = `INSERT INTO assignments (thread_id, machine, generation, routed, at, trail) VALUES (?, ?, ?, ?, ?, ?)
+  ON CONFLICT(thread_id) DO UPDATE SET machine = excluded.machine, generation = excluded.generation, routed = excluded.routed, at = excluded.at, trail = excluded.trail`;
 const legacyHolder = (threadId: string) => {
   const v = kv.get<unknown>(HOLDER + threadId);
   return isMachineId(v) ? v : null;
@@ -36,14 +72,14 @@ const legacyHolder = (threadId: string) => {
 
 export const assignments = {
   /** The row as this machine stores it, without the older builds' records. */
-  stored: (threadId: string) => parse(db.prepare('SELECT thread_id, machine, generation, routed, at FROM assignments WHERE thread_id = ?').get(threadId) as Row | undefined),
+  stored: (threadId: string) => parse(db.prepare(`SELECT ${COLUMNS} FROM assignments WHERE thread_id = ?`).get(threadId) as Row | undefined),
 
   /** Who holds the thread, or null when no machine is known to (sync never set up, or it has not run since). */
   get(threadId: string): Assignment | null {
     const row = assignments.stored(threadId);
     const legacy = legacyHolder(threadId);
-    if (!row) return legacy ? { thread_id: threadId, machine: legacy, generation: 0, routed: isMachineId(kv.get(ROUTED + threadId)), at: '' } : null;
-    return legacy && legacy !== row.machine ? { ...row, machine: legacy } : row;
+    if (!row) return legacy ? { thread_id: threadId, machine: legacy, generation: 0, routed: isMachineId(kv.get(ROUTED + threadId)), at: '', trail: [] } : null;
+    return legacy && legacy !== row.machine ? { ...row, machine: legacy, at: '', trail: leaving(row, legacy) } : row;
   },
 
   /** The machine that holds the thread, or null. */
@@ -62,10 +98,10 @@ export const assignments = {
       const routed = !!(opts.routed || cur?.routed);
       if (stored && stored.machine === machine && stored.routed === routed && legacyHolder(threadId) === machine) return stored;
       const generation = cur && cur.machine !== machine ? cur.generation + 1 : (cur?.generation ?? 0);
-      db.prepare(
-        `INSERT INTO assignments (thread_id, machine, generation, routed, at) VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(thread_id) DO UPDATE SET machine = excluded.machine, generation = excluded.generation, routed = excluded.routed, at = excluded.at`,
-      ).run(threadId, machine, generation, routed ? 1 : 0, now());
+      const moved = !!cur && cur.machine !== machine;
+      // The same holder keeps the time it arrived; a move starts the next stop.
+      const at = !moved && stored ? stored.at : now();
+      db.prepare(UPSERT).run(threadId, machine, generation, routed ? 1 : 0, at, JSON.stringify(leaving(cur, machine)));
       record('assignment', threadId);
       // For machines on an older build, which read only this key.
       if (legacyHolder(threadId) !== machine) kv.set(HOLDER + threadId, machine);
@@ -75,17 +111,16 @@ export const assignments = {
 
   /**
    * Another machine's row, from sync: kept when it is a later generation than this machine's, or the same one from
-   * a machine whose id sorts first, so every machine settles on the same owner. True when it was kept.
+   * a machine whose id sorts first, so every machine settles on the same owner. True when it was kept. A row from an
+   * older build has no trail: the one here, with this holder added when the thread moved, stands in for it.
    */
-  applyRemote(a: Assignment): boolean {
+  applyRemote(a: Omit<Assignment, 'trail'> & { trail?: TrailStop[] }): boolean {
     const cur = assignments.stored(a.thread_id);
     if (cur && a.generation < cur.generation) return false;
     // The same generation: the same machine only adds the routed mark; two machines tie by id.
     if (cur && a.generation === cur.generation && (a.machine === cur.machine ? !a.routed || cur.routed : a.machine > cur.machine)) return false;
-    db.prepare(
-      `INSERT INTO assignments (thread_id, machine, generation, routed, at) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(thread_id) DO UPDATE SET machine = excluded.machine, generation = excluded.generation, routed = excluded.routed, at = excluded.at`,
-    ).run(a.thread_id, a.machine, a.generation, a.routed ? 1 : 0, a.at);
+    const trail = a.trail ?? leaving(cur, a.machine);
+    db.prepare(UPSERT).run(a.thread_id, a.machine, a.generation, a.routed ? 1 : 0, a.at, JSON.stringify(trail));
     // The holder key agrees with the row again, whichever of the two the relay delivered first; not recorded, so nothing echoes.
     db.prepare('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(HOLDER + a.thread_id, JSON.stringify(a.machine));
     return true;

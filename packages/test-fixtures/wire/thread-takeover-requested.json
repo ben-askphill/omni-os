@@ -40,7 +40,14 @@
     "continued_from": null,
     "created_at": "2026-01-05T09:00:00.000Z",
     "updated_at": "2026-01-05T09:00:00.000Z",
-    "delegating": false
+    "delegating": false,
+    "ran_on": {
+      "id": "mac-a",
+      "name": "Mac A",
+      "at": "2026-01-05T09:00:00.000Z",
+      "before": []
+    },
+    "run_started_at": "2026-01-05T09:00:00.000Z"
   },
   "channel": {
     "id": "shop",

@@ -37,7 +37,7 @@ export { turnSnapshots } from './db/repos/turn-snapshots.ts';
 export { continuations, type Continuation } from './db/repos/continuations.ts';
 export type { RemoteCommand, RemoteCommandKind, RemoteCommandState } from './db/repos/remote-commands.ts';
 export { isCommandAhead, remoteCommands } from './db/repos/remote-commands.ts';
-export { assignments, type Assignment } from './db/repos/assignments.ts';
+export { assignments, parseTrail, type Assignment, type TrailStop } from './db/repos/assignments.ts';
 export { transitions, type TransitionRow } from './db/repos/transitions.ts';
 export { reviewNotes, type ReviewNote } from './db/repos/review-notes.ts';
 export type { SyncEntity, SyncOp, OutboxRow } from './db/sync.ts';

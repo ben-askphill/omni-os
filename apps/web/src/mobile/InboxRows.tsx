@@ -5,6 +5,8 @@ import { errorText, type Thread, type ThreadStub } from '../api.ts';
 import type { InboxShelf } from '../app/useInbox.ts';
 import { DelegateCount, DelegateCountSpace, delegatesHref, useDelegateSummary } from '../components/DelegateCount.tsx';
 import { DoneMark, Icon, type IconName } from '../components/ui.tsx';
+import { RunElapsed } from '../components/RunElapsed.tsx';
+import { ranOnLine } from '@omni/shared/ran-on.ts';
 import type { RowStatus } from '@omni/shared/status.ts';
 import type { InboxThread } from '../inbox.ts';
 import { canMarkDone } from '../needs-you.ts';
@@ -50,7 +52,7 @@ function RowActions({ actions }: { actions: RowAction[] }) {
   );
 }
 
-/** A thread as the sidebar's Inbox card: its status on the avatar and on the right, the title, the channel and branch. */
+/** A thread as the sidebar's Inbox card: its status on the avatar and on the right, the title, the channel and the machine. */
 export function MoInboxRow({
   t,
   status,
@@ -71,6 +73,9 @@ export function MoInboxRow({
   const summary = useDelegateSummary(delegated);
   const ch = channel(t.channel_id);
   const title = t.title || 'Untitled';
+  // The machine it runs on or last ran on, then the run's time; the branch only without a machine.
+  const where = ranOnLine(t, now);
+  const label = where.machine ?? where.branch;
   const actions: RowAction[] = [];
   if (pinned) actions.push({ icon: 'pin', label: `Unpin ${title}`, run: () => act.unpin(t) });
   if (canMarkDone(t.status)) actions.push({ icon: 'check', label: `Mark ${title} done`, run: () => act.done(t) });
@@ -86,7 +91,16 @@ export function MoInboxRow({
           </span>
           <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
             {pinned && <Icon name="pin" size={12} className="shrink-0" />}
-            <span className="min-w-0 flex-1 truncate">{[`#${ch?.name ?? t.channel_id}`, t.branch].filter(Boolean).join(' · ')}</span>
+            <span className={`min-w-0 truncate ${label ? 'max-w-[45%] shrink-0' : 'flex-1'}`}>#{ch?.name ?? t.channel_id}</span>
+            {label && (
+              <span className="-ml-1 flex min-w-0 flex-1 items-center gap-1" title={where.title || undefined} data-ran-on={where.machine ?? undefined}>
+                <span aria-hidden>·</span>
+                <span className="min-w-0 truncate">{label}</span>
+                {t.run_started_at && <span aria-hidden>·</span>}
+                <RunElapsed since={t.run_started_at} />
+              </span>
+            )}
+            {!label && <RunElapsed since={t.run_started_at} />}
             {summary && <DelegateCountSpace summary={summary} size={13} />}
           </span>
         </span>

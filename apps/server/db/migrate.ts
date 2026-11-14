@@ -657,4 +657,7 @@ export function migrate() {
     ON CONFLICT(machine_id) DO NOTHING;
   DELETE FROM sync_refused WHERE reason = 'waiting for Trust' AND machine IN
     (SELECT t.machine_id FROM sync_trusted t JOIN sync_keys k ON k.machine_id = t.machine_id AND k.sign_key = t.sign_key);`);
+  // The machines that held a thread before its holder, oldest first (db/repos/assignments.ts), for the Inbox row's
+  // machine history. JSON; synced with the row. Null reads as none.
+  ensureColumn('assignments', 'trail', 'TEXT');
 }
