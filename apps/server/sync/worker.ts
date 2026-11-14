@@ -180,14 +180,20 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   }
 
   async function pull(result: SyncResult) {
-    // Fail closed on an unavailable list or an older transport. A cached device record is synced data, not evidence
-    // of pairing. This API proves registration only; token bindings remain private to the relay (ADR 0013).
+    // No auto-trust without the relay's registration list: an unavailable list or an older transport leaves new keys
+    // seen only, for Ben to trust, and the rest of the sync goes on. A cached device record is synced data, not
+    // evidence of pairing. This API proves registration only; token bindings remain private to the relay (ADR 0013).
     const ctx: ApplyContext = { machineId };
     let checked = false;
     const checkFirstKeys = async (changes: Change[]) => {
       if (checked || !changes.some((c) => unsigned(c).signature && !keyring.get(c.machine_id)?.signKey)) return;
-      ctx.pairedMachines = await transport.pairedMachines?.() ?? new Set();
       checked = true;
+      try {
+        ctx.pairedMachines = (await transport.pairedMachines?.()) ?? new Set();
+      } catch (err) {
+        ctx.pairedMachines = new Set();
+        console.warn(`[sync] the relay's registration list is unavailable, so new machines wait for Trust: ${(err as Error)?.message ?? err}`);
+      }
     };
     for (;;) {
       const after = kv.get<number>('sync.cursor') ?? 0;

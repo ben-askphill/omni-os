@@ -14,6 +14,8 @@ import type { Change, RemoteChange } from './transport.ts';
 //   while the others update. The `syncSignatures` setting turns that strict, or relaxes actions to log only.
 // - A signer with no key here yet (its device record has not arrived) makes an action wait in sync_deferred.
 // - A machine is trusted with the first key pinned for it (sync/keyring.ts), so a paired machine's actions apply at once.
+//   A first key is pinned from a change only when the relay lists the machine's Connect registration. Otherwise it is
+//   kept as seen: the machine's data syncs by the signature mode and its actions wait for Trust.
 //   One that is still not trusted (keyring.trusted) syncs everything else, but its signed actions wait in sync_deferred,
 //   listed in sync_refused, until Ben trusts it in Sync settings (POST /api/sync/devices/:id/confirm-key).
 // - A machine whose key changed: its actions signed with the new key wait the same way until Ben confirms that key, the
@@ -103,8 +105,11 @@ export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syn
   // automations owner claim goes out in its first sync).
   const carried = unsigned(raw).signature;
   if (carried && carried.signer === raw.machine_id && !signKeyOf(raw.machine_id) && verifyChange(raw, () => carried.key).verdict === 'valid') {
-    if (!pairedMachines?.has(raw.machine_id)) return { kind: 'defer', reason: `waiting for relay Connect registration (${raw.machine_id})` };
-    keyring.observe(raw.machine_id, { signKey: carried.key });
+    // Without relay registration evidence the key is only seen: Ben trusts it in Sync settings, or a later
+    // registration pins it. A pinned key would be trusted by the startup migration.
+    const paired = !!pairedMachines?.has(raw.machine_id);
+    keyring.observe(raw.machine_id, { signKey: carried.key }, { pin: paired });
+    if (paired) db.prepare('DELETE FROM sync_refused WHERE machine = ? AND reason = ?').run(raw.machine_id, UNTRUSTED);
   }
   const { verdict, change } = verifyChange(raw, signKeyOf);
   // The keys a record announces: pinned only from a record that verifies, else kept as seen for Ben to confirm.
@@ -122,12 +127,13 @@ export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syn
     }
     return { kind: 'apply', change };
   }
-  // Signed by the machine with the new key its record announced: held until Ben confirms, then discarded.
-  // Nothing applies before then: the pinned key still decides.
-  if (action && verdict === 'bad-signature' && carried?.signer === raw.machine_id && carried.key === keyring.get(raw.machine_id)?.seenSignKey) {
+  // Signed by the machine with the key it announced but this machine has not pinned (a changed key, or a first key
+  // without relay registration): held until Ben confirms, then discarded. Nothing applies before then.
+  if (action && (verdict === 'bad-signature' || verdict === 'unknown-signer') && carried?.signer === raw.machine_id && carried.key === keyring.get(raw.machine_id)?.seenSignKey) {
     if (verifyChange(raw, () => carried.key).verdict === 'valid') {
-      logHeld(change, KEY_CHANGED);
-      return { kind: 'defer', reason: `${KEY_CHANGED} (${change.machine_id})` };
+      const reason = signKeyOf(raw.machine_id) ? KEY_CHANGED : UNTRUSTED;
+      logHeld(change, reason);
+      return { kind: 'defer', reason: `${reason} (${change.machine_id})` };
     }
   }
   const reason = REASONS[verdict];

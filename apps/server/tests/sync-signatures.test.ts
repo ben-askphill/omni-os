@@ -135,14 +135,21 @@ describe('a paired machine is trusted with its first key', () => {
 });
 
 describe('first-key pairing evidence from the relay', () => {
-  it('does not pin or trust a signed machine missing from Connect, including after a restart migration', async () => {
+  const keys = (id: string) => r.db.db.prepare('SELECT sign_key, seen_sign_key FROM sync_keys WHERE machine_id = ?').get(id);
+
+  it('keeps the first key of a machine missing from Connect seen only, syncs its data and holds its actions, including after a restart migration', async () => {
     const list = vi.spyOn(relay, 'pairedMachines').mockResolvedValue(new Set());
     try {
-      await pull(signAs(commandFrom('not-paired', 'cmd-not-paired')), record('not-paired', rawPublicKey(keyOf('not-paired'))));
-      const { keyring } = await import('../sync/keyring.ts');
-      expect(keyring.get('not-paired')).toBeNull();
+      await pull(
+        signAs(commandFrom('not-paired', 'cmd-not-paired')),
+        signAs({ machine_id: 'not-paired', entity: 'kv', entity_id: 'note.not-paired', op: 'upsert', data: { value: 'data' }, ts: later() }),
+        record('not-paired', rawPublicKey(keyOf('not-paired'))),
+      );
+      expect(keys('not-paired')).toEqual({ sign_key: null, seen_sign_key: rawPublicKey(keyOf('not-paired')) });
+      expect(r.db.kv.get('note.not-paired')).toBe('data');
       expect(trusted('not-paired')).toBeUndefined();
       expect(stored('cmd-not-paired')).toBe(false);
+      expect((await devices()).find((d) => d.id === 'not-paired')).toMatchObject({ trusted: false, pinnedFingerprint: null, held: 1 });
       r.db.migrate();
       await pull();
       expect(trusted('not-paired')).toBeUndefined();
@@ -152,23 +159,28 @@ describe('first-key pairing evidence from the relay', () => {
       await pull();
       expect(stored('cmd-not-paired')).toBe(true);
       expect(trusted('not-paired')).toEqual({ sign_key: rawPublicKey(keyOf('not-paired')) });
+      expect((await devices()).find((d) => d.id === 'not-paired')).toMatchObject({ trusted: true, keyChanged: false, held: 0 });
     } finally {
       list.mockRestore();
     }
   });
 
-  it('does not auto-trust when the relay registration list is unavailable, then retries', async () => {
+  it('keeps syncing trusted machines when the registration list is unavailable, and Ben can trust the new machine by hand', async () => {
     const list = vi.spyOn(relay, 'pairedMachines').mockRejectedValue(new Error('registration list unavailable'));
     try {
-      await relay.push([signAs(commandFrom('offline-list', 'cmd-offline-list'))]);
-      expect((await worker.syncNow()).error).toBe('registration list unavailable');
+      await pull(signAs(commandFrom('offline-list', 'cmd-offline-list')), signAs(command('cmd-trusted-while-offline')));
+      expect(stored('cmd-trusted-while-offline')).toBe(true);
       expect(trusted('offline-list')).toBeUndefined();
       expect(stored('cmd-offline-list')).toBe(false);
+      expect(await refused()).toContainEqual(expect.objectContaining({ machine: 'offline-list', entityId: 'cmd-offline-list', reason: 'waiting for Trust', applied: false }));
+      expect((await trust('offline-list')).status).toBe(200);
+      expect(trusted('offline-list')).toEqual({ sign_key: rawPublicKey(keyOf('offline-list')) });
+      await pull(signAs(commandFrom('offline-list', 'cmd-after-trust')));
+      expect(stored('cmd-offline-list')).toBe(false);
+      expect(stored('cmd-after-trust')).toBe(true);
     } finally {
       list.mockRestore();
     }
-    await pull();
-    expect(stored('cmd-offline-list')).toBe(true);
   });
 });
 
@@ -287,6 +299,7 @@ describe('synced paths', () => {
 });
 
 describe('signing keys in Sync settings', () => {
+  const keys = (id: string) => r.db.db.prepare('SELECT sign_key, seen_sign_key FROM sync_keys WHERE machine_id = ?').get(id);
   const recordB = (key: string) => record('mac-b', key, { name: 'Mac B' });
 
   it('lists this machine first and each other machine with its pinned key', async () => {
@@ -326,6 +339,52 @@ describe('signing keys in Sync settings', () => {
     expect(stored('cmd-after-confirm')).toBe(true);
     expect(stored('cmd-other-key')).toBe(false);
     expect((await trust('mac-b')).status).toBe(404);
+  });
+
+  it('drains actions the relay holds before confirming, and confirms nothing when that sync fails', async () => {
+    const machine = 'drain-mac';
+    const old = rawPublicKey(keyOf(machine));
+    const next = generateKeyPairSync('ed25519').privateKey;
+    await pull(record(machine, old));
+    await pull(record(machine, rawPublicKey(next)), signChange(commandFrom(machine, 'cmd-drain-pulled'), next));
+    // Pushed after the last pull: this machine has not seen it when Ben clicks.
+    await relay.push([signChange(commandFrom(machine, 'cmd-drain-unpulled'), next)]);
+    await worker.settled();
+    const deferredIds = () => (r.db.db.prepare('SELECT change FROM sync_deferred').all() as { change: string }[]).map((row) => JSON.parse(row.change).entity_id);
+
+    const failing = vi.spyOn(relay, 'pull').mockRejectedValueOnce(new Error('relay down'));
+    const res = await trust(machine);
+    failing.mockRestore();
+    expect(res.status).toBe(503);
+    expect(keys(machine)).toEqual({ sign_key: old, seen_sign_key: rawPublicKey(next) });
+    expect(trusted(machine)).toEqual({ sign_key: old });
+    expect(deferredIds()).toContain('cmd-drain-pulled');
+
+    const [a, b] = await Promise.all([trust(machine), trust(machine)]);
+    expect([a.status, b.status].filter((s) => s === 200)).toHaveLength(1);
+    await worker.settled();
+    expect(trusted(machine)).toEqual({ sign_key: rawPublicKey(next) });
+    expect(stored('cmd-drain-pulled')).toBe(false);
+    expect(stored('cmd-drain-unpulled')).toBe(false);
+    expect(deferredIds()).not.toContain('cmd-drain-unpulled');
+    const log = await refused();
+    for (const id of ['cmd-drain-pulled', 'cmd-drain-unpulled'])
+      expect(log).toContainEqual(expect.objectContaining({ entityId: id, reason: 'discarded when the key was confirmed; send again if still needed' }));
+  });
+
+  it('stops a confirm when the machine announces another key during its sync', async () => {
+    const machine = 'swap-mac';
+    await pull(record(machine, rawPublicKey(keyOf(machine))));
+    const next = rawPublicKey(generateKeyPairSync('ed25519').privateKey);
+    await pull(record(machine, next));
+    const third = rawPublicKey(generateKeyPairSync('ed25519').privateKey);
+    await relay.push([record(machine, third)]);
+    await worker.settled();
+    expect((await trust(machine)).status).toBe(409);
+    expect(keys(machine)).toEqual({ sign_key: rawPublicKey(keyOf(machine)), seen_sign_key: third });
+    expect(trusted(machine)).toEqual({ sign_key: rawPublicKey(keyOf(machine)) });
+    expect((await trust(machine)).status).toBe(200);
+    expect(trusted(machine)).toEqual({ sign_key: third });
   });
 
   it('discards every held action for the confirmed machine, keeping other machines and ordinary deferred data', async () => {
