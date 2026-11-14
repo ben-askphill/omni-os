@@ -4,7 +4,6 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fixture } from '@omni/test-fixtures';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
-import { trustEachOther } from './sync-sign.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 
 // Two Macs in one process: each loads its own copy of the server modules against its own temp data dir,
@@ -46,7 +45,6 @@ beforeAll(async () => {
   a.worker = a.sync.createSyncWorker({ transport: relay, machineId: 'mac-a' });
   b = await machine('mac-b');
   b.worker = b.sync.createSyncWorker({ transport: relay, machineId: 'mac-b' });
-  trustEachOther([a, b]);
 });
 
 describe('two machines, one relay', () => {

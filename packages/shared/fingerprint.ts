@@ -19,17 +19,20 @@ interface SyncDeviceTrust {
 }
 
 /**
- * A machine new to this one (GET /api/sync/devices): it syncs, but its commands, assignments, update requests and
- * secrets wait until Ben trusts it. A server from before `trusted` leaves it out, and its machines count as trusted.
+ * A machine not trusted here (GET /api/sync/devices): it syncs, but its commands, assignments, update requests and
+ * secrets wait. A machine paired through Omni Connect is trusted with the first key this one pins, so this is one whose
+ * only key came unsigned, or one trusted with an older key. A changed key is not this: that is `confirm`. A server from
+ * before `trusted` leaves it out, and its machines count as trusted.
  */
 export function isNewMachine(d: SyncDeviceTrust): boolean {
-  return !d.current && (d.trusted === false || (d.keyChanged && !d.pinnedFingerprint));
+  if (d.current) return false;
+  return d.keyChanged ? !d.pinnedFingerprint : d.trusted === false;
 }
 
 /**
- * What Settings › Sync asks of Ben for one machine. `trust`: a new machine that has sent its key, so he can compare it.
- * `confirm`: a machine he trusted whose key changed since. Both call POST /api/sync/devices/:id/confirm-key. A new
- * machine with no key yet gets no button until one arrives.
+ * What Settings › Sync asks of Ben for one machine. `confirm`: a machine whose key changed since this one pinned it.
+ * `trust`: a machine that is not trusted (isNewMachine) and has sent a key he can compare. Both call
+ * POST /api/sync/devices/:id/confirm-key. A paired machine with its first key pinned needs nothing.
  */
 export function syncKeyAction(d: SyncDeviceTrust): 'trust' | 'confirm' | null {
   if (d.current) return null;

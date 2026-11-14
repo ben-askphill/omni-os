@@ -8,9 +8,7 @@ import { FAKE_TAILSCALE } from './support.ts';
 // One synced Mac of several in one process: the real server (runner, API, sync worker, file hooks) on its own data and
 // home dirs, with fake claude and a fake tailscale CLI whose status the test sets. Every Mac given the same relay sees
 // the others' pushes. Boot them one after another: each boot loads fresh copies of the server modules. Macs on one
-// relay trust each other, as Ben's Trust click in Sync settings would make them (sync/keyring.ts).
-
-const onRelay = new WeakMap<MemoryTransport, { id: string; key: string; trust: (id: string, key: string) => void }[]>();
+// relay trust each other from the first signed change each pulls from the other, as paired Macs do (sync/keyring.ts).
 
 export async function bootMac(id: string, name: string, relay: MemoryTransport, env: Record<string, string> = {}) {
   vi.resetModules();
@@ -47,15 +45,6 @@ export async function bootMac(id: string, name: string, relay: MemoryTransport, 
     if (res.error) throw new Error(`${id} sync failed: ${res.error}`);
     return res;
   };
-  const key = await (await import('../sync/sign-key.ts')).signPublicKey();
-  const trust = (other: string, otherKey: string) =>
-    void r.db.db.prepare('INSERT OR IGNORE INTO sync_trusted (machine_id, sign_key, trusted_at) VALUES (?, ?, ?)').run(other, otherKey, new Date().toISOString());
-  const peers = onRelay.get(relay) ?? [];
-  for (const p of peers) {
-    p.trust(id, key);
-    trust(p.id, p.key);
-  }
-  onRelay.set(relay, [...peers, { id, key, trust }]);
   return { ...r, id, name, home, worker, files, devices, app, json, tailnet, sync: sync1 };
 }
 
