@@ -42,15 +42,15 @@ export function agentStatus(c: ToolCall, task: TaskView | undefined, running: bo
 
 /**
  * Stored task rows merged with the server's live list. The live list wins where it can know: a task it no longer runs
- * has ended, even if no end row was stored. `here`: this server runs the thread's process. While another Mac holds the
- * thread, this server's list never has its tasks, so the stored rows (synced from that Mac) decide.
+ * has ended, even if no end row was stored. `elsewhere`: another Mac holds the thread, so this server's list never has
+ * its tasks and the stored rows (synced from that Mac) decide, until that Mac goes idle: then nothing there still runs.
  */
-export function mergeTasks(stored: Map<string, TaskView>, live: BackgroundTask[], threadId: string, opts: { feedLive: boolean; here: boolean }): Map<string, TaskView> {
-  if (!opts.here) return stored;
-  const mine = live.filter((t) => t.thread_id === threadId && t.tool_use_id);
+export function mergeTasks(stored: Map<string, TaskView>, live: BackgroundTask[], threadId: string, opts: { feedLive: boolean; elsewhere: { running: boolean } | null }): Map<string, TaskView> {
   const out = new Map(stored);
+  const mine = opts.elsewhere ? [] : live.filter((t) => t.thread_id === threadId && t.tool_use_id);
+  const ended = opts.elsewhere ? !opts.elsewhere.running : opts.feedLive;
   for (const [id, t] of out) {
-    if (t.running && opts.feedLive && !mine.some((m) => m.tool_use_id === id)) out.set(id, { ...t, running: false, status: t.status ?? 'stopped' });
+    if (t.running && ended && !mine.some((m) => m.tool_use_id === id)) out.set(id, { ...t, running: false, status: t.status ?? 'stopped' });
   }
   for (const m of mine) {
     const prev = out.get(m.tool_use_id!);

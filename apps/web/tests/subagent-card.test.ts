@@ -64,23 +64,39 @@ describe('sub-agent state from the live task list', () => {
   });
 
   it('ends a stored running task this server no longer runs', () => {
-    const t = mergeTasks(stored(), [], 't1', { feedLive: true, here: true }).get('toolu_a')!;
+    const t = mergeTasks(stored(), [], 't1', { feedLive: true, elsewhere: null }).get('toolu_a')!;
     expect(t.running).toBe(false);
     expect(agentStatus({ id: 'toolu_a', name: 'Agent', input: {}, parent: null, at: '', children: [], orphan: false, event: 1 }, t, false, false)).toBe('stopped');
   });
 
   it('keeps a task the live list still runs, with its newest count', () => {
-    const t = mergeTasks(stored(), [liveTask('t1')], 't1', { feedLive: true, here: true }).get('toolu_a')!;
+    const t = mergeTasks(stored(), [liveTask('t1')], 't1', { feedLive: true, elsewhere: null }).get('toolu_a')!;
     expect(t).toMatchObject({ running: true, tool_uses: 54, started: '2026-11-14T17:58:46Z' });
   });
 
-  it('trusts the stored rows while another Mac holds the thread', () => {
+  it('trusts the stored rows while another Mac holds the thread and runs a turn', () => {
     // This server runs nothing for a thread the other Mac holds: an empty live list says nothing about its agents.
-    const t = mergeTasks(stored(), [], 't1', { feedLive: true, here: false }).get('toolu_a')!;
-    expect(t.running).toBe(true);
+    const t = mergeTasks(stored(), [], 't1', { feedLive: true, elsewhere: { running: true } }).get('toolu_a')!;
+    expect(t).toMatchObject({ running: true, tool_uses: 41 });
+  });
+
+  it('ignores this server\'s live list while another Mac holds the thread', () => {
+    const t = mergeTasks(new Map(), [liveTask('t1')], 't1', { feedLive: true, elsewhere: { running: true } });
+    expect(t.has('toolu_a')).toBe(false);
+  });
+
+  it('ends a stored running task once the holding Mac is idle, though no end row came', () => {
+    const t = mergeTasks(stored(), [], 't1', { feedLive: true, elsewhere: { running: false } }).get('toolu_a')!;
+    expect(t.running).toBe(false);
+    expect(agentStatus({ id: 'toolu_a', name: 'Agent', input: {}, parent: null, at: '', children: [], orphan: false, event: 1 }, t, false, false)).toBe('stopped');
+  });
+
+  it('keeps a stored end status once the holding Mac is idle', () => {
+    const done = new Map([['toolu_a', { ...running, running: false, status: 'completed' }]]);
+    expect(mergeTasks(done, [], 't1', { feedLive: true, elsewhere: { running: false } }).get('toolu_a')).toMatchObject({ running: false, status: 'completed' });
   });
 
   it('leaves stored rows alone until the feed is live', () => {
-    expect(mergeTasks(stored(), [], 't1', { feedLive: false, here: true }).get('toolu_a')!.running).toBe(true);
+    expect(mergeTasks(stored(), [], 't1', { feedLive: false, elsewhere: null }).get('toolu_a')!.running).toBe(true);
   });
 });
