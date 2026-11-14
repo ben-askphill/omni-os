@@ -40,9 +40,9 @@ Before this, the relay was a Supabase project. A machine that still holds the Su
 
 ## Signed changes
 
-Each machine signs every change it pushes with a key of its own, and the other machines check that signature, so the relay, or anyone who can write to it, cannot make up a change. Why and what it does not cover: [ADR 0012](../adr/0012-signed-sync.md).
+Each machine signs every change it pushes with a key of its own, and the other machines check that signature, so the relay, or anyone who can write to it, cannot make up a change from a machine yours already know. Why and what it does not cover: [ADR 0012](../adr/0012-signed-sync.md).
 
-- A machine pins another machine's keys the first time it sees it. Settings > Sync, Signing keys lists each machine with its key's full fingerprint, in lowercase hex in groups of four.
+- A machine pins another machine's keys the first time it sees it. Settings > Sync, Signing keys lists each machine with its key's full fingerprint, in lowercase hex in groups of four. Check that list when you add a machine: an entry you do not recognise is a machine someone else introduced through your relay.
 - A change that makes a machine act (a message, Stop or report sent to the machine running a thread, a thread moving to another machine, an update request, moving scheduled automations, a secret sent with `set_secret`) applies only with a valid signature from a pinned key. A secret is sealed only to the key pinned for that machine, so the relay never reads it.
 - Other changes (threads, events, artifacts) are signed too. During the rollout, one without a valid signature still applies, so a machine on an older build keeps syncing ordinary data while you update one machine at a time. Update every machine before running threads on another machine, handing off or sending secrets between them.
 - A thread or channel whose folder is outside your home folder and your channel checkouts, or inside `.ssh`, `.gnupg` or Omni's data folder, is refused even when signed, and a thread with no branch is checked again before it starts.
