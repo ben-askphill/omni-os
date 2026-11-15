@@ -1459,7 +1459,7 @@ html:has(.mo-app) body {
 }
 /* The channel rail layout: the native traffic lights sit centred at the rail's top, 15 window points down as in the
    Claude desktop app (window-rules.ts trafficLights centres them in the 98px rail), on a liquid-glass capsule. The
-   rail's top strip holds them above the Omni mark, and it and the list panel's title row drag the window. Linux draws
+   rail's top strip holds them above the Inbox disc, and it and the list panel's title row drag the window. Linux draws
    its own frame, so none of this changes there.
    The three lights are 14px with 9px gaps (macOS 27), so they end 78 window pixels in. The rail widens from 72px to
    98px to keep them off the list panel down to the smallest zoom (0.8 x 98 = 78.4).

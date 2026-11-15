@@ -105,7 +105,8 @@ export const MORE_PAGES = [
 /**
  * The "More" disc: Pull requests, Library and Automations in one menu that opens beside the rail, so they take one
  * disc of height instead of three. Selected while one of them is on screen, its label saying which. Enter, Space or
- * the down arrow open it on its first item; the arrows walk it; Escape closes it and puts focus back on the disc.
+ * the down arrow open it on its first item; the arrows walk it; Escape or Tab closes it and puts focus back on the
+ * disc, so Tab carries on from the disc.
  */
 function MoreMenu({ selection }: { selection: RailSelection }) {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
@@ -161,7 +162,8 @@ function MorePopup({ at, anchor, onClose }: { at: { x: number; y: number }; anch
       e.preventDefault();
       moveFocus(ref, e.key);
     } else if (e.key === 'Tab') {
-      onClose(false);
+      // The menu is portaled to the end of the page: focus goes back to the disc first, so Tab moves on from there.
+      onClose(true);
     }
   };
   return (

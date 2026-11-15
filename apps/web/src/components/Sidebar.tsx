@@ -1,17 +1,17 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { taskHost, type ChannelWithRunning, type FolderWithThreads, type ThreadStub } from '../api.ts';
 import { DEFAULT_FOLDER_NAME, draftKey, freeName, useFolders } from '../folders.tsx';
 import { pinnedRows } from '../pins.ts';
 import { opensOnVisit } from '../sidebar-fold.ts';
 import { rowsElsewhere, runningThreadGroups } from '../sidebar-lists.ts';
 import { href, useRoute } from '../router.ts';
-import { readPref, useApp, writePref } from '../store.tsx';
+import { useApp } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { OmniMark } from './brand.tsx';
 import { Avatar, ChannelMark, ErrorNote } from './ui.tsx';
 import { useUngroupDrop } from './sidebar/channel-lists.ts';
-import { SidebarTop, type SidebarView } from './sidebar/SidebarTop.tsx';
+import { SidebarTop } from './sidebar/SidebarTop.tsx';
 import { InboxView } from './sidebar/InboxView.tsx';
 import { channelFolders, channelThreads, useChannelFold } from './sidebar/channel-lists.ts';
 import { FolderNameField, FolderRow, AddFolderButton } from './sidebar/FolderRows.tsx';
@@ -21,7 +21,7 @@ import { UsageCard } from './sidebar/UsageCard.tsx';
 import { UpdateNotice } from './UpdateNotice.tsx';
 import { DiskNotice } from './DiskNotice.tsx';
 import { AccountNotice } from './AccountNotice.tsx';
-import { useInboxKey } from '../inbox-key.ts';
+import { useSidebarView } from '../sidebar-view.ts';
 
 /** Past this many threads a channel shows "N more" (or "See all threads" when highlighted) and links to its full list. */
 const MAX_THREADS = 5;
@@ -39,12 +39,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   const folders = useFolders();
   const { dropOn, ungroupDrop } = useUngroupDrop(folders);
   const { collapsed, setChannelOpen, foldAll, toggleAll } = useChannelFold(channels, folders);
-  const [view, setView] = useState<SidebarView>(() => (readPref<SidebarView>('sidebar.view', 'projects') === 'inbox' ? 'inbox' : 'projects'));
-  const switchView = (next: SidebarView) => {
-    writePref('sidebar.view', next);
-    setView(next);
-  };
-  useInboxKey(() => switchView('inbox'));
+  const [view, switchView] = useSidebarView(route.name);
 
   // Running and Pinned each fold on their own.
   const [runningClosed, toggleRunning] = useSectionFold('sidebar.runningCollapsed');
