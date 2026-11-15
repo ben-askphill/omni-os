@@ -23,6 +23,9 @@ jobs:
   prepare:
     name: Version and draft release
     runs-on: ubuntu-latest
+    # RELEASE_DEPLOY_KEY is a secret of this environment, which only runs from main, so a run dispatched from another
+    # branch cannot read it.
+    environment: release
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
