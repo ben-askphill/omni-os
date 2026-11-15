@@ -83,7 +83,7 @@ no-mistakes doctor
 
 `test.instructions` tells the live check to start `scripts/qa-stack.sh` on a free port, to leave port 4747 and `data/` alone, and to stop that stack before it finishes.
 
-`no_ci: false`, because pull requests run `.github/workflows/ci.yml`. A run waits for those checks after it opens the PR and stops on a failing one.
+`no_ci: true`, because the gate already runs the typecheck, suite and build itself. `.github/workflows/ci.yml` runs typecheck and tests on the PR as an advisory check.
 
 New pull requests take their narrative from `.github/pull_request_template.md`. The gate collapses its evidence appendix under one Validation block.
 

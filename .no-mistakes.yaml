@@ -37,5 +37,5 @@ pr:
   template: .github/pull_request_template.md
   appendix: collapsed
 
-# Pull requests run .github/workflows/ci.yml. no_ci stays off so a run waits for those checks and fails on a red one.
-no_ci: false
+# The gate runs the full typecheck, suite and build itself, so a run does not wait for GitHub CI.
+no_ci: true

@@ -130,7 +130,7 @@ describe('repo config', () => {
     expect(doc.document.instructions).toContain('CONTEXT.md');
     expect(doc.pr.template).toBe('.github/pull_request_template.md');
     expect(doc.pr.appendix).toBe('collapsed');
-    expect(doc.no_ci).toBe(false);
+    expect(doc.no_ci).toBe(true);
     expect(doc.allow_repo_commands).toBeUndefined();
     expect(doc.agent).toBeUndefined();
   });

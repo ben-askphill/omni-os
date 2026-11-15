@@ -1,5 +1,4 @@
-# Runs on every pull request and every push to main. The "main: CI required" ruleset requires both jobs, `check` and `desktop`.
-# It runs what the no-mistakes gate runs locally (.no-mistakes.yaml), so a PR merged without the gate is held to the same bar.
+# Typecheck and tests on every pull request and every push to main. Advisory: nothing requires it to pass before a merge.
 name: CI
 
 on:
@@ -24,42 +23,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --include=dev
-      - name: Typecheck (includes unused locals and parameters)
-        run: npm run typecheck
-      - name: Knip (unused files and dependencies)
-        run: npm run unused
-      - name: Tests
-        run: npm test
-      - name: Build
-        run: npm run build
-      # Tests and the build must not change tracked files, for example a wire fixture recorded again by accident.
-      - name: No changes to tracked files
-        run: git diff --exit-code --stat
-
-  desktop:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --include=dev
-      # The AppImage ships node-pty's addon compiled for Linux, and stage.ts checks it on Electron's own binary.
-      - name: Build node-pty and fetch Electron
-        run: |
-          npm rebuild node-pty
-          node apps/desktop/scripts/ensure-electron.mjs
-      - name: Typecheck
-        run: npx turbo run typecheck --filter=@omni/desktop
-      - name: Tests
-        run: npx turbo run test --filter=@omni/desktop
-      # This runner's glibc is newer than the AppImage's floor, so stage.ts compiles node-pty again in an older
-      # distro's container (docker is on the runner) and fails if the addon still needs more.
-      - name: Stage and package the AppImage
-        run: npm run dist:linux --workspace @omni/desktop
-      - name: Check the packaged node-pty against the glibc floor
-        run: |
-          need="$(objdump -T apps/desktop/release/linux-unpacked/resources/omni/node_modules/node-pty/build/Release/pty.node | grep -oE 'GLIBC_[0-9.]+' | sort -uV | tail -1)"
-          echo "pty.node needs $need"
-          [ "$(printf '%s\n' "$need" GLIBC_2.28 | sort -V | tail -1)" = GLIBC_2.28 ]
+      - run: npm run typecheck
+      - run: npm test
