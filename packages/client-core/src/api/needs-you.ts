@@ -24,6 +24,8 @@ export interface NeedsYouBlocker {
   count: number;
   /** question and child_failed: the threads under this one that asked or failed, newest first. */
   from?: string[];
+  /** child_failed: each failed thread's unread result, in `from`'s order. Opening that thread reads it. */
+  results?: string[];
   /** limited: when the harness said the limit resets. Null when it did not say, so only a manual Resume works. */
   resets_at?: string | null;
   /** limited: scheduled for that time. Still a blocker: nothing runs until then. */

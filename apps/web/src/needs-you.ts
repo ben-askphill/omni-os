@@ -3,6 +3,7 @@
 import type { NeedsYou, NeedsYouItem } from './api.ts';
 import { BLOCKER_GLYPH, STATUS, asksForYou, resultGlyph, type Glyph } from '@omni/shared/status.ts';
 import { resetLabel } from './limits.ts';
+import { unreadResultOf, withoutRead } from '@omni/shared/needs-read.ts';
 
 export interface Reason {
   glyph: Glyph;
@@ -54,17 +55,18 @@ export function inChannel(all: NeedsYou | null, channelId: string): NeedsYou | n
 }
 
 /**
- * The result an open thread shows, to mark read: the inbox's unread one for it, once the thread is not running.
- * A running thread is still writing, so what Ben sees is not that result yet; the turn brings a newer one.
+ * The result an open thread shows, to mark read: the inbox's unread one for it, once the thread is not running. A
+ * failed thread under a job has its result on the job's blocker instead. A running thread is still writing, so what
+ * Ben sees is not that result yet; the turn brings a newer one.
  */
 export function shownResult(all: NeedsYou | null, threadId: string, status: string | undefined): string | null {
-  if (!status || status === 'running' || status === 'queued') return null;
-  return all?.items.find((i) => i.thread.id === threadId)?.result?.uid ?? null;
+  if (!all || !status || status === 'running' || status === 'queued') return null;
+  return unreadResultOf(all.items, threadId);
 }
 
-/** The inbox once a result is read, before the server answers: the result goes, its blockers stay. */
+/** The inbox once a result is read, before the server answers: the result goes, its blockers stay, a failed child leaves its job's. */
 export function withoutResult(all: NeedsYou, uid: string): NeedsYou {
-  const items = all.items.flatMap((i) => (i.result?.uid !== uid ? [i] : i.blockers.length ? [{ ...i, result: null }] : []));
+  const items = withoutRead(all.items, uid);
   return { items, unread: items.filter((i) => i.result).length, blocked: items.filter((i) => i.blockers.length).length };
 }
 

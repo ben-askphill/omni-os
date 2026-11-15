@@ -54,6 +54,8 @@ export interface NeedsYouBlocker {
   at?: string;
   /** question and child_failed: the threads under this one that asked or failed, newest first. Absent when it asked itself. */
   from?: string[];
+  /** child_failed: each failed thread's unread result, in `from`'s order. Opening that thread reads it (POST /needs-you/read). */
+  results?: string[];
   /** limited: when the harness said the limit resets. Null when it did not say, so only a manual Resume works. */
   resets_at?: string | null;
   /** limited: Ben scheduled the continuation for that time. Still a blocker: nothing runs until then. */
@@ -183,6 +185,7 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
   // continues it (threads.home), where its card shows too: a delegated thread's or a team member's question brings that
   // thread here, not the one that asked.
   const home = db.prepare(`SELECT ${prefixed} FROM threads t WHERE t.id = ? AND ${LISTED} ${scope}`);
+  const listed = db.prepare(`SELECT 1 FROM threads t WHERE t.id = ? AND ${LISTED}`);
   const asked = (
     db
       .prepare(
@@ -223,14 +226,24 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     if (q.q_thread !== it.thread.id && !b.from?.includes(q.q_thread)) b.from = [...(b.from ?? []), q.q_thread];
   }
   // A failure under a job waits on the job, as a question does: the newest unread failed result of a delegated thread or
-  // a team member brings its home here (threads.home), and the tree under the job shows which one.
+  // a team member brings its home here (threads.home), and the tree under the job shows which one. It moves there: the
+  // failed thread's own item loses that result, so one failure counts once. With nothing listed above it (the job is
+  // done or archived) a delegated thread keeps its own item.
+  const moved = new Map<string, string>();
   for (const f of failedChildren()) {
-    const t = home.get(threads.home(f.id), ...args) as unknown as Thread | undefined;
-    if (!t || t.id === f.id) continue;
+    const top = threads.home(f.id);
+    if (top === f.id || !listed.get(top)) continue;
+    moved.set(f.id, f.r_uid);
+    const t = home.get(top, ...args) as unknown as Thread | undefined;
+    if (!t) continue;
     const it = item(t, f.r_at);
     const b = it.blockers.find((x) => x.kind === 'child_failed');
-    if (!b) it.blockers.push({ kind: 'child_failed', detail: f.title, count: 1, from: [f.id] });
-    else if (!b.from?.includes(f.id)) (b.count++, (b.from = [...(b.from ?? []), f.id]));
+    if (!b) it.blockers.push({ kind: 'child_failed', detail: f.title, count: 1, from: [f.id], results: [f.r_uid] });
+    else if (!b.from?.includes(f.id)) {
+      b.count++;
+      b.from = [...(b.from ?? []), f.id];
+      b.results = [...(b.results ?? []), f.r_uid];
+    }
   }
   for (const t of setup) item(t, t.updated_at).blockers.unshift({ kind: 'setup', detail: t.setup_error, count: 0 });
   for (const p of parked) item(p, p.p_at).blockers.push({ kind: p.p_state, detail: null, count: Number(p.p_count) });
@@ -238,6 +251,12 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     item(t, t.updated_at).blockers.push({
       kind: 'limited', detail: null, count: 0, resets_at: t.limit_resets_at, scheduled: t.limit_state === 'scheduled', elsewhere: !!t.limit_elsewhere,
     });
+  }
+  for (const [id, uid] of moved) {
+    const it = items.get(id);
+    if (it?.result?.uid !== uid) continue;
+    it.result = null;
+    if (!it.blockers.length) items.delete(id);
   }
   for (const i of items.values()) i.blockers.sort((a, b) => BLOCKER_ORDER.indexOf(a.kind) - BLOCKER_ORDER.indexOf(b.kind));
 
@@ -254,7 +273,7 @@ const BLOCKER_ORDER: NeedsYouBlocker['kind'][] = ['question', 'child_failed', 's
 function failedChildren() {
   return db
     .prepare(
-      `SELECT t.id, t.title, c.created_at AS r_at
+      `SELECT t.id, t.title, c.uid AS r_uid, c.created_at AS r_at
        FROM threads t
        JOIN completions c ON c.uid = (SELECT uid FROM completions WHERE thread_id = t.id ORDER BY n DESC, uid DESC LIMIT 1)
        LEFT JOIN result_reads r ON r.thread_id = t.id
@@ -262,7 +281,7 @@ function failedChildren() {
          AND (r.thread_id IS NULL OR (c.n, c.uid) > (r.n, r.uid))
        ORDER BY c.created_at DESC`,
     )
-    .all() as { id: string; title: string; r_at: string }[];
+    .all() as { id: string; title: string; r_uid: string; r_at: string }[];
 }
 
 /** Just the thread's own columns, without what the queries joined to it. */

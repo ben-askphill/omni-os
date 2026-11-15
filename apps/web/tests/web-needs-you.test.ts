@@ -81,6 +81,24 @@ describe('reading a result', () => {
     expect(kept.blockers.map((b) => b.kind)).toEqual(['setup', 'recovered']);
   });
 
+  it('reads a failed thread under a job from the job\'s blocker, which has no item of its own', () => {
+    const job = byTitle(inbox(), 'Plan the launch');
+    const failing: NeedsYouItem = {
+      ...job,
+      result: null,
+      blockers: [{ kind: 'child_failed', detail: 'Zoom modal a11y pass', count: 2, from: ['member', 'other'], results: ['r-member', 'r-other'] }],
+    };
+    const n: NeedsYou = { items: [failing], unread: 0, blocked: 1 };
+    expect(shownResult(n, 'member', 'failed')).toBe('r-member');
+    expect(shownResult(n, 'other', 'failed')).toBe('r-other');
+    expect(shownResult(n, 'member', 'running')).toBeNull();
+
+    // Read at once: that thread leaves the blocker, and the job leaves with the last one.
+    const one = withoutResult(n, 'r-member');
+    expect(one.items[0].blockers).toEqual([{ kind: 'child_failed', detail: 'Zoom modal a11y pass', count: 1, from: ['other'], results: ['r-other'] }]);
+    expect(withoutResult(one, 'r-other')).toEqual({ items: [], unread: 0, blocked: 0 });
+  });
+
   it('drops a thread marked done at once, its result and blockers with it', () => {
     const n = inbox();
     const widget = byTitle(n, 'Fix the widget');

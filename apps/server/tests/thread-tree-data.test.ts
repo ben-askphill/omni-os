@@ -8,6 +8,9 @@ import { startRunner } from './runner-boot.ts';
 
 const h = await startRunner({ FAKE_CLAUDE_CRASH_ON: 'CRASH_NOW' });
 const { app } = await import('../app.ts');
+const { db } = await import('../db.ts');
+const { completions } = await import('../db/repos/needs-you.ts');
+const { migrate } = await import('../db/migrate.ts');
 const T = { timeout: 30_000 };
 
 const call = async (method: string, path: string, body?: unknown) => {
@@ -37,25 +40,70 @@ describe('a failed thread under a job', () => {
     expect(await itemOf(job.id)).toBeUndefined();
 
     const child = await failed({ parent_id: job.id, title: 'Re-record the wire fixture' });
+    const uid = completions.latest(child.id)!.uid;
     const item = await itemOf(job.id);
-    expect(item.blockers).toEqual([{ kind: 'child_failed', detail: 'Re-record the wire fixture', count: 1, from: [child.id] }]);
-    // The failed thread keeps its own result too, which the job's tree reads.
-    expect((await itemOf(child.id)).result.status).toBe('failed');
+    expect(item.blockers).toEqual([{ kind: 'child_failed', detail: 'Re-record the wire fixture', count: 1, from: [child.id], results: [uid] }]);
 
-    await call('POST', '/needs-you/read', { uid: (await itemOf(child.id)).result.uid });
+    await call('POST', '/needs-you/read', { uid });
     expect(await itemOf(job.id)).toBeUndefined();
   });
 
-  it('waits on the top of the chain for a team member, past its lead', T, async () => {
+  it('counts one failed thread once: it moves to the job, as its question does', T, async () => {
+    const job = await idle('conduct a single failure');
+    await call('POST', '/needs-you/read', { uid: (await itemOf(job.id)).result.uid });
+    const child = await failed({ parent_id: job.id, title: 'Fail once' });
+    const uid = completions.latest(child.id)!.uid;
+
+    // One item holds the failure, the job's; the failed run is no unread result of its own. (The child's crew report
+    // can still give the job a result of its own, which counts as the job's, not the failure's.)
+    const { items } = (await call('GET', '/needs-you')).body as { items: any[] };
+    expect(await itemOf(child.id)).toBeUndefined();
+    expect(items.filter((i) => i.result?.uid === uid)).toEqual([]);
+    const holding = items.filter((i) => i.blockers.some((b: any) => b.from?.includes(child.id)));
+    expect(holding.map((i) => i.thread.id)).toEqual([job.id]);
+  });
+
+  it('keeps a failed thread on its own item when nothing above it is listed', T, async () => {
+    const job = await idle('a job Ben archived');
+    await call('PATCH', `/threads/${job.id}`, { archived: 1 });
+    const child = await failed({ parent_id: job.id, title: 'Fail under a done job' });
+    expect((await itemOf(child.id)).result.status).toBe('failed');
+  });
+
+  it('waits on the top of the chain for a team member, past its lead, until Ben opens the member', T, async () => {
     const job = await idle('be the conductor again');
     await call('POST', '/needs-you/read', { uid: (await itemOf(job.id)).result.uid });
     const lead = await idle('lead the team', { parent_id: job.id, title: 'Rebuild PDP gallery' });
     const member = await failed({ parent_id: lead.id, source: 'team', title: 'Zoom modal a11y pass' });
+    const uid = completions.latest(member.id)!.uid;
 
     const item = await itemOf(job.id);
-    expect(item.blockers).toContainEqual({ kind: 'child_failed', detail: 'Zoom modal a11y pass', count: 1, from: [member.id] });
+    expect(item.blockers).toContainEqual({ kind: 'child_failed', detail: 'Zoom modal a11y pass', count: 1, from: [member.id], results: [uid] });
     // Team members never list on their own.
     expect(await itemOf(member.id)).toBeUndefined();
+
+    // Opening the member reads the result its job's blocker names, which clears it.
+    await call('POST', '/needs-you/read', { uid });
+    expect((await itemOf(job.id))?.blockers.find((b: any) => b.kind === 'child_failed')).toBeUndefined();
+  });
+
+  it('treats team members that failed before the upgrade as read, once', T, async () => {
+    const job = await idle('a job from before');
+    await call('POST', '/needs-you/read', { uid: (await itemOf(job.id)).result.uid });
+    const lead = await idle('an old lead', { parent_id: job.id });
+    const member = await failed({ parent_id: lead.id, source: 'team', title: 'Failed last week' });
+    // As an older build left it: no read watermark on a member, and the migration not run yet.
+    db.prepare('DELETE FROM result_reads WHERE thread_id = ?').run(member.id);
+    db.prepare(`DELETE FROM kv WHERE key = 'sync.migrated.team_results_read'`).run();
+    expect((await itemOf(job.id)).blockers[0]).toMatchObject({ kind: 'child_failed', from: [member.id] });
+
+    migrate();
+    expect((await itemOf(job.id))?.blockers ?? []).toEqual([]);
+
+    // Once only: a member that fails after the upgrade counts.
+    const later = await failed({ parent_id: lead.id, source: 'team', title: 'Failed today' });
+    migrate();
+    expect((await itemOf(job.id)).blockers[0]).toMatchObject({ kind: 'child_failed', from: [later.id] });
   });
 
   it('leaves the job alone once the failed thread is marked done', T, async () => {

@@ -389,6 +389,18 @@ export function migrate() {
       INSERT INTO result_reads (thread_id, n, uid, read_at) SELECT r.thread_id, c.n, r.uid, r.read_at FROM result_reads_old r JOIN completions c ON c.uid = r.uid;
       DROP TABLE result_reads_old;`);
   }
+  // #733: a failed team member brings its job to Needs you until Ben opens it (db/repos/needs-you.ts). Members never
+  // listed on their own, so none has a read watermark: once per machine, every member's newest result so far counts as
+  // read. The marker is a `sync.` key, which stays on this machine (db/sync.ts localKey).
+  if (!db.prepare(`SELECT 1 FROM kv WHERE key = 'sync.migrated.team_results_read'`).get()) {
+    db.exec(`INSERT INTO result_reads (thread_id, n, uid, read_at)
+        SELECT t.id, c.n, c.uid, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM threads t
+        JOIN completions c ON c.uid = (SELECT uid FROM completions WHERE thread_id = t.id ORDER BY n DESC, uid DESC LIMIT 1)
+        WHERE t.source = 'team'
+      ON CONFLICT(thread_id) DO UPDATE SET n = excluded.n, uid = excluded.uid, read_at = excluded.read_at
+        WHERE (excluded.n, excluded.uid) > (result_reads.n, result_reads.uid);
+      INSERT INTO kv (key, value) VALUES ('sync.migrated.team_results_read', json_quote(strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));`);
+  }
   // Every way a turn ends writes the thread's status (the runners, Setup, boot): a turn leaving running or queued for
   // done, failed or stopped is a result. Only on the Mac that ran it (run_machine was this one, or none): another
   // Mac's turn arrives with its status from sync, and its result comes as that Mac's completion, with the same uid.

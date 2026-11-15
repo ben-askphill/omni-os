@@ -198,4 +198,11 @@ describe('inbox', () => {
     expect(kept).toMatchObject({ unread: 1, blocked: 1 });
     expect(kept.items.find((i) => i.thread.id === 'b')?.result).toBeNull();
   });
+
+  it('reads a failed thread under a job from the job\'s blocker, and drops it from there', () => {
+    const job = item('job', { result: null, blockers: [{ kind: 'child_failed', detail: 'x', count: 1, from: ['member'], results: ['r-member'] }] });
+    const inbox = all([job]);
+    expect(shownResult(inbox, 'member', 'failed')).toBe('r-member');
+    expect(withoutResult(inbox, 'r-member')).toEqual({ items: [], unread: 0, blocked: 0 });
+  });
 });
