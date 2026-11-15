@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { navigationRef } from './navigation/ref';
 import { RootNavigator } from './navigation/RootNavigator';
 import { NotificationsProvider } from './notifications/NotificationsProvider';
+import { SettledAlerts } from './notifications/SettledAlerts';
 import { PairingProvider } from './pairing/PairingProvider';
 import { ActiveSessionProvider } from './session/ActiveSession';
 import { restoreThemePref } from './settings/appearance';
@@ -38,6 +39,7 @@ export default function App() {
             <NotificationsProvider>
               <NavigationContainer ref={navigationRef} theme={navTheme}>
                 <ActiveSessionProvider>
+                  <SettledAlerts />
                   <RootNavigator />
                 </ActiveSessionProvider>
               </NavigationContainer>

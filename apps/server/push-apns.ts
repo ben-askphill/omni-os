@@ -75,6 +75,8 @@ export interface ApnsRequest {
   body: string;
   /** Seconds since the epoch after which Apple stops trying. */
   expiration: number;
+  /** `apns-collapse-id`: a newer alert with the same id replaces the one shown. At most 64 bytes. */
+  collapseId?: string;
 }
 
 export interface ApnsResponse {
@@ -131,6 +133,7 @@ export function http2Transport(opts: { origins?: Partial<Record<ApnsEnvironment,
           'apns-push-type': 'alert',
           'apns-priority': '10',
           'apns-expiration': String(req.expiration),
+          ...(req.collapseId ? { 'apns-collapse-id': req.collapseId } : {}),
           'content-type': 'application/json',
         });
         let status = 0;

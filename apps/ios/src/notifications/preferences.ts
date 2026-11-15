@@ -8,6 +8,7 @@ export const KIND_COPY: Record<AppPushKind, { title: string; detail: string }> =
   finished: { title: 'Finished', detail: 'A thread finished its work.' },
   failed: { title: 'Failed', detail: 'A thread failed, or its workspace could not be prepared.' },
   crewReport: { title: 'Crew reports', detail: 'A crew member reported back to the Conductor.' },
+  prAttention: { title: 'Pull requests', detail: 'A watched PR has failing checks or new review feedback.' },
 };
 
 export { PUSH_KINDS };

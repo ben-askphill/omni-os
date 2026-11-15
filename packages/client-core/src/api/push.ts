@@ -1,6 +1,8 @@
 import type {
+  AppPushAlertRef,
   AppPushPreferences,
   AppPushPreferencesUpdate,
+  AppPushSettled,
   AppPushTokenRequest,
   AppPushTokenStatus,
   ServerCapabilities,
@@ -20,6 +22,8 @@ export function pushApi(http: HttpClient) {
     /** Sends only the kinds in `update` and returns the full set. */
     setPushPreferences: (update: AppPushPreferencesUpdate) =>
       http.request<AppPushPreferences>('PUT', apiPath`/auth/push-preferences`, { body: update }),
+    /** Which of these alerts Ben has dealt with since they were sent, so the phone clears them. */
+    pushSettled: (alerts: AppPushAlertRef[]) => http.request<AppPushSettled>('POST', apiPath`/auth/push-settled`, { body: { alerts } }),
     /** Whether the server can send alerts at all: `delivery` is false until it has an APNs key. */
     pushDelivery: async () => (await http.request<ServerCapabilities>('GET', apiPath`/capabilities`)).push,
   };

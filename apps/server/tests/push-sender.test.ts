@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { ApnsRequest, ApnsResponse, ApnsTransport } from '../push-apns.ts';
-import { alertFor, createPushSender, loadPushConfig, noopPushSender, payloadFor, type PushEvent, type PushSenderDeps } from '../push-sender.ts';
+import { alertFor, collapseIdFor, createPushSender, loadPushConfig, noopPushSender, payloadFor, type PushEvent, type PushSenderDeps } from '../push-sender.ts';
 import type { PushTarget } from '../push-preferences.ts';
 
 const PEM = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
@@ -72,6 +72,27 @@ describe('sending an alert', () => {
     expect(Object.keys(payload).sort()).toEqual(['aps', 'omni']);
     expect(payload.aps.alert).toEqual({ title: 'Fix iOS push previews', subtitle: 'Finished', body: 'Done Opened PR #612.' });
     expect(payload.omni).toEqual({ kind: 'finished', threadId: 'thread-9', channelId: 'omni-os' });
+  });
+
+  it('sends each alert with its thread as the collapse id and the time it was sent, so the phone keeps one per thread', async () => {
+    const h = harness();
+    h.sender.send(EVENT);
+    await vi.waitFor(() => expect(h.sent).toHaveLength(1));
+    expect(h.sent[0].collapseId).toBe('thread-1');
+    expect(JSON.parse(h.sent[0].body).omni).toEqual({ kind: 'needsInput', threadId: 'thread-1', channelId: 'conductor', at: new Date(NOW).toISOString() });
+  });
+
+  it('leaves the collapse id off a thread id longer than Apple allows', () => {
+    expect(collapseIdFor({ ...EVENT, threadId: 'x'.repeat(65) })).toBeUndefined();
+    expect(collapseIdFor({ ...EVENT, threadId: 'x'.repeat(64) })).toBe('x'.repeat(64));
+  });
+
+  it('labels a pull request alert and previews what the PR needs', () => {
+    expect(alertFor({ kind: 'prAttention', threadId: 't', channelId: 'omni-os', title: 'Ship push', text: '#12 at abc1234. CI failed: CI / build' })).toEqual({
+      title: 'Ship push',
+      subtitle: 'Pull request',
+      body: '#12 at abc1234. CI failed: CI / build',
+    });
   });
 
   it('names the reporting thread in a crew report', () => {

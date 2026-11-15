@@ -30,6 +30,7 @@ import {
   type PollResult,
 } from './google-auth.ts';
 import { PushPreferencesBody, readPushPreferences, updatePushPreferences } from './push-preferences.ts';
+import { PushSettledBody, settledAlerts } from './push-settled.ts';
 import { deletePushToken, pushRegistration, PushTokenBody, setPushToken } from './push-tokens.ts';
 import { clientKey, viaConnect } from './request-guard.ts';
 
@@ -329,4 +330,16 @@ authApi.put('/push-preferences', async (c) => {
   const next = updatePushPreferences(who.session, body.data);
   if (!next) return c.json({ error: 'Unauthorized: this session has ended' }, 401);
   return c.json(next);
+});
+
+/**
+ * Which of the alerts still in the phone's Notification Center Ben has dealt with, here or on another device. The app
+ * asks when it comes to the front and when Needs you changes, and clears the ones named (push-settled.ts).
+ */
+authApi.post('/push-settled', async (c) => {
+  const who = appSession(c);
+  if (who.refused) return who.refused;
+  const body = PushSettledBody.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: firstIssue(body.error) }, 400);
+  return c.json({ settled: settledAlerts(body.data.alerts) });
 });

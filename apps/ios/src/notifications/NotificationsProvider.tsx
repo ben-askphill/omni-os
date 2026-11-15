@@ -7,6 +7,7 @@ import { usePairing } from '../pairing/PairingProvider';
 import { pairingVault } from '../pairing/runtime';
 import { alertOf } from './alert';
 import { createPushServerApi, type PushServerApi } from './api';
+import { createAlertClearer, deliveredAlerts, type AlertClearer } from './clear';
 import { BUNDLE_ID, pushEnvironment } from './environment';
 import { foregroundBehavior } from './foreground';
 import { permissionOf, shouldShowPrimer, type PermissionState } from './permission';
@@ -24,6 +25,8 @@ interface NotificationsContextValue {
   /** Opens this app's page in iOS Settings, where a denied permission can be changed. */
   openSystemSettings(): Promise<void>;
   api: PushServerApi;
+  /** Clears alerts Ben has dealt with from Notification Center. */
+  clearer: AlertClearer;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -75,6 +78,17 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     [api],
   );
 
+  const clearer = useMemo(
+    () =>
+      createAlertClearer({
+        delivered: async () => deliveredAlerts(await Notifications.getPresentedNotificationsAsync()),
+        servers: async () => (await pairingVault.loadIndex()).servers.map(({ id, origin }) => ({ id, origin })),
+        settled: (server, alerts) => api.settled(server, alerts),
+        dismiss: (id) => Notifications.dismissNotificationAsync(id),
+      }),
+    [api],
+  );
+
   const tapRouter = useMemo(
     () =>
       createTapRouter({
@@ -101,9 +115,23 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       if (state !== 'active') return;
       void readPermission().then(setPermission, () => undefined);
       void registrar.sync();
+      // Back in front: what was read elsewhere while away goes, and so does the thread still on screen.
+      const onScreen = threadOnScreen();
+      if (onScreen) void clearer.opened(onScreen);
+      void clearer.sweep();
     });
     return () => subscription.remove();
-  }, [registrar]);
+  }, [registrar, clearer]);
+
+  // A thread opened here is read here: its alerts go.
+  useEffect(
+    () =>
+      navigationRef.addListener('state', () => {
+        const onScreen = threadOnScreen();
+        if (onScreen && AppState.currentState === 'active') void clearer.opened(onScreen);
+      }),
+    [clearer],
+  );
 
   // A new or re-paired server, or a permission just granted, gets this phone's token.
   const serverKey = pairing.servers.map((server) => `${server.id}:${server.sessionId}`).join(',');
@@ -122,7 +150,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     });
     const handle = (response: Notifications.NotificationResponse) => {
       const alert = alertOf(response.notification);
-      if (alert) void tapRouter.handle(response.notification.request.identifier, alert);
+      // One identifier serves every alert of a thread (apns-collapse-id), so the delivery time tells two taps apart.
+      const { notification } = response;
+      if (alert) void tapRouter.handle(`${notification.request.identifier}@${notification.date}`, alert);
     };
     const subscription = Notifications.addNotificationResponseReceivedListener(handle);
     // The tap that launched the app arrived before this listener existed.
@@ -158,6 +188,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     permission,
     registration,
     api,
+    clearer,
     async requestPermission() {
       const next = permissionOf(
         await Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowSound: true, allowBadge: false } }),

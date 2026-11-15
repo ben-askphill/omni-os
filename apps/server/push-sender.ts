@@ -116,7 +116,17 @@ const ALERTS: Record<AppPushKind, { label: string; title: string; body: string }
   finished: { label: 'Finished', title: 'Thread finished', body: 'Open Omni to see the result.' },
   failed: { label: 'Failed', title: 'Thread failed', body: 'Open Omni to see what happened.' },
   crewReport: { label: 'Crew report', title: 'Crew report', body: 'A crew member reported back in Conductor.' },
+  prAttention: { label: 'Pull request', title: 'Pull request needs attention', body: 'A watched PR has failing checks or new review feedback.' },
 };
+
+/** Apple's limit for `apns-collapse-id`. A thread id is a uuid, well under it. */
+const COLLAPSE_MAX_BYTES = 64;
+
+/**
+ * One alert per thread on the phone, as on the desktop: a newer alert for a thread replaces the one shown, so the newest
+ * says where it stands.
+ */
+export const collapseIdFor = (event: PushEvent) => (Buffer.byteLength(event.threadId) <= COLLAPSE_MAX_BYTES ? event.threadId : undefined);
 
 const oneLine = (text: string | null | undefined) => text?.replace(/\s+/g, ' ').trim() || null;
 
@@ -130,10 +140,20 @@ export function alertFor(event: PushEvent): { title: string; subtitle?: string; 
   return { title: clip(title, TITLE_MAX), subtitle: clip(from ? `${fixed.label}: ${from}` : fixed.label, TITLE_MAX), body };
 }
 
-export function payloadFor(event: PushEvent): string {
+/**
+ * `at` is when the server sent it, by the server's clock. The phone hands it back to POST /api/auth/push-settled, which
+ * clears the alert once the thread was read after it.
+ */
+export function payloadFor(event: PushEvent, at?: string): string {
   return JSON.stringify({
     aps: { alert: alertFor(event), sound: 'default' },
-    omni: { kind: event.kind, threadId: event.threadId, channelId: event.channelId, ...(event.askerId ? { askerId: event.askerId } : {}) },
+    omni: {
+      kind: event.kind,
+      threadId: event.threadId,
+      channelId: event.channelId,
+      ...(event.askerId ? { askerId: event.askerId } : {}),
+      ...(at ? { at } : {}),
+    },
   });
 }
 
@@ -160,7 +180,7 @@ export function createPushSender(deps: PushSenderDeps): PushSender {
   const tokens = providerTokens(deps.config.key, deps.now);
   const run = pool(CONCURRENCY);
 
-  async function deliver(t: PushTarget, body: string, attempt = 1): Promise<void> {
+  async function deliver(t: PushTarget, body: string, collapseId: string | undefined, attempt = 1): Promise<void> {
     if (!deps.live(t.sessionId)) return;
     const expiration = Math.floor(deps.now() / 1000) + ALERT_TTL_S;
     let res: ApnsResponse;
@@ -172,6 +192,7 @@ export function createPushSender(deps: PushSenderDeps): PushSender {
         jwt: tokens.get(),
         body,
         expiration,
+        collapseId,
       });
     } catch {
       res = { status: 0, reason: 'network' };
@@ -180,11 +201,11 @@ export function createPushSender(deps: PushSenderDeps): PushSender {
     if (action === 'delivered') return;
     if (action === 'refresh' && attempt === 1) {
       tokens.refresh();
-      return deliver(t, body, 2);
+      return deliver(t, body, collapseId, 2);
     }
     if (action === 'retry' && attempt < MAX_ATTEMPTS) {
       await deps.sleep(backoffMs(attempt));
-      return deliver(t, body, attempt + 1);
+      return deliver(t, body, collapseId, attempt + 1);
     }
     if (action === 'forget') deps.forget(t.token);
     // The token itself stays out of the log: a status and a reason are enough to act on.
@@ -196,8 +217,9 @@ export function createPushSender(deps: PushSenderDeps): PushSender {
     send(event) {
       const targets = deps.targets(event.kind);
       if (!targets.length) return;
-      const body = payloadFor(event);
-      for (const t of targets) run(() => deliver(t, body)).catch((err: Error) => deps.log(`[push] ${err.message}`));
+      const body = payloadFor(event, new Date(deps.now()).toISOString());
+      const collapseId = collapseIdFor(event);
+      for (const t of targets) run(() => deliver(t, body, collapseId)).catch((err: Error) => deps.log(`[push] ${err.message}`));
     },
     close: () => deps.transport.close(),
   };
@@ -335,11 +357,13 @@ export function notifyCrewReport(parentId: string, report: Record<string, unknow
 
 /**
  * A watched PR has new failing checks or review feedback, and its thread was woken for it (pr-watch/worker.ts).
- * `summary` is the wake's one line ("#12 at abc1234. CI failed: test"). Feed only: the phone has no kind for it yet.
+ * `summary` is the wake's one line ("#12 at abc1234. CI failed: test"). The phone gets a push; the Web UI and the
+ * desktop app get a feed `alert`. The worker calls this once per wake, so a poll that finds nothing new sends nothing.
  */
 export function notifyPRAttention(threadId: string, summary: string, key: string) {
   const t = threads.get(threadId);
   if (!t) return;
+  emit({ kind: 'prAttention', threadId, channelId: t.channel_id, title: t.title, text: summary });
   publishFeed({
     type: 'alert',
     alert: { id: `pr:${threadId}:${key}`, kind: 'prAttention', thread_id: threadId, channel_id: t.channel_id, title: t.title, body: summary, at: new Date().toISOString() },

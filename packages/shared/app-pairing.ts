@@ -34,14 +34,30 @@ export interface AppPushTokenStatus {
   updatedAt?: string;
 }
 
-/** The four things an alert can be about. The payload's `kind` is one of these. */
-export type AppPushKind = 'needsInput' | 'finished' | 'failed' | 'crewReport';
+/** The things an alert can be about. The payload's `kind` is one of these. */
+export type AppPushKind = 'needsInput' | 'finished' | 'failed' | 'crewReport' | 'prAttention';
 
 /** Per-device alert choices. Each defaults to on until the device changes it. */
 export type AppPushPreferences = Record<AppPushKind, boolean>;
 
 /** A partial update: only the kinds sent change. */
 export type AppPushPreferencesUpdate = Partial<AppPushPreferences>;
+
+/**
+ * One alert still in the phone's Notification Center, asked about by POST /api/auth/push-settled: `id` is the
+ * notification's identifier, `at` the server time the alert carried (`omni.at`).
+ */
+export interface AppPushAlertRef {
+  id: string;
+  kind: AppPushKind;
+  threadId: string;
+  at: string;
+}
+
+/** The ids of the alerts the server says Ben has dealt with, here or on another device, so the phone clears them. */
+export interface AppPushSettled {
+  settled: string[];
+}
 
 export interface ServerCapabilities {
   api: number;

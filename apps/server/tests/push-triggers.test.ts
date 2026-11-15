@@ -216,17 +216,18 @@ describe('a crew report', () => {
 });
 
 describe('a PR needs attention', () => {
-  it('posts a feed alert keyed by the wake, and no phone push', () => {
+  it('posts a feed alert keyed by the wake, and one phone push aimed at the thread', () => {
     const id = thread({ channel: 'scratch' });
     notifyPRAttention(id, '#12 at abc1234. CI failed: CI / build', 'req-1');
     expect(feed).toEqual([
       { id: `pr:${id}:req-1`, kind: 'prAttention', thread_id: id, channel_id: 'scratch', title: id, body: '#12 at abc1234. CI failed: CI / build', at: expect.any(String) },
     ]);
-    expect(sent).toEqual([]);
+    expect(sent).toEqual([{ kind: 'prAttention', threadId: id, channelId: 'scratch', title: id, text: '#12 at abc1234. CI failed: CI / build' }]);
   });
 
   it('says nothing for a thread that is gone', () => {
     notifyPRAttention('no-such-thread', '#1', 'req');
     expect(feed).toEqual([]);
+    expect(sent).toEqual([]);
   });
 });

@@ -12,6 +12,12 @@ describe('parseAlert', () => {
     expect(parseAlert({ omni: { ...payload.omni, askerId: '' } })).not.toHaveProperty('askerId');
   });
 
+  it('reads a pull request alert and the time the server sent it', () => {
+    const at = '2026-11-15T10:00:00.000Z';
+    expect(parseAlert({ omni: { kind: 'prAttention', threadId: 't1', channelId: 'c1', at } })).toEqual({ kind: 'prAttention', threadId: 't1', channelId: 'c1', at });
+    expect(parseAlert({ omni: { kind: 'prAttention', threadId: 't1', at: '' } })).not.toHaveProperty('at');
+  });
+
   it('treats a missing or empty channel as none', () => {
     expect(parseAlert({ omni: { kind: 'finished', threadId: 't1' } })?.channelId).toBeNull();
     expect(parseAlert({ omni: { kind: 'finished', threadId: 't1', channelId: '' } })?.channelId).toBeNull();

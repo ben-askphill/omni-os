@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { initialPrefs, prefsReducer, shownPreferences, type PrefsAction, type PrefsState } from './preferences';
 
-const allOn: AppPushPreferences = { needsInput: true, finished: true, failed: true, crewReport: true };
+const allOn: AppPushPreferences = { needsInput: true, finished: true, failed: true, crewReport: true, prAttention: true };
 
 function run(actions: PrefsAction[], from: PrefsState = initialPrefs): PrefsState {
   return actions.reduce(prefsReducer, from);

@@ -24,6 +24,10 @@ When one thread has several things at once, it notifies once, with what matters 
 
 A notification goes away once you read the result or answer the question, here or on your other Mac. Clicking one opens its thread.
 
+## iPhone app
+
+The iPhone app has the same kinds, Pull requests included, as switches under its own **Settings > Notifications**, per server. It shows one alert per thread: a newer one for the same thread replaces it. An alert goes away once you open its thread on the phone, or once you read its result or answer its question on any device and the app next comes to the front. With the app closed, alerts read elsewhere stay until you open it.
+
 ## Desktop app
 
 The desktop app posts native notifications from its main process, so they arrive even with every Omni window closed (on a Mac the app stays in the Dock). They are on by default. Turn them off with **Notify from the desktop app**.

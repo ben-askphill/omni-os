@@ -32,7 +32,7 @@ async function pairApp(name = 'Ben iPhone') {
 
 const prefRows = () => r.db.db.prepare('SELECT session_id FROM push_preferences').all() as { session_id: string }[];
 
-const ALL_ON = { needsInput: true, finished: true, failed: true, crewReport: true };
+const ALL_ON = { needsInput: true, finished: true, failed: true, crewReport: true, prAttention: true };
 
 beforeEach(() => {
   pairing.resetPairings();
@@ -106,6 +106,9 @@ describe('who the sender picks for an alert', () => {
     expect(pushTargets('failed').map((t) => t.sessionId)).toEqual([b.sessionId]);
     expect(pushTargets('needsInput').map((t) => t.sessionId).sort()).toEqual([a.sessionId, b.sessionId].sort());
     expect(pushTargets('needsInput')[0]).toMatchObject({ environment: 'sandbox', bundleId: null });
+    expect(pushTargets('prAttention').map((t) => t.sessionId).sort()).toEqual([a.sessionId, b.sessionId].sort());
+    await req('PUT', '/auth/push-preferences', { prAttention: false }, as(b.token));
+    expect(pushTargets('prAttention').map((t) => t.sessionId)).toEqual([a.sessionId]);
 
     expect((await req('DELETE', `/auth/devices/${b.sessionId}`)).status).toBe(200);
     expect(pushTargets('needsInput').map((t) => t.sessionId)).toEqual([a.sessionId]);

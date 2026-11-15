@@ -117,7 +117,8 @@ function ServerBody({ server }: { server: PairedServer }) {
       case 'ready':
         return (
           <View>
-            {PUSH_KINDS.map((kind, index) => (
+            {/* A server from before a kind existed does not send it, and would refuse a change to it. */}
+            {PUSH_KINDS.filter((kind) => prefs.values && kind in prefs.values).map((kind, index) => (
               <AlertSwitchRow
                 key={kind}
                 kind={kind}

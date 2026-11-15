@@ -75,16 +75,20 @@ Alerts go out on these events:
 - `finished`: a turn ends with the thread done. A finished child thread does not alert, because its parent gets the crew report.
 - `failed`: a turn ends with an error, or Omni cannot prepare the thread's worktree. A failed child does alert.
 - `crewReport`: a crew report lands in a Conductor thread. A report in any other channel does not alert.
+- `prAttention`: a PR under Watch PR has new failing checks or new review feedback, and its thread is woken for it. One alert per wake: a poll that finds nothing new sends none. Only the machine whose PR watch woke the thread sends it.
 
 A stopped turn, a queued turn and a turn cut short by Omni shutting down do not alert.
 
-The alert's title is the thread's title, clipped to 80 characters. Its subtitle says what happened (`Needs your answer`, `Finished`, `Failed`, or `Crew report: <reporting thread>`). Its body previews the text as plain text (`apps/server/push-preview.ts`): markdown marks, code blocks, rules and HTML tags removed, whitespace collapsed to one line, and clipped to 150 characters at a word with an ellipsis. The text is:
+The alert's title is the thread's title, clipped to 80 characters. Its subtitle says what happened (`Needs your answer`, `Finished`, `Failed`, `Pull request`, or `Crew report: <reporting thread>`). Its body previews the text as plain text (`apps/server/push-preview.ts`): markdown marks, code blocks, rules and HTML tags removed, whitespace collapsed to one line, and clipped to 150 characters at a word with an ellipsis. The text is:
 
 - `needsInput`: the first question.
 - `finished` and `failed`: the turn's last assistant text, not the narration before its tool calls. A worktree that cannot be prepared gives the reason.
 - `crewReport`: the report.
+- `prAttention`: the wake's one line, such as `#12 at abc1234. CI failed: CI / build`.
 
-When there is no readable text, such as a tool-only turn or a code-only reply, the body is a generic line, and a thread with no title gets a generic title and no subtitle. Under `omni` the payload carries `kind`, `threadId` and `channelId` only. It never carries the prompt or a code. The phone's own Show Previews setting decides whether the body shows on a locked screen.
+When there is no readable text, such as a tool-only turn or a code-only reply, the body is a generic line, and a thread with no title gets a generic title and no subtitle. Under `omni` the payload carries `kind`, `threadId`, `channelId`, `at` (when the server sent it, by its clock) and, for a delegated thread's question, `askerId`. It never carries the prompt or a code.
+
+Every alert goes with `apns-collapse-id` set to its thread id, so the phone shows at most one alert per thread: a newer one replaces the one shown, as on the desktop app. iOS gives every alert of a thread the same notification identifier, so the app tells two taps apart by identifier and delivery time. The phone's own Show Previews setting decides whether the body shows on a locked screen.
 
 How each APNs answer is handled:
 
@@ -100,11 +104,17 @@ A session revoked before an attempt gets no further attempts.
 
 ## Push preferences
 
-`GET /api/auth/push-preferences` returns the device's choices: `{ "needsInput": true, "finished": true, "failed": true, "crewReport": true }`. Every kind is on until the device turns it off.
+`GET /api/auth/push-preferences` returns the device's choices: `{ "needsInput": true, "finished": true, "failed": true, "crewReport": true, "prAttention": true }`. Every kind is on until the device turns it off, including `prAttention` for a device that chose before it existed. The app shows a switch only for the kinds its server returns, so an older server shows no Pull requests switch.
 
-`PUT /api/auth/push-preferences` changes only the keys it sends and returns the full set. The body takes any of the four keys, each `true` or `false`. It must name at least one key and no other field. Anything else gets 400. Only app sessions may call either route (403 otherwise). A revoked session gets 401. The choices are removed with the session, as its token is.
+`PUT /api/auth/push-preferences` changes only the keys it sends and returns the full set. The body takes any of the five keys, each `true` or `false`. It must name at least one key and no other field. Anything else gets 400. Only app sessions may call either route (403 otherwise). A revoked session gets 401. The choices are removed with the session, as its token is.
 
-The shared types are `AppPushKind`, `AppPushPreferences` and `AppPushPreferencesUpdate` in `packages/shared/app-pairing.ts`.
+The shared types are `AppPushKind`, `AppPushPreferences`, `AppPushPreferencesUpdate`, `AppPushAlertRef` and `AppPushSettled` in `packages/shared/app-pairing.ts`.
+
+## Clearing read alerts
+
+`POST /api/auth/push-settled` takes `{ "alerts": [{ "id", "kind", "threadId", "at" }] }`, up to 100, where `id` is the notification's identifier and `at` the alert's `omni.at`. It returns `{ "settled": [ids] }`: the alerts Ben has dealt with, here or on another device (`apps/server/push-settled.ts`). An alert is settled when its thread was archived or marked done; for `needsInput`, when no question waits on the thread any more; for any other kind, when nothing waits on the thread in Needs you, it is not running, and its result was read at or after `at`. A thread the server does not have is never settled, since another paired server may have sent the alert. Only app sessions may call it (403 otherwise); a malformed body gets 400.
+
+The app asks every paired server when it comes to the front and whenever Needs you changes, and clears the alerts any of them names. Opening a thread on the phone clears its alerts at once, without asking. With the app closed nothing clears until it next opens: there is no background push for it.
 
 ## What revoking does and does not stop
 

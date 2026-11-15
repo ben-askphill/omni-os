@@ -67,7 +67,10 @@ export interface TapDeps {
 }
 
 export interface TapRouter {
-  /** `id` is the notification's identifier, so one tap that arrives twice opens once. A newer tap replaces an older one. */
+  /**
+   * `id` names one delivered alert (its identifier and delivery time), so one tap that arrives twice opens once. A newer
+   * tap replaces an older one.
+   */
   handle(id: string, alert: OmniAlert): Promise<void>;
 }
 

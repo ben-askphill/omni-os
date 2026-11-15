@@ -6,19 +6,20 @@ import { sessionIsLive } from './google-auth.ts';
 import type { ApnsEnvironment } from './push-apns.ts';
 import type { AppPushKind, AppPushPreferences, AppPushPreferencesUpdate } from '@omni/shared/app-pairing.ts';
 
-const COLUMN: Record<AppPushKind, 'needs_input' | 'finished' | 'failed' | 'crew_report'> = {
+const COLUMN: Record<AppPushKind, 'needs_input' | 'finished' | 'failed' | 'crew_report' | 'pr_attention'> = {
   needsInput: 'needs_input',
   finished: 'finished',
   failed: 'failed',
   crewReport: 'crew_report',
+  prAttention: 'pr_attention',
 };
 
-/** A PUT body: any of the four kinds, strictly. An empty body changes nothing, so it is refused. */
+/** A PUT body: any of the kinds, strictly. An empty body changes nothing, so it is refused. */
 export const PushPreferencesBody = z
-  .object({ needsInput: z.boolean(), finished: z.boolean(), failed: z.boolean(), crewReport: z.boolean() })
+  .object({ needsInput: z.boolean(), finished: z.boolean(), failed: z.boolean(), crewReport: z.boolean(), prAttention: z.boolean() })
   .partial()
   .strict()
-  .refine((b) => Object.keys(b).length > 0, 'send at least one of needsInput, finished, failed, crewReport');
+  .refine((b) => Object.keys(b).length > 0, 'send at least one of needsInput, finished, failed, crewReport, prAttention');
 
 export interface PushTarget {
   sessionId: string;
@@ -32,16 +33,19 @@ interface PrefRow {
   finished: number;
   failed: number;
   crew_report: number;
+  pr_attention: number;
 }
 
-const DEFAULTS: AppPushPreferences = { needsInput: true, finished: true, failed: true, crewReport: true };
+const DEFAULTS: AppPushPreferences = { needsInput: true, finished: true, failed: true, crewReport: true, prAttention: true };
 
 const fromRow = (r: PrefRow | undefined): AppPushPreferences =>
-  r ? { needsInput: r.needs_input === 1, finished: r.finished === 1, failed: r.failed === 1, crewReport: r.crew_report === 1 } : { ...DEFAULTS };
+  r
+    ? { needsInput: r.needs_input === 1, finished: r.finished === 1, failed: r.failed === 1, crewReport: r.crew_report === 1, prAttention: r.pr_attention === 1 }
+    : { ...DEFAULTS };
 
 /** The device's choices. Every kind is on until it changes one. */
 export function readPushPreferences(sessionId: string): AppPushPreferences {
-  return fromRow(db.prepare('SELECT needs_input, finished, failed, crew_report FROM push_preferences WHERE session_id = ?').get(sessionId) as PrefRow | undefined);
+  return fromRow(db.prepare('SELECT needs_input, finished, failed, crew_report, pr_attention FROM push_preferences WHERE session_id = ?').get(sessionId) as PrefRow | undefined);
 }
 
 /** Change the kinds sent, and keep the rest. Null, with nothing written, when the session has ended. */
@@ -51,9 +55,10 @@ export function updatePushPreferences(sessionId: string, patch: AppPushPreferenc
     if (!sessionIsLive(sessionId)) return null;
     const next = { ...readPushPreferences(sessionId), ...patch };
     db.prepare(
-      `INSERT INTO push_preferences (session_id, needs_input, finished, failed, crew_report, updated_at) VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(session_id) DO UPDATE SET needs_input = excluded.needs_input, finished = excluded.finished, failed = excluded.failed, crew_report = excluded.crew_report, updated_at = excluded.updated_at`,
-    ).run(sessionId, +next.needsInput, +next.finished, +next.failed, +next.crewReport, at);
+      `INSERT INTO push_preferences (session_id, needs_input, finished, failed, crew_report, pr_attention, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(session_id) DO UPDATE SET needs_input = excluded.needs_input, finished = excluded.finished, failed = excluded.failed,
+         crew_report = excluded.crew_report, pr_attention = excluded.pr_attention, updated_at = excluded.updated_at`,
+    ).run(sessionId, +next.needsInput, +next.finished, +next.failed, +next.crewReport, +next.prAttention, at);
     return next;
   });
 }

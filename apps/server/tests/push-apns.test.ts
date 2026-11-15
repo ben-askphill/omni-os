@@ -107,6 +107,7 @@ describe('the HTTP/2 transport', () => {
       jwt: 'jwt-value',
       body: '{"aps":{}}',
       expiration: 1_700_000_900,
+      collapseId: 'thread-1',
     });
     expect(answer).toEqual({ status: 200, reason: null });
     expect(seen?.path).toBe('/3/device/abcdef0123');
@@ -117,6 +118,7 @@ describe('the HTTP/2 transport', () => {
       'apns-push-type': 'alert',
       'apns-priority': '10',
       'apns-expiration': '1700000900',
+      'apns-collapse-id': 'thread-1',
     });
     expect(seen?.body).toBe('{"aps":{}}');
   });

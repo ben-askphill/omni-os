@@ -45,7 +45,7 @@ describe('createPushServerApi', () => {
   });
 
   it('sends only the changed key when saving preferences', async () => {
-    const all = { needsInput: true, finished: false, failed: true, crewReport: true };
+    const all = { needsInput: true, finished: false, failed: true, crewReport: true, prAttention: true };
     const { api, calls } = setup(() => json(all));
 
     await expect(api.setPreferences(a, { finished: false })).resolves.toEqual(all);
@@ -54,11 +54,19 @@ describe('createPushServerApi', () => {
   });
 
   it('reads preferences', async () => {
-    const all = { needsInput: true, finished: true, failed: true, crewReport: true };
+    const all = { needsInput: true, finished: true, failed: true, crewReport: true, prAttention: false };
     const { api, calls } = setup(() => json(all));
 
     await expect(api.preferences(a)).resolves.toEqual(all);
     expect(calls[0]?.method).toBe('GET');
+  });
+
+  it('asks which delivered alerts are settled and returns their ids', async () => {
+    const { api, calls } = setup(() => json({ settled: ['n1'] }));
+    const alerts = [{ id: 'n1', kind: 'prAttention' as const, threadId: 't1', at: '2026-11-15T10:00:00.000Z' }];
+
+    await expect(api.settled(b, alerts)).resolves.toEqual(['n1']);
+    expect(calls[0]).toMatchObject({ url: 'https://b.example.com/api/auth/push-settled', method: 'POST', authorization: 'Bearer token-b', body: { alerts } });
   });
 
   it('tells a thread that exists from one that does not and from an unreachable server', async () => {
