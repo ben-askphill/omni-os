@@ -24,13 +24,6 @@ Local agent workspace. See README.md for what it does.
 - How: the Claude Design MCP (`mcp__claude_design__get_project`, `list_files`, `read_file`, `write_files`) reads and writes the project. Read its `readme.md` and `SKILL.md` first. Components live in `components/<group>/` (a `.jsx`, `.d.ts` and `.prompt.md` each, plus a `*.card.html` preview), their styles in `components/omni.css`, tokens in `tokens/`. Writing needs a plan first: call `finalize_plan` with the exact paths, then pass the plan token it returns to `write_files` (an `if_match` etag alone is refused). `project not found` from `get_project` means the login lacks Claude Design access: ask Ben to run `/design-login`.
 - The repo has no `DESIGN.md`. The code copies of the tokens are `apps/web/src/index.css`, `apps/ios/src/theme.ts` and the window background in `apps/desktop/src/windows.ts` (`--chrome`): a token change goes into the design system and all three files.
 
-### no-mistakes, when it is installed
-
-- Optional. Omni runs the same with nothing but git and `gh`. Setup is [docs/user/no-mistakes.md](docs/user/no-mistakes.md).
-- A checkout uses the gate when `no-mistakes` is on PATH and `git remote get-url no-mistakes` prints a URL. Commit, then `no-mistakes axi run`. The gate opens the PR.
-- When either check fails, push with `git push origin` and open the PR with `gh`.
-- A pipeline command that says this turn is already inside a validation step means you are the gate's own agent. Finish that step. Leave the pipeline alone.
-
 - Backend: `apps/server/` (Hono, node:sqlite, no ORM). `runner.ts` owns the claude CLI lifecycle; `stream.ts` is the pure stream-json parser.
 - Web UI: `apps/web/` (React 19, Tailwind v4, hash router). Talks only to `/api`. Desktop web shows the channel rail by default (`rail-model.ts`: the Omni mark opens Overview at `#/`, the Inbox disc `#/inbox`, and the list panel follows the page); Settings > Appearance turns on the Classic sidebar instead (Full color discs, Press I for the Inbox and Press E to mark done live there too); the phone layout stays its own shell and has no rail. Inbox cards (desktop, channel rail, phone Activity) name the machine and live run time; Overview and phone Activity show machine tiles with live CPU and RAM when sync is on. Claude Code threads can show a `/goal` line under the transcript.
 - Sync relay: `apps/relay/`. A Cloudflare Worker each user deploys; see ADR 0008. Thread files and change-log payloads live in R2; the Durable Object SQLite keeps the index. It imports nothing from the other packages.
