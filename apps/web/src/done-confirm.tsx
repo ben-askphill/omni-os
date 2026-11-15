@@ -6,7 +6,7 @@ import { buildTree, doneNeedsConfirm, unfinishedLabel } from '@omni/shared/threa
 import { errorText, type Thread } from './api.ts';
 import { ConfirmDialog } from './components/ui.tsx';
 import { useApp } from './store.tsx';
-import { treeSource } from './thread-tree.ts';
+import { treeSource, useForgetTreeChoices } from './thread-tree.ts';
 
 /** Mark it done (asking first when work under it is unfinished) or not done. Null when Ben cancelled. */
 type MarkDone = (t: { id: string; title?: string | null }, on: boolean) => Promise<Thread | null>;
@@ -26,6 +26,7 @@ export function DoneConfirmProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The latest lists, read when Ben asks rather than captured, so a stale closure never skips the question.
+  useForgetTreeChoices();
   const source = useRef({ channels, needsYou });
   source.current = { channels, needsYou };
 

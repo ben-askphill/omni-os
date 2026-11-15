@@ -3,6 +3,9 @@ import {
   buildTree,
   doneNeedsConfirm,
   FINISHED_SHOWN,
+  keptChoice,
+  NO_FLAGS,
+  showsAgents,
   spansChannels,
   treeFlags,
   treeIndex,
@@ -80,15 +83,20 @@ describe('opening and closing by itself', () => {
     expect(treeOpen('finished', null)).toBe(false);
   });
 
-  it('keeps what Ben chose until the phase changes', () => {
+  it('keeps what Ben chose while the phase lasts, and forgets it when the job moves on, so the next run opens', () => {
     const closedWhileRunning: SavedOpen = { open: false, phase: 'running' };
-    expect(treeOpen('running', closedWhileRunning)).toBe(false);
-    expect(treeOpen('finished', closedWhileRunning)).toBe(false);
+    expect(treeOpen('running', keptChoice(closedWhileRunning, 'running'))).toBe(false);
+    // It finished: the choice goes with the run it was made in, and the tree closes by itself.
+    const afterFinish = keptChoice(closedWhileRunning, 'finished');
+    expect(afterFinish).toBeNull();
+    expect(treeOpen('finished', afterFinish)).toBe(false);
+    // The job runs again: nothing saved holds it closed, so it opens by itself.
+    expect(treeOpen('running', keptChoice(afterFinish, 'running'))).toBe(true);
+    // The same the other way: opened by hand after it finished, it closes by itself after the next run.
     const openedAfter: SavedOpen = { open: true, phase: 'finished' };
-    expect(treeOpen('finished', openedAfter)).toBe(true);
-    // The job runs again: it opens by itself, and finishing again closes it.
-    expect(treeOpen('running', openedAfter)).toBe(true);
-    expect(treeOpen('finished', { open: true, phase: 'running' })).toBe(false);
+    expect(treeOpen('finished', keptChoice(openedAfter, 'finished'))).toBe(true);
+    expect(keptChoice(openedAfter, 'running')).toBeNull();
+    expect(treeOpen('finished', keptChoice(keptChoice(openedAfter, 'running'), 'finished'))).toBe(false);
   });
 
   it('keeps a failed or waiting row showing while closed, behind it the rest', () => {
@@ -101,6 +109,28 @@ describe('opening and closing by itself', () => {
     const nodes = buildTree('j', deep, { needs: new Set(), failed: new Set(['m']) });
     expect(treeRows(nodes, false).rows.map((x) => x.thread.id)).toEqual(['l']);
     expect(treeRows(nodes[0].children, false).rows.map((x) => x.thread.id)).toEqual(['m']);
+  });
+
+  it('keeps a failed thread as a row in a closed tree after Ben read it, until it is marked done', () => {
+    // Read: Needs you no longer names it, but its status is still failed.
+    const read = treeIndex([{ parent: { id: 'j' }, children: [t('ok', 'done'), t('bad', 'failed')] }]);
+    const nodes = buildTree('j', read, NO_FLAGS);
+    expect(nodes[0]).toMatchObject({ state: 'failed', flagged: true });
+    expect(treeRows(nodes, false).rows.map((x) => x.thread.id)).toEqual(['bad']);
+    // The tally and the Done question count it, so the closed tree shows it.
+    expect(treeTally(nodes).failed).toBe(1);
+    expect(doneNeedsConfirm(nodes)).toBe(true);
+    // Marked done, it settles and folds away.
+    const settled = buildTree('j', treeIndex([{ parent: { id: 'j' }, children: [t('ok', 'done'), t('bad', 'failed', { done_at: '2026-11-15T21:00:00Z' })] }]), NO_FLAGS);
+    expect(treeRows(settled, false).rows).toEqual([]);
+  });
+
+  it('shows sub-agents only under a job at work', () => {
+    expect(showsAgents({ status: 'done', delegating: true }, 'running')).toBe(true);
+    expect(showsAgents({ status: 'running' }, 'finished')).toBe(false);
+    // A thread on its own: while it works. A sub-agent a failed turn left behind does not count.
+    expect(showsAgents({ status: 'running' })).toBe(true);
+    expect(showsAgents({ status: 'failed' })).toBe(false);
   });
 
   it('folds finished rows past the first few into "n more done" while open', () => {

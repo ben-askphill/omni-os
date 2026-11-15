@@ -41,7 +41,7 @@ export interface TreeNode<T extends TreeThread = TreeThread> {
   thread: T;
   /** The glyph its row shows: needs you or failed first, as Ben has to act on those, then its own. */
   state: Glyph;
-  /** It waits on Ben or failed unseen: a closed tree still shows its row, and its job sits in Needs you. */
+  /** It waits on Ben or failed (read or not, until it is marked done): a closed tree still shows its row. */
   flagged: boolean;
   /** Not at work: its own turn and everything under it have ended. */
   finished: boolean;
@@ -92,7 +92,8 @@ const byRank = (a: TreeNode, b: TreeNode) => rank(a) - rank(b) || at(b.thread).l
 export function nodeState(t: TreeThread, flags: TreeFlags): { state: Glyph; flagged: boolean } {
   if (t.done_at) return { state: 'done', flagged: false };
   if (flags.needs.has(t.id)) return { state: 'needs', flagged: true };
-  if (flags.failed.has(t.id)) return { state: 'failed', flagged: true };
+  // Failed stays flagged once Ben read it: Needs you lets go of the job, but the row stays until the thread is done.
+  if (flags.failed.has(t.id) || threadGlyph(t) === 'failed') return { state: 'failed', flagged: true };
   return { state: threadGlyph(t), flagged: false };
 }
 
@@ -134,6 +135,23 @@ export interface SavedOpen {
 /** Open while the job runs, closed once it finished, unless Ben chose otherwise in this phase. */
 export function treeOpen(phase: TreePhase, saved: SavedOpen | null | undefined): boolean {
   return saved && saved.phase === phase ? saved.open : phase === 'running';
+}
+
+/**
+ * Ben's choice, while it still holds: it ends when the job moves between running and finished, so a tree closed in one
+ * run opens by itself in the next. Null means forget it (the views drop the saved value).
+ */
+export function keptChoice(saved: SavedOpen | null | undefined, phase: TreePhase): SavedOpen | null {
+  return saved && saved.phase === phase ? saved : null;
+}
+
+/**
+ * Sub-agents show only under a job at work, in the Inbox (its Working shelf) and the sidebar alike, and go when they
+ * stop. `phase`: the job's, when it has a tree; a thread with nothing under it shows them while it works itself, so a
+ * sub-agent a failed or stopped turn left behind never shows.
+ */
+export function showsAgents(t: { status: string; delegating?: boolean }, phase?: TreePhase): boolean {
+  return phase ? phase === 'running' : isWorking(t);
 }
 
 /** Each view keeps its own choice per job: the sidebar's and the Inbox's never move each other. */

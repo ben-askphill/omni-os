@@ -239,6 +239,14 @@ export function writePref(key: string, value: unknown) {
   }
 }
 
+export function dropPref(key: string) {
+  try {
+    localStorage.removeItem(`omni.${key}`);
+  } catch {
+    /* private mode or blocked storage: ignore */
+  }
+}
+
 export function useMediaQuery(q: string) {
   const [m, setM] = useState(() => (typeof window !== 'undefined' ? window.matchMedia(q).matches : false));
   useEffect(() => {

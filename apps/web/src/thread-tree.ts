@@ -1,9 +1,10 @@
 // The thread tree from the Web UI's side: the tree under a job, read off the channel listing (Conductor `handoffs`
 // and every channel's `teams`) and Needs you, with its open state on this device for one view. The rules are
 // @omni/shared/thread-tree.ts.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildTree,
+  keptChoice,
   spansChannels,
   treeFlags,
   treeIndex,
@@ -18,7 +19,7 @@ import {
   type TreeView,
 } from '@omni/shared/thread-tree.ts';
 import type { ChannelWithRunning, NeedsYou, ThreadStub } from './api.ts';
-import { readPref, useApp, writePref } from './store.tsx';
+import { dropPref, readPref, useApp, writePref } from './store.tsx';
 
 export type StubNode = TreeNode<ThreadStub>;
 
@@ -53,9 +54,16 @@ export function useJobTree(parent: ThreadStub, view: TreeView): JobTree | null {
   const nodes = useMemo(() => buildTree(parent.id, index, flags), [parent.id, index, flags]);
   const key = treePrefKey(view, parent.id);
   const [saved, setSaved] = useState<SavedOpen | null>(() => readPref<SavedOpen | null>(key, null));
-  if (!nodes.length) return null;
-  const phase = treePhase(parent, nodes);
-  const open = treeOpen(phase, saved);
+  const phase = nodes.length ? treePhase(parent, nodes) : null;
+  const kept = phase ? keptChoice(saved, phase) : saved;
+  // The job moved between running and finished: Ben's choice ended with the phase it was made in.
+  useEffect(() => {
+    if (!saved || kept) return;
+    dropPref(key);
+    setSaved(null);
+  }, [saved, kept, key]);
+  if (!phase) return null;
+  const open = treeOpen(phase, kept);
   return {
     nodes,
     phase,
@@ -69,6 +77,28 @@ export function useJobTree(parent: ThreadStub, view: TreeView): JobTree | null {
     spans: spansChannels(nodes),
     team: nodes.every((n) => n.thread.source === 'team'),
   };
+}
+
+/**
+ * Forgets each view's choice for a job once it moves between running and finished, for the views that are not on
+ * screen (useJobTree does it for the ones that are). Mounted once, under the app's lists.
+ */
+export function useForgetTreeChoices() {
+  const { channels, needsYou } = useApp();
+  const seen = useRef(new Map<string, TreePhase>());
+  useEffect(() => {
+    const { index, flags } = treeSource(channels, needsYou);
+    for (const g of channels.flatMap((c) => [...(c.handoffs ?? []), ...(c.teams ?? [])])) {
+      const phase = treePhase(g.parent, buildTree(g.parent.id, index, flags));
+      const was = seen.current.get(g.parent.id);
+      seen.current.set(g.parent.id, phase);
+      if (!was || was === phase) continue;
+      for (const view of ['sidebar', 'inbox'] as const) {
+        const key = treePrefKey(view, g.parent.id);
+        if (!keptChoice(readPref<SavedOpen | null>(key, null), phase)) dropPref(key);
+      }
+    }
+  }, [channels, needsYou]);
 }
 
 /** The line under a job's title: its branch, or what sits under it. */

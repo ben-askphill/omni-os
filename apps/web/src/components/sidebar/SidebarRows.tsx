@@ -8,6 +8,7 @@ import { readPref, useApp, useNow, writePref } from '../../store.tsx';
 import { HarnessLogo, Loader } from '../brand.tsx';
 import { DoneMark, Icon, StatusDot, threadGlyph, threadStatusText, type IconName } from '../ui.tsx';
 import { showsRunning } from '@omni/shared/delegate-count.ts';
+import { showsAgents } from '@omni/shared/thread-tree.ts';
 import { useJobTree, treeLabel, type JobTree } from '../../thread-tree.ts';
 import { TreeRows, TreeToggle } from '../ThreadTree.tsx';
 
@@ -46,14 +47,18 @@ export function RunningBadge({ n }: { n: number }) {
  */
 const TREE_AT = { true: { line: 'ml-[43px]', meta: 'ml-[57px]' }, flush: { line: 'ml-[22px]', meta: 'ml-[36px]' }, false: { line: 'ml-[18px]', meta: 'ml-[32px]' } } as const;
 
-/** A job's second line (its branch, or what sits under it, with the tally that opens and closes the tree) and its tree. */
-function TreeUnder({ t, tree, at, tasks, onNavigate }: { t: ThreadStub; tree: JobTree; at: { line: string; meta: string }; tasks: BackgroundTask[]; onNavigate?: () => void }) {
+/**
+ * A job's second line (its branch, or what sits under it, with the tally that opens and closes the tree) and its tree.
+ * Each thread in it nests its own running sub-agents, from the store's live tasks, while the job is at work.
+ */
+function TreeUnder({ t, tree, at, onNavigate }: { t: ThreadStub; tree: JobTree; at: { line: string; meta: string }; onNavigate?: () => void }) {
+  const { tasks } = useApp();
   return (
     <>
       <div className={`-mt-1 flex h-5 min-w-0 items-center pr-3 ${at.meta}`}>
         <TreeToggle tree={tree} title={t.title || 'Untitled'} label={treeLabel(t, tree)} className="max-w-full" />
       </div>
-      <TreeRows tree={tree} variant="sidebar" agents={tasks} onNavigate={onNavigate} className={at.line} />
+      <TreeRows tree={tree} variant="sidebar" agents={showsAgents(t, tree.phase) ? tasks : undefined} onNavigate={onNavigate} className={at.line} />
     </>
   );
 }
@@ -65,8 +70,9 @@ function TreeUnder({ t, tree, at, tasks, onNavigate }: { t: ThreadStub; tree: Jo
  */
 export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }: { t: ThreadStub; active: boolean; tasks: BackgroundTask[]; onNavigate?: () => void; indent?: boolean | 'flush'; tree?: JobTree | null }) {
   const title = t.title || 'Untitled';
-  // With a tree, each thread's sub-agents nest under its own row there, so the job keeps only its own.
-  const own = tree ? tasks.filter((k) => k.thread_id === t.id) : tasks;
+  // Sub-agents show only while the job is at work, as on the Inbox's Working shelf. With a tree, each thread's nest
+  // under its own row there, so the job keeps only its own.
+  const own = !showsAgents(t, tree?.phase) ? [] : tree ? tasks.filter((k) => k.thread_id === t.id) : tasks;
   const agents = own.length;
   // A thread whose turn ended still works while its sub-agents or the threads it delegated run.
   const busy = showsRunning(t) || agents > 0;
@@ -99,7 +105,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
           </span>
         )}
       </a>
-      {tree && <TreeUnder t={t} tree={tree} at={TREE_AT[String(indent) as keyof typeof TREE_AT]} tasks={tasks} onNavigate={onNavigate} />}
+      {tree && <TreeUnder t={t} tree={tree} at={TREE_AT[String(indent) as keyof typeof TREE_AT]} onNavigate={onNavigate} />}
       {own.map((k, i) => (
         <AgentLink key={k.task_id} t={k} last={i === agents - 1} onNavigate={onNavigate} />
       ))}
@@ -159,7 +165,7 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
 export function SectionLink({ t, channel, active, home = false, tasks, unpin, tree, onNavigate }: { t: ThreadStub; channel: string; active: boolean; home?: boolean; tasks: BackgroundTask[]; unpin?: boolean; tree?: JobTree | null; onNavigate?: () => void }) {
   const { setPinned } = useApp();
   const title = t.title || 'Untitled';
-  const own = tree ? tasks.filter((k) => k.thread_id === t.id) : tasks;
+  const own = !showsAgents(t, tree?.phase) ? [] : tree ? tasks.filter((k) => k.thread_id === t.id) : tasks;
   const agents = own.length;
   const busy = showsRunning(t) || agents > 0;
   return (
@@ -197,7 +203,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
         </button>
       )}
     </div>
-    {home && tree && <TreeUnder t={t} tree={tree} at={{ line: 'ml-[19px]', meta: 'ml-[37px]' }} tasks={tasks} onNavigate={onNavigate} />}
+    {home && tree && <TreeUnder t={t} tree={tree} at={{ line: 'ml-[19px]', meta: 'ml-[37px]' }} onNavigate={onNavigate} />}
     {home && own.map((k, i) => <AgentLink key={k.task_id} t={k} last={i === agents - 1} flush onNavigate={onNavigate} />)}
     </>
   );
