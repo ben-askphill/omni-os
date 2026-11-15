@@ -49,7 +49,8 @@ const settled = (threadId: string) => publishFeed({ type: 'needs_you', thread_id
 /**
  * The agent asks: a card in the thread, and a blocker in Needs you until Ben acts. A delegated thread's card also shows
  * on every thread above it (crewQuestions) and its blocker and push alert go to the top one, the thread Ben delegated
- * from, which comes back out of done for it. Refused with what to fix.
+ * from, or the newest thread that continues it (threads.home), which comes back out of done for it. Refused with what to
+ * fix.
  */
 export function askQuestion(threadId: string, raw: unknown): { id: string } {
   if (!threads.get(threadId)) throw refusal('thread not found', 404);
@@ -57,7 +58,7 @@ export function askQuestion(threadId: string, raw: unknown): { id: string } {
   if (!parsed.ok) throw refusal(parsed.error, 400);
   const id = randomUUID();
   addEvent(threadId, QUESTION_EVENT, { id, questions: parsed.value } satisfies QuestionPayload);
-  const home = threads.root(threadId);
+  const home = threads.home(threadId);
   if (home !== threadId) threads.setDone(home, false);
   settled(threadId);
   notifyNeedsInput(threadId, parsed.value[0]?.question ?? null);

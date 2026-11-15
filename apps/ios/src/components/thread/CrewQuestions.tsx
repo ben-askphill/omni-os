@@ -5,6 +5,7 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { crewAsker, type CrewQuestion } from '@omni/shared/question.ts';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useLiveHub, useNeedsYou } from '../../live/react';
@@ -16,9 +17,12 @@ import { Text } from '../../ui/Text';
 import { QuestionCard } from './QuestionCard';
 
 export function CrewQuestions({ threadId }: { threadId: string }) {
+  const hub = useLiveHub();
   const { data, reload } = useFetched(`crew-questions:${threadId}`, (api) => api.crewQuestions(threadId));
-  // Needs you reloads on every ask and answer (here, on another client or synced from the other Mac) and on a feed
-  // reconnect, so the cards follow it.
+  // Every ask and answer, here, on another client or synced from the other Mac, sends a needs_you message, even when
+  // Needs you itself stays the same (an archived delegating thread is not listed there).
+  useEffect(() => hub.watchFeed((m) => isNeedsYou(m) && reload()), [hub, reload]);
+  // Needs you reloads after a feed reconnect, which watchFeed does not hear: missed messages land here.
   useOnChange(useNeedsYou(), reload);
   const items = data?.items ?? [];
   if (!items.length) return null;
@@ -30,6 +34,8 @@ export function CrewQuestions({ threadId }: { threadId: string }) {
     </View>
   );
 }
+
+const isNeedsYou = (m: unknown) => typeof m === 'object' && m !== null && (m as { type?: unknown }).type === 'needs_you';
 
 function CrewCard({ c, onAnswered }: { c: CrewQuestion; onAnswered: () => void }) {
   const { colors } = useOmniTheme();

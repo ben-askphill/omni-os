@@ -13,8 +13,11 @@ const SILENT: ForegroundBehavior = { shouldShowBanner: false, shouldShowList: fa
 
 /**
  * An alert that arrives while the app is open shows as a banner, except for the thread already on screen: the person is
- * reading it, and the live stream already has the news. A payload that is not Omni's keeps the default banner.
+ * reading it, and the live stream already has the news. A delegated thread's question opens the thread it was delegated
+ * from, but its card shows on the asking thread too, so that one on screen keeps it quiet as well. A payload that is not
+ * Omni's keeps the default banner.
  */
 export function foregroundBehavior(alert: OmniAlert | null, threadOnScreen: string | null): ForegroundBehavior {
-  return alert !== null && alert.threadId === threadOnScreen ? SILENT : SHOW;
+  if (alert === null || threadOnScreen === null) return SHOW;
+  return alert.threadId === threadOnScreen || alert.askerId === threadOnScreen ? SILENT : SHOW;
 }

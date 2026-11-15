@@ -253,6 +253,24 @@ export const threads = {
         )
         .get(id) as { id: string } | undefined
     )?.id ?? id,
+  /**
+   * Where Ben answers a delegated thread's questions: the top of its delegation chain (root), then the newest thread that
+   * continues it (continue.ts), and so on, since Ben works on in the newest and its crew cards show there. An archived
+   * continuation does not count. A thread nobody delegated is its own home: its card shows only on itself.
+   */
+  home(id: string): string {
+    let at = threads.root(id);
+    if (at === id) return id;
+    const newer = db.prepare('SELECT id FROM threads WHERE continued_from = ? AND archived = 0 ORDER BY created_at DESC, rowid DESC LIMIT 1');
+    const seen = new Set<string>();
+    while (!seen.has(at)) {
+      seen.add(at);
+      const next = newer.get(at) as { id: string } | undefined;
+      if (!next) break;
+      at = next.id;
+    }
+    return at;
+  },
   /** Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel. */
   conductorHandoffChildren: () =>
     db

@@ -23,6 +23,8 @@ export interface PushEvent {
   text: string | null;
   /** Crew reports: the title of the thread that reported. A delegated thread's question: the thread that asked. */
   from?: string | null;
+  /** A delegated thread's question: the thread that asked, so the app stays quiet while that thread is on screen. */
+  askerId?: string;
 }
 
 /** Secret names (secret store first, then an environment variable of the same name). Values are never logged. */
@@ -130,7 +132,7 @@ export function alertFor(event: PushEvent): { title: string; subtitle?: string; 
 export function payloadFor(event: PushEvent): string {
   return JSON.stringify({
     aps: { alert: alertFor(event), sound: 'default' },
-    omni: { kind: event.kind, threadId: event.threadId, channelId: event.channelId },
+    omni: { kind: event.kind, threadId: event.threadId, channelId: event.channelId, ...(event.askerId ? { askerId: event.askerId } : {}) },
   });
 }
 
@@ -273,14 +275,15 @@ function emit(event: PushEvent) {
 
 /**
  * The agent asked a question and waits for an answer. The alert previews the first question. A delegated thread's
- * question opens the thread Ben delegated from, where its card shows too, and names the thread that asked.
+ * question opens the thread Ben answers it on (threads.home: the one he delegated from, or the newest that continues
+ * it), where its card shows too, and names the thread that asked.
  */
 export function notifyNeedsInput(threadId: string, question: string | null = null) {
   const t = threads.get(threadId);
-  const home = threads.get(threads.root(threadId));
+  const home = threads.get(threads.home(threadId));
   if (t && home && home.id !== t.id) {
     const from = crewAsker({ task_id: t.task_id, thread_title: t.title });
-    emit({ kind: 'needsInput', threadId: home.id, channelId: home.channel_id, title: home.title, text: question, from });
+    emit({ kind: 'needsInput', threadId: home.id, channelId: home.channel_id, title: home.title, text: question, from, askerId: t.id });
     return;
   }
   emit({ kind: 'needsInput', threadId, channelId: t?.channel_id ?? null, title: t?.title ?? null, text: question });

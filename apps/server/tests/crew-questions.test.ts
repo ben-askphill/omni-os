@@ -154,6 +154,9 @@ describe('a delegated thread asks', () => {
     const qid = await ask(child.id);
 
     for (const where of [first.id, next.id]) expect((await crew(where)).map((c) => [c.thread_id, c.question.id])).toEqual([[child.id, qid]]);
+    // Needs you shows it on the continued thread, where Ben works now, not the one it continues.
+    expect(await asking()).toContain(next.id);
+    expect(await asking()).not.toContain(first.id);
     // Only forward: what the continued thread delegates does not ask on the one it continues.
     const later = await busy('pick a channel', { parent_id: next.id });
     const qid2 = await ask(later.id);
@@ -164,6 +167,19 @@ describe('a delegated thread asks', () => {
     expect((await answer(shown.thread_id, shown.question.id, [{ selected: ['NL'], other: null }])).status).toBe(200);
     expect((await crew(first.id)).map((c) => c.question.id)).toEqual([]);
     expect((await crew(next.id)).map((c) => c.question.id)).toEqual([qid2]);
+  });
+
+  it('brings the continued thread back out of done for a question, and leaves the one it continues done', T, async () => {
+    const { continuations } = await import('../db.ts');
+    const first = await idle('be the conductor');
+    const child = await busy('pick a market', { parent_id: first.id });
+    const next = await idle('be the conductor, continued');
+    continuations.link(next.id, first.id);
+    for (const t of [first, next]) await ok('PATCH', `/threads/${t.id}`, { done: true });
+    await ask(child.id);
+    expect(h.thread(next.id).done_at).toBeNull();
+    expect(h.thread(first.id).done_at).not.toBeNull();
+    expect(await asking()).toContain(next.id);
   });
 
   it('keeps a thread nobody delegated as it was: its question waits on itself', T, async () => {

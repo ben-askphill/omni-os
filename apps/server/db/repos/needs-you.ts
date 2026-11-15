@@ -174,8 +174,9 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     .all(...args) as unknown as Thread[];
 
   // Questions with no answer yet, whatever the asking thread's status, newest first so the first row per thread is its
-  // newest. Each waits on the top of its delegation chain (threads.root), the thread Ben delegated from, where its card
-  // shows too: a delegated thread's or a team member's question brings that thread here, not the one that asked.
+  // newest. Each waits on the top of its delegation chain, the thread Ben delegated from, or the newest thread that
+  // continues it (threads.home), where its card shows too: a delegated thread's or a team member's question brings that
+  // thread here, not the one that asked.
   const home = db.prepare(`SELECT ${prefixed} FROM threads t WHERE t.id = ? AND ${LISTED} ${scope}`);
   const asked = (
     db
@@ -189,7 +190,7 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
       )
       .all() as { q_thread: string; q_payload: string; q_at: string }[]
   ).flatMap((q) => {
-    const t = home.get(threads.root(q.q_thread), ...args) as unknown as Thread | undefined;
+    const t = home.get(threads.home(q.q_thread), ...args) as unknown as Thread | undefined;
     return t ? [{ ...t, ...q }] : [];
   });
 

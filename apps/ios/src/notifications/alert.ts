@@ -5,6 +5,8 @@ export interface OmniAlert {
   kind: AppPushKind;
   threadId: string;
   channelId: string | null;
+  /** A delegated thread's question: the thread that asked, while `threadId` is the one Ben answers it on. */
+  askerId?: string;
 }
 
 export const PUSH_KINDS: readonly AppPushKind[] = ['needsInput', 'finished', 'failed', 'crewReport'];
@@ -14,13 +16,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 /** The `omni` object of an APNs payload, or null for anything that is not one of Omni's alerts. */
 export function parseAlert(payload: unknown): OmniAlert | null {
   if (!isRecord(payload) || !isRecord(payload.omni)) return null;
-  const { kind, threadId, channelId } = payload.omni;
+  const { kind, threadId, channelId, askerId } = payload.omni;
   if (typeof threadId !== 'string' || threadId === '') return null;
   if (!PUSH_KINDS.includes(kind as AppPushKind)) return null;
   return {
     kind: kind as AppPushKind,
     threadId,
     channelId: typeof channelId === 'string' && channelId !== '' ? channelId : null,
+    ...(typeof askerId === 'string' && askerId !== '' ? { askerId } : {}),
   };
 }
 

@@ -7,7 +7,7 @@ import { startRunner } from './runner-boot.ts';
 const r = await startRunner();
 const { askQuestion } = await import('../runner/questions.ts');
 const { failSetup } = await import('../runner/setup.ts');
-const { alertFor, installPushSender, noopPushSender, notifyCrewReport, notifyEnded } = await import('../push-sender.ts');
+const { alertFor, installPushSender, noopPushSender, notifyCrewReport, notifyEnded, payloadFor } = await import('../push-sender.ts');
 type PushEvent = import('../push-sender.ts').PushEvent;
 type ThreadStatus = import('../db.ts').ThreadStatus;
 
@@ -61,8 +61,31 @@ describe('a thread needs input', () => {
     const lead = thread({ channel: 'scratch', parent: conductor });
     const member = thread({ channel: 'scratch', parent: lead, task: 'T-ASK' });
     askQuestion(member, [Q]);
-    expect(sent).toEqual([{ kind: 'needsInput', threadId: conductor, channelId: 'conductor', title: conductor, text: Q.question, from: `T-ASK · ${member}` }]);
+    expect(sent).toEqual([{ kind: 'needsInput', threadId: conductor, channelId: 'conductor', title: conductor, text: Q.question, from: `T-ASK · ${member}`, askerId: member }]);
     expect(alertFor(sent[0]!)).toEqual({ title: conductor, subtitle: `Needs your answer: T-ASK · ${member}`, body: Q.question });
+  });
+
+  it('opens it on the newest thread that continues the delegating one, never an archived one', () => {
+    const conductor = thread({ channel: 'conductor' });
+    const child = thread({ parent: conductor, task: 'T-CONT' });
+    const next = thread({ channel: 'conductor' });
+    const newest = thread({ channel: 'conductor' });
+    const shelved = thread({ channel: 'conductor' });
+    r.db.continuations.link(next, conductor);
+    r.db.continuations.link(newest, next);
+    r.db.continuations.link(shelved, newest);
+    r.db.threads.update(shelved, { archived: 1 });
+    askQuestion(child, [Q]);
+    expect(sent).toEqual([{ kind: 'needsInput', threadId: newest, channelId: 'conductor', title: newest, text: Q.question, from: `T-CONT · ${child}`, askerId: child }]);
+    expect(JSON.parse(payloadFor(sent[0]!)).omni).toEqual({ kind: 'needsInput', threadId: newest, channelId: 'conductor', askerId: child });
+  });
+
+  it("keeps a continued thread's own question on itself: nobody delegated it", () => {
+    const solo = thread();
+    const next = thread();
+    r.db.continuations.link(next, solo);
+    askQuestion(solo, [Q]);
+    expect(sent.map((e) => [e.threadId, e.askerId])).toEqual([[solo, undefined]]);
   });
 });
 
