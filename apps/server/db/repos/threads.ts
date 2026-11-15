@@ -285,6 +285,16 @@ export const threads = {
          ORDER BY parent.updated_at DESC, child.created_at ASC`,
       )
       .all() as unknown as Thread[],
+  /** Every live team member whose lead is live too, by lead, in the order they were handed out. */
+  teamMembers: () =>
+    db
+      .prepare(
+        `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `m.${c}`).join(', ')}
+         FROM threads m JOIN threads lead ON lead.id = m.parent_id
+         WHERE m.source = 'team' AND m.archived = 0 AND lead.archived = 0
+         ORDER BY lead.updated_at DESC, m.created_at ASC`,
+      )
+      .all() as unknown as Thread[],
   /** A team lead's members, in the order they were handed out. */
   team: (leadId: string) =>
     db

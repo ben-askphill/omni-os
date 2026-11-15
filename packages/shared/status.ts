@@ -57,8 +57,9 @@ export function threadGlyph(t: { status: string; delegating?: boolean; limit_sta
 export const asksForYou = (g: Glyph) => g === 'needs' || g === 'failed' || g === 'limited';
 
 /** What holds a thread up until Ben acts (NeedsYouBlocker in apps/server/db/repos/needs-you.ts), to its glyph. */
-export const BLOCKER_GLYPH: Record<'question' | 'setup' | 'recovered' | 'uncertain' | 'limited', Glyph> = {
+export const BLOCKER_GLYPH: Record<'question' | 'setup' | 'recovered' | 'uncertain' | 'limited' | 'child_failed', Glyph> = {
   question: 'needs',
+  child_failed: 'failed',
   setup: 'failed',
   limited: 'limited',
   uncertain: 'needs',

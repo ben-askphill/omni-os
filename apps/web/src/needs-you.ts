@@ -21,6 +21,7 @@ export function reasonOf(item: NeedsYouItem): Reason {
   if (b) {
     const glyph = BLOCKER_GLYPH[b.kind];
     if (b.kind === 'question') return { glyph, label: plural(b.count, 'Waiting on your answer', '# questions wait on your answer'), detail: b.detail };
+    if (b.kind === 'child_failed') return { glyph, label: plural(b.count, 'A delegated thread failed', '# delegated threads failed'), detail: b.detail };
     if (b.kind === 'setup') return { glyph, label: 'Worktree could not be prepared', detail: b.detail };
     if (b.kind === 'limited') {
       const at = b.resets_at ? resetLabel(b.resets_at) : null;

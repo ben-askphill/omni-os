@@ -59,6 +59,9 @@ function actionsOf(item: NeedsYouItem, harness: (id: string) => string, now: num
     case 'recovered':
       out = [{ kind: 'resume', label: b.count > 1 ? `Resume ${b.count}` : 'Resume' }];
       break;
+    case 'child_failed':
+      out = [{ kind: 'open', label: 'Review' }];
+      break;
     case 'uncertain':
       // Sending again names each message, and only the thread lists them.
       out = [{ kind: 'open', label: 'Review' }];

@@ -110,8 +110,9 @@ const RECENT_PER_CHANNEL = 5;
 const THREADS_PER_FOLDER = 50;
 
 /** A thread as the sidebar lists it. `delegating`: a thread it delegated still works (apps/server/delegating.ts). */
-const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source, limit_state }: Thread, delegating: ReadonlySet<string>) => ({
-  id, channel_id, title, status, created_at, updated_at, folder_id, harness, pinned_at, done_at, parent_id, source, limit_state, delegating: delegating.has(id),
+/** A thread as the lists show it. `model` and `branch` are for the thread tree's child rows (tooltip and second line). */
+const stub = ({ id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state }: Thread, delegating: ReadonlySet<string>) => ({
+  id, channel_id, title, status, created_at, updated_at, folder_id, harness, model, branch, pinned_at, done_at, parent_id, source, limit_state, delegating: delegating.has(id),
 });
 
 /** Conductor jobs with their delegated child threads, including children in other channels. */
@@ -130,6 +131,32 @@ function conductorHandoffs(delegating: ReadonlySet<string>) {
     group.children.push(child);
   }
   return [...groups.values()].map(({ parent, children }) => ({ parent: stub(parent, delegating), children: children.map((t) => stub(t, delegating)) }));
+}
+
+/**
+ * Team leads with their members, keyed by the lead's channel: a lead lists in its channel, and its members (who get no
+ * row of their own) nest under it. A lead the Conductor delegated also nests under its job through `handoffs`.
+ */
+function teamsByChannel(delegating: ReadonlySet<string>) {
+  const groups = new Map<string, { parent: Thread; children: Thread[] }>();
+  for (const member of threads.teamMembers()) {
+    const leadId = member.parent_id!;
+    let group = groups.get(leadId);
+    if (!group) {
+      const lead = threads.get(leadId);
+      if (!lead || lead.archived) continue;
+      group = { parent: lead, children: [] };
+      groups.set(leadId, group);
+    }
+    group.children.push(member);
+  }
+  const byChannel = new Map<string, { parent: ReturnType<typeof stub>; children: ReturnType<typeof stub>[] }[]>();
+  for (const { parent, children } of groups.values()) {
+    const list = byChannel.get(parent.channel_id) ?? [];
+    list.push({ parent: stub(parent, delegating), children: children.map((t) => stub(t, delegating)) });
+    byChannel.set(parent.channel_id, list);
+  }
+  return byChannel;
 }
 
 /** Each folder with its count, how many of its threads run, and its newest threads, keyed by channel. */
@@ -177,7 +204,15 @@ const isWorking = (t: Thread, delegating: ReadonlySet<string>) => t.status === '
  * A channel plus its busy threads, its latest ones, and its folders with their threads, so the sidebar can list them
  * under the name. `running` counts the running and queued ones and those whose delegated threads or sub-agents still work.
  */
-const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<string, unknown[]>, handoffs: ReturnType<typeof conductorHandoffs>, delegating: ReadonlySet<string>) => {
+const withActive = (
+  ch: Channel,
+  busy: Thread[],
+  recent: Thread[],
+  folders: Map<string, unknown[]>,
+  handoffs: ReturnType<typeof conductorHandoffs>,
+  teams: ReturnType<typeof teamsByChannel>,
+  delegating: ReadonlySet<string>,
+) => {
   const mine = busy.filter((t) => t.channel_id === ch.id && t.source !== 'team');
   return {
     ...publicChannel(ch),
@@ -186,6 +221,7 @@ const withActive = (ch: Channel, busy: Thread[], recent: Thread[], folders: Map<
     recent: recent.filter((t) => t.channel_id === ch.id).map((t) => stub(t, delegating)),
     folders: folders.get(ch.id) ?? [],
     ...(ch.id === 'conductor' && handoffs.length ? { handoffs } : {}),
+    ...(teams.get(ch.id)?.length ? { teams: teams.get(ch.id) } : {}),
   };
 };
 
@@ -195,7 +231,8 @@ channelsApi.get('/', (c) => {
   const recent = threads.recentPerChannel(RECENT_PER_CHANNEL);
   const folders = foldersByChannel(folderRepo.all(), threads.filed(), delegating);
   const handoffs = conductorHandoffs(delegating);
-  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent, folders, handoffs, delegating)));
+  const teams = teamsByChannel(delegating);
+  return c.json(channels.list(c.req.query('archived') === '1').map((ch) => withActive(ch, busy, recent, folders, handoffs, teams, delegating)));
 });
 
 channelsApi.get('/:id', (c) => {
@@ -203,7 +240,7 @@ channelsApi.get('/:id', (c) => {
   if (!ch) return c.json({ error: 'not found' }, 404);
   const delegating = delegatingIds();
   const folders = foldersByChannel(folderRepo.byChannel(ch.id), threads.filed(ch.id), delegating);
-  return c.json(withActive(ch, busyThreads(delegating), threads.byChannel(ch.id, RECENT_PER_CHANNEL), folders, conductorHandoffs(delegating), delegating));
+  return c.json(withActive(ch, busyThreads(delegating), threads.byChannel(ch.id, RECENT_PER_CHANNEL), folders, conductorHandoffs(delegating), teamsByChannel(delegating), delegating));
 });
 
 channelsApi.post('/', async (c) => {

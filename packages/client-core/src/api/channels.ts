@@ -51,7 +51,7 @@ export type FolderWithThreads = Folder & { count: number; running: number; threa
 
 /**
  * GET /channels and /channels/:id. `active`: running and queued threads, and those whose sub-agents still run.
- * `recent`: the latest threads of any status. `handoffs`: only on the Conductor channel. Older servers leave the lists out.
+ * `recent`: the latest threads of any status. `handoffs`: only on the Conductor channel. `teams`: on a channel with team leads. Older servers leave the lists out.
  */
 export type ChannelWithRunning = Channel & {
   running: number;
@@ -59,6 +59,8 @@ export type ChannelWithRunning = Channel & {
   recent?: ThreadStub[];
   folders?: FolderWithThreads[];
   handoffs?: { parent: ThreadStub; children: ThreadStub[] }[];
+  /** The channel's team leads with their members, in the order they were handed out. Older servers leave it out. */
+  teams?: { parent: ThreadStub; children: ThreadStub[] }[];
 };
 
 export interface ListArchived {

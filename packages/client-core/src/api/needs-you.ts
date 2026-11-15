@@ -15,12 +15,15 @@ export interface NeedsYouResult {
 /**
  * What holds a thread up until Ben acts: `question` (the agent asked and waits), `setup` (its worktree could not be
  * prepared), `recovered` (messages a restart kept for Resume), `uncertain` (a message a harness may have read before a
- * restart) or `limited` (its harness stopped the turn at the plan's usage limit). `count` is how many questions or messages.
+ * restart), `limited` (its harness stopped the turn at the plan's usage limit) or `child_failed` (a thread it delegated, or
+ * a team member, failed and Ben has not seen it). `count` is how many questions, messages or failed threads.
  */
 export interface NeedsYouBlocker {
-  kind: 'question' | 'setup' | 'recovered' | 'uncertain' | 'limited';
+  kind: 'question' | 'setup' | 'recovered' | 'uncertain' | 'limited' | 'child_failed';
   detail: string | null;
   count: number;
+  /** question and child_failed: the threads under this one that asked or failed, newest first. */
+  from?: string[];
   /** limited: when the harness said the limit resets. Null when it did not say, so only a manual Resume works. */
   resets_at?: string | null;
   /** limited: scheduled for that time. Still a blocker: nothing runs until then. */
