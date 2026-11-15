@@ -5,6 +5,10 @@ import { Button, ErrorNote, IconButton } from '../ui.tsx';
 
 type Busy = 'send' | 'dismiss-all' | `dismiss:${number}`;
 
+/** The answers typed for items still on the card. */
+const keep = (answers: Record<string, string>, items: readonly OpenItem[]) =>
+  Object.fromEntries(items.flatMap((i) => (answers[i.text] ? [[i.text, answers[i.text]]] : [])));
+
 /**
  * What the finished turn left open for Ben (apps/server/runner/aux.ts): questions it asked him, decisions it left to
  * him and blockers only he can clear. Answers typed or picked here go back as one reply; New thread opens a composer
@@ -27,6 +31,15 @@ export function OpenItemsCard({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Busy | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Answers belong to this set of items. A reply from the composer clears the set, and a later turn can ask the same
+  // question again: that one starts empty, never with what was typed for the last one. Only a dismiss, which leaves
+  // some of the same items, keeps what was typed on the rest.
+  const [answeredFor, setAnsweredFor] = useState(thread.open_items);
+  if (answeredFor !== thread.open_items) {
+    setAnsweredFor(thread.open_items);
+    const before = new Set(readOpenItems(answeredFor).map((i) => i.text));
+    setAnswers(items.length && items.every((i) => before.has(i.text)) ? (a) => keep(a, items) : {});
+  }
   if (!items.length || thread.status !== 'done') return null;
 
   const path = `/threads/${encodeURIComponent(thread.id)}`;

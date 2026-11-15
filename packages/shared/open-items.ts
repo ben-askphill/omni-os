@@ -23,17 +23,20 @@ const KINDS = new Set<string>(['question', 'decision', 'blocker']);
 const clean = (s: string) => s.replace(/^["'`]+|["'`]+$/g, '').replace(/\s+/g, ' ').trim();
 
 /**
- * The items in Haiku's answer: one `QUESTION:`, `DECISION:` or `BLOCKER:` line each, a decision's options after `|`.
+ * The items in Haiku's answer: one `QUESTION:`, `DECISION:` or `BLOCKER:` line each, a decision's options after `|`
+ * (a `|` in a question or a blocker is its own text).
  * Bullets and numbering are tolerated and any other line is ignored. Null for NONE or when no line is an item.
  */
 export function parseOpenItems(out: string): OpenItem[] | null {
   const items: OpenItem[] = [];
   const seen = new Set<string>();
   for (const raw of out.replace(/\r/g, '').split('\n')) {
-    const m = /^\s*(?:[-*•]|\d+[.)])?\s*\**(QUESTION|DECISION|BLOCKER)\**\s*:\s*(.+)$/i.exec(raw);
+    // `**Question**: text` and `**Question:** text` both: the bold may close before or after the colon.
+    const m = /^\s*(?:[-*•]|\d+[.)])?\s*\**\s*(QUESTION|DECISION|BLOCKER)\s*\**\s*:\s*\**\s*(.+)$/i.exec(raw);
     if (!m) continue;
     const kind = m[1].toLowerCase() as OpenItemKind;
-    const [head, ...rest] = m[2].split('|');
+    // Only a decision has options after `|`. A question or a blocker can hold one of its own: `grep | sort`, `string | null`.
+    const [head, ...rest] = kind === 'decision' ? m[2].split('|') : [m[2]];
     const text = clean(head);
     // Too long for the card to show whole, and a new thread can start from it: drop it rather than cut it.
     if (!text || text.length > OPEN_ITEM_TEXT_MAX || seen.has(text.toLowerCase())) continue;

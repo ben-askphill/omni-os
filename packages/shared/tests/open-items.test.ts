@@ -25,9 +25,25 @@ describe('parseOpenItems', () => {
     ]);
   });
 
+  it('accepts the bold closing after the colon too', () => {
+    expect(parseOpenItems('- **Question:** Ship on Friday?\n**BLOCKER:** Needs a login.\n**Decision**: A or B? | A | B')).toEqual([
+      { kind: 'question', text: 'Ship on Friday?' },
+      { kind: 'blocker', text: 'Needs a login.' },
+      { kind: 'decision', text: 'A or B?', options: ['A', 'B'] },
+    ]);
+  });
+
+  it('keeps a | in a question or a blocker as its text, and splits only a decision on it', () => {
+    expect(parseOpenItems('QUESTION: Should the log check use `grep | sort` or `rg`?\nBLOCKER: The field is typed `string | null`, so the build fails.')).toEqual([
+      { kind: 'question', text: 'Should the log check use `grep | sort` or `rg`?' },
+      { kind: 'blocker', text: 'The field is typed `string | null`, so the build fails.' },
+    ]);
+    expect(parseOpenItems('DECISION: Pipe or flag? | grep | sort')).toEqual([{ kind: 'decision', text: 'Pipe or flag?', options: ['grep', 'sort'] }]);
+  });
+
   it('keeps options only for a decision with two or more', () => {
     expect(parseOpenItems('DECISION: Rename it? | yes')).toEqual([{ kind: 'decision', text: 'Rename it?' }]);
-    expect(parseOpenItems('QUESTION: Which one? | a | b')).toEqual([{ kind: 'question', text: 'Which one?' }]);
+    expect(parseOpenItems('QUESTION: Which one? | a | b')).toEqual([{ kind: 'question', text: 'Which one? | a | b' }]);
   });
 
   it('takes at most five, and drops an item too long to show whole', () => {
