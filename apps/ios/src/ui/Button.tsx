@@ -15,6 +15,8 @@ interface ButtonProps {
   size?: 'regular' | 'small' | 'compact';
   busy?: boolean;
   disabled?: boolean;
+  /** A toggle among options (an open item's chips): VoiceOver reads it as selected. Left out for a plain action. */
+  selected?: boolean;
   /** What VoiceOver reads when the label alone is ambiguous in a list ("Revoke iPhone"). */
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -37,6 +39,7 @@ export function Button({
   size = 'regular',
   busy = false,
   disabled = false,
+  selected,
   accessibilityLabel = label,
   accessibilityHint,
 }: ButtonProps) {
@@ -50,7 +53,7 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled: inactive, busy }}
+      accessibilityState={{ disabled: inactive, busy, ...(selected !== undefined && { selected }) }}
       disabled={inactive}
       hitSlop={size === 'compact' ? COMPACT_SLOP : undefined}
       onPress={onPress}

@@ -6,14 +6,14 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { Thread } from '@omni/client-core';
-import { answersMessage, OPEN_ITEM_LABEL, spawnPrompt, type OpenItem } from '@omni/shared/open-items.ts';
+import { OPEN_ITEM_LABEL, spawnPrompt, type OpenItem } from '@omni/shared/open-items.ts';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { ThreadLive } from '../../live/hub';
 import { useLiveHub, useStore } from '../../live/react';
 import type { RootStackParamList } from '../../navigation/types';
-import { answerPlaceholder, answersAfter, openItemsHeading, pickOption, shownOpenItems, type OpenAnswers } from '../../thread/open-items';
+import { answerPlaceholder, answersAfter, answersReply, answersWait, SLOT_TAKEN, openItemsHeading, pickOption, shownOpenItems, type OpenAnswers } from '../../thread/open-items';
 import { fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
 import { Button } from '../../ui/Button';
 import { Icon, type IconName } from '../../ui/Icon';
@@ -26,8 +26,7 @@ export function OpenItemsCard({ thread, live, waiting }: { thread: Thread; live:
   const { colors } = useOmniTheme();
   const hub = useLiveHub();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  // A message in the outbox, sending or failed, is a reply on its way: the card waits for it as for a queued one.
-  const sending = useStore(live.send.state).outbox.item !== null;
+  const outbox = useStore(live.send.state).outbox.item;
   const [answers, setAnswers] = useState<OpenAnswers>({});
   const [busy, setBusy] = useState<Busy | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,10 +36,10 @@ export function OpenItemsCard({ thread, live, waiting }: { thread: Thread; live:
     setAnsweredFor(thread.open_items);
     setAnswers((a) => answersAfter(answeredFor, thread.open_items, a));
   }
-  const items = shownOpenItems(thread, waiting || sending);
+  const items = shownOpenItems(thread, answersWait(waiting, outbox));
   if (!items.length) return null;
 
-  const reply = answersMessage(items, items.map((i) => answers[i.text]));
+  const reply = answersReply(items, answers);
   const run = async (what: Busy, call: () => Promise<void>) => {
     if (busy) return;
     setBusy(what);
@@ -58,6 +57,8 @@ export function OpenItemsCard({ thread, live, waiting }: { thread: Thread; live:
     run('send', async () => {
       if (!reply) return;
       if (await live.send.submit(thread, reply)) setAnswers({});
+      // The outbox holds one message at a time: a failed one waits for its Retry or Edit before this can go.
+      else if (live.send.state.get().outbox.item?.phase === 'failed') setError(SLOT_TAKEN);
     });
   const dismiss = (what: Busy, text?: string) =>
     run(what, async () => hub.applyThread(await hub.request((api) => api.dismissOpenItems(thread.id, text))));
@@ -94,7 +95,8 @@ export function OpenItemsCard({ thread, live, waiting }: { thread: Thread; live:
                     label={o}
                     size="compact"
                     variant={value === o ? 'primary' : 'secondary'}
-                    accessibilityHint={value === o ? 'Picked. Tap again to clear.' : undefined}
+                    selected={value === o}
+                    accessibilityHint={value === o ? 'Tap again to clear.' : undefined}
                     disabled={!!busy}
                     onPress={() => setAnswers((a) => pickOption(a, item, o))}
                   />
@@ -109,7 +111,7 @@ export function OpenItemsCard({ thread, live, waiting }: { thread: Thread; live:
               placeholder={answerPlaceholder(item)}
               placeholderTextColor={colors.fg4}
               returnKeyType="send"
-              enablesReturnKeyAutomatically
+              // Return is never greyed out: it sends once any item has an answer, as Enter does on the web, even from an empty field.
               onSubmitEditing={() => void send()}
               style={[styles.input, { color: colors.fg, borderColor: colors.lineStrong, backgroundColor: colors.surface2 }]}
             />
@@ -180,7 +182,7 @@ const styles = StyleSheet.create({
   },
   itemActions: {
     flexDirection: 'row',
-    marginTop: -space.s5,
+    marginTop: -space.s6,
     marginRight: -space.s6,
   },
   kind: {
@@ -220,8 +222,8 @@ const styles = StyleSheet.create({
     fontSize: fontSize.caption,
   },
   iconTap: {
-    width: minTarget - 4,
-    height: minTarget - 4,
+    width: minTarget,
+    height: minTarget,
     alignItems: 'center',
     justifyContent: 'center',
   },

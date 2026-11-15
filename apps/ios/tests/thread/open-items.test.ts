@@ -1,7 +1,7 @@
 import { answersMessage, storeOpenItems, type OpenItem } from '@omni/shared/open-items.ts';
 import { describe, expect, it } from 'vitest';
 
-import { answerPlaceholder, answersAfter, openItemsHeading, pickOption, shownOpenItems } from '../../src/thread/open-items';
+import { answerPlaceholder, answersAfter, answersReply, answersWait, openItemsHeading, pickOption, shownOpenItems } from '../../src/thread/open-items';
 import { thread } from './fixtures';
 
 const question: OpenItem = { kind: 'question', text: 'Which port should the dev server use?' };
@@ -23,6 +23,34 @@ describe('shownOpenItems', () => {
 
   it('reads a malformed column as none', () => {
     expect(shownOpenItems(thread({ status: 'done', open_items: '{oops' }), false)).toEqual([]);
+  });
+});
+
+describe('answersWait', () => {
+  it('hides the card while a message is queued or sending, as the web card hides while one is queued', () => {
+    expect(answersWait(true, null)).toBe(true);
+    expect(answersWait(false, { phase: 'sending' })).toBe(true);
+    expect(answersWait(false, null)).toBe(false);
+  });
+
+  it('keeps the card while the outbox holds a failed send', () => {
+    expect(answersWait(false, { phase: 'failed' })).toBe(false);
+    const t = thread({ status: 'done', open_items: all });
+    expect(shownOpenItems(t, answersWait(false, { phase: 'failed' }))).toHaveLength(3);
+  });
+});
+
+describe('answersReply', () => {
+  it('lets Return send from an empty field once another item has an answer', () => {
+    const items = [question, decision, blocker];
+    // The focused field (the question's) is empty; the decision has a picked option.
+    const answers = pickOption({ [question.text]: '' }, decision, 'Postgres');
+    expect(answersReply(items, answers)).toBe(`My answers to what you left open:\n\n- Decision: ${decision.text}\n  Answer: Postgres`);
+  });
+
+  it('has nothing to send while no item has an answer', () => {
+    expect(answersReply([question, decision], {})).toBeNull();
+    expect(answersReply([question, decision], { [question.text]: '   ' })).toBeNull();
   });
 });
 
