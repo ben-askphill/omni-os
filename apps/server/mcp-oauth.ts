@@ -98,18 +98,19 @@ async function cachedSub(issuer: string, token: string, now: number): Promise<st
  * This install's /mcp resource URLs, never from what a request names: the configured public URL, this machine's
  * Connect hostname and its own MagicDNS name (`tailnetName`, from Tailscale). Loopback on this port only for a request
  * straight from this machine (`local`): every install answers on that URL, so a token naming it says nothing about
- * which one it is for. Each comes with and without `/mcp`: the metadata names the `/mcp` URL, but a client may send
- * the server's origin as its RFC 8707 resource instead (the MCP spec takes either as canonical), and that names this
- * install just as well.
+ * which one it is for. The configured public URL and the Connect hostname also count without `/mcp`: the metadata
+ * names the `/mcp` URL, but a client may send the server's origin as its RFC 8707 resource instead (the MCP spec takes
+ * either as canonical), and those origins serve only this install. Loopback and the tailnet name do not: every install
+ * shares loopback, and the tailnet name may serve other apps on this machine.
  */
 export function mcpResources(local: boolean, tailnetName: string | null = null): string[] {
-  const bases = local ? [`http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`] : [];
+  const resources = local ? [`http://127.0.0.1:${config.port}/mcp`, `http://localhost:${config.port}/mcp`] : [];
   const configured = resolved.mcpPublicUrl();
-  if (configured) bases.push(configured);
+  if (configured) resources.push(`${configured}/mcp`, configured);
   const connect = connectHostname();
-  if (connect) bases.push(`https://${connect}`);
-  if (tailnetName) bases.push(`https://${tailnetName.replace(/\.$/, '')}`);
-  return [...new Set(bases.flatMap((b) => [`${b}/mcp`, b]))];
+  if (connect) resources.push(`https://${connect}/mcp`, `https://${connect}`);
+  if (tailnetName) resources.push(`https://${tailnetName.replace(/\.$/, '')}/mcp`);
+  return [...new Set(resources)];
 }
 
 /**
