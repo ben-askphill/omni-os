@@ -3,7 +3,7 @@
 // done hides it from the Inbox with that work unfinished. With all of them finished it is one click, as before.
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { buildTree, doneNeedsConfirm, unfinishedLabel } from '@omni/shared/thread-tree.ts';
-import { errorText, type Thread } from './api.ts';
+import { errorText, type ChannelWithRunning, type Thread } from './api.ts';
 import { ConfirmDialog } from './components/ui.tsx';
 import { useApp } from './store.tsx';
 import { treeSource, useForgetTreeChoices } from './thread-tree.ts';
@@ -12,6 +12,10 @@ import { treeSource, useForgetTreeChoices } from './thread-tree.ts';
 type MarkDone = (t: { id: string; title?: string | null }, on: boolean) => Promise<Thread | null>;
 
 const Ctx = createContext<MarkDone | null>(null);
+
+/** A job's name from the lists, for a caller that holds only its id. */
+const titleIn = (channels: readonly ChannelWithRunning[], id: string) =>
+  channels.flatMap((c) => [...(c.handoffs ?? []), ...(c.teams ?? [])]).find((g) => g.parent.id === id)?.parent.title;
 
 interface Pending {
   id: string;
@@ -22,11 +26,11 @@ interface Pending {
 
 export function DoneConfirmProvider({ children }: { children: ReactNode }) {
   const { channels, needsYou, setDone } = useApp();
+  useForgetTreeChoices();
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The latest lists, read when Ben asks rather than captured, so a stale closure never skips the question.
-  useForgetTreeChoices();
   const source = useRef({ channels, needsYou });
   source.current = { channels, needsYou };
 
@@ -38,7 +42,7 @@ export function DoneConfirmProvider({ children }: { children: ReactNode }) {
       if (!doneNeedsConfirm(nodes)) return setDone(t.id, true);
       return new Promise<Thread | null>((resolve) => {
         setError(null);
-        setPending({ id: t.id, title: t.title || 'Untitled', what: unfinishedLabel(nodes), resolve });
+        setPending({ id: t.id, title: t.title || titleIn(source.current.channels, t.id) || 'Untitled', what: unfinishedLabel(nodes), resolve });
       });
     },
     [setDone],

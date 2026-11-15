@@ -22,8 +22,10 @@ vi.mock('../src/store.tsx', async (importActual) => ({
 vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: () => {}, toast: () => {} }) }));
 
 import { treePrefKey } from '@omni/shared/thread-tree.ts';
-import type { BackgroundTask, ChannelWithRunning, ThreadStub } from '../src/api.ts';
+import type { BackgroundTask, ChannelWithRunning, NeedsYouItem, Thread, ThreadStub } from '../src/api.ts';
 import { DoneConfirmProvider } from '../src/done-confirm.tsx';
+import { needsCard } from '../src/mobile/activity.ts';
+import { NeedsActions } from '../src/mobile/NeedsCard.tsx';
 import { ChannelThreadEntry } from '../src/components/sidebar/SidebarRows.tsx';
 import { useJobTree, type JobTree } from '../src/thread-tree.ts';
 
@@ -97,6 +99,21 @@ describe('a choice made in a view that is not on screen', () => {
     expect(localStorage.getItem(`omni.${treePrefKey('sidebar', 'job')}`)).not.toBeNull();
     await at('done');
     expect(localStorage.getItem(`omni.${treePrefKey('sidebar', 'job')}`)).toBeNull();
+  });
+});
+
+describe('the phone card\'s Done question', () => {
+  it('names the job it is about', async () => {
+    const job = s('job', 'conductor', 'done', { title: 'Ship the thread tree' });
+    app.channels = conductor(job, [s('child', 'omni-os', 'running')]);
+    const item = { thread: job as unknown as Thread, result: null, blockers: [{ kind: 'child_failed', detail: 'x', count: 1, from: ['child'] }], at: job.created_at } as NeedsYouItem;
+    const card = needsCard(item, undefined, (h) => h, Date.parse('2026-11-15T21:00:00.000Z'));
+    await render(createElement(DoneConfirmProvider, null, createElement(NeedsActions, { card })));
+    const done = [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Mark done')!;
+    await act(async () => done.click());
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Under Ship the thread tree, 1 still runs');
+    expect(dialog?.textContent).not.toContain('Untitled');
   });
 });
 

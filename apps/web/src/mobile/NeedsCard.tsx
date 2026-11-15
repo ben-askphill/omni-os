@@ -25,7 +25,7 @@ export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
   const { readResult } = useApp();
   const markDone = useMarkDone();
   const [busy, setBusy] = useState<NeedsAction | null>(null);
-  const run = async (card: Pick<NeedsCard, 'id'>, a: NeedsAction) => {
+  const run = async (card: Pick<NeedsCard, 'id' | 'thread'>, a: NeedsAction) => {
     if (a.kind === 'open') return shell.open(href.thread(a.thread ?? card.id));
     if (a.kind === 'read') {
       readResult(a.uid);
@@ -34,7 +34,7 @@ export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
     setBusy(a);
     if (a.kind === 'done') {
       try {
-        if (await markDone({ id: card.id }, true)) shell.toast(DONE.done!);
+        if (await markDone(card.thread, true)) shell.toast(DONE.done!);
       } catch (e) {
         shell.toast(errorText(e));
       } finally {
