@@ -19,6 +19,10 @@ export interface RowAction {
 }
 
 const AVATAR = 36;
+/** The row's own inset, its second line (where the tree toggle sits) and the padding under that line. */
+const ROW_PAD = space.s2;
+const META_LINE = Math.round(fontSize.small * 1.35);
+const BODY_PAD = space.s5;
 const ACTION = 36;
 const ACTION_GAP = space.s2;
 /** What a row's text leaves free at its end for the actions, so the title truncates before them. */
@@ -91,13 +95,14 @@ export function InboxRowView({ row, last, actions, onPress, tree }: { row: Inbox
               <Text numberOfLines={1} style={[styles.meta, { color: colors.fg3 }]}>
                 {where}
               </Text>
-              {row.tree ? <TreeToggleSpace tree={row.tree} open={tree.open} /> : null}
+              {row.tree ? <TreeToggleSpace tree={row.tree} open={tree.open} line={META_LINE} /> : null}
             </View>
           </View>
         </Pressable>
         {row.tree ? (
-          <View style={[styles.toggle, { right: reserve }]} pointerEvents="box-none">
-            <TreeToggle tree={row.tree} open={tree.open} title={row.title} onToggle={tree.onToggle} />
+          // Over its spacer: the row's own padding, then the actions' room. Its band starts under the title line.
+          <View style={[styles.toggle, { right: ROW_PAD + reserve }]} pointerEvents="box-none">
+            <TreeToggle tree={row.tree} open={tree.open} title={row.title} onToggle={tree.onToggle} line={META_LINE} below={BODY_PAD} />
           </View>
         ) : null}
         <RowActions actions={actions} />
@@ -186,7 +191,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s6,
-    paddingHorizontal: space.s2,
+    paddingHorizontal: ROW_PAD,
     borderRadius: radius.xs,
   },
   body: {
@@ -194,7 +199,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     justifyContent: 'center',
     gap: space.s1,
-    paddingVertical: space.s5,
+    paddingVertical: BODY_PAD,
     minHeight: minTarget + space.s6,
   },
   line: {
@@ -214,15 +219,15 @@ const styles = StyleSheet.create({
   meta: {
     flex: 1,
     fontSize: fontSize.small,
-    lineHeight: Math.round(fontSize.small * 1.35),
+    lineHeight: META_LINE,
   },
   toggle: {
     position: 'absolute',
-    bottom: space.s2,
+    bottom: 0,
     flexDirection: 'row',
   },
   tree: {
-    marginLeft: space.s2 + AVATAR / 2,
+    marginLeft: ROW_PAD + AVATAR / 2,
     paddingBottom: space.s3,
   },
   actions: {

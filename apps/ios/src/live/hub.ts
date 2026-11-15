@@ -55,6 +55,9 @@ const LIST_CHANGES = new Set(['thread', 'channel', 'folder']);
 const NEEDS_YOU = 'needs_you';
 /** A burst of feed messages refetches the lists once, at most this often: a busy server sends several a second. */
 export const REFRESH_DEBOUNCE_MS = 500;
+/** A failed GET /tasks tries again after this, doubling up to TASKS_RETRY_MAX_MS until it loads. */
+export const TASKS_RETRY_MS = 5_000;
+export const TASKS_RETRY_MAX_MS = 60_000;
 
 export interface ChannelsState {
   channels: readonly ChannelWithRunning[] | null;
@@ -294,8 +297,19 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   });
 
   const tasks = createStore<readonly BackgroundTask[]>([]);
+  /** The list has loaded, from GET /tasks or a feed `tasks` message, which always carries the whole list. */
+  let tasksLoaded = false;
+  let tasksRetry: ReturnType<typeof setTimeout> | null = null;
+  let tasksRetryMs = TASKS_RETRY_MS;
+  function cancelTasksRetry() {
+    if (tasksRetry !== null) clearTimeout(tasksRetry);
+    tasksRetry = null;
+  }
   /** Keeps the sub-agents, and sets the store only when one starts or stops: the feed repeats the list about once a second. */
   function setTasks(list: readonly unknown[]) {
+    tasksLoaded = true;
+    cancelTasksRetry();
+    tasksRetryMs = TASKS_RETRY_MS;
     const next = list.filter((t): t is BackgroundTask => isRecord(t) && t.subagent === true && typeof t.thread_id === 'string' && typeof t.task_id === 'string');
     const key = (l: readonly BackgroundTask[]) => l.map((t) => `${t.thread_id}:${t.task_id}`).join();
     if (key(next) !== key(tasks.get())) tasks.set(next);
@@ -305,7 +319,14 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     try {
       setTasks(await withAuth(() => requireApi().tasks()));
     } catch {
-      // The next feed message brings the list again.
+      // The feed sends `tasks` only when the list changes, so while nothing starts or stops it would never bring the
+      // list. Ask again after a backoff, in the foreground only: coming back to the foreground asks anyway.
+      if (!foreground || tasksRetry !== null) return;
+      tasksRetry = setTimeout(() => {
+        tasksRetry = null;
+        void refreshTasks();
+      }, tasksRetryMs);
+      tasksRetryMs = Math.min(tasksRetryMs * 2, TASKS_RETRY_MAX_MS);
     }
   });
 
@@ -371,6 +392,11 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         void claudeArtifacts.reload();
       },
       onState: (state) => {
+        // The feed is connected, so the server is up: a list that never loaded asks again now.
+        if (state.kind === 'open' && !tasksLoaded) {
+          cancelTasksRetry();
+          void refreshTasks();
+        }
         feedState = state;
         recomputeLink();
       },
@@ -632,6 +658,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     setForeground(active) {
       foreground = active;
       if (!active) {
+        cancelTasksRetry();
         feed?.pause();
         for (const t of openThreads) t.pause();
         for (const a of openActions) a.pause();
@@ -656,6 +683,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       if (refreshTimer !== null) clearTimeout(refreshTimer);
       refreshTimer = null;
       due.channels = due.needsYou = due.pinned = false;
+      cancelTasksRetry();
       library.close();
       feed?.close();
       feed = null;

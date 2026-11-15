@@ -3,7 +3,7 @@
 // variant "phone"). Which rows show, and in what state, is @omni/shared/thread-tree.ts.
 import { treeRows, type Tally } from '@omni/shared/thread-tree.ts';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { shortAgo } from '../../live/channel-model';
 import { tallyLabel, tallyOf, TALLY_ORDER, type JobTree, type StubNode } from '../../live/thread-tree';
@@ -24,6 +24,22 @@ const NEST = space.s9;
 
 const GLYPH: Record<keyof Tally, 'needs' | 'failed' | 'running' | 'done'> = { needs: 'needs', failed: 'failed', running: 'running', done: 'done' };
 
+/** iOS's small activity indicator, drawn at this size. */
+const INDICATOR = 20;
+
+/**
+ * Work under way, where phone web's tree draws its Loader: the native activity indicator, as everywhere else on iOS
+ * (the liquid Loader stays web-only, README). Scaled down to the size web gives its Loader at that spot.
+ */
+function Running({ size }: { size: number }) {
+  const { colors } = useOmniTheme();
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <ActivityIndicator size="small" color={colors.live} style={{ transform: [{ scale: size / INDICATOR }] }} />
+    </View>
+  );
+}
+
 /** How many threads under a job are in each state: needs you, failed, running, done. */
 export function TreeTally({ tally }: { tally: Tally }) {
   const { colors } = useOmniTheme();
@@ -31,7 +47,7 @@ export function TreeTally({ tally }: { tally: Tally }) {
     <View style={styles.tally}>
       {TALLY_ORDER.filter((x) => tally[x.key]).map((x) => (
         <View key={x.key} style={styles.tallyPart}>
-          <StatusDot glyph={GLYPH[x.key]} size={6} />
+          {x.key === 'running' ? <Running size={9} /> : <StatusDot glyph={GLYPH[x.key]} size={6} />}
           <Text style={[styles.tallyCount, { color: colors.fg3 }]}>{tally[x.key]}</Text>
         </View>
       ))}
@@ -49,27 +65,35 @@ function ToggleFace({ tree, open }: { tree: JobTree; open: boolean }) {
   );
 }
 
-/** The job's tally with a chevron: a button that opens and closes its tree. It sits over the row, a sibling of its button. */
-export function TreeToggle({ tree, open, title, onToggle }: { tree: JobTree; open: boolean; title: string; onToggle: () => void }) {
+/**
+ * The job's tally with a chevron: a button that opens and closes its tree. It sits over the row, a sibling of its
+ * button, on the row's last line: `line` is that line's height and `below` the row's padding under it. Its touch area
+ * is that band and reaches no higher, so a tap on the title line above always opens the thread.
+ */
+export function TreeToggle({ tree, open, title, onToggle, line, below }: { tree: JobTree; open: boolean; title: string; onToggle: () => void; line: number; below: number }) {
   const { colors } = useOmniTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${open ? 'Close' : 'Open'} the threads under ${title}: ${tallyLabel(tree.tally)}`}
       accessibilityState={{ expanded: open }}
-      hitSlop={8}
+      hitSlop={{ top: 0, bottom: 0, left: space.s4, right: 0 }}
       onPress={onToggle}
-      style={({ pressed }) => [styles.toggle, { backgroundColor: pressed ? colors.wash : 'transparent' }]}
+      style={{ height: line + below, paddingBottom: below }}
     >
-      <ToggleFace tree={tree} open={open} />
+      {({ pressed }) => (
+        <View style={[styles.toggle, { height: line, backgroundColor: pressed ? colors.wash : 'transparent' }]}>
+          <ToggleFace tree={tree} open={open} />
+        </View>
+      )}
     </Pressable>
   );
 }
 
-/** The toggle's size without the button, to hold its place on the row's line it is laid over. */
-export function TreeToggleSpace({ tree, open }: { tree: JobTree; open: boolean }) {
+/** The toggle's size without the button, to hold its place on the row's last line, which keeps its own height. */
+export function TreeToggleSpace({ tree, open, line }: { tree: JobTree; open: boolean; line: number }) {
   return (
-    <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.toggle, styles.hidden]}>
+    <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.toggle, styles.hidden, { height: line }]}>
       <ToggleFace tree={tree} open={open} />
     </View>
   );
@@ -154,7 +178,7 @@ function Node({ n, last, spans, ...props }: TreeRowsProps & { n: StubNode; last:
         onPress={() => props.onOpen(t.id)}
         style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : 'transparent' }]}
       >
-        <View style={styles.mark}>{t.done_at ? <Icon name="check" size={10} color={colors.fg3} /> : <StatusDot glyph={n.state} size={7} />}</View>
+        <View style={styles.mark}>{t.done_at ? <Icon name="check" size={10} color={colors.fg3} /> : n.state === 'running' ? <Running size={11} /> : <StatusDot glyph={n.state} size={7} />}</View>
         {t.harness ? <HarnessLogo harness={t.harness} size={13} /> : null}
         <Text numberOfLines={1} style={[styles.title, { color: colors.fg2 }]}>
           {title}
@@ -190,7 +214,7 @@ export function AgentsRow({ count, onPress }: { count: number; onPress: () => vo
       <Rule last />
       <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : 'transparent' }]}>
         <View style={styles.mark}>
-          <StatusDot glyph="running" size={6} />
+          <Running size={10} />
         </View>
         <Icon name="layers" size={13} color={colors.fg3} />
         <Text numberOfLines={1} style={[styles.agents, { color: colors.fg3 }]}>
@@ -217,16 +241,13 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   toggle: {
-    height: 28,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s4,
     paddingHorizontal: space.s2,
-    borderRadius: 14,
+    borderRadius: space.s3,
   },
-  /** Only its width counts: the line it holds a place on keeps its own height. */
   hidden: {
-    height: 16,
     opacity: 0,
   },
   node: {
