@@ -72,8 +72,12 @@ Questions an agent asks the user with Omni's `ask_user_question` tool: one to fo
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
 **Inbox**:
-The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. With Channel rail (Beta) on, the same list fills the panel beside the rail from the Inbox disc (Home's place). On a phone, Activity shows the same list. When Appearance's **Press I for the Inbox** is on, pressing `i` outside a text field opens it. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Home (and the rail's Inbox landing) is the usage dashboard, not this list.
+The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. Each card names the machine the thread runs on (or last ran on) and, while a turn runs, how long it has gone. With Channel rail (Beta) on, the same list fills the panel beside the rail from the Inbox disc (Home's place). On a phone, Activity shows the same list. When Appearance's **Press I for the Inbox** is on, pressing `i` outside a text field opens it. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Home (and the rail's Inbox landing) is the usage dashboard, not this list.
 _Avoid_: Needs you (the reasons a thread waits), notifications, Home (the dashboard)
+
+**Goal**:
+On Claude Code, a `/goal <condition>` the session keeps working until the condition holds. The UI shows a line under the transcript (**Pursuing goal**, **Goal set**, **Goal complete**) and the status **Goal** while a turn works on it. It lives in the session on the machine that runs the thread and does not sync. Other harnesses have none.
+_Avoid_: Plan (agent todos), objective (generic)
 
 **Needs you**:
 One list across every thread neither archived nor marked done: each thread's newest unread **Result**, and what blocks a thread until the user acts (a **Question card** waiting for an answer, even in a running thread, a failed **Setup**, `recovered` or `uncertain` **Requests**, a **Limit stop**). Opening a thread reads the **Result** it shows and only that one, so a later one stays unread. Omni keeps read state separately (`result_reads`), and it never changes a thread's status, place in the lists or folder. It syncs and only moves forward. Each thread keeps the newest **Result** read on either Mac, ordered by the place each one has in its thread, never by a clock. The **Inbox** view and phone Activity list these threads among others.

@@ -4,11 +4,11 @@
 
 - [Install and first run](user/install.md): the desktop app, running from a checkout, and the step-by-step agent instructions
 - [Configuration](user/configuration.md): your config, `.env`, placeholders, secrets, Appearance (Channel rail Beta, Full color, Press I for Inbox, Press E to mark done), Accounts, Branch steps, worktree copy/shared directories, teardown actions and channel avatar backgrounds
-- [Threads](user/threads.md): Inbox and Needs you, machine tiles (CPU and RAM), Mark done, the composer (including Open PR when the agent asks and To Grok Bot), the quick-actions card, context chips, review notes, Auto-merge, Rerun failed checks, history, channel actions, Watch PR and Send to Grok Bot
+- [Threads](user/threads.md): Inbox (machine and run time on each card) and Needs you, Claude Code `/goal`, machine tiles (CPU and RAM), Mark done, the composer (including Open PR when the agent asks and To Grok Bot), the quick-actions card, context chips, review notes, Auto-merge, Rerun failed checks, history, channel actions, Watch PR and Send to Grok Bot
 - [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud, and Settings > Accounts for which account each is signed in to per machine
 - [Crew and Conductor](user/crew.md)
 - [No-mistakes](user/no-mistakes.md): optional local git gate for pushing a branch and opening its PR
-- [Automations](user/automations.md): cron, GitHub PR events, published pages and signed GitHub webhooks, with optional `precheck` and `catchup_max_age` skips
+- [Automations](user/automations.md): edit in Omni (Form or YAML, machine per automation), cron, GitHub PR events, published pages and signed GitHub webhooks, with optional `precheck` and `catchup_max_age` skips
 - [Sync between two Macs](user/sync.md): signed changes, first-key trust for Omni Connect machines ([ADR 0013](adr/0013-paired-machines-are-trusted.md)), handoff and repo clone on a machine without the checkout
 - [Remote access and security](user/remote-access.md), including the phone layout, home-screen setup and pairing the native iOS app
 - [Omni Connect](user/omni-connect.md): open any machine from a phone through your relay, without Tailscale
