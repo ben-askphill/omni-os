@@ -24,6 +24,8 @@ You do these once, on the Mac that has your Apple account. An agent cannot do th
 
 Linux needs no secrets.
 
+The run pushes its version commit straight to `main`, which the "main: CI required" ruleset blocks for everyone except deploy keys. So the workflow checks out with the `RELEASE_DEPLOY_KEY` secret, the private half of a write deploy key on the repo. To replace it, run `ssh-keygen -t ed25519 -N "" -f key`, add `key.pub` under Settings, Deploy keys with write access, run `gh secret set RELEASE_DEPLOY_KEY < key`, then delete both files.
+
 ## Release
 
 ```sh

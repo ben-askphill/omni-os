@@ -21,7 +21,7 @@ If you already run Omni for real on :4747, do not develop against it. Use the th
 | `npm test` | `turbo boundaries`, then every package's vitest suite |
 | `npm run typecheck` | `tsc` in every package, with `noUnusedLocals` and `noUnusedParameters` on |
 | `npm run unused` | Knip: unused files, dependencies and binaries (`knip.json`). Unused exports are not checked yet |
-| `npm run check` | Typecheck, knip, then `npm test`. CI (`.github/workflows/ci.yml`) runs the same three plus `npm run build` on every PR, and `check` must pass before a PR merges into `main` |
+| `npm run check` | Typecheck, knip, then `npm test`. CI (`.github/workflows/ci.yml`) runs the same three plus `npm run build` on every PR. The "main: CI required" ruleset needs its `check` and `desktop` jobs green before a PR merges into `main` |
 | `npx turbo run test --filter=@omni/web` | One package (`server`, `web`, `desktop`, `shared`) |
 | `cd apps/server && npx vitest run tests/<file>.test.ts` | One file |
 | `npx turbo run test --affected` | Only what changed against `main` |
