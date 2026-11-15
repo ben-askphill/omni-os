@@ -34,6 +34,8 @@ import { joinMenus, useNewThreadMenus, useSlashMenu } from './composer/menus.tsx
 import { pickerOptions } from './composer/pickerOptions.tsx';
 import { finePointer, SteerButton, ThreadRunPills } from './composer/ReplyControls.tsx';
 import { ThreadMachineChip, type MachineHeld } from './composer/MachineChip.tsx';
+import { LivesOnNote, sendRefusal, type SendRefusal } from './thread/LivesOn.tsx';
+import { TakeoverConfirm } from './thread/Takeover.tsx';
 
 export { AttachmentStrip, useAttachments };
 
@@ -266,11 +268,15 @@ export function useReplySend(threadId: string) {
     lastRequest.current = null;
   }, [threadId]);
   return useCallback(
-    async (prompt: string, mode: SendMode | undefined, files: File[], context: readonly MessageContext[] = []) => {
+    /**
+     * `ifAway: 'ask'`: when the thread lives on a machine Tailscale sees asleep, refuse with `lives_on` (Send there,
+     * Take over) instead of leaving the message to wait there. The reply boxes ask; Send there sends without it.
+     */
+    async (prompt: string, mode: SendMode | undefined, files: File[], context: readonly MessageContext[] = [], ifAway?: 'ask') => {
       const ids = context.map((r) => r.id);
       const request = requestIdFor(lastRequest.current, sendKey(prompt, mode, files, ids));
       lastRequest.current = request;
-      const body = { prompt, ...(mode && { mode }), ...(context.length ? { context } : {}), request_id: request.id };
+      const body = { prompt, ...(mode && { mode }), ...(context.length ? { context } : {}), request_id: request.id, ...(ifAway && { if_away: ifAway }) };
       // In the thread at once, files and all, while the upload and the server's checks run (sending.ts).
       const done = beginSend(threadId, request.id, prompt, files);
       try {
@@ -327,15 +333,25 @@ export function ReplyComposer({
   const [text, setText] = useState(() => drafts.get(key) ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A send the server refused with where the thread lives or a raw reason (LivesOn.tsx), and the mode it went with.
+  const [away, setAway] = useState<{ refusal: SendRefusal; mode?: SendMode } | null>(null);
+  const [takingOver, setTakingOver] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const att = useAttachments();
   const context = useDraftContext(threadId);
   const sendReply = useReplySend(threadId);
   useAutosize(ref, text, 240);
 
+  // Once Take over is asked for (or the thread is here again), the card's offer is past.
+  const takeover = machine?.takeover;
+  useEffect(() => {
+    if (!takeover) setAway((a) => (a?.refusal.livesOn ? null : a));
+  }, [takeover]);
+
   useEffect(() => {
     setText(drafts.get(key) ?? '');
     setError(null);
+    setAway(null);
     att.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -360,12 +376,14 @@ export function ReplyComposer({
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
   const canSend = !!text.trim() || context.length > 0;
-  const submit = async (mode?: SendMode) => {
+  /** `sendThere`: the card's Send there, which lets the message wait for a machine that is asleep. */
+  const submit = async (mode?: SendMode, sendThere = false) => {
     const raw = text;
     const prompt = raw.trim();
     if (!canSend || busy) return;
     setBusy(true);
     setError(null);
+    setAway(null);
     // The box empties now: the message shows in the thread while it goes, and comes back here if it fails.
     const files = att.files;
     drafts.delete(key);
@@ -373,13 +391,15 @@ export function ReplyComposer({
     att.clear();
     onSending?.();
     try {
-      const t = await sendReply(prompt, mode, files, context);
+      const t = await sendReply(prompt, mode, files, context, sendThere ? undefined : 'ask');
       onSent?.(t, mode);
     } catch (e) {
       // Unless Ben started a new message meanwhile.
       if (!latest.current || latest.current === raw) update(raw);
       att.add(files);
-      setError(errorText(e));
+      const refusal = sendRefusal(e);
+      if (refusal.livesOn || refusal.detail) setAway({ refusal, mode });
+      else setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -502,7 +522,28 @@ export function ReplyComposer({
           <div className="px-4 pb-2.5 text-[12px] text-fg-3">{slash.hint}</div>
         )}
       </div>
+      {away && (
+        <LivesOnNote
+          className="mx-2 mb-2"
+          refusal={away.refusal}
+          takeover={machine?.takeover}
+          busy={busy}
+          onSendThere={() => void submit(away.mode, true)}
+          onTakeOver={() => setTakingOver(true)}
+        />
+      )}
       {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
+      {takingOver && machine?.takeover && (
+        <TakeoverConfirm
+          threadId={threadId}
+          takeover={machine.takeover}
+          onClose={() => setTakingOver(false)}
+          onChanged={(a) => {
+            setAway(null);
+            machine.onChanged(a);
+          }}
+        />
+      )}
     </div>
   );
 }

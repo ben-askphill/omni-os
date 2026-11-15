@@ -48,7 +48,8 @@ export async function call(path: string, init?: RequestInit) {
     }
   }
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(body.error ?? `HTTP ${res.status}`, res.status);
+  // A refusal's `detail` (such as git's reason under it) belongs to the message, so the agent reads both.
+  if (!res.ok) throw new ApiError(body.error ? (body.detail ? `${body.error} ${body.detail}` : body.error) : `HTTP ${res.status}`, res.status);
   return body;
 }
 

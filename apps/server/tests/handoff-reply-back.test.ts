@@ -1,15 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MemoryTransport } from '../sync/transport.ts';
 import { tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
 
-// Repro for the PR 554 thread: a worktree thread handed A -> B, a commit made on B, then Ben's next message sent on A.
-// The reply moves the thread back to A (docs/user/sync.md "You can still just reply to an idle thread here"), but
-// nothing carries B's worktree: A's turn runs on A's stale checkout, without B's commit.
+// From the PR 554 thread: a worktree thread handed A -> B, a commit made on B, then Ben's next message sent on A. That
+// reply once moved the thread back to A with nothing of B's worktree, so A's turn ran on A's stale checkout without
+// B's commit. A worktree thread's replies now go to the machine that holds it (ownership.ts remoteHolder, ADR 0005
+// amendment): the reply runs on B, on top of B's commit, and moving the thread back stays Take over.
 
 const relay = new MemoryTransport();
 const NODE_A = { id: 'nA', dns: 'mac-a.tail1234.ts.net' };
@@ -49,7 +50,7 @@ beforeAll(async () => {
 }, 60_000);
 
 describe('a worktree thread handed A -> B, then replied to on A', () => {
-  it('runs on A without the commit B made', { timeout: 90_000 }, async () => {
+  it('runs the reply on B, on top of the commit B made', { timeout: 90_000 }, async () => {
     const origin = join(shared, 'origin.git');
     git(shared, 'init', '-q', '--bare', '-b', 'main', origin);
     const seed = join(shared, 'seed');
@@ -95,28 +96,33 @@ describe('a worktree thread handed A -> B, then replied to on A', () => {
     await b.sync();
     await a.sync();
 
-    // What A shows before Ben replies: B holds it, idle, nothing blocks a reply here.
+    // What A shows before Ben replies: B holds it, idle, nothing blocks a reply here, and the chip says replies go there.
     const before = await detail(a, t.id);
     expect(a.db.assignments.get(t.id)?.machine).toBe('mac-b');
     expect(before.blocked).toBeUndefined();
+    expect(before.takeover).toMatchObject({ from: { id: 'mac-b' }, forwards: true });
 
     // 3. Ben replies on A (as at 10:06Z: "Commit your work, push the branch and open a PR").
-    const resultsBefore = a.byKind(t.id, 'result').length;
+    const resultsBefore = b.byKind(t.id, 'result').length;
+    const spawnsOnA = a.spawns(t.id).length;
     const reply = await a.json(`/threads/${t.id}/messages`, { body: { prompt: 'commit, push and open a PR' } });
     expect(reply.status).toBe(200);
-    await waitFor(() => a.byKind(t.id, 'result').length > resultsBefore, 'A to run the reply', 20_000);
-    await idle(a, t.id);
+    expect(reply.body.forwarded_to).toBe('Mac B');
+    await eventually(async () => {
+      await a.sync();
+      await b.sync();
+      return b.byKind(t.id, 'result').length > resultsBefore;
+    }, 'B to run the reply');
+    await idle(b, t.id);
+    expect(b.claudeTexts(t.id).at(-1)).toContain('commit, push and open a PR');
 
-    // The thread is A's again: the reply claimed it, and no offer or request carried anything back.
-    expect(a.db.assignments.get(t.id)?.machine).toBe('mac-a');
-    expect(a.db.kv.get<{ to: { id: string } }>(`handoff.offer.${t.id}`)?.to.id).toBe('mac-b');
-    expect(a.db.kv.get(`handoff.request.${t.id}`)).toBeFalsy();
-
-    // The gap: A's turn ran in A's old checkout. B's commit is not in it, not on A's branch, not in A's repo at all.
+    // The thread stays B's, and A never started a turn: its old checkout is as it was.
+    await a.sync();
+    expect(a.db.assignments.get(t.id)?.machine).toBe('mac-b');
+    expect(a.spawns(t.id)).toHaveLength(spawnsOnA);
     expect(git(wtA, 'rev-parse', 'HEAD')).toBe(baseA);
-    expect(existsSync(join(wtA, 'secret-drop.ts'))).toBe(false);
-    expect(() => git(cloneA, 'cat-file', '-e', `${commitB}^{commit}`)).toThrow();
-    // B still has it, unpushed.
+    // B's turn ran in B's worktree, with its commit.
+    expect(realpathSync(b.spawns(t.id).at(-1)!.cwd)).toBe(realpathSync(wtB));
     expect(git(wtB, 'rev-parse', 'HEAD')).toBe(commitB);
   });
 });

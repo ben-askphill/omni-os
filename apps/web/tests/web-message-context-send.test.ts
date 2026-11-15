@@ -100,7 +100,7 @@ describe.each([false, true])('a reply with context, phone=%s', (phone) => {
     expect(host.textContent).toContain('src/cart.ts:1-3');
     expect(sendButton()?.disabled).toBe(false);
     await act(async () => sendButton()!.click());
-    expect(sent).toEqual([{ prompt: '', context: [a], request_id: expect.any(String) }]);
+    expect(sent).toEqual([{ prompt: '', context: [a], request_id: expect.any(String), if_away: 'ask' }]);
     expect(draftContext(thread.id)).toEqual([]);
     expect(host.textContent).not.toContain('src/cart.ts:1-3');
   });
@@ -121,7 +121,7 @@ describe.each([false, true])('a reply with context, phone=%s', (phone) => {
     await type('fix it');
     answer = () => {};
     await act(async () => sendButton()!.click());
-    expect(sent).toEqual([{ prompt: 'fix it', context: [a], request_id: expect.any(String) }]);
+    expect(sent).toEqual([{ prompt: 'fix it', context: [a], request_id: expect.any(String), if_away: 'ask' }]);
     await act(async () => void addDraftContext(thread.id, b));
     await act(async () => answer!());
     expect(draftContext(thread.id)).toEqual([b]);
@@ -140,6 +140,7 @@ describe.each([false, true])('a reply with context, phone=%s', (phone) => {
     await mount(phone);
     await type('plain');
     await act(async () => sendButton()!.click());
-    expect(sent).toEqual([{ prompt: 'plain', request_id: expect.any(String) }]);
+    // The reply boxes ask before leaving a message for a machine that is asleep (components/thread/LivesOn.tsx).
+    expect(sent).toEqual([{ prompt: 'plain', request_id: expect.any(String), if_away: 'ask' }]);
   });
 });

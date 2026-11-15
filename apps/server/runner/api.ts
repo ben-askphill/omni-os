@@ -431,7 +431,7 @@ export function wakePrepared(r: MessageRequest): Promise<void> {
 export async function postMessage(
   threadId: string,
   prompt: string,
-  opts: Parameters<typeof sendMessage>[2] & { requestId?: string; fingerprint?: string } = {},
+  opts: Parameters<typeof sendMessage>[2] & { requestId?: string; fingerprint?: string; ifAway?: 'ask' | 'send' } = {},
 ): Promise<PostedThread> {
   const thread = threads.get(threadId);
   if (!thread) throw new Error('thread not found');
@@ -447,9 +447,17 @@ export async function postMessage(
   // Ben wrote instead of answering the agent's questions: a call waiting on them returns, so this message is read now.
   // On a thread that runs elsewhere the dismissal syncs to the machine whose call waits.
   const dismiss = source === 'ben' && mode !== 'queue';
-  // A thread routed to another machine runs there: the message goes to it (run-on.ts).
+  // A thread that stays on the machine holding it (sent there, delegated, or a worktree thread) runs there: the
+  // message goes to it (run-on.ts). Moving it here is Take over, which brings its branch and files along.
   if (remoteHolder(thread)) {
-    const forwarded = (await runnerPorts().routing.forwardMessage(thread, prompt, { mode, from: source, requestId: opts.requestId, attachments: opts.attachments, context: opts.context })) as PostedThread;
+    const forwarded = (await runnerPorts().routing.forwardMessage(thread, prompt, {
+      mode,
+      from: source,
+      requestId: opts.requestId,
+      attachments: opts.attachments,
+      context: opts.context,
+      ifAway: opts.ifAway,
+    })) as PostedThread;
     if (dismiss) dismissQuestions(threadId);
     return forwarded;
   }

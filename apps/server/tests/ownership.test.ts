@@ -1,4 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 
 // One execution owner (docs/adr/0005-one-execution-owner.md): the assignment record, its generation, how sync merges
@@ -19,11 +21,17 @@ beforeAll(async () => {
   await sync.setActiveWorker(sync.createSyncWorker({ transport: new MemoryTransport(), machineId: SELF }));
 });
 
-const plain = (id: string) =>
+const plain = (id: string, over: { cwd?: string; branch?: string; parent_id?: string } = {}) =>
   H.db.threads.create({
     id, channel_id: 'scratch', title: id, status: 'done', role: null, model: null, session_id: id, cwd: H.db.channels.get('scratch')!.base_dir!,
-    branch: null, parent_id: null, task_id: null, source: 'manual', automation: null,
+    branch: null, parent_id: null, task_id: null, source: 'manual', automation: null, ...over,
   });
+/** A thread in a worktree of its own, at Omni's path for it, made here when `made`. */
+const worktree = (id: string, made = true) => {
+  const cwd = join(H.paths.worktrees, id);
+  if (made) mkdirSync(cwd, { recursive: true });
+  return plain(id, { cwd, branch: `omni/${id}` });
+};
 
 describe('the assignment record', () => {
   it('a turn here claims the thread; a new machine is the next generation; the same one again changes nothing', () => {
@@ -98,6 +106,66 @@ describe('the delivery boundary', () => {
     expect(G.wakeBlocked(busy)).toBe('This thread is running on your other machine.');
     // Without sync there is no owner, so nothing is ever elsewhere.
     expect(O.ownedElsewhere(busy)).toMatchObject({ machine: 'mac-b' });
+  });
+});
+
+describe("where Ben's messages go", () => {
+  const holder = (id: string) => O.remoteHolder(H.db.threads.get(id)!);
+
+  it('to the holder for a worktree, delegated or routed thread another machine holds', () => {
+    worktree('wt-there');
+    H.db.assignments.claim('wt-there', 'mac-b');
+    expect(holder('wt-there')).toBe('mac-b');
+    plain('child-there', { parent_id: 'gen' });
+    H.db.assignments.claim('child-there', 'mac-b');
+    expect(holder('child-there')).toBe('mac-b');
+    plain('sent-there');
+    O.assignRouted('sent-there', 'mac-b');
+    expect(holder('sent-there')).toBe('mac-b');
+  });
+
+  it('here for a thread this machine holds, one in a shared folder, and one no machine is known to hold', () => {
+    worktree('wt-here');
+    H.db.assignments.claim('wt-here');
+    expect(holder('wt-here')).toBeNull();
+    // A shared folder is on both machines, so a reply between turns brings the thread here.
+    plain('shared-there');
+    H.db.assignments.claim('shared-there', 'mac-b');
+    expect(holder('shared-there')).toBeNull();
+    worktree('wt-nobody', false);
+    expect(holder('wt-nobody')).toBeNull();
+  });
+
+  it('marks the Take over of a thread whose replies go there', async () => {
+    const { takeoverOf } = await import('../handoff.ts');
+    expect(takeoverOf(H.db.threads.get('wt-there')!)).toMatchObject({ from: { id: 'mac-b' }, forwards: true });
+    expect(takeoverOf(H.db.threads.get('shared-there')!)).toMatchObject({ from: { id: 'mac-b' }, forwards: false });
+  });
+
+  it('claims, once per sync worker, a worktree thread no machine holds whose worktree is here', async () => {
+    const R = await import('../run-on.ts');
+    const { MemoryTransport } = await import('../sync/transport.ts');
+    const sync = await import('../sync/worker.ts');
+    const worker = sync.createSyncWorker({ transport: new MemoryTransport(), machineId: SELF });
+    worktree('old-here');
+    worktree('old-elsewhere', false);
+    worktree('old-legacy');
+    H.db.kv.set('handoff.holder.old-legacy', 'mac-old');
+    worktree('old-held');
+    H.db.assignments.claim('old-held', 'mac-b');
+    plain('old-shared');
+    expect(R.claimOwnWorktrees(worker)).toBe(1);
+    expect(H.db.assignments.get('old-here')).toMatchObject({ machine: SELF, generation: 0, routed: false });
+    // Its worktree is not here: whichever machine has it claims it.
+    expect(H.db.assignments.get('old-elsewhere')).toBeNull();
+    // A holder an older build wrote, or a row, stands.
+    expect(H.db.assignments.get('old-legacy')).toMatchObject({ machine: 'mac-old' });
+    expect(H.db.assignments.get('old-held')).toMatchObject({ machine: 'mac-b', generation: 0 });
+    expect(H.db.assignments.get('old-shared')).toBeNull();
+    // Once per worker: a thread made like it later is claimed when it runs, not by another pass.
+    worktree('old-later');
+    expect(R.claimOwnWorktrees(worker)).toBe(0);
+    expect(H.db.assignments.get('old-later')).toBeNull();
   });
 });
 

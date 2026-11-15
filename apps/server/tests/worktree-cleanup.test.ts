@@ -232,7 +232,12 @@ describe('cleanup: what it removes', T, () => {
     git(main, 'update-ref', '-d', keptRef(t.id));
     const res = await app.request(`/api/threads/${t.id}/messages`, json('POST', { prompt: 'again' }));
     expect(res.status).toBe(409);
-    expect(((await res.json()) as { error: string }).error).toMatch(new RegExp(`its branch ${t.branch} is gone from .* Make it again at the commit`));
+    // The plain words first; git's reason, with the command to make the branch again, on a line of its own.
+    const body = (await res.json()) as { error: string; detail?: string; lives_on?: unknown };
+    expect(body.error).toBe("This thread's worktree is not on this machine, and Omni could not make it again.");
+    expect(body.detail).toMatch(new RegExp(`^Its branch ${t.branch} is gone from .* Make it again at the commit`));
+    // No other machine holds it, so there is nowhere else it lives.
+    expect(body.lives_on).toBeUndefined();
   });
 
   it('checks the worktree out again for a turn Omni starts itself, which skips the message path', async () => {

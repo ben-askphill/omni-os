@@ -11,6 +11,7 @@ import { historyEdges } from '@omni/shared/history.ts';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
 import { TakeoverConfirm } from '../components/thread/Takeover.tsx';
 import { useThreadMachine } from '../components/composer/MachineChip.tsx';
+import { HERE } from '@omni/shared/thread-machine.ts';
 import { MoContinueLinks } from '../components/ContinueLinks.tsx';
 import { ErrorNote, StatusPill } from '../components/ui.tsx';
 import { plural } from '../format.ts';
@@ -252,6 +253,8 @@ export function ThreadScreen() {
         onSent={(t) => applyThread(t, true)}
         onSwitched={(t) => applyThread(t)}
         onFork={() => shell.sheet({ name: 'continue', source: thread })}
+        takeover={takeover}
+        onTakeOver={() => void machine.pick(HERE)}
       />
       {menu && (
         <MenuSheet

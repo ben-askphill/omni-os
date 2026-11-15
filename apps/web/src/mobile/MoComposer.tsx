@@ -1,7 +1,9 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
+import { LivesOnNote, sendRefusal, type SendRefusal } from '../components/thread/LivesOn.tsx';
+import type { Takeover } from '@omni/shared/handoff.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
 import { canSteer } from '../steer.ts';
@@ -36,9 +38,15 @@ export function MoComposer({
   onSwitched,
   onFork,
   stop,
+  takeover,
+  onTakeOver,
 }: {
   thread: Thread;
   chips: ComposerChip[];
+  /** The thread's Take over, for the card a send to a thread that lives on another machine can show. */
+  takeover?: Takeover | null;
+  /** Opens the Take over sheet. */
+  onTakeOver?: () => void;
   /** Set while a turn runs that can be stopped: an empty box shows Stop where Send sits. */
   stop?: { busy: boolean; run: () => void } | null;
   /** A function gets whether a busy thread steers, so it can say queue where the harness cannot steer. */
@@ -52,6 +60,8 @@ export function MoComposer({
   const [text, setText] = useState(() => drafts.get(thread.id) ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A send the server refused with where the thread lives or a raw reason (components/thread/LivesOn.tsx).
+  const [away, setAway] = useState<SendRefusal | null>(null);
   const [plus, setPlus] = useState(false);
   const [runSheet, setRunSheet] = useState(false);
   // The thread shows as this machine's, as on the desktop reply box: its run sheet names this machine's accounts.
@@ -68,6 +78,10 @@ export function MoComposer({
     drafts.set(thread.id, v);
   };
   const mic = useDictation((p) => update(withPhrase(ref.current?.value ?? '', p)));
+  // Once Take over is asked for (or the thread is here again), the card's offer is past.
+  useEffect(() => {
+    if (!takeover) setAway((a) => (a?.livesOn ? null : a));
+  }, [takeover]);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -81,12 +95,14 @@ export function MoComposer({
   const steers = canSteer(thread.harness, harnesses) && !thread.queued_harness;
   const hint = typeof placeholder === 'function' ? placeholder(steers) : placeholder;
   const canSend = !!text.trim() || context.length > 0;
-  const submit = async () => {
+  /** `sendThere`: the card's Send there, which lets the message wait for a machine that is asleep. */
+  const submit = async (sendThere = false) => {
     const prompt = text.trim();
     if (!canSend || busy) return;
     const mode: SendMode | undefined = busyThread ? (steers ? 'steer' : 'queue') : undefined;
     setBusy(true);
     setError(null);
+    setAway(null);
     // The box empties now: the message shows in the thread while it goes, and comes back here if it fails.
     const raw = text;
     const files = att.files;
@@ -94,14 +110,16 @@ export function MoComposer({
     drafts.delete(thread.id);
     att.clear();
     try {
-      const t = await send(prompt, mode, files, context);
+      const t = await send(prompt, mode, files, context, sendThere ? undefined : 'ask');
       onSent(t, mode);
     } catch (e) {
       // Unless Ben started a new message meanwhile.
       const now = ref.current?.value ?? '';
       if (!now || now === raw) update(raw);
       att.add(files);
-      setError(errorText(e));
+      const refusal = sendRefusal(e);
+      if (refusal.livesOn || refusal.detail) setAway(refusal);
+      else setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -168,6 +186,17 @@ export function MoComposer({
             </button>
           ))}
         </div>
+      )}
+      {away && (
+        <LivesOnNote
+          mobile
+          className="mb-2"
+          refusal={away}
+          takeover={takeover}
+          busy={busy}
+          onSendThere={() => void submit(true)}
+          onTakeOver={() => onTakeOver?.()}
+        />
       )}
       {(att.error || error) && <ErrorNote className="mb-2">{att.error ?? error}</ErrorNote>}
       <div className="flex flex-col rounded-[26px] bg-surface">

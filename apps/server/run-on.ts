@@ -16,8 +16,10 @@
 // - `runon.accepted.<thread>.<message>`: durable acceptance, synced so a new holder never replays it.
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { basename, dirname } from 'node:path';
 import { publishFeed } from './bus.ts';
-import { kv, outbox, remoteCommands, threads, tx, type RemoteCommand, type Thread } from './db.ts';
+import { assignments, db, kv, outbox, remoteCommands, threads, tx, type RemoteCommand, type Thread } from './db.ts';
 import { reportCommandId } from './db/repos/remote-commands.ts';
 import { inFlight } from './handoff/records.ts';
 import { COMMAND_WINDOW_MS, expiryReason, recordOutcome } from './remote-outcomes.ts';
@@ -25,6 +27,7 @@ import { holderOf, remoteHolder } from './ownership.ts';
 import { cancelLimitResume, fenceStale, interruptThread, resumeLimitNow, saveOwn, scheduleLimitResume, wakePrepared } from './runner.ts';
 import { fileReport } from './runner/queue.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
+import { livesOnRefusal } from './sync/guard.ts';
 import { safeSegment } from './sync/paths.ts';
 import { RUN_ON_NEEDS, syncProblem } from './sync/problem.ts';
 import { activeWorker, onSynced, type SyncWorker } from './sync/worker.ts';
@@ -108,19 +111,30 @@ function send(c: Omit<Parameters<typeof remoteCommands.add>[0], 'sender' | 'targ
   return saved.command;
 }
 
+/** When Tailscale sees the machine asleep or offline: when it last saw it. Null while it is up, or with no Tailscale to ask. */
+async function asleep(machine: string): Promise<{ lastSeen: string | null } | null> {
+  const d = deviceRecord(machine);
+  if (!d) return null;
+  const reach = reachabilityOf(await tailnet(), d);
+  return reach.reachability === 'offline' ? { lastSeen: reach.lastSeen } : null;
+}
+
 /**
- * Ben's message to a routed thread that runs elsewhere: written for the holder to send, and answered as accepted.
- * The message shows in the transcript once the holder's turn syncs back; until then the thread lists it as on its
- * way. Its files are in Storage before the command is written, so the holder never sees a message whose files it
- * cannot fetch.
+ * Ben's message to a thread that stays on the machine holding it (ownership.ts remoteHolder): written for the holder
+ * to send, and answered as accepted. The message shows in the transcript once the holder's turn syncs back; until then
+ * the thread lists it as on its way. Its files are in Storage before the command is written, so the holder never sees
+ * a message whose files it cannot fetch. `ifAway: 'ask'` (the reply box) refuses it first, with Send there and Take
+ * over to offer, when Tailscale sees the holder asleep or offline; without it the message waits for the holder.
  */
 export async function forwardMessage(
   t: Thread,
   prompt: string,
-  opts: { mode: Forwarded['mode']; from: 'ben' | 'conductor'; requestId?: string; attachments?: Attachment[]; context?: MessageContext[] },
+  opts: { mode: Forwarded['mode']; from: 'ben' | 'conductor'; requestId?: string; attachments?: Attachment[]; context?: MessageContext[]; ifAway?: 'ask' | 'send' },
 ) {
   const { mode, from } = opts;
   const holder = remoteHolder(t)!;
+  const away = opts.ifAway === 'ask' ? await asleep(holder) : null;
+  if (away) throw livesOnRefusal({ machine: { id: holder, name: nameOf(holder) }, why: 'offline', last_seen: away.lastSeen });
   const id = opts.requestId && isId(opts.requestId) ? opts.requestId : randomUUID();
   const files = await sendSaved(opts.attachments ?? []).catch((err) => {
     throw refused(`Could not send the files to ${nameOf(holder)}: ${(err as Error).message}`, (err as { status?: number }).status ?? 503);
@@ -326,4 +340,37 @@ function legacyStops(self: string, now: number) {
   }
 }
 
-onSynced((worker) => void reconcileRunOn(worker));
+/** The sync workers claimOwnWorktrees has run for in this process. */
+const claimedFor = new WeakSet<SyncWorker>();
+
+/**
+ * Once per sync worker, after its first sync: claim each worktree thread no machine is assigned to whose worktree is
+ * on this machine. Such a thread last ran before assignments existed (an older delegated thread, say), so no machine
+ * would forward a reply to it here, and the one Ben replied on would try to cut its worktree again from a branch that
+ * may be on no remote. After the sync, so a row another machine wrote is here first; two machines that both have the
+ * folder settle on one owner by the row's tie rule (db/repos/assignments.ts). Returns how many it claimed.
+ */
+export function claimOwnWorktrees(worker: SyncWorker): number {
+  if (claimedFor.has(worker)) return 0;
+  claimedFor.add(worker);
+  const rows = db
+    .prepare(`SELECT id, cwd FROM threads t WHERE branch IS NOT NULL AND NOT EXISTS (SELECT 1 FROM assignments a WHERE a.thread_id = t.id)`)
+    .all() as { id: string; cwd: string }[];
+  let claimed = 0;
+  for (const r of rows) {
+    // Its own worktree (handoff/worktree.ts inOwnWorktree), here; and no holder an older build wrote in kv.
+    if (basename(r.cwd) !== r.id || basename(dirname(r.cwd)) !== 'worktrees' || !existsSync(r.cwd) || assignments.get(r.id)) continue;
+    if (assignments.claim(r.id, worker.machineId)) claimed++;
+  }
+  if (claimed) console.log(`[run-on] claimed ${claimed} worktree thread${claimed === 1 ? '' : 's'} that ran here before assignments existed`);
+  return claimed;
+}
+
+onSynced((worker) => {
+  try {
+    claimOwnWorktrees(worker);
+  } catch (err) {
+    console.error('[run-on] could not claim worktree threads:', (err as Error).message);
+  }
+  void reconcileRunOn(worker);
+});

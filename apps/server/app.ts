@@ -57,7 +57,9 @@ const api = new Hono();
 app.onError((err, c) => {
   console.error('[api]', err);
   const status = err instanceof z.ZodError ? 400 : ((err as { status?: number }).status ?? 500);
-  return c.json({ error: err.message }, status as 400);
+  // A refusal with more to say than its message (sync/guard.ts livesOnRefusal): its fields go next to `error`.
+  const reply = (err as { reply?: unknown }).reply;
+  return c.json({ ...(reply && typeof reply === 'object' ? reply : {}), error: err.message }, status as 400);
 });
 
 // Ahead of every route: refuses requests without this install's token, and those other sites make through a browser

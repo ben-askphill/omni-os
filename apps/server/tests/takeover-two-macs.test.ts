@@ -121,7 +121,7 @@ describe('taking over a running thread', () => {
   it('B shows it running on A, with Take over', async () => {
     const d = await detail(b);
     expect(d.blocked).toBe('This thread is running on Mac A.');
-    expect(d.takeover).toEqual({ from: MAC_A, to: MAC_B, running: true, refused: null });
+    expect(d.takeover).toEqual({ from: MAC_A, to: MAC_B, running: true, refused: null, forwards: false });
     fixtures.set('thread-takeover.json', d);
     expect((await detail(a)).takeover).toBeUndefined();
   });
@@ -182,7 +182,7 @@ describe('taking over a running thread', () => {
     await both();
     const d = await detail(a);
     expect(d.blocked).toBe('This thread is running on Mac B.');
-    expect(d.takeover).toEqual({ from: MAC_B, to: MAC_A, running: true, refused: null });
+    expect(d.takeover).toEqual({ from: MAC_B, to: MAC_A, running: true, refused: null, forwards: false });
     expect(d.handoff).toMatchObject({ id: offerId, outgoing: true, requested: true, state: { phase: 'accepted' } });
     expect(await listed(a)).toBeUndefined();
     expect(await listed(b)).toBeUndefined();
@@ -216,7 +216,7 @@ describe('taking over an idle thread', () => {
     write(sessionFile(a, a.thread(t.id)), '{"type":"user","from":"mac-a"}\n');
     await both();
     const before = await detail(b, t.id);
-    expect(before.takeover).toEqual({ from: MAC_A, to: MAC_B, running: false, refused: null });
+    expect(before.takeover).toEqual({ from: MAC_A, to: MAC_B, running: false, refused: null, forwards: false });
     expect(before.blocked).toBeUndefined();
 
     expect((await takeOver(b, t.id)).status).toBe(200);
@@ -238,7 +238,7 @@ describe('taking over an idle thread', () => {
     expect(b.byKind(t.id, 'user').map((e) => e.p.source)).toEqual(['manual']);
 
     await both();
-    expect((await detail(a, t.id)).takeover).toEqual({ from: MAC_B, to: MAC_A, running: false, refused: null });
+    expect((await detail(a, t.id)).takeover).toEqual({ from: MAC_B, to: MAC_A, running: false, refused: null, forwards: false });
     expect((await handOff(a, t.id, 'mac-b')).body.error).toBe('This thread is on Mac B. Take it over instead.');
     expect((await b.json(`/threads/${t.id}/messages`, { body: { prompt: 'and the header' } })).status).toBe(200);
     await waitFor(() => b.spawns(t.id).some((s) => s.args.includes('--resume')), 'B to resume it for the next message', 20_000);
@@ -321,7 +321,8 @@ describe('a Take over that is refused', () => {
     a.db.threads.setLimit('limited', { state: 'limited', resets_at: null, id: 'limit-1', machine: 'mac-a' });
     await both();
     for (const [threadId, why] of cases) {
-      expect((await detail(b, threadId)).takeover).toEqual({ from: MAC_A, to: MAC_B, running: false, refused: why });
+      // A delegated thread's replies go to its holder; the others' bring it here.
+      expect((await detail(b, threadId)).takeover).toEqual({ from: MAC_A, to: MAC_B, running: false, refused: why, forwards: threadId === 'crew-member' });
       const res = await takeOver(b, threadId);
       expect(res.status).toBe(409);
       expect(res.body.error).toBe(why);
@@ -422,7 +423,7 @@ describe('Ben cancels, or A does not answer', () => {
     expect(request(b, tid)).toMatchObject({ state: 'cancelled' });
     expect(offer(a, tid)).toBeUndefined();
     expect(a.runner.isLive(tid)).toBe(true);
-    expect((await detail(b, tid)).takeover).toEqual({ from: MAC_A, to: MAC_B, running: true, refused: null });
+    expect((await detail(b, tid)).takeover).toEqual({ from: MAC_A, to: MAC_B, running: true, refused: null, forwards: false });
   });
 
   it('cancelled after A answered: B refuses the offer, and A keeps the queued message for Resume', T, async () => {
@@ -475,7 +476,7 @@ describe('Ben cancels, or A does not answer', () => {
     const d = await detail(b, tid);
     expect(d.handoff).toMatchObject({ requested: true, state: { phase: 'expired' } });
     expect(d.blocked).toBeUndefined();
-    expect(d.takeover).toEqual({ from: MAC_A, to: MAC_B, running: false, refused: null });
+    expect(d.takeover).toEqual({ from: MAC_A, to: MAC_B, running: false, refused: null, forwards: false });
     await a.sync();
     expect(offer(a, tid)).toBeUndefined();
   });

@@ -242,7 +242,7 @@ threadActionsApi.get('/:id/base', (c) => {
 threadActionsApi.post('/:id/messages', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, from, mode, request_id, context: raw, wake_cold } = z
+  const { prompt, from, mode, request_id, context: raw, wake_cold, if_away } = z
     .object({
       prompt: z.string(),
       from: z.enum(['ben', 'conductor']).default('ben'),
@@ -254,6 +254,9 @@ threadActionsApi.post('/:id/messages', async (c) => {
       context: z.unknown().optional(),
       // A parent thread's send to a thread whose session went cold is refused unless it was asked to resume that thread.
       wake_cold: z.boolean().default(false),
+      // A thread that lives on another machine Tailscale sees asleep: "ask" refuses with `lives_on` (Send there, Take
+      // over) instead of leaving the message to wait there. The reply box asks; Send there sends again without it.
+      if_away: z.enum(['ask', 'send']).default('send'),
     })
     .parse(data);
   const target = threads.get(id);
@@ -278,7 +281,7 @@ threadActionsApi.post('/:id/messages', async (c) => {
   const attachments = await saveUploads(id, files);
   // Ben's Fix checks step (the channel's own prompt or the built-in one) goes out with the failing checks and their log tails (fix-checks.ts), from any client.
   const text = from === 'ben' && stepOf(prompt, stepPrompts(channels.get(target.channel_id))) === 'checks' ? await fixChecksPrompt(target) : prompt;
-  return c.json(await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint }));
+  return c.json(await postMessage(id, text, { from, mode, attachments, context: stamped.value, requestId: request_id, fingerprint, ifAway: if_away }));
 });
 
 const requestIds = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) });

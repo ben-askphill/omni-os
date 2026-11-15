@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Device, HandoffPhase, HandoffView, Takeover } from '../handoff.ts';
-import { blockedNote, deviceRows, handoffBanner, handoffTargets, mayTakeOver, takeoverShown } from '../thread-machine.ts';
+import { livesOnOf, livesOnText, refusalDetail, takeoverNote, type Device, type HandoffPhase, type HandoffView, type LivesOn, type Takeover } from '../handoff.ts';
+import { blockedNote, deviceRows, handoffBanner, handoffTargets, HERE, mayTakeOver, takeoverShown, threadMachine } from '../thread-machine.ts';
 
 // What a client shows for handing a thread to another synced Mac (packages/shared/thread-machine.ts): when "Hand off to…" is
 // offered, which Macs can be picked and how each reads, the banner per phase on the giving and the taking Mac, and when
@@ -213,5 +213,50 @@ describe('the note over the composer', () => {
     const waiting = asked({ phase: 'requested', stale: false });
     expect(blockedNote(handoffBanner(waiting, 'running')!.text, waiting, 'running', null)).toBeNull();
     expect(blockedNote("This thread is running on Ben's MacBook Air.", waiting, 'running', null)).toBeNull();
+  });
+});
+
+describe('a thread whose replies go to the Mac that holds it', () => {
+  const idle = held({ running: false, forwards: true });
+  const ready = { state: 'ready' as const, devices: [air] };
+
+  it('says on the chip and its note that a reply goes there, and Take over still brings it here', () => {
+    const chip = threadMachine({ targets: ready, takeover: idle, handoff: null, running: false }, NOW)!;
+    expect(chip.kind).toBe('held');
+    expect(chip.rows[0]).toMatchObject({ value: 'm-pro', sub: 'Last ran there, replies go there' });
+    expect(chip.rows[1]).toMatchObject({ value: HERE, sub: 'Take over: next message runs here', disabled: false });
+    expect(takeoverNote(idle)).toBe("Last ran on Ben's MacBook Pro. Your messages run there.");
+    // One a reply brings here keeps the old words.
+    const moves = held({ running: false, forwards: false });
+    expect(threadMachine({ targets: ready, takeover: moves, handoff: null, running: false }, NOW)!.rows[0].sub).toBe('Last ran there');
+    expect(takeoverNote(moves)).toBe("Last ran on Ben's MacBook Pro.");
+  });
+});
+
+describe("a send refused because the thread lives on another Mac", () => {
+  const pro = { id: 'm-pro', name: "Ben's MacBook Pro" };
+
+  it('names the Mac and both ways on: Send there and Take over', () => {
+    expect(livesOnText({ machine: pro, why: 'offline', last_seen: '2026-10-23T11:40:00Z' }, NOW)).toBe(
+      "This thread lives on Ben's MacBook Pro, which is asleep or offline, last seen 20m ago. Send there and it runs once Ben's MacBook Pro is back, or take the thread over.",
+    );
+    expect(livesOnText({ machine: pro, why: 'offline', last_seen: null }, NOW)).toBe(
+      "This thread lives on Ben's MacBook Pro, which is asleep or offline. Send there and it runs once Ben's MacBook Pro is back, or take the thread over.",
+    );
+    expect(livesOnText({ machine: pro, why: 'rebuild', last_seen: null }, NOW)).toBe(
+      "This thread lives on Ben's MacBook Pro, and its worktree is not on this machine. Send there to run it on Ben's MacBook Pro, or take the thread over to bring the worktree here.",
+    );
+  });
+
+  it("reads the 409's lives_on and detail, and nothing from any other reply", () => {
+    const lives: LivesOn = { machine: pro, why: 'offline', last_seen: null };
+    expect(livesOnOf({ error: 'x', lives_on: lives })).toEqual(lives);
+    expect(livesOnOf({ error: 'x', lives_on: { machine: pro, why: 'elsewhere' } })).toBeNull();
+    expect(livesOnOf({ error: 'x', lives_on: { why: 'offline' } })).toBeNull();
+    expect(livesOnOf({ error: 'x' })).toBeNull();
+    expect(livesOnOf(null)).toBeNull();
+    expect(refusalDetail({ error: 'x', detail: 'Its branch omni/1 is gone' })).toBe('Its branch omni/1 is gone');
+    expect(refusalDetail({ error: 'x', detail: '' })).toBeNull();
+    expect(refusalDetail('x')).toBeNull();
   });
 });

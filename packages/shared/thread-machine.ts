@@ -223,7 +223,7 @@ export function threadMachine(
       value: t.from.id,
       takeover: t,
       rows: [
-        { value: t.from.id, label: t.from.name, sub: t.running ? 'Running there now' : 'Last ran there', disabled: false },
+        { value: t.from.id, label: t.from.name, sub: t.running ? 'Running there now' : t.forwards ? 'Last ran there, replies go there' : 'Last ran there', disabled: false },
         { value: HERE, label: hereLabel(t.to.name || v.hereName), sub: t.refused ?? (t.running ? 'Take over: stops there, continues here' : 'Take over: next message runs here'), disabled: !can },
       ],
     };

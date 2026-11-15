@@ -9,6 +9,8 @@
 //   handoff.offer.<thread>   written by the Mac giving the thread away.
 //   handoff.reply.<thread>   written by the Mac taking it, naming the offer it answers.
 
+import { relTime } from './format.ts';
+
 /** A synced Mac as it describes itself in kv `devices.<id>`. */
 export interface DeviceRecord {
   /** Its sync machine id. */
@@ -167,11 +169,54 @@ export interface Takeover {
   running: boolean;
   /** Why it cannot be taken over now, or null when it can. */
   refused: string | null;
+  /**
+   * Ben's messages go to that Mac and run there (a worktree thread, a delegated one, or one sent to run there). Otherwise
+   * a reply runs here and brings the thread here. Missing from an older server.
+   */
+  forwards?: boolean;
 }
 
 /** The note over the reply box on a thread another Mac holds. */
-export const takeoverNote = (t: Pick<Takeover, 'from' | 'running'>) =>
-  t.running ? `This thread is running on ${t.from.name}.` : `Last ran on ${t.from.name}.`;
+export const takeoverNote = (t: Pick<Takeover, 'from' | 'running' | 'forwards'>) =>
+  t.running ? `This thread is running on ${t.from.name}.` : t.forwards ? `Last ran on ${t.from.name}. Your messages run there.` : `Last ran on ${t.from.name}.`;
+
+/**
+ * POST /api/threads/:id/messages refused with 409 and `lives_on`: the thread lives on another machine and the message
+ * did not go there. `offline`: the client asked to hear first (`if_away: "ask"`) and Tailscale sees that machine asleep
+ * or offline, so a message sent there would wait for it. `rebuild`: this machine tried to make the thread's worktree
+ * and could not. The reply's `detail`, when there is one, is the raw reason (git's), for a secondary line.
+ */
+export interface LivesOn {
+  machine: { id: string; name: string };
+  why: 'offline' | 'rebuild';
+  /** When Tailscale last saw it, for `offline`. */
+  last_seen: string | null;
+}
+
+/** The refusal's text: where the thread lives, and the two ways on (Send there, Take over). */
+export function livesOnText(l: LivesOn, now = Date.now()): string {
+  const name = l.machine.name;
+  if (l.why === 'offline') {
+    const seen = l.last_seen ? `, last seen ${relTime(l.last_seen, now)}` : '';
+    return `This thread lives on ${name}, which is asleep or offline${seen}. Send there and it runs once ${name} is back, or take the thread over.`;
+  }
+  return `This thread lives on ${name}, and its worktree is not on this machine. Send there to run it on ${name}, or take the thread over to bring the worktree here.`;
+}
+
+/** A 409 body's `lives_on`, when it is one. */
+export function livesOnOf(body: unknown): LivesOn | null {
+  const l = body && typeof body === 'object' ? (body as { lives_on?: unknown }).lives_on : null;
+  if (!l || typeof l !== 'object') return null;
+  const v = l as Partial<LivesOn>;
+  if (!v.machine || typeof v.machine.id !== 'string' || typeof v.machine.name !== 'string' || (v.why !== 'offline' && v.why !== 'rebuild')) return null;
+  return { machine: { id: v.machine.id, name: v.machine.name }, why: v.why, last_seen: typeof v.last_seen === 'string' ? v.last_seen : null };
+}
+
+/** A 409 body's `detail`: the raw reason under the refusal, or null. */
+export const refusalDetail = (body: unknown): string | null => {
+  const d = body && typeof body === 'object' ? (body as { detail?: unknown }).detail : null;
+  return typeof d === 'string' && d ? d : null;
+};
 
 /** What Take over asks before it goes ahead: it cuts a turn on another Mac, which cannot be undone. */
 export function takeoverConfirm(t: Pick<Takeover, 'from' | 'to' | 'running'>): { title: string; body: string } {

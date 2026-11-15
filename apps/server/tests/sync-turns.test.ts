@@ -170,7 +170,9 @@ describe('with sync on', () => {
     thread('wt-lost', { channel_id: 'wt3', branch: 'omni/gone0000', cwd: '/Users/someone/omni-os/data/worktrees/wt-lost' });
     const res = await post('wt-lost');
     expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/omni\/gone0000/);
+    // Plain words first; the branch and git's reason on the line under them.
+    expect(res.body.error).toBe("This thread's worktree is not on this machine, and Omni could not make it again.");
+    expect(res.body.detail).toMatch(/omni\/gone0000/);
     expect(r.events('wt-lost')).toEqual([]);
     expect(existsSync(join(r.paths.worktrees, 'wt-lost'))).toBe(false);
   });

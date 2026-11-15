@@ -130,6 +130,7 @@
       "name": "Mac B"
     },
     "running": true,
-    "refused": null
+    "refused": null,
+    "forwards": false
   }
 }

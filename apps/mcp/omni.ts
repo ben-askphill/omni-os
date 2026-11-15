@@ -272,6 +272,7 @@ server.registerTool(
   {
     description:
       'Send a message to an existing thread (yours or any other). It resumes with full context. ' +
+      'A thread another synced machine holds (sent to run there, delegated, or one with its own worktree) gets the message there, and the answer names it in forwarded_to. ' +
       'If the thread is busy, mode "steer" (default) hands it over at its next step so it adjusts while it keeps working; ' +
       'mode "queue" waits until its current turn ends and then runs as a new turn. ' +
       'A steer to a thread whose harness cannot steer (Cursor) is queued automatically. ' +
@@ -289,7 +290,7 @@ server.registerTool(
       method: 'POST',
       body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer', ...(wake_cold && { wake_cold }) }),
     });
-    return text({ thread_id: t.id, status: t.status });
+    return text({ thread_id: t.id, status: t.status, ...(t.forwarded_to && { forwarded_to: t.forwarded_to }) });
   },
 );
 

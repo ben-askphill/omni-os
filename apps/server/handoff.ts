@@ -14,7 +14,7 @@ import { requestPhase, type HandoffOffer, type HandoffRequest, type HandoffView,
 import { publishFeed } from './bus.ts';
 import { paths } from './config.ts';
 import { assignments, channels, completions, messageRequests, outbox, resultReads, threads, tx, type Thread } from './db.ts';
-import { holderOf } from './ownership.ts';
+import { holderOf, remoteHolder } from './ownership.ts';
 import { HARNESS_META, isHarnessId, isProviderHarness, type HarnessId } from './harness/types.ts';
 import { needsWorktree, plannedWorktree } from './sandbox.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
@@ -181,7 +181,7 @@ export function takeoverOf(t: Thread): Takeover | null {
   if (!self || !holder || holder === self || inFlight(t.id)) return null;
   const from = { id: holder, name: machineName(holder) };
   const to = { id: self, name: ownName(self) };
-  return { from, to, running: busy(t), refused: activeWorker() ? refusal(t, from.name) : syncProblem(HANDOFF_NEEDS) };
+  return { from, to, running: busy(t), refused: activeWorker() ? refusal(t, from.name) : syncProblem(HANDOFF_NEEDS), forwards: !!remoteHolder(t) };
 }
 
 /**

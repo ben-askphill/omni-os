@@ -22,7 +22,7 @@ export interface RunnerPorts {
     forwardMessage(
       t: Thread,
       prompt: string,
-      opts: { mode: 'steer' | 'queue' | 'interrupt'; from: 'ben' | 'conductor'; requestId?: string; attachments?: Attachment[]; context?: MessageContext[] },
+      opts: { mode: 'steer' | 'queue' | 'interrupt'; from: 'ben' | 'conductor'; requestId?: string; attachments?: Attachment[]; context?: MessageContext[]; ifAway?: 'ask' | 'send' },
     ): Promise<unknown>;
     forwardReport(parentId: string, key: string, prompt: string, payload: Record<string, unknown>): void;
   };

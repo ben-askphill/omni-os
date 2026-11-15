@@ -34,12 +34,13 @@ export const ownedElsewhere = (t: Pick<Thread, 'id'>): Owner | null => (inFlight
 
 /**
  * The machine that keeps Ben's messages, Stop and limit actions for a thread that stays where it is: one sent to run
- * there (run-on.ts), or a delegated one, which never moves since its report wakes its parent where it ran. Null for
- * any other thread: a reply to one of those between turns brings it here (docs/user/sync.md).
+ * there (run-on.ts), a delegated one, which never moves since its report wakes its parent where it ran, or a worktree
+ * thread, whose branch and uncommitted files are on that machine and may be on no remote (only Take over carries
+ * them). Null for any other thread: a reply to one of those between turns brings it here (docs/user/sync.md).
  */
-export function remoteHolder(t: Pick<Thread, 'id' | 'parent_id'>): string | null {
+export function remoteHolder(t: Pick<Thread, 'id' | 'parent_id' | 'branch'>): string | null {
   const owner = ownedElsewhere(t);
-  return owner && (owner.routed || t.parent_id) ? owner.machine : null;
+  return owner && (owner.routed || t.parent_id || t.branch) ? owner.machine : null;
 }
 
 /**

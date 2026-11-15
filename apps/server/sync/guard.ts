@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import { livesOnText, type LivesOn } from '@omni/shared/handoff.ts';
 import { paths, threadDir } from '../config.ts';
 import { channels, outbox, threads, type Thread } from '../db.ts';
 import { restoreCheckout } from '../workspace.ts';
@@ -19,8 +20,22 @@ const busyElsewhere = (t: Pick<Thread, 'id' | 'status'>) => (t.status === 'runni
 /** True when the thread is running or queued on another machine. A new turn here would fork the session, so the runner must refuse one. */
 export const runningElsewhere = (t: Pick<Thread, 'id' | 'status'>) => !!busyElsewhere(t);
 
-/** A refused turn. app.ts answers it as a 409 with the message. */
-const refused = (message: string) => Object.assign(new Error(message), { status: 409 });
+/** A refused turn. app.ts answers it as a 409 with the message, and with `reply`'s fields when it has them. */
+const refused = (message: string, reply?: Record<string, unknown>) => Object.assign(new Error(message), { status: 409, ...(reply && { reply }) });
+
+/**
+ * A message that did not go to the machine the thread lives on: a 409 whose `lives_on` lets the reply box offer Send
+ * there and Take over (packages/shared/handoff.ts LivesOn). `detail` is the raw reason, for a line under the text.
+ */
+export const livesOnRefusal = (lives: LivesOn, detail: string | null = null) => refused(livesOnText(lives), { lives_on: lives, ...(detail && { detail }) });
+
+/** The thread's worktree could not be made here: where it lives when another machine holds it, git's reason under that. */
+function rebuildRefusal(t: Pick<Thread, 'id'>, why: string) {
+  const detail = why.charAt(0).toUpperCase() + why.slice(1);
+  const owner = heldElsewhere(t.id);
+  if (owner) return livesOnRefusal({ machine: { id: owner.machine, name: machineName(owner.machine) }, why: 'rebuild', last_seen: null }, detail);
+  return refused("This thread's worktree is not on this machine, and Omni could not make it again.", { detail });
+}
 
 /**
  * Where a thread whose folder is not here can run on this Mac, when Omni can make that folder: its own data
@@ -94,7 +109,7 @@ export async function prepareTurn(t: Thread, here = false, taking = false): Prom
       try {
         await restoreCheckout(target.worktree.repo, target.cwd, target.worktree.branch);
       } catch (err) {
-        throw refused(`This thread's worktree is not on this machine and Omni could not make it again: ${(err as Error).message}`);
+        throw rebuildRefusal(t, (err as Error).message);
       }
     }
   }

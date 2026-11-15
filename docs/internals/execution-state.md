@@ -97,7 +97,7 @@ stateDiagram-v2
 
 - A process here whose generation is behind the assignment is stale: `deliver` gives it nothing more, and `fenceStale`
   after each sync stops its turn with an error row, or closes it when idle.
-- Messages, Stop and limit actions for a `routed` or delegated thread go to its holder as remote commands (`run-on.ts`);
+- Messages, Stop and limit actions for a `routed`, delegated or worktree thread go to its holder as remote commands (`run-on.ts`);
   a wake for a thread held elsewhere parks for Resume (`sync/guard.ts wakeBlocked`, applied in `runner/queue.ts wake`).
 
 ## How the runner reaches the rest of Omni

@@ -279,6 +279,78 @@ describe('a thread delegated on the other machine', () => {
   }, T.timeout);
 });
 
+describe('a worktree thread made on the other machine', () => {
+  // Ben starts it on B: never routed, no parent, and its branch may be on no remote. Its worktree and files are on B
+  // only, so A sends it everything, and moving it to A is Take over, which carries them (docs/adr/0005 amendment).
+  const onB = async (prompt: string) => {
+    const t = await b.runner.createThread({ channel: 'code', prompt, device: 'here' });
+    await b.untilResults(t.id, 1);
+    for (let n = 0; n < 5 && a.db.assignments.holder(t.id) !== 'box-b'; n++) await both();
+    expect(a.db.assignments.get(t.id)).toMatchObject({ machine: 'box-b', routed: false });
+    expect(a.thread(t.id)).toMatchObject({ parent_id: null, branch: expect.stringMatching(/^omni\//) });
+    return t.id;
+  };
+  const forwardedOn = async (m: Mac, id: string) => ((await m.json(`/threads/${id}`)).body.pending as { forwarded_to?: string }[]).filter((p) => p.forwarded_to);
+
+  it("sends Ben's reply on the hub to that machine instead of cutting the worktree here", async () => {
+    const id = await onB('tidy the cart');
+    // The chip says what a reply does: it goes there.
+    expect((await a.json(`/threads/${id}`)).body.takeover).toMatchObject({ from: { id: 'box-b', name: 'Box B' }, forwards: true });
+    const res = await a.json(`/threads/${id}/messages`, { body: { prompt: 'and the drawer', request_id: 'wt-reply', if_away: 'ask' } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.forwarded_to).toBe('Box B');
+    expect(a.runner.isLive(id)).toBe(false);
+    expect(existsSync(join(a.paths.worktrees, id))).toBe(false);
+
+    await both();
+    await b.untilResults(id, 2);
+    expect(b.claudeTexts(id).at(-1)).toContain('and the drawer');
+    // A reply never moves it: B still holds it, and A never made the worktree.
+    await both();
+    expect(a.db.assignments.get(id)).toMatchObject({ machine: 'box-b', generation: 0 });
+    expect(existsSync(join(a.paths.worktrees, id))).toBe(false);
+  }, T.timeout);
+
+  it('runs a reply on the machine that holds it, as before', async () => {
+    const id = await onB('tidy the header');
+    expect((await b.json(`/threads/${id}`)).body.takeover).toBeUndefined();
+    const res = await b.json(`/threads/${id}/messages`, { body: { prompt: 'and the logo', if_away: 'ask' } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.forwarded_to).toBeUndefined();
+    await b.untilResults(id, 2);
+    expect(b.claudeTexts(id).at(-1)).toContain('and the logo');
+  }, T.timeout);
+
+  it('asks before leaving a message for a machine Tailscale sees asleep, and sends it there when told to', async () => {
+    const id = await onB('tidy the footer');
+    a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: false, lastSeen: new Date(Date.now() - 3 * 60_000).toISOString() }]));
+    try {
+      const asked = await a.json(`/threads/${id}/messages`, { body: { prompt: 'and the links', request_id: 'wt-asleep', if_away: 'ask' } });
+      expect(asked.status).toBe(409);
+      expect(asked.body).toMatchObject({
+        error: 'This thread lives on Box B, which is asleep or offline, last seen 3m ago. Send there and it runs once Box B is back, or take the thread over.',
+        lives_on: { machine: { id: 'box-b', name: 'Box B' }, why: 'offline', last_seen: expect.any(String) },
+      });
+      // Nothing went: no command waits for B.
+      expect(await forwardedOn(a, id)).toEqual([]);
+      // Send there: the same message, without the ask, waits for B.
+      const sent = await a.json(`/threads/${id}/messages`, { body: { prompt: 'and the links', request_id: 'wt-asleep' } });
+      expect(sent.status, JSON.stringify(sent.body)).toBe(200);
+      expect(sent.body.forwarded_to).toBe('Box B');
+      // The Conductor never asks: its message waits for B too.
+      const conductor = await a.json(`/threads/${id}/messages`, { body: { prompt: 'and the sitemap', from: 'conductor', mode: 'queue' } });
+      expect(conductor.status, JSON.stringify(conductor.body)).toBe(200);
+      expect(conductor.body.forwarded_to).toBe('Box B');
+      expect(await forwardedOn(a, id)).toHaveLength(2);
+    } finally {
+      a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: true }]));
+    }
+    await both();
+    await waitFor(() => ['and the links', 'and the sitemap'].every((m) => b.claudeTexts(id).some((t) => t.includes(m))), () => `both messages on B: ${JSON.stringify(b.claudeTexts(id))}`, 15_000);
+    expect(a.runner.isLive(id)).toBe(false);
+  }, T.timeout);
+});
+
 describe('a question from a thread delegated on the other machine', () => {
   // The Conductor delegated on B, so its crewmate runs there and asks there. Ben answers on A, on the card the parent's
   // thread shows (GET crew-questions), and the call waiting on B returns.

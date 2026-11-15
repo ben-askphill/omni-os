@@ -164,6 +164,7 @@
       "name": "Mac A"
     },
     "running": false,
-    "refused": null
+    "refused": null,
+    "forwards": false
   }
 }

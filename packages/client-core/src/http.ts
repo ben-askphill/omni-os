@@ -204,7 +204,9 @@ const parseJson = (text: string): unknown => {
 
 function errorMessage(data: unknown, contentType: string | null, status: number): string {
   if (data && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string' && (data as { error: string }).error) {
-    return (data as { error: string }).error;
+    // A refusal's `detail` (such as git's reason under it) goes on a line of its own, so nothing is hidden.
+    const { error, detail } = data as { error: string; detail?: unknown };
+    return typeof detail === 'string' && detail ? `${error}\n${detail}` : error;
   }
   if (typeof data === 'string' && data && !contentType?.toLowerCase().startsWith('text/html')) return data.slice(0, 300);
   return `Request failed (${status})`;
