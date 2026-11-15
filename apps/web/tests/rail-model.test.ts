@@ -27,6 +27,7 @@ describe('railSelection', () => {
 
   it('lights no disc on Overview, and the Inbox on its page and while a thread loads', () => {
     expect(railSelection({ name: 'home' }, null)).toEqual({ kind: 'overview' });
+    expect(railSelection({ name: 'channels' }, null)).toEqual({ kind: 'overview' });
     expect(railSelection({ name: 'inbox' }, null)).toEqual({ kind: 'inbox' });
     expect(railSelection({ name: 'thread', id: 't1' }, { id: 't0', channel_id: 'volero' })).toEqual({ kind: 'inbox' });
   });
@@ -36,6 +37,12 @@ describe('railSelection', () => {
     expect(railSelection({ name: 'artifacts' }, null)).toEqual({ kind: 'library' });
     expect(railSelection({ name: 'artifacts', source: 'claude' }, null)).toEqual({ kind: 'library' });
     expect(railSelection({ name: 'automations' }, null)).toEqual({ kind: 'automations' });
+  });
+
+  it('lights nothing, not even the Omni mark, on Search', () => {
+    const sel = railSelection({ name: 'search', q: 'x' }, null);
+    expect(sel).toEqual({ kind: 'none' });
+    expect(listMode(sel)).toEqual({ kind: 'none' });
   });
 
   it('selects Settings and the add-channel control on their pages', () => {

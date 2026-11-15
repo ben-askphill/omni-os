@@ -27,7 +27,8 @@ export interface Inbox {
   needs: InboxThread[];
   /** The rest of `inbox`: turns that ended, bold while unread. */
   finished: InboxThread[];
-  working: InboxShelf;
+  /** `threads`: every thread on the Working shelf, folded or not, so Overview lists what the shelf counts. */
+  working: InboxShelf & { threads: InboxThread[] };
   done: InboxShelf & { showMore: () => void };
   /** The recent list has come, so an empty inbox means nothing waits. */
   loaded: boolean;
@@ -83,7 +84,7 @@ export function useInbox(): Inbox {
     inbox: layout.inbox,
     needs: layout.inbox.filter(asks),
     finished: layout.inbox.filter((t) => !asks(t)),
-    working: { ...shelfView(layout.working, { open: workingOpen, openId }), open: workingOpen, toggle: toggleWorking },
+    working: { ...shelfView(layout.working, { open: workingOpen, openId }), open: workingOpen, toggle: toggleWorking, threads: layout.working },
     done: {
       ...shelfView(layout.done, { open: doneOpen, openId, limit: doneLimit }),
       open: doneOpen,

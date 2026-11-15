@@ -14,11 +14,13 @@ export interface RailChannel {
 }
 
 /**
- * What the rail highlights. Overview (the Omni mark's page) lights no disc. `marked`: the open thread's channel, when
+ * What the rail highlights. Overview (the Omni mark's page) lights no disc; `none` (Search and unknown pages) lights
+ * nothing, not even the mark. `marked`: the open thread's channel, when
  * the Inbox is selected for it, so its disc shows where the thread lives as well as where Ben came from.
  */
 export type RailSelection =
   | { kind: 'overview' }
+  | { kind: 'none' }
   | { kind: 'inbox'; marked?: string }
   | { kind: 'channel'; id: string }
   | { kind: 'prs' }
@@ -53,7 +55,6 @@ export function railSelection(route: Route, openThread: { id: string; channel_id
   switch (route.name) {
     case 'home':
     case 'channels':
-    case 'search':
       return { kind: 'overview' };
     case 'inbox':
       return { kind: 'inbox' };
@@ -75,7 +76,7 @@ export function railSelection(route: Route, openThread: { id: string; channel_id
     case 'new-channel':
       return { kind: 'new-channel' };
     default:
-      return { kind: 'overview' };
+      return { kind: 'none' };
   }
 }
 
