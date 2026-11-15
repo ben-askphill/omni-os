@@ -9,6 +9,7 @@ import {
   ThreadHistory,
   type AnswerResult,
   type Artifact,
+  type BackgroundTask,
   type ChannelWithRunning,
   type Fetch,
   type HarnessInfo,
@@ -100,6 +101,8 @@ export interface LiveHub {
   /** The header's link state, reduced from the feed and the open thread. */
   readonly link: Store<Link>;
   readonly needsYou: Store<NeedsYouState>;
+  /** The sub-agents running now, on every thread, for the thread tree on Activity. Background shells are left out. */
+  readonly tasks: Store<readonly BackgroundTask[]>;
   readonly activity: Store<ActivityState>;
   readonly library: Store<LibraryState>;
   /** Ben's claude.ai Artifacts, for the Library's claude.ai switch. Loads once the switch is first shown. */
@@ -290,6 +293,22 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     }
   });
 
+  const tasks = createStore<readonly BackgroundTask[]>([]);
+  /** Keeps the sub-agents, and sets the store only when one starts or stops: the feed repeats the list about once a second. */
+  function setTasks(list: readonly unknown[]) {
+    const next = list.filter((t): t is BackgroundTask => isRecord(t) && t.subagent === true && typeof t.thread_id === 'string' && typeof t.task_id === 'string');
+    const key = (l: readonly BackgroundTask[]) => l.map((t) => `${t.thread_id}:${t.task_id}`).join();
+    if (key(next) !== key(tasks.get())) tasks.set(next);
+  }
+  const refreshTasks = coalesced(async () => {
+    if (!api) return;
+    try {
+      setTasks(await withAuth(() => requireApi().tasks()));
+    } catch {
+      // The next feed message brings the list again.
+    }
+  });
+
   async function markResultRead(uid: string): Promise<void> {
     readsMarked += 1;
     needsYou.set((s) => (s.data ? { ...s, data: withoutResult(s.data, uid) } : s));
@@ -334,6 +353,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         const thread = isThreadChange(message);
         if (isListChange(message) || taskHostsChanged(message)) scheduleRefresh({ channels: true, needsYou: thread, pinned: thread });
         if (isRecord(message) && message.type === NEEDS_YOU) void refreshNeedsYou();
+        if (isRecord(message) && message.type === 'tasks' && Array.isArray(message.tasks)) setTasks(message.tasks);
         activity.applyFeed(message);
         library.applyFeed(message);
         claudeArtifacts.applyFeed(message);
@@ -345,6 +365,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       onReconnect: () => {
         void refreshChannels();
         void refreshNeedsYou();
+        void refreshTasks();
         void activity.refresh();
         void library.refresh();
         void claudeArtifacts.reload();
@@ -546,6 +567,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     startFeed(http);
     void refreshChannels();
     void refreshNeedsYou();
+    void refreshTasks();
     void activity.refresh();
     void library.refresh();
   }
@@ -555,6 +577,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     channels,
     link,
     needsYou,
+    tasks,
     activity: activity.state,
     library: library.state,
     claudeArtifacts: claudeArtifacts.state,
@@ -618,6 +641,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         for (const a of openActions) a.resume();
         void refreshChannels();
         void refreshNeedsYou();
+        void refreshTasks();
         void activity.refresh();
         void library.refresh();
       }

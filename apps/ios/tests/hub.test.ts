@@ -522,6 +522,28 @@ const inbox = (items: ReturnType<typeof waiting>[]) => ({
   blocked: items.filter((i) => i.blockers.length).length,
 });
 
+describe('sub-agents', () => {
+  it('loads the running sub-agents when the hub opens, then follows the feed, changing only when one starts or stops', async () => {
+    const t = fakeTransport();
+    const task = (thread_id: string, task_id: string, over: Record<string, unknown> = {}) => ({ thread_id, task_id, channel_id: 'c', description: 'x', subagent: true, background: true, started_at: '', ...over });
+    const { fetch, calls } = fakeFetch((path) => (path === '/api/tasks' ? { body: [task('t1', 'k1'), task('t1', 'shell', { subagent: false })] } : { body: [] }));
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    expect(calls).toContain('/api/tasks');
+    expect(hub.tasks.get().map((k) => k.task_id)).toEqual(['k1']);
+    const first = hub.tasks.get();
+    const [feed] = t.feeds();
+    feed?.sink.open();
+    feed?.sink.message(frame({ type: 'tasks', tasks: [task('t1', 'k1', { tool_uses: 4 })] }));
+    expect(hub.tasks.get()).toBe(first);
+    feed?.sink.message(frame({ type: 'tasks', tasks: [task('t1', 'k1'), task('t2', 'k2')] }));
+    expect(hub.tasks.get().map((k) => k.thread_id)).toEqual(['t1', 't2']);
+    feed?.sink.message(frame({ type: 'tasks', tasks: [] }));
+    expect(hub.tasks.get()).toEqual([]);
+    hub.close();
+  });
+});
+
 describe('needs you', () => {
   it('loads when the hub opens, and once more after a burst of needs_you messages', async () => {
     const t = fakeTransport();

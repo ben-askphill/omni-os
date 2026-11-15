@@ -20,6 +20,8 @@ export type ActionOutcome =
   | { kind: 'changed'; thread: Thread; message: string }
   /** The action asked for what the thread already is (a rename to the same title, a move to its own folder). */
   | { kind: 'unchanged' }
+  /** Ben was asked first (marking a job done while work under it is unfinished) and said no. */
+  | { kind: 'cancelled' }
   | { kind: 'failed'; error: string };
 
 /** One line, as the server stores it: runs of whitespace collapse and the ends are trimmed. */

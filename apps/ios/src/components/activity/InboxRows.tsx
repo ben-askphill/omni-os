@@ -1,16 +1,16 @@
 // Phone web's Inbox rows (apps/web/src/mobile/InboxRows.tsx) on the Activity tab: a thread with its status, a Done row,
 // a shelf's header and Show more. A row's actions sit over its right end as siblings of the row, so tapping one never
-// opens the thread.
-import { delegateLabel, type DelegateSummary } from '@omni/shared/delegate-count.ts';
+// opens the thread. A job's tree hangs under its row (ThreadTree.tsx).
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useChannelLook } from '../../live/react';
 import type { DoneRow, InboxRow } from '../../live/activity-model';
+import { tallyLabel } from '../../live/thread-tree';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../theme';
 import { Icon, type IconName } from '../../ui/Icon';
 import { Text } from '../../ui/Text';
 import { ChannelAvatar } from '../ChannelAvatar';
-import { StatusDot } from '../StatusDot';
+import { AgentsRow, TreeRows, TreeToggle, TreeToggleSpace } from './ThreadTree';
 
 export interface RowAction {
   icon: IconName;
@@ -46,55 +46,78 @@ function RowActions({ actions }: { actions: RowAction[] }) {
   );
 }
 
+/** What a job's row needs for its tree: whether it shows open, its toggle, and what its rows read. */
+export interface RowTree {
+  open: boolean;
+  onToggle: () => void;
+  channelName: (id: string) => string;
+  now: number;
+  onOpenThread: (threadId: string) => void;
+}
+
 /**
  * A thread as phone web's MoInboxRow draws it: the channel's avatar with the status on its corner, the title with the
- * status (or the time) on its right, then the channel, branch and delegate count.
+ * status (or the time) on its right, then the channel and branch. A job has its tally at the end of that line, a
+ * button laid over the row, and its tree under it. A row on the Working shelf lists its running sub-agents there too.
  */
-export function InboxRowView({ row, last, actions, onPress }: { row: InboxRow; last: boolean; actions: RowAction[]; onPress: () => void }) {
+export function InboxRowView({ row, last, actions, onPress, tree }: { row: InboxRow; last: boolean; actions: RowAction[]; onPress: () => void; tree: RowTree }) {
   const { colors } = useOmniTheme();
   const home = useChannelLook(row.channelId);
   const where = [`#${row.channel}`, row.branch].filter(Boolean).join(' · ');
   const right = row.status ? row.status.label : row.time;
+  const reserve = actionsWidth(actions.length);
+  const own = row.agents?.get(row.id) ?? 0;
+  const under = !!row.tree || own > 0;
+  const rule = { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line };
   return (
     <View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={[row.title, row.pinned ? 'pinned' : null, where, right, row.delegates ? delegateLabel(row.delegates) : null].filter(Boolean).join(', ')}
-        onPress={onPress}
-        style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
-      >
-        <ChannelAvatar name={home.name ?? row.channel} icon={home.icon} avatarBg={home.avatarBg} conductor={row.channelId === 'conductor'} glyph={row.glyph} size={AVATAR} />
-        <View style={[styles.body, { paddingRight: actionsWidth(actions.length) }, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }]}>
-          <View style={styles.line}>
-            <Text numberOfLines={1} style={[styles.title, { color: row.receded ? colors.fg3 : colors.fg }]}>
-              {row.title}
-            </Text>
-            <Text style={[styles.right, { color: colors.fg3 }]}>{right}</Text>
+      <View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={[row.title, row.pinned ? 'pinned' : null, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
+          onPress={onPress}
+          style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
+        >
+          <ChannelAvatar name={home.name ?? row.channel} icon={home.icon} avatarBg={home.avatarBg} conductor={row.channelId === 'conductor'} glyph={row.glyph} size={AVATAR} />
+          <View style={[styles.body, { paddingRight: reserve }, !last && !under && rule]}>
+            <View style={styles.line}>
+              <Text numberOfLines={1} style={[styles.title, { color: row.receded ? colors.fg3 : colors.fg }]}>
+                {row.title}
+              </Text>
+              <Text style={[styles.right, { color: colors.fg3 }]}>{right}</Text>
+            </View>
+            <View style={styles.line}>
+              {row.pinned ? <Icon name="pin" size={11} color={colors.fg3} /> : null}
+              <Text numberOfLines={1} style={[styles.meta, { color: colors.fg3 }]}>
+                {where}
+              </Text>
+              {row.tree ? <TreeToggleSpace tree={row.tree} open={tree.open} /> : null}
+            </View>
           </View>
-          <View style={styles.line}>
-            {row.pinned ? <Icon name="pin" size={11} color={colors.fg3} /> : null}
-            <Text numberOfLines={1} style={[styles.meta, { color: colors.fg3 }]}>
-              {where}
-            </Text>
-            {row.delegates ? <DelegateCount summary={row.delegates} /> : null}
+        </Pressable>
+        {row.tree ? (
+          <View style={[styles.toggle, { right: reserve }]} pointerEvents="box-none">
+            <TreeToggle tree={row.tree} open={tree.open} title={row.title} onToggle={tree.onToggle} />
           </View>
+        ) : null}
+        <RowActions actions={actions} />
+      </View>
+      {under ? (
+        <View style={[styles.tree, !last && rule]}>
+          {own > 0 ? <AgentsRow count={own} onPress={onPress} /> : null}
+          {row.tree ? (
+            <TreeRows
+              tree={row.tree}
+              open={tree.open}
+              onToggle={tree.onToggle}
+              agents={row.agents}
+              channelName={tree.channelName}
+              now={tree.now}
+              onOpen={tree.onOpenThread}
+            />
+          ) : null}
         </View>
-      </Pressable>
-      <RowActions actions={actions} />
-    </View>
-  );
-}
-
-/** The Conductor thread's delegated threads as one count: the diamond while one waits on Ben or failed (web: DelegateCount). */
-function DelegateCount({ summary }: { summary: DelegateSummary }) {
-  const { colors } = useOmniTheme();
-  const flagged = summary.state === 'needs' || summary.state === 'failed';
-  const tone = { needs: colors.fg, failed: colors.fg3, working: colors.live, settled: colors.fg4 }[summary.state];
-  return (
-    <View style={styles.delegates}>
-      {flagged ? <StatusDot glyph="needs" size={7} /> : null}
-      <Icon name="delegate" size={12} color={tone} />
-      <Text style={[styles.count, { color: tone }]}>{summary.total}</Text>
+      ) : null}
     </View>
   );
 }
@@ -193,14 +216,14 @@ const styles = StyleSheet.create({
     fontSize: fontSize.small,
     lineHeight: Math.round(fontSize.small * 1.35),
   },
-  delegates: {
+  toggle: {
+    position: 'absolute',
+    bottom: space.s2,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
   },
-  count: {
-    fontSize: fontSize.small,
-    fontVariant: ['tabular-nums'],
+  tree: {
+    marginLeft: space.s2 + AVATAR / 2,
+    paddingBottom: space.s3,
   },
   actions: {
     position: 'absolute',

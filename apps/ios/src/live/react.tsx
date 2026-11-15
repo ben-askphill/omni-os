@@ -1,4 +1,4 @@
-import { eventSourceTransport, xhrUploadTransport, type NeedsYou } from '@omni/client-core';
+import { eventSourceTransport, xhrUploadTransport, type BackgroundTask, type NeedsYou } from '@omni/client-core';
 import { useIsFocused } from '@react-navigation/native';
 import { addNetworkStateListener } from 'expo-network';
 import * as SecureStore from 'expo-secure-store';
@@ -11,6 +11,7 @@ import { shownResult } from '../needs/inbox';
 import type { ActionsLive, ActionsView } from './actions';
 import { afterFirstPage, afterNextPage, type ChannelPages } from './channel-pages';
 import { createHandoffPrefs, type HandoffPrefs } from './handoff-prefs';
+import { createTreePrefs, type TreePrefs } from './tree-prefs';
 import { createLiveHub, type LiveHub, type ThreadLive, type ThreadView } from './hub';
 import type { Link } from './connection';
 import type { OmniSession } from './session';
@@ -74,6 +75,33 @@ export function useChannelLook(id: string): { name: string | null; icon: string 
 /** What waits on Ben: unread results and blockers across the server's threads. Null until the first load. */
 export function useNeedsYou(): NeedsYou | null {
   return useStore(useLiveHub().needsYou).data;
+}
+
+/** The sub-agents running now, on every thread. */
+export function useTasks(): readonly BackgroundTask[] {
+  return useStore(useLiveHub().tasks);
+}
+
+const TREE_PREF_KEY = 'omni.pref.tree.inbox';
+let treePrefs: TreePrefs | null = null;
+
+/** One per app, like the handoffs': which job trees Ben opened or closed on Activity is a choice of this device. */
+function sharedTreePrefs(): TreePrefs {
+  treePrefs ??= createTreePrefs({
+    read: () => SecureStore.getItemAsync(TREE_PREF_KEY),
+    write: (value) => SecureStore.setItemAsync(TREE_PREF_KEY, value),
+  });
+  return treePrefs;
+}
+
+/**
+ * Ben's open or closed choices for the job trees on Activity, a setter, and a prune that drops the choices whose job
+ * moved between running and finished since (phone web: useJobTree and useForgetTreeChoices).
+ */
+export function useTreeChoices() {
+  const prefs = sharedTreePrefs();
+  const saved = useStore(prefs.saved);
+  return { saved, set: prefs.set, prune: prefs.prune };
 }
 
 function useAppActive(): boolean {

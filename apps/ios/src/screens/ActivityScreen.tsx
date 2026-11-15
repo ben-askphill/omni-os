@@ -1,10 +1,11 @@
-import { useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
-import { DoneRowView, InboxRowView, ShelfHeader, ShowMore, type RowAction } from '../components/activity/InboxRows';
+import { DoneRowView, InboxRowView, ShelfHeader, ShowMore, type RowAction, type RowTree } from '../components/activity/InboxRows';
 import { StatusLine } from '../components/StatusLine';
 import { activityInbox, DONE_INITIAL, DONE_PAGE, type ActivityInbox, type InboxRow } from '../live/activity-model';
-import { useActivity, useChannels, useLiveHub, useNeedsYou, usePullRefresh, useShelfOpen } from '../live/react';
+import { useActivity, useChannels, useLiveHub, useNeedsYou, usePullRefresh, useShelfOpen, useTasks, useTreeChoices } from '../live/react';
+import { treeIsOpen, treePhases, treeSource } from '../live/thread-tree';
 import { useMinuteClock } from '../live/use-minute-clock';
 import type { RootScreenProps } from '../navigation/types';
 import { usePairing } from '../pairing/PairingProvider';
@@ -27,6 +28,8 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
   const activity = useActivity();
   const { channels } = useChannels();
   const needsYou = useNeedsYou();
+  const tasks = useTasks();
+  const choices = useTreeChoices();
   const { activeServer, statusById, notice, clearNotice } = usePairing();
   const incompatible = activeServer !== null && statusById[activeServer.id] === 'incompatible';
   const now = useMinuteClock();
@@ -36,8 +39,29 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
   const act = useRowActions();
 
   const { recent, pinned } = activity;
-  const inbox = useMemo(() => activityInbox({ recent, needsYou, pinned, channels, now }), [recent, needsYou, pinned, channels, now]);
+  const inbox = useMemo(() => activityInbox({ recent, needsYou, pinned, channels, tasks, now }), [recent, needsYou, pinned, channels, tasks, now]);
   const open = (id: string) => navigation.navigate('Thread', { id });
+
+  // A tree Ben opened or closed by hand goes back to opening and closing by itself once its job moves between running
+  // and finished, on screen or not (phone web: useForgetTreeChoices).
+  const { prune } = choices;
+  useEffect(() => {
+    prune(treePhases(channels, treeSource(channels, needsYou)));
+  }, [channels, needsYou, prune]);
+  const names = useMemo(() => new Map((channels ?? []).map((c) => [c.id, c.name])), [channels]);
+  const treeOf = (row: InboxRow): RowTree => {
+    const shown = row.tree ? treeIsOpen(row.tree, choices.saved.get(row.id)) : false;
+    return {
+      open: shown,
+      onToggle: () => row.tree && choices.set(row.id, { open: !shown, phase: row.tree.phase }),
+      channelName: (id) => names.get(id) ?? id,
+      now,
+      onOpenThread: (id) => {
+        tap();
+        navigation.navigate('Thread', { id });
+      },
+    };
+  };
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -81,7 +105,7 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
 
       <View style={styles.list}>
         {inbox.waiting.map((row, i) => (
-          <InboxRowView key={row.id} row={row} last={i === inbox.waiting.length - 1} actions={rowActions(row)} onPress={() => open(row.id)} />
+          <InboxRowView key={row.id} row={row} last={i === inbox.waiting.length - 1} actions={rowActions(row)} onPress={() => open(row.id)} tree={treeOf(row)} />
         ))}
         <Empty inbox={inbox} error={activity.error} />
       </View>
@@ -92,7 +116,7 @@ export function ActivityScreen({ navigation }: RootScreenProps<'Activity'>) {
             <ShelfHeader label="Working" count={inbox.working.length} open={workingOpen} onToggle={toggleWorking} />
             {workingOpen &&
               inbox.working.map((row, i) => (
-                <InboxRowView key={row.id} row={row} last={i === inbox.working.length - 1} actions={rowActions(row)} onPress={() => open(row.id)} />
+                <InboxRowView key={row.id} row={row} last={i === inbox.working.length - 1} actions={rowActions(row)} onPress={() => open(row.id)} tree={treeOf(row)} />
               ))}
           </>
         )}
@@ -122,6 +146,7 @@ function useRowActions() {
   return (target: ThreadTarget, action: ThreadAction, ok: string) => {
     tap();
     void run(target, action).then(async (outcome) => {
+      if (outcome.kind === 'cancelled') return;
       if (outcome.kind === 'failed') {
         failure();
         Alert.alert('Could not change this thread', outcome.error);

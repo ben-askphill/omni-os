@@ -1,19 +1,13 @@
 // The Activity tab: phone web's Inbox (apps/web/src/mobile/ActivityScreen.tsx), with its shelves mirrored from
 // apps/web/src/inbox.ts (inboxLayout) and its card status shared with the web (inboxStatus). Pinned threads, then the
 // threads waiting on Ben, the latest back first; Working and Done fold away below them. Pure.
-import type { ChannelWithRunning, NeedsYou, NeedsYouItem, PinnedThread, Thread, ThreadStub } from '@omni/client-core';
-import {
-  delegatedIds,
-  delegatesByParent,
-  delegateSummary,
-  isWorking,
-  type DelegateNeeds,
-  type DelegateSummary,
-} from '@omni/shared/delegate-count.ts';
+import type { BackgroundTask, ChannelWithRunning, NeedsYou, PinnedThread, Thread, ThreadStub } from '@omni/client-core';
+import { delegatedIds, isWorking } from '@omni/shared/delegate-count.ts';
 
 import { asksForYou, inboxStatus, threadGlyph, type Glyph, type RowStatus } from '@omni/shared/status.ts';
 import { canMarkDone, targetOfStub, type ThreadTarget } from '../thread/target';
 import { shortAgo } from './channel-model';
+import { agentsByThread, jobTree, treeSource, type JobTree } from './thread-tree';
 
 /** Any thread the inbox can list: a full row from the recent list, or the stub the pinned and channel lists send. */
 type InboxThread = ThreadStub & Partial<Pick<Thread, 'role' | 'branch' | 'archived'>> & { delegating?: boolean };
@@ -39,8 +33,13 @@ export interface InboxRow {
   receded: boolean;
   /** The check on the row's end: a running or queued thread brings its own result first. */
   canMarkDone: boolean;
-  /** A Conductor thread's delegated threads, counted on its row since they get none of their own. */
-  delegates: DelegateSummary | null;
+  /** A job's delegated threads and team members, with its own below them: the tally on its row and the tree under it. */
+  tree: JobTree | null;
+  /**
+   * The sub-agents running under this row and its tree, by thread. Only a row on the Working shelf has them, as on phone
+   * web: a sub-agent a stopped or failed turn left behind never shows.
+   */
+  agents: ReadonlyMap<string, number> | null;
   /** What the row's actions act on. */
   target: ThreadTarget;
 }
@@ -71,6 +70,8 @@ export interface ActivityInput {
   needsYou: NeedsYou | null;
   pinned: readonly PinnedThread[];
   channels: readonly ChannelWithRunning[] | null;
+  /** The live background tasks, for the sub-agents under a Working row. */
+  tasks?: readonly BackgroundTask[];
   now: number;
 }
 
@@ -82,15 +83,15 @@ const at = (t: InboxThread) => t.updated_at ?? t.created_at;
 /** Newest first; a tie goes to the lower id, so the order never flickers between reloads. */
 const newest = (key: (t: InboxThread) => string) => (a: InboxThread, b: InboxThread) => key(b).localeCompare(key(a)) || a.id.localeCompare(b.id);
 
-export function activityInbox({ recent, needsYou, pinned, channels, now }: ActivityInput): ActivityInbox {
+export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }: ActivityInput): ActivityInbox {
   const list = channels ?? [];
   const names = new Map(list.map((c) => [c.id, c.name]));
   const needs = needsYou?.items ?? [];
   const needOf = new Map(needs.map((n) => [n.thread.id, n]));
   const handoffs = list.find((c) => c.id === 'conductor')?.handoffs;
   const delegated = delegatedIds(handoffs);
-  const delegates = delegatesByParent(handoffs);
-  const lookup = needsYou ? (id: string): DelegateNeeds | undefined => needsOf(needOf.get(id)) : undefined;
+  const source = treeSource(list, needsYou);
+  const agents = agentsByThread(tasks);
 
   // Every candidate once, the later copy's fields over the earlier: recent, pinned, what runs, what needs Ben.
   const byId = new Map<string, InboxThread>();
@@ -115,9 +116,8 @@ export function activityInbox({ recent, needsYou, pinned, channels, now }: Activ
   shelves.working.sort(newest(at));
   shelves.done.sort(newest((t) => t.done_at ?? ''));
 
-  const row = (t: InboxThread): InboxRow => {
+  const row = (t: InboxThread, working = false): InboxRow => {
     const status = inboxStatus(t, needOf.get(t.id));
-    const children = delegates.get(t.id);
     return {
       id: t.id,
       title: t.title || 'Untitled',
@@ -130,13 +130,14 @@ export function activityInbox({ recent, needsYou, pinned, channels, now }: Activ
       pinned: !!t.pinned_at,
       receded: status?.glyph === 'running',
       canMarkDone: canMarkDone(t.status),
-      delegates: children?.length ? delegateSummary(children, lookup) : null,
+      tree: jobTree(t, source),
+      agents: working ? agents : null,
       target: targetOfStub(t),
     };
   };
 
-  const waiting = [...shelves.pinned, ...shelves.inbox].map(row);
-  const working = shelves.working.map(row);
+  const waiting = [...shelves.pinned, ...shelves.inbox].map((t) => row(t));
+  const working = shelves.working.map((t) => row(t, true));
   return {
     subtitle: `${dayLabel(now)} · ${waiting.length} waiting · ${working.length} working`,
     waiting,
@@ -146,9 +147,6 @@ export function activityInbox({ recent, needsYou, pinned, channels, now }: Activ
     loaded: recent !== null,
   };
 }
-
-const needsOf = (n: NeedsYouItem | undefined): DelegateNeeds | undefined =>
-  n ? { blocked: n.blockers.length > 0, failed: n.result?.status === 'failed' } : undefined;
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

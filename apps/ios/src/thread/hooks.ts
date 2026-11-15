@@ -1,8 +1,10 @@
 import type { HarnessInfo, OmniApi } from '@omni/client-core';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 
 import type { LiveHub } from '../live/hub';
 import { useLiveHub } from '../live/react';
+import { doneQuestion, type DoneQuestion } from '../live/thread-tree';
 import { runThreadAction, type ActionOutcome, type ThreadAction, type ThreadActionApi } from './actions';
 import { IDLE, switchReducer, switchThreadRun, type SwitchPick, type SwitchState } from './switch-state';
 import { targetOfThread, type ThreadTarget } from './target';
@@ -20,14 +22,32 @@ function hubApi(hub: LiveHub): ThreadActionApi & Pick<OmniApi, 'switchRun'> {
   };
 }
 
+/** Asks the Done question as an alert: Cancel, or Mark as done. */
+function confirmDone(q: DoneQuestion): Promise<boolean> {
+  return new Promise((resolve) =>
+    Alert.alert(q.title, q.message, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'Mark as done', onPress: () => resolve(true) },
+    ], { cancelable: true, onDismiss: () => resolve(false) }),
+  );
+}
+
 /**
  * Runs an Organize action on a thread. A change goes into the open thread's view and refetches the lists, so the rows
  * the user left behind show it too. Resolves with what happened, for the caller to show.
+ *
+ * Marking a job done while a thread under it still runs, failed or waits on Ben asks first, as on the web
+ * (apps/web/src/done-confirm.tsx): done takes the job out of Activity with that work unfinished. The lists are read
+ * when Ben asks, so the question never goes by a stale tree.
  */
 export function useThreadActions() {
   const hub = useLiveHub();
   return useCallback(
     async (target: ThreadTarget, action: ThreadAction): Promise<ActionOutcome> => {
+      if (action.kind === 'done' && !target.done) {
+        const question = doneQuestion(target, hub.channels.get().channels, hub.needsYou.get().data);
+        if (question && !(await confirmDone(question))) return { kind: 'cancelled' };
+      }
       const outcome = await runThreadAction(hubApi(hub), target, action, targetOfThread);
       if (outcome.kind === 'changed') hub.applyThread(outcome.thread);
       return outcome;

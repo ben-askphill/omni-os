@@ -114,13 +114,46 @@ describe('the Activity inbox', () => {
     expect(a.waiting[0]).toMatchObject({ status: { glyph: 'settled', label: 'Stopped' }, glyph: 'settled', receded: false, canMarkDone: true });
   });
 
-  it('keeps a Conductor job in Working while a thread it delegated works, and counts its delegates', () => {
+  it('keeps a Conductor job in Working while a thread it delegated works, with its tree and tally', () => {
     const crew = stub('crew', { status: 'running' });
     const conductor = channel('conductor', { handoffs: [{ parent: stub('job'), children: [crew] }] });
     const a = inbox({ recent: [thread('job', { channel_id: 'conductor', delegating: true })], channels: [conductor], needsYou: needs() });
     expect(ids(a.working)).toEqual(['job']);
-    expect(a.working[0]?.delegates).toMatchObject({ total: 1, active: 1, state: 'working' });
+    expect(a.working[0]?.tree).toMatchObject({ phase: 'running', tally: { needs: 0, failed: 0, running: 1, done: 0 } });
+    expect(a.working[0]?.tree?.nodes.map((n) => n.thread.id)).toEqual(['crew']);
     expect(a.mark).toBe('delegating');
+  });
+
+  it("gives a team lead its members' tree, flagged from Needs you, and a thread with nothing under it none", () => {
+    const lead = thread('lead');
+    const asked = stub('asker', { source: 'team' });
+    const failed = stub('broke', { source: 'team', status: 'failed' });
+    const fine = stub('fine', { source: 'team' });
+    const volero = channel('volero', { teams: [{ parent: stub('lead'), children: [fine, asked, failed] }] });
+    const a = inbox({
+      recent: [lead, thread('solo')],
+      channels: [volero],
+      needsYou: needs(item(lead, { blockers: [{ kind: 'question', detail: null, count: 1, from: ['asker'] }] })),
+    });
+    const row = a.waiting.find((r) => r.id === 'lead');
+    expect(row?.tree?.tally).toEqual({ needs: 1, failed: 1, running: 0, done: 1 });
+    expect(row?.tree?.nodes.map((n) => [n.thread.id, n.state])).toEqual([
+      ['asker', 'needs'],
+      ['broke', 'failed'],
+      ['fine', 'done'],
+    ]);
+    expect(row?.tree?.phase).toBe('finished');
+    expect(a.waiting.find((r) => r.id === 'solo')?.tree).toBeNull();
+  });
+
+  it('counts running sub-agents on Working rows only', () => {
+    const task = (thread_id: string, subagent = true) => ({ thread_id, channel_id: 'volero', task_id: `${thread_id}-${subagent}`, description: 'x', subagent, background: true, started_at: at(1) });
+    const a = inbox({
+      recent: [thread('busy', { status: 'running' }), thread('idle')],
+      tasks: [task('busy'), task('busy', false), task('idle')],
+    });
+    expect(a.working[0]?.agents?.get('busy')).toBe(1);
+    expect(a.waiting[0]?.agents).toBeNull();
   });
 
   it('lists a thread once from every source, the later copy winning', () => {
