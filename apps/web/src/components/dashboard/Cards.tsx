@@ -12,6 +12,7 @@ export type ListKind = 'needs' | 'running' | 'unread' | 'done';
 
 const BLOCKER_LABEL: Record<string, [string, string]> = {
   question: ['question set', 'question sets'],
+  child_failed: ['failed delegated thread', 'failed delegated threads'],
   limited: ['usage limit', 'usage limits'],
   setup: ['setup failure', 'setup failures'],
   uncertain: ['unsent message', 'unsent messages'],
