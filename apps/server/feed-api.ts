@@ -5,7 +5,7 @@ import { about } from './about.ts';
 import { bus, publishFeed, type FeedEvent } from './bus.ts';
 import { config } from './config.ts';
 import { diskView, refreshDisk } from './disk-space.ts';
-import { needsYou, resultReads, search, threads, type Thread } from './db.ts';
+import { completions, needsYou, resultReads, search, threads, type Thread } from './db.ts';
 import { allWithDelegating, withDelegating } from './delegating.ts';
 import { handoffView } from './handoff/records.ts';
 import { grokBotConfigured } from './grokbot.ts';
@@ -104,4 +104,22 @@ feedApi.post('/needs-you/read', async (c) => {
   if (!read) return c.json({ error: 'No such result' }, 404);
   publishFeed({ type: 'needs_you', thread_id: read.thread_id });
   return c.json({ thread_id: read.thread_id, item: needsYou(undefined, read.thread_id).items[0] ?? null });
+});
+
+/**
+ * Ben has a thread on screen whose results Needs you never lists, `{ thread }`: a delegated thread's success went to
+ * its parent as a crew report, and a team member's turns go to its lead. Its newest result counts as read, so an alert
+ * on the phone for it settles (push-settled.ts). Nothing moves while it runs. `{ read }` says whether the watermark moved.
+ */
+feedApi.post('/needs-you/seen', async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { thread?: unknown } | null;
+  if (typeof body?.thread !== 'string' || !body.thread) return c.json({ error: 'thread is required' }, 400);
+  const t = threads.get(body.thread);
+  if (!t) return c.json({ error: 'No such thread' }, 404);
+  const latest = completions.latest(t.id);
+  if (!latest || t.status === 'running' || t.status === 'queued' || resultReads.get(t.id)?.uid === latest.uid) return c.json({ read: false });
+  resultReads.read(latest.uid);
+  const read = resultReads.get(t.id)?.uid === latest.uid;
+  if (read) publishFeed({ type: 'needs_you', thread_id: t.id });
+  return c.json({ read });
 });

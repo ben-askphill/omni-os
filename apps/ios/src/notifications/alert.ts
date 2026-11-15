@@ -9,6 +9,8 @@ export interface OmniAlert {
   askerId?: string;
   /** When the server sent it, by its clock. The server compares it with when the thread was read to clear the alert. */
   at?: string;
+  /** Which server sent it. Only that server says whether it is settled. */
+  sender?: string;
 }
 
 export const PUSH_KINDS: readonly AppPushKind[] = ['needsInput', 'finished', 'failed', 'crewReport', 'prAttention'];
@@ -18,7 +20,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 /** The `omni` object of an APNs payload, or null for anything that is not one of Omni's alerts. */
 export function parseAlert(payload: unknown): OmniAlert | null {
   if (!isRecord(payload) || !isRecord(payload.omni)) return null;
-  const { kind, threadId, channelId, askerId, at } = payload.omni;
+  const { kind, threadId, channelId, askerId, at, sender } = payload.omni;
   if (typeof threadId !== 'string' || threadId === '') return null;
   if (!PUSH_KINDS.includes(kind as AppPushKind)) return null;
   return {
@@ -27,6 +29,7 @@ export function parseAlert(payload: unknown): OmniAlert | null {
     channelId: typeof channelId === 'string' && channelId !== '' ? channelId : null,
     ...(typeof askerId === 'string' && askerId !== '' ? { askerId } : {}),
     ...(typeof at === 'string' && at !== '' ? { at } : {}),
+    ...(typeof sender === 'string' && sender !== '' ? { sender } : {}),
   };
 }
 

@@ -6,8 +6,8 @@ import type { PushServer } from './registration';
 
 const AT = '2026-11-15T10:00:00.000Z';
 const note = (identifier: string, omni: unknown) => ({ request: { identifier, content: { data: { omni } } } });
-const pr: Delivered = { id: 'n-pr', alert: { kind: 'prAttention', threadId: 't1', channelId: 'c1', at: AT } };
-const question: Delivered = { id: 'n-q', alert: { kind: 'needsInput', threadId: 'job', channelId: 'c1', askerId: 'crew', at: AT } };
+const pr: Delivered = { id: 'n-pr', alert: { kind: 'prAttention', threadId: 't1', channelId: 'c1', at: AT, sender: 'mac-a' } };
+const question: Delivered = { id: 'n-q', alert: { kind: 'needsInput', threadId: 'job', channelId: 'c1', askerId: 'crew', at: AT, sender: 'mac-a' } };
 const old: Delivered = { id: 'n-old', alert: { kind: 'finished', threadId: 't2', channelId: null } };
 
 describe('deliveredAlerts', () => {
@@ -26,8 +26,9 @@ describe('alertsForThread', () => {
 });
 
 describe('settleQueries', () => {
-  it('asks about alerts that carry the time they were sent, and skips one from an older server', () => {
-    expect(settleQueries([pr, old])).toEqual([{ id: 'n-pr', kind: 'prAttention', threadId: 't1', at: AT }]);
+  it('asks about alerts that carry when and by whom they were sent, and skips one from an older server', () => {
+    const noSender: Delivered = { id: 'n-x', alert: { kind: 'failed', threadId: 't3', channelId: null, at: AT } };
+    expect(settleQueries([pr, old, noSender])).toEqual([{ id: 'n-pr', kind: 'prAttention', threadId: 't1', at: AT, sender: 'mac-a' }]);
   });
 });
 
@@ -55,6 +56,14 @@ describe('createAlertClearer', () => {
     await h.clearer.sweep();
     expect(h.asked.map((x) => x.server)).toEqual(['a', 'b', 'down']);
     expect(h.dismissed).toEqual(['n-pr']);
+  });
+
+  it('asks in batches the server accepts, so a full Notification Center still clears', async () => {
+    const many: Delivered[] = Array.from({ length: 250 }, (_, i) => ({ ...pr, id: `n${i}` }));
+    const h = harness({ delivered: many, answers: { a: ['n0', 'n150', 'n249'] } });
+    await h.clearer.sweep();
+    expect(h.asked.map((x) => x.alerts.length)).toEqual([100, 100, 50]);
+    expect(h.dismissed).toEqual(['n0', 'n150', 'n249']);
   });
 
   it('asks nothing when no alert can be asked about', async () => {

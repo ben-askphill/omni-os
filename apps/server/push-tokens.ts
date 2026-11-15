@@ -2,6 +2,7 @@
 // deletes it whenever it ends sessions. push-sender.ts reads the registry through push-preferences.ts (pushTargets),
 // which joins it to each device's alert choices and to live sessions.
 import { z } from 'zod';
+import { APP_PUSH_FEATURES, type AppPushFeature } from '@omni/shared/app-pairing.ts';
 import { db, tx } from './db.ts';
 
 export const PushTokenBody = z.object({
@@ -13,6 +14,12 @@ export const PushTokenBody = z.object({
   platform: z.literal('ios'),
   environment: z.enum(['sandbox', 'production']),
   bundleId: z.string().trim().min(1).max(200).optional(),
+  /** What the build can take. Names this server does not know are dropped, so a newer app still registers. */
+  features: z
+    .array(z.string().max(40))
+    .max(20)
+    .optional()
+    .transform((f) => [...new Set(f ?? [])].filter((x): x is AppPushFeature => (APP_PUSH_FEATURES as readonly string[]).includes(x)).sort()),
 });
 export type PushTokenInput = z.infer<typeof PushTokenBody>;
 
@@ -35,9 +42,10 @@ export function setPushToken(sessionId: string, input: PushTokenInput): boolean 
     if (!db.prepare('SELECT 1 FROM device_sessions WHERE id = ? AND revoked_at IS NULL').get(sessionId)) return false;
     db.prepare('DELETE FROM push_tokens WHERE token = ? AND platform = ? AND environment = ? AND session_id != ?').run(input.token, input.platform, input.environment, sessionId);
     db.prepare(
-      `INSERT INTO push_tokens (session_id, token, platform, environment, bundle_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(session_id) DO UPDATE SET token = excluded.token, platform = excluded.platform, environment = excluded.environment, bundle_id = excluded.bundle_id, updated_at = excluded.updated_at`,
-    ).run(sessionId, input.token, input.platform, input.environment, input.bundleId ?? null, at, at);
+      `INSERT INTO push_tokens (session_id, token, platform, environment, bundle_id, features, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(session_id) DO UPDATE SET token = excluded.token, platform = excluded.platform, environment = excluded.environment,
+         bundle_id = excluded.bundle_id, features = excluded.features, updated_at = excluded.updated_at`,
+    ).run(sessionId, input.token, input.platform, input.environment, input.bundleId ?? null, JSON.stringify(input.features), at, at);
     return true;
   });
 }

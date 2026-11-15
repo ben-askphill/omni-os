@@ -9,6 +9,7 @@ const H = await startRunner();
 const { app } = await import('../app.ts');
 const { askQuestion, dismissQuestions } = await import('../runner/questions.ts');
 const { settledAlerts } = await import('../push-settled.ts');
+const { pushSenderId } = await import('../push-sender.ts');
 type Ref = import('@omni/shared/app-pairing.ts').AppPushAlertRef;
 
 const T = { timeout: 20_000 };
@@ -28,7 +29,13 @@ async function finished(prompt: string) {
   return t.id;
 }
 const unreadUid = (threadId: string) => H.db.needsYou(undefined, threadId).items[0]!.result!.uid;
-const alert = (threadId: string, kind: Ref['kind'], at = new Date().toISOString()): Ref => ({ id: `n-${threadId}-${kind}`, kind, threadId, at });
+const alert = (threadId: string, kind: Ref['kind'], at = new Date().toISOString(), sender = pushSenderId()): Ref => ({
+  id: `n-${threadId}-${kind}`,
+  kind,
+  threadId,
+  at,
+  sender,
+});
 
 describe('which alerts are settled', () => {
   it('clears a finished or PR alert once the result is read after it, and not before', T, async () => {
@@ -75,6 +82,43 @@ describe('which alerts are settled', () => {
     expect(settledAlerts([alert(a, 'failed'), alert(d, 'crewReport')])).toEqual([`n-${a}-failed`, `n-${d}-crewReport`]);
   });
 
+  it('leaves an alert another server sent to that server, even when this one has no question waiting', T, async () => {
+    // Two paired Macs: this one is behind on sync and has not seen the question the other one alerted for.
+    const id = await finished('asked on the other Mac');
+    expect(pushSenderId()).toMatch(/^[0-9a-f-]{36}$/);
+    expect(pushSenderId()).toBe(pushSenderId());
+    expect(settledAlerts([alert(id, 'needsInput', undefined, 'the-other-mac')])).toEqual([]);
+    expect(settledAlerts([alert(id, 'needsInput')])).toEqual([`n-${id}-needsInput`]);
+  });
+
+  it('clears a delegated thread\'s PR alert once its result is seen on the Mac, though Needs you never lists it', T, async () => {
+    const parent = await finished('lead the job');
+    const child = `child-${Date.now()}`;
+    H.db.threads.create({
+      id: child, channel_id: 'scratch', title: 'Ship the fix', status: 'running', role: null, model: null, session_id: child,
+      cwd: H.tmp, branch: null, parent_id: parent, task_id: 'T-1', source: 'conductor', automation: null,
+    });
+    const sent = alert(child, 'prAttention', new Date(Date.now() - 1000).toISOString());
+    H.db.threads.update(child, { status: 'done' });
+    // A delegated thread's success goes to its parent as a crew report, so Needs you has nothing to read for it.
+    expect(H.db.needsYou(undefined, child).items).toEqual([]);
+    expect(settledAlerts([sent])).toEqual([]);
+    const res = await req('/needs-you/seen', { thread: child }, process.env.OMNI_TOKEN!);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ read: true });
+    expect(settledAlerts([sent])).toEqual([sent.id]);
+    // Seen again: nothing moves.
+    expect(await (await req('/needs-you/seen', { thread: child }, process.env.OMNI_TOKEN!)).json()).toEqual({ read: false });
+  });
+
+  it('marks nothing seen for a thread still running, or one that is not here', T, async () => {
+    const id = await finished('keep going');
+    H.db.threads.update(id, { status: 'running' });
+    expect(await (await req('/needs-you/seen', { thread: id }, process.env.OMNI_TOKEN!)).json()).toEqual({ read: false });
+    expect((await req('/needs-you/seen', { thread: 'nope' }, process.env.OMNI_TOKEN!)).status).toBe(404);
+    expect((await req('/needs-you/seen', {}, process.env.OMNI_TOKEN!)).status).toBe(400);
+  });
+
   it('never clears an alert for a thread this server does not have', () => {
     expect(settledAlerts([alert('on-another-server', 'finished', '2000-01-01T00:00:00Z')])).toEqual([]);
   });
@@ -97,7 +141,9 @@ describe('POST /api/auth/push-settled', () => {
 
   it('refuses a malformed body and anyone but an app session', async () => {
     const token = await pairApp();
-    for (const body of [{}, { alerts: [{ id: 'x', kind: 'other', threadId: 't', at: '2026-01-01T00:00:00Z' }] }, { alerts: [{ id: 'x', kind: 'failed', threadId: 't', at: 'soon' }] }, 'nope']) {
+    const ok = { id: 'x', kind: 'failed', threadId: 't', at: '2026-01-01T00:00:00Z', sender: 's' };
+    const tooMany = Array.from({ length: 101 }, (_, i) => ({ ...ok, id: `x${i}` }));
+    for (const body of [{}, { alerts: [{ ...ok, kind: 'other' }] }, { alerts: [{ ...ok, at: 'soon' }] }, { alerts: [{ ...ok, sender: undefined }] }, { alerts: tooMany }, 'nope']) {
       expect((await req('/auth/push-settled', body, token)).status).toBe(400);
     }
     expect((await req('/auth/push-settled', { alerts: [] }, process.env.OMNI_TOKEN!)).status).toBe(403);

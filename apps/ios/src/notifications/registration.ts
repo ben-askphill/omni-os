@@ -1,4 +1,4 @@
-import type { AppPushTokenRequest } from '@omni/shared/app-pairing.ts';
+import { APP_PUSH_FEATURES, type AppPushTokenRequest } from '@omni/shared/app-pairing.ts';
 
 import type { PushEnvironment } from './environment';
 
@@ -55,7 +55,8 @@ export function createPushRegistrar(deps: RegistrarDeps): PushRegistrar {
     }
 
     const servers = await deps.servers().catch(() => []);
-    const body: AppPushTokenRequest = { token, platform: 'ios', environment: deps.environment, bundleId: deps.bundleId };
+    // Declares what this build understands: the server sends pull request alerts and per-thread collapse only then.
+    const body: AppPushTokenRequest = { token, platform: 'ios', environment: deps.environment, bundleId: deps.bundleId, features: [...APP_PUSH_FEATURES] };
     const results = await Promise.all(
       servers.map(async (server): Promise<[string, ServerRegistration]> => {
         try {

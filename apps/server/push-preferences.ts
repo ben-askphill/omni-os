@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db, tx } from './db.ts';
 import { sessionIsLive } from './google-auth.ts';
 import type { ApnsEnvironment } from './push-apns.ts';
-import type { AppPushKind, AppPushPreferences, AppPushPreferencesUpdate } from '@omni/shared/app-pairing.ts';
+import type { AppPushFeature, AppPushKind, AppPushPreferences, AppPushPreferencesUpdate } from '@omni/shared/app-pairing.ts';
 
 const COLUMN: Record<AppPushKind, 'needs_input' | 'finished' | 'failed' | 'crew_report' | 'pr_attention'> = {
   needsInput: 'needs_input',
@@ -26,7 +26,21 @@ export interface PushTarget {
   token: string;
   environment: ApnsEnvironment;
   bundleId: string | null;
+  /** The app declared `collapse`: alerts go to it with a per-thread collapse id. */
+  collapse: boolean;
 }
+
+/** Kinds an app build must declare before it gets them: an older build could neither open nor switch them off. */
+const KIND_NEEDS: Partial<Record<AppPushKind, AppPushFeature>> = { prAttention: 'prAttention' };
+
+const featuresOf = (raw: string | null): string[] => {
+  try {
+    const parsed: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+};
 
 interface PrefRow {
   needs_input: number;
@@ -64,18 +78,22 @@ export function updatePushPreferences(sessionId: string, patch: AppPushPreferenc
 }
 
 /**
- * Where an alert of this kind goes now: each registered device whose session is live and whose choice for the kind is
- * on. Read when the alert is queued; the sender checks liveness again before each attempt.
+ * Where an alert of this kind goes now: each registered device whose session is live, whose choice for the kind is
+ * on, and whose app build declared the kind when it needs declaring. Read when the alert is queued; the sender checks
+ * liveness again before each attempt.
  */
 export function pushTargets(kind: AppPushKind, at = Date.now()): PushTarget[] {
   const rows = db
     .prepare(
-      `SELECT t.session_id, t.token, t.environment, t.bundle_id FROM push_tokens t
+      `SELECT t.session_id, t.token, t.environment, t.bundle_id, t.features FROM push_tokens t
        LEFT JOIN push_preferences p ON p.session_id = t.session_id
        WHERE COALESCE(p.${COLUMN[kind]}, 1) = 1`,
     )
-    .all() as { session_id: string; token: string; environment: ApnsEnvironment; bundle_id: string | null }[];
-  return rows
-    .filter((r) => sessionIsLive(r.session_id, at))
-    .map((r) => ({ sessionId: r.session_id, token: r.token, environment: r.environment, bundleId: r.bundle_id }));
+    .all() as { session_id: string; token: string; environment: ApnsEnvironment; bundle_id: string | null; features: string | null }[];
+  const needs = KIND_NEEDS[kind];
+  return rows.flatMap((r) => {
+    const features = featuresOf(r.features);
+    if ((needs && !features.includes(needs)) || !sessionIsLive(r.session_id, at)) return [];
+    return [{ sessionId: r.session_id, token: r.token, environment: r.environment, bundleId: r.bundle_id, collapse: features.includes('collapse') }];
+  });
 }

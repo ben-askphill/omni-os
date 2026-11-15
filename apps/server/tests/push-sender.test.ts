@@ -12,6 +12,7 @@ const target = (n: number, extra: Partial<PushTarget> = {}): PushTarget => ({
   token: `token${n}`,
   environment: 'production',
   bundleId: null,
+  collapse: false,
   ...extra,
 });
 
@@ -38,6 +39,7 @@ function harness(opts: { targets?: PushTarget[]; reply?: Reply; live?: (id: stri
     live: opts.live ?? (() => true),
     forget: (token) => forgotten.push(token),
     now: () => clock,
+    senderId: () => 'server-1',
     sleep: async (ms) => {
       sleeps.push(ms);
       clock += ms;
@@ -74,12 +76,21 @@ describe('sending an alert', () => {
     expect(payload.omni).toEqual({ kind: 'finished', threadId: 'thread-9', channelId: 'omni-os' });
   });
 
-  it('sends each alert with its thread as the collapse id and the time it was sent, so the phone keeps one per thread', async () => {
-    const h = harness();
+  it('collapses per thread only on devices whose app declared it, and stamps the time and this server', async () => {
+    const h = harness({ targets: [target(1, { collapse: true }), target(2)] });
     h.sender.send(EVENT);
-    await vi.waitFor(() => expect(h.sent).toHaveLength(1));
-    expect(h.sent[0].collapseId).toBe('thread-1');
-    expect(JSON.parse(h.sent[0].body).omni).toEqual({ kind: 'needsInput', threadId: 'thread-1', channelId: 'conductor', at: new Date(NOW).toISOString() });
+    await vi.waitFor(() => expect(h.sent).toHaveLength(2));
+    expect(h.sent.map((r) => [r.token, r.collapseId])).toEqual([
+      ['token1', 'thread-1'],
+      ['token2', undefined],
+    ]);
+    expect(JSON.parse(h.sent[0].body).omni).toEqual({
+      kind: 'needsInput',
+      threadId: 'thread-1',
+      channelId: 'conductor',
+      at: new Date(NOW).toISOString(),
+      sender: 'server-1',
+    });
   });
 
   it('leaves the collapse id off a thread id longer than Apple allows', () => {

@@ -26,7 +26,7 @@ A notification goes away once you read the result or answer the question, here o
 
 ## iPhone app
 
-The iPhone app has the same kinds, Pull requests included, as switches under its own **Settings > Notifications**, per server. It shows one alert per thread: a newer one for the same thread replaces it. An alert goes away once you open its thread on the phone, or once you read its result or answer its question on any device and the app next comes to the front. With the app closed, alerts read elsewhere stay until you open it.
+The iPhone app has the same kinds, Pull requests included, as switches under its own **Settings > Notifications**, per server. It shows one alert per thread: a newer one for the same thread replaces it. An alert goes away once you open its thread on the phone, or once you read its result or answer its question on any device and the app next comes to the front. For a delegated thread, opening it on the Mac counts as reading it. An older build of the app gets no Pull requests alerts and no one-per-thread grouping until it is updated. With the app closed, alerts read elsewhere stay until you open it.
 
 ## Desktop app
 

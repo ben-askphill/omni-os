@@ -14,7 +14,13 @@ describe('parseAlert', () => {
 
   it('reads a pull request alert and the time the server sent it', () => {
     const at = '2026-11-15T10:00:00.000Z';
-    expect(parseAlert({ omni: { kind: 'prAttention', threadId: 't1', channelId: 'c1', at } })).toEqual({ kind: 'prAttention', threadId: 't1', channelId: 'c1', at });
+    expect(parseAlert({ omni: { kind: 'prAttention', threadId: 't1', channelId: 'c1', at, sender: 'mac-a' } })).toEqual({
+      kind: 'prAttention',
+      threadId: 't1',
+      channelId: 'c1',
+      at,
+      sender: 'mac-a',
+    });
     expect(parseAlert({ omni: { kind: 'prAttention', threadId: 't1', at: '' } })).not.toHaveProperty('at');
   });
 

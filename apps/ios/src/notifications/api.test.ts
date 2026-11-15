@@ -63,7 +63,7 @@ describe('createPushServerApi', () => {
 
   it('asks which delivered alerts are settled and returns their ids', async () => {
     const { api, calls } = setup(() => json({ settled: ['n1'] }));
-    const alerts = [{ id: 'n1', kind: 'prAttention' as const, threadId: 't1', at: '2026-11-15T10:00:00.000Z' }];
+    const alerts = [{ id: 'n1', kind: 'prAttention' as const, threadId: 't1', at: '2026-11-15T10:00:00.000Z', sender: 'mac-a' }];
 
     await expect(api.settled(b, alerts)).resolves.toEqual(['n1']);
     expect(calls[0]).toMatchObject({ url: 'https://b.example.com/api/auth/push-settled', method: 'POST', authorization: 'Bearer token-b', body: { alerts } });

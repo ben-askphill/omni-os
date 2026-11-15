@@ -1,6 +1,6 @@
 // Needs you (apps/server/db/repos/needs-you.ts) from the Web UI's side: why each thread is there, and which result an
 // open thread has shown.
-import type { NeedsYou, NeedsYouItem } from './api.ts';
+import type { NeedsYou, NeedsYouItem, Thread } from './api.ts';
 import { BLOCKER_GLYPH, STATUS, asksForYou, resultGlyph, type Glyph } from '@omni/shared/status.ts';
 import { resetLabel } from './limits.ts';
 import { unreadResultOf, withoutRead } from '@omni/shared/needs-read.ts';
@@ -62,6 +62,16 @@ export function inChannel(all: NeedsYou | null, channelId: string): NeedsYou | n
 export function shownResult(all: NeedsYou | null, threadId: string, status: string | undefined): string | null {
   if (!all || !status || status === 'running' || status === 'queued') return null;
   return unreadResultOf(all.items, threadId);
+}
+
+/**
+ * A thread on screen whose results Needs you never lists: a delegated thread's success (its parent got a crew report)
+ * or a team member's turn. Idle, in front and with no listed result, opening it is the only read there is, so its
+ * newest result counts as seen (POST /needs-you/seen) and a phone alert for it settles.
+ */
+export function seesUnlisted(thread: Pick<Thread, 'status' | 'parent_id' | 'source'> | null, shown: string | null, visible: boolean): boolean {
+  if (!thread || shown || !visible || thread.status === 'running' || thread.status === 'queued') return false;
+  return !!thread.parent_id || thread.source === 'team';
 }
 
 /** The inbox once a result is read, before the server answers: the result goes, its blockers stay, a failed child leaves its job's. */

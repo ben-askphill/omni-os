@@ -50,7 +50,7 @@ Running threads keep the old token in `OMNI_TOKEN` until their agent process sta
 
 ## Push registration
 
-`PUT /api/auth/push-token` requires an app session and returns 401 if the session ended while the request was in flight. Send `token`, a hexadecimal APNs device token, `platform: "ios"`, `environment: "sandbox"` or `"production"`, and an optional `bundleId`. Registering again replaces that session's registration. The server associates a token with at most one session.
+`PUT /api/auth/push-token` requires an app session and returns 401 if the session ended while the request was in flight. Send `token`, a hexadecimal APNs device token, `platform: "ios"`, `environment: "sandbox"` or `"production"`, an optional `bundleId`, and an optional `features` list of what the app build understands (`AppPushFeature`): `collapse` (alerts may share a notification identifier per thread) and `prAttention` (it can show, open and switch off pull request alerts). Unknown names are dropped. A build that sends no `features`, every build from before the field, gets no collapse id and no `prAttention` alerts, so a server update never breaks taps on an older app. Registering again replaces that session's registration, `features` included. The server associates a token with at most one session.
 
 `GET /api/auth/push-token` returns whether a token is registered and its metadata, but never returns the token. `DELETE /api/auth/push-token` removes the registration and is idempotent. Revoking a session removes its registration. A registration sends nothing by itself; the server uses it only when `push.delivery` is `true`. A push is a wake-up signal; HTTP and SSE remain the source of truth.
 
@@ -86,9 +86,9 @@ The alert's title is the thread's title, clipped to 80 characters. Its subtitle 
 - `crewReport`: the report.
 - `prAttention`: the wake's one line, such as `#12 at abc1234. CI failed: CI / build`.
 
-When there is no readable text, such as a tool-only turn or a code-only reply, the body is a generic line, and a thread with no title gets a generic title and no subtitle. Under `omni` the payload carries `kind`, `threadId`, `channelId`, `at` (when the server sent it, by its clock) and, for a delegated thread's question, `askerId`. It never carries the prompt or a code.
+When there is no readable text, such as a tool-only turn or a code-only reply, the body is a generic line, and a thread with no title gets a generic title and no subtitle. Under `omni` the payload carries `kind`, `threadId`, `channelId`, `at` (when the server sent it, by its clock), `sender` (this server's own id, kept under the local kv key `sync.push_sender` so it never syncs) and, for a delegated thread's question, `askerId`. It never carries the prompt or a code.
 
-Every alert goes with `apns-collapse-id` set to its thread id, so the phone shows at most one alert per thread: a newer one replaces the one shown, as on the desktop app. iOS gives every alert of a thread the same notification identifier, so the app tells two taps apart by identifier and delivery time. The phone's own Show Previews setting decides whether the body shows on a locked screen.
+Every alert to a build that declared `collapse` goes with `apns-collapse-id` set to its thread id, so the phone shows at most one alert per thread: a newer one replaces the one shown, as on the desktop app. iOS gives every alert of a thread the same notification identifier, so the app tells two taps apart by identifier and delivery time. The phone's own Show Previews setting decides whether the body shows on a locked screen.
 
 How each APNs answer is handled:
 
@@ -112,9 +112,11 @@ The shared types are `AppPushKind`, `AppPushPreferences`, `AppPushPreferencesUpd
 
 ## Clearing read alerts
 
-`POST /api/auth/push-settled` takes `{ "alerts": [{ "id", "kind", "threadId", "at" }] }`, up to 100, where `id` is the notification's identifier and `at` the alert's `omni.at`. It returns `{ "settled": [ids] }`: the alerts Ben has dealt with, here or on another device (`apps/server/push-settled.ts`). An alert is settled when its thread was archived or marked done; for `needsInput`, when no question waits on the thread any more; for any other kind, when nothing waits on the thread in Needs you, it is not running, and its result was read at or after `at`. A thread the server does not have is never settled, since another paired server may have sent the alert. Only app sessions may call it (403 otherwise); a malformed body gets 400.
+`POST /api/auth/push-settled` takes `{ "alerts": [{ "id", "kind", "threadId", "at", "sender" }] }`, up to 100 (`APP_PUSH_SETTLED_MAX`; more gets 400), where `id` is the notification's identifier and `at` and `sender` the alert's `omni.at` and `omni.sender`. Only the server that sent an alert settles it: with two paired Macs, the one behind on sync may not have a question yet and would take it for answered. It returns `{ "settled": [ids] }`: the alerts Ben has dealt with, here or on another device (`apps/server/push-settled.ts`). An alert is settled when its thread was archived or marked done; for `needsInput`, when no question waits on the thread any more; for any other kind, when nothing waits on the thread in Needs you, it is not running, and its result was read at or after `at`. A thread the server does not have is never settled, since another paired server may have sent the alert. Only app sessions may call it (403 otherwise); a malformed body gets 400.
 
-The app asks every paired server when it comes to the front and whenever Needs you changes, and clears the alerts any of them names. Opening a thread on the phone clears its alerts at once, without asking. With the app closed nothing clears until it next opens: there is no background push for it.
+The app asks every paired server, in batches of 100, when it comes to the front and whenever Needs you changes, and clears the alerts any of them names.
+
+Needs you never lists a delegated thread's success or a team member's turn, so reading one there writes no read. The Web UI (desktop and phone) instead sends `POST /api/needs-you/seen` with `{ "thread" }` while such a thread is on screen and idle: its newest result counts as read, `{ "read": true }` when the watermark moved, and a pull request alert on that thread settles. Opening a thread on the phone clears its alerts at once, without asking. With the app closed nothing clears until it next opens: there is no background push for it.
 
 ## What revoking does and does not stop
 

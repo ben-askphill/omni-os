@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { NeedsYou, NeedsYouItem } from '../src/api.ts';
-import { canMarkDone, coalesced, inChannel, reasonOf, shownResult, splitNeeds, withoutResult, withoutThread } from '../src/needs-you.ts';
+import { canMarkDone, coalesced, inChannel, reasonOf, seesUnlisted, shownResult, splitNeeds, withoutResult, withoutThread } from '../src/needs-you.ts';
 
 // The Web UI's side of Needs you (apps/web/src/needs-you.ts), against the recorded server answers
 // (apps/server/tests/wire-fixtures.test.ts records them): every kind of result and blocker, then a read.
@@ -160,5 +160,21 @@ describe('needs_you events', () => {
     await settle();
     failing();
     expect(loads).toBe(4);
+  });
+});
+
+describe('seesUnlisted', () => {
+  // A delegated thread's success and a team member's turn never list in Needs you, so opening one is the only read.
+  it('counts an idle delegated or team thread on screen as seen, when Needs you shows no result for it', () => {
+    expect(seesUnlisted({ status: 'done', parent_id: 'lead', source: 'conductor' }, null, true)).toBe(true);
+    expect(seesUnlisted({ status: 'failed', parent_id: null, source: 'team' }, null, true)).toBe(true);
+  });
+
+  it('leaves it to the normal read when Needs you lists one, and skips a top-level, running or hidden thread', () => {
+    expect(seesUnlisted({ status: 'done', parent_id: 'lead', source: 'conductor' }, 'uid-1', true)).toBe(false);
+    expect(seesUnlisted({ status: 'done', parent_id: null, source: 'manual' }, null, true)).toBe(false);
+    expect(seesUnlisted({ status: 'running', parent_id: 'lead', source: 'conductor' }, null, true)).toBe(false);
+    expect(seesUnlisted({ status: 'done', parent_id: 'lead', source: 'conductor' }, null, false)).toBe(false);
+    expect(seesUnlisted(null, null, true)).toBe(false);
   });
 });

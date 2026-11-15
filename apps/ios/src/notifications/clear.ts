@@ -1,4 +1,4 @@
-import type { AppPushAlertRef } from '@omni/shared/app-pairing.ts';
+import { APP_PUSH_SETTLED_MAX, type AppPushAlertRef } from '@omni/shared/app-pairing.ts';
 
 import { alertOf, type NotificationLike, type OmniAlert } from './alert';
 import type { PushServer } from './registration';
@@ -27,14 +27,26 @@ export function alertsForThread(delivered: readonly Delivered[], threadId: strin
   return delivered.filter(({ alert }) => alert.threadId === threadId || alert.askerId === threadId).map((d) => d.id);
 }
 
-/** What the servers are asked about. An alert from a server older than `omni.at` cannot be asked about: opening its thread clears it. */
+/**
+ * What the servers are asked about: alerts that say when and by which server they were sent. An alert from an older
+ * server says neither and cannot be asked about: opening its thread clears it.
+ */
 export function settleQueries(delivered: readonly Delivered[]): AppPushAlertRef[] {
-  return delivered.flatMap(({ id, alert }) => (alert.at ? [{ id, kind: alert.kind, threadId: alert.threadId, at: alert.at }] : []));
+  return delivered.flatMap(({ id, alert }) =>
+    alert.at && alert.sender ? [{ id, kind: alert.kind, threadId: alert.threadId, at: alert.at, sender: alert.sender }] : [],
+  );
 }
+
+/** Splits a list into runs of at most `size`. */
+const batches = <T>(list: readonly T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, (i + 1) * size));
 
 export interface ClearerDeps {
   delivered(): Promise<Delivered[]>;
-  /** Every paired server. An alert does not say which one sent it. */
+  /**
+   * Every paired server. An alert's `sender` is the server's own id, not the phone's name for it, so each is asked and
+   * only the sender answers for it.
+   */
   servers(): Promise<PushServer[]>;
   /** The ids a server says are settled. A server that does not have the thread never names it. */
   settled(server: PushServer, alerts: AppPushAlertRef[]): Promise<string[]>;
@@ -59,8 +71,10 @@ export function createAlertClearer(deps: ClearerDeps): AlertClearer {
   async function once() {
     const queries = settleQueries(await deps.delivered());
     if (!queries.length) return;
+    // The server takes at most APP_PUSH_SETTLED_MAX per request and refuses more, so a full Notification Center asks in batches.
+    const servers = await deps.servers();
     const answers = await Promise.all(
-      (await deps.servers()).map((server) => deps.settled(server, queries).catch((): string[] => [])),
+      servers.flatMap((server) => batches(queries, APP_PUSH_SETTLED_MAX).map((batch) => deps.settled(server, batch).catch((): string[] => []))),
     );
     await dismiss(answers.flat());
   }

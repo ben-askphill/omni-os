@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import type { Thread } from '../api.ts';
 import { shownResult } from '../needs-you.ts';
 import { useApp, usePageVisible } from '../store.tsx';
+import { useSeenUnlisted } from '../app/useSeenUnlisted.ts';
 
 /** What the app knows about the thread on screen: the sidebar lists it, and its newest result counts as read. */
 export function useThreadPresence(id: string, thread: Thread | null) {
@@ -20,4 +21,6 @@ export function useThreadPresence(id: string, thread: Thread | null) {
   useEffect(() => {
     if (shown && visible) readResult(shown);
   }, [shown, visible, readResult]);
+  // A delegated or team thread's result never lists there: on screen is its read.
+  useSeenUnlisted(id, thread, shown, visible);
 }

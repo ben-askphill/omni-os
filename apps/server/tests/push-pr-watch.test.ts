@@ -10,7 +10,7 @@ const H = await startRunner();
 const { app } = await import('../app.ts');
 const W = await import('../pr-watch/worker.ts');
 const S = await import('../pr-watch/store.ts');
-const { createPushSender, installPushSender } = await import('../push-sender.ts');
+const { createPushSender, installPushSender, pushSenderId } = await import('../push-sender.ts');
 const { pushTargets } = await import('../push-preferences.ts');
 const { sessionIsLive } = await import('../google-auth.ts');
 type ApnsRequest = import('../push-apns.ts').ApnsRequest;
@@ -63,7 +63,7 @@ beforeAll(async () => {
     body: JSON.stringify({ code, name: 'Ben iPhone' }),
   });
   phone = (await redeemed.json()) as typeof phone;
-  expect((await req('PUT', '/auth/push-token', { token: PHONE_TOKEN, platform: 'ios', environment: 'production' }, phone.token)).status).toBe(200);
+  expect((await req('PUT', '/auth/push-token', { token: PHONE_TOKEN, platform: 'ios', environment: 'production', features: ['collapse', 'prAttention'] }, phone.token)).status).toBe(200);
   installPushSender(
     createPushSender({
       config: { key: { keyId: 'KEY1', teamId: 'TEAM1', pem: PEM }, bundleId: 'app.omni-os.ios' },
@@ -72,6 +72,7 @@ beforeAll(async () => {
       live: sessionIsLive,
       forget() {},
       now: Date.now,
+      senderId: pushSenderId,
       sleep: async () => undefined,
       log() {},
     }),
@@ -91,7 +92,7 @@ describe('a watched PR on the iPhone', () => {
     const [sent] = prAlerts();
     expect(sent).toMatchObject({ token: PHONE_TOKEN, environment: 'production', topic: 'app.omni-os.ios', collapseId: t.id });
     const payload = JSON.parse(sent.body);
-    expect(payload.omni).toEqual({ kind: 'prAttention', threadId: t.id, channelId: 'scratch', at: expect.any(String) });
+    expect(payload.omni).toEqual({ kind: 'prAttention', threadId: t.id, channelId: 'scratch', at: expect.any(String), sender: pushSenderId() });
     expect(Date.parse(payload.omni.at)).not.toBeNaN();
     expect(payload.aps.alert).toEqual({ title: H.db.threads.get(t.id)!.title, subtitle: 'Pull request', body: '#7 at aaaaaaa. CI failed: CI / build' });
 

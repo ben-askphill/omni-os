@@ -24,7 +24,20 @@ export interface AppPushTokenRequest {
   platform: 'ios';
   environment: 'sandbox' | 'production';
   bundleId?: string;
+  /** What this build of the app can take. A build from before the field sends none and gets neither. */
+  features?: AppPushFeature[];
 }
+
+/**
+ * Alert behaviour an app build has to understand before the server uses it:
+ * - `collapse`: alerts carry `apns-collapse-id`, so every alert of a thread shares one notification identifier and the
+ *   app must tell taps apart by more than it;
+ * - `prAttention`: the build can show, open and switch off pull request alerts.
+ */
+export type AppPushFeature = 'collapse' | 'prAttention';
+
+/** What the current iOS app declares on PUT /api/auth/push-token. */
+export const APP_PUSH_FEATURES: readonly AppPushFeature[] = ['collapse', 'prAttention'];
 
 export interface AppPushTokenStatus {
   registered: boolean;
@@ -45,14 +58,19 @@ export type AppPushPreferencesUpdate = Partial<AppPushPreferences>;
 
 /**
  * One alert still in the phone's Notification Center, asked about by POST /api/auth/push-settled: `id` is the
- * notification's identifier, `at` the server time the alert carried (`omni.at`).
+ * notification's identifier, `at` and `sender` what the alert carried (`omni.at`, `omni.sender`).
  */
 export interface AppPushAlertRef {
   id: string;
   kind: AppPushKind;
   threadId: string;
   at: string;
+  /** The alert's `omni.sender`: only the server that sent an alert settles it. */
+  sender: string;
 }
+
+/** The most alerts one POST /api/auth/push-settled may ask about. The app asks in batches of this size. */
+export const APP_PUSH_SETTLED_MAX = 100;
 
 /** The ids of the alerts the server says Ben has dealt with, here or on another device, so the phone clears them. */
 export interface AppPushSettled {

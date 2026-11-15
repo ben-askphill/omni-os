@@ -4,7 +4,7 @@
 // deleting one of the APNs secrets loads the config again, so no restart is needed.
 import { createPrivateKey, randomUUID } from 'node:crypto';
 import { publishFeed } from './bus.ts';
-import { threads, type ThreadStatus } from './db.ts';
+import { kv, threads, type ThreadStatus } from './db.ts';
 import { sessionIsLive } from './google-auth.ts';
 import { clip, pushPreview, TITLE_MAX } from './push-preview.ts';
 import { classify, http2Transport, providerTokens, type ApnsKey, type ApnsResponse, type ApnsTransport } from './push-apns.ts';
@@ -98,6 +98,8 @@ export interface PushSenderDeps {
   /** Drop the registration for a token Apple says is dead. */
   forget(token: string): unknown;
   now(): number;
+  /** This server's id in every payload (`omni.sender`), so only it settles its alerts (push-settled.ts). */
+  senderId(): string;
   sleep(ms: number): Promise<void>;
   log(line: string): void;
 }
@@ -124,7 +126,8 @@ const COLLAPSE_MAX_BYTES = 64;
 
 /**
  * One alert per thread on the phone, as on the desktop: a newer alert for a thread replaces the one shown, so the newest
- * says where it stands.
+ * says where it stands. Sent only to app builds that declared `collapse`: an older build keys taps by the notification
+ * identifier alone, and collapsed alerts share one, so its second tap on a thread would open nothing.
  */
 export const collapseIdFor = (event: PushEvent) => (Buffer.byteLength(event.threadId) <= COLLAPSE_MAX_BYTES ? event.threadId : undefined);
 
@@ -140,11 +143,24 @@ export function alertFor(event: PushEvent): { title: string; subtitle?: string; 
   return { title: clip(title, TITLE_MAX), subtitle: clip(from ? `${fixed.label}: ${from}` : fixed.label, TITLE_MAX), body };
 }
 
+/** Where this server's sender id lives. Under `sync.` so it never leaves this machine: each Mac has its own. */
+const SENDER_KEY = 'sync.push_sender';
+
+/** This server's id in its alerts, made once and kept. */
+export function pushSenderId(): string {
+  const had = kv.get<string>(SENDER_KEY);
+  if (had) return had;
+  const id = randomUUID();
+  kv.set(SENDER_KEY, id);
+  return id;
+}
+
 /**
- * `at` is when the server sent it, by the server's clock. The phone hands it back to POST /api/auth/push-settled, which
- * clears the alert once the thread was read after it.
+ * `at` is when the server sent it, by the server's clock, and `sender` which server sent it. The phone hands both back
+ * to POST /api/auth/push-settled on every paired server; only the sender settles the alert, once the thread was read
+ * after `at`. Another server may be behind on sync and take an open question for an answered one.
  */
-export function payloadFor(event: PushEvent, at?: string): string {
+export function payloadFor(event: PushEvent, meta: { at?: string; sender?: string } = {}): string {
   return JSON.stringify({
     aps: { alert: alertFor(event), sound: 'default' },
     omni: {
@@ -152,7 +168,8 @@ export function payloadFor(event: PushEvent, at?: string): string {
       threadId: event.threadId,
       channelId: event.channelId,
       ...(event.askerId ? { askerId: event.askerId } : {}),
-      ...(at ? { at } : {}),
+      ...(meta.at ? { at: meta.at } : {}),
+      ...(meta.sender ? { sender: meta.sender } : {}),
     },
   });
 }
@@ -217,9 +234,9 @@ export function createPushSender(deps: PushSenderDeps): PushSender {
     send(event) {
       const targets = deps.targets(event.kind);
       if (!targets.length) return;
-      const body = payloadFor(event, new Date(deps.now()).toISOString());
+      const body = payloadFor(event, { at: new Date(deps.now()).toISOString(), sender: deps.senderId() });
       const collapseId = collapseIdFor(event);
-      for (const t of targets) run(() => deliver(t, body, collapseId)).catch((err: Error) => deps.log(`[push] ${err.message}`));
+      for (const t of targets) run(() => deliver(t, body, t.collapse ? collapseId : undefined)).catch((err: Error) => deps.log(`[push] ${err.message}`));
     },
     close: () => deps.transport.close(),
   };
@@ -278,6 +295,7 @@ async function loadAndInstall(): Promise<void> {
       live: sessionIsLive,
       forget: forgetPushToken,
       now: Date.now,
+      senderId: pushSenderId,
       sleep: (ms) =>
         new Promise((done) => {
           setTimeout(done, ms).unref();

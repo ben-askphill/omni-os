@@ -32,8 +32,8 @@ describe('createPushRegistrar', () => {
 
     expect(report).toEqual({ kind: 'synced', byServer: { a: 'registered', b: 'registered' } });
     expect(sent).toEqual([
-      { server: 'a', body: { token: 'abc123', platform: 'ios', environment: 'sandbox', bundleId: 'app.omni-os.ios' } },
-      { server: 'b', body: { token: 'abc123', platform: 'ios', environment: 'sandbox', bundleId: 'app.omni-os.ios' } },
+      { server: 'a', body: { token: 'abc123', platform: 'ios', environment: 'sandbox', bundleId: 'app.omni-os.ios', features: ['collapse', 'prAttention'] } },
+      { server: 'b', body: { token: 'abc123', platform: 'ios', environment: 'sandbox', bundleId: 'app.omni-os.ios', features: ['collapse', 'prAttention'] } },
     ]);
   });
 

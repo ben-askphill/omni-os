@@ -5,6 +5,7 @@ import { type ContinueSource } from '@omni/shared/continue-flow.ts';
 import { useThreadSession } from '../pages/useThreadSession.ts';
 import { shownResult } from '../needs-you.ts';
 import { useApp, usePageVisible } from '../store.tsx';
+import { useSeenUnlisted } from '../app/useSeenUnlisted.ts';
 
 export type ShellSheet = { name: 'new'; channel?: string; prompt?: string } | { name: 'search' } | { name: 'continue'; source: ContinueSource };
 
@@ -47,5 +48,6 @@ export function ThreadScope({ id, at, children }: { id: string; at?: number; chi
   useEffect(() => {
     if (shown && visible) readResult(shown);
   }, [shown, visible, readResult]);
+  useSeenUnlisted(id, session.thread, shown, visible);
   return <ThreadCtx.Provider value={session}>{children}</ThreadCtx.Provider>;
 }

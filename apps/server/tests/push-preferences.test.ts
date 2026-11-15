@@ -95,6 +95,24 @@ describe('reading and changing the choices', () => {
   });
 });
 
+describe('what an app build can take', () => {
+  it('sends pull request alerts and one-per-thread collapse only to a token whose app declared them', async () => {
+    const old = await pairApp('old build');
+    const fresh = await pairApp('new build');
+    await req('PUT', '/auth/push-token', { ...PUSH, token: 'aa'.repeat(32) }, as(old.token));
+    await req('PUT', '/auth/push-token', { ...PUSH, token: 'bb'.repeat(32), features: ['collapse', 'prAttention', 'later-thing'] }, as(fresh.token));
+
+    // An older build cannot open or turn off a pull request alert, and keys taps by an identifier collapse would reuse.
+    expect(pushTargets('prAttention').map((t) => t.sessionId)).toEqual([fresh.sessionId]);
+    const byId = Object.fromEntries(pushTargets('finished').map((t) => [t.sessionId, t.collapse]));
+    expect(byId).toEqual({ [old.sessionId]: false, [fresh.sessionId]: true });
+
+    // Registering again without them (a build rolled back) takes them away.
+    await req('PUT', '/auth/push-token', { ...PUSH, token: 'bb'.repeat(32) }, as(fresh.token));
+    expect(pushTargets('prAttention')).toEqual([]);
+  });
+});
+
 describe('who the sender picks for an alert', () => {
   it('sends a kind only to devices that have it on, and only while their sessions are live', async () => {
     const a = await pairApp('a');
@@ -106,9 +124,6 @@ describe('who the sender picks for an alert', () => {
     expect(pushTargets('failed').map((t) => t.sessionId)).toEqual([b.sessionId]);
     expect(pushTargets('needsInput').map((t) => t.sessionId).sort()).toEqual([a.sessionId, b.sessionId].sort());
     expect(pushTargets('needsInput')[0]).toMatchObject({ environment: 'sandbox', bundleId: null });
-    expect(pushTargets('prAttention').map((t) => t.sessionId).sort()).toEqual([a.sessionId, b.sessionId].sort());
-    await req('PUT', '/auth/push-preferences', { prAttention: false }, as(b.token));
-    expect(pushTargets('prAttention').map((t) => t.sessionId)).toEqual([a.sessionId]);
 
     expect((await req('DELETE', `/auth/devices/${b.sessionId}`)).status).toBe(200);
     expect(pushTargets('needsInput').map((t) => t.sessionId)).toEqual([a.sessionId]);
