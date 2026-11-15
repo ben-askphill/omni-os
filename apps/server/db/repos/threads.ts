@@ -46,6 +46,8 @@ export interface Thread {
   /** A follow-up thread proposed once a turn is done, the card under the transcript: its title and first prompt. Local only, not synced. */
   next_title: string | null;
   next_prompt: string | null;
+  /** What the last turn left open for Ben, as JSON (packages/shared/open-items.ts): the card under the transcript. Local only, not synced. */
+  open_items: string | null;
   /** 1 once Ben archived it: hidden from the lists, still found by search and by its link. */
   archived: number;
   /** The sidebar folder it sits in (db/repos/folders.ts), null for ungrouped. Synced with the row. */
@@ -177,7 +179,7 @@ export function stampEdits(id: string, fields: readonly EditedField[], where = '
 
 /** The columns clients read, without sync's run_machine, the limit stop's id and owner, or the session state. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, open_items, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, created_at, updated_at';
 
 /**
  * The machine whose status write this is: this one while it is running or queued here and sync is set up, else nobody.
@@ -330,7 +332,7 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'open_items' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; auto_reason?: string | null; folder_id?: string | null; setup?: ThreadSetup | null;
     },
@@ -444,6 +446,10 @@ export const threads = {
         .prepare('UPDATE threads SET next_title = ?, next_prompt = ? WHERE id = ? AND (next_title IS NOT ? OR next_prompt IS NOT ?)')
         .run(title, prompt, id, title, prompt).changes > 0
     );
+  },
+  /** What the last turn left open, as stored JSON, or null to drop it. Like the suggestion: updated_at stays and sync never hears of it. */
+  setOpenItems(id: string, json: string | null) {
+    return db.prepare('UPDATE threads SET open_items = ? WHERE id = ? AND open_items IS NOT ?').run(json, id, json).changes > 0;
   },
   /** A thread's limit stop with the columns clients never read: its id and the Mac that owns it. */
   limit(id: string) {

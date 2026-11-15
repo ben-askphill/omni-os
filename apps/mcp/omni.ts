@@ -501,7 +501,8 @@ server.registerTool(
   {
     description:
       'Status, last reply, artifacts and running subagents of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
-      'its last model activity and the minutes since. Reading it never wakes the thread.',
+      'its last model activity and the minutes since. `open_items`, when present, lists what its last turn left for the user to resolve ' +
+      '(questions, decisions with options, blockers). Reading it never wakes the thread.',
     inputSchema: { thread_id: z.string() },
   },
   async ({ thread_id }) => text(await call(`/threads/${thread_id}/summary`)),

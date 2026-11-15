@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { TITLE_MAX } from '@omni/shared/slash.ts';
+import { readOpenItems, storeOpenItems } from '@omni/shared/open-items.ts';
 import { publishFeed } from './bus.ts';
 import { FolderError, folders, threads, type Thread } from './db.ts';
 
@@ -25,10 +26,19 @@ const patchSchema = z
     done: z.boolean().optional(),
     /** Null dismisses the proposed follow-up thread, the card under the transcript. */
     next_thread: z.null().optional(),
+    /** Null dismisses every open item on the card under the transcript. */
+    open_items: z.null().optional(),
+    /** Dismisses the one open item with this text, leaving the rest on the card. */
+    dismiss_open_item: z.string().min(1).optional(),
   })
-  .refine((b) => b.title !== undefined || b.archived !== undefined || b.folder_id !== undefined || b.pinned !== undefined || b.done !== undefined || b.next_thread !== undefined, 'a title is required');
+  .refine(
+    (b) =>
+      b.title !== undefined || b.archived !== undefined || b.folder_id !== undefined || b.pinned !== undefined || b.done !== undefined ||
+      b.next_thread !== undefined || b.open_items !== undefined || b.dismiss_open_item !== undefined,
+    'a title is required',
+  );
 
-/** Rename, archive, pin, mark done or file a thread, or dismiss its proposed follow-up. It keeps its place in the lists, since nothing happened in it. */
+/** Rename, archive, pin, mark done or file a thread, or dismiss its proposed follow-up or open items. It keeps its place in the lists, since nothing happened in it. */
 threadsApi.patch('/:id', async (c) => {
   const id = c.req.param('id');
   const t = threads.get(id);
@@ -51,6 +61,11 @@ threadsApi.patch('/:id', async (c) => {
     }
   }
   if (body.data.next_thread === null) threads.setNextThread(id, null);
+  if (body.data.open_items === null) threads.setOpenItems(id, null);
+  else if (body.data.dismiss_open_item !== undefined) {
+    const left = readOpenItems(t.open_items).filter((i) => i.text !== body.data.dismiss_open_item);
+    threads.setOpenItems(id, storeOpenItems(left));
+  }
   // Archiving unpins: restoring it later brings it back to its channel, not to Pinned.
   if (body.data.pinned !== undefined || edit.archived) threads.setPinned(id, !!body.data.pinned && !edit.archived);
   if (body.data.done !== undefined) threads.setDone(id, body.data.done);

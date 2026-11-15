@@ -30,14 +30,15 @@ const pill = (on: boolean) =>
 /**
  * A new delegation to the Conductor, or a new thread in one channel: the same POST /threads the desktop composer
  * makes, with the role's or the channel's run defaults until Ben picks another model. With Grok Bot on the machine
- * chip it posts the text to /api/grokbot instead, as the desktop composer does, and no thread starts.
+ * chip it posts the text to /api/grokbot instead, as the desktop composer does, and no thread starts. `prompt` fills the box to start.
  */
-export function NewSheet({ channel: initial }: { channel?: string }) {
+export function NewSheet({ channel: initial, prompt: first }: { channel?: string; prompt?: string }) {
   const shell = useShell();
   const { channels, crew } = useApp();
   const listed = channels.filter((c) => !c.archived && c.id !== 'conductor');
   const [target, setTarget] = useState(initial ?? 'conductor');
-  const [text, setText] = useState('');
+  // An open item's New thread starts with its prompt (components/thread/OpenItemsCard.tsx).
+  const [text, setText] = useState(first ?? '');
   // As the target channel sees them: Cursor Cloud needs its GitHub repo.
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(target));
   // A pick holds for the target it was made for; another target starts on its own defaults, as on the desktop.

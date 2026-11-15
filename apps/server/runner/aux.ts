@@ -1,4 +1,5 @@
-// Haiku sidecars: a title for a new thread, and after a turn a suggested reply and a proposed follow-up thread.
+// Haiku sidecars: a title for a new thread, and after a turn a suggested reply, a proposed follow-up thread and what the
+// turn left open for Ben.
 import { spawn } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -6,12 +7,14 @@ import { closePipesAfterExit } from '../child.ts';
 import { config, paths } from '../config.ts';
 import { events, threads, type Thread } from '../db.ts';
 import { harnessEnv } from '../harness/env-guard.ts';
+import { parseOpenItems, storeOpenItems } from '@omni/shared/open-items.ts';
 import { userName, userPossessive } from '../profile.ts';
 import { emitThread } from './state.ts';
 
 /** Each thread's latest suggestion calls. A message sent while one runs makes its answer stale. */
 const suggestCalls = new Map<string, number>();
 const nextCalls = new Map<string, number>();
+const openCalls = new Map<string, number>();
 let suggestSeq = 0;
 
 /**
@@ -76,13 +79,15 @@ function haiku(entrypoint: string, prompt: string, done: (out: string | null) =>
   });
 }
 
-/** Drop the thread's suggested reply and proposed follow-up thread, and any answer still on its way. */
+/** Drop the thread's suggested reply, proposed follow-up thread and open items, and any answer still on its way. */
 export function clearSuggestion(threadId: string) {
   suggestCalls.delete(threadId);
   nextCalls.delete(threadId);
+  openCalls.delete(threadId);
   const a = threads.setSuggestion(threadId, null);
   const b = threads.setNextThread(threadId, null);
-  if (a || b) emitThread(threadId);
+  const c = threads.setOpenItems(threadId, null);
+  if (a || b || c) emitThread(threadId);
 }
 
 /** Guess Ben's next reply from his last message and the agent's answer, for the reply box to offer. */
@@ -148,6 +153,41 @@ export function suggestNextThread(threadId: string, runText: string) {
     const next = out ? parseNextThread(out) : null;
     if (!next || threads.get(threadId)?.status !== 'done') return;
     if (threads.setNextThread(threadId, next)) emitThread(threadId);
+  });
+}
+
+/**
+ * What the agent's answer leaves for Ben to resolve before the thread can be closed: questions it asked him, decisions
+ * it left to him and blockers only he can clear. Derived here rather than emitted by the agent, so every harness gets it
+ * without a tool or an output convention of its own (docs/adr/decisions.log, T-BLOCKCARD). Most turns leave none.
+ */
+export function suggestOpenItems(threadId: string, runText: string) {
+  if (!config.suggestions) return;
+  const call = ++suggestSeq;
+  openCalls.set(threadId, call);
+  const t = threads.get(threadId);
+  const prompt =
+    `${userName()} is working with a coding agent. Read the agent's answer below and list what it leaves for ${userName()} to resolve ` +
+    'before this thread can be closed. Three kinds count:\n' +
+    `QUESTION: a question the agent asked ${userName()} and needs answered to finish\n` +
+    `DECISION: a choice the agent left to ${userName()}, with the options it named\n` +
+    `BLOCKER: something only ${userName()} can do or provide before the work can finish, such as a login, a secret, an approval or a file\n\n` +
+    'List only items the answer states or plainly asks for, most important first, at most 5. Never list work the agent will do ' +
+    'itself, optional ideas, a summary of what was done, or a closing line such as "let me know if you need anything else". ' +
+    'If nothing is left open, output NONE. Most answers get NONE.\n\n' +
+    'Answer in exactly this format, one item per line, plain text, no quotes, no em dashes, nothing else:\n' +
+    'QUESTION: <the question, one self-contained sentence naming what it is about>\n' +
+    'DECISION: <the choice, one self-contained sentence> | <option> | <option>\n' +
+    'BLOCKER: <what is needed and why, one self-contained sentence>\n\n' +
+    'Thread: ' + (t?.title ?? '') +
+    `\n\n${userPossessive()} last message:\n` + events.lastUserText(threadId).slice(0, 1500) +
+    "\n\nThe agent's answer:\n" + runText.slice(-4000);
+  haiku('omni-os-open-items', prompt, (out) => {
+    if (openCalls.get(threadId) !== call) return;
+    openCalls.delete(threadId);
+    const items = out ? parseOpenItems(out) : null;
+    if (!items || threads.get(threadId)?.status !== 'done') return;
+    if (threads.setOpenItems(threadId, storeOpenItems(items))) emitThread(threadId);
   });
 }
 

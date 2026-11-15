@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS threads (
   suggestion TEXT,
   next_title TEXT,
   next_prompt TEXT,
+  open_items TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -314,6 +315,8 @@ export function migrate() {
   // A follow-up thread Haiku proposes once a turn is done: its title and first prompt. Local, not synced.
   ensureColumn('threads', 'next_title', 'TEXT');
   ensureColumn('threads', 'next_prompt', 'TEXT');
+  // What a finished turn left open for Ben (packages/shared/open-items.ts), as JSON. Local, not synced.
+  ensureColumn('threads', 'open_items', 'TEXT');
   ensureColumn('threads', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   // A worktree thread's preparation (apps/server/runner/setup.ts): preparing or failed, with why; null once it is ready. Local, not synced.
   ensureColumn('threads', 'setup', 'TEXT');

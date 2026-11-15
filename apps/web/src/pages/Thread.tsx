@@ -6,6 +6,8 @@ import { LinkChannel } from '../link-previews.ts';
 import { ThreadIdCtx } from '../components/thread/ToolOutput.tsx';
 import { PanelResizeHandle } from '../components/thread/panel/PanelResizeHandle.tsx';
 import { NextThreadCard } from '../components/thread/NextThreadCard.tsx';
+import { OpenItemsCard } from '../components/thread/OpenItemsCard.tsx';
+import { sameSettings } from '../new-thread-preset.ts';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
 import { LimitCard } from '../components/thread/LimitCard.tsx';
@@ -23,7 +25,7 @@ import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from './useThreadSession.ts';
 import { AGENTS_CARD_ID } from '../components/thread/panel/AgentsSection.tsx';
 import { Empty, ErrorNote, Icon, LinkButton, Loading } from '../components/ui.tsx';
-import { href, navigate, type ThreadView } from '../router.ts';
+import { href, navigate, openNewThread, type ThreadView } from '../router.ts';
 import { reportNotes } from '../requests.ts';
 import { canSteer } from '../steer.ts';
 import { teamOf } from '../transcript/delegation.ts';
@@ -265,13 +267,23 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 <QueuedMessages items={queued} starting={betweenTurns} threadId={id} onPending={setQueued} setup={thread.setup} sessionBlocked={!!thread.resume_blocked} canSteer={canSteer(thread.harness, harnesses)} />
                 <SendingMessages threadId={id} pending={listed} />
                 {!queued.length && (
-                  <NextThreadCard
-                    thread={thread}
-                    onThread={(t, reply) => {
-                      applyThread(t, reply);
-                      if (reply) pin();
-                    }}
-                  />
+                  <>
+                    <OpenItemsCard
+                      thread={thread}
+                      onThread={(t, reply) => {
+                        applyThread(t, reply);
+                        if (reply) pin();
+                      }}
+                      onSpawn={(prompt) => openNewThread({ ...sameSettings(thread), prompt })}
+                    />
+                    <NextThreadCard
+                      thread={thread}
+                      onThread={(t, reply) => {
+                        applyThread(t, reply);
+                        if (reply) pin();
+                      }}
+                    />
+                  </>
                 )}
               </div>
             </div>

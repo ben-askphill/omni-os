@@ -33,6 +33,8 @@ export interface Thread {
   suggestion: string | null;
   next_title: string | null;
   next_prompt: string | null;
+  /** What the last turn left open for Ben, as JSON: read it with readOpenItems (@omni/shared/open-items.ts). */
+  open_items: string | null;
   archived: number;
   folder_id: string | null;
   pinned_at: string | null;

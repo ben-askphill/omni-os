@@ -27,6 +27,8 @@
 //   SUGGEST_NONE      text mode (Omni's reply suggestion): answer NONE
 //   NEXT_THREAD       text mode (Omni's proposed follow-up thread): propose one; without it, answer NONE
 //   NEXT:<ms>         text mode (Omni's proposed follow-up thread): take that long to answer
+//   OPEN_ITEMS        text mode (Omni's open items): list a question, a decision and a blocker; without it, answer NONE
+//   OPEN:<ms>         text mode (Omni's open items): take that long to answer
 //   RICH              before the answer, the calls a real turn is made of: a plan updated as it goes, a sub-agent
 //                     with calls of its own, a status, a failing command and an MCP tool
 //   MODS              before the answer, what a mod's hooks send (Claude Code 2.1.287+): a ui_status, a ui_log, a
@@ -993,6 +995,18 @@ async function main() {
       if (wait) await new Promise((r) => setTimeout(r, wait));
       return process.stdout.write(
         prompt.includes('NEXT_THREAD') ? 'TITLE: Fix the docs drift\nPROMPT: Update the skills catalog in docs/skills.md. Work on a branch.\n' : 'NONE\n',
+      );
+    }
+    if (outFmt === 'text' && prompt.includes('before this thread can be closed')) {
+      // Omni's open items. Same echo as the reply suggestion.
+      const wait = Number(/OPEN:(\d+)/.exec(prompt)?.[1] ?? 0);
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      return process.stdout.write(
+        prompt.includes('OPEN_ITEMS')
+          ? 'QUESTION: Should the export include archived threads?\n' +
+              'DECISION: Store the cache in SQLite or in Postgres? | SQLite | Postgres\n' +
+              'BLOCKER: The APNs key is missing from the secret store, so push alerts cannot be tested.\n'
+          : 'NONE\n',
       );
     }
     if (outFmt === 'text' && prompt.includes('Predict the short reply')) {

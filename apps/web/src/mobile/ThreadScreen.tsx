@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
+import { OpenItemsCard } from '../components/thread/OpenItemsCard.tsx';
 import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { SetupCard } from '../components/thread/SetupCard.tsx';
 import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
@@ -238,6 +239,14 @@ export function ThreadScreen() {
                   }} />}
               {queued.length > 0 && <Pending thread={thread} items={queued} onPending={setQueued} />}
               <Sending threadId={thread.id} pending={listed} />
+              {!queued.length && (
+                <OpenItemsCard
+                  thread={thread}
+                  mobile
+                  onThread={(t, reply) => applyThread(t, reply)}
+                  onSpawn={(prompt) => shell.sheet({ name: 'new', channel: thread.channel_id, prompt })}
+                />
+              )}
               {actionError && <ErrorNote>{actionError}</ErrorNote>}
             </div>
           </HistoryCtx.Provider>

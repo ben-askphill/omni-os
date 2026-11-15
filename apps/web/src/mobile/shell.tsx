@@ -6,7 +6,7 @@ import { useThreadSession } from '../pages/useThreadSession.ts';
 import { shownResult } from '../needs-you.ts';
 import { useApp, usePageVisible } from '../store.tsx';
 
-export type ShellSheet = { name: 'new'; channel?: string } | { name: 'search' } | { name: 'continue'; source: ContinueSource };
+export type ShellSheet = { name: 'new'; channel?: string; prompt?: string } | { name: 'search' } | { name: 'continue'; source: ContinueSource };
 
 export interface MobileShellApi {
   /** Back to the screen under this one: the previous history entry when it is the app's, else the parent route. */

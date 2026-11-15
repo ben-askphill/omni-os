@@ -9,7 +9,7 @@ import { detachThread } from '../browser.ts';
 import { turnFinished } from '../sync/files.ts';
 import { followBranch } from '../branch-follow.ts';
 import { notifyEnded } from '../push-sender.ts';
-import { suggestNextThread, suggestReply } from './aux.ts';
+import { suggestNextThread, suggestOpenItems, suggestReply } from './aux.ts';
 import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
 import { pump, reportToParent } from './queue.ts';
 import { toolTails } from '../tool-tail.ts';
@@ -148,6 +148,7 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
   if (status === 'done' && !more && !t?.parent_id && runText && !isShuttingDown()) {
     suggestReply(id, runText);
     suggestNextThread(id, runText);
+    suggestOpenItems(id, runText);
   }
   void turnFinished(id);
   // The agent may have switched to a branch of its own and opened its PR from it.
