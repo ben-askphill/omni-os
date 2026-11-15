@@ -1,9 +1,11 @@
 // The sidebar Inbox's rows (apps/web/src/components/sidebar/InboxView.tsx) on the phone's Activity tab, on the mobile
 // parts: a thread with its status, a Done row, and a shelf's header. A row's actions are laid over its right end as
 // siblings of its button, so tapping one never opens the thread.
-import { errorText, type Thread, type ThreadStub } from '../api.ts';
+import { errorText, type Thread } from '../api.ts';
 import type { InboxShelf } from '../app/useInbox.ts';
-import { DelegateCount, DelegateCountSpace, delegatesHref, useDelegateSummary } from '../components/DelegateCount.tsx';
+import { AgentRows, TreeRows, TreeToggle, TreeToggleSpace } from '../components/ThreadTree.tsx';
+import { useMarkDone } from '../done-confirm.tsx';
+import { useJobTree } from '../thread-tree.ts';
 import { DoneMark, Icon, type IconName } from '../components/ui.tsx';
 import { RunElapsed } from '../components/RunElapsed.tsx';
 import { ranOnLine } from '@omni/shared/ran-on.ts';
@@ -30,11 +32,14 @@ const actionsWidth = (n: number) => (n ? n * ACTION + (n - 1) * ACTION_GAP : 0);
 /** Mark done, undo and unpin, each answered with a toast, or the server's error, as in Thread options. */
 function useRowActions() {
   const shell = useShell();
-  const { setDone, setPinned } = useApp();
-  const run = (p: Promise<unknown>, ok: string) => void p.then(() => shell.toast(ok), (e: unknown) => shell.toast(errorText(e)));
+  const { setPinned } = useApp();
+  const markDone = useMarkDone();
+  const run = (p: Promise<unknown>, ok: string) =>
+    void p.then((r) => r !== null && shell.toast(ok), (e: unknown) => shell.toast(errorText(e)));
   return {
-    done: (t: InboxThread) => run(setDone(t.id, true), 'Marked done'),
-    undo: (t: InboxThread) => run(setDone(t.id, false), 'Back in the inbox'),
+    // A job with work still going under it asks first; cancelling it says nothing.
+    done: (t: InboxThread) => run(markDone(t, true), 'Marked done'),
+    undo: (t: InboxThread) => run(markDone(t, false), 'Back in the inbox'),
     unpin: (t: InboxThread) => run(setPinned(t, false), 'Unpinned'),
   };
 }
@@ -52,17 +57,21 @@ function RowActions({ actions }: { actions: RowAction[] }) {
   );
 }
 
-/** A thread as the sidebar's Inbox card: its status on the avatar and on the right, the title, the channel and the machine. */
+/**
+ * A thread as the sidebar's Inbox card: its status on the avatar and on the right, the title, the channel and the
+ * machine. A job has its tally at the end of the second line and its tree under it. `working`: the row is on the
+ * Working shelf, so what runs under it shows too.
+ */
 export function MoInboxRow({
   t,
   status,
-  delegated,
+  working = false,
   pinned = false,
   last,
 }: {
   t: InboxThread & Partial<Pick<Thread, 'branch' | 'role'>>;
   status: RowStatus | null;
-  delegated: readonly ThreadStub[] | undefined;
+  working?: boolean;
   pinned?: boolean;
   last: boolean;
 }) {
@@ -70,7 +79,9 @@ export function MoInboxRow({
   const { channel } = useApp();
   const now = useNow(60_000);
   const act = useRowActions();
-  const summary = useDelegateSummary(delegated);
+  const { tasks } = useApp();
+  const tree = useJobTree(t, 'inbox');
+  const own = working ? tasks.filter((k) => k.thread_id === t.id && k.subagent) : [];
   const ch = channel(t.channel_id);
   const title = t.title || 'Untitled';
   // The machine it runs on or last ran on, then the run's time; the branch only without a machine.
@@ -80,11 +91,13 @@ export function MoInboxRow({
   if (pinned) actions.push({ icon: 'pin', label: `Unpin ${title}`, run: () => act.unpin(t) });
   if (canMarkDone(t.status)) actions.push({ icon: 'check', label: `Mark ${title} done`, run: () => act.done(t) });
   const reserve = actionsWidth(actions.length);
+  const under = !!tree || own.length > 0;
   return (
+    <div>
     <div className="relative">
       <button type="button" onClick={() => shell.open(href.thread(t.id))} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
         <MoAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} state={status?.glyph ?? t.status} />
-        <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last ? '' : 'border-b border-line'}`} style={{ paddingRight: reserve }}>
+        <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last || under ? '' : 'border-b border-line'}`} style={{ paddingRight: reserve }}>
           <span className="flex items-baseline gap-2">
             <span className="min-w-0 flex-1 truncate text-[15px] leading-[1.3] text-fg">{title}</span>
             <span className="shrink-0 text-[12px] leading-none text-fg-3 tabular-nums">{status ? status.label : shortTime(t.updated_at ?? t.created_at, now)}</span>
@@ -101,16 +114,25 @@ export function MoInboxRow({
               </span>
             )}
             {!label && <RunElapsed since={t.run_started_at} />}
-            {summary && <DelegateCountSpace summary={summary} size={13} />}
+            {tree && (
+              <TreeToggleSpace tree={tree} className="ml-auto h-7 px-1" />
+            )}
           </span>
         </span>
       </button>
-      {summary && (
-        <span className="absolute bottom-2.5 flex" style={{ right: reserve }}>
-          <DelegateCount summary={summary} size={13} onOpen={() => shell.open(delegatesHref(t.id))} />
+      {tree && (
+        <span className="absolute bottom-1 flex" style={{ right: reserve }}>
+          <TreeToggle tree={tree} title={title} className="h-7 px-1" />
         </span>
       )}
       <RowActions actions={actions} />
+    </div>
+      {under && (
+        <div className={`ml-[22px] pb-1.5 ${last ? '' : 'border-b border-line'}`}>
+          {own.length > 0 && <AgentRows tasks={own} variant="phone" />}
+          {tree && <TreeRows tree={tree} variant="phone" agents={working ? tasks : undefined} />}
+        </div>
+      )}
     </div>
   );
 }

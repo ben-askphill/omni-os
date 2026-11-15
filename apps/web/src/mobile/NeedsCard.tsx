@@ -1,3 +1,4 @@
+import { useMarkDone } from '../done-confirm.tsx';
 import { useState } from 'react';
 import { api, errorText, type PendingMsg, type Thread } from '../api.ts';
 import { Button, asksForYou } from '../components/ui.tsx';
@@ -21,7 +22,8 @@ const DONE: Partial<Record<NeedsAction['kind'], string>> = { retry: 'Preparing t
 /** Runs a card's action. `onRecovered` gets the thread page's answer, so an open thread shows it before the stream does. */
 export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
   const shell = useShell();
-  const { readResult, setDone } = useApp();
+  const { readResult } = useApp();
+  const markDone = useMarkDone();
   const [busy, setBusy] = useState<NeedsAction | null>(null);
   const run = async (card: Pick<NeedsCard, 'id'>, a: NeedsAction) => {
     if (a.kind === 'open') return shell.open(href.thread(a.thread ?? card.id));
@@ -32,8 +34,7 @@ export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
     setBusy(a);
     if (a.kind === 'done') {
       try {
-        await setDone(card.id, true);
-        shell.toast(DONE.done!);
+        if (await markDone({ id: card.id }, true)) shell.toast(DONE.done!);
       } catch (e) {
         shell.toast(errorText(e));
       } finally {

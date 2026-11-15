@@ -487,6 +487,38 @@
     }
   }
 
+  /* ---- the thread tree (ThreadTree.tsx) ----
+     Each row hangs off one vertical line from its parent's status mark; the last row's line curves into it at the
+     row's middle, as the sidebar's sub-agent rows do. A row's children nest inside its node, so the line runs past them. */
+  .tree-node {
+    position: relative;
+    --tree-mid: 16px;
+  }
+  @media (min-width: 768px) {
+    .tree-node {
+      --tree-mid: 14px;
+    }
+  }
+  .tree-node[data-variant="phone"] {
+    --tree-mid: 18px;
+  }
+  .tree-node::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-left: 1px solid var(--line-strong);
+    pointer-events: none;
+  }
+  .tree-node.tree-last::before {
+    bottom: auto;
+    width: 8px;
+    height: var(--tree-mid);
+    border-bottom: 1px solid var(--line-strong);
+    border-bottom-left-radius: 6px;
+  }
+
   /* ---- channel rail items (ChannelRail.tsx) ----
      Discs rest in greyscale and take their colour back on hover or keyboard focus, unless Settings, Appearance sets
      the rail to full colour (data-color="full"). The selected disc and the status badges (outside the disc) always

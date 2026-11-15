@@ -20,7 +20,7 @@ import { useShell } from './shell.tsx';
 export function ActivityScreen() {
   const shell = useShell();
   const now = useNow(60_000);
-  const { pinned, inbox, working, done, loaded, status, delegates } = useInbox();
+  const { pinned, inbox, working, done, loaded, status } = useInbox();
   const machines = useMachines().data;
   const waiting = [...pinned, ...inbox];
   const mark = waiting.some((t) => asksForYou(status(t)?.glyph ?? 'idle')) ? 'attention' : working.count ? 'delegating' : 'idle';
@@ -55,7 +55,7 @@ export function ActivityScreen() {
         </div>
         <div className="flex flex-col px-4">
           {waiting.map((t, i) => (
-            <MoInboxRow key={t.id} t={t} status={status(t)} delegated={delegates.get(t.id)} pinned={i < pinned.length} last={i === waiting.length - 1} />
+            <MoInboxRow key={t.id} t={t} status={status(t)} pinned={i < pinned.length} last={i === waiting.length - 1} />
           ))}
           {loaded && !waiting.length && <MoEmpty>Nothing is waiting on you.</MoEmpty>}
         </div>
@@ -65,7 +65,7 @@ export function ActivityScreen() {
               <div aria-hidden className="mt-2 mb-1 border-t border-line" />
               <MoShelf label="Working" shelf={working} />
               {working.rows.map((t, i) => (
-                <MoInboxRow key={t.id} t={t} status={status(t)} delegated={delegates.get(t.id)} last={i === working.rows.length - 1} />
+                <MoInboxRow key={t.id} t={t} status={status(t)} working last={i === working.rows.length - 1} />
               ))}
             </>
           )}

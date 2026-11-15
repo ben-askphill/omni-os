@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { ranOnLine } from '@omni/shared/ran-on.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import type { Thread, ThreadStub } from '../../api.ts';
+import type { BackgroundTask, Thread } from '../../api.ts';
 import { useInbox } from '../../app/useInbox.ts';
 import { useDoneKey } from '../../inbox-key.ts';
 import type { RowStatus } from '@omni/shared/status.ts';
@@ -12,8 +12,9 @@ import { href } from '../../router.ts';
 import { useApp, useNow } from '../../store.tsx';
 import { HarnessLogo, Loader, OmniMark } from '../brand.tsx';
 import { Avatar, ChannelMark, DoneMark, Icon, StatusDot } from '../ui.tsx';
-import { DelegateCount, DelegateCountSpace } from '../DelegateCount.tsx';
-import { useRowDelegates } from './SidebarRows.tsx';
+import { useMarkDone } from '../../done-confirm.tsx';
+import { useJobTree } from '../../thread-tree.ts';
+import { AgentRows, TreeRows, TreeToggle, TreeToggleSpace } from '../ThreadTree.tsx';
 import { RunElapsed } from '../RunElapsed.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
 
@@ -25,24 +26,26 @@ import { WorkspaceLinks } from './SidebarLinks.tsx';
  * links at the foot, which the classic sidebar needs and the rail has discs for.
  */
 export function InboxView({ onNavigate, links = true }: { onNavigate?: () => void; links?: boolean }) {
-  const { channels, setDone } = useApp();
-  const { pinned, inbox, needs, finished, working, done, loaded, openId, status, delegates } = useInbox();
+  const { channels, tasks } = useApp();
+  const markDone = useMarkDone();
+  const { pinned, inbox, needs, finished, working, done, loaded, openId, status } = useInbox();
   const channelOf = (id: string) => channels.find((c) => c.id === id);
   useDoneKey((focusedId) => {
     const id = focusedId ?? openId;
     const t = id ? [...pinned, ...inbox, ...working.rows].find((r) => r.id === id) : undefined;
     if (!t || !canMarkDone(t.status)) return false;
-    void setDone(t.id, true).catch(() => {});
+    void markDone(t, true).catch(() => {});
     return true;
   });
 
-  const card = (t: InboxThread, pinnedRow = false) => (
+  // Sub-agents show only under a card on the Working shelf, and go when they stop.
+  const card = (t: InboxThread, pinnedRow = false, agents?: BackgroundTask[]) => (
     <InboxCard
       key={t.id}
       t={t}
       channel={channelOf(t.channel_id)}
       status={status(t)}
-      delegated={delegates.get(t.id)}
+      agents={agents}
       active={t.id === openId}
       pinned={pinnedRow}
       onNavigate={onNavigate}
@@ -70,7 +73,7 @@ export function InboxView({ onNavigate, links = true }: { onNavigate?: () => voi
         <div className="space-y-px pt-1">
           <div aria-hidden className="mx-3 mb-3 border-t border-line" />
           <Shelf label="Working" count={working.count} open={working.open} onToggle={working.toggle} />
-          {working.rows.map((t) => card(t))}
+          {working.rows.map((t) => card(t, false, tasks))}
         </div>
       )}
 
@@ -135,13 +138,15 @@ function ChannelLead({ channel }: { channel: ReturnType<typeof useApp>['channels
 
 /**
  * T3's card: the channel on top with the status or the time on its right, the title, then the machine it runs or ran
- * on with the run's time, and the harness. The branch and the machines before are in that line's tooltip.
+ * on with the run's time, and the harness. The branch and the machines before are in that line's tooltip. A job's
+ * card has its tally there instead of the harness, and its tree under it. `agents`: the live tasks, on the Working
+ * shelf only, so a card there lists what runs under it.
  */
 function InboxCard({
   t,
   channel,
   status,
-  delegated,
+  agents,
   active,
   pinned,
   onNavigate,
@@ -149,21 +154,24 @@ function InboxCard({
   t: InboxThread & Partial<Pick<Thread, 'branch'>>;
   channel: ReturnType<typeof useApp>['channels'][number] | undefined;
   status: RowStatus | null;
-  delegated: readonly ThreadStub[] | undefined;
+  agents?: BackgroundTask[];
   active: boolean;
   pinned: boolean;
   onNavigate?: () => void;
 }) {
-  const { setDone, setPinned } = useApp();
+  const { setPinned } = useApp();
+  const markDone = useMarkDone();
   const now = useNow(60_000);
-  const delegates = useRowDelegates(t.id, delegated, onNavigate);
+  const tree = useJobTree(t, 'inbox');
+  const own = (agents ?? []).filter((k) => k.thread_id === t.id && k.subagent);
   const title = t.title || 'Untitled';
   const channelName = channel?.id === 'conductor' ? 'Conductor' : (channel?.name ?? t.channel_id);
   // The machine it runs on or last ran on, with the run's time while it runs; the branch only without a machine.
   const where = ranOnLine(t, now);
   const label = where.machine ?? where.branch;
-  const line = !!label || !!t.run_started_at;
-  const harness = t.harness && !delegates && (
+  // A job's tree toggle sits on this line, laid over the link (a link can't hold a button), so a job always has it.
+  const line = !!label || !!t.run_started_at || !!tree;
+  const harness = t.harness && !tree && (
     <span className="shrink-0 text-fg-3">
       <HarnessLogo harness={t.harness} size={11} />
     </span>
@@ -198,7 +206,6 @@ function InboxCard({
         <span className={`mt-1 flex items-center gap-1.5 text-[13px] leading-5 ${active ? 'font-medium text-fg' : 'font-medium text-fg-2'}`}>
           <span className="min-w-0 flex-1 truncate">{title}</span>
           {!line && harness}
-          {!line && delegates && <DelegateCountSpace summary={delegates.summary} />}
         </span>
         {line && (
           <span className="mt-0.5 flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3" title={where.title || undefined} data-ran-on={where.machine ?? undefined}>
@@ -208,15 +215,21 @@ function InboxCard({
             <RunElapsed since={t.run_started_at} />
             <span className="min-w-0 flex-1" />
             {harness}
-            {delegates && <DelegateCountSpace summary={delegates.summary} />}
+            {tree && <TreeToggleSpace tree={tree} />}
           </span>
         )}
       </a>
-      {delegates && <DelegateCount summary={delegates.summary} onOpen={delegates.open} className="z-[2] mr-2 mb-2 self-end justify-self-end [grid-area:1/1]" />}
+      {tree && line && <TreeToggle tree={tree} title={title} className="mr-3 mb-2 self-end justify-self-end [grid-area:1/1]" />}
       <span className="z-[2] mt-1.5 mr-1.5 flex items-center gap-0.5 self-start justify-self-end [grid-area:1/1] opacity-100 transition-opacity md:opacity-0 md:group-focus-within/row:opacity-100 md:group-hover/row:opacity-100">
         {pinned && <RowAction icon="pin" label={`Unpin ${title}`} onClick={() => void setPinned(t, false).catch(() => {})} />}
-        {canMarkDone(t.status) && <RowAction icon="check" label={`Mark ${title} done`} text="Done" kbd="E" onClick={() => void setDone(t.id, true).catch(() => {})} />}
+        {canMarkDone(t.status) && <RowAction icon="check" label={`Mark ${title} done`} text="Done" kbd="E" onClick={() => void markDone(t, true).catch(() => {})} />}
       </span>
+      {(tree || own.length > 0) && (
+        <div className="ml-[18px] [grid-area:2/1]">
+          {own.length > 0 && <AgentRows tasks={own} variant="inbox" onNavigate={onNavigate} />}
+          {tree && <TreeRows tree={tree} variant="inbox" agents={agents} onNavigate={onNavigate} />}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useMarkDone } from '../done-confirm.tsx';
 import type { ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import type { NeedsYou as Inbox, NeedsYouItem } from '../api.ts';
@@ -12,7 +13,8 @@ import { Avatar, Icon, StatusDot, type IconName } from './ui.tsx';
  */
 export function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showChannel?: boolean }) {
   useNow(60_000);
-  const { channels, setDone } = useApp();
+  const { channels } = useApp();
+  const markDone = useMarkDone();
   const t = item.thread;
   const reason = reasonOf(item);
   const unread = !!item.result;
@@ -53,7 +55,7 @@ export function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showCha
         type="button"
         aria-label={`Mark ${t.title || 'Untitled'} as done`}
         title="Mark as done"
-        onClick={() => void setDone(t.id, true).catch(() => {})}
+        onClick={() => void markDone(t, true).catch(() => {})}
         className="hov absolute top-2.5 right-2.5 z-[2] grid h-7 w-7 place-items-center rounded-full text-fg-3 opacity-100 transition-opacity [--hov:var(--bg)] hover:text-fg focus-visible:opacity-100 md:opacity-0 md:group-hover/ny:opacity-100 md:group-focus-within/ny:opacity-100"
       >
         <Icon name="check" size={15} />

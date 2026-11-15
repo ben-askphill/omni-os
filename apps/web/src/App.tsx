@@ -11,6 +11,7 @@ import { startNewThread, useRoute } from './router.ts';
 import { Page } from './pages/Page.tsx';
 import { AppProvider, readPref, useApp, useIsMobile, usePageTitle, useSyncOnReturn, writePref } from './store.tsx';
 import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
+import { DoneConfirmProvider } from './done-confirm.tsx';
 import { MobileShell } from './mobile/MobileShell.tsx';
 import { desktop } from './desktop.ts';
 import { QuickPromptPage } from './pages/QuickPrompt.tsx';
@@ -189,7 +190,9 @@ export function App() {
     <AppProvider>
       <ToastProvider>
         <FolderProvider>
-          <Shells />
+          <DoneConfirmProvider>
+            <Shells />
+          </DoneConfirmProvider>
         </FolderProvider>
       </ToastProvider>
     </AppProvider>

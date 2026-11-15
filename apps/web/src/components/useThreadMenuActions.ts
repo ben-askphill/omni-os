@@ -1,3 +1,4 @@
+import { useMarkDone } from '../done-confirm.tsx';
 import { useRef, useState } from 'react';
 import { api, errorText, type Thread } from '../api.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
@@ -7,7 +8,8 @@ import { useToast } from './Toaster.tsx';
 
 /** What the thread menu's items do. Each closes the menu when it works and leaves its message in `error` when it does not. */
 export function useThreadMenuActions({ id, row, archived, current, onClose }: { id: string; row: Thread | null; archived: boolean | null; current: string | null; onClose: () => void }) {
-  const { reloadChannels, setPinned, setDone } = useApp();
+  const { reloadChannels, setPinned } = useApp();
+  const markDone = useMarkDone();
   const route = useRoute();
   const toast = useToast();
   const [error, setError] = useState('');
@@ -51,7 +53,7 @@ export function useThreadMenuActions({ id, row, archived, current, onClose }: { 
   const toggleDone = async () => {
     if (!row) return;
     try {
-      await setDone(row.id, !row.done_at);
+      if (!(await markDone(row, !row.done_at))) return;
       onClose();
     } catch (e) {
       setError(errorText(e));

@@ -1,3 +1,4 @@
+import { useMarkDone } from '../done-confirm.tsx';
 import { useEffect, useRef, useState } from 'react';
 import { stepOf, type PRStep, type StepPrompts } from '@omni/shared/thread-glance.ts';
 import { api, errorText, type PendingMsg, type SendMode, type Thread } from '../api.ts';
@@ -33,7 +34,8 @@ export function useThreadActions({
   setActionError: (e: string | null) => void;
   pin: () => void;
 }) {
-  const { reloadChannels, setDone } = useApp();
+  const { reloadChannels } = useApp();
+  const markDone = useMarkDone();
   // The step prompt sent from a button, so the button reads as working from the click to the end of the turn it starts.
   // The thread's own state (`underway`) blinks off in between: the POST returns before the stream has the message, and
   // the stream drops the pending row a frame before the recorded message arrives. So it holds until the thread has
@@ -101,7 +103,8 @@ export function useThreadActions({
   const toggleDone = async () => {
     setActionError(null);
     try {
-      applyThread(await setDone(thread!.id, !thread?.done_at), true);
+      const next = await markDone(thread!, !thread?.done_at);
+      if (next) applyThread(next, true);
     } catch (e) {
       setActionError(errorText(e));
     }

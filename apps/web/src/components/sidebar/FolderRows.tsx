@@ -53,7 +53,7 @@ function accepts(f: FolderWithThreads) {
  * closes it, double-click or F2 renames, Delete asks to delete, and the "…" button or a right-click opens its menu.
  * Drop a thread on it to file it; drop another folder on it to put that one just above.
  */
-export function FolderRow({ f, openId, tasks, handoffs, onNavigate }: { f: FolderWithThreads; openId: string | null; tasks: BackgroundTask[]; handoffs: ChannelWithRunning['handoffs']; onNavigate?: () => void }) {
+export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThreads; openId: string | null; tasks: BackgroundTask[]; onNavigate?: () => void }) {
   const folders = useFolders();
   const [over, setOver] = useState<'thread' | 'folder' | null>(null);
   const [all, setAll] = useState(false);
@@ -151,7 +151,7 @@ export function FolderRow({ f, openId, tasks, handoffs, onNavigate }: { f: Folde
         </div>
       )}
       {shown.map((t) => (
-        <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} handoffs={handoffs} onNavigate={onNavigate} />
+        <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} onNavigate={onNavigate} />
       ))}
       {open && !all && list.length > shown.length && (
         <button type="button" onClick={() => setAll(true)} className="item ml-[25px] flex h-7 items-center pr-3 pl-8 text-[12px] text-fg-3 hover:text-fg-2">

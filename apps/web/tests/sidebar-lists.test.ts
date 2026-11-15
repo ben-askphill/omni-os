@@ -129,10 +129,12 @@ describe('rowsElsewhere', () => {
   const running = runningThreadGroups(channels).map((g) => g.thread);
 
   it('takes every thread in Running out of its channel while Running is open, so one row holds the highlight', () => {
-    expect([...rowsElsewhere(channels, running, true)].sort()).toEqual(['child', 'job', 'run']);
+    // The delegated thread shows under its job's row in Running, and keeps its own row in its channel.
+    expect(ids(running).sort()).toEqual(['job', 'run']);
+    expect([...rowsElsewhere(running, true)].sort()).toEqual(['job', 'run']);
   });
 
-  it('hands Running threads back to their channels while Running is folded, but never a delegated thread', () => {
-    expect([...rowsElsewhere(channels, running, false)]).toEqual(['child']);
+  it('hands Running threads back to their channels while Running is folded', () => {
+    expect([...rowsElsewhere(running, false)]).toEqual([]);
   });
 });

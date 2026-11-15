@@ -1,10 +1,9 @@
 // The Inbox that the sidebar's Inbox view and the phone's Activity tab both show, so the two never drift: which threads,
 // on which shelf, with what status, and how far each shelf is open. The rules are apps/web/src/inbox.ts.
 import { useMemo, useState } from 'react';
-import { delegatedIds, delegatesByParent } from '@omni/shared/delegate-count.ts';
+import { delegatedIds } from '@omni/shared/delegate-count.ts';
 import { asksForYou, inboxStatus, type RowStatus } from '@omni/shared/status.ts';
 import { reasonOf } from '../needs-you.ts';
-import type { ThreadStub } from '../api.ts';
 import { DONE_INITIAL, DONE_PAGE, inboxLayout, shelfView, type InboxThread, type ShelfView } from '../inbox.ts';
 import { useLiveThreads } from '../components/ThreadList.tsx';
 import { useRoute } from '../router.ts';
@@ -36,8 +35,6 @@ export interface Inbox {
   openId: string | null;
   /** What a card says in place of the time, as Home says it (inboxStatus). */
   status: (t: InboxThread) => RowStatus | null;
-  /** A Conductor thread's delegated threads, by its id: their count on its row stands for them. */
-  delegates: Map<string, readonly ThreadStub[]>;
 }
 
 /** A shelf's open state on this device. Every shelf starts folded, as T3's do. */
@@ -94,6 +91,5 @@ export function useInbox(): Inbox {
     loaded: !!recent.data,
     openId,
     status: (t) => inboxStatus(t, needOf.get(t.id)),
-    delegates: delegatesByParent(handoffs),
   };
 }

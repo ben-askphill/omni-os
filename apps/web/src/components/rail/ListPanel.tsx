@@ -147,7 +147,7 @@ function ChannelList({ id }: { id: string }) {
               <div className="caption px-3 pt-1 pb-2">Folders</div>
               <div className="space-y-px">
                 {folderList.map((f) => (
-                  <FolderRow key={f.id} f={f} openId={openId} tasks={tasks} handoffs={c.handoffs} />
+                  <FolderRow key={f.id} f={f} openId={openId} tasks={tasks} />
                 ))}
                 {folders.editing === draftKey(c.id) && (
                   <FolderNameField
@@ -164,7 +164,7 @@ function ChannelList({ id }: { id: string }) {
             <div className="space-y-px">
               {threads.length ? (
                 <>
-                  {threads.map((t) => <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} handoffs={c.handoffs} flush />)}
+                  {threads.map((t) => <ChannelThreadEntry key={t.id} t={t} active={t.id === openId} tasks={agents(t.id)} flush />)}
                   <NavLink to={href.channel(c.id)} active={tab === 'threads' && !openId}>
                     See all threads
                   </NavLink>

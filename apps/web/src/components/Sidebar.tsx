@@ -7,7 +7,7 @@ import { rowsElsewhere, runningThreadGroups } from '../sidebar-lists.ts';
 import { href, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import { delegatesByParent } from '@omni/shared/delegate-count.ts';
+import { useJobTree } from '../thread-tree.ts';
 import { OmniMark } from './brand.tsx';
 import { Avatar, ChannelMark, ErrorNote } from './ui.tsx';
 import { useUngroupDrop } from './sidebar/channel-lists.ts';
@@ -15,7 +15,7 @@ import { SidebarTop } from './sidebar/SidebarTop.tsx';
 import { InboxView } from './sidebar/InboxView.tsx';
 import { channelFolders, channelThreads, useChannelFold } from './sidebar/channel-lists.ts';
 import { FolderNameField, FolderRow, AddFolderButton } from './sidebar/FolderRows.tsx';
-import { ChannelThreadEntry, NavLink, RunningBadge, SectionLink, ThreadSection, useRowDelegates, useSectionFold } from './sidebar/SidebarRows.tsx';
+import { ChannelThreadEntry, NavLink, RunningBadge, SectionLink, ThreadSection, useSectionFold } from './sidebar/SidebarRows.tsx';
 import { ChannelListLink, WorkspaceLinks } from './sidebar/SidebarLinks.tsx';
 import { UsageCard } from './sidebar/UsageCard.tsx';
 import { UpdateNotice } from './UpdateNotice.tsx';
@@ -60,13 +60,11 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   // copy and stays after it stops, so the highlight never jumps out from under you. The highlighted
   // channel also lists its latest threads of any status, so finished ones stay a click away.
   // Threads in a folder are listed under the folder instead.
-  // Threads the Conductor delegated get no row of their own, anywhere: the count on their Conductor thread's row
-  // stands for them, and the channel's running badge still counts the ones at work.
+  // A job's tree nests the threads it delegated and its team under its row, and each also keeps its row in its channel.
   // A thread listed in Running lives there alone while Running is open, so one row holds the highlight.
-  const delegates = delegatesByParent(conductor?.handoffs);
   const openCopy = openThread && openThread.id === openId ? openThread : null;
   const running = runningThreadGroups(channels, openCopy).map((g) => g.thread);
-  const away = rowsElsewhere(channels, running, !runningClosed);
+  const away = rowsElsewhere(running, !runningClosed);
   const elsewhere = (t: ThreadStub) => away.has(t.id);
   const listed = (f: FolderWithThreads) => ({ ...f, threads: f.threads.filter((t) => !elsewhere(t)) });
   const threadsOf = (c: ChannelWithRunning) => channelThreads(c, openIn(c), focused).filter((t) => !elsewhere(t));
@@ -92,7 +90,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           <div className="min-h-0 space-y-px overflow-hidden">{channelContents(c, closed)}</div>
         </div>
         {closed && open && !elsewhere(open) && (
-          <ChannelThreadEntry t={open} active tasks={agents(open.id)} handoffs={c.handoffs} flush={c.id === 'conductor'} onNavigate={onNavigate} />
+          <ChannelThreadEntry t={open} active tasks={agents(open.id)} flush={c.id === 'conductor'} onNavigate={onNavigate} />
         )}
       </>
     );
@@ -107,7 +105,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     return (
       <>
         {(closed ? (c.folders ?? []).map(listed) : foldersOf(c)).map((f) => (
-          <FolderRow key={f.id} f={f} openId={oid} tasks={tasks} handoffs={c.handoffs} onNavigate={onNavigate} />
+          <FolderRow key={f.id} f={f} openId={oid} tasks={tasks} onNavigate={onNavigate} />
         ))}
         {folders.editing === draftKey(c.id) && (
           <FolderNameField
@@ -117,7 +115,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           />
         )}
         {shown.map((t) => (
-          <ChannelThreadEntry key={t.id} t={t} active={t.id === oid} tasks={agents(t.id)} handoffs={c.handoffs} flush={c.id === 'conductor'} onNavigate={onNavigate} />
+          <ChannelThreadEntry key={t.id} t={t} active={t.id === oid} tasks={agents(t.id)} flush={c.id === 'conductor'} onNavigate={onNavigate} />
         ))}
         {c.id === focused ? (
           <ChannelListLink channelId={c.id} onNavigate={onNavigate}>
@@ -182,7 +180,6 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
       home={!unpin}
       tasks={tasks.filter((k) => taskHost(k) === t.id)}
       unpin={unpin}
-      delegated={unpin ? undefined : delegates.get(t.id)}
       onNavigate={onNavigate}
     />
   );
@@ -272,8 +269,8 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
   );
 }
 
-/** A Running or Pinned row. A Conductor thread in Running carries its delegate count, in place of the threads it delegated. */
-function SectionEntry({ delegated, ...props }: Omit<Parameters<typeof SectionLink>[0], 'delegates'> & { delegated?: readonly ThreadStub[] }) {
-  const delegates = useRowDelegates(props.t.id, delegated, props.onNavigate);
-  return <SectionLink {...props} delegates={delegates} />;
+/** A Running or Pinned row. A job in Running carries its tree; a Pinned copy leaves it to the thread's own row. */
+function SectionEntry(props: Omit<Parameters<typeof SectionLink>[0], 'tree'>) {
+  const tree = useJobTree(props.t, 'sidebar');
+  return <SectionLink {...props} tree={props.home ? tree : null} />;
 }
