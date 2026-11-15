@@ -25,13 +25,16 @@ function subshellWithDetachedChild(cwd: string) {
   return p.pid!;
 }
 
+// The child of `pid` once it leads its own process group: up only records a stack after detach() has run.
 const childOf = async (pid: number) => {
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 100; i++) {
     const out = spawnSync('pgrep', ['-P', String(pid)], { encoding: 'utf8' }).stdout.trim();
-    if (out) return Number(out.split('\n')[0]);
+    const child = out ? Number(out.split('\n')[0]) : 0;
+    const pg = child ? spawnSync('ps', ['-o', 'pgid=', '-p', String(child)], { encoding: 'utf8' }).stdout.trim() : '';
+    if (child && Number(pg) === child) return child;
     await new Promise((r) => setTimeout(r, 50));
   }
-  throw new Error(`no child of ${pid}`);
+  throw new Error(`no detached child of ${pid}`);
 };
 
 function stackDir(pid: number) {
