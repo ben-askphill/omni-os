@@ -51,10 +51,13 @@ export function useMenuPlacement(ref: RefObject<HTMLDivElement | null>, x: numbe
   return pos;
 }
 
-/** Close on a press or right-click outside, Escape, and anything that moves the page under the menu. */
-export function useMenuDismiss(ref: RefObject<HTMLDivElement | null>, onClose: () => void) {
+/**
+ * Close on a press or right-click outside, Escape, and anything that moves the page under the menu. `anchor`: the
+ * button that opened it, whose own click toggles it, so a press there is not "outside".
+ */
+export function useMenuDismiss(ref: RefObject<HTMLDivElement | null>, onClose: () => void, anchor?: RefObject<HTMLElement | null>) {
   useEffect(() => {
-    const away = (e: Event) => !ref.current?.contains(e.target as Node) && onClose();
+    const away = (e: Event) => !ref.current?.contains(e.target as Node) && !anchor?.current?.contains(e.target as Node) && onClose();
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('pointerdown', away, true);
     document.addEventListener('contextmenu', away, true);
@@ -70,7 +73,7 @@ export function useMenuDismiss(ref: RefObject<HTMLDivElement | null>, onClose: (
       window.removeEventListener('resize', onClose);
       window.removeEventListener('hashchange', onClose);
     };
-  }, [ref, onClose]);
+  }, [ref, onClose, anchor]);
 }
 
 const ITEMS = '[role="menuitem"], [role="menuitemradio"]';

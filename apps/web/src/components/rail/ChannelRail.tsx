@@ -1,4 +1,5 @@
-import { useContext, useEffect, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { ChannelWithRunning } from '../../api.ts';
@@ -8,15 +9,17 @@ import { useRailColor } from '../../layout-pref.ts';
 import { useApp } from '../../store.tsx';
 import { monogram } from '@omni/shared/monogram.ts';
 import { needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
-import { OmniMark, StaticMark } from '../brand.tsx';
+import { StaticMark } from '../brand.tsx';
 import { ChannelMark, Icon, Monograms, StatusDot, type IconName } from '../ui.tsx';
+import { focusFirstItem, MenuGroups, moveFocus, useMenuDismiss, useMenuPlacement, type MenuItem } from '../ContextMenuParts.tsx';
+import { MENU_SURFACE } from '../ui/overlay.tsx';
 import { useScrollFade } from './useScrollFade.ts';
 
 /**
  * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights.
- * From the top: the Omni mark (Overview), the Inbox and the Conductor, then client channels and internal and personal
- * channels as discs that scroll between two pinned blocks, then Pull requests, Library and Automations, then Add
- * channel, Settings and Ben's monogram. On macOS the desktop app's native traffic lights sit in the rail's top strip.
+ * From the top: the Inbox and the Conductor, then client channels and internal and personal channels as discs that
+ * scroll between two pinned blocks, then "More" (Pull requests, Library and Automations), Add channel, Settings and
+ * Ben's monogram. On macOS the desktop app's native traffic lights sit in the rail's top strip, above the Inbox.
  */
 export function ChannelRail({ selection }: { selection: RailSelection }) {
   const { channels, needsYou, profile } = useApp();
@@ -49,18 +52,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
       {/* The glass capsule behind the macOS traffic lights, in the desktop app only (index.css). */}
       <span aria-hidden="true" className="rail-lights-glass" />
       {/* rail-top: the desktop app's macOS window drags by this strip, where its traffic lights sit (index.css). */}
-      <div className="rail-top flex w-full shrink-0 items-end justify-center pt-3.5">
-        <a
-          href={href.home()}
-          aria-label="Overview"
-          title="Overview"
-          aria-current={selection.kind === 'overview' ? 'page' : undefined}
-          className="rail-mark grid h-10 w-10 place-items-center text-fg"
-        >
-          <OmniMark size={30} title="" />
-        </a>
-      </div>
-      <div className="mt-1.5 flex flex-col items-center gap-1">
+      <div className="rail-top flex w-full shrink-0 flex-col items-center gap-1 pt-3.5">
         <RailItem to={href.inbox()} label="Inbox" selected={selection.kind === 'inbox'}>
           <Disc selected={selection.kind === 'inbox'} icon="inbox" />
         </RailItem>
@@ -86,18 +78,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
       </div>
       <Hairline />
       <div className="flex flex-col items-center gap-1">
-        <RailItem to={href.pullRequests()} label="Pull requests" selected={selection.kind === 'prs'}>
-          <Disc selected={selection.kind === 'prs'} icon="pr" quiet />
-        </RailItem>
-        <RailItem to={href.artifacts()} label="Library" selected={selection.kind === 'library'}>
-          <Disc selected={selection.kind === 'library'} icon="layers" quiet />
-        </RailItem>
-        <RailItem to={href.automations()} label="Automations" selected={selection.kind === 'automations'}>
-          <Disc selected={selection.kind === 'automations'} icon="zap" quiet />
-        </RailItem>
-      </div>
-      <Hairline />
-      <div className="flex flex-col items-center gap-1">
+        <MoreMenu selection={selection} />
         <RailItem to={href.newChannel()} label="Add channel" selected={selection.kind === 'new-channel'}>
           <Disc selected={selection.kind === 'new-channel'} icon="plus" quiet />
         </RailItem>
@@ -111,6 +92,82 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
         )}
       </div>
     </nav>
+  );
+}
+
+/** The workspace pages behind the rail's "More" disc, in menu order. */
+export const MORE_PAGES = [
+  { kind: 'prs', label: 'Pull requests', icon: 'pr', to: href.pullRequests() },
+  { kind: 'library', label: 'Library', icon: 'layers', to: href.artifacts() },
+  { kind: 'automations', label: 'Automations', icon: 'zap', to: href.automations() },
+] as const satisfies readonly { kind: RailSelection['kind']; label: string; icon: IconName; to: string }[];
+
+/**
+ * The "More" disc: Pull requests, Library and Automations in one menu that opens beside the rail, so they take one
+ * disc of height instead of three. Selected while one of them is on screen, its label saying which. Enter, Space or
+ * the down arrow open it on its first item; the arrows walk it; Escape closes it and puts focus back on the disc.
+ */
+function MoreMenu({ selection }: { selection: RailSelection }) {
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const current = MORE_PAGES.find((p) => p.kind === selection.kind);
+  const open = () => {
+    const r = button.current?.getBoundingClientRect();
+    if (r) setAt({ x: r.right + 8, y: r.top });
+  };
+  const close = useCallback((refocus: boolean) => {
+    setAt(null);
+    if (refocus) button.current?.focus();
+  }, []);
+  const label = current ? `More, ${current.label} open` : 'More';
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        aria-label={label}
+        title="Pull requests, Library and Automations"
+        aria-haspopup="menu"
+        aria-expanded={!!at}
+        aria-current={current ? 'page' : undefined}
+        onClick={() => (at ? close(false) : open())}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowDown' || at) return;
+          e.preventDefault();
+          open();
+        }}
+        className="rail-item press relative grid h-12 w-12 shrink-0 place-items-center"
+      >
+        <Disc selected={!!current} icon="more" quiet />
+      </button>
+      {at && createPortal(<MorePopup at={at} anchor={button} onClose={close} />, document.body)}
+    </>
+  );
+}
+
+function MorePopup({ at, anchor, onClose }: { at: { x: number; y: number }; anchor: RefObject<HTMLButtonElement | null>; onClose: (refocus: boolean) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const pos = useMenuPlacement(ref, at.x, at.y);
+  const dismiss = useCallback(() => onClose(ref.current?.contains(document.activeElement) ?? false), [onClose]);
+  useMenuDismiss(ref, dismiss, anchor);
+  useEffect(() => focusFirstItem(ref), []);
+  const items: MenuItem[] = MORE_PAGES.map((p) => ({
+    label: p.label,
+    icon: p.icon,
+    run: () => (onClose(false), navigate(p.to)),
+  }));
+  const onKey = (e: ReactKeyboardEvent) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveFocus(ref, e.key);
+    } else if (e.key === 'Tab') {
+      onClose(false);
+    }
+  };
+  return (
+    <div ref={ref} role="menu" aria-label="More" style={{ left: pos.x, top: pos.y }} onKeyDown={onKey} className={`pop-in fixed z-[60] min-w-[200px] p-1.5 ${MENU_SURFACE}`}>
+      <MenuGroups groups={[{ items }]} />
+    </div>
   );
 }
 

@@ -6,7 +6,6 @@ import { AutomationsPage } from './Automations.tsx';
 import { ChannelPage } from './Channel.tsx';
 import { NewChannelPage } from './ChannelSettings.tsx';
 import { HomePage } from './Home.tsx';
-import { InboxPage } from './Inbox.tsx';
 import { SearchPage } from './Search.tsx';
 import { SettingsPage } from './Settings.tsx';
 import { ThreadPage } from './Thread.tsx';
@@ -16,9 +15,9 @@ export function Page({ route }: { route: Route }) {
   switch (route.name) {
     case 'home':
     case 'channels':
-      return <HomePage />;
     case 'inbox':
-      return <InboxPage />;
+      // The rail's Inbox disc: the Inbox list sits in the panel beside it, so the page is the dashboard.
+      return <HomePage />;
     case 'channel':
       return <ChannelPage key={route.id} id={route.id} tab={route.tab} pr={route.pr} />;
     case 'thread':

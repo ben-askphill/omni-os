@@ -72,7 +72,7 @@ Questions an agent asks the user with Omni's `ask_user_question` tool: one to fo
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
 **Inbox**:
-The Inbox page (`#/inbox`, the rail's Inbox disc) and the Classic sidebar's view toggled against Projects, on desktop web and in the **Desktop app**: pinned threads, then the Needs you, Finished, Working and Done shelves. Each card names the machine the thread runs on (or last ran on) and, while a turn runs, how long it has gone. On the channel rail the same list fills the panel beside the rail. On a phone, Activity shows the same list. When Appearance's **Press I for the Inbox** is on, pressing `i` outside a text field opens it. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Overview (`#/`, the Omni mark) is the usage dashboard, not this list.
+The rail's Inbox list (`#/inbox`, the Inbox disc) and the Classic sidebar's view toggled against Projects, on desktop web and in the **Desktop app**: pinned threads, then the Needs you, Finished, Working and Done shelves. Each card names the machine the thread runs on (or last ran on) and, while a turn runs, how long it has gone. On the channel rail the same list fills the panel beside the rail. On a phone, Activity shows the same list. When Appearance's **Press I for the Inbox** is on, pressing `i` outside a text field opens it. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Overview (`#/`) is the usage dashboard, not this list; on the rail it is the page beside the Inbox list.
 _Avoid_: Needs you (the reasons a thread waits), notifications, Overview (the dashboard)
 
 **Goal**:

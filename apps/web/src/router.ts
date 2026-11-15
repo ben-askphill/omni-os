@@ -16,9 +16,9 @@ export type ThreadView = (typeof THREAD_VIEWS)[number];
 const isThreadView = (s: string | undefined): s is ThreadView => (THREAD_VIEWS as readonly string[]).includes(s ?? '');
 
 export type Route =
-  /** Overview: the Conductor composer, the counts, the machines and usage. The Omni mark opens it. */
+  /** Overview: the Conductor composer, the counts, the machines and usage. */
   | { name: 'home' }
-  /** The Inbox: what waits on Ben, on four shelves. The rail's Inbox disc opens it. */
+  /** The Inbox: the rail's Inbox disc opens it, its shelves in the list panel and the Overview dashboard beside them. */
   | { name: 'inbox' }
   /** The phone layout's Channels tab. The desktop lists channels in the sidebar and shows Home here. */
   | { name: 'channels' }

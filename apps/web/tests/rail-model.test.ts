@@ -25,21 +25,22 @@ describe('railSelection', () => {
     expect(railSelection({ name: 'thread', id: 't1' }, { id: 't1', channel_id: 'volero' })).toEqual({ kind: 'channel', id: 'volero' });
   });
 
-  it('lights no disc on Overview, and the Inbox on its page and while a thread loads', () => {
-    expect(railSelection({ name: 'home' }, null)).toEqual({ kind: 'overview' });
-    expect(railSelection({ name: 'channels' }, null)).toEqual({ kind: 'overview' });
+  it('lights the Inbox on the dashboard, which is its page, and while a thread loads', () => {
+    expect(railSelection({ name: 'home' }, null)).toEqual({ kind: 'inbox' });
+    expect(railSelection({ name: 'channels' }, null)).toEqual({ kind: 'inbox' });
     expect(railSelection({ name: 'inbox' }, null)).toEqual({ kind: 'inbox' });
+    expect(listMode(railSelection({ name: 'home' }, null))).toEqual({ kind: 'inbox' });
     expect(railSelection({ name: 'thread', id: 't1' }, { id: 't0', channel_id: 'volero' })).toEqual({ kind: 'inbox' });
   });
 
-  it('gives Pull requests, Library and Automations discs of their own', () => {
+  it('tells Pull requests, Library and Automations apart for the More menu', () => {
     expect(railSelection({ name: 'prs' }, null)).toEqual({ kind: 'prs' });
     expect(railSelection({ name: 'artifacts' }, null)).toEqual({ kind: 'library' });
     expect(railSelection({ name: 'artifacts', source: 'claude' }, null)).toEqual({ kind: 'library' });
     expect(railSelection({ name: 'automations' }, null)).toEqual({ kind: 'automations' });
   });
 
-  it('lights nothing, not even the Omni mark, on Search', () => {
+  it('lights nothing on Search', () => {
     const sel = railSelection({ name: 'search', q: 'x' }, null);
     expect(sel).toEqual({ kind: 'none' });
     expect(listMode(sel)).toEqual({ kind: 'none' });
@@ -91,7 +92,7 @@ describe('listMode', () => {
     expect(listMode({ kind: 'channel', id: 'x' })).toEqual({ kind: 'channel', id: 'x' });
     expect(listMode({ kind: 'inbox' })).toEqual({ kind: 'inbox' });
     expect(listMode({ kind: 'settings' })).toEqual({ kind: 'settings' });
-    expect(listMode({ kind: 'overview' })).toEqual({ kind: 'none' });
+    expect(listMode({ kind: 'automations' })).toEqual({ kind: 'none' });
     expect(listMode({ kind: 'prs' })).toEqual({ kind: 'none' });
     expect(listMode({ kind: 'library' })).toEqual({ kind: 'none' });
   });

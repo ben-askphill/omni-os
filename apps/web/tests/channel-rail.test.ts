@@ -48,6 +48,32 @@ describe('ChannelRail', () => {
     expect(current(onChannel)).toBe(1);
   });
 
+  it('has no Omni mark: the Inbox disc leads the rail, in the strip that holds the macOS traffic lights', () => {
+    state.channels = [];
+    const html = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'inbox' } }));
+    expect(html).not.toContain('aria-label="Overview"');
+    expect(html).not.toContain('rail-mark ');
+    const top = html.slice(html.indexOf('rail-top'));
+    expect(top.indexOf('aria-label="Inbox"')).toBeGreaterThan(0);
+    expect(top.indexOf('aria-label="Inbox"')).toBeLessThan(top.indexOf('rail-scroll'));
+  });
+
+  it('folds Pull requests, Library and Automations into one More menu button, current while one of them is open', () => {
+    state.channels = [];
+    const onInbox = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind: 'inbox' } }));
+    for (const label of ['Pull requests', 'Library', 'Automations']) expect(onInbox).not.toContain(`aria-label="${label}"`);
+    const more = (html: string) => html.slice(html.lastIndexOf('<button', html.indexOf('aria-haspopup="menu"')), html.indexOf('</button>', html.indexOf('aria-haspopup="menu"')));
+    expect(more(onInbox)).toContain('aria-label="More"');
+    expect(more(onInbox)).toContain('aria-expanded="false"');
+    expect(more(onInbox)).not.toContain('aria-current');
+    for (const [kind, label] of [['prs', 'Pull requests'], ['library', 'Library'], ['automations', 'Automations']] as const) {
+      const html = renderToStaticMarkup(createElement(ChannelRail, { selection: { kind } }));
+      expect(more(html)).toContain(`aria-label="More, ${label} open"`);
+      expect(more(html)).toContain('aria-current="page"');
+      expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    }
+  });
+
   it('rests in grayscale by default and switches to full color from the Appearance pref', () => {
     state.channels = [];
     state.prefs = {};
