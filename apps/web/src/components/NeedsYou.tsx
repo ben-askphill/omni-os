@@ -73,7 +73,7 @@ export function EmptyNote({ icon, children }: { icon: IconName; children: ReactN
   );
 }
 
-function ItemsSection({ label, items, showChannel, empty }: { label: string; items: NeedsYouItem[]; showChannel?: boolean; empty?: ReactNode }) {
+export function ItemsSection({ label, items, showChannel, empty }: { label: string; items: NeedsYouItem[]; showChannel?: boolean; empty?: ReactNode }) {
   return (
     <section aria-label={label} className="mt-10">
       <h2 className="mb-2 flex items-center gap-2 px-3 font-display text-[length:var(--fs-heading)] md:px-3.5">
