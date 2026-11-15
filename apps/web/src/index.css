@@ -517,7 +517,7 @@
       color 150ms var(--ease-out),
       background-color 150ms var(--ease-out);
   }
-  .rail-item:is(:hover, :focus-visible, [aria-current="page"]) .rail-disc,
+  .rail-item:is(:hover, :focus-visible, [aria-current="page"], [data-marked]) .rail-disc,
   .rail-chrome[data-color="full"] .rail-disc {
     filter: none;
   }

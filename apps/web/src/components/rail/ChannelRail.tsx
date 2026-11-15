@@ -13,8 +13,9 @@ import { ChannelMark, Icon, Monograms, StatusDot, type IconName } from '../ui.ts
 import { useScrollFade } from './useScrollFade.ts';
 
 /**
- * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights. From the top: the Omni mark, the Inbox and the Conductor, then
- * client channels and internal and personal channels as discs that scroll between two pinned blocks, then Add
+ * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights.
+ * From the top: the Omni mark (Overview), the Inbox and the Conductor, then client channels and internal and personal
+ * channels as discs that scroll between two pinned blocks, then Pull requests, Library and Automations, then Add
  * channel, Settings and Ben's monogram. On macOS the desktop app's native traffic lights sit in the rail's top strip.
  */
 export function ChannelRail({ selection }: { selection: RailSelection }) {
@@ -24,21 +25,23 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
   const { clients, rest } = railGroups(channels);
   const conductor = channels.find((c) => c.id === 'conductor');
   const isChannel = (id: string) => selection.kind === 'channel' && selection.id === id;
+  // A thread opened from the Inbox: its channel's disc is marked, quieter than selected.
+  const isMarked = (id: string) => selection.kind === 'inbox' && selection.marked === id;
   const badgeOf = (c: ChannelWithRunning) => railBadge(c.running, needs.get(c.id) ?? 0);
   const disc = (c: ChannelWithRunning) => (
-    <RailItem key={c.id} to={href.channel(c.id)} label={c.name} selected={isChannel(c.id)} badge={badgeOf(c)}>
+    <RailItem key={c.id} to={href.channel(c.id)} label={c.name} selected={isChannel(c.id)} marked={isMarked(c.id)} badge={badgeOf(c)}>
       <Disc selected={isChannel(c.id)} fill={c.avatar_bg}>{parseChannelIcon(c.icon) ? <ChannelMark icon={c.icon} size={22} /> : (marks.get(c.id) ?? monogram(c.name))}</Disc>
     </RailItem>
   );
   const { ref, fade } = useScrollFade();
-  // "i" opens the Inbox here as the classic Sidebar's does: the rail's Inbox is the home page.
-  useInboxKey(() => navigate(href.home()));
+  // "i" opens the Inbox, the page the Inbox disc opens.
+  useInboxKey(() => navigate(href.inbox()));
   const color = useRailColor();
   // The selected disc scrolls into view when it is out of sight, for a thread opened from elsewhere.
-  const selectedId = selection.kind === 'channel' ? selection.id : null;
+  const selectedId = selection.kind === 'channel' ? selection.id : selection.kind === 'inbox' ? (selection.marked ?? null) : null;
   useEffect(() => {
     if (!selectedId) return;
-    ref.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+    ref.current?.querySelector('[aria-current="page"], [data-marked]')?.scrollIntoView({ block: 'nearest' });
   }, [selectedId, ref, channels.length]);
 
   return (
@@ -47,12 +50,18 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
       <span aria-hidden="true" className="rail-lights-glass" />
       {/* rail-top: the desktop app's macOS window drags by this strip, where its traffic lights sit (index.css). */}
       <div className="rail-top flex w-full shrink-0 items-end justify-center pt-3.5">
-        <a href={href.home()} aria-label="Omni, Inbox" className="grid h-10 w-10 place-items-center text-fg">
+        <a
+          href={href.home()}
+          aria-label="Overview"
+          title="Overview"
+          aria-current={selection.kind === 'overview' ? 'page' : undefined}
+          className="rail-mark grid h-10 w-10 place-items-center text-fg"
+        >
           <OmniMark size={30} title="" />
         </a>
       </div>
       <div className="mt-1.5 flex flex-col items-center gap-1">
-        <RailItem to={href.home()} label="Inbox" selected={selection.kind === 'inbox'}>
+        <RailItem to={href.inbox()} label="Inbox" selected={selection.kind === 'inbox'}>
           <Disc selected={selection.kind === 'inbox'} icon="inbox" />
         </RailItem>
         {conductor && (
@@ -77,6 +86,18 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
       </div>
       <Hairline />
       <div className="flex flex-col items-center gap-1">
+        <RailItem to={href.pullRequests()} label="Pull requests" selected={selection.kind === 'prs'}>
+          <Disc selected={selection.kind === 'prs'} icon="pr" quiet />
+        </RailItem>
+        <RailItem to={href.artifacts()} label="Library" selected={selection.kind === 'library'}>
+          <Disc selected={selection.kind === 'library'} icon="layers" quiet />
+        </RailItem>
+        <RailItem to={href.automations()} label="Automations" selected={selection.kind === 'automations'}>
+          <Disc selected={selection.kind === 'automations'} icon="zap" quiet />
+        </RailItem>
+      </div>
+      <Hairline />
+      <div className="flex flex-col items-center gap-1">
         <RailItem to={href.newChannel()} label="Add channel" selected={selection.kind === 'new-channel'}>
           <Disc selected={selection.kind === 'new-channel'} icon="plus" quiet />
         </RailItem>
@@ -97,17 +118,23 @@ function Hairline() {
   return <span aria-hidden className="my-1.5 block h-px w-7 shrink-0 bg-[var(--line-strong)]" />;
 }
 
-/** A 48px hit target holding a disc, with its badge top right and its name as the tooltip. */
-function RailItem({ to, label, selected, badge, children }: { to: string; label: string; selected: boolean; badge?: RailBadge; children: ReactNode }) {
-  const what = badge === 'needs' ? `${label}, needs you` : badge === 'running' ? `${label}, running` : label;
+/**
+ * A 48px hit target holding a disc, with its badge top right and its name as the tooltip. `marked`: the channel of
+ * the thread on screen while the Inbox stays selected, drawn as a short bar at the rail's left edge.
+ */
+function RailItem({ to, label, selected, marked, badge, children }: { to: string; label: string; selected: boolean; marked?: boolean; badge?: RailBadge; children: ReactNode }) {
+  const state = badge === 'needs' ? `${label}, needs you` : badge === 'running' ? `${label}, running` : label;
+  const what = marked ? `${state}, open thread's channel` : state;
   return (
     <a
       href={to}
       aria-label={what}
       title={what}
       aria-current={selected ? 'page' : undefined}
+      data-marked={marked || undefined}
       className="rail-item press relative grid h-12 w-12 shrink-0 place-items-center"
     >
+      {marked && <span aria-hidden className="rail-mark-bar absolute top-1/2 -left-2 h-4 w-1 -translate-y-1/2 rounded-full bg-fg-2" />}
       {children}
       {badge && (
         <span aria-hidden className="absolute top-[5px] right-[5px] grid h-3.5 w-3.5 place-items-center rounded-full bg-[var(--chrome)]">

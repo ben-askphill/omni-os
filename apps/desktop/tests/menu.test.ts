@@ -82,7 +82,7 @@ describe('application menu', () => {
       'go-to': 'CmdOrCtrl+K',
       search: 'Shift+CmdOrCtrl+F',
     });
-    expect(visible(menu(t, 'Go'))).toEqual(['Back', 'Forward', 'Home', 'Go to…', 'Search']);
+    expect(visible(menu(t, 'Go'))).toEqual(['Back', 'Forward', 'Overview', 'Inbox', 'Go to…', 'Search']);
   });
 
   it('sends each page command', () => {
@@ -141,6 +141,7 @@ describe('application menu', () => {
 describe('commandRoute', () => {
   it('opens a closed app where the command leads', () => {
     expect(commandRoute('home')).toBe('#/');
+    expect(commandRoute('inbox')).toBe('#/inbox');
     expect(commandRoute('new-thread')).toBe('#/');
     expect(commandRoute('settings')).toBe('#/settings');
     expect(commandRoute('search')).toBe('#/search?q=');

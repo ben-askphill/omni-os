@@ -37,6 +37,8 @@ function run(command: DesktopCommand) {
       return navigate(href.search(''));
     case 'home':
       return navigate(href.home());
+    case 'inbox':
+      return navigate(href.inbox());
     case 'settings':
       return navigate(href.settingsPage());
   }

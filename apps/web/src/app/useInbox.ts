@@ -2,7 +2,8 @@
 // on which shelf, with what status, and how far each shelf is open. The rules are apps/web/src/inbox.ts.
 import { useMemo, useState } from 'react';
 import { delegatedIds, delegatesByParent } from '@omni/shared/delegate-count.ts';
-import { inboxStatus, type RowStatus } from '@omni/shared/status.ts';
+import { asksForYou, inboxStatus, type RowStatus } from '@omni/shared/status.ts';
+import { reasonOf } from '../needs-you.ts';
 import type { ThreadStub } from '../api.ts';
 import { DONE_INITIAL, DONE_PAGE, inboxLayout, shelfView, type InboxThread, type ShelfView } from '../inbox.ts';
 import { useLiveThreads } from '../components/ThreadList.tsx';
@@ -22,6 +23,10 @@ export interface Inbox {
   pinned: InboxThread[];
   /** The threads waiting on Ben, the latest back first. */
   inbox: InboxThread[];
+  /** The part of `inbox` Ben has to act on: a question, a failure or a usage limit. */
+  needs: InboxThread[];
+  /** The rest of `inbox`: turns that ended, bold while unread. */
+  finished: InboxThread[];
   working: InboxShelf;
   done: InboxShelf & { showMore: () => void };
   /** The recent list has come, so an empty inbox means nothing waits. */
@@ -68,10 +73,16 @@ export function useInbox(): Inbox {
     [recent.data, pinned, channels, needs, handoffs, openCopy],
   );
   const needOf = useMemo(() => new Map(needs.map((n) => [n.thread.id, n])), [needs]);
+  const asks = (t: InboxThread) => {
+    const item = needOf.get(t.id);
+    return !!item && asksForYou(reasonOf(item).glyph);
+  };
 
   return {
     pinned: layout.pinned,
     inbox: layout.inbox,
+    needs: layout.inbox.filter(asks),
+    finished: layout.inbox.filter((t) => !asks(t)),
     working: { ...shelfView(layout.working, { open: workingOpen, openId }), open: workingOpen, toggle: toggleWorking },
     done: {
       ...shelfView(layout.done, { open: doneOpen, openId, limit: doneLimit }),

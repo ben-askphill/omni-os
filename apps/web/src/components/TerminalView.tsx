@@ -27,7 +27,7 @@ export function TerminalView({ threadId, cwd, readOnly }: { threadId: string; cw
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    // The page's mono face: the rail Beta's bundled JetBrains Mono (index.css), else Apple's. xterm measures its cells
+    // The page's mono face: the rail's bundled JetBrains Mono (index.css), else Apple's. xterm measures its cells
     // once, so until a bundled face has loaded it draws with the system mono and switches when the face arrives.
     const face = getComputedStyle(document.documentElement).getPropertyValue('--face-mono').trim() || SYSTEM_MONO;
     const loaded = document.fonts.check(`12px ${face}`);

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import { PairGate } from './components/Pair.tsx';
 import './index.css';
-// The channel rail Beta's faces (index.css :root[data-layout="rail"]). Each @font-face downloads only when used.
+// The channel rail's faces (index.css :root[data-layout="rail"]). Each @font-face downloads only when used.
 import '@fontsource/adwaita-sans/400.css';
 import '@fontsource/adwaita-sans/500.css';
 import '@fontsource/adwaita-sans/500-italic.css';

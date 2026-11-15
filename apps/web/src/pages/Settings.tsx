@@ -11,7 +11,7 @@ import { useTheme } from '../components/theme.tsx';
 import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
-import { Avatar, Button, Chip, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
@@ -66,13 +66,17 @@ export function SettingsPage({ section, focus }: { section?: SettingsSection; fo
     if (section && hash.split('?')[0] !== settingsHash(current)) navigate(settingsHash(current, current === section ? focus : undefined), { replace: true });
   }, [hash, section, current, focus]);
   useFocus(current, focus);
+  const layout = useLayout();
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
       <div className="mx-auto flex max-w-[64rem] gap-6 md:px-4 lg:gap-10">
-        <aside className="sticky top-0 hidden max-h-screen w-56 shrink-0 self-start overflow-y-auto pt-10 pb-10 md:block">
-          <SettingsNav section={current} />
-        </aside>
+        {/* The rail's list panel holds the sections (ListPanel.tsx), so the page drops its own column there. */}
+        {layout !== 'rail' && (
+          <aside className="sticky top-0 hidden max-h-screen w-56 shrink-0 self-start overflow-y-auto pt-10 pb-10 md:block">
+            <SettingsNav section={current} />
+          </aside>
+        )}
         <div className="min-w-0 max-w-2xl flex-1">
           <PageHeader eyebrow={<span className="max-md:hidden">Settings</span>} title={def.title} subtitle={def.blurb}>
             {def.scoped && (
@@ -699,16 +703,11 @@ function AppearanceCard() {
         {!mobile && (
           <div id={settingAnchor('layout')} className="scroll-mt-6">
             <SwitchRow
-              title="Channel rail"
-              origin={
-                <>
-                  <Chip tone="outline">Beta</Chip>
-                  {thisBrowser}
-                </>
-              }
-              detail="Channels as a rail of discs, with the selected channel's threads beside it. Turn it off for the classic sidebar. The phone layout stays as it is."
-              checked={layout === 'rail'}
-              onChange={(on) => setLayout(on ? 'rail' : 'classic')}
+              title="Classic sidebar"
+              origin={thisBrowser}
+              detail="One sidebar with every channel and its threads, in place of the channel rail. The phone layout stays as it is."
+              checked={layout === 'classic'}
+              onChange={(on) => setLayout(on ? 'classic' : 'rail')}
             />
           </div>
         )}

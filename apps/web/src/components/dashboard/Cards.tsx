@@ -47,7 +47,8 @@ function Tile({ kind, label, value, sub, open, emphasis }: { kind: ListKind; lab
   );
 }
 
-export function KpiTiles({ needs, unread, done, open }: { needs: NeedsYouItem[] | null; unread: number | null; done: number | null; open: ListKind | null }) {
+/** `working`: the Inbox's Working count (useInbox), so Overview and the Inbox panel never give two numbers. */
+export function KpiTiles({ needs, unread, working, done, open }: { needs: NeedsYouItem[] | null; unread: number | null; working: number | null; done: number | null; open: ListKind | null }) {
   const { status } = useApp();
   const slots = status?.slots ?? {};
   // The harness doing the most, else the default one, with how full its slots are.
@@ -58,8 +59,8 @@ export function KpiTiles({ needs, unread, done, open }: { needs: NeedsYouItem[] 
       <Tile kind="needs" label="Needs you" value={needs?.length ?? null} sub={needs?.length ? needsBreakdown(needs) : 'All clear'} open={open === 'needs'} emphasis />
       <Tile
         kind="running"
-        label="Running"
-        value={status?.running ?? null}
+        label="Working"
+        value={working}
         sub={slot ? `${harnessLabel(busiest.id)} · ${slot.running} of ${slot.cap} slots` : status?.queued ? `${status.queued} queued` : undefined}
         open={open === 'running'}
       />
@@ -244,7 +245,7 @@ export function AutomationsCard({ automations }: { automations: InsightsAutomati
 
 export const LIST_TITLE: Record<ListKind, { title: string; icon: IconName; empty: string }> = {
   needs: { title: 'Needs you', icon: 'check', empty: 'Nothing needs you. Questions, failures and usage limits show up here.' },
-  running: { title: 'Running', icon: 'clock', empty: 'Nothing running. Threads that are running or queued show up here.' },
+  running: { title: 'Working', icon: 'clock', empty: 'Nothing working. Threads that are running or queued show up here.' },
   unread: { title: 'Unread', icon: 'message', empty: 'Nothing unread. Finished threads you have not opened show up here.' },
   done: { title: 'Done', icon: 'check', empty: 'Nothing marked done in this range.' },
 };

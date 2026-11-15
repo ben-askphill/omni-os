@@ -90,8 +90,9 @@ describe('window state', () => {
 });
 
 describe('trafficLights', () => {
-  it('sits in the sidebar row, or above the phone layout', () => {
-    expect(trafficLights(1320, 1)).toEqual({ x: 18, y: 29 });
+  it('sits in the classic sidebar row, or above the phone layout', () => {
+    expect(trafficLights(1320, 1)).toEqual({ x: 19, y: 15 });
+    expect(trafficLights(1320, 1, 'classic')).toEqual({ x: 18, y: 29 });
     expect(trafficLights(700, 1)).toEqual({ x: 12, y: 7 });
     // 1000 window pixels at 160% are 625 CSS pixels: the phone layout.
     expect(trafficLights(1000, 1.6)).toEqual({ x: 12, y: 7 });

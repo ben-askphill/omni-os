@@ -8,7 +8,7 @@ export type DesktopPlatform = 'darwin' | 'linux' | 'win32';
 export type DesktopLayout = 'classic' | 'rail';
 
 /** A menu item or global shortcut that the page carries out, because only the page knows how. */
-export type DesktopCommand = 'new-thread' | 'go-to' | 'search' | 'home' | 'settings';
+export type DesktopCommand = 'new-thread' | 'go-to' | 'search' | 'home' | 'inbox' | 'settings';
 
 export type DesktopEvent =
   | { type: 'command'; command: DesktopCommand }

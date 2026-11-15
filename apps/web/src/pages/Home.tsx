@@ -17,19 +17,21 @@ import { greeting } from '../greeting.ts';
 import { isFresh, keepInsights, keptInsights } from '../insights-cache.ts';
 import { splitNeeds } from '../needs-you.ts';
 import { readPref, useApp, useFeed, useNow, writePref } from '../store.tsx';
+import { useInbox } from '../app/useInbox.ts';
 
 const acceptAll = () => true;
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const LISTS: ListKind[] = ['needs', 'running', 'unread', 'done'];
 
-function Pulse() {
+/** How many threads are working, the Inbox's own count, and what waits in the queue. */
+function Pulse({ working }: { working: number | null }) {
   const { status } = useApp();
-  if (!status) return null;
-  const busy = status.running > 0;
+  if (!status || working === null) return null;
+  const busy = working > 0;
   return (
     <span className="inline-flex h-7 items-center gap-2 rounded-full bg-surface px-3 font-num text-[11.5px] text-fg-2 tabular-nums">
       <StatusDot status={busy ? 'running' : 'idle'} size={7} />
-      {busy ? `${status.running} running` : 'Nothing running'}
+      {busy ? `${working} working` : 'Nothing working'}
       {status.queued > 0 && <span className="text-fg-3">· {status.queued} queued</span>}
     </span>
   );
@@ -194,6 +196,8 @@ export function HomePage() {
   const data = insights.data?.range === range ? insights.data : undefined;
   const split = needsYou ? splitNeeds(needsYou.items) : null;
   const chips = data?.channels.slice(0, 4) ?? [];
+  const inbox = useInbox();
+  const working = inbox.loaded ? inbox.working.count : null;
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
@@ -216,7 +220,7 @@ export function HomePage() {
                 { id: '30d', label: '30 days' },
               ]}
             />
-            <Pulse />
+            <Pulse working={working} />
             <Freshness at={insights.at} refreshing={insights.refreshing} onRefresh={insights.reload} />
           </div>
         </header>
@@ -245,7 +249,7 @@ export function HomePage() {
         )}
 
         <div className="mt-8">
-          <KpiTiles needs={split?.needs ?? null} unread={split?.unread.length ?? null} done={data?.done ?? null} open={machine ? null : open} />
+          <KpiTiles needs={split?.needs ?? null} unread={split?.unread.length ?? null} working={working} done={data?.done ?? null} open={machine ? null : open} />
           <MachineTiles view={machines.data} open={machine} />
           {open && <OpenList kind={open} insights={data} machine={machine} machines={machines.data} />}
         </div>

@@ -25,29 +25,37 @@ describe('railSelection', () => {
     expect(railSelection({ name: 'thread', id: 't1' }, { id: 't1', channel_id: 'volero' })).toEqual({ kind: 'channel', id: 'volero' });
   });
 
-  it('selects the Inbox on the landing page, while a thread loads and for workspace pages', () => {
-    expect(railSelection({ name: 'home' }, null)).toEqual({ kind: 'inbox' });
+  it('lights no disc on Overview, and the Inbox on its page and while a thread loads', () => {
+    expect(railSelection({ name: 'home' }, null)).toEqual({ kind: 'overview' });
+    expect(railSelection({ name: 'inbox' }, null)).toEqual({ kind: 'inbox' });
     expect(railSelection({ name: 'thread', id: 't1' }, { id: 't0', channel_id: 'volero' })).toEqual({ kind: 'inbox' });
-    expect(railSelection({ name: 'prs' }, null)).toEqual({ kind: 'inbox' });
-    expect(railSelection({ name: 'artifacts' }, null)).toEqual({ kind: 'inbox' });
+  });
+
+  it('gives Pull requests, Library and Automations discs of their own', () => {
+    expect(railSelection({ name: 'prs' }, null)).toEqual({ kind: 'prs' });
+    expect(railSelection({ name: 'artifacts' }, null)).toEqual({ kind: 'library' });
+    expect(railSelection({ name: 'artifacts', source: 'claude' }, null)).toEqual({ kind: 'library' });
+    expect(railSelection({ name: 'automations' }, null)).toEqual({ kind: 'automations' });
   });
 
   it('selects Settings and the add-channel control on their pages', () => {
     expect(railSelection({ name: 'settings' }, null)).toEqual({ kind: 'settings' });
     expect(railSelection({ name: 'new-channel' }, null)).toEqual({ kind: 'new-channel' });
   });
-  it('keeps the Inbox selected for a thread opened from it, so the panel stays on it', () => {
+
+  it("keeps the Inbox selected for a thread opened from it, and marks the thread's channel", () => {
     const sel = railSelection({ name: 'thread', id: 't1' }, { id: 't1', channel_id: 'volero' }, true);
-    expect(sel).toEqual({ kind: 'inbox' });
+    expect(sel).toEqual({ kind: 'inbox', marked: 'volero' });
     expect(listMode(sel)).toEqual({ kind: 'inbox' });
   });
 });
 
 describe('cameFromInbox', () => {
-  it('is set by every page that shows the Inbox, cleared by a channel, and kept by a thread', () => {
+  it('is set by the Inbox and Overview, cleared by every other page, and kept by a thread', () => {
+    expect(cameFromInbox({ name: 'inbox' }, false)).toBe(true);
     expect(cameFromInbox({ name: 'home' }, false)).toBe(true);
-    expect(cameFromInbox({ name: 'prs' }, false)).toBe(true);
-    expect(cameFromInbox({ name: 'settings' }, false)).toBe(true);
+    expect(cameFromInbox({ name: 'prs' }, true)).toBe(false);
+    expect(cameFromInbox({ name: 'search', q: 'x' }, true)).toBe(false);
     expect(cameFromInbox({ name: 'channel', id: 'acne', tab: 'threads' }, true)).toBe(false);
     expect(cameFromInbox({ name: 'thread', id: 't1' }, true)).toBe(true);
     expect(cameFromInbox({ name: 'thread', id: 't1' }, false)).toBe(false);
@@ -72,9 +80,12 @@ describe('badges', () => {
 });
 
 describe('listMode', () => {
-  it('shows a channel list for a channel, else the Inbox', () => {
+  it('follows the page: a channel, the Inbox, Settings, or no panel', () => {
     expect(listMode({ kind: 'channel', id: 'x' })).toEqual({ kind: 'channel', id: 'x' });
     expect(listMode({ kind: 'inbox' })).toEqual({ kind: 'inbox' });
-    expect(listMode({ kind: 'settings' })).toEqual({ kind: 'inbox' });
+    expect(listMode({ kind: 'settings' })).toEqual({ kind: 'settings' });
+    expect(listMode({ kind: 'overview' })).toEqual({ kind: 'none' });
+    expect(listMode({ kind: 'prs' })).toEqual({ kind: 'none' });
+    expect(listMode({ kind: 'library' })).toEqual({ kind: 'none' });
   });
 });

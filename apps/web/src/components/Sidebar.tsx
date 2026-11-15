@@ -221,7 +221,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
           <div className="space-y-4">
             <div className="space-y-px">
               <NavLink to={href.home()} icon="home" active={route.name === 'home'} onNavigate={onNavigate}>
-                Home
+                Overview
               </NavLink>
               {conductor && (
                 <>

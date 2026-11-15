@@ -120,7 +120,7 @@ function Shell() {
   }, [fromInbox, lastFromInbox]);
   const selection = railSelection(route, openThread, fromInbox);
   // The desktop app puts its macOS traffic lights where this layout leaves room for them (apps/desktop windows.ts).
-  // The rail Beta also swaps the type faces (index.css :root[data-layout]); the phone layout keeps Apple's.
+  // The rail also swaps the type faces (index.css :root[data-layout]); the phone layout keeps Apple's.
   useEffect(() => {
     desktop?.setLayout?.(layout);
     document.documentElement.dataset.layout = layout;

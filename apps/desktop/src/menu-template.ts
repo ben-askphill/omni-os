@@ -145,7 +145,8 @@ export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemCo
       { id: 'back', label: 'Back', accelerator: 'CmdOrCtrl+[', click: () => actions.back() },
       { id: 'forward', label: 'Forward', accelerator: 'CmdOrCtrl+]', click: () => actions.forward() },
       separator,
-      { id: 'home', label: 'Home', accelerator: 'Shift+CmdOrCtrl+H', click: () => actions.command('home') },
+      { id: 'home', label: 'Overview', accelerator: 'Shift+CmdOrCtrl+H', click: () => actions.command('home') },
+      { id: 'inbox', label: 'Inbox', click: () => actions.command('inbox') },
       { id: 'go-to', label: 'Go to…', accelerator: 'CmdOrCtrl+K', click: () => actions.command('go-to') },
       { id: 'search', label: 'Search', accelerator: 'Shift+CmdOrCtrl+F', click: () => actions.command('search') },
     ],
@@ -180,6 +181,8 @@ export function commandRoute(command: DesktopCommand): string | null {
     case 'home':
     case 'new-thread':
       return '#/';
+    case 'inbox':
+      return '#/inbox';
     case 'settings':
       return '#/settings';
     case 'search':

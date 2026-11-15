@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, openSSE, taskHost, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type ModStatus, type NeedsYou, type Profile, type Status, type Thread, type ThreadStub } from './api.ts';
 import { type PinnedThread } from './pins.ts';
 import { pageTitle, type Route } from './router.ts';
-import { windowTitle } from './device.ts';
+import { threadTitle, windowTitle } from './device.ts';
 import { useChannels } from './app/useChannels.ts';
 import { useNeedsYou } from './app/useNeedsYou.ts';
 import { useStatusAndProfile } from './app/useStatusAndProfile.ts';
@@ -265,11 +265,14 @@ export function useNow(ms = 30_000) {
 
 /** The window title: the page's name, or the one given, then Omni, led by the Mac's name when it is not this one. */
 export function usePageTitle(route: Route, name?: string) {
-  const { channel, status } = useApp();
+  const { channel, status, openThread } = useApp();
   const device = status?.device;
+  // A thread is named by its title, then its channel, so the Window menu and Mission Control tell threads apart.
+  const thread = route.name === 'thread' && openThread?.id === route.id ? openThread : null;
+  const threadName = thread ? threadTitle(thread.title, thread.channel_id === 'conductor' ? 'conductor' : (channel(thread.channel_id)?.name ?? thread.channel_id)) : undefined;
   useEffect(() => {
-    document.title = windowTitle(name ?? pageTitle(route, (id) => channel(id)?.name), device);
-  }, [route, channel, name, device]);
+    document.title = windowTitle(name ?? threadName ?? pageTitle(route, (id) => channel(id)?.name), device);
+  }, [route, channel, name, threadName, device]);
 }
 
 /** Back on the tab: ask the server to sync, so the other Mac's work shows up now rather than on its timer. */

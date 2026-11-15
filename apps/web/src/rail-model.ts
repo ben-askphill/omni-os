@@ -13,8 +13,19 @@ export interface RailChannel {
   running: number;
 }
 
-/** What the rail highlights: the Inbox, a channel (the Conductor is one), Settings or the add-channel page. */
-export type RailSelection = { kind: 'inbox' } | { kind: 'channel'; id: string } | { kind: 'settings' } | { kind: 'new-channel' };
+/**
+ * What the rail highlights. Overview (the Omni mark's page) lights no disc. `marked`: the open thread's channel, when
+ * the Inbox is selected for it, so its disc shows where the thread lives as well as where Ben came from.
+ */
+export type RailSelection =
+  | { kind: 'overview' }
+  | { kind: 'inbox'; marked?: string }
+  | { kind: 'channel'; id: string }
+  | { kind: 'prs' }
+  | { kind: 'library' }
+  | { kind: 'automations' }
+  | { kind: 'settings' }
+  | { kind: 'new-channel' };
 
 /** The rail's groups below the first hairline: clients, then internal and personal (and any other kind), A to Z. */
 export interface RailGroups<C extends RailChannel = RailChannel> {
@@ -34,23 +45,37 @@ export function railGroups<C extends RailChannel>(channels: readonly C[]): RailG
 }
 
 /**
- * The selected disc for a route. A thread selects its channel once the open thread is known; before that, and for
- * the landing page and the workspace pages (Pull requests, Artifacts, Automations, Search), the Inbox is selected. A
- * thread opened from the Inbox (`fromInbox`) keeps the Inbox selected, so the panel stays on it.
+ * The selected disc for a route. A thread selects its channel once the open thread is known; a thread opened from the
+ * Inbox (`fromInbox`) keeps the Inbox selected, so the panel stays on it, and marks its channel. Pull requests,
+ * Library and Automations have discs of their own. Search lights none: it is the palette's page.
  */
 export function railSelection(route: Route, openThread: { id: string; channel_id: string } | null, fromInbox = false): RailSelection {
   switch (route.name) {
+    case 'home':
+    case 'channels':
+    case 'search':
+      return { kind: 'overview' };
+    case 'inbox':
+      return { kind: 'inbox' };
     case 'channel':
       return { kind: 'channel', id: route.id };
-    case 'thread':
-      if (fromInbox) return { kind: 'inbox' };
-      return openThread && openThread.id === route.id ? { kind: 'channel', id: openThread.channel_id } : { kind: 'inbox' };
+    case 'thread': {
+      const known = openThread && openThread.id === route.id ? openThread : null;
+      if (fromInbox || !known) return known ? { kind: 'inbox', marked: known.channel_id } : { kind: 'inbox' };
+      return { kind: 'channel', id: known.channel_id };
+    }
+    case 'prs':
+      return { kind: 'prs' };
+    case 'artifacts':
+      return { kind: 'library' };
+    case 'automations':
+      return { kind: 'automations' };
     case 'settings':
       return { kind: 'settings' };
     case 'new-channel':
       return { kind: 'new-channel' };
     default:
-      return { kind: 'inbox' };
+      return { kind: 'overview' };
   }
 }
 
@@ -70,18 +95,30 @@ export function needsByChannel(items: readonly { thread: { channel_id: string };
   return out;
 }
 
-/** The list panel beside the rail: one channel's threads, else the Inbox. */
-export type ListMode = { kind: 'inbox' } | { kind: 'channel'; id: string };
+/**
+ * The list panel beside the rail follows the page: a channel's threads, the Inbox, or Settings' sections. Overview
+ * and the workspace pages (Pull requests, Library, Automations, Search) have none: they fill the window.
+ */
+export type ListMode = { kind: 'inbox' } | { kind: 'channel'; id: string } | { kind: 'settings' } | { kind: 'none' };
 
 export function listMode(selection: RailSelection): ListMode {
-  return selection.kind === 'channel' ? { kind: 'channel', id: selection.id } : { kind: 'inbox' };
+  switch (selection.kind) {
+    case 'channel':
+      return { kind: 'channel', id: selection.id };
+    case 'inbox':
+      return { kind: 'inbox' };
+    case 'settings':
+      return { kind: 'settings' };
+    default:
+      return { kind: 'none' };
+  }
 }
 
 /**
- * Whether the thread on screen came from the Inbox. Every page but a channel's shows the Inbox in the panel, so
- * leaving one of them for a thread keeps it; a channel's page hands the thread its channel. A thread keeps what it had.
+ * Whether the thread on screen came from the Inbox. The Inbox and Overview (whose cards are the Inbox's) hand a
+ * thread the Inbox; every other page hands it its channel. A thread keeps what it had.
  */
 export function cameFromInbox(route: Route, prev: boolean): boolean {
   if (route.name === 'thread') return prev;
-  return route.name !== 'channel';
+  return route.name === 'inbox' || route.name === 'home';
 }

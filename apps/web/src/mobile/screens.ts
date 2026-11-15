@@ -62,6 +62,7 @@ export const SCREENS: Record<ScreenKey, ScreenSpec> = {
 export function screenOf(r: Route): ScreenKey {
   switch (r.name) {
     case 'home':
+    case 'inbox':
       return 'activity';
     case 'channels':
       return 'channels';

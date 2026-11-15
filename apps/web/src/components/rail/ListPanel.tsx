@@ -11,6 +11,9 @@ import { InboxView } from '../sidebar/InboxView.tsx';
 import { ChannelThreadEntry, NavLink } from '../sidebar/SidebarRows.tsx';
 import { UsageCard } from '../sidebar/UsageCard.tsx';
 import { useScrollFade } from './useScrollFade.ts';
+import { SettingsNav } from '../SettingsNav.tsx';
+import { sectionShows } from '@omni/shared/settings-catalog.ts';
+import { desktop } from '../../desktop.ts';
 import { UpdateNotice } from '../UpdateNotice.tsx';
 import { DiskNotice } from '../DiskNotice.tsx';
 import { AccountNotice } from '../AccountNotice.tsx';
@@ -18,14 +21,30 @@ import { AccountNotice } from '../AccountNotice.tsx';
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /**
- * The list beside the rail: the selected channel's threads and folders, else the Inbox with Search and New thread
- * above it. 264px of surface.
+ * The list beside the rail, following the page: the selected channel's threads and folders, the Inbox with Search
+ * and New thread above it, or Settings' sections. 264px of surface. Pages with no list (Overview, Pull requests,
+ * Library, Automations, Search) get no panel.
  */
 export function ListPanel({ mode, onSearch }: { mode: ListMode; onSearch: () => void }) {
+  if (mode.kind === 'none') return null;
   return (
     <aside className="flex h-full w-[264px] shrink-0 flex-col border-r border-[var(--line)] bg-surface">
-      {mode.kind === 'channel' ? <ChannelList id={mode.id} /> : <InboxList onSearch={onSearch} />}
+      {mode.kind === 'channel' ? <ChannelList id={mode.id} /> : mode.kind === 'settings' ? <SettingsList /> : <InboxList onSearch={onSearch} />}
     </aside>
+  );
+}
+
+/** Settings' sections, in the panel instead of a column of the page, so the rail never shows three columns of navigation. */
+function SettingsList() {
+  const route = useRoute();
+  const section = route.name === 'settings' && route.section && sectionShows(route.section, desktop !== null) ? route.section : 'general';
+  return (
+    <>
+      <PanelHeader title="Settings" />
+      <PanelScroll>
+        <SettingsNav section={section} />
+      </PanelScroll>
+    </>
   );
 }
 
@@ -82,7 +101,7 @@ function InboxList({ onSearch }: { onSearch: () => void }) {
         <NewThreadButton />
       </div>
       <PanelScroll>
-        <InboxView />
+        <InboxView links={false} />
       </PanelScroll>
       <div className="px-3 pt-1 pb-3">
         <UpdateNotice className="mb-2" />

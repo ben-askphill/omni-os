@@ -12,13 +12,15 @@ const thread = (id: string, over: Partial<Thread> = {}) =>
   ({ id, channel_id: 'omni-os', title: id, status: 'done', created_at: '2026-11-12T08:00:00.000Z', updated_at: '2026-11-12T08:20:00.000Z', ...over }) as Thread;
 const stopped = thread('stopped', { status: 'stopped' });
 const running = thread('running', { status: 'running' });
+const asking = thread('asking', { status: 'done' });
+const question: NeedsYouItem = { thread: asking, result: null, blockers: [{ kind: 'question', detail: 'Which handle?', count: 1 }], at: '2026-11-12T08:30:00.000Z' };
 const item: NeedsYouItem = { thread: stopped, result: { uid: 'r1', status: 'stopped', event_uid: null, at: '2026-11-12T08:27:00.000Z' }, blockers: [], at: '2026-11-12T08:27:00.000Z' };
 // The turn is over, the process is not: a background shell it started still runs.
 const shell: BackgroundTask = { thread_id: 'stopped', channel_id: 'omni-os', task_id: 'bg1', description: 'npm run dev', subagent: false, background: true, started_at: '2026-11-12T08:10:00.000Z' };
 
-const app = { channels: [], pinned: [], needsYou: { items: [item], unread: 1, blocked: 0 }, openThread: null, tasks: [shell] };
+const app = { channels: [], pinned: [], needsYou: { items: [item, question], unread: 1, blocked: 1 }, openThread: null, tasks: [shell] };
 vi.mock('../src/store.tsx', () => ({ useApp: () => app, readPref: <T,>(_k: string, d: T) => d, writePref: () => {} }));
-vi.mock('../src/components/ThreadList.tsx', () => ({ useLiveThreads: () => ({ data: [stopped, running], loading: false, error: null, reload: () => {} }) }));
+vi.mock('../src/components/ThreadList.tsx', () => ({ useLiveThreads: () => ({ data: [stopped, running, asking], loading: false, error: null, reload: () => {} }) }));
 vi.mock('../src/router.ts', () => ({ useRoute: () => ({ name: 'home' }) }));
 
 const { useInbox } = await import('../src/app/useInbox.ts');
@@ -56,5 +58,12 @@ describe('Inbox status of a stopped thread', () => {
     const inbox = seen!;
     expect(inbox.working.count).toBe(1);
     expect(inbox.status(running)).toEqual({ glyph: 'running', label: 'Running' });
+  });
+
+  it('puts a question on Needs you and a finished turn on Finished, both in the inbox', () => {
+    const inbox = seen!;
+    expect(inbox.needs.map((t) => t.id)).toEqual(['asking']);
+    expect(inbox.finished.map((t) => t.id)).toEqual(['stopped']);
+    expect(inbox.inbox.map((t) => t.id).sort()).toEqual(['asking', 'stopped']);
   });
 });

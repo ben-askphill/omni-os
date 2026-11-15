@@ -42,7 +42,7 @@ describe('the i key', () => {
   it('opens the Inbox from the channel rail', async () => {
     act(() => root.render(createElement(ChannelRail, { selection: { kind: 'channel', id: 'acne' } })));
     await press();
-    expect(window.location.hash).toBe('#/');
+    expect(window.location.hash).toBe('#/inbox');
   });
 
   it('does nothing in the channel rail once turned off', async () => {

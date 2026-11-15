@@ -18,13 +18,15 @@ import { RunElapsed } from '../RunElapsed.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
 
 /**
- * The sidebar's Inbox view, T3 Code's default thread list: every channel's threads in one list. Pinned cards, then the
- * threads waiting on Ben, the latest back on top, then the Working shelf right under them. Done folds away at the
- * bottom. Marking a thread done (the check on hover, or E on the selected card) moves it to Done, as Settle does in T3.
+ * The sidebar's Inbox view, T3 Code's default thread list: every channel's threads in one list, on four shelves in a
+ * fixed order. Pinned cards on top, then Needs you (a question, a failure, a usage limit) and Finished (turns that
+ * ended), the latest back on top in each, then Working, then Done folded away at the bottom. Marking a thread done
+ * (the check on hover, or E on the selected card) moves it to Done, as Settle does in T3. `links`: the Workspace
+ * links at the foot, which the classic sidebar needs and the rail has discs for.
  */
-export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
+export function InboxView({ onNavigate, links = true }: { onNavigate?: () => void; links?: boolean }) {
   const { channels, setDone } = useApp();
-  const { pinned, inbox, working, done, loaded, openId, status, delegates } = useInbox();
+  const { pinned, inbox, needs, finished, working, done, loaded, openId, status, delegates } = useInbox();
   const channelOf = (id: string) => channels.find((c) => c.id === id);
   useDoneKey((focusedId) => {
     const id = focusedId ?? openId;
@@ -49,14 +51,23 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="space-y-px">
-        {pinned.map((t) => card(t, true))}
-        {inbox.map((t) => card(t))}
-        {loaded && !pinned.length && !inbox.length && <p className="px-3 py-6 text-center text-[12.5px] text-fg-3">Nothing is waiting on you.</p>}
-      </div>
+      {pinned.length > 0 && <div className="space-y-px pb-3">{pinned.map((t) => card(t, true))}</div>}
+      {needs.length > 0 && (
+        <div className="space-y-px pb-3">
+          <ShelfLabel label="Needs you" count={needs.length} />
+          {needs.map((t) => card(t))}
+        </div>
+      )}
+      {finished.length > 0 && (
+        <div className="space-y-px pb-3">
+          <ShelfLabel label="Finished" count={finished.length} />
+          {finished.map((t) => card(t))}
+        </div>
+      )}
+      {loaded && !pinned.length && !inbox.length && <p className="px-3 py-6 text-center text-[12.5px] text-fg-3">Nothing is waiting on you.</p>}
 
       {working.count > 0 && (
-        <div className="space-y-px pt-4">
+        <div className="space-y-px pt-1">
           <div aria-hidden className="mx-3 mb-3 border-t border-line" />
           <Shelf label="Working" count={working.count} open={working.open} onToggle={working.toggle} />
           {working.rows.map((t) => card(t))}
@@ -79,9 +90,21 @@ export function InboxView({ onNavigate }: { onNavigate?: () => void }) {
           </button>
         )}
       </div>
-      <div className="pt-4">
-        <WorkspaceLinks onNavigate={onNavigate} />
-      </div>
+      {links && (
+        <div className="pt-4">
+          <WorkspaceLinks onNavigate={onNavigate} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A shelf that does not fold: Needs you and Finished stay open, so nothing waiting on Ben hides. */
+function ShelfLabel({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="caption flex h-8 items-center gap-2 px-3">
+      {label}
+      <span className="font-num font-normal text-fg-3 tabular-nums">{count}</span>
     </div>
   );
 }

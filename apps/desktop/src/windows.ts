@@ -66,7 +66,7 @@ export function applyZoom(factor: number): void {
   }
 }
 
-/** The desktop layout each window's page last reported (DesktopBridge.setLayout). Classic until it says. */
+/** The desktop layout each window's page last reported (DesktopBridge.setLayout). The rail, the default, until it says. */
 const layouts = new WeakMap<BrowserWindow, DesktopLayout>();
 
 /** Keeps the traffic lights where the page leaves room for them, which moves when the layout does. */
