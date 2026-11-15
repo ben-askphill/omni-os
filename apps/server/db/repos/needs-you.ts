@@ -49,6 +49,8 @@ export interface NeedsYouBlocker {
   kind: 'question' | 'setup' | 'recovered' | 'uncertain' | 'limited';
   detail: string | null;
   count: number;
+  /** question: when the newest question card was asked, so a client can tell a new card from one it already saw. */
+  at?: string;
   /** limited: when the harness said the limit resets. Null when it did not say, so only a manual Resume works. */
   resets_at?: string | null;
   /** limited: Ben scheduled the continuation for that time. Still a blocker: nothing runs until then. */
@@ -214,7 +216,7 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     const it = item(q, q.q_at);
     const had = it.blockers.find((b) => b.kind === 'question');
     if (had) had.count += questions.length;
-    else it.blockers.push({ kind: 'question', detail: questions[0].question, count: questions.length });
+    else it.blockers.push({ kind: 'question', detail: questions[0].question, count: questions.length, at: q.q_at });
   }
   for (const t of setup) item(t, t.updated_at).blockers.unshift({ kind: 'setup', detail: t.setup_error, count: 0 });
   for (const p of parked) item(p, p.p_at).blockers.push({ kind: p.p_state, detail: null, count: Number(p.p_count) });

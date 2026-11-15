@@ -53,7 +53,8 @@
         {
           "kind": "question",
           "detail": "Which store should the digest cover first?",
-          "count": 1
+          "count": 1,
+          "at": "2026-01-05T09:00:00.000Z"
         }
       ],
       "at": "2026-01-05T09:00:00.000Z"

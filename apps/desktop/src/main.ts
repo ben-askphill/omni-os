@@ -15,6 +15,7 @@ import { installLoginItem, LOGIN_ITEM_SUPPORTED } from './login-item.ts';
 import { installMenu, showServerLog } from './menu.ts';
 import { desktopPlatform } from './menu-template.ts';
 import { installNativeBrowser } from './native-browser.ts';
+import { installNotifications } from './notifications.ts';
 import { parseOptions, safeRoute } from './options.ts';
 import { defaultDataDir, logsDir, serverLogFile, type PlatformDirs } from './paths.ts';
 import { installQuickPrompt } from './quick-prompt.ts';
@@ -165,6 +166,7 @@ async function boot(): Promise<void> {
   installUpdates(ctx);
   installQuitHold(ctx);
   installLoginItem(ctx);
+  installNotifications(ctx);
 
   // Opening the app again while it runs: the main window once the server is up, else the failure screen. A start
   // still under way opens the main window itself when it is ready (below, and the screen's Try Again).

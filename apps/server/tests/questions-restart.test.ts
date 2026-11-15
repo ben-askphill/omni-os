@@ -121,7 +121,7 @@ describe('a question across a forced restart', () => {
     const inbox = await api2.ok('GET', '/needs-you');
     const item = inbox.items.find((i: { thread: { id: string } }) => i.thread.id === t.id);
     expect(item.blockers).toEqual([
-      { kind: 'question', detail: 'Which Q4 goal should get the most of your time between now and December?', count: 1 },
+      { kind: 'question', detail: 'Which Q4 goal should get the most of your time between now and December?', count: 1, at: expect.any(String) },
     ]);
     expect(item.thread.status).toBe('failed');
 

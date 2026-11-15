@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import type { FeedAlert } from '@omni/shared/attention.ts';
 
 // In-process pub/sub. SSE endpoints subscribe; runner, watcher and scheduler publish.
 export const bus = new EventEmitter();
@@ -30,7 +31,12 @@ export type FeedEvent =
   /** A thread's review notes changed, here or on another Mac (db/repos/review-notes.ts). Its open Changes panels refetch them. */
   | { type: 'review_notes'; thread_id: string }
   /** A machine's CPU and memory sample: this one's while a client watches, another's as sync brings it (machine-stats.ts). Id null is this machine with sync off. */
-  | { type: 'machine_stats'; id: string | null; stats: unknown };
+  | { type: 'machine_stats'; id: string | null; stats: unknown }
+  /**
+   * Something worth a notification that Needs you does not list: a crew report in the Conductor, a watched PR that
+   * needs attention (push-sender.ts). Clients that notify post it; nothing else changes.
+   */
+  | { type: 'alert'; alert: FeedAlert };
 
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);

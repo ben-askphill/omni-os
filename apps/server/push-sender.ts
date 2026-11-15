@@ -2,7 +2,8 @@
 // report (push-preview.ts), plus the thread and channel ids for a deep link. Never the prompt or a code. Triggers in
 // the runner call the notify functions at the bottom. With no APNs key configured every call is a no-op, and startPush says why. Setting or
 // deleting one of the APNs secrets loads the config again, so no restart is needed.
-import { createPrivateKey } from 'node:crypto';
+import { createPrivateKey, randomUUID } from 'node:crypto';
+import { publishFeed } from './bus.ts';
 import { threads, type ThreadStatus } from './db.ts';
 import { sessionIsLive } from './google-auth.ts';
 import { clip, pushPreview, TITLE_MAX } from './push-preview.ts';
@@ -307,10 +308,40 @@ export function notifyEnded(threadId: string, status: ThreadStatus, reply: strin
   });
 }
 
-/** A crew report landed in a thread. Only the Conductor's reports alert: that is where Ben reads them. */
+/**
+ * A crew report landed in a thread. Only the Conductor's reports alert: that is where Ben reads them. The phone gets a
+ * push; the Web UI and the desktop app get a feed `alert` (Needs you does not list reports).
+ */
 export function notifyCrewReport(parentId: string, report: Record<string, unknown> = {}) {
   const t = threads.get(parentId);
   if (t?.channel_id !== 'conductor') return;
   const str = (value: unknown) => (typeof value === 'string' ? value : null);
   emit({ kind: 'crewReport', threadId: parentId, channelId: t.channel_id, title: t.title, text: str(report.text), from: str(report.title) });
+  const from = oneLine(str(report.title));
+  const preview = pushPreview(str(report.text));
+  publishFeed({
+    type: 'alert',
+    alert: {
+      id: `crew:${randomUUID()}`,
+      kind: 'crewReport',
+      thread_id: parentId,
+      channel_id: t.channel_id,
+      title: t.title,
+      body: [from, preview].filter(Boolean).join(': '),
+      at: new Date().toISOString(),
+    },
+  });
+}
+
+/**
+ * A watched PR has new failing checks or review feedback, and its thread was woken for it (pr-watch/worker.ts).
+ * `summary` is the wake's one line ("#12 at abc1234. CI failed: test"). Feed only: the phone has no kind for it yet.
+ */
+export function notifyPRAttention(threadId: string, summary: string, key: string) {
+  const t = threads.get(threadId);
+  if (!t) return;
+  publishFeed({
+    type: 'alert',
+    alert: { id: `pr:${threadId}:${key}`, kind: 'prAttention', thread_id: threadId, channel_id: t.channel_id, title: t.title, body: summary, at: new Date().toISOString() },
+  });
 }

@@ -3,7 +3,6 @@ import { sectionDef, sectionShows, type Provenance } from '@omni/shared/settings
 import { pageFields, SETTING_PAGES, settingHint, settingId, settingPlaceholder, settingProblem, type SettingField, type SettingPage } from '@omni/shared/settings.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SetupState, type Status, type UserConfig, type UserConfigPatch } from '../api.ts';
-import { PERMISSION_LABEL, permissionNow, setChannelAlerts, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
 import { PRONOUNS } from '../components/onboarding-parts.tsx';
 import { SettingsNav } from '../components/SettingsNav.tsx';
@@ -11,7 +10,7 @@ import { useTheme } from '../components/theme.tsx';
 import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
-import { Avatar, Button, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
@@ -23,6 +22,7 @@ import { IosPairingSection } from './IosPairing.tsx';
 import { MachinesSection, RunOnCard } from './Machines.tsx';
 import { SecretsSection } from './Secrets.tsx';
 import { AppServerRows, DesktopSection, ZoomRow } from './SettingsDesktop.tsx';
+import { NotificationsCard } from './SettingsNotifications.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
 import { AccountsSection } from './SettingsAccounts.tsx';
 import { StorageSection } from './Storage.tsx';
@@ -750,82 +750,3 @@ function AppearanceCard() {
   );
 }
 
-const PERMISSION_GLYPH: Record<Permission, string> = { granted: 'done', denied: 'needs', default: 'settled', unsupported: 'settled' };
-
-function NotificationsCard({ scoped }: { scoped?: string }) {
-  const { channels } = useApp();
-  const prefs = useNotificationPrefs();
-  const [permission, setPermission] = useState<Permission>(permissionNow);
-  // Browser settings can change while the page is open; read again when Ben comes back to the tab.
-  useEffect(() => {
-    const check = () => setPermission(permissionNow());
-    window.addEventListener('focus', check);
-    return () => window.removeEventListener('focus', check);
-  }, []);
-  const toggle = async (on: boolean) => setPermission(await setNotificationsEnabled(on));
-  const listed = channels.filter((c) => !c.archived);
-  const inScope = listed.find((c) => c.id === scoped);
-  const thisBrowser = <Origin of="device" label="This browser" />;
-  const channelRow = (c: (typeof listed)[number]) => (
-    <li key={c.id} className="py-2.5">
-      <SwitchRow
-        title={c.id === 'conductor' ? 'Conductor' : `#${c.name}`}
-        origin={inScope ? thisBrowser : undefined}
-        checked={!prefs.muted.includes(c.id)}
-        onChange={(on) => setChannelAlerts(c.id, on)}
-        disabled={!prefs.enabled}
-      />
-    </li>
-  );
-  const muteNote = 'A channel turned off still lists its results in Needs you, without a notification.';
-
-  return (
-    <>
-      <Card entry="notify" title="This browser">
-        <SwitchRow
-          title="Notify in this browser"
-          origin={thisBrowser}
-          detail="Alerts when a thread finishes or fails while you are in another tab or app. Nothing alerts for the thread you are looking at. Turning it on asks the browser the first time."
-          checked={prefs.enabled}
-          onChange={toggle}
-          disabled={permission === 'unsupported'}
-        />
-        <SettingRow
-          label="Browser permission"
-          control={
-            <>
-              {permission === 'default' && prefs.enabled && (
-                <Button size="sm" onClick={() => void toggle(true)}>
-                  Ask the browser
-                </Button>
-              )}
-              <span className="inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">
-                <StatusDot status={PERMISSION_GLYPH[permission]} size={7} />
-                {PERMISSION_LABEL[permission]}
-              </span>
-            </>
-          }
-        />
-        {prefs.enabled && permission === 'denied' && (
-          <ErrorNote>The browser blocks notifications for Omni. Allow them in the site settings (the icon left of the address), then come back.</ErrorNote>
-        )}
-      </Card>
-      {inScope ? (
-        <Card entry="notify-channels" title={inScope.id === 'conductor' ? 'Conductor' : `#${inScope.name}`} subtitle={muteNote}>
-          <ul className={prefs.enabled ? '' : 'pointer-events-none opacity-55'}>{channelRow(inScope)}</ul>
-        </Card>
-      ) : (
-        // One switch per channel grows with the sidebar, so the list folds shut like Advanced (#405).
-        <div id={settingAnchor('notify-channels')} className="scroll-mt-6">
-          <Advanced title="Channels" summary={`${listed.filter((c) => !prefs.muted.includes(c.id)).length} of ${listed.length} notify`}>
-            <div className={`space-y-2 ${prefs.enabled ? '' : 'pointer-events-none opacity-55'}`}>
-              <p className="text-[12.5px] text-fg-3">{muteNote}</p>
-              {listed.length === 0 && <p className="text-[12.5px] text-fg-3">No channels yet.</p>}
-              <ul className="divide-y divide-line">{listed.map(channelRow)}</ul>
-            </div>
-          </Advanced>
-        </div>
-      )}
-    </>
-  );
-}

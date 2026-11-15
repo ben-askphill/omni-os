@@ -7,7 +7,9 @@ import { startRunner } from './runner-boot.ts';
 const r = await startRunner();
 const { askQuestion } = await import('../runner/questions.ts');
 const { failSetup } = await import('../runner/setup.ts');
-const { alertFor, installPushSender, noopPushSender, notifyCrewReport, notifyEnded, payloadFor } = await import('../push-sender.ts');
+const { alertFor, installPushSender, noopPushSender, notifyCrewReport, notifyEnded, notifyPRAttention, payloadFor } = await import('../push-sender.ts');
+const { bus } = await import('../bus.ts');
+type FeedEvent = import('../bus.ts').FeedEvent;
 type PushEvent = import('../push-sender.ts').PushEvent;
 type ThreadStatus = import('../db.ts').ThreadStatus;
 
@@ -22,11 +24,19 @@ const Q = {
 };
 
 let sent: PushEvent[] = [];
+/** The feed's `alert` events: what the Web UI and the desktop app notify for, beside the phone's push. */
+let feed: Extract<FeedEvent, { type: 'alert' }>['alert'][] = [];
+const onFeed = (e: FeedEvent) => void (e.type === 'alert' && feed.push(e.alert));
 beforeEach(() => {
   sent = [];
+  feed = [];
+  bus.on('feed', onFeed);
   installPushSender({ configured: true, send: (event) => void sent.push(event), close() {} });
 });
-afterEach(() => installPushSender(noopPushSender));
+afterEach(() => {
+  bus.off('feed', onFeed);
+  installPushSender(noopPushSender);
+});
 
 let n = 0;
 function thread(over: { channel?: string; parent?: string | null; task?: string | null } = {}) {
@@ -185,10 +195,38 @@ describe('a crew report', () => {
     expect(sent).toEqual([
       { kind: 'crewReport', threadId: conductorThread, channelId: 'conductor', title: conductorThread, text: 'PR opened.', from: 'Fix push previews' },
     ]);
+    expect(feed).toEqual([
+      { id: expect.stringMatching(/^crew:/), kind: 'crewReport', thread_id: conductorThread, channel_id: 'conductor', title: conductorThread, body: 'Fix push previews: PR opened.', at: expect.any(String) },
+    ]);
+  });
+
+  it('gives each report its own feed alert, so a second report is not taken for the first', () => {
+    const conductorThread = thread({ channel: 'conductor' });
+    notifyCrewReport(conductorThread, { text: 'One.' });
+    notifyCrewReport(conductorThread, { text: 'Two.' });
+    expect(feed.map((a) => a.body)).toEqual(['One.', 'Two.']);
+    expect(new Set(feed.map((a) => a.id)).size).toBe(2);
   });
 
   it('does not alert for a report that lands in another channel', () => {
     notifyCrewReport(thread({ channel: 'scratch' }));
     expect(sent).toEqual([]);
+    expect(feed).toEqual([]);
+  });
+});
+
+describe('a PR needs attention', () => {
+  it('posts a feed alert keyed by the wake, and no phone push', () => {
+    const id = thread({ channel: 'scratch' });
+    notifyPRAttention(id, '#12 at abc1234. CI failed: CI / build', 'req-1');
+    expect(feed).toEqual([
+      { id: `pr:${id}:req-1`, kind: 'prAttention', thread_id: id, channel_id: 'scratch', title: id, body: '#12 at abc1234. CI failed: CI / build', at: expect.any(String) },
+    ]);
+    expect(sent).toEqual([]);
+  });
+
+  it('says nothing for a thread that is gone', () => {
+    notifyPRAttention('no-such-thread', '#1', 'req');
+    expect(feed).toEqual([]);
   });
 });

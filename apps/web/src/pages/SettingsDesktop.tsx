@@ -30,7 +30,7 @@ const ZOOM_LEVELS = Array.from({ length: Math.round((ZOOM_MAX - ZOOM_MIN) / ZOOM
 export const zoomLabel = (factor: number) => `${Math.round(factor * 100)}%`;
 
 /** The app's settings, kept current as another window changes them, and a save that answers with the new ones. */
-function useDesktopSettings(bridge: DesktopBridge) {
+export function useDesktopSettings(bridge: DesktopBridge) {
   const [settings, setSettings] = useState<DesktopSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {

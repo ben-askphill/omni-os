@@ -5,6 +5,7 @@
 // Polling, not webhooks: the server sits on loopback behind the tailnet, so GitHub cannot reach it.
 import { createHash } from 'node:crypto';
 import { messageRequests, outbox, threads, tx, type MessageRequest } from '../db.ts';
+import { notifyPRAttention } from '../push-sender.ts';
 import { emitThread, runsHere, saveOwn, wake } from '../runner.ts';
 import { wakeBlocked } from '../sync/guard.ts';
 import { checkLog, observePR } from './gh.ts';
@@ -103,6 +104,8 @@ async function apply(w: PRWatchRow, obs: PRObservation, deps: PRWatchDeps): Prom
   if (prWatches.get(w.thread_id)?.state !== 'watching' || threads.get(w.thread_id)?.archived) return false;
   const row = save(w, obs, fresh, prompt, iso(at));
   if (!row) return false;
+  const said = row.payload?.text;
+  notifyPRAttention(w.thread_id, typeof said === 'string' ? said : `${obs.repo}#${obs.number}`, row.id);
   deliver(row, deps);
   return true;
 }

@@ -197,7 +197,7 @@ describe('a question an agent asked', () => {
     a.db.events.add('t-q', 'question', { id: 'q-1', questions: [Q] });
     b.feed.length = 0;
     await exchange();
-    expect(asked(b)).toEqual([{ kind: 'question', detail: 'Which goal comes first?', count: 1 }]);
+    expect(asked(b)).toEqual([{ kind: 'question', detail: 'Which goal comes first?', count: 1, at: expect.any(String) }]);
     expect(b.feed).toContainEqual({ type: 'needs_you', thread_id: 't-q' });
 
     b.db.events.add('t-q', 'question_answer', { id: 'q-1', state: 'answered', answers: [{ selected: ['KE go-live'], other: null }], via: 'tool' });

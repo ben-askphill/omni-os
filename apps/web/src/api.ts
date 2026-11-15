@@ -17,6 +17,7 @@ import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/au
 import type { ContinueLink } from '@omni/shared/continue.ts';
 import type { Clipped, HistoryHead } from '@omni/shared/history.ts';
 import { outputQuery, type OutputChunk } from '@omni/shared/tool-output.ts';
+import type { FeedAlert } from '@omni/shared/attention.ts';
 
 export type { EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
 
@@ -455,6 +456,8 @@ export type FeedEvent =
   | { type: 'review_notes'; thread_id: string }
   /** A machine's CPU and memory sample, while the machine tiles are watched (apps/server/machine-stats.ts). Id null is this machine with sync off. */
   | { type: 'machine_stats'; id: string | null; stats: MachineStats }
+  /** A crew report in the Conductor, or a watched PR that needs attention: worth a notification, not in Needs you. */
+  | { type: 'alert'; alert: FeedAlert }
   | { type: 'reconnect' };
 
 /** GET /api/update (apps/server/update.ts): how far this server is behind main, and where Update is. */

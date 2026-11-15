@@ -2,6 +2,8 @@
 // The Web UI in a browser or on a phone has no bridge, so every caller checks for it (apps/web/src/desktop.ts).
 // Types and the few pure rules both sides share. The preload implements it over IPC, the main process answers.
 
+import { DEFAULT_ALERT_KINDS, parseAlertKinds, type AlertKinds, type AlertPrefs } from './attention.ts';
+
 export type DesktopPlatform = 'darwin' | 'linux' | 'win32';
 
 /** The Web UI's desktop shell: the classic sidebar, or the channel rail with a list panel (apps/web/src/layout-pref.ts). */
@@ -71,6 +73,11 @@ export interface DesktopSettings {
    * Check for Updates looks, and Download fetches what it found.
    */
   autoUpdate: boolean;
+  /**
+   * Native notifications the main process raises (apps/desktop/src/notifications.ts): on, which kinds, and channels
+   * that never alert. On by default, every kind on.
+   */
+  notifications: AlertPrefs;
 }
 
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
@@ -78,6 +85,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   launchAtLogin: false,
   zoom: 1,
   autoUpdate: true,
+  notifications: { enabled: true, kinds: { ...DEFAULT_ALERT_KINDS }, muted: [] },
 };
 
 export type DesktopSettingsPatch = {
@@ -85,6 +93,7 @@ export type DesktopSettingsPatch = {
   launchAtLogin?: boolean;
   zoom?: number;
   autoUpdate?: boolean;
+  notifications?: { enabled?: boolean; kinds?: Partial<AlertKinds>; muted?: string[] };
 };
 
 /** Reads stored settings field by field: an unknown or broken value takes its default, never fails the whole file. */
@@ -93,6 +102,7 @@ export function parseDesktopSettings(raw: unknown): DesktopSettings {
   const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
   const root = obj(raw);
   const qp = obj(root.quickPrompt);
+  const n = obj(root.notifications);
   const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback);
   const shortcut = QUICK_PROMPT_SHORTCUTS.includes(qp.shortcut as QuickPromptShortcut) ? (qp.shortcut as QuickPromptShortcut) : d.quickPrompt.shortcut;
   return {
@@ -100,6 +110,11 @@ export function parseDesktopSettings(raw: unknown): DesktopSettings {
     launchAtLogin: bool(root.launchAtLogin, d.launchAtLogin),
     zoom: typeof root.zoom === 'number' ? clampZoom(root.zoom) : d.zoom,
     autoUpdate: bool(root.autoUpdate, d.autoUpdate),
+    notifications: {
+      enabled: bool(n.enabled, d.notifications.enabled),
+      kinds: parseAlertKinds(n.kinds),
+      muted: Array.isArray(n.muted) ? [...new Set(n.muted.filter((m): m is string => typeof m === 'string'))] : [],
+    },
   };
 }
 
@@ -108,6 +123,11 @@ export function applySettingsPatch(current: DesktopSettings, patch: DesktopSetti
     ...current,
     ...patch,
     quickPrompt: { ...current.quickPrompt, ...patch.quickPrompt },
+    notifications: {
+      ...current.notifications,
+      ...patch.notifications,
+      kinds: { ...current.notifications.kinds, ...patch.notifications?.kinds },
+    },
   });
 }
 
@@ -163,6 +183,11 @@ export interface DesktopBridge {
   openWindow(route: string): void;
   /** Brings this window forward, as a notification click should. */
   focus(): void;
+  /**
+   * The main process raises native notifications itself (settings `notifications`), so the page posts none of its
+   * own. Older app builds lack it, and the page's browser notifications stay on there.
+   */
+  readonly nativeNotifications?: boolean;
   /** Keeps the native window chrome and menus on the theme the Web UI picked. */
   setAppearance(mode: 'system' | 'light' | 'dark'): void;
   /**

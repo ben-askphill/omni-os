@@ -10,6 +10,7 @@ The desktop app is an Electron window on the Web UI that runs the Omni server it
 | `src/context.ts` | `AppContext`, what every feature gets |
 | `src/backend/` | Attach to this install's server or start one, restart it after exit 75, stop it on quit if this app started it (on this launch, or on an earlier one that kept it running, as a note in userData's `server-<port>.json` records). An attached server that stops answering shows the failure screen. `data-dir.ts` picks the data dir |
 | `src/ipc.ts`, `src/handle.ts`, `src/preload.ts` | The bridge: channel table, typed `ipcMain` handlers with an origin check, and `window.omniDesktop` |
+| `src/notifications.ts` | Native notifications: follows the server's feed and Needs you with the install's token, asks the shared tracker (`packages/shared/attention.ts`) what is news, posts it, and opens the thread on click. The bridge's `nativeNotifications` tells the page to post none of its own. See [docs/user/notifications.md](../../docs/user/notifications.md) |
 | `src/options.ts`, `src/paths.ts`, `src/settings.ts` | Command line, per-OS default paths, the app's own settings file |
 | `scripts/build.ts` | Builds `dist/main.cjs`, `dist/preload.cjs` and `dist/pick-preload.cjs` |
 | `scripts/stage.ts`, `scripts/dist.ts`, `electron-builder.config.cjs` | Stage the server bundle and package the app |

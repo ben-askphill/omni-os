@@ -82,8 +82,12 @@ async function idleThread(prompt: string) {
 }
 const watch = (threadId: string, number: number, at: number) => S.prWatches.start(threadId, REPO, number, null, W.BASE_S, new Date(at).toISOString());
 
+/** The feed's `alert` events, from the start of the file. */
+const alerts: { id: string; kind: string; thread_id: string; body: string }[] = [];
+
 beforeAll(async () => {
   H = await startRunner();
+  (await import('../bus.ts')).bus.on('feed', (e: { type: string; alert?: (typeof alerts)[number] }) => void (e.type === 'alert' && alerts.push(e.alert!)));
   W = await import('../pr-watch/worker.ts');
   S = await import('../pr-watch/store.ts');
   G = await import('../pr-watch/gh.ts');
@@ -115,6 +119,10 @@ describe('PR watch', () => {
     expect(req.prompt).toContain('log of CI / build');
     expect(req.prompt).not.toContain('CI / lint');
     expect(userTexts(t.id).at(-1)).toMatchObject({ source: 'pr-watch', text: '#1 at aaaaaaa. CI failed: CI / build', head_sha: 'a'.repeat(40) });
+    // Ben hears about it too: one feed alert for the wake, which the Web UI and the desktop app notify for.
+    expect(alerts.filter((a) => a.thread_id === t.id)).toEqual([
+      expect.objectContaining({ kind: 'prAttention', id: `pr:${t.id}:${req.id}`, body: '#1 at aaaaaaa. CI failed: CI / build' }),
+    ]);
 
     // Polled again, unchanged, and replayed after a re-run passed and failed again on the same head: no second wake.
     gh.advance(2 * MIN);
@@ -126,6 +134,7 @@ describe('PR watch', () => {
     gh.advance(10 * MIN);
     expect(await W.pollOnce(gh.deps)).toBe(0);
     expect(watchRequests(t.id)).toHaveLength(1);
+    expect(alerts.filter((a) => a.thread_id === t.id)).toHaveLength(1);
     expect(H.byKind(t.id, 'result')).toHaveLength(2);
     expect(S.prWatches.get(t.id)).toMatchObject({ state: 'watching', wakes: 1, checks: { failed: 1, passed: 1, pending: 0 } });
   });
