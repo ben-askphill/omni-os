@@ -10,6 +10,7 @@ import { openArtifact } from '../../navigation/open-artifact';
 import type { RootStackParamList } from '../../navigation/types';
 import { CLOSED, type Disclosure, threadRows, type ThreadRow } from '../../thread/rows';
 import { fontSize, minTarget, space, useOmniTheme, weight } from '../../theme';
+import { CrewQuestions } from './CrewQuestions';
 import { NeedsCards } from './NeedsCards';
 import { PendingRows } from './PendingRows';
 import type { SendAnswers } from './QuestionCard';
@@ -100,6 +101,7 @@ export function ThreadBody({ view, live }: { view: ThreadView; live: ThreadLive 
         ListHeaderComponent={
           live ? (
             <View>
+              <CrewQuestions threadId={view.threadId} />
               {view.thread ? <NeedsCards thread={view.thread} pending={view.pending} blocked={view.blocked !== null} act={(action) => live.act(action)} /> : null}
               <PendingRows view={view} live={live} />
             </View>

@@ -29,7 +29,7 @@ beforeEach(() => {
 afterEach(() => installPushSender(noopPushSender));
 
 let n = 0;
-function thread(over: { channel?: string; parent?: string | null } = {}) {
+function thread(over: { channel?: string; parent?: string | null; task?: string | null } = {}) {
   const id = `trigger-${++n}`;
   r.db.threads.create({
     id,
@@ -42,7 +42,7 @@ function thread(over: { channel?: string; parent?: string | null } = {}) {
     cwd: r.tmp,
     branch: null,
     parent_id: over.parent ?? null,
-    task_id: null,
+    task_id: over.task ?? null,
     source: 'manual',
     automation: null,
   });
@@ -54,6 +54,15 @@ describe('a thread needs input', () => {
     const id = thread({ channel: 'scratch' });
     askQuestion(id, [Q]);
     expect(sent).toEqual([{ kind: 'needsInput', threadId: id, channelId: 'scratch', title: id, text: Q.question }]);
+  });
+
+  it("opens a delegated thread's question on the thread Ben delegated from, naming the thread that asked", () => {
+    const conductor = thread({ channel: 'conductor' });
+    const lead = thread({ channel: 'scratch', parent: conductor });
+    const member = thread({ channel: 'scratch', parent: lead, task: 'T-ASK' });
+    askQuestion(member, [Q]);
+    expect(sent).toEqual([{ kind: 'needsInput', threadId: conductor, channelId: 'conductor', title: conductor, text: Q.question, from: `T-ASK · ${member}` }]);
+    expect(alertFor(sent[0]!)).toEqual({ title: conductor, subtitle: `Needs your answer: T-ASK · ${member}`, body: Q.question });
   });
 });
 

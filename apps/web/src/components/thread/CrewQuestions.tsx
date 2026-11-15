@@ -1,4 +1,4 @@
-import type { CrewQuestion } from '@omni/shared/question.ts';
+import { crewAsker, type CrewQuestion } from '@omni/shared/question.ts';
 import { useApi } from '../../api.ts';
 import { href } from '../../router.ts';
 import { useFeed } from '../../store.tsx';
@@ -37,7 +37,7 @@ export function CrewQuestionList({ items, touch, onOpen }: { items: CrewQuestion
             className={`hov flex min-w-0 items-center gap-1.5 self-start rounded-full px-2 text-[12px] text-fg-3 [--hov:var(--surface)] ${touch ? 'min-h-11' : 'py-1'}`}
           >
             <Icon name="message" size={13} />
-            <span className="truncate">{[c.task_id, c.thread_title].filter(Boolean).join(' · ')} asks</span>
+            <span className="truncate">{crewAsker(c)} asks</span>
           </a>
           <QuestionCard threadId={c.thread_id} q={c.question} touch={touch} />
         </div>

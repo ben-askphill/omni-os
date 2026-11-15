@@ -1,5 +1,5 @@
 import type { MessageContext } from '@omni/shared/message-context.ts';
-import type { Answer, AnswerPayload, QuestionState } from '@omni/shared/question.ts';
+import type { Answer, AnswerPayload, CrewQuestion, QuestionState } from '@omni/shared/question.ts';
 import { apiPath, sendWithFiles, type HttpClient, type WithFiles } from '../http.ts';
 import type { Thread } from './threads.ts';
 
@@ -79,6 +79,8 @@ export function messagesApi(http: HttpClient) {
     /** One answer per question, null to skip it. */
     answerQuestion: (id: string, questionId: string, answers: readonly Answer[]) =>
       http.request<AnswerResult>('POST', apiPath`/threads/${id}/questions/${questionId}/answer`, { body: { answers } }),
+    /** What the threads delegated from this one (or the ones it continues) wait on Ben to answer. Each card answers its own `thread_id`. */
+    crewQuestions: (id: string) => http.request<{ items: CrewQuestion[] }>('GET', apiPath`/threads/${id}/crew-questions`),
     stop: (id: string) => http.request<Thread>('POST', apiPath`/threads/${id}/stop`),
     /** The thread's accepted messages, newest first. A user row on the stream carries no `request_id`, so this is how a client learns whether its own send landed. */
     requests: (id: string) => http.request<MessageRequestRow[]>('GET', apiPath`/threads/${id}/requests`),

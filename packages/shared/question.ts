@@ -154,6 +154,9 @@ export interface CrewQuestion {
   question: ThreadQuestion;
 }
 
+/** Who asks, on a crew question's card and its push alert: "T-4299 · Build the CSV export". */
+export const crewAsker = (c: Pick<CrewQuestion, 'task_id' | 'thread_title'>) => [c.task_id, c.thread_title].filter(Boolean).join(' · ');
+
 type EventLike = { id: number; kind: string; payload: string | object };
 const payloadOf = <T>(e: EventLike) => (typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload) as T;
 

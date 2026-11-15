@@ -118,6 +118,13 @@ describe('omni api', () => {
     expect(sent).toEqual([{ method: 'POST', url: at('/threads/t1/questions/q%201/answer'), body: { answers } }]);
   });
 
+  it("reads the questions a thread's crew waits on", async () => {
+    const items = [{ thread_id: 'c1', thread_title: 'Build the export', task_id: 'T-1', channel_id: 'inbox', question: { id: 'q1', event_id: 3, questions: [], state: 'pending', answers: null } }];
+    const { sent, api: a } = api({ json: { items } });
+    expect(await a.crewQuestions('t 1')).toEqual({ items });
+    expect(sent).toEqual([{ method: 'GET', url: at('/threads/t%201/crew-questions') }]);
+  });
+
   it('rejects an answer to settled questions with the state the first answer left', async () => {
     const { api: a } = api({ status: 409, json: { error: 'These questions were already answered.', state: 'skipped' } });
     const err = await a.answerQuestion('t1', 'q1', [null]).catch((e: unknown) => e);

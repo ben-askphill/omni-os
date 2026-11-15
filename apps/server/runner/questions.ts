@@ -48,8 +48,8 @@ const settled = (threadId: string) => publishFeed({ type: 'needs_you', thread_id
 
 /**
  * The agent asks: a card in the thread, and a blocker in Needs you until Ben acts. A delegated thread's card also shows
- * on every thread above it (crewQuestions) and its blocker sits on the top one, the thread Ben delegated from, which
- * comes back out of done for it. Refused with what to fix.
+ * on every thread above it (crewQuestions) and its blocker and push alert go to the top one, the thread Ben delegated
+ * from, which comes back out of done for it. Refused with what to fix.
  */
 export function askQuestion(threadId: string, raw: unknown): { id: string } {
   if (!threads.get(threadId)) throw refusal('thread not found', 404);
@@ -64,11 +64,21 @@ export function askQuestion(threadId: string, raw: unknown): { id: string } {
   return { id };
 }
 
-/** The questions waiting on Ben in the threads delegated from this one, at any depth, in the order they were asked. */
+/** This thread and the ones it continues (continue.ts), newest first. Each id once, so a broken link cannot loop. */
+function continuedLine(threadId: string): string[] {
+  const line: string[] = [];
+  for (let t = threads.get(threadId); t && !line.includes(t.id); t = t.continued_from ? threads.get(t.continued_from) : undefined) line.push(t.id);
+  return line;
+}
+
+/**
+ * The questions waiting on Ben in the threads delegated from this one, at any depth, in the order they were asked. A
+ * continued thread also shows those of the crew its earlier threads delegated, since Ben works on in the newest.
+ */
 export function crewQuestions(threadId: string): CrewQuestion[] {
   if (!threads.get(threadId)) throw refusal('thread not found', 404);
-  return threads
-    .descendants(threadId)
+  return continuedLine(threadId)
+    .flatMap((id) => threads.descendants(id))
     .filter((t) => !t.archived)
     .flatMap((t) =>
       questionsIn(events.questions(t.id))

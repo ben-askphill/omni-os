@@ -11,6 +11,7 @@ import { pushTargets, type PushTarget } from './push-preferences.ts';
 import { forgetPushToken } from './push-tokens.ts';
 import { globalSecret, onSecretChange } from './secrets.ts';
 import type { AppPushKind } from '@omni/shared/app-pairing.ts';
+import { crewAsker } from '@omni/shared/question.ts';
 
 export interface PushEvent {
   kind: AppPushKind;
@@ -20,7 +21,7 @@ export interface PushEvent {
   title: string | null;
   /** The markdown the alert previews: the turn's last reply, the question or the crew report. */
   text: string | null;
-  /** Crew reports: the title of the thread that reported. */
+  /** Crew reports: the title of the thread that reported. A delegated thread's question: the thread that asked. */
   from?: string | null;
 }
 
@@ -270,9 +271,18 @@ function emit(event: PushEvent) {
   }
 }
 
-/** The agent asked a question and waits for an answer. The alert previews the first question. */
+/**
+ * The agent asked a question and waits for an answer. The alert previews the first question. A delegated thread's
+ * question opens the thread Ben delegated from, where its card shows too, and names the thread that asked.
+ */
 export function notifyNeedsInput(threadId: string, question: string | null = null) {
   const t = threads.get(threadId);
+  const home = threads.get(threads.root(threadId));
+  if (t && home && home.id !== t.id) {
+    const from = crewAsker({ task_id: t.task_id, thread_title: t.title });
+    emit({ kind: 'needsInput', threadId: home.id, channelId: home.channel_id, title: home.title, text: question, from });
+    return;
+  }
   emit({ kind: 'needsInput', threadId, channelId: t?.channel_id ?? null, title: t?.title ?? null, text: question });
 }
 
