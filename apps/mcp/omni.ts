@@ -87,7 +87,7 @@ server.registerTool(
     inputSchema: {
       channel: z.string().describe('Channel id, e.g. "acme". Use list_channels.'),
       role: z.string().describe('Crew role id, e.g. "researcher". Use list_crew.'),
-      prompt: z.string().describe('Self-contained task brief (there is no `brief` parameter; the brief goes here). Include everything the crewmate needs; it cannot see your chat.'),
+      prompt: z.string().describe('The task brief (there is no `brief` parameter; the brief goes here): Goal, Done when and Proof back. It cannot see your chat.'),
       task_id: z.string().optional().describe('Short id like T-12 to match the report. Generated if omitted.'),
       title: z.string().optional(),
       harness: z
@@ -150,7 +150,7 @@ server.registerTool(
         .array(
           z.object({
             title: z.string().describe('Short title, e.g. "Best price in NL".'),
-            prompt: z.string().describe('Self-contained brief for this member. It cannot see your chat or the other members.'),
+            prompt: z.string().describe('This member\'s brief: Goal, Done when and Proof back. It cannot see your chat or the other members.'),
             role: z.string().optional(),
             task_id: z.string().optional(),
             harness: z.string().optional(),

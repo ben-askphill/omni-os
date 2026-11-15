@@ -98,7 +98,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? [
           '',
           '## Thread delegation',
-          `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another crew role.`} For work that has independent parts, use delegate_team so the member threads run in parallel and the lead returns one combined report. First call list_crew and list_channels when you need valid ids. Give each delegated thread a self-contained brief because it cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.`,
+          `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another crew role.`} First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.`,
           SESSION_CACHE_RULE,
         ]
       : []),
