@@ -72,8 +72,8 @@ Questions an agent asks the user with Omni's `ask_user_question` tool: one to fo
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
 
 **Inbox**:
-The sidebar view toggled against Projects on desktop web and in the **Desktop app**: pinned threads, then threads waiting on you, then Working and Done shelves. Each card names the machine the thread runs on (or last ran on) and, while a turn runs, how long it has gone. With Channel rail (Beta) on, the same list fills the panel beside the rail from the Inbox disc (Home's place). On a phone, Activity shows the same list. When Appearance's **Press I for the Inbox** is on, pressing `i` outside a text field opens it. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Home (and the rail's Inbox landing) is the usage dashboard, not this list.
-_Avoid_: Needs you (the reasons a thread waits), notifications, Home (the dashboard)
+The Inbox page (`#/inbox`, the rail's Inbox disc) and the Classic sidebar's view toggled against Projects, on desktop web and in the **Desktop app**: pinned threads, then the Needs you, Finished, Working and Done shelves. Each card names the machine the thread runs on (or last ran on) and, while a turn runs, how long it has gone. On the channel rail the same list fills the panel beside the rail. On a phone, Activity shows the same list. When Appearance's **Press I for the Inbox** is on, pressing `i` outside a text field opens it. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Overview (`#/`, the Omni mark) is the usage dashboard, not this list.
+_Avoid_: Needs you (the reasons a thread waits), notifications, Overview (the dashboard)
 
 **Goal**:
 On Claude Code, a `/goal <condition>` the session keeps working until the condition holds. The UI shows a line under the transcript (**Pursuing goal**, **Goal set**, **Goal complete**) and the status **Goal** while a turn works on it. It lives in the session on the machine that runs the thread and does not sync. Other harnesses have none.

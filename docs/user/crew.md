@@ -10,7 +10,7 @@ Each role is a file in `crew/*.md` with frontmatter and a charter. Edit them fre
 | builder | Code in a repo channel, own worktree, opens PRs. Pushes through a no-mistakes gate when that checkout has one ([No-mistakes](no-mistakes.md)) |
 | inbox | Mail, calendar, Productive, Notion, Slack drafts. Never sends on its own |
 
-The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Home and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
+The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Overview and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
 
 `delegate_only: true` in a role's frontmatter makes it a router that runs without the tools that do work. Only the conductor sets it.
 
