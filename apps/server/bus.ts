@@ -34,3 +34,6 @@ export type FeedEvent =
 
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);
+
+/** A sub-agent's task row came in from another machine (sync/handlers/event.ts), so `delegating` may have changed. */
+export const SYNCED_TASK = 'synced_task';

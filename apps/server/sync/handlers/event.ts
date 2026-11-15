@@ -1,6 +1,6 @@
 import { db, EVENT_COLUMNS, indexEvent, type EventRow } from '../../db.ts';
 import { ANSWER_EVENT, QUESTION_EVENT } from '@omni/shared/question.ts';
-import { publishFeed, publishThread } from '../../bus.ts';
+import { bus, publishFeed, publishThread, SYNCED_TASK } from '../../bus.ts';
 import { registerHandler } from '../apply.ts';
 
 // Events: insert-only, keyed by uid, so a change pulled twice lands once. The local id is assigned on arrival,
@@ -45,5 +45,7 @@ registerHandler('event', {
     publishThread(row.thread_id, row);
     // A question asked or answered on the other Mac adds or clears a Needs you blocker here.
     if (row.kind === QUESTION_EVENT || row.kind === ANSWER_EVENT) publishFeed({ type: 'needs_you', thread_id: row.thread_id });
+    // A sub-agent starting or ending on the other Mac moves the thread between Working and the Inbox here (delegating.ts).
+    if (row.kind === 'task') bus.emit(SYNCED_TASK);
   },
 });

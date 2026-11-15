@@ -660,4 +660,8 @@ export function migrate() {
   // The machines that held a thread before its holder, oldest first (db/repos/assignments.ts), for the Inbox row's
   // machine history. JSON; synced with the row. Null reads as none.
   ensureColumn('assignments', 'trail', 'TEXT');
+  // Sub-agents another machine runs, read from their synced task rows (db/repos/events.ts openTasksSince): the recent
+  // ones, and each one's start.
+  db.exec(`CREATE INDEX IF NOT EXISTS events_task_at ON events(created_at) WHERE kind = 'task';
+    CREATE INDEX IF NOT EXISTS events_task ON events(thread_id, json_extract(payload, '$.task_id')) WHERE kind = 'task';`);
 }

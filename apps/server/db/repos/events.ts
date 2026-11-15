@@ -72,6 +72,23 @@ export const events = {
         .prepare(`SELECT MAX(created_at) AS at FROM events WHERE thread_id = ? AND kind IN ('assistant_text', 'tool_use', 'tool_result', 'result')`)
         .get(threadId) as { at: string | null }
     ).at,
+  /**
+   * The tasks with a stored event since `since` whose newest event is not their end, each with its start's payload
+   * (null when that row is missing). For the sub-agents another machine runs (apps/server/delegating.ts).
+   */
+  openTasksSince: (since: string) =>
+    db
+      .prepare(
+        `WITH latest AS (
+           SELECT thread_id, json_extract(payload, '$.task_id') AS task_id, MAX(id) AS id FROM events INDEXED BY events_task_at
+           WHERE kind = 'task' AND created_at > ? GROUP BY thread_id, task_id)
+         SELECT l.thread_id, l.task_id,
+           (SELECT s.payload FROM events s WHERE s.thread_id = l.thread_id AND s.kind = 'task' AND json_extract(s.payload, '$.task_id') = l.task_id
+              AND json_extract(s.payload, '$.event') = 'started' ORDER BY s.id LIMIT 1) AS started
+         FROM latest l JOIN events e ON e.id = l.id
+         WHERE json_extract(e.payload, '$.event') IS NOT 'ended'`,
+      )
+      .all(since) as { thread_id: string; task_id: string; started: string | null }[],
   uidOf: (id: number) => (db.prepare('SELECT uid FROM events WHERE id = ?').get(id) as { uid: string } | undefined)?.uid ?? null,
   lastAssistantText(threadId: string): string | null {
     const row = db

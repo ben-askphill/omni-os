@@ -190,3 +190,65 @@ describe('delegating, live', () => {
     expect(D.delegatingIds().has(lead.id)).toBe(false);
   });
 });
+
+describe('delegating, on another machine', () => {
+  const OTHER = '00000000-0000-4000-8000-0000000000b2';
+  const agent = (task_id: string) => ({ task_id, event: 'started', description: 'Audit', subagent_type: 'Explore', task_type: 'local_agent', background: true });
+  /** A done thread the other machine holds, as sync leaves it here. */
+  function heldElsewhere() {
+    H.db.outbox.arm();
+    const t = row('done');
+    H.db.assignments.applyRemote({ thread_id: t.id, machine: OTHER, generation: 1, routed: false, at: new Date().toISOString() });
+    return t;
+  }
+
+  it('its sub-agents still running there make it working here, until their end syncs in', () => {
+    const t = heldElsewhere();
+    H.db.events.add(t.id, 'task', agent('a1'));
+    H.db.events.add(t.id, 'task', { task_id: 'a1', event: 'progress', last_tool: 'Bash', tool_uses: 3 });
+    expect(D.delegatingIds().has(t.id)).toBe(true);
+    H.db.events.add(t.id, 'task', { task_id: 'a1', event: 'ended', status: 'completed' });
+    expect(D.delegatingIds().has(t.id)).toBe(false);
+  });
+
+  it('a synced task row sends the thread on the feed again', T, async () => {
+    const t = heldElsewhere();
+    const shown = watchShown(t.id);
+    H.db.events.add(t.id, 'task', agent('a2'));
+    H.bus.emit('synced_task');
+    await H.until('sent as working', () => shown.log.includes('working'));
+    H.db.events.add(t.id, 'task', { task_id: 'a2', event: 'ended', status: 'completed' });
+    H.bus.emit('synced_task');
+    await H.until('sent as idle', () => shown.log.at(-1) === 'idle');
+    shown.stop();
+  });
+
+  it('does not count a silent one, a shell, a stopped thread or a thread held here', () => {
+    const silent = heldElsewhere();
+    H.db.events.add(silent.id, 'task', agent('a3'), new Date(Date.now() - D.REMOTE_TASK_STALE_MS - 60_000).toISOString());
+    expect(D.delegatingIds().has(silent.id)).toBe(false);
+
+    const shell = heldElsewhere();
+    H.db.events.add(shell.id, 'task', { task_id: 'b1', event: 'started', description: 'npm test', task_type: 'local_bash', background: true });
+    expect(D.delegatingIds().has(shell.id)).toBe(false);
+
+    const stopped = heldElsewhere();
+    H.db.events.add(stopped.id, 'task', agent('a4'));
+    H.db.threads.update(stopped.id, { status: 'stopped' });
+    expect(D.delegatingIds().has(stopped.id)).toBe(false);
+
+    // Held here with no process: what a crash left. This machine settles its own threads.
+    const mine = row('done');
+    H.db.assignments.claim(mine.id);
+    H.db.events.add(mine.id, 'task', agent('a5'));
+    expect(D.delegatingIds().has(mine.id)).toBe(false);
+  });
+
+  it('counts for the thread above it too', () => {
+    const parent = row('done');
+    const t = heldElsewhere();
+    H.db.db.prepare('UPDATE threads SET parent_id = ? WHERE id = ?').run(parent.id, t.id);
+    H.db.events.add(t.id, 'task', agent('a6'));
+    expect(D.delegatingIds().has(parent.id)).toBe(true);
+  });
+});
