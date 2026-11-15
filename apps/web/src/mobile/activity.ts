@@ -8,7 +8,8 @@ import { shortTime, type ChannelInfo } from './rows.ts';
 
 /** What a card's button does. Each is a route the server already has; nothing here is invented for the phone. */
 export type NeedsAction =
-  | { kind: 'open'; label: string }
+  /** Opens the card's thread, or `thread` when the action is about another one (a failed thread under the job). */
+  | { kind: 'open'; label: string; thread?: string }
   /** POST /needs-you/read with the result's uid. */
   | { kind: 'read'; label: string; uid: string }
   /** POST /threads/:id/setup/retry. */
@@ -60,7 +61,8 @@ function actionsOf(item: NeedsYouItem, harness: (id: string) => string, now: num
       out = [{ kind: 'resume', label: b.count > 1 ? `Resume ${b.count}` : 'Resume' }];
       break;
     case 'child_failed':
-      out = [{ kind: 'open', label: 'Review' }];
+      // Review opens the thread that failed: opening reads its result, which clears this blocker.
+      out = [b.from?.[0] ? { kind: 'open', label: 'Review', thread: b.from[0] } : { kind: 'open', label: 'Review' }];
       break;
     case 'uncertain':
       // Sending again names each message, and only the thread lists them.

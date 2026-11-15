@@ -24,7 +24,7 @@ export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
   const { readResult, setDone } = useApp();
   const [busy, setBusy] = useState<NeedsAction | null>(null);
   const run = async (card: Pick<NeedsCard, 'id'>, a: NeedsAction) => {
-    if (a.kind === 'open') return shell.open(href.thread(card.id));
+    if (a.kind === 'open') return shell.open(href.thread(a.thread ?? card.id));
     if (a.kind === 'read') {
       readResult(a.uid);
       return shell.toast(DONE.read!);

@@ -59,4 +59,11 @@ describe('needsCard', () => {
     n.items[0] = { ...n.items[0], thread: { ...n.items[0].thread, source: 'conductor', role: 'builder' } };
     expect(cardsOf(n)[0].meta).toBe('#Acme · builder · via Conductor');
   });
+
+  it('opens the failed thread under a job from Review, not the job it is on', () => {
+    const job = inbox().items[0];
+    const failing = { ...job, result: null, blockers: [{ kind: 'child_failed' as const, detail: 'Zoom modal a11y pass', count: 1, from: ['member'], results: ['r'] }] };
+    const card = needsCard(failing, undefined, harness, NOW);
+    expect(card.actions[0]).toEqual({ kind: 'open', label: 'Review', thread: 'member' });
+  });
 });
