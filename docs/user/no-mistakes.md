@@ -83,7 +83,7 @@ no-mistakes doctor
 
 `test.instructions` tells the live check to start `scripts/qa-stack.sh` on a free port, to leave port 4747 and `data/` alone, and to stop that stack before it finishes.
 
-`no_ci: true` matches GitHub as it is today. Pull requests register no checks. `scripts/ci-workflow.yml` is not under `.github/workflows`, and `desktop-release.yml` runs only when someone dispatches it. An empty check list then counts as passed, so a run can finish. A check that is registered still has to pass. The flag does not waive a failing check.
+`no_ci: false`, because pull requests run `.github/workflows/ci.yml`. A run waits for those checks after it opens the PR and stops on a failing one.
 
 New pull requests take their narrative from `.github/pull_request_template.md`. The gate collapses its evidence appendix under one Validation block.
 

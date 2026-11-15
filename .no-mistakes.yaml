@@ -37,7 +37,5 @@ pr:
   template: .github/pull_request_template.md
   appendix: collapsed
 
-# Pull requests register no checks today. scripts/ci-workflow.yml is not installed under
-# .github/workflows, and desktop-release.yml runs only when dispatched. An empty check list
-# then counts as passed. A check that does register still has to pass.
-no_ci: true
+# Pull requests run .github/workflows/ci.yml. no_ci stays off so a run waits for those checks and fails on a red one.
+no_ci: false

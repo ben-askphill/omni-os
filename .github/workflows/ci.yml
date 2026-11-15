@@ -1,3 +1,5 @@
+# Runs on every pull request and every push to main. `check` is the required status check on main.
+# It runs what the no-mistakes gate runs locally (.no-mistakes.yaml), so a PR merged without the gate is held to the same bar.
 name: CI
 
 on:
@@ -9,12 +11,15 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -25,12 +30,17 @@ jobs:
         run: npm run unused
       - name: Tests
         run: npm test
+      - name: Build
+        run: npm run build
+      # Tests and the build must not change tracked files, for example a wire fixture recorded again by accident.
+      - name: No changes to tracked files
+        run: git diff --exit-code --stat
 
   desktop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
