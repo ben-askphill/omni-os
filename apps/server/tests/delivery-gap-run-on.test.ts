@@ -113,6 +113,11 @@ describe('replies forwarded to the machine running a thread (#398)', () => {
     await both();
     expect(a.byKind(late, 'user').filter((e) => e.p.command === 'late-1')).toHaveLength(1);
     expect(a.db.remoteCommands.openCount(late)).toBe(0);
+    // Record once B's turn for the fresh reply has ended and A heard so, not whichever moment the sync happened to land in.
+    await b.untilResults(late, 2);
+    await waitFor(() => !b.runner.isLive(late), 'the turn to end on B');
+    await both();
+    expect(a.db.threads.get(late)?.status).not.toBe('running');
     fixtures.set('thread-undelivered.json', (await a.json(`/threads/${late}`)).body);
   });
 

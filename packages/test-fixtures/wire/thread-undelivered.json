@@ -2,8 +2,8 @@
   "thread": {
     "id": "00000000-0000-4000-8000-000000000001",
     "channel_id": "shop",
-    "title": "audit the footer",
-    "status": "running",
+    "title": "Fake title",
+    "status": "done",
     "role": null,
     "model": "claude-haiku-4-5",
     "harness": "claude-code",
@@ -20,7 +20,7 @@
     "task_id": null,
     "source": "manual",
     "automation": null,
-    "last_text": "ack: audit the footer",
+    "last_text": "ack: and the links",
     "suggestion": null,
     "next_title": null,
     "next_prompt": null,
@@ -47,7 +47,7 @@
       "at": "2026-01-05T09:00:00.000Z",
       "before": []
     },
-    "run_started_at": "2026-01-05T09:00:00.000Z"
+    "run_started_at": null
   },
   "channel": {
     "id": "shop",
@@ -65,6 +65,8 @@
     "design_system_name": null,
     "archived": 0,
     "created_at": "2026-01-05T09:00:00.000Z",
+    "avatar_bg": null,
+    "avatar_bg_manual": 0,
     "default_harness": null,
     "default_model": null,
     "default_effort": null,
@@ -73,9 +75,7 @@
     "prompt_open_pr": null,
     "prompt_fix_conflicts": null,
     "prompt_fix_checks": null,
-    "design_system_size": 0,
-    "avatar_bg": null,
-    "avatar_bg_manual": 0
+    "design_system_size": 0
   },
   "events": [
     {
@@ -112,6 +112,34 @@
       "kind": "user",
       "payload": "{\"text\":\"the footer copy\",\"source\":\"ben\",\"mode\":\"queue\",\"dropped\":true,\"undelivered\":\"Box B did not take it within 24 hours.\",\"command\":\"late-1\"}",
       "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 14,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "init",
+      "payload": "{\"model\":\"claude-haiku-4-5\",\"cwd\":\"/tmp/omni-fixtures\",\"tools\":10,\"mcp\":[\"omni-ask:connected\",\"omni-render:connected\",\"omni-threads:connected\"]}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 15,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "user",
+      "payload": "{\"text\":\"and the links\",\"source\":\"ben\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 16,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "assistant_text",
+      "payload": "{\"text\":\"ack: and the links\"}",
+      "created_at": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": 17,
+      "thread_id": "00000000-0000-4000-8000-000000000001",
+      "kind": "result",
+      "payload": "{\"ok\":true,\"subtype\":\"success\",\"duration_ms\":11,\"turns\":1,\"cost_usd\":0.001}",
+      "created_at": "2026-01-05T09:00:00.000Z"
     }
   ],
   "artifacts": [],
@@ -126,7 +154,6 @@
   "handoff": null,
   "continued_from": null,
   "continued_in": [],
-  "blocked": "This thread is running on Box B.",
   "takeover": {
     "from": {
       "id": "box-b",
@@ -136,7 +163,7 @@
       "id": "mac-a",
       "name": "Mac A"
     },
-    "running": true,
+    "running": false,
     "refused": null
   }
 }
