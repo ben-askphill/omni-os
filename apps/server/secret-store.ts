@@ -30,6 +30,7 @@ function piped(cmd: string, args: string[], input: string): Promise<void> {
     child.stderr.on('data', (d) => (err += d));
     child.on('error', reject);
     child.on('close', (code) => (code === 0 && !err.trim() ? resolve() : reject(new Error(err.trim() || `${cmd} exited ${code}`))));
+    child.stdin.on('error', () => {}); // A command that exits before reading closes the pipe; its exit says why.
     child.stdin.end(input);
   });
 }
