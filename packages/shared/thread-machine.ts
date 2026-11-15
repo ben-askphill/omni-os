@@ -300,3 +300,21 @@ export function grokBotBlock(files: number): string | null {
   if (files <= 0) return null;
   return `Grok Bot takes text only. Remove ${files === 1 ? 'the attachment' : `the ${files} attachments`} to send.`;
 }
+
+/**
+ * The Fork dialog's Run on: machines only, never Grok Bot, since a fork is always a thread. `rows` is null, so the
+ * picker hides and nothing is sent, while no other machine is synced. It opens on Settings' default. `device` is what
+ * the fork's preview and Start send: Ben's pick, or the default once `settingKnown`; null sends nothing, so the server
+ * applies Settings' default itself (a /setup that failed to load never turns into an explicit "here").
+ */
+export function forkMachine(
+  devices: Device[] | null | undefined,
+  setting: string | null | undefined,
+  picked: string | null,
+  { settingKnown, now = Date.now(), hereName }: { settingKnown: boolean; now?: number; hereName?: string | null },
+): { rows: RunOnRow[] | null; pick: string; device: string | null } {
+  if (!offersRunOn(devices)) return { rows: null, pick: HERE, device: null };
+  const pick = runOnPick(picked, setting, devices);
+  const chose = picked !== null && picked === pick;
+  return { rows: runOnRows(devices, { now, hereName }), pick, device: chose || settingKnown ? pick : null };
+}

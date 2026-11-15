@@ -18,7 +18,8 @@ const attachments = z.array(z.string().min(1).max(200)).max(200).optional();
 const reconfigure = z.object({ kind: z.literal('reconfigure'), run: runSchema });
 /** A synced machine's id from GET /api/devices, or "here" to take the thread over. */
 const relocate = z.object({ kind: z.literal('relocate'), to: z.string().min(1).max(200) });
-const forkPreview = z.object({ kind: z.literal('fork'), run: runSchema, attachments });
+/** A fork's machine: a synced machine's id, or "here". Left out, Settings > Threads' default. */
+const forkPreview = z.object({ kind: z.literal('fork'), run: runSchema, attachments, device: z.string().min(1).max(200).optional() });
 const fork = forkPreview.extend({
   // Ben's message goes as he wrote it, after the Carryover, never cut.
   text: z.string().refine((s) => s.trim().length > 0, 'Write the first message for the new thread.'),

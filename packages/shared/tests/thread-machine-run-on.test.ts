@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Device } from '../handoff.ts';
 import {
   GROK_BOT,
+  forkMachine,
   grokBotBlock,
   HERE,
   newThreadPick,
@@ -131,5 +132,29 @@ describe('Grok Bot as a new thread target', () => {
     expect(runOnRows([omarchy], { now }).some((r) => r.value === GROK_BOT)).toBe(false);
     expect(runOnRows([omarchy], { now, asDefault: true }).some((r) => r.value === GROK_BOT)).toBe(false);
     expect(settingPick(GROK_BOT, [omarchy])).toBe(HERE);
+  });
+});
+
+describe("the Fork dialog's Run on", () => {
+  const box = { id: 'box-b', name: 'Box B', reachability: 'online', dnsName: 'box-b.ts.net', lastSeen: null } as Device;
+
+  it('lists synced machines only, never Grok Bot, and hides with no other machine', () => {
+    expect(forkMachine([], 'box-b', null, { settingKnown: true })).toEqual({ rows: null, pick: HERE, device: null });
+    expect(forkMachine(undefined, '', 'box-b', { settingKnown: true })).toEqual({ rows: null, pick: HERE, device: null });
+    const m = forkMachine([box], '', null, { settingKnown: true, hereName: 'Mac A' });
+    expect(m.rows!.map((r) => r.value)).toEqual([HERE, 'box-b']);
+    expect(m.rows!.some((r) => r.value === GROK_BOT)).toBe(false);
+  });
+
+  it("opens on Settings' default and sends Ben's pick", () => {
+    expect(forkMachine([box], 'box-b', null, { settingKnown: true })).toMatchObject({ pick: 'box-b', device: 'box-b' });
+    expect(forkMachine([box], 'box-b', HERE, { settingKnown: true })).toMatchObject({ pick: HERE, device: HERE });
+    expect(forkMachine([box], '', GROK_BOT, { settingKnown: true }), 'Grok Bot is not a machine').toMatchObject({ pick: HERE, device: HERE });
+  });
+
+  it("sends nothing until Settings' default is known, unless Ben picked", () => {
+    expect(forkMachine([box], undefined, null, { settingKnown: false })).toMatchObject({ pick: HERE, device: null });
+    expect(forkMachine([box], undefined, 'box-b', { settingKnown: false })).toMatchObject({ pick: 'box-b', device: 'box-b' });
+    expect(forkMachine([box], undefined, HERE, { settingKnown: false })).toMatchObject({ pick: HERE, device: HERE });
   });
 });

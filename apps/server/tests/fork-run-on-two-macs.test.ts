@@ -119,3 +119,86 @@ describe('a fork with "Run new threads on" set to another machine', () => {
     expect(p.body).toMatchObject({ runs_on: null, blocked: null });
   }, T.timeout);
 });
+
+// The Fork dialog's machine picker: `device` names the machine for this fork, over Settings' default, as the new-thread
+// composer's Run on does.
+describe('a fork with a machine picked in the dialog', () => {
+  let source: string;
+
+  beforeAll(async () => {
+    expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: '' } } })).status).toBe(200);
+    const t = await a.runner.createThread({ channel: 'code', prompt: 'edit a.txt again', title: 'Edit a again', device: 'here' });
+    source = t.id;
+    await a.untilResults(source, 1);
+  }, T.timeout);
+
+  it('goes to the picked machine while Settings says this one, and its Carryover says where it runs', async () => {
+    const p = await a.json(`/threads/${source}/continue/preview`, { body: { ...claude, device: 'box-b' } });
+    expect(p.status, JSON.stringify(p.body)).toBe(200);
+    expect(p.body).toMatchObject({ runs_on: { id: 'box-b', name: 'Box B' }, blocked: null });
+    expect(p.body.carryover.constraints).toContainEqual(expect.stringMatching(/^Machine: you run on Box B\. The source ran on Mac A/));
+    const request_id = randomUUID();
+    const res = await a.json(`/threads/${source}/continue`, { body: { ...claude, device: 'box-b', text: 'carry on there', request_id, revision: p.body.revision } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const fork = res.body.thread.id;
+    expect(a.thread(fork)).toMatchObject({ status: 'stopped', setup: null, continued_from: source });
+    expect(a.db.assignments.get(fork)).toMatchObject({ machine: 'box-b', routed: true });
+    expect(a.db.kv.get<any>(`handoff.offer.${fork}`)).toMatchObject({ state: 'offered', fresh: true, queued: ['carry on there'], to: { id: 'box-b' } });
+
+    // The same request id for another machine is another request.
+    const again = await a.json(`/threads/${source}/continue`, { body: { ...claude, device: 'here', text: 'carry on there', request_id, revision: p.body.revision } });
+    expect(again.status).toBe(409);
+    expect(again.body).toMatchObject({ code: 'request_reused' });
+  }, T.timeout);
+
+  it('runs here when this machine is picked, while Settings sends new threads to the other one', async () => {
+    expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: 'box-b' } } })).status).toBe(200);
+    const p = await a.json(`/threads/${source}/continue/preview`, { body: { ...claude, device: 'here' } });
+    expect(p.status, JSON.stringify(p.body)).toBe(200);
+    expect(p.body).toMatchObject({ runs_on: null, blocked: null });
+    expect(p.body.carryover.constraints.join('\n')).not.toMatch(/^Machine:/m);
+    // A preview for another machine is another preview: Start refuses its revision.
+    const elsewhere = await a.json(`/threads/${source}/continue/preview`, { body: claude });
+    expect(elsewhere.body).toMatchObject({ runs_on: { id: 'box-b' } });
+    expect(elsewhere.body.revision).not.toBe(p.body.revision);
+
+    const res = await a.json(`/threads/${source}/continue`, { body: { ...claude, device: 'here', text: 'carry on here', request_id: randomUUID(), revision: p.body.revision } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const fork = res.body.thread.id;
+    expect(a.db.assignments.get(fork)?.machine ?? null).not.toBe('box-b');
+    expect(a.db.kv.get(`handoff.offer.${fork}`)).toBeFalsy();
+    await a.untilResults(fork, 1);
+    expect(a.texts(fork, 'user')).toEqual(['carry on here']);
+  }, T.timeout);
+
+  it('is blocked for a machine that is not synced', async () => {
+    const p = await a.json(`/threads/${source}/continue/preview`, { body: { ...claude, device: 'nowhere' } });
+    expect(p.status, JSON.stringify(p.body)).toBe(200);
+    expect(p.body.blocked).toMatchObject({ code: 'machine', message: expect.stringContaining('No synced machine has that id') });
+  }, T.timeout);
+
+  it('names the machine the source ran on, not the one that forks it', async () => {
+    expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: '' } } })).status).toBe(200);
+    const t = await b.runner.createThread({ channel: 'code', prompt: 'edit a.txt on B', title: 'Edit a on B', device: 'here' });
+    await b.untilResults(t.id, 1);
+    await both();
+    await waitFor(() => a.db.threads.get(t.id)?.status === 'done' && a.db.assignments.holder(t.id) === 'box-b', 'the thread B ran to sync to A');
+
+    const here = await a.json(`/threads/${t.id}/continue/preview`, { body: { ...claude, device: 'here' } });
+    expect(here.status, JSON.stringify(here.body)).toBe(200);
+    expect(here.body.runs_on).toBeNull();
+    expect(here.body.carryover.constraints).toContainEqual(expect.stringMatching(/^Machine: you run on Mac A\. The source ran on Box B/));
+
+    const there = await a.json(`/threads/${t.id}/continue/preview`, { body: { ...claude, device: 'box-b' } });
+    expect(there.status, JSON.stringify(there.body)).toBe(200);
+    expect(there.body.runs_on).toMatchObject({ id: 'box-b' });
+    expect(there.body.carryover.constraints.join('\n')).not.toMatch(/^Machine:/m);
+  }, T.timeout);
+
+  it('takes the machine through the transitions API too', async () => {
+    expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: '' } } })).status).toBe(200);
+    const p = await a.json(`/threads/${source}/transitions/preview`, { body: { kind: 'fork', run: claude, device: 'box-b' } });
+    expect(p.status, JSON.stringify(p.body)).toBe(200);
+    expect(p.body).toMatchObject({ kind: 'fork', runs_on: { id: 'box-b', name: 'Box B' } });
+  }, T.timeout);
+});

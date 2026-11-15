@@ -461,10 +461,15 @@ server.registerTool(
       effort: z.string().optional().describe("One of the model's effort levels. Omit for its default."),
       message: z.string().describe('The first message for the new thread. It reads it after the carryover, whole.'),
       attachments: z.array(z.string()).optional().describe('Names of files attached in the thread to carry into the new one. Omit to carry none.'),
+      device: z
+        .string()
+        .optional()
+        .describe(`Where the new thread runs: a synced machine by id or name from list_devices, or "here" for this machine. Omit to use ${USER}'s default from Settings.`),
     },
   },
-  async ({ thread_id, harness, model, effort, message, attachments }) => {
-    const run = { harness, model: model ?? '', effort: effort ?? '' };
+  async ({ thread_id, harness, model, effort, message, attachments, device }) => {
+    const machine = await deviceId(device);
+    const run = { harness, model: model ?? '', effort: effort ?? '', ...(machine && { device: machine }) };
     const previewOf = (picked?: string[]) => call(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify({ ...run, attachments: picked }) });
     let preview = await previewOf();
     if (attachments?.length) {

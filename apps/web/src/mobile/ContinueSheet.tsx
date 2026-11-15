@@ -17,11 +17,12 @@ import {
 } from '@omni/shared/continue-flow.ts';
 import { useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import { HarnessLogo, harnessLabel } from '../components/brand.tsx';
-import { BlockNote, ExactText, rowTone, useContinue } from '../components/ContinueSheet.tsx';
+import { BlockNote, ExactText, MACHINE_HINT, rowTone, useContinue } from '../components/ContinueSheet.tsx';
 import { Button, Chip, ErrorNote, Toggle } from '../components/ui.tsx';
 import { href } from '../router.ts';
 import { ModelSheet, runLabel } from './ModelSheet.tsx';
 import { MoEmpty, MoGroup, MoListRow, MoSection, MoSheet } from './parts.tsx';
+import { RunOnSheet } from './RunOnSheet.tsx';
 import { useShell } from './shell.tsx';
 
 const TITLE = 'Continue with another harness';
@@ -85,8 +86,10 @@ function Sheet({
   onClose: () => void;
   onStarted: (t: Thread) => void;
 }) {
-  const { s, dispatch, start, recheck, closeTerminal, closing } = useContinue(source, targets.offered, onStarted);
+  const { s, dispatch, start, recheck, closeTerminal, closing, machines } = useContinue(source, targets.offered, onStarted);
   const [picking, setPicking] = useState(false);
+  const [pickingMachine, setPickingMachine] = useState(false);
+  const machine = machines.rows?.find((r) => r.value === machines.pick);
   const { run } = s;
   const p = shownPreview(s.preview);
   const block = blockOf(s);
@@ -125,6 +128,24 @@ function Sheet({
               </p>
             ))}
           </MoSection>
+          {machines.rows && (
+            <MoSection title="Run on">
+              <MoGroup>
+                <MoListRow
+                  icon="monitor"
+                  label={machine?.label ?? 'Choose'}
+                  sub={machine?.sub}
+                  disabled={s.posting}
+                  onClick={() => {
+                    machines.reload();
+                    setPickingMachine(true);
+                  }}
+                  last
+                />
+              </MoGroup>
+              <p className="m-0 px-1 text-[12.5px] leading-[1.4] text-pretty text-fg-3">{MACHINE_HINT}</p>
+            </MoSection>
+          )}
           {p && p.carryover.attachments.length > 0 && (
             <MoSection title="Attachments">
               <MoGroup>
@@ -168,7 +189,7 @@ function Sheet({
               {s.preview.kind === 'failed' ? (
                 <ErrorNote onRetry={recheck}>{s.preview.error}</ErrorNote>
               ) : (
-                <p className="m-0 px-1 text-[13px] leading-[1.45] text-fg-3">{p ? workspaceText(p) : 'Building the preview'}</p>
+                <p className="m-0 px-1 text-[13px] leading-[1.45] text-fg-3">{p ? workspaceText(p, !!machines.rows) : 'Building the preview'}</p>
               )}
             </MoSection>
           )}
@@ -184,6 +205,7 @@ function Sheet({
           )}
         </div>
       </MoSheet>
+      {pickingMachine && machines.rows && <RunOnSheet rows={machines.rows} value={machines.pick} onChange={machines.setPick} onClose={() => setPickingMachine(false)} />}
       {picking && (
         <ModelSheet
           harnesses={targets.offered}

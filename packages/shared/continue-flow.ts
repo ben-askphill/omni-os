@@ -77,7 +77,8 @@ export function defaultRun(offered: readonly ContinueHarness[], sourceHarness: s
 
 /**
  * POST /threads/:id/continue's body. The request id is the last Start's while Ben retries the same one, so a retry
- * gets the same thread back; another message, run, set of attachments or preview gets a new id.
+ * gets the same thread back; another message, run, set of attachments, machine or preview gets a new id. `device` is
+ * the machine Ben picked; null sends none, so the server uses Settings > Threads' default.
  */
 export function startBody(
   run: Run,
@@ -86,8 +87,17 @@ export function startBody(
   last: PendingRequest | null,
   make?: () => string,
   attachments: readonly string[] = [],
+  device: string | null = null,
 ): { body: ContinueBody; attempt: PendingRequest } {
-  const fields = { harness: run.harness, model: run.model, effort: run.effort, attachments: [...new Set(attachments)].sort(), text: text.trim(), revision };
+  const fields = {
+    harness: run.harness,
+    model: run.model,
+    effort: run.effort,
+    attachments: [...new Set(attachments)].sort(),
+    ...(device === null ? {} : { device }),
+    text: text.trim(),
+    revision,
+  };
   const attempt = requestIdFor(last, JSON.stringify(fields), make);
   return { body: { ...fields, request_id: attempt.id }, attempt };
 }
@@ -140,6 +150,8 @@ export interface ContinueState {
   run: Run | null;
   /** The ids of the source's attachments Ben ticked. */
   picked: string[];
+  /** The machine Ben picked: a synced machine's id or "here". Null sends none: Settings > Threads' default. */
+  device: string | null;
   text: string;
   preview: PreviewState;
   /** Counts "check again": the same run's preview asked for anew. */
@@ -154,16 +166,20 @@ export type ContinueAction =
   | { type: 'pick'; run: Run }
   /** Tick or untick one attachment. */
   | { type: 'attach'; id: string }
+  /** The machine the new thread runs on. */
+  | { type: 'machine'; device: string | null }
   | { type: 'text'; text: string }
-  | { type: 'previewed'; run: Run; picked: string[]; preview: ContinuePreview }
-  | { type: 'previewFailed'; run: Run; picked: string[]; error: string }
+  /** `device` is the machine the preview was asked for, left out for none. */
+  | { type: 'previewed'; run: Run; picked: string[]; device?: string | null; preview: ContinuePreview }
+  | { type: 'previewFailed'; run: Run; picked: string[]; device?: string | null; error: string }
   | { type: 'recheck' }
   | { type: 'posting'; attempt: PendingRequest }
   | { type: 'refused'; error: StartError };
 
-export const initContinue = (run: Run | null): ContinueState => ({
+export const initContinue = (run: Run | null, device: string | null = null): ContinueState => ({
   run,
   picked: [],
+  device,
   text: '',
   preview: { kind: 'loading', last: null },
   asked: 0,
@@ -177,8 +193,9 @@ export const shownPreview = (p: PreviewState) => (p.kind === 'ready' ? p.preview
 
 const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id) => b.includes(id));
 
-/** Whether an answer is for what Ben has picked now: this run and these attachments. */
-const isPicked = (s: ContinueState, run: Run, picked: readonly string[]) => !!s.run && sameRun(s.run, run) && sameIds(s.picked, picked);
+/** Whether an answer is for what Ben has picked now: this run, these attachments and this machine. */
+const isPicked = (s: ContinueState, a: { run: Run; picked: readonly string[]; device?: string | null }) =>
+  !!s.run && sameRun(s.run, a.run) && sameIds(s.picked, a.picked) && (a.device ?? null) === s.device;
 
 function refuse(s: ContinueState, e: StartError): ContinueState {
   const done = { ...s, posting: false };
@@ -206,13 +223,16 @@ export function continueReducer(s: ContinueState, a: ContinueAction): ContinueSt
         preview: { kind: 'loading', last: shownPreview(s.preview) },
         refusal: null,
       };
+    case 'machine':
+      if (s.device === a.device) return s;
+      return { ...s, device: a.device, preview: { kind: 'loading', last: shownPreview(s.preview) }, refusal: null };
     case 'text':
       return { ...s, text: a.text };
-    // An answer for a run or a set of attachments Ben has since changed is dropped: the current one's is on its way.
+    // An answer for a run, a set of attachments or a machine Ben has since changed is dropped: the current one's is on its way.
     case 'previewed':
-      return isPicked(s, a.run, a.picked) ? { ...s, preview: { kind: 'ready', preview: a.preview } } : s;
+      return isPicked(s, a) ? { ...s, preview: { kind: 'ready', preview: a.preview } } : s;
     case 'previewFailed':
-      return isPicked(s, a.run, a.picked) ? { ...s, preview: { kind: 'failed', error: a.error } } : s;
+      return isPicked(s, a) ? { ...s, preview: { kind: 'failed', error: a.error } } : s;
     case 'recheck':
       return { ...s, preview: { kind: 'loading', last: shownPreview(s.preview) }, asked: s.asked + 1, refusal: null };
     case 'posting':
@@ -359,10 +379,14 @@ const WORKSPACE_TEXT: Record<ContinuePreview['workspace'], string> = {
   folder: "Starts in the channel's folder, as any new thread does.",
 };
 
-/** Where the new thread starts, and on which machine when Settings > Threads sends new threads to another one. */
-export const workspaceText = (p: Pick<ContinuePreview, 'workspace' | 'runs_on'>) => {
+/**
+ * Where the new thread starts, and on which machine when that is another one. `picked`: Ben chose the machine in the
+ * sheet, which shows it; otherwise it is where Settings > Threads sends new threads.
+ */
+export const workspaceText = (p: Pick<ContinuePreview, 'workspace' | 'runs_on'>, picked = false) => {
   const where = WORKSPACE_TEXT[p.workspace] ?? WORKSPACE_TEXT.folder;
-  return p.runs_on ? `${where} It runs on ${p.runs_on.name}, where Settings > Threads sends new threads.` : where;
+  if (!p.runs_on) return where;
+  return picked ? `${where} It runs on ${p.runs_on.name}.` : `${where} It runs on ${p.runs_on.name}, where Settings > Threads sends new threads.`;
 };
 
 // ---------- links ----------

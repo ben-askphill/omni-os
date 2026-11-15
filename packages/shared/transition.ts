@@ -22,18 +22,21 @@ export interface Party {
   name: string;
 }
 
-/** POST /api/threads/:id/transitions/preview. A fork's preview needs only the run and the picked attachments. */
+/**
+ * POST /api/threads/:id/transitions/preview. A fork's preview needs only the run, the picked attachments and, when
+ * picked, the machine it runs on (a synced machine's id or "here"; left out, Settings > Threads' default).
+ */
 export type TransitionPreviewRequest =
   | { kind: 'reconfigure'; run: Run }
   | { kind: 'relocate'; to: string }
-  | { kind: 'fork'; run: Run; attachments?: string[] };
+  | { kind: 'fork'; run: Run; attachments?: string[]; device?: string };
 
 /** POST /api/threads/:id/transitions. A fork also carries the first message, the client's request id and the preview's revision. */
 export type TransitionRequest =
   | { kind: 'reconfigure'; run: Run }
   /** A synced machine's id from GET /api/devices, or "here" to take the thread over from the machine that holds it. */
   | { kind: 'relocate'; to: string }
-  | { kind: 'fork'; run: Run; attachments?: string[]; text: string; request_id: string; revision: string };
+  | { kind: 'fork'; run: Run; attachments?: string[]; device?: string; text: string; request_id: string; revision: string };
 
 export type TransitionPreview =
   | {

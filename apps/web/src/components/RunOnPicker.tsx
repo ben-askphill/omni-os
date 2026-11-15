@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Device } from '@omni/shared/handoff.ts';
-import { GROK_BOT, newThreadPick, newThreadRows, offersRunOn, runOnRequest, runOnRows, runOnSetting, settingPick, type RunOnRow } from '@omni/shared/thread-machine.ts';
+import { forkMachine, GROK_BOT, newThreadPick, newThreadRows, offersRunOn, runOnRequest, runOnRows, runOnSetting, settingPick, type RunOnRow } from '@omni/shared/thread-machine.ts';
 import { api, errorText, useApi, type SetupState } from '../api.ts';
 import { useApp, useHereName } from '../store.tsx';
 import { MachineChip, machineOptions } from './composer/MachineChip.tsx';
@@ -22,6 +22,23 @@ export function useRunOn() {
   const rows = useMemo(() => newThreadRows(list, { grokBot: grokBotSet, hereName }), [list, grokBotSet, hereName]);
   const grokBot = pick === GROK_BOT;
   return { rows, pick, setPick: setPicked, grokBot, request: grokBot ? {} : runOnRequest(pick, list), reload: devices.reload };
+}
+
+/**
+ * The Fork dialog's Run on (shared/thread-machine.ts forkMachine): synced machines only, no Grok Bot, hidden with no
+ * other machine. `device` is what the fork sends, null for Settings' default. `settled` once /devices and /setup have
+ * answered (or failed), so the first preview is asked for the machine it will start on.
+ */
+export function useForkMachine() {
+  const devices = useApi<Device[]>('/devices');
+  const setup = useApi<SetupState>('/setup');
+  const hereName = useHereName();
+  const [picked, setPicked] = useState<string | null>(null);
+  const settingKnown = setup.data !== undefined;
+  const setting = setup.data?.config.runOn?.device;
+  const m = useMemo(() => forkMachine(devices.data, setting, picked, { settingKnown, hereName }), [devices.data, setting, picked, settingKnown, hereName]);
+  const settled = (devices.data !== undefined || !!devices.error) && (settingKnown || !!setup.error);
+  return { ...m, setPick: setPicked, reload: devices.reload, settled };
 }
 
 export const runOnOptions = machineOptions;

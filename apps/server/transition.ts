@@ -49,7 +49,7 @@ export async function previewTransition(threadId: string, req: TransitionPreview
     case 'relocate':
       return previewRelocate(threadId, req.to);
     case 'fork':
-      return { kind: 'fork', ...(await previewContinue(threadId, req.run, req.attachments ?? [])) };
+      return { kind: 'fork', ...(await previewContinue(threadId, req.run, req.attachments ?? [], req.device)) };
   }
 }
 
@@ -97,6 +97,7 @@ export async function createTransition(threadId: string, req: TransitionRequest)
       const { thread, duplicate } = await startContinue(threadId, {
         ...req.run,
         attachments: req.attachments,
+        device: req.device,
         text: req.text,
         request_id: req.request_id,
         revision: req.revision,
@@ -106,7 +107,7 @@ export async function createTransition(threadId: string, req: TransitionRequest)
         thread_id: threadId,
         kind: 'fork',
         state: 'started',
-        request: { run: req.run, request_id: req.request_id },
+        request: { run: req.run, request_id: req.request_id, ...(req.device && { device: req.device }) },
         result: { thread_id: thread.id },
       });
       return { ...view(row, mustExist(threadId)), fork: { thread, duplicate } };

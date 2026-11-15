@@ -74,6 +74,8 @@ export interface CarryoverInput {
   attachments: CarryoverAttachment[];
   /** The source's uploads folder as stored and resolved. A path into it names nothing the new thread can read. */
   uploads?: string[];
+  /** The machines, by name, when the continued thread runs on another one than the source. */
+  machine?: { from: string; to: string } | null;
   budget?: number;
 }
 
@@ -212,6 +214,9 @@ export function buildCarryover(i: CarryoverInput): { carryover: Carryover; body:
     `Channel: #${i.source.channel}`,
     ...(i.role ? [`Crew role: ${i.role}`] : []),
     workspaceLine(ws, head),
+    ...(i.machine
+      ? [`Machine: you run on ${neutral(i.machine.to)}. The source ran on ${neutral(i.machine.from)}, so anything it had there outside its checkout, such as a running server or files outside the repo, is not on yours.`]
+      : []),
     ...(!('paths' in ws)
       ? []
       : ["Paths from the source's checkout are shown relative to its root. Your working directory is your own checkout of the same repo; never write to the source thread's checkout."]),

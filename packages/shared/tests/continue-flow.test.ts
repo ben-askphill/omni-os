@@ -296,6 +296,39 @@ describe('the sheet', () => {
   });
 });
 
+describe('the machine the fork runs on', () => {
+  it("opens on Settings' default, sending no machine, until Ben picks one", () => {
+    const s = initContinue(CODEX);
+    expect(s.device).toBeNull();
+    expect(startBody(CODEX, 'go', 'r1', null, () => 'id-a').body).not.toHaveProperty('device');
+  });
+
+  it('asks for a new preview when Ben picks a machine, and drops one that answers another machine', () => {
+    let s = continueReducer(initContinue(CODEX), { type: 'previewed', run: CODEX, picked: [], preview: preview('r1') });
+    s = continueReducer(s, { type: 'machine', device: 'box-b' });
+    expect(s).toMatchObject({ device: 'box-b', preview: { kind: 'loading', last: preview('r1') } });
+    expect(continueReducer(s, { type: 'machine', device: 'box-b' })).toBe(s);
+    expect(continueReducer(s, { type: 'previewed', run: CODEX, picked: [], preview: preview('stale') }), 'an answer for no machine').toBe(s);
+    expect(continueReducer(s, { type: 'previewed', run: CODEX, picked: [], device: 'here', preview: preview('stale') })).toBe(s);
+    expect(continueReducer(s, { type: 'previewFailed', run: CODEX, picked: [], device: 'here', error: 'gone' })).toBe(s);
+    s = continueReducer(s, { type: 'previewed', run: CODEX, picked: [], device: 'box-b', preview: preview('r2', { runs_on: { id: 'box-b', name: 'Box B' } }) });
+    expect(s.preview).toMatchObject({ kind: 'ready', preview: { revision: 'r2' } });
+    expect(canStart({ ...s, text: 'go' })).toBe(true);
+  });
+
+  it('sends the picked machine, and another machine gets a new request id', () => {
+    const one = startBody(CODEX, 'go', 'r1', null, () => 'id-a', [], 'box-b');
+    expect(one.body).toMatchObject({ device: 'box-b', request_id: 'id-a' });
+    expect(startBody(CODEX, 'go', 'r1', one.attempt, () => 'id-b', [], 'box-b').body.request_id).toBe('id-a');
+    expect(startBody(CODEX, 'go', 'r1', one.attempt, () => 'id-b', [], 'here').body.request_id).toBe('id-b');
+  });
+
+  it('names the picked machine without pointing at Settings', () => {
+    expect(workspaceText({ workspace: 'worktree', runs_on: { id: 'box-b', name: 'Box B' } }, true)).toMatch(/new branch and worktree.* It runs on Box B\.$/);
+    expect(workspaceText({ workspace: 'worktree', runs_on: null }, true)).not.toMatch(/runs on/);
+  });
+});
+
 describe("the preview's sections", () => {
   it('lists each section that has something, in reading order', () => {
     expect(previewSections(carryover()).map((s) => s.title)).toEqual(['Goal', 'Constraints']);

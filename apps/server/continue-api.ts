@@ -14,12 +14,14 @@ const runSchema = z.object({
   effort: z.string().max(100).nullish().transform((v) => v ?? ''),
   // The ids of the source's attachments Ben picked (`CarryoverAttachment.id`). None unless he picks.
   attachments: z.array(z.string().min(1).max(200)).max(200).optional(),
+  // The machine Ben picked: a synced machine's id, or "here". Left out, Settings > Threads' default.
+  device: z.string().min(1).max(200).optional(),
 });
 
 /** The Carryover the picked run would read, the revision a start must name, and what keeps the thread from it now. */
 continueApi.post('/:id/continue/preview', async (c) => {
-  const { attachments, ...run } = runSchema.parse(await c.req.json().catch(() => ({})));
-  const { kind: _kind, ...preview } = await previewTransition(c.req.param('id'), { kind: 'fork', run, attachments });
+  const { attachments, device, ...run } = runSchema.parse(await c.req.json().catch(() => ({})));
+  const { kind: _kind, ...preview } = await previewTransition(c.req.param('id'), { kind: 'fork', run, attachments, device });
   return c.json(preview);
 });
 
@@ -36,9 +38,9 @@ const startSchema = runSchema.extend({
  * the fresh `preview`, or `request_reused`.
  */
 continueApi.post('/:id/continue', async (c) => {
-  const { harness, model, effort, attachments, text, request_id, revision } = startSchema.parse(await c.req.json().catch(() => ({})));
+  const { harness, model, effort, attachments, device, text, request_id, revision } = startSchema.parse(await c.req.json().catch(() => ({})));
   try {
-    const t = await createTransition(c.req.param('id'), { kind: 'fork', run: { harness, model, effort }, attachments, text, request_id, revision });
+    const t = await createTransition(c.req.param('id'), { kind: 'fork', run: { harness, model, effort }, attachments, device, text, request_id, revision });
     return c.json({ thread: t.fork!.thread, duplicate: !!t.fork!.duplicate });
   } catch (err) {
     if (err instanceof ContinueRefused) return c.json(err.body, 409);

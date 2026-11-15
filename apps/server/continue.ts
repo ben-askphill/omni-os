@@ -11,7 +11,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
 import { continueRefusal, continueSourceRefusal, type CarriedStats, type CarryoverFile, type ContinueBlock, type ContinueBody, type ContinueLink, type ContinuePreview } from '@omni/shared/continue.ts';
 import type { Run, RunName } from '@omni/shared/run-switch.ts';
-import { channels, continuations, events, messageRequests, threadBases, threads, tx, type SkippedFile, type Thread, type ThreadBase } from './db.ts';
+import { channels, continuations, events, messageRequests, outbox, threadBases, threads, tx, type SkippedFile, type Thread, type ThreadBase } from './db.ts';
 import { buildCarryover, carriedStats, historyText, type CarryoverP } from './carryover.ts';
 import { copyAttachments, planAttachments, planSignature, type AttachmentPlan } from './continue-attachments.ts';
 import { changesCheckout, defaultBranch, git, gitOr, parseNameStatus, real, threadBase } from './changes.ts';
@@ -24,7 +24,8 @@ import { resumeRequests } from './runner/api.ts';
 import { failSetup, saveStart, setUpThread } from './runner/setup.ts';
 import { sendNewThread } from './handoff.ts';
 import { packTree } from './handoff/worktree.ts';
-import { assignRouted } from './ownership.ts';
+import { assignRouted, holderOf } from './ownership.ts';
+import { deviceName, ownName } from './sync/devices.ts';
 import { targetFor } from './run-on.ts';
 import type { Mac } from './runner/ports.ts';
 import { sendSaved } from './sync/files.ts';
@@ -204,7 +205,7 @@ interface Captured {
 const WORKSPACE: Record<Checkout['kind'], ContinuePreview['workspace']> = { snapshot: 'worktree', head: 'worktree', branch: 'branch', gone: 'fresh', folder: 'folder' };
 
 /** The source as the continued thread would start from it now, and the preview of that. */
-async function capture(sourceId: string, to: RunName, picked: readonly string[]): Promise<Captured> {
+async function capture(sourceId: string, to: RunName, picked: readonly string[], route: Route | null): Promise<Captured> {
   const source = threads.get(sourceId);
   if (!source) throw refusal('thread not found', 404);
   const blocked = sourceBlock(source);
@@ -237,6 +238,7 @@ async function capture(sourceId: string, to: RunName, picked: readonly string[])
     parked: messageRequests.parked(sourceId).map((r) => (typeof r.payload?.text === 'string' ? r.payload.text : r.prompt)),
     attachments: plan.items,
     uploads: [uploadsDir(sourceId), real(uploadsDir(sourceId))],
+    machine: machinesOf(sourceId, route),
   });
   const revision = createHash('sha256')
     .update(JSON.stringify([events.uidOf(guard) ?? guard, repo?.head ?? '', repo?.tree ?? '', body, planSignature(plan)]))
@@ -251,28 +253,50 @@ async function capture(sourceId: string, to: RunName, picked: readonly string[])
   };
 }
 
+type Route = { from: Mac; to: Mac };
+
 /**
- * Where a new thread goes: Settings > Threads' "Run new threads on", as for a thread started from the composer. A
- * machine that cannot take it now (offline, or sync off) is a block, so the preview says why before Ben writes.
+ * The Carryover's `Machine:` line: the machine the source ran on (the one that holds it, else this one) and the one the
+ * fork runs on, by name. Null when they are the same, or with sync off, where every thread is this machine's.
  */
-async function machineFor(): Promise<{ route: { from: Mac; to: Mac } | null; block: ContinueBlock | null }> {
+function machinesOf(sourceId: string, route: Route | null): { from: string; to: string } | null {
+  const self = outbox.machineId();
+  if (!self) return null;
+  const ran = holderOf(sourceId) ?? self;
+  const runs = route?.to.id ?? self;
+  if (ran === runs) return null;
+  const name = (id: string) => (id === self ? ownName(self) : (deviceName(id) ?? 'another machine'));
+  return { from: name(ran), to: route ? route.to.name : name(self) };
+}
+
+/**
+ * Where the new thread goes: the machine Ben picked in the Fork dialog (`device`, a synced machine's id or "here"),
+ * else Settings > Threads' "Run new threads on", as for a thread started from the composer. A machine that cannot
+ * take it now (offline, not synced, or sync off) is a block, so the preview says why before Ben writes.
+ */
+async function machineFor(device: string | undefined): Promise<{ route: Route | null; block: ContinueBlock | null }> {
   try {
-    return { route: await targetFor(undefined), block: null };
+    return { route: await targetFor(device), block: null };
   } catch (err) {
     return { route: null, block: { code: 'machine', message: (err as Error).message } };
   }
 }
 
 /** POST /api/threads/:id/continue/preview: the Carryover for this run, whether the thread can be continued now, and where. */
-export async function previewContinue(sourceId: string, run: Run, attachments: readonly string[] = []): Promise<ContinuePreview> {
+export async function previewContinue(sourceId: string, run: Run, attachments: readonly string[] = [], device?: string): Promise<ContinuePreview> {
   if (!threads.get(sourceId)) throw refusal('thread not found', 404);
-  const [{ preview }, machine] = await Promise.all([capture(sourceId, await targetRun(run), attachments), machineFor()]);
+  const to = await targetRun(run);
+  // The Carryover says which machine it runs on, so the machine is known before the capture.
+  const machine = await machineFor(device);
+  const { preview } = await capture(sourceId, to, attachments, machine.route);
   return { ...preview, blocked: preview.blocked ?? machine.block, runs_on: machine.route?.to ?? null };
 }
 
-/** The same message on the same run hashes the same. */
+/** The same message on the same run, to the same machine, hashes the same. A start that names no machine hashes as before machines could be picked. */
 const fingerprintOf = (b: ContinueBody) =>
-  createHash('sha256').update(JSON.stringify([b.text, b.harness, b.model, b.effort, [...new Set(b.attachments ?? [])].sort()])).digest('hex');
+  createHash('sha256')
+    .update(JSON.stringify([b.text, b.harness, b.model, b.effort, [...new Set(b.attachments ?? [])].sort(), ...(b.device === undefined ? [] : [b.device])]))
+    .digest('hex');
 
 /** The thread a start with this request id made before, or a 409 when the id went with another message or run. */
 function startedBefore(sourceId: string, requestId: string, fingerprint: string): { thread: Thread; duplicate: true } | null {
@@ -298,11 +322,11 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   const again = startedBefore(sourceId, body.request_id, fingerprint);
   if (again) return again;
   const to = await targetRun(body);
-  const { route, block } = await machineFor();
+  const { route, block } = await machineFor(body.device);
   if (block) throw busy(block);
   const idle = sourceBlock(threads.get(sourceId) ?? first);
   if (idle) throw busy(idle);
-  const cap = await capture(sourceId, to, body.attachments ?? []);
+  const cap = await capture(sourceId, to, body.attachments ?? [], route);
   if (cap.preview.blocked) throw busy(cap.preview.blocked);
   if (cap.preview.revision !== body.revision) throw changed(cap.preview);
 
@@ -372,7 +396,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   if (!made) {
     discard();
     if (lost) throw busy(lost);
-    throw changed((await capture(sourceId, to, body.attachments ?? [])).preview);
+    throw changed({ ...(await capture(sourceId, to, body.attachments ?? [], route)).preview, runs_on: route?.to ?? null });
   }
 
   emitThread(id);
@@ -387,7 +411,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
 }
 
 /**
- * Send a fork made here to the machine Settings names, as a new thread's offer: its files in Storage and, for repo
+ * Send a fork made here to the machine Ben picked or Settings names, as a new thread's offer: its files in Storage and, for repo
  * work, the source's checkout as a worktree bundle (the source's HEAD, its changes on top), which that machine lays out
  * before its setup runs. Nothing is laid out here. When the send fails, the fork stays here with its first message
  * kept, as a new thread the other machine could not take does (handoff.ts restoreFresh).

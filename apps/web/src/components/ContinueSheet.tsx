@@ -27,30 +27,42 @@ import {
 } from '@omni/shared/continue-flow.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import { href, navigate } from '../router.ts';
+import { MachineChip } from './composer/MachineChip.tsx';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
+import { useForkMachine } from './RunOnPicker.tsx';
 import { Button, Chip, ErrorNote, Icon, IconButton, Label, Loading, Modal, Toggle, type ChipTone } from './ui.tsx';
 import { ModalFooter } from './ui/modal.tsx';
 import { MOD_KEY } from './ui/overlay.tsx';
 
 /**
- * One continue sheet's state, for the desktop and the phone: the picked run's preview, asked again whenever the run
- * changes or Ben checks again, and Start. `onStarted` gets the new thread.
+ * One continue sheet's state, for the desktop and the phone: the picked run and machine's preview, asked again whenever
+ * either changes or Ben checks again, and Start. `onStarted` gets the new thread. `machines` is the sheet's Run on:
+ * synced machines only, opening on Settings > Threads' default, with rows null while there is no other machine.
  */
 export function useContinue(source: ContinueSource, offered: HarnessWithRunning[], onStarted: (t: Thread) => void) {
   const [s, dispatch] = useReducer(continueReducer, offered, (o) => initContinue(defaultRun(o, source.harness)));
-  const { run, picked, asked } = s;
+  const machines = useForkMachine();
+  // Null sends no machine: nothing to pick, or Settings' default not known yet. The server applies the default then.
+  const device = machines.device;
   useEffect(() => {
-    if (!run) return;
+    if (machines.settled) dispatch({ type: 'machine', device });
+  }, [machines.settled, device]);
+  const { run, picked, asked } = s;
+  // The first preview waits for the machine, so the sheet does not ask twice as it opens.
+  const ready = machines.settled && s.device === device;
+  const at = s.device;
+  useEffect(() => {
+    if (!run || !ready) return;
     // A later ask replaces this one: its answer, if it comes last, is stale.
     let alive = true;
     api
-      .post<ContinuePreview>(`/threads/${encodeURIComponent(source.id)}/continue/preview`, { ...run, attachments: picked })
-      .then((preview) => alive && dispatch({ type: 'previewed', run, picked, preview }))
-      .catch((e) => alive && dispatch({ type: 'previewFailed', run, picked, error: errorText(e) }));
+      .post<ContinuePreview>(`/threads/${encodeURIComponent(source.id)}/continue/preview`, { ...run, attachments: picked, ...(at === null ? {} : { device: at }) })
+      .then((preview) => alive && dispatch({ type: 'previewed', run, picked, device: at, preview }))
+      .catch((e) => alive && dispatch({ type: 'previewFailed', run, picked, device: at, error: errorText(e) }));
     return () => {
       alive = false;
     };
-  }, [source.id, run, picked, asked]);
+  }, [source.id, run, picked, asked, at, ready]);
 
   const [closing, setClosing] = useState(false);
   const closeTerminal = async () => {
@@ -67,7 +79,7 @@ export function useContinue(source: ContinueSource, offered: HarnessWithRunning[
 
   const start = async () => {
     if (!canStart(s) || !s.run || s.preview.kind !== 'ready') return;
-    const { body, attempt } = startBody(s.run, s.text, s.preview.preview.revision, s.attempt, undefined, s.picked);
+    const { body, attempt } = startBody(s.run, s.text, s.preview.preview.revision, s.attempt, undefined, s.picked, s.device);
     dispatch({ type: 'posting', attempt });
     try {
       const res = await api.post<{ thread: Thread; duplicate: boolean }>(`/threads/${encodeURIComponent(source.id)}/continue`, body);
@@ -76,7 +88,7 @@ export function useContinue(source: ContinueSource, offered: HarnessWithRunning[
       dispatch({ type: 'refused', error: startError(e) });
     }
   };
-  return { s, dispatch, start, recheck: () => dispatch({ type: 'recheck' }), closeTerminal, closing };
+  return { s, dispatch, start, recheck: () => dispatch({ type: 'recheck' }), closeTerminal, closing, machines };
 }
 
 /** Why the source cannot be continued yet, with Retry, and "Close terminal" when an open shell is why. */
@@ -141,7 +153,7 @@ export function ContinueSheet({ source, onClose }: { source: ContinueSource; onC
 }
 
 function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: ContinueSource; targets: ContinueTargets<HarnessWithRunning>; onPickerOpen: () => void; onClose: () => void }) {
-  const { s, dispatch, start, recheck, closeTerminal, closing } = useContinue(source, targets.offered, (t) => {
+  const { s, dispatch, start, recheck, closeTerminal, closing, machines } = useContinue(source, targets.offered, (t) => {
     onClose();
     navigate(href.thread(t.id));
   });
@@ -185,6 +197,12 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
               </ul>
             )}
           </div>
+          {machines.rows && (
+            <div>
+              <Label hint={MACHINE_HINT}>Run on</Label>
+              <MachineChip rows={machines.rows} value={machines.pick} onChange={machines.setPick} disabled={s.posting} />
+            </div>
+          )}
           {files && files.attachments.length > 0 && (
             <div>
               <Label hint={attachmentsSummary(files)}>Attachments</Label>
@@ -214,7 +232,7 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
           </div>
           {note && <ErrorNote>{note}</ErrorNote>}
         </div>
-        {run && <PreviewPane s={s} onRecheck={recheck} onCloseTerminal={() => void closeTerminal()} closing={closing} />}
+        {run && <PreviewPane s={s} picked={!!machines.rows} onRecheck={recheck} onCloseTerminal={() => void closeTerminal()} closing={closing} />}
       </div>
       <ModalFooter hint={{ keys: [MOD_KEY, '↵'], label: 'start' }}>
         <Button variant="secondary" onClick={onClose}>
@@ -249,7 +267,10 @@ export function AttachmentList({ files, disabled, onToggle }: { files: Pick<Carr
   );
 }
 
-function PreviewPane({ s, onRecheck, onCloseTerminal, closing }: { s: ContinueState; onRecheck: () => void; onCloseTerminal: () => void; closing: boolean }) {
+/** Under the dialog's machine picker, on the desktop and the phone. */
+export const MACHINE_HINT = 'Settings > Threads picks it unless you change it here. Replies and Stop follow the thread wherever it runs.';
+
+function PreviewPane({ s, picked, onRecheck, onCloseTerminal, closing }: { s: ContinueState; picked: boolean; onRecheck: () => void; onCloseTerminal: () => void; closing: boolean }) {
   const p = shownPreview(s.preview);
   const block = blockOf(s);
   const loading = s.preview.kind === 'loading';
@@ -264,7 +285,7 @@ function PreviewPane({ s, onRecheck, onCloseTerminal, closing }: { s: ContinueSt
       {loading && !p && <Loading label="Building the preview" />}
       {p && (
         <div aria-busy={loading || undefined} className={`flex flex-col gap-3 transition-opacity ${loading ? 'opacity-50' : ''}`}>
-          <p className="px-1 text-[12.5px] leading-snug text-fg-3">{workspaceText(p)}</p>
+          <p className="px-1 text-[12.5px] leading-snug text-fg-3">{workspaceText(p, picked)}</p>
           {previewSections(p.carryover).map((sec) => (
             <SectionView key={sec.id} section={sec} />
           ))}

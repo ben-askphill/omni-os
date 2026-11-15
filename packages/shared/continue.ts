@@ -127,7 +127,8 @@ export interface ContinuePreview {
   workspace: 'worktree' | 'branch' | 'fresh' | 'folder';
   blocked: ContinueBlock | null;
   /**
-   * The other machine the new thread will run on: Settings > Threads' "Run new threads on". Null when it runs here.
+   * The other machine the new thread will run on: the one the request picked (`device`), else Settings > Threads' "Run
+   * new threads on". Null when it runs here.
    * Left out by a server older than this field.
    */
   runs_on?: { id: string; name: string } | null;
@@ -140,6 +141,8 @@ export interface ContinueBody {
   effort: string;
   /** The ids of the source's attachments Ben picked (`CarryoverAttachment.id`). None by default. */
   attachments?: string[];
+  /** The machine the new thread runs on: a synced machine's id, or "here". Left out, Settings > Threads' default. */
+  device?: string;
   text: string;
   /** The client's id for this start, kept across retries: a retry gets the same thread back. */
   request_id: string;
