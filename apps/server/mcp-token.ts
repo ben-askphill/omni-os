@@ -99,11 +99,13 @@ export async function verifyMcpToken(token: string, input: VerifyInput): Promise
   if (aud.some((a) => mine.has(a))) via = 'audience';
   else if (status === 'approved') via = 'client';
   if (!via) {
+    // What the token named, so the next report says whether the client sent a resource at all. URLs, never secrets.
+    const named = aud.length ? `names ${aud.slice(0, 3).map((a) => a.slice(0, 200)).join(', ')}` : 'names no resource';
     return refuse(
       'unbound',
       client
-        ? `The OAuth client ${client} is not approved for this Omni. Approve it in Settings, Sharing & access, then reconnect`
-        : 'Access token names neither this Omni nor an OAuth client. Reconnect the client',
+        ? `The OAuth client ${client} is not approved for this Omni yet (its access token ${named}, not ${input.resources[0] ?? "this Omni's /mcp URL"}). Signing in again gives the same answer. Omni's owner can approve it in Settings, Sharing & access, MCP clients, and this token then works as it is`
+        : `Access token names neither this Omni nor an OAuth client (it ${named}). Reconnect the client`,
       client,
     );
   }

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import type { Server } from 'node:http';
@@ -332,23 +332,25 @@ describe('/mcp: Google sign-in through Clerk', () => {
   it("refuses an owner token issued to another app on the shared Clerk instance, and says which client to approve (S1)", async () => {
     const token = clerk.jwtAccessToken(OWNER, { client: 'client_other_app' });
     const res = await listTools(token);
-    expect(res.status).toBe(401);
-    expect(res.headers.get('www-authenticate')).toMatch(/invalid_token/);
-    expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(/client_other_app is not approved/);
+    // 403, not 401 invalid_token: signing in again would only bring another token like this one.
+    expect(res.status).toBe(403);
+    expect(res.headers.get('www-authenticate')).toBeNull();
+    expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(/client_other_app is not approved .*names no resource/);
     const wrongAud = await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_other_app', aud: 'https://other-app.example/api' }));
-    expect(wrongAud.status).toBe(401);
+    expect(wrongAud.status).toBe(403);
+    expect(((await wrongAud.json()) as { error: { message: string } }).error.message).toMatch(/names https:\/\/other-app\.example\/api/);
     const list = (await (await api('GET', '/mcp/clients')).json()) as { id: string; status: string }[];
     expect(list.find((c) => c.id === 'client_other_app')).toMatchObject({ status: 'pending' });
   });
 
   it('takes an approved client without an audience, and refuses a removed one even with it', async () => {
     const token = clerk.jwtAccessToken(OWNER, { client: 'client_approved' });
-    expect((await listTools(token)).status).toBe(401);
+    expect((await listTools(token)).status).toBe(403);
     expect(await (await api('POST', '/mcp/clients/client_approved/approve')).json()).toMatchObject({ id: 'client_approved', status: 'approved' });
     expect((await listTools(token)).status).toBe(200);
     expect((await api('DELETE', '/mcp/clients/client_approved')).status).toBe(200);
-    expect((await listTools(token)).status).toBe(401);
-    expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_approved', aud: RESOURCE }))).status).toBe(401);
+    expect((await listTools(token)).status).toBe(403);
+    expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_approved', aud: RESOURCE }))).status).toBe(403);
   });
 
   it('lists a client whose bound token got in as bound, not approved', async () => {
@@ -357,25 +359,72 @@ describe('/mcp: Google sign-in through Clerk', () => {
     expect(list.find((c) => c.id === 'client_bound')).toMatchObject({ status: 'bound', via: 'audience' });
     wireFixture('mcp-clients.json', list);
     // Bound is not approved: the same client's token without the audience still waits for Ben.
-    expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_bound' }))).status).toBe(401);
+    expect((await listTools(clerk.jwtAccessToken(OWNER, { client: 'client_bound' }))).status).toBe(403);
   });
 
   it('takes a loopback audience only from a request straight from this machine', async () => {
     const token = clerk.jwtAccessToken(OWNER, { client: 'client_loop', aud: RESOURCE });
     expect((await listTools(token, '/mcp')).status).toBe(200);
     const viaTunnel = await post('/mcp', 'tools/list', {}, { authorization: `Bearer ${token}`, 'cf-connecting-ip': '203.0.113.9', 'x-forwarded-for': '203.0.113.9' });
-    expect(viaTunnel.status).toBe(401);
+    expect(viaTunnel.status).toBe(403);
   });
 
   it('takes no audience from the Host a request names', async () => {
     const token = clerk.jwtAccessToken(OWNER, { client: 'client_hosty', aud: 'https://omni.example.com/mcp' });
-    expect((await listTools(token)).status).toBe(401);
+    expect((await listTools(token)).status).toBe(403);
     process.env.OMNI_MCP_PUBLIC_URL = 'https://omni.example.com';
     try {
       expect((await listTools(token)).status).toBe(200);
     } finally {
       delete process.env.OMNI_MCP_PUBLIC_URL;
     }
+  });
+
+  describe('a sign-in through the public URL, from issue to the first call', () => {
+    const PUBLIC = 'https://mcp.example.com';
+    const tunnel = { host: 'mcp.example.com', 'cf-connecting-ip': '203.0.113.9', 'x-forwarded-for': '203.0.113.9' };
+    beforeAll(() => {
+      process.env.OMNI_MCP_PUBLIC_URL = PUBLIC;
+    });
+    afterAll(() => {
+      delete process.env.OMNI_MCP_PUBLIC_URL;
+    });
+
+    /** What an MCP client does: read the resource from the metadata, sign in, swap the code at Clerk's token endpoint. */
+    const signIn = async (client: string, resource: (fromMetadata: string) => string | null) => {
+      const meta = (await (await get('/.well-known/oauth-protected-resource/mcp', tunnel)).json()) as { resource: string; authorization_servers: string[] };
+      const named = resource(meta.resource);
+      const code = clerk.authorize(OWNER, client);
+      const body = new URLSearchParams({ grant_type: 'authorization_code', code, client_id: client, ...(named ? { resource: named } : {}) });
+      const res = await clerk.fetch(`${meta.authorization_servers[0]}/oauth/token`, { method: 'POST', body: body.toString() });
+      return ((await res.json()) as { access_token: string }).access_token;
+    };
+    const call = (token: string) => post('/mcp', 'tools/list', {}, { ...tunnel, authorization: `Bearer ${token}` });
+
+    it('takes the token at once when the client sends the resource the metadata names', async () => {
+      expect((await call(await signIn('client_rt_spec', (r) => r))).status).toBe(200);
+    });
+
+    it("takes it when the client names the server's origin as its resource instead", async () => {
+      expect((await call(await signIn('client_rt_origin', (r) => new URL(r).origin))).status).toBe(200);
+      expect((await call(await signIn('client_rt_slash', (r) => `${new URL(r).origin}/`))).status).toBe(200);
+    });
+
+    it('holds a token without a resource with a 403 until Ben approves its client, then takes the same token', async () => {
+      const token = await signIn('client_rt_none', () => null);
+      const first = await call(token);
+      expect(first.status).toBe(403);
+      expect(((await first.json()) as { error: { message: string } }).error.message).toMatch(/client_rt_none is not approved .*names no resource, not https:\/\/mcp\.example\.com\/mcp/);
+      // Signing in again brings the same kind of token, and the same answer.
+      expect((await call(await signIn('client_rt_none', () => null))).status).toBe(403);
+      await api('POST', '/mcp/clients/client_rt_none/approve');
+      expect((await call(token)).status).toBe(200);
+    });
+
+    it("still refuses a token for another install's URL", async () => {
+      expect((await call(await signIn('client_rt_other', () => 'https://mcp.someone-else.example/mcp'))).status).toBe(403);
+      expect((await call(await signIn('client_rt_other_origin', () => 'https://mcp.someone-else.example'))).status).toBe(403);
+    });
   });
 
   it('refuses an opaque token with a reconnect message, unless OMNI_MCP_ALLOW_OPAQUE brings back the subject check', async () => {

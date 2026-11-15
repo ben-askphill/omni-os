@@ -90,7 +90,9 @@ export function mcpApi(request: (path: string, init: RequestInit) => Response | 
       try {
         const verdict = await mcpTokenVerdict(bearer, directFromThisMac(c));
         if (verdict?.ok) return answer(c.req.raw);
-        // A real owner token for a client this install does not take: say why, so the client's user can approve or reconnect.
+        // A valid token from a client Ben has not approved: 403, since a 401 invalid_token sends the client through
+        // sign-in again for another token just like it. The token works as it is once Ben approves the client.
+        if (verdict && !verdict.ok && verdict.client && (verdict.kind === 'unbound' || verdict.kind === 'removed')) return refuse(`Forbidden: ${verdict.reason}`, 403);
         if (verdict && verdict.kind !== 'invalid') return challenge(c, true, verdict.reason);
       } catch (err) {
         if (err instanceof ClerkUnreachable) return refuse(`Could not check the sign-in: ${err.message}. Try again shortly`, 503, { 'retry-after': '10' });

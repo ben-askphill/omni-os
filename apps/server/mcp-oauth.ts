@@ -98,16 +98,18 @@ async function cachedSub(issuer: string, token: string, now: number): Promise<st
  * This install's /mcp resource URLs, never from what a request names: the configured public URL, this machine's
  * Connect hostname and its own MagicDNS name (`tailnetName`, from Tailscale). Loopback on this port only for a request
  * straight from this machine (`local`): every install answers on that URL, so a token naming it says nothing about
- * which one it is for.
+ * which one it is for. Each comes with and without `/mcp`: the metadata names the `/mcp` URL, but a client may send
+ * the server's origin as its RFC 8707 resource instead (the MCP spec takes either as canonical), and that names this
+ * install just as well.
  */
 export function mcpResources(local: boolean, tailnetName: string | null = null): string[] {
-  const out = new Set<string>(local ? [`http://127.0.0.1:${config.port}/mcp`, `http://localhost:${config.port}/mcp`] : []);
+  const bases = local ? [`http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`] : [];
   const configured = resolved.mcpPublicUrl();
-  if (configured) out.add(`${configured}/mcp`);
+  if (configured) bases.push(configured);
   const connect = connectHostname();
-  if (connect) out.add(`https://${connect}/mcp`);
-  if (tailnetName) out.add(`https://${tailnetName.replace(/\.$/, '')}/mcp`);
-  return [...out];
+  if (connect) bases.push(`https://${connect}`);
+  if (tailnetName) bases.push(`https://${tailnetName.replace(/\.$/, '')}`);
+  return [...new Set(bases.flatMap((b) => [`${b}/mcp`, b]))];
 }
 
 /**
