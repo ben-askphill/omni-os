@@ -47,7 +47,8 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
   const { channels } = useChannels();
   const crew = useCrew();
   const [target, setTarget] = useState(route.params?.channel ?? CONDUCTOR);
-  const [text, setText] = useState('');
+  // An open item's + starts with its prompt (components/thread/OpenItemsCard.tsx).
+  const [text, setText] = useState(route.params?.prompt ?? '');
   const [pick, setPick] = useState<{ target: string; run: DraftRun } | null>(null);
   const [picking, setPicking] = useState(false);
   const [machinePick, setMachinePick] = useState<string | null>(null);

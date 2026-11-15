@@ -16,8 +16,8 @@ export type RootStackParamList = {
   Thread: { id: string };
   Changes: { id: string };
   PullRequest: { id: string };
-  /** Starts a thread. Opens on the channel it was asked from, else the Conductor. */
-  NewThread: { channel?: string } | undefined;
+  /** Starts a thread. Opens on the channel it was asked from, else the Conductor. `prompt` fills the box to start, as an open item's + does. */
+  NewThread: { channel?: string; prompt?: string } | undefined;
   /** A file the crew made. Any tab can push it, through `openArtifact`. */
   Artifact: { artifact: Artifact };
   /** Forks a thread onto another harness: a new, linked thread that picks up from it. Presented as a modal over the thread. */

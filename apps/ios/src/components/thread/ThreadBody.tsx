@@ -12,6 +12,7 @@ import { CLOSED, type Disclosure, threadRows, type ThreadRow } from '../../threa
 import { fontSize, minTarget, space, useOmniTheme, weight } from '../../theme';
 import { CrewQuestions } from './CrewQuestions';
 import { NeedsCards } from './NeedsCards';
+import { OpenItemsCard } from './OpenItemsCard';
 import { PendingRows } from './PendingRows';
 import type { SendAnswers } from './QuestionCard';
 import { type RowActions, RowActionsContext } from './rows/actions';
@@ -104,6 +105,7 @@ export function ThreadBody({ view, live }: { view: ThreadView; live: ThreadLive 
               <CrewQuestions threadId={view.threadId} />
               {view.thread ? <NeedsCards thread={view.thread} pending={view.pending} blocked={view.blocked !== null} act={(action) => live.act(action)} /> : null}
               <PendingRows view={view} live={live} />
+              {view.thread ? <OpenItemsCard thread={view.thread} live={live} waiting={view.pending.length > 0} /> : null}
             </View>
           ) : undefined
         }

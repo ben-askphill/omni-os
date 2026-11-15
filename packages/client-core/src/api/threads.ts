@@ -96,6 +96,10 @@ export interface ThreadPatch {
   folder_id?: string | null;
   pinned?: boolean;
   done?: boolean;
+  /** Null drops every open item, the card under the transcript (@omni/shared/open-items.ts). */
+  open_items?: null;
+  /** Drops the one open item with this text and leaves the rest. */
+  dismiss_open_item?: string;
 }
 
 export function threadsApi(http: HttpClient) {
@@ -111,6 +115,8 @@ export function threadsApi(http: HttpClient) {
     /** A 409 for an archived thread. */
     setPinned: (id: string, pinned: boolean) => patch(id, { pinned }),
     rename: (id: string, title: string) => patch(id, { title }),
+    /** Drops the open item with this text from the card under the transcript, or every one of them without a text. */
+    dismissOpenItems: (id: string, text?: string) => patch(id, text === undefined ? { open_items: null } : { dismiss_open_item: text }),
     /** Archiving also unpins it. */
     setArchived: (id: string, archived: boolean) => patch(id, { archived }),
     /** A folder of the thread's channel, or null for the ungrouped list. A 4xx for another channel's folder. */

@@ -97,6 +97,16 @@ describe('omni api', () => {
     expect(sent).toEqual([{ method: 'GET', url: at('/threads/t%201/requests') }]);
   });
 
+  it('dismisses one open item by its text, or all of them', async () => {
+    const { sent, api: a } = api();
+    await a.dismissOpenItems('t1', 'Which database?');
+    await a.dismissOpenItems('t1');
+    expect(sent).toEqual([
+      { method: 'PATCH', url: at('/threads/t1'), body: { dismiss_open_item: 'Which database?' } },
+      { method: 'PATCH', url: at('/threads/t1'), body: { open_items: null } },
+    ]);
+  });
+
   it('switches the run, marks done and not done, and stops', async () => {
     const { sent, api: a } = api();
     await a.switchRun('t1', { harness: 'codex', model: '', effort: 'high' });
