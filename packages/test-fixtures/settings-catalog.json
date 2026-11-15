@@ -236,9 +236,8 @@
       "title": "What notifies",
       "keywords": [
         "questions",
-        "crew report",
+        "crew",
         "pull request",
-        "pr",
         "checks",
         "review",
         "finished",
@@ -871,7 +870,6 @@
       "expected": [
         "server",
         "channel-actions",
-        "notify-kinds",
         "brain"
       ]
     },

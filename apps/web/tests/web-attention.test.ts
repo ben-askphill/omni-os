@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ALERT_KINDS } from '@omni/shared/attention.ts';
-import { allows, notificationPrefs, setChannelAlerts, setKindAlerts, setNotificationPrefs } from '../src/attention.ts';
+import { DEFAULT_DESKTOP_SETTINGS, applySettingsPatch, type DesktopSettings, type DesktopSettingsPatch } from '@omni/shared/desktop-bridge.ts';
+import { allows, carryMutesToApp, notificationPrefs, setChannelAlerts, setKindAlerts, setNotificationPrefs } from '../src/attention.ts';
 
 // This browser's notification choices (apps/web/src/attention.ts). Which events alert is the shared tracker's
 // (packages/shared/tests/attention.test.ts); the desktop app keeps its own choices (apps/desktop/tests/notifications.test.ts).
@@ -21,5 +22,28 @@ describe('Browser notification choices', () => {
     expect(check('question', 'widgets')).toBe(false);
     setChannelAlerts('widgets', true);
     expect(allows(notificationPrefs())('question', 'widgets')).toBe(true);
+  });
+
+  it('move channels muted on the page into the desktop app once, keeping the app\'s own', async () => {
+    let app: DesktopSettings = applySettingsPatch(DEFAULT_DESKTOP_SETTINGS, { notifications: { muted: ['acme'] } });
+    const sets: DesktopSettingsPatch[] = [];
+    const bridge = {
+      settings: {
+        get: async () => app,
+        set: async (patch: DesktopSettingsPatch) => {
+          sets.push(patch);
+          return (app = applySettingsPatch(app, patch));
+        },
+      },
+    };
+    setNotificationPrefs({ ...notificationPrefs(), muted: ['widgets', 'acme'] });
+    expect(await carryMutesToApp(bridge)).toEqual(['widgets', 'acme']);
+    expect(app.notifications.muted).toEqual(['acme', 'widgets']);
+    expect(notificationPrefs().muted).toEqual([]);
+    // Turned back on in the app, a channel stays on: there is nothing left here to carry.
+    app = applySettingsPatch(app, { notifications: { muted: ['acme'] } });
+    expect(await carryMutesToApp(bridge)).toEqual([]);
+    expect(app.notifications.muted).toEqual(['acme']);
+    expect(sets).toHaveLength(1);
   });
 });

@@ -120,10 +120,39 @@ describe('questions', () => {
     expect(second.post.map((a) => a.body)).toEqual(['2 questions wait in #acme: Which store first?']);
   });
 
-  it('alerts a result and a question in one thread separately, and a question while the thread is in the background', () => {
+  it('alerts one thread once per list, with its question over its result', () => {
     const t = started();
     const both = { ...result('Audit the checkout', 'res'), blockers: question('Audit the checkout').blockers };
-    expect(t.observe(list([both]), opts()).post.map((a) => a.kind)).toEqual(['finished', 'question']);
+    const out = t.observe(list([both, result('Fix the cart total', 'other')]), opts());
+    expect(out.post.map((a) => [a.threadId, a.kind])).toEqual([
+      [byTitle('Fix the cart total').thread.id, 'failed'],
+      [both.thread.id, 'question'],
+    ]);
+    // The result it left out is not news later either, and only what was posted is withdrawn.
+    expect(t.observe(list([both]), opts())).toEqual({ post: [], withdraw: ['other'] });
+    expect(t.observe(list([]), opts()).withdraw).toEqual([out.post[1].id]);
+  });
+
+  it('prefers a failure to a finish in one thread, as the worktree and a result can both say', () => {
+    const t = started();
+    const i = byTitle('Fix the widget');
+    const setupAndDone: AttentionItem = { ...i, thread: { ...i.thread, status: 'failed' }, at: new Date(AT).toISOString(), result: { uid: 'd', status: 'done', at: new Date(AT).toISOString() }, blockers: i.blockers.filter((b) => b.kind === 'setup') };
+    expect(t.observe(list([setupAndDone]), opts()).post.map((a) => a.kind)).toEqual(['failed']);
+  });
+
+  it('does not alert the older of two questions when the newer one is answered', () => {
+    // Both were waiting when the app started, so only the newer card's key was seen.
+    const t = createTracker();
+    t.observe(list([question('Audit the checkout', AT + 500, 2)]), opts());
+    expect(t.observe(list([question('Audit the checkout', AT, 1)]), opts()).post).toEqual([]);
+    // Both arrive between two loads, the newer alerts; answering it does not bring the older back as news.
+    const t2 = started();
+    const both = t2.observe(list([question('Audit the checkout', AT + 500, 2)]), opts());
+    expect(both.post).toHaveLength(1);
+    const answered = t2.observe(list([question('Audit the checkout', AT, 1)]), opts());
+    expect(answered).toEqual({ post: [], withdraw: [both.post[0].id] });
+    // A card newer than any seen still alerts.
+    expect(t2.observe(list([question('Audit the checkout', AT + 900, 2)]), opts()).post).toHaveLength(1);
   });
 
   it('keeps quiet for a question in the thread on screen in front, or with questions off', () => {

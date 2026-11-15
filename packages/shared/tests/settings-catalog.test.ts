@@ -39,6 +39,12 @@ describe('settings catalog', () => {
     expect(searchSettings('worktree zebra', 'web')).toEqual([]);
   });
 
+  it('finds What notifies by its kinds, not by fragments like "pr" or "port"', () => {
+    const finds = (q: string) => searchSettings(q, 'web').some((e) => e.id === 'notify-kinds');
+    expect(['crew', 'pull request', 'questions', 'checks'].filter((q) => !finds(q))).toEqual([]);
+    expect(['pr', 'port', 'proxy'].filter(finds)).toEqual([]);
+  });
+
   it('lists the desktop app\'s section only in the desktop app', () => {
     const ids = (desktopApp: boolean) => sectionsIn('app', { desktopApp }).map((s) => s.id);
     expect(ids(false)).toEqual(['about']);

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { allows, createTracker, notificationPrefs, permissionNow, type AttentionAlert } from '../attention.ts';
+import { allows, carryMutesToApp, createTracker, notificationPrefs, permissionNow, type AttentionAlert } from '../attention.ts';
 import { desktop } from '../desktop.ts';
 import { href, navigate, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -11,8 +11,16 @@ import { useApp } from '../store.tsx';
  * notifications it stands down, so nothing alerts twice.
  */
 export function BrowserNotifier() {
-  if (desktop?.nativeNotifications) return null;
+  if (desktop?.nativeNotifications) return <CarryMutes />;
   return <Notifier />;
+}
+
+/** Channels muted on this page before the app notified natively keep quiet there (attention.ts carryMutesToApp). */
+function CarryMutes() {
+  useEffect(() => {
+    if (desktop) carryMutesToApp(desktop).catch(() => {});
+  }, []);
+  return null;
 }
 
 function Notifier() {

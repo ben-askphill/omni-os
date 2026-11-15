@@ -68,6 +68,18 @@ describe('the desktop notifier', () => {
     expect(r.closed).toEqual(['new']);
   });
 
+  it('posts one banner for a thread whose result and question arrive in one load, and closes none', async () => {
+    const r = rig();
+    r.notifier.connected();
+    await settle();
+    await r.notifier.refresh();
+    const asked = { ...done('res'), blockers: [{ kind: 'question', detail: 'Which store first?', count: 1, at: '2026-01-05T09:00:00.500Z' }] };
+    r.set([asked]);
+    await r.notifier.refresh();
+    expect(r.posted.map((a) => a.kind)).toEqual(['question']);
+    expect(r.closed).toEqual([]);
+  });
+
   it('reloads Needs you once for a burst of thread events', async () => {
     const r = rig();
     r.notifier.connected();

@@ -104,7 +104,11 @@ export function setupAlert(item: AttentionItem, channelName?: string): Attention
   };
 }
 
-/** The question key: the newest question card's time, so a second card alerts again and an answer withdraws it. */
+/**
+ * The question key: the newest question card's time, so a newer card alerts again and an answer withdraws it. The
+ * tracker never alerts a key older than the newest it has seen for the thread: answering the newer of two cards
+ * brings the older card's time back, and that card is not news.
+ */
 export const questionKey = (item: AttentionItem): string | null => {
   const q = item.blockers.find((b) => b.kind === 'question');
   return q ? `question:${item.thread.id}:${q.at ?? `${q.count}:${q.detail ?? ''}`}` : null;
@@ -153,17 +157,21 @@ export interface Tracker {
  * - each alerts once, the first time a list has it;
  * - one older than FRESHNESS_MS when it first shows never alerts;
  * - the thread on screen in a window in front is being watched: its result or question is recorded, not alerted;
- * - a kind or channel turned off records it too, so turning it on later does not alert old ones.
+ * - a kind or channel turned off records it too, so turning it on later does not alert old ones;
+ * - a question older than the newest one already seen in its thread never alerts;
+ * - one thread alerts once per list, with what matters most (a question, then a failure, then a finish).
  * Feed alerts skip only the watched thread and what is turned off, and alert once per id.
  */
 export function createTracker(): Tracker {
   const seen = new Set<string>();
   const posted = new Set<string>();
+  /** The newest question card time seen per thread. */
+  const newestQuestion = new Map<string, string>();
   let started = false;
   const watched = (threadId: string, o: ObserveOptions) => o.visible && o.viewing === threadId;
   return {
     observe(list, o) {
-      const candidates: { key: string; at: string | null | undefined; make: () => AttentionAlert | null; item: AttentionItem }[] = [];
+      const candidates: { key: string; at: string | null | undefined; make: () => AttentionAlert | null; item: AttentionItem; question?: boolean }[] = [];
       // Oldest first, so alerts stack in the order things happened.
       for (const item of [...list.items].reverse()) {
         const name = o.channelName?.(item.thread.channel_id);
@@ -171,7 +179,7 @@ export function createTracker(): Tracker {
         const setup = setupAlert(item, name);
         if (setup) candidates.push({ key: setup.id, at: item.at, make: () => setup, item });
         const q = questionKey(item);
-        if (q) candidates.push({ key: q, at: item.blockers.find((b) => b.kind === 'question')?.at, make: () => questionAlert(item, name), item });
+        if (q) candidates.push({ key: q, at: item.blockers.find((b) => b.kind === 'question')?.at, make: () => questionAlert(item, name), item, question: true });
       }
       const present = new Set(candidates.map((c) => c.key));
       const withdraw = [...posted].filter((id) => !present.has(id)).sort();
@@ -180,16 +188,27 @@ export function createTracker(): Tracker {
       for (const c of candidates) {
         if (seen.has(c.key)) continue;
         seen.add(c.key);
+        if (c.question && c.at) {
+          const newest = newestQuestion.get(c.item.thread.id);
+          if (newest && c.at <= newest) continue;
+          newestQuestion.set(c.item.thread.id, c.at);
+        }
         if (!started) continue;
         if (c.at && o.now - Date.parse(c.at) > FRESHNESS_MS) continue;
         if (watched(c.item.thread.id, o)) continue;
         const alert = c.make();
         if (!alert || !o.allows(alert.kind, alert.channelId)) continue;
-        posted.add(alert.id);
         post.push(alert);
       }
       started = true;
-      return { post, withdraw };
+      const best = new Map<string, AttentionAlert>();
+      for (const a of post) {
+        const had = best.get(a.threadId);
+        if (!had || RANK[a.kind] < RANK[had.kind]) best.set(a.threadId, a);
+      }
+      const kept = post.filter((a) => best.get(a.threadId) === a);
+      kept.forEach((a) => posted.add(a.id));
+      return { post: kept, withdraw };
     },
     feed(a, o) {
       if (seen.has(a.id)) return null;
@@ -199,6 +218,9 @@ export function createTracker(): Tracker {
     },
   };
 }
+
+/** What matters most when one thread has several things in one list: lower first. */
+const RANK: Record<AlertKind, number> = { question: 0, failed: 1, finished: 2, crewReport: 3, prAttention: 3 };
 
 /** One device's choices: the master switch, each kind, and channels that never alert (a new channel alerts until turned off). */
 export interface AlertPrefs {

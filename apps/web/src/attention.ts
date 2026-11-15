@@ -2,6 +2,7 @@
 // app; this file keeps this browser's choices and what it allows. Choices stay in this browser and start off.
 import { useEffect, useState } from 'react';
 import { parseAlertKinds, type AlertKind, type AlertPrefs } from '@omni/shared/attention.ts';
+import type { DesktopBridge } from '@omni/shared/desktop-bridge.ts';
 import { readPref, writePref } from './store.tsx';
 
 export { createTracker, allows, type AttentionAlert } from '@omni/shared/attention.ts';
@@ -33,6 +34,21 @@ export function setKindAlerts(kind: AlertKind, on: boolean) {
 export function setChannelAlerts(channelId: string, on: boolean) {
   const muted = prefs.muted.filter((m) => m !== channelId);
   setNotificationPrefs({ ...prefs, muted: on ? muted : [...muted, channelId] });
+}
+
+/**
+ * The desktop app once used this page's choices too. Its native notifications keep their own, so channels muted here
+ * move to the app's setting, once: the list here empties after, so a channel turned back on in the app stays on.
+ * Resolves with the channels it moved.
+ */
+export async function carryMutesToApp(bridge: Pick<DesktopBridge, 'settings'>): Promise<string[]> {
+  const old = prefs.muted;
+  if (!old.length) return [];
+  const current = await bridge.settings.get();
+  const muted = [...new Set([...current.notifications.muted, ...old])];
+  await bridge.settings.set({ notifications: { muted } });
+  setNotificationPrefs({ ...prefs, muted: [] });
+  return old;
 }
 
 export function useNotificationPrefs() {
