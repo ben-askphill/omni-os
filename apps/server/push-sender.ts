@@ -143,7 +143,10 @@ export function alertFor(event: PushEvent): { title: string; subtitle?: string; 
   return { title: clip(title, TITLE_MAX), subtitle: clip(from ? `${fixed.label}: ${from}` : fixed.label, TITLE_MAX), body };
 }
 
-/** Where this server's sender id lives. Under `sync.` so it never leaves this machine: each Mac has its own. */
+/**
+ * Where this server's sender id lives. Under `sync.` so it never leaves this machine: each Mac has its own. A data
+ * folder copied to another Mac drops it when sync gives the copy a new machine id (db/sync.ts arm).
+ */
 const SENDER_KEY = 'sync.push_sender';
 
 /** This server's id in its alerts, made once and kept. */

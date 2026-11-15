@@ -63,6 +63,8 @@ describe('a data folder copied to another Mac', () => {
   const warned: string[] = [];
 
   beforeAll(async () => {
+    // A has sent a phone alert, so its folder holds its push sender id.
+    a.db.kv.set('sync.push_sender', 'sender-of-a');
     // Copy A's folder as it is on disk, the WAL folded in first, then keep working on A.
     a.db.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
     const copy = mkdtempSync(join(tmpdir(), 'omni-sync-copy-'));
@@ -84,6 +86,11 @@ describe('a data folder copied to another Mac', () => {
     expect(warned[0]).toMatch(/^\[sync\] this data folder was copied from another machine/);
     // A second start on this Mac keeps the new id.
     expect(b.sync.createSyncWorker({ transport: relay }).machineId).toBe(b.worker.machineId);
+  });
+
+  it('drops the push sender id it copied, so it never settles phone alerts A sent', () => {
+    expect(b.db.kv.get('sync.push_sender')).toBeUndefined();
+    expect(a.db.kv.get('sync.push_sender')).toBe('sender-of-a');
   });
 
   it('leaves the scheduled automations with the Mac it was copied from', async () => {

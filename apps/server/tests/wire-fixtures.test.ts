@@ -98,6 +98,9 @@ const NAMES = [
   'needs-you.json',
   'needs-you-read-request.json',
   'needs-you-read.json',
+  // The held report's child on screen: its success never lists in Needs you, so seeing it reads it.
+  'needs-you-seen-request.json',
+  'needs-you-seen.json',
   // A turn stopped at the plan's usage limit, with its reset time: scheduled to resume then, cancelled, resumed now.
   'thread-limited.json',
   'limit-scheduled.json',
@@ -680,6 +683,9 @@ async function scenario() {
   const readBody = request('needs-you-read-request.json', { uid: stopped.result!.uid }) as { uid: string };
   const after = keep('needs-you-read.json', await call('POST', '/needs-you/read', { ...readBody, uid: stopped.result!.uid })) as { item: Item };
   expect(after.item).toMatchObject({ result: null, blockers: [{ kind: 'recovered' }] });
+  // The child that reported is on screen: a delegated thread's success is not in Needs you, so seeing it reads it.
+  const seenBody = request('needs-you-seen-request.json', { thread: crew.id }) as { thread: string };
+  expect(keep('needs-you-seen.json', await call('POST', '/needs-you/seen', { ...seenBody, thread: crew.id }))).toEqual({ read: true });
   git('commit', '-q', '--allow-empty', '-m', 'first');
   keep('setup-retried.json', await call('POST', `/threads/${wt.id}/setup/retry`, {}));
   await eventually(async () => (await detail(wt.id)).thread.status === 'done', 'the retried thread to run');

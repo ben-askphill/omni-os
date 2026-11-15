@@ -135,6 +135,9 @@ export const outbox = {
         // fill gaps over there, so nothing here overwrites what that Mac has; everything it has comes back here.
         setLocal('sync.cursor', 0);
         db.exec('DELETE FROM sync_outbox; DELETE FROM sync_deferred');
+        // The phone alert sender id (push-sender.ts pushSenderId) is that Mac's too: sharing it, either Mac would settle
+        // the other's alerts. This one makes its own on its next alert.
+        db.exec(`DELETE FROM kv WHERE key = 'sync.push_sender'`);
       }
       // A thread mid-run as sync is set up is this machine's run, and its row should say so.
       db.prepare(`UPDATE threads SET run_machine = ? WHERE status IN ('running','queued') AND run_machine IS NULL`).run(id);
