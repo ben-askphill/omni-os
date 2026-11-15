@@ -255,21 +255,22 @@ export const threads = {
     )?.id ?? id,
   /**
    * Where Ben answers a delegated thread's questions: the top of its delegation chain (root), then the newest thread that
-   * continues it (continue.ts), and so on, since Ben works on in the newest and its crew cards show there. An archived
-   * continuation does not count. A thread nobody delegated is its own home: its card shows only on itself.
+   * continues it (continue.ts), and so on, since Ben works on in the newest and its crew cards show there. The walk goes
+   * through archived threads (cleanup archives the middle of a chain), preferring a live continuation at each step, and
+   * ends on the last live thread it passed, or the root when none is live. A thread nobody delegated is its own home: its
+   * card shows only on itself.
    */
   home(id: string): string {
-    let at = threads.root(id);
-    if (at === id) return id;
-    const newer = db.prepare('SELECT id FROM threads WHERE continued_from = ? AND archived = 0 ORDER BY created_at DESC, rowid DESC LIMIT 1');
-    const seen = new Set<string>();
-    while (!seen.has(at)) {
-      seen.add(at);
-      const next = newer.get(at) as { id: string } | undefined;
-      if (!next) break;
-      at = next.id;
+    const root = threads.root(id);
+    if (root === id) return id;
+    const next = db.prepare('SELECT id, archived FROM threads WHERE continued_from = ? ORDER BY archived, created_at DESC, rowid DESC LIMIT 1');
+    const seen = new Set<string>([root]);
+    let live = threads.get(root)?.archived ? null : root;
+    for (let at = next.get(root) as { id: string; archived: number } | undefined; at && !seen.has(at.id); at = next.get(at.id) as typeof at) {
+      seen.add(at.id);
+      if (!at.archived) live = at.id;
     }
-    return at;
+    return live ?? root;
   },
   /** Threads delegated from Conductor jobs, kept visible beside their parent in the originating channel. */
   conductorHandoffChildren: () =>

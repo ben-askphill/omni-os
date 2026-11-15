@@ -182,6 +182,23 @@ describe('a delegated thread asks', () => {
     expect(await asking()).toContain(next.id);
   });
 
+  it('lists the question on the live end of a continued chain whose middle and start are archived', T, async () => {
+    const { continuations } = await import('../db.ts');
+    const a = await idle('be the conductor');
+    const child = await busy('pick a market', { parent_id: a.id });
+    const b = await idle('be the conductor, continued');
+    const c = await idle('be the conductor, continued again');
+    continuations.link(b.id, a.id);
+    continuations.link(c.id, b.id);
+    for (const t of [a, b]) await ok('PATCH', `/threads/${t.id}`, { archived: true });
+    const qid = await ask(child.id);
+    const needs = await asking();
+    expect(needs).toContain(c.id);
+    expect(needs).not.toContain(a.id);
+    expect(needs).not.toContain(b.id);
+    expect((await crew(c.id)).map((q) => q.question.id)).toEqual([qid]);
+  });
+
   it('keeps a thread nobody delegated as it was: its question waits on itself', T, async () => {
     const solo = await busy('plan alone');
     await ask(solo.id);

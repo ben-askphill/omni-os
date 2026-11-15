@@ -80,6 +80,24 @@ describe('a thread needs input', () => {
     expect(JSON.parse(payloadFor(sent[0]!)).omni).toEqual({ kind: 'needsInput', threadId: newest, channelId: 'conductor', askerId: child });
   });
 
+  it('follows the continuations through archived threads to the live one after them', () => {
+    const a = thread({ channel: 'conductor' });
+    const child = thread({ parent: a });
+    const b = thread({ channel: 'conductor' });
+    const c = thread({ channel: 'conductor' });
+    r.db.continuations.link(b, a);
+    r.db.continuations.link(c, b);
+    r.db.threads.update(b, { archived: 1 });
+    expect(r.db.threads.home(child)).toBe(c);
+    // The first thread archived too: still the live one at the end.
+    r.db.threads.update(a, { archived: 1 });
+    askQuestion(child, [Q]);
+    expect(sent.map((e) => e.threadId)).toEqual([c]);
+    // Nothing live along the chain: the thread Ben delegated from, as before.
+    r.db.threads.update(c, { archived: 1 });
+    expect(r.db.threads.home(child)).toBe(a);
+  });
+
   it("keeps a continued thread's own question on itself: nobody delegated it", () => {
     const solo = thread();
     const next = thread();
