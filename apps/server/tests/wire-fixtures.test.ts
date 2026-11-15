@@ -430,6 +430,10 @@ async function scenario() {
   expect(busy.pending?.length, 'the held message').toBe(1);
 
   writeFileSync(join(data, 'threads', id, 'artifacts', 'report.md'), '# Report\n');
+  // An automation file saved again, as an editor would: the scheduler reloads and the feed sends `automations`. Recorded
+  // on purpose, since a late watch event (FSEvents on a Mac) can send one in this window anyway.
+  const digestFile = join(setUp!.automationsDir, 'daily-digest.yaml');
+  writeFileSync(digestFile, readFileSync(digestFile));
   await call('PATCH', `/threads/${id}`, { title: 'Fix the cart and the tests' });
   await eventually(async () => {
     const d = await detail(id);
@@ -437,8 +441,12 @@ async function scenario() {
   }, 'the held message to run');
   const sent = (text: string, tag: string) => frames(text).some((f) => tagOf(f) === tag);
   await eventually(
-    async () => sent(stream.text(), 'artifact') && sent(feed.text(), 'artifact') && frames(stream.text()).filter((f) => tagOf(f) === 'result').length === 3,
-    () => `the artifact on both streams and the last result on the thread's:\n${stream.text()}\n\n${feed.text()}`,
+    async () =>
+      sent(stream.text(), 'artifact') &&
+      sent(feed.text(), 'artifact') &&
+      sent(feed.text(), 'automations') &&
+      frames(stream.text()).filter((f) => tagOf(f) === 'result').length === 3,
+    () => `the artifact on both streams, the automations reload on the feed and the last result on the thread's:\n${stream.text()}\n\n${feed.text()}`,
   );
 
   keep('channel-threads.json', await get('/channels/acme/threads'));
