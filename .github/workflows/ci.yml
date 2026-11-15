@@ -1,4 +1,4 @@
-# Runs on every pull request and every push to main. `check` is the required status check on main.
+# Runs on every pull request and every push to main. The "main: CI required" ruleset requires both jobs, `check` and `desktop`.
 # It runs what the no-mistakes gate runs locally (.no-mistakes.yaml), so a PR merged without the gate is held to the same bar.
 name: CI
 
