@@ -219,6 +219,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
   if (!t) return c.json({ error: 'not found' }, 404);
   return c.json({
     id: t.id, title: t.title, status: t.status, channel: t.channel_id, role: t.role, task_id: t.task_id,
+    // What it runs on: the Conductor picks a PR review's model family from the builder's (crew/conductor.md).
+    harness: t.harness, model: t.model, effort: t.effort,
     // A thread it delegated, at any depth, still runs or queues: it reports back here.
     delegating: delegatingIds().has(t.id),
     updated_at: t.updated_at, last_reply: events.lastRunText(t.id) || events.lastAssistantText(t.id),

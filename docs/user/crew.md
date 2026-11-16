@@ -13,6 +13,8 @@ Each role is a file in `crew/*.md` with frontmatter and a charter. Edit them fre
 
 The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Overview and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
 
+The conductor reviews every PR a builder reports on the other model family from the one that wrote it, read from the builder thread's harness and model (`get_thread`): Codex `gpt-6.1-sol` at `xhigh` following `/code-review:code-review` for a PR Claude wrote, Claude Code `claude-opus-5-5` at `xhigh` for any other. When that harness or model is unavailable, or the builder's model does not say its family, it asks you instead of reviewing on the same family.
+
 `delegate_only: true` in a role's frontmatter makes it a router that runs without the tools that do work. Only the conductor sets it.
 
 - Claude Code: `--disallowedTools` for Bash, Edit, Write, NotebookEdit, Agent, Task, Workflow, Artifact, ArtifactData and the browser MCPs.

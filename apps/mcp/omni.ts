@@ -505,7 +505,7 @@ server.registerTool(
   'get_thread',
   {
     description:
-      'Status, last reply, artifacts and running subagents of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
+      'Status, last reply, artifacts, running subagents and the harness, model and effort of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
       'its last model activity and the minutes since. `open_items`, when present, lists what its last turn left for the user to resolve ' +
       '(questions, decisions with options, blockers). Reading it never wakes the thread.',
     inputSchema: { thread_id: z.string() },

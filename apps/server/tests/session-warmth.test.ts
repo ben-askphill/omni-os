@@ -3,7 +3,7 @@ import { startRunner } from './runner-boot.ts';
 
 // A parent thread's message_thread (a send from "conductor") reaches a thread only while its session is warm in the
 // prompt cache. A cold one is refused with what to do instead, unless the parent passes wake_cold. Ben's own sends
-// are never refused. get_thread (/summary) shows the same warmth.
+// are never refused. get_thread (/summary) shows the same warmth, and what the thread runs on.
 
 const h = await startRunner();
 const { app } = await import('../app.ts');
@@ -62,5 +62,13 @@ describe('session warmth', () => {
     const sent = await call('POST', `/threads/${t.id}/messages`, { prompt: 'picking this back up', mode: 'queue' });
     expect(sent.status).toBe(200);
     await h.untilResults(t.id, 2);
+  });
+});
+
+describe('get_thread', () => {
+  it('names the harness, model and effort, so the Conductor can review a PR on another model family', T, async () => {
+    const t = await h.start('first pass', { model: 'claude-opus-5-5', effort: 'xhigh' });
+    await h.untilResults(t.id, 1);
+    expect(await summary(t.id)).toMatchObject({ harness: 'claude-code', model: 'claude-opus-5-5', effort: 'xhigh' });
   });
 });
