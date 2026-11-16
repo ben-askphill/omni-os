@@ -43,7 +43,7 @@ describe('codex logged out', () => {
   });
 
   it('counts a Codex binary that will not run as unavailable, without crashing', async () => {
-    expect(await svc.probeCodex('/nonexistent/codex')).toEqual({ available: false, models: [] });
+    expect(await svc.probeCodex('/nonexistent/codex')).toMatchObject({ available: false, models: [], fix: expect.stringContaining('could not run') });
   });
 });
 
