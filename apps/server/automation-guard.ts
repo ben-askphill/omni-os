@@ -30,9 +30,6 @@ const WHAT: Record<AutomationWrite, string> = {
 /** What a thread an automation started may still do: stop automations, never start or make one. */
 const STOPS = new Set<AutomationWrite>(['disable', 'delete']);
 
-/** How deep the walk up the parent chain goes: deeper than any real delegation, and a cycle in bad data still ends. */
-const MAX_DEPTH = 64;
-
 export interface Lineage {
   /** The automation that started this thread or one above it. */
   automation: string | null;
@@ -40,18 +37,32 @@ export interface Lineage {
   scan: string | null;
 }
 
+/**
+ * The threads above this one, nearest first, along both links a thread can have to the one it came from: `parent_id`
+ * (delegate, delegate_team, review notes, PR review) and `continued_from` (continue.ts, which starts the new thread with
+ * no parent, source manual and no automation). Other ways a thread moves (hand off, the run switch) keep its id. The walk
+ * has no depth limit, so no chain is too deep to reach its automation; each thread is read once, so a cycle in bad data
+ * still ends it.
+ */
 export function lineage(threadId: string): Lineage {
-  const rows = db
-    .prepare(
-      `WITH RECURSIVE up(id, parent_id, automation, source, role, depth) AS (
-         SELECT id, parent_id, automation, source, role, 0 FROM threads WHERE id = ?
-         UNION ALL SELECT t.id, t.parent_id, t.automation, t.source, t.role, up.depth + 1 FROM threads t JOIN up ON t.id = up.parent_id
-         WHERE up.depth < ${MAX_DEPTH})
-       SELECT id, automation, source, role FROM up ORDER BY depth`,
-    )
-    .all(threadId) as { id: string; automation: string | null; source: string; role: string | null }[];
-  const ran = rows.find((r) => r.automation || r.source === 'automation');
-  return { automation: ran ? (ran.automation ?? ran.id) : null, scan: rows.find((r) => r.role === SCAN_ROLE)?.id ?? null };
+  const get = db.prepare('SELECT id, parent_id, continued_from, automation, source, role FROM threads WHERE id = ?');
+  const seen = new Set<string>();
+  const queue = [threadId];
+  let automation: string | null = null;
+  let scan: string | null = null;
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const t = get.get(id) as
+      | { id: string; parent_id: string | null; continued_from: string | null; automation: string | null; source: string; role: string | null }
+      | undefined;
+    if (!t) continue;
+    if (!automation && (t.automation || t.source === 'automation')) automation = t.automation ?? t.id;
+    if (!scan && t.role === SCAN_ROLE) scan = t.id;
+    for (const up of [t.parent_id, t.continued_from]) if (up && !seen.has(up)) queue.push(up);
+  }
+  return { automation, scan };
 }
 
 /** Ben answered in the scan's thread: a message of his after Omni's report, or an answer to a question the lead asked. */

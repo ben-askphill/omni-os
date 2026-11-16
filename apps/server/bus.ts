@@ -45,3 +45,6 @@ export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:
 
 /** A sub-agent's task row came in from another machine (sync/handlers/event.ts), so `delegating` may have changed. */
 export const SYNCED_TASK = 'synced_task';
+
+/** An automation run record came in from another machine (sync/handlers/automation-run.ts): its failure streak may have changed. */
+export const SYNCED_AUTOMATION_RUN = 'synced_automation_run';

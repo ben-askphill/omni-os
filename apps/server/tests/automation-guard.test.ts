@@ -14,6 +14,7 @@ const yaml = (name: string) => `name: ${name}\nenabled: true\ncron: "0 2 * * *"\
 writeFileSync(join(shipped, 'nightly.yaml'), yaml('Nightly'));
 writeFileSync(join(shipped, 'flaky.yaml'), yaml('Flaky'));
 writeFileSync(join(shipped, 'steady.yaml'), yaml('Steady'));
+writeFileSync(join(shipped, 'patient.yaml'), yaml('Patient'));
 const { app } = await import('../app.ts');
 const { loadAutomations } = await import('../automations.ts');
 const { FAILURE_LIMIT, PAUSE_REASON, failuresInARow, pauseIfFailing, watchAutomationFailures } = await import('../automation-pause.ts');
@@ -71,6 +72,48 @@ describe('threads an automation started', () => {
     expect((await call('POST', '/automations/nightly/enabled', { enabled: false }, delegated)).status).toBe(200);
     expect(find('nightly')?.enabled).toBe(false);
     expect((await call('POST', '/automations/nightly/enabled', { enabled: true })).status).toBe(200);
+  });
+
+  it('cannot create one from a thread continued out of one below the run', async () => {
+    // continue.ts starts the new thread with no parent, source manual and no automation: only continued_from links it.
+    const { loadCatalog } = await import('../harness/catalog-service.ts');
+    await loadCatalog(['claude-code']);
+    const crewmate = 'g-crewmate';
+    db.prepare(
+      `INSERT INTO threads (id, channel_id, title, status, session_id, cwd, source, automation, parent_id, harness, model, effort) VALUES (?, 'scratch', 'Crewmate', 'done', ?, ?, 'conductor', NULL, ?, 'claude-code', 'sonnet', 'high')`,
+    ).run(crewmate, crewmate, r.tmp, run);
+    events.add(crewmate, 'user', { text: 'Report only.', source: 'conductor' });
+    events.add(crewmate, 'assistant_text', { text: 'Finished.' });
+    const how = { harness: 'claude-code', model: 'sonnet', effort: 'high' };
+    const preview = await call('POST', `/threads/${crewmate}/continue/preview`, how);
+    expect(preview.status, JSON.stringify(preview.body)).toBe(200);
+    const made = await call('POST', `/threads/${crewmate}/continue`, { ...how, text: 'Make the automation.', request_id: 'continue-guard', revision: preview.body.revision });
+    expect(made.status, JSON.stringify(made.body)).toBe(200);
+    const continued = made.body.thread;
+    expect(continued).toMatchObject({ parent_id: null, automation: null, source: 'manual', continued_from: crewmate });
+
+    const { status, body } = await call('POST', '/automations', { fields: fields('From the continuation') }, continued.id);
+    expect(status).toBe(403);
+    expect(body.error).toMatch(/automation "nightly"/);
+    expect(find('from-the-continuation')).toBeUndefined();
+  });
+
+  it('holds a thread however deep below the run it sits', async () => {
+    let bottom = run;
+    for (let i = 0; i < 100; i++) bottom = thread({ source: 'conductor', parent: bottom });
+    const { status, body } = await call('POST', '/automations', { fields: fields('From deep down') }, bottom);
+    expect(status).toBe(403);
+    expect(body.error).toMatch(/automation "nightly"/);
+  });
+
+  it('ends the walk up on a cycle in bad data', async () => {
+    const a = 'g-cycle-a';
+    const b = 'g-cycle-b';
+    for (const [id, up] of [[a, b], [b, a]]) {
+      db.prepare(`INSERT INTO threads (id, channel_id, title, status, session_id, cwd, source) VALUES (?, 'scratch', 'Cycle', 'done', ?, ?, 'manual')`).run(id, id, r.tmp);
+      db.prepare('UPDATE threads SET continued_from = ? WHERE id = ?').run(up, id);
+    }
+    expect((await call('POST', '/automations', { fields: fields('From a cycle') }, a)).status).toBe(201);
   });
 
   it("does not hold other threads or Ben's own clients", async () => {
@@ -142,6 +185,17 @@ describe('turning off after failed runs', () => {
     expect(flaky.runs[0]).toMatchObject({ trigger: 'pause', status: 'skipped', skip_reason: PAUSE_REASON });
     // Already off: nothing more happens.
     expect(pauseIfFailing('flaky')).toBe(false);
+  });
+
+  it('counts failures with any number of skipped runs between them', () => {
+    ran('patient', 'failed');
+    ran('patient', 'failed');
+    for (let i = 0; i < 120; i++) automationRuns.skip('patient', 'cron', 'precheck exited 1: nothing new');
+    ran('patient', 'stopped');
+    expect(failuresInARow('patient')).toBe(2);
+    ran('patient', 'failed');
+    expect(failuresInARow('patient')).toBe(FAILURE_LIMIT);
+    expect(pauseIfFailing('patient')).toBe(true);
   });
 
   it('a run that finished breaks the streak', () => {

@@ -4,7 +4,7 @@
 // Failures before that row no longer count, so turning it back on gives it a clean slate.
 import { setAutomationEnabled } from './automation-files.ts';
 import { loadAutomations } from './automations.ts';
-import { bus, type FeedEvent } from './bus.ts';
+import { bus, SYNCED_AUTOMATION_RUN, type FeedEvent } from './bus.ts';
 import { automationRuns, db } from './db.ts';
 import { runsHere } from './sync/owner.ts';
 
@@ -13,24 +13,24 @@ export const FAILURE_LIMIT = 3;
 export const PAUSE_TRIGGER = 'pause';
 export const PAUSE_REASON = `Turned off after ${FAILURE_LIMIT} failed runs in a row. Turn it back on once the cause is fixed.`;
 
-/** How far back the count looks: a run of skips and stops this long ends it. */
-const LOOK_BACK = 100;
-
 /**
- * How many of the automation's latest runs failed in a row, back to its last automatic pause. A finished run breaks
- * the streak; skipped, stopped and unfinished runs say nothing about whether it works, so they neither count nor break it.
+ * How many of the automation's latest runs failed in a row, back to its last automatic pause, counted up to
+ * FAILURE_LIMIT. A finished run breaks the streak; skipped, stopped and unfinished runs say nothing about whether it
+ * works, so they neither count nor break it. The query reads only the rows that decide (failed, done, a pause), so any
+ * number of skips between two failures cannot push the earlier one out of the count.
  */
 export function failuresInARow(id: string): number {
   const rows = db
     .prepare(
       `SELECT r.trigger, t.status FROM automation_runs r LEFT JOIN threads t ON t.id = r.thread_id
-       WHERE r.automation = ? ORDER BY r.created_at DESC, r.id DESC LIMIT ?`,
+       WHERE r.automation = ? AND (r.trigger = ? OR t.status IN ('failed', 'done'))
+       ORDER BY r.created_at DESC, r.id DESC LIMIT ?`,
     )
-    .all(id, LOOK_BACK) as { trigger: string; status: string | null }[];
+    .all(id, PAUSE_TRIGGER, FAILURE_LIMIT) as { trigger: string; status: string | null }[];
   let n = 0;
   for (const r of rows) {
     if (r.trigger === PAUSE_TRIGGER || r.status === 'done') break;
-    if (r.status === 'failed') n++;
+    n++;
   }
   return n;
 }
@@ -45,16 +45,23 @@ export function pauseIfFailing(id: string): boolean {
   return true;
 }
 
-/** Check an automation each time one of its run threads fails, here or on another machine (sync emits those too). */
+function check(automation: string) {
+  try {
+    pauseIfFailing(automation);
+  } catch (err) {
+    console.error(`[automations] could not check ${automation} for failed runs:`, err);
+  }
+}
+
+/**
+ * Check an automation each time one of its run threads fails, here or on another machine, and each time a run record
+ * arrives from another machine: sync can bring a run's failed thread before its record, and the count needs both.
+ */
 export function watchAutomationFailures() {
   bus.on('feed', (e: FeedEvent) => {
     if (e.type !== 'thread') return;
     const t = e.thread as { automation?: string | null; status?: string };
-    if (!t?.automation || t.status !== 'failed') return;
-    try {
-      pauseIfFailing(t.automation);
-    } catch (err) {
-      console.error(`[automations] could not check ${t.automation} for failed runs:`, err);
-    }
+    if (t?.automation && t.status === 'failed') check(t.automation);
   });
+  bus.on(SYNCED_AUTOMATION_RUN, check);
 }

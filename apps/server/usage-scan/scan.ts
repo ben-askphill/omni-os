@@ -13,7 +13,7 @@ import { secretValues } from '../secrets.ts';
 import { readAsks, SCAN_ROLE, type Ask } from './asks.ts';
 import { clusterAsks, coveredBy, describeGroup, spread, type Cluster, type Group } from './cluster.ts';
 import { labelGroups, type Label } from './labels.ts';
-import { maskSecrets } from './mask.ts';
+import { maskSecrets, MIN_EXACT } from './mask.ts';
 
 export const SCAN_DAYS = 90;
 /** Haiku labels every group in one call; past this the scan goes on without labels. */
@@ -51,6 +51,19 @@ export interface ScanResult {
   labelled: boolean;
 }
 
+/**
+ * An ask with every secret masked: its title and text, and its commands. A command that holds a secret is dropped, not
+ * masked: `/[masked]` would still group the asks by that secret. Commands are lowercase, so stored values match them
+ * in any case.
+ */
+export function maskAsk(a: Ask, exact: readonly string[]): { ask: Ask; masked: number } {
+  const title = maskSecrets(a.title, exact);
+  const text = maskSecrets(a.text, exact);
+  const lower = exact.filter((v) => v.length >= MIN_EXACT).map((v) => v.toLowerCase());
+  const commands = a.commands.filter((c) => !maskSecrets(c).masked && !lower.some((v) => c.toLowerCase().includes(v)));
+  return { ask: { ...a, title: title.text, text: text.text, commands }, masked: title.masked + text.masked + a.commands.length - commands.length };
+}
+
 /** Starts are one at a time: a second click while the labels run gets a refusal, not a second thread. */
 let starting = false;
 
@@ -74,7 +87,11 @@ export async function startUsageScan(opts: { channel?: string | null }, deps: Sc
       masked += m.masked;
       return m.text;
     };
-    const clean = (a: Ask): Ask => ({ ...a, title: mask(a.title), text: mask(a.text) });
+    const clean = (a: Ask): Ask => {
+      const m = maskAsk(a, exact);
+      masked += m.masked;
+      return m.ask;
+    };
     const clusters = clusterAsks(scan.asks.map(clean), { timezone: config.timezone });
     const pasted = scan.pasted.map((p) => describeGroup(p.asks.map(clean), config.timezone));
     if (!clusters.length && !pasted.length)

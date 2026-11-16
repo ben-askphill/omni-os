@@ -9,8 +9,8 @@ const r = await startRunner();
 const { readAsks, SCAN_ROLE } = await import('../usage-scan/asks.ts');
 const { cadence, clusterAsks, coveredBy, features, linkFeature, spread } = await import('../usage-scan/cluster.ts');
 const { maskSecrets, MASK } = await import('../usage-scan/mask.ts');
-const { parseLabels } = await import('../usage-scan/labels.ts');
-const { startUsageScan } = await import('../usage-scan/scan.ts');
+const { labelPrompt, parseLabels } = await import('../usage-scan/labels.ts');
+const { maskAsk, startUsageScan } = await import('../usage-scan/scan.ts');
 const { app } = await import('../app.ts');
 const { channels, db, events } = r.db;
 
@@ -239,6 +239,27 @@ describe('the scan', () => {
     for (const text of [prompt, ...haikuSaw]) expect(text).not.toContain(VAULT);
     expect(prompt).toContain('Acme copy check');
     expect(prompt).not.toMatch(/hush pipeline|Hush weekly/i);
+  });
+
+  it('keeps a stored secret used as a slash command out of the keys, the commands and both prompts', async () => {
+    const BADGER = 'honeybadger';
+    ['invoices', 'returns', 'reviews', 'coupons', 'payouts', 'bundles'].forEach((topic, w) =>
+      ask(`/${BADGER} ${topic}`, at(w, 5, 4), {}, { slash: { command: { name: BADGER } } }),
+    );
+    const read = readAsks(db, { days: 90 }).asks;
+    // Unmasked, the command would name a group of its own.
+    expect(clusterAsks(read, { timezone: 'UTC' }).some((c) => c.key === `/${BADGER}`)).toBe(true);
+
+    const asks = read.map((a) => maskAsk(a, [BADGER]).ask);
+    const clusters = clusterAsks(asks, { timezone: 'UTC' });
+    const haikuPrompt = labelPrompt(clusters.map((c) => ({ id: c.id, key: c.key, samples: c.asks.map((a) => a.text) })));
+    for (const text of [haikuPrompt, ...clusters.map((c) => c.key), ...asks.flatMap((a) => [a.text, a.title, ...a.commands])]) expect(text).not.toContain(BADGER);
+
+    const haikuSaw: string[] = [];
+    const result = await startUsageScan({}, { secrets: async () => [STORED, BADGER], ask: async (p) => (haikuSaw.push(p), null) });
+    const lead = await waitFor(() => r.texts(result.thread.id, 'user')[0], 'the scan prompt');
+    expect(haikuSaw).toHaveLength(1);
+    for (const text of [lead, ...haikuSaw]) expect(text).not.toContain(BADGER);
   });
 
   it('goes on without labels when Haiku fails', async () => {

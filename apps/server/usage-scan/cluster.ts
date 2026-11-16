@@ -100,7 +100,8 @@ export function features(ask: Pick<Ask, 'text' | 'commands'>): Set<string> {
   const links = head.match(URL_RE) ?? [];
   const low = head.replace(URL_RE, ' ').replace(PATH_RE, ' ').toLowerCase();
   const words = (low.replace(SLASH, ' ').match(WORD) ?? []).filter((w) => !STOP.has(w));
-  const out = new Set<string>([...ask.commands.map((c) => c.toLowerCase()), ...(low.match(SLASH) ?? [])]);
+  const commands = ask.commands.filter((c) => !maskSecrets(c).masked).map((c) => c.toLowerCase());
+  const out = new Set<string>([...commands, ...(low.match(SLASH) ?? [])]);
   for (const l of links) {
     const f = linkFeature(l);
     if (f) out.add(f);
