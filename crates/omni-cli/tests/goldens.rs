@@ -12,15 +12,18 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use omni_core::js::{self, JsObject, JsValue};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
-/// How many scenarios run side by side. Several time a server that is slow to answer, so not all at once.
+/// How many scenarios of one file run side by side. Several time a server that is slow to answer, so not all at once.
 const WORKERS: usize = 12;
+
+/// How many run at once in the whole process, where the test runner has several files going.
+const AT_ONCE: usize = 16;
 
 /// The headers both implementations must send the same. The rest (user-agent, accept-encoding) belong to the HTTP client.
 const HEADERS: [&str; 3] = ["accept", "authorization", "content-type"];
@@ -310,14 +313,16 @@ fn serve(scenario: &JsValue, now: i64, dir: &str) -> Arc<Api> {
     api
 }
 
-/// A port nothing listens on, held for as long as the socket lives: bound, never listening, so a connection is refused
-/// and no other scenario is handed the port meanwhile.
-fn closed_port() -> (rustix::fd::OwnedFd, u16) {
+/// A port nothing listens on, so a connection is refused. On Linux the socket that found it stays bound and never
+/// listens, and no other scenario is handed the port for as long as it lives.
+fn closed_port() -> (Option<rustix::fd::OwnedFd>, u16) {
     use rustix::net::{AddressFamily, SocketType, bind, getsockname, socket};
     let held = socket(AddressFamily::INET, SocketType::STREAM, None).expect("a socket");
     bind(&held, &SocketAddr::from(([127, 0, 0, 1], 0))).expect("a free port");
     let address: SocketAddr = getsockname(&held).expect("the socket's address").try_into().expect("an IP address");
-    (held, address.port())
+    // Linux refuses a connection to a bound socket that does not listen. A Mac drops the packet, and the command
+    // would wait out its time limit. There the socket closes first and the port is only very likely still free.
+    (cfg!(target_os = "linux").then_some(held), address.port())
 }
 
 fn sh(text: &str) -> String {
@@ -565,6 +570,29 @@ fn differences(want: &Ran, got: &Ran) -> Vec<String> {
     out
 }
 
+/// A place among the scenarios running at once, in every test of this file together. Each holds a listener, the
+/// command's three pipes and its connections, and a Mac starts a process with room for 256 open files.
+struct Turn;
+
+static RUNNING: (Mutex<usize>, Condvar) = (Mutex::new(0), Condvar::new());
+
+impl Turn {
+    fn take() -> Self {
+        let (running, freed) = &RUNNING;
+        let mut running = freed.wait_while(running.lock().unwrap(), |n| *n >= AT_ONCE).unwrap();
+        *running += 1;
+        Self
+    }
+}
+
+impl Drop for Turn {
+    fn drop(&mut self) {
+        let (running, freed) = &RUNNING;
+        *running.lock().unwrap() -= 1;
+        freed.notify_one();
+    }
+}
+
 fn check(scenarios: &[JsValue]) {
     let next = AtomicUsize::new(0);
     let failures: Mutex<Vec<(usize, String)>> = Mutex::default();
@@ -574,10 +602,12 @@ fn check(scenarios: &[JsValue]) {
                 loop {
                     let i = next.fetch_add(1, Ordering::Relaxed);
                     let Some(scenario) = scenarios.get(i) else { break };
+                    let turn = Turn::take();
                     let why = match run(scenario) {
                         Ok(ran) => differences(&expected(scenario), &ran),
                         Err(why) => vec![why],
                     };
+                    drop(turn);
                     if !why.is_empty() {
                         let name = text(field(scenario, "name")).unwrap_or_default();
                         failures.lock().unwrap().push((i, format!("{name}:\n{}", why.join("\n"))));
