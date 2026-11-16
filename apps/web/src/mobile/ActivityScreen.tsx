@@ -28,7 +28,7 @@ export function ActivityScreen() {
   const machines = useMachines().data;
   const conductor = useApp().channel(CONDUCTOR_CHANNEL);
   const waiting = [...pinned, ...inbox];
-  const mark = waiting.some((t) => asksForYou(status(t)?.glyph ?? 'idle')) ? 'attention' : working.count ? 'delegating' : 'idle';
+  const mark = waiting.some((t) => asksForYou(status(t)?.glyph ?? 'idle')) ? 'attention' : 'idle';
   const date = new Date(now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (

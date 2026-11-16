@@ -54,9 +54,10 @@ describe("the Conductor's name over its answer on the phone", () => {
     }
   });
 
-  it('keeps the mark moving while its crew runs', () => {
+  it('never makes the mark a running signal: the status dots say what works', () => {
     const line = label(ctx({ crew: [{ ...thread, id: 'kid', status: 'running' } as Thread] }));
-    expect(line).toContain('aria-label="Omni, delegating"');
+    expect(line).toContain('aria-label="Omni"');
+    expect(line).not.toContain('delegating');
   });
 
   it('draws the icon and background saved for it instead', () => {

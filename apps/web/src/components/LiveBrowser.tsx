@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type Keyboard
 import { api, ApiError, errorText, openSSE } from '../api.ts';
 import { AnnotateButton, AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from './BrowserAnnotate.tsx';
 import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from './BrowserAnnotationOverlay.tsx';
-import { Button, Icon, IconButton } from './ui.tsx';
+import { Button, Icon, IconButton, Loader } from './ui.tsx';
 
 export interface BrowserTabInfo {
   id: string;
@@ -256,7 +256,7 @@ function usePaint(b: Browser, box: RefObject<HTMLDivElement | null>, canvas: Ref
 
 function Favicon({ tab, loading }: { tab: BrowserTabInfo; loading?: boolean }) {
   const [failed, setFailed] = useState<string | null>(null);
-  if (loading) return <span className="spin h-3 w-3 shrink-0 rounded-full border-[1.5px] border-fg-4 border-t-transparent" />;
+  if (loading) return <Loader size={12} className="shrink-0 text-fg-3" />;
   if (!tab.favicon || failed === tab.favicon) return <Icon name="globe" size={13} className="shrink-0 text-fg-3" />;
   return <img src={tab.favicon} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setFailed(tab.favicon!)} className="h-4 w-4 shrink-0 rounded-[3px] object-contain" />;
 }

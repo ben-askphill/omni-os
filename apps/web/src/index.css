@@ -367,11 +367,39 @@
     inset: 0;
     border-radius: 50%;
   }
-  .glyph[data-s="running"] > i {
-    background: var(--live);
+  /* Running, by phase (StatusDot's `phase`, @omni/shared/status.ts). One motion for all of them: a halo leaves the
+     dot (omni-ping), slower for the phases that wait on something else. The shape says which phase without it:
+     starting is a hollow ring, working the filled dot, a tool the dot inside a ring, waiting on crew a ring around
+     a small core, checks the filled dot in amber. Loading is the working dot in the text's own color. */
+  .glyph[data-s="running"] {
+    color: var(--live);
   }
-  .glyph[data-s="running"] > i.ping {
-    animation: omni-ping var(--dur-ping) var(--ease-out) infinite;
+  .glyph[data-s="running"] > i {
+    background: currentColor;
+  }
+  .glyph[data-phase="starting"] > i {
+    background: none;
+    box-shadow: inset 0 0 0 1.5px currentColor;
+  }
+  .glyph[data-phase="tool"] > i:not(.ping) {
+    outline: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+    outline-offset: 1.5px;
+  }
+  .glyph[data-phase="delegating"] > i {
+    background: none;
+    box-shadow: inset 0 0 0 1.25px currentColor;
+  }
+  .glyph[data-phase="delegating"] > i:not(.ping) {
+    background: radial-gradient(circle closest-side, currentColor 34%, transparent 42%);
+  }
+  .glyph[data-phase="checking"] {
+    color: var(--warn);
+  }
+  .glyph[data-phase="loading"] {
+    color: inherit;
+  }
+  .glyph[data-phase="loading"] > i {
+    inset: 25%;
   }
   .glyph[data-s="needs"] > i {
     border-radius: 1.5px;
@@ -1182,15 +1210,11 @@
   }
 }
 .ping {
-  animation: omni-ping 1.6s var(--ease-out) infinite;
+  animation: omni-ping var(--dur-ping) var(--ease-out) infinite;
 }
-@keyframes omni-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.spin {
-  animation: omni-spin 0.9s linear infinite;
+/* The phases that wait on something else breathe slower (the phase rules sit with .glyph). */
+.glyph:is([data-phase="starting"], [data-phase="delegating"], [data-phase="checking"]) > .ping {
+  animation-duration: calc(var(--dur-ping) * 1.5);
 }
 /* The browser panel's loading bar, Chrome style: a sliver sweeping under the address bar. */
 @keyframes omni-load {
@@ -1395,7 +1419,6 @@
   }
   .pulse,
   .ping,
-  .spin,
   .shimmer-text {
     animation: none !important;
   }

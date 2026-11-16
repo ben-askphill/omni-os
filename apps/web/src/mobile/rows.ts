@@ -2,7 +2,7 @@
 import { relTime } from '@omni/shared/format.ts';
 import type { Thread, ThreadStub } from '../api.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
-import { STATUS, threadGlyph } from '@omni/shared/status.ts';
+import { PHASE, STATUS, threadGlyph, threadPhase, type Phase } from '@omni/shared/status.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
 
 export interface RowItem {
@@ -16,6 +16,8 @@ export interface RowItem {
   role: string | null;
   /** The thread's status, drawn as its glyph. */
   status: string;
+  /** What it is doing while it is at work, for the dot and the second line (threadPhase). */
+  phase?: Phase | null;
   /** Finished: the title drops to fg-2. */
   settled: boolean;
   time: string;
@@ -37,6 +39,7 @@ export const shortTime = (iso: string, now: number) => relTime(iso, now).replace
 
 export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: number): RowItem {
   const glyph = threadGlyph(t);
+  const phase = glyph === 'running' || glyph === 'queued' ? threadPhase(t) : null;
   return {
     id: t.id,
     title: t.title || 'Untitled',
@@ -46,8 +49,9 @@ export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: nu
     avatarBg: channel?.avatar_bg,
     role: t.role ?? null,
     status: glyph,
+    ...(phase && { phase }),
     settled: !isWorking(t),
     time: shortTime(t.updated_at ?? t.created_at, now),
-    meta: glyph === 'done' || glyph === 'idle' ? null : t.status === 'running' ? runningLabel(t, STATUS[glyph].label) : STATUS[glyph].label,
+    meta: glyph === 'done' || glyph === 'idle' ? null : t.status === 'running' ? runningLabel(t, phase ? PHASE[phase].label : STATUS[glyph].label) : phase ? PHASE[phase].label : STATUS[glyph].label,
   };
 }

@@ -2,7 +2,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
-import { HarnessLogo, HarnessMark, harnessLabel, Loader } from '../components/brand.tsx';
+import { HarnessLogo, HarnessMark, harnessLabel } from '../components/brand.tsx';
 import { ArtifactBody } from '../components/ArtifactViewer.tsx';
 import { AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from '../components/BrowserAnnotate.tsx';
 import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from '../components/BrowserAnnotationOverlay.tsx';
@@ -307,7 +307,7 @@ export function PRScreen() {
           <MoSection title="Checks" count={p.checkRuns.length} pad={false}>
             <MoGroup>
               {p.checkRuns.map((c, i) => (
-                <MoListRow key={`${c.name}:${i}`} icon={<StatusDot status={checkTone(c.state)} size={9} />} label={c.name} right={c.state.toLowerCase().replace(/_/g, ' ')} chevron={false} last={i === p.checkRuns.length - 1} />
+                <MoListRow key={`${c.name}:${i}`} icon={<StatusDot status={checkTone(c.state)} phase={checkTone(c.state) === 'running' ? 'checking' : null} size={9} />} label={c.name} right={c.state.toLowerCase().replace(/_/g, ' ')} chevron={false} last={i === p.checkRuns.length - 1} />
               ))}
             </MoGroup>
           </MoSection>
@@ -450,7 +450,7 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
   }
   for (const l of links.into) rows.push({ key: `i${l.id}`, icon: <AgentGlyph harness={l.harness} status={l.status} />, label: linkName(l), sub: 'Continued in', go: () => open(l.id) });
   for (const c of running) rows.push({ key: `r${c.id}`, icon: <AgentGlyph harness={c.harness} status={c.status} />, label: c.title || 'Untitled', sub: 'Running', right: relTime(c.updated_at), go: () => open(c.id) });
-  for (const t of agents) rows.push({ key: `a${t.task_id}`, icon: <Loader size={15} className="text-live-text" />, label: t.description, sub: subagentKind(t) ? `Subagent · ${subagentKind(t)}` : 'Subagent' });
+  for (const t of agents) rows.push({ key: `a${t.task_id}`, icon: <span className="grid size-[15px] place-items-center"><StatusDot status="running" size={8} /></span>, label: t.description, sub: subagentKind(t) ? `Subagent · ${subagentKind(t)}` : 'Subagent' });
   if (previous.length) {
     rows.push({ key: 'prev', icon: 'delegate', label: 'Previous agents', right: <span className="flex items-center gap-1.5">{previous.length}<Icon name="chevronDown" size={14} className={showPrev ? '' : '-rotate-90'} /></span>, go: () => setShowPrev((v) => !v) });
     if (showPrev) for (const c of previous) rows.push({ key: `d${c.id}`, icon: <AgentGlyph harness={c.harness} status={c.status} />, label: c.title || 'Untitled', sub: statusLabel(c.status), right: relTime(c.updated_at), go: () => open(c.id) });

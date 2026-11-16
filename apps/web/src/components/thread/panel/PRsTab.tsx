@@ -131,7 +131,7 @@ function BranchPRs({ thread, data: { pr, prs }, next, step, parked, openPrompt, 
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[13px] font-medium text-fg">{p.title}</span>
                 <span className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-fg-3">
-                  <StatusDot status={TONE_DOT[line.tone]} size={6} />
+                  <StatusDot status={TONE_DOT[line.tone]} phase={line.tone === 'live' ? 'checking' : null} size={6} />
                   <span className="truncate">{line.text}</span>
                 </span>
                 <span className="flex items-center gap-2 text-[11px] text-fg-3">

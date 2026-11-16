@@ -9,8 +9,8 @@ import { duration, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import type { JobTree, StubNode, TreesFold } from '../thread-tree.ts';
-import { HarnessLogo, Loader, harnessLabel } from './brand.tsx';
-import { DoneMark, Icon, StatusDot, statusLabel } from './ui.tsx';
+import { HarnessLogo, harnessLabel } from './brand.tsx';
+import { Icon, StatusDot, ThreadDot, statusLabel } from './ui.tsx';
 
 /** sidebar and inbox: 28px rows on desktop. phone: 36px rows with the time on the right. */
 export type TreeVariant = 'sidebar' | 'inbox' | 'phone';
@@ -40,7 +40,7 @@ export function TreeTally({ tally, size = 6 }: { tally: Tally; size?: number }) 
     <span className="inline-flex shrink-0 items-center gap-[7px] font-num text-[11px] text-fg-3 tabular-nums">
       {TALLY.filter((x) => tally[x.key]).map((x) => (
         <span key={x.key} className="inline-flex items-center gap-[3px]">
-          {x.glyph === 'running' ? <Loader size={size + 3} className="text-live-text" /> : <StatusDot status={x.glyph} size={size} />}
+          <StatusDot status={x.glyph} size={size} />
           {tally[x.key]}
         </span>
       ))}
@@ -221,7 +221,7 @@ function Node({
         className={`item group/tn flex min-w-0 items-center gap-1.5 pr-2 pl-3 ${ROW[variant]} ${phone ? 'text-fg-2' : 'text-fg-3 hover:text-fg'}`}
       >
         <span className="mr-0.5 grid w-3 shrink-0 place-items-center">
-          {n.state === 'running' ? <Loader size={11} className="text-live-text" /> : t.done_at ? <DoneMark size={7} /> : <StatusDot status={n.state} size={7} />}
+          <ThreadDot t={t} state={n.state} />
         </span>
         {t.harness && (
           <span className="shrink-0 text-fg-2">
@@ -255,7 +255,7 @@ export function AgentRows({ tasks, variant, onNavigate }: { tasks: readonly Back
       <div className="tree-node tree-last" data-variant={variant}>
         <a href={href.thread(tasks[0].thread_id)} onClick={onNavigate} className={`item flex items-center gap-1.5 pr-2 pl-3 text-fg-3 ${ROW.phone} text-[13px]`}>
           <span className="mr-0.5 grid w-3 shrink-0 place-items-center">
-            <Loader size={10} className="text-live-text" />
+            <StatusDot status="running" size={6} />
           </span>
           <Icon name="layers" size={13} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">{plural(tasks.length, 'agent')} running</span>
@@ -273,7 +273,7 @@ export function AgentRows({ tasks, variant, onNavigate }: { tasks: readonly Back
             className={`item flex min-w-0 items-center gap-1.5 pr-2 pl-3 text-[12px] text-fg-3 hover:text-fg ${ROW[variant]}`}
           >
             <span className="mr-0.5 grid w-3 shrink-0 place-items-center">
-              <Loader size={10} className="text-live-text" />
+              <StatusDot status="running" size={6} />
             </span>
             <Icon name="layers" size={12} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate">{k.description}</span>

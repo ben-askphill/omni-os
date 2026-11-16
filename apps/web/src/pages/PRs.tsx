@@ -27,7 +27,7 @@ export function ChecksSummary({ c }: { c: Checks }) {
     <span className="inline-flex items-center gap-2 font-num text-[11.5px] tabular-nums" title={`${c.passed} passed, ${c.failed} failed, ${c.pending} pending`}>
       {c.passed > 0 && <span className="inline-flex items-center gap-1 text-fg-2"><StatusDot status="done" size={7} /> {c.passed}</span>}
       {c.failed > 0 && <span className="inline-flex items-center gap-1 text-fg-2"><StatusDot status="needs" size={7} /> {c.failed}</span>}
-      {c.pending > 0 && <span className="inline-flex items-center gap-1 text-live-text"><StatusDot status="running" size={7} /> {c.pending}</span>}
+      {c.pending > 0 && <span className="inline-flex items-center gap-1 text-fg-2"><StatusDot status="running" phase="checking" size={7} /> {c.pending}</span>}
     </span>
   );
 }

@@ -114,7 +114,7 @@ function Wizard() {
         className="modal-in flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-[var(--r-3xl)] bg-elev shadow-[var(--shadow-menu)] sm:max-h-[min(720px,calc(100dvh-48px))] sm:max-w-lg sm:rounded-[var(--r-3xl)]"
       >
         <div className="flex items-center justify-between gap-3 px-6 pt-6 sm:px-8 sm:pt-8">
-          <OmniMark size={32} state={busy ? 'thinking' : 'idle'} />
+          <OmniMark size={32} />
           <Steps step={step} />
         </div>
         <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6 sm:px-8">

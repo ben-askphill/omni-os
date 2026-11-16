@@ -10,8 +10,8 @@ export function useThreadPresence(id: string, thread: Thread | null) {
 
   // The sidebar keeps this thread listed under its channel, with live title and status, even once it stops.
   useEffect(() => {
-    if (thread) setOpenThread({ id: thread.id, channel_id: thread.channel_id, title: thread.title, status: thread.status, created_at: thread.created_at, done_at: thread.done_at });
-  }, [thread?.id, thread?.channel_id, thread?.title, thread?.status, thread?.created_at, thread?.done_at]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (thread) setOpenThread({ id: thread.id, channel_id: thread.channel_id, title: thread.title, status: thread.status, created_at: thread.created_at, done_at: thread.done_at, delegating: thread.delegating, setup: thread.setup, limit_state: thread.limit_state });
+  }, [thread?.id, thread?.channel_id, thread?.title, thread?.status, thread?.created_at, thread?.done_at, thread?.delegating, thread?.setup, thread?.limit_state]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => setOpenThread(null), [setOpenThread]);
 
   // On screen, the thread's newest result is read: exactly the one Needs you listed, so a turn that ends after it

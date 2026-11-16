@@ -1,10 +1,11 @@
+import type { Phase, TurnPhase } from '@omni/shared/status.ts';
 import { useState, type ReactNode } from 'react';
 import type { BackgroundTask, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
-import { HarnessMark, harnessLabel, Loader } from '../brand.tsx';
+import { HarnessMark, harnessLabel } from '../brand.tsx';
 import { useThreadAccount } from '../../accounts.ts';
 import { threadAccountLine } from '@omni/shared/harness-accounts.ts';
-import { Chip, copyText, Icon, IconButton, StatusDot, type Glyph, type IconName } from '../ui.tsx';
+import { Chip, copyText, Icon, IconButton, StatusDot, ThreadDot, type Glyph, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
@@ -84,6 +85,7 @@ export function ThreadQuickCard({
   onOpenThread,
   onJump,
   asking = false,
+  turn,
   reconnecting = false,
   className = '',
 }: {
@@ -108,6 +110,8 @@ export function ThreadQuickCard({
   onJump: (eventId: number) => void;
   /** The agent waits on a question card: the turn is open, but on Ben. */
   asking?: boolean;
+  /** What the running turn is doing, for the run row's dot. */
+  turn?: TurnPhase | null;
   reconnecting?: boolean;
   className?: string;
 }) {
@@ -120,8 +124,8 @@ export function ThreadQuickCard({
   const model = thread.model || init?.model;
   const now = useNow(60_000);
   // The run row says what the header pill says, except that a turn in progress reads as one.
-  const pill = threadPill(thread, { asking, reconnecting, now });
-  const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? 'Waiting on you' : pill.label } : { glyph: 'running' as const, label: runningLabel(thread, 'Turn running') };
+  const pill = threadPill(thread, { asking, reconnecting, now, turn });
+  const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? 'Waiting on you' : pill.label } : { glyph: 'running' as const, label: runningLabel(thread, 'Turn running'), phase: pill.phase };
   const branchDisabled = !thread.branch;
   // The account its harness ran as when its process last started (apps/server/harness-accounts.ts), here or elsewhere.
   const ran = useThreadAccount(thread.id);
@@ -166,7 +170,7 @@ export function ThreadQuickCard({
         </QuickRow>
       )}
       <QuickRow icon={run.glyph === 'running' ? 'zap' : 'clock'}>
-        <StatusDot status={run.glyph} size={8} />
+        <StatusDot status={run.glyph} phase={run.phase} size={8} />
         <span className="truncate">
           {run.label}
           {warm !== undefined && !remote && !reconnecting && (
@@ -210,7 +214,7 @@ export function ThreadQuickCard({
           <span className="font-medium">All details</span>
         </QuickRow>
       </div>
-      <Lineage thread={thread} glyph={run.glyph} parent={parent} delegated={children.filter(isWorking)} agents={agents} onOpenThread={onOpenThread} onJump={onJump} />
+      <Lineage thread={thread} glyph={run.glyph} phase={run.phase} parent={parent} delegated={children.filter(isWorking)} agents={agents} onOpenThread={onOpenThread} onJump={onJump} />
     </section>
   );
 }
@@ -253,7 +257,7 @@ function SubagentLeaf({ t, last, indent, onJump }: { t: BackgroundTask; last: bo
   const body = (
     <>
       <Branch last={last} />
-      <Loader size={10} className="shrink-0 text-live-text" />
+      <StatusDot status="running" size={6} className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">{t.description}</span>
       <span className="shrink-0 font-num text-[10.5px] text-fg-3 tabular-nums">{duration(Math.max(0, now - toDate(t.started_at).getTime()))}</span>
     </>
@@ -278,6 +282,7 @@ function SubagentLeaf({ t, last, indent, onJump }: { t: BackgroundTask; last: bo
 function Lineage({
   thread,
   glyph,
+  phase,
   parent,
   delegated,
   agents,
@@ -287,6 +292,8 @@ function Lineage({
   thread: Thread;
   /** The thread's own state, as the run row shows it. */
   glyph: Glyph;
+  /** What its running dot says (threadPhase), when it is at work. */
+  phase?: Phase | null;
   parent: Thread | null;
   delegated: Thread[];
   agents: BackgroundTask[];
@@ -312,18 +319,18 @@ function Lineage({
         <button type="button" title={`Back to the thread that delegated this one: ${parent.title}`} onClick={() => onOpenThread(parent.id)} className={treeButton}>
           <Icon name="arrowUpRight" size={13} className="shrink-0 text-fg-3" />
           <span className="min-w-0 flex-1 truncate text-fg-2">{parent.title || 'Untitled'}</span>
-          <StatusDot status={parent.status} size={6} />
+          <ThreadDot t={parent} size={6} />
         </button>
       )}
       <div className={`${treeRow} font-medium`}>
         {parent && <Branch last />}
-        <StatusDot status={glyph} size={7} />
+        <StatusDot status={glyph} phase={phase} size={phase ? 8 : 7} />
         <span className="min-w-0 flex-1 truncate">{thread.title || 'This thread'}</span>
       </div>
       {delegated.map((c, i) => (
         <button key={c.id} type="button" title={c.title} onClick={() => onOpenThread(c.id)} className={`${treeButton} ${indent}`}>
           <Branch last={i === total - 1} />
-          <StatusDot status={c.status} size={6} />
+          <ThreadDot t={c} size={6} />
           <span className="min-w-0 flex-1 truncate">{c.title || 'Untitled'}</span>
           <Icon name="chevronRight" size={12} className="shrink-0 text-fg-3" />
         </button>

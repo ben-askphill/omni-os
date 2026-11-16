@@ -67,7 +67,7 @@ export function ChannelsScreen() {
         <div className="px-4">
           <MoGroup>
             <MoListRow
-              icon={conductor && hasOwnLook(conductor) ? <Avatar name={conductor.name} omni channelIcon={conductor.icon} avatarBg={conductor.avatar_bg} size={30} /> : <OmniMark size={22} state={conductor?.running ? 'delegating' : 'idle'} />}
+              icon={conductor && hasOwnLook(conductor) ? <Avatar name={conductor.name} omni channelIcon={conductor.icon} avatarBg={conductor.avatar_bg} size={30} /> : <OmniMark size={22} />}
               label="Conductor"
               sub={conductor?.notes || 'Delegates to crew threads in every channel'}
               right={<Counts needs={needsIn('conductor')} running={conductor?.running ?? 0} />}

@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { api, errorText, type BackgroundTask, type Thread } from '../api.ts';
 import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts';
 import { toDate } from '@omni/shared/format.ts';
-import { Button, ErrorNote, Loader } from '../components/ui.tsx';
+import { Button, ErrorNote, Loader, StatusDot } from '../components/ui.tsx';
 import { duration } from '../format.ts';
 import { runningSubagents, subagentKind } from '../subagents.ts';
 import { canMarkDone } from '../needs-you.ts';
@@ -20,7 +20,7 @@ function MoSubagentRow({ t, last, onJump }: { t: BackgroundTask; last: boolean; 
   const now = useNow(1000);
   return (
     <MoListRow
-      icon={<Loader size={14} className="mx-0.5 text-live-text" />}
+      icon={<span className="mx-0.5 grid size-3.5 place-items-center"><StatusDot status="running" size={8} /></span>}
       label={t.description}
       sub={subagentKind(t)}
       right={duration(Math.max(0, now - toDate(t.started_at).getTime()))}

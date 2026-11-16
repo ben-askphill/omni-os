@@ -1,3 +1,4 @@
+import { turnPhase } from '@omni/shared/status.ts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, type HarnessWithRunning } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
@@ -110,6 +111,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   const members = useMemo(() => teamOf(children), [children]);
   const reports = useMemo(() => reportNotes(queued), [queued]);
   const asking = useMemo(() => isAsking(events), [events]);
+  // What the running turn is doing, for the header pill's dot and the quick card's.
+  const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
   const agents = useMemo(() => runningSubagents(tasks, id), [tasks, id]);
   const selectArtifact = useCallback(
     (artifact: number) => {
@@ -219,6 +222,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             onPanel: panel.toggle,
             artifactCount,
             asking,
+            turn,
           }}
         />
 
@@ -316,6 +320,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 onOpenThread={(t) => navigate(href.thread(t))}
                 onJump={jumpTo}
                 asking={asking}
+                turn={turn}
                 reconnecting={reconnecting}
               />
             </div>

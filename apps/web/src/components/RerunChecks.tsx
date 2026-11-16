@@ -38,7 +38,7 @@ export function RerunNote({ outcome, className = '' }: { outcome: Outcome | null
   if (!outcome.ok) return <ErrorNote className={className}>{outcome.text}</ErrorNote>;
   return (
     <div role="status" className={`pop-in flex items-start gap-2.5 rounded-[var(--r-xl)] bg-surface px-4 py-3 text-[length:var(--fs-ui)] text-fg ${className}`}>
-      <StatusDot status="running" size={9} className="mt-1 shrink-0" />
+      <StatusDot status="running" phase="checking" size={9} className="mt-1 shrink-0" />
       <span>{outcome.text}</span>
     </div>
   );

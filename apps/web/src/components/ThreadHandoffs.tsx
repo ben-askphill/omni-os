@@ -2,10 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { ThreadStub } from '../api.ts';
 import { href } from '../router.ts';
 import { readPref, useApp, writePref } from '../store.tsx';
-import { DoneMark, Icon, StatusDot } from './ui.tsx';
-import { Loader } from './brand.tsx';
-import { isWorking } from '@omni/shared/delegate-count.ts';
-import { threadGlyph } from '@omni/shared/status.ts';
+import { Icon, ThreadDot } from './ui.tsx';
 
 /** A Conductor job row with its delegated threads, using the sidebar's existing tree-row style. */
 export function ThreadHandoffs({ parent, children, renderParent, channelIndent = false, idPrefix = 'sidebar', onNavigate }: {
@@ -50,7 +47,6 @@ function HandoffLink({ child, last, onNavigate }: { child: ThreadStub; last: boo
   const { channels } = useApp();
   const channel = channels.find((c) => c.id === child.channel_id)?.name ?? child.channel_id;
   const title = child.title || 'Untitled';
-  const busy = isWorking(child);
 
   return (
     <a
@@ -62,7 +58,7 @@ function HandoffLink({ child, last, onNavigate }: { child: ThreadStub; last: boo
     >
       <span aria-hidden className={`pointer-events-none absolute -left-[9px] top-0 w-2 border-l border-line-strong ${last ? 'h-1/2 rounded-bl-[6px] border-b' : 'h-full'}`} />
       <span className="grid w-2.5 shrink-0 place-items-center" aria-hidden="true">
-        {busy ? <Loader size={10} className="text-live-text" /> : child.done_at ? <DoneMark size={7} /> : <StatusDot status={threadGlyph(child)} size={7} />}
+        <ThreadDot t={child} />
       </span>
       <span className="min-w-0 flex-1 truncate">{title}</span>
       <span className="max-w-[40%] shrink-0 truncate rounded-full bg-surface-2 px-1.5 text-[length:var(--fs-label)] leading-[18px] text-fg-3">#{channel}</span>

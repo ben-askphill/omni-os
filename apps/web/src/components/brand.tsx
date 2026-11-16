@@ -37,10 +37,11 @@ export function StaticMark({ size = 32, title = 'Omni', className = '' }: { size
 }
 
 /**
- * The live mark. `thinking` ripples, `delegating` sheds droplets, `report` catches one coming back,
- * `attention` pulls the satellite in and turns vermilion. It leans toward the pointer.
+ * The live mark: it breathes and leans toward the pointer, and `attention` pulls the satellite in and turns it
+ * vermilion. It never shows that something runs: that is the status dot's job (ui/status.tsx), so the mark takes
+ * none of the working states the physics know (thinking, delegating, report).
  */
-export function OmniMark({ state = 'idle', size = 48, title = 'Omni' }: { state?: MarkState; size?: number; title?: string }) {
+export function OmniMark({ state = 'idle', size = 48, title = 'Omni' }: { state?: Extract<MarkState, 'idle' | 'hover' | 'attention'>; size?: number; title?: string }) {
   const reduced = useReducedMotion();
   const id = `goo${useId().replace(/:/g, '')}`;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -153,28 +154,7 @@ export function OmniWordmark({ height = 32 }: { height?: number }) {
 
 // ---------- loader ----------
 
-/** A bead of the ring's own liquid travels around it: a bulge, not a spinner. */
-export function Loader({ size = 14, className = '' }: { size?: number; className?: string }) {
-  const id = `lgoo${useId().replace(/:/g, '')}`;
-  const reduced = useReducedMotion();
-  return (
-    <svg width={size} height={size} viewBox="-64 -64 128 128" className={`block shrink-0 overflow-visible ${className}`} role="status" aria-label="Loading">
-      <defs>
-        <filter id={id} x="-120" y="-120" width="240" height="240" filterUnits="userSpaceOnUse">
-          <feGaussianBlur stdDeviation="5" />
-          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8" />
-        </filter>
-      </defs>
-      <g filter={`url(#${id})`}>
-        <circle r="40" fill="none" stroke="currentColor" strokeWidth="20" />
-        <g>
-          <circle cx="0" cy="-54" r="13" fill="currentColor" />
-          {!reduced && <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="1.6s" repeatCount="indefinite" />}
-        </g>
-      </g>
-    </svg>
-  );
-}
+export { Loader } from './ui/status.tsx';
 
 // ---------- harness marks ----------
 

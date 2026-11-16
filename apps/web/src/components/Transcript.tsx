@@ -16,6 +16,7 @@ import { CheckItem, copyText, Icon, Loader, StatusDot, StatusPill, Ticks } from 
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
+import { PHASE, turnPhase } from '@omni/shared/status.ts';
 import { ThinkingLine } from './thread/ThinkingLine.tsx';
 import type { SlashHit } from '@omni/shared/slash.ts';
 import { publishedFrom, type Published } from '@omni/shared/published.ts';
@@ -481,6 +482,7 @@ export const Transcript = memo(function Transcript({
   const tasks = useMemo(() => mergeTasks(stored, live, threadId, { feedLive, here: !elsewhere }), [stored, live, feedLive, threadId, elsewhere]);
   const latestStatus = useMemo(() => (running ? statusLabel(events) : null), [events, running]);
   const since = useMemo(() => (running ? turnStart(events) : null), [events, running]);
+  const phase = useMemo(() => (running ? turnPhase(events) : 'working'), [events, running]);
 
   // Mod log lines are asides: the row before them is still the live one.
   const lastIdx = items.findLastIndex((it) => it.type !== 'mod');
@@ -518,7 +520,7 @@ export const Transcript = memo(function Transcript({
             />,
           ])}
           {edgeRow(-1)}
-          {running && !asking && <ThinkingLine label={latestStatus ?? 'Thinking'} since={since} />}
+          {running && !asking && <ThinkingLine label={latestStatus ?? (phase === 'starting' ? PHASE.starting.label : 'Thinking')} since={since} phase={phase} />}
         </div>
       </TaskCtx.Provider>
     </HistoryCtx.Provider>

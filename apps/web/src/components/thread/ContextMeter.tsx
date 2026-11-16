@@ -228,7 +228,7 @@ function ContextPanel({
               aria-label="Refresh"
               className="hov press grid h-7 w-7 shrink-0 place-items-center rounded-full text-fg-3 hover:text-fg disabled:opacity-40"
             >
-              <Icon name="refresh" size={14} className={refreshing ? 'animate-spin' : ''} />
+              <Icon name="refresh" size={14} className={refreshing ? 'pulse' : ''} />
             </button>
           </div>
 

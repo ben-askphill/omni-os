@@ -36,7 +36,7 @@ import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { runningSubagents } from '../subagents.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
-import { STATUS, asksForYou, type Glyph } from '@omni/shared/status.ts';
+import { STATUS, asksForYou, turnPhase, type Glyph } from '@omni/shared/status.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
@@ -55,6 +55,7 @@ export function ThreadScreen() {
   const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
   const edges = useMemo(() => historyEdges({ spans }, view?.turns.map((t) => t.key) ?? []), [spans, view]);
   const status = useMemo(() => (thread?.status === 'running' ? statusLabel(events) : null), [events, thread?.status]);
+  const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
   const changes = useBranchChanges(thread, slotBusy);
   const [pr] = useThreadPR(thread, slotBusy, true);
   const agents = useMemo(() => runningSubagents(tasks, thread?.id ?? ''), [tasks, thread?.id]);
@@ -128,10 +129,10 @@ export function ThreadScreen() {
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
   const reconnecting = !s.live && ready;
-  const own = threadPill(thread, { asking: view.asking, reconnecting, now });
+  const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn });
   const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: STATUS[needs].label } : own;
   const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
-  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, ch, changes, pr, now, shell, status };
+  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, ch, changes, pr, now, shell, status, turn };
 
   const openFromCard = (tab: PanelTab) => {
     setQuick(false);
@@ -156,7 +157,7 @@ export function ThreadScreen() {
         sub={parent ? <span>{sub} · <a href={href.thread(parent.id)} className="text-fg-2 hover:text-fg" title={`Delegated from ${parent.title}`}>Parent: {parent.title}</a></span> : sub}
         right={
           <>
-            <StatusPill status={pill.glyph} label={pill.label} />
+            <StatusPill status={pill.glyph} phase={pill.phase} label={pill.label} />
             <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
             <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
           </>
@@ -181,6 +182,7 @@ export function ThreadScreen() {
                 machineName={hereName}
                 cwd={workCwd}
                 asking={view.asking}
+                turn={turn}
                 reconnecting={reconnecting}
                 onOpen={openFromCard}
                 onOpenThread={(id) => {

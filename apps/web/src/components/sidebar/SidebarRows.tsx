@@ -5,8 +5,8 @@ import { drag } from '../../folders.tsx';
 import { duration, plural } from '../../format.ts';
 import { href } from '../../router.ts';
 import { readPref, useApp, useNow, writePref } from '../../store.tsx';
-import { HarnessLogo, Loader } from '../brand.tsx';
-import { DoneMark, Icon, StatusDot, threadGlyph, threadStatusText, type IconName } from '../ui.tsx';
+import { HarnessLogo } from '../brand.tsx';
+import { Icon, StatusDot, ThreadDot, threadStatusText, type IconName } from '../ui.tsx';
 import { showsRunning } from '@omni/shared/delegate-count.ts';
 import { showsAgents } from '@omni/shared/thread-tree.ts';
 import { useJobTree, treeLabel, type JobTree } from '../../thread-tree.ts';
@@ -96,7 +96,7 @@ export function ThreadLink({ t, active, tasks, onNavigate, indent = true, tree }
         }`}
       >
         <span className="grid w-3 shrink-0 place-items-center">
-          {busy ? <Loader size={11} className="text-live-text" /> : t.done_at ? <DoneMark size={7} /> : <StatusDot status={threadGlyph(t)} size={7} />}
+          <ThreadDot t={t} busy={busy} />
         </span>
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {t.harness && (
@@ -150,7 +150,7 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
         className={`pointer-events-none absolute top-0 left-0 w-2 border-l border-line-strong ${last ? 'h-1/2 rounded-bl-[6px] border-b' : 'h-full'}`}
       />
       <span className="min-w-0 flex-1 truncate">{t.description}</span>
-      <Loader size={10} className="shrink-0 text-live-text" />
+      <StatusDot status="running" size={6} className="shrink-0" />
       <span className="shrink-0 font-num text-[11px] text-fg-3 tabular-nums">{duration(Math.max(0, now - toDate(t.started_at).getTime()))}</span>
     </a>
   );
@@ -182,7 +182,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
         className={`item flex h-9 min-w-0 flex-1 items-center gap-2.5 px-3 text-[13.5px] md:h-8 md:text-[13px] ${active ? 'font-medium text-fg' : 'text-fg-2 hover:text-fg'}`}
       >
         <span className="grid w-[15px] shrink-0 place-items-center">
-          {busy ? <Loader size={11} className="text-live-text" /> : t.done_at ? <DoneMark size={7} /> : <StatusDot status={threadGlyph(t)} size={7} />}
+          <ThreadDot t={t} busy={busy} />
         </span>
         <span className="min-w-0 flex-1 truncate">{title}</span>
         <span

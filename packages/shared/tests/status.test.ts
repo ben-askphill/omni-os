@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STATUS, glyphFor, inboxStatus, resultGlyph, statusLabel, threadGlyph } from '../status.ts';
+import { PHASE, STATUS, glyphFor, inboxStatus, resultGlyph, statusLabel, threadGlyph, threadPhase, turnPhase, waitsElsewhere } from '../status.ts';
 
 describe('status', () => {
   it('has one label for each state a person reads', () => {
@@ -58,5 +58,69 @@ describe('inboxStatus', () => {
       [{ status: 'failed', limit_state: 'limited' }, { blockers: [{ kind: 'limited' as const }], result: { status: 'failed' } }],
     ] as const;
     for (const [t, need] of pairs) expect(inboxStatus(t, need)?.glyph).toBe(threadGlyph(t));
+  });
+});
+
+const row = (kind: string, payload: unknown = {}) => ({ kind, payload: JSON.stringify(payload) });
+
+describe('the phase a working thread shows', () => {
+  it('names every phase for the dot\'s tooltip', () => {
+    expect(Object.values(PHASE).map((p) => p.label)).toEqual(['Starting', 'Running', 'Running a tool', 'Waiting on crew', 'Checks running']);
+    for (const p of Object.values(PHASE)) expect(p.hint).not.toBe('');
+  });
+
+  it('reads Starting while the folder is prepared, queued or running', () => {
+    expect(threadPhase({ status: 'queued', setup: 'preparing' })).toBe('starting');
+    expect(threadPhase({ status: 'running', setup: 'preparing' })).toBe('starting');
+    // A failed setup is not at work, and a stopped thread whose setup row was left behind is not either.
+    expect(threadPhase({ status: 'failed', setup: 'failed' })).toBeNull();
+    expect(threadPhase({ status: 'stopped', setup: 'preparing' })).toBeNull();
+  });
+
+  it('reads its own turn first, then the crew it waits on', () => {
+    expect(threadPhase({ status: 'running' })).toBe('working');
+    expect(threadPhase({ status: 'running', delegating: true })).toBe('working');
+    expect(threadPhase({ status: 'done', delegating: true })).toBe('delegating');
+    expect(threadPhase({ status: 'running' }, 'tool')).toBe('tool');
+    // The turn's phase belongs to a running turn only.
+    expect(threadPhase({ status: 'done', delegating: true }, 'tool')).toBe('delegating');
+  });
+
+  it('has no phase for a thread that is not at work', () => {
+    for (const status of ['queued', 'done', 'failed', 'stopped', 'imported']) expect(threadPhase({ status })).toBeNull();
+    expect(threadPhase({ status: 'queued', delegating: true })).toBeNull();
+  });
+
+  it('pulses slower for the phases that wait on something else', () => {
+    expect((['starting', 'working', 'tool', 'delegating', 'checking'] as const).filter(waitsElsewhere)).toEqual(['starting', 'delegating', 'checking']);
+  });
+});
+
+describe('the phase of a running turn, from its rows', () => {
+  it('is starting until the harness takes the message', () => {
+    expect(turnPhase([])).toBe('starting');
+    expect(turnPhase([row('user'), row('assistant_text'), row('result')])).toBe('starting');
+    // A status or an init alone says the process is up, not that it read the message.
+    expect(turnPhase([row('result'), row('init'), row('status', { text: 'Compacting' })])).toBe('starting');
+  });
+
+  it('is working once the message is replayed or anything is said', () => {
+    expect(turnPhase([row('result'), row('user')])).toBe('working');
+    expect(turnPhase([row('user'), row('assistant_text', { text: 'On it' })])).toBe('working');
+  });
+
+  it('is a tool while a call has no result, and working again once it returns', () => {
+    const call = row('tool_use', { id: 'a', name: 'Bash' });
+    expect(turnPhase([row('user'), call])).toBe('tool');
+    expect(turnPhase([row('user'), call, row('tool_result', { tool_use_id: 'a' })])).toBe('working');
+    expect(turnPhase([row('user'), call, row('tool_result', { tool_use_id: 'a' }), row('tool_use', { id: 'b' })])).toBe('tool');
+  });
+
+  it('does not read a call the last turn left open', () => {
+    expect(turnPhase([row('user'), row('tool_use', { id: 'old' }), row('result'), row('user')])).toBe('working');
+  });
+
+  it('skips a row it cannot read', () => {
+    expect(turnPhase([row('user'), { kind: 'tool_use', payload: '{' }])).toBe('working');
   });
 });

@@ -1,5 +1,4 @@
 import { relTime } from '@omni/shared/format.ts';
-import { Loader } from './brand.tsx';
 import { useCallback, useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { api, errorText, useApi, type BranchPRMark, type ChannelWithRunning, type FolderWithThreads, type Thread } from '../api.ts';
 import { folderOf, groupByFolder } from '../folder-groups.ts';
@@ -10,7 +9,7 @@ import { useApp, useFeed, useNow } from '../store.tsx';
 import { Avatar, Button, Chip, DoneMark, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
 import { isWorking, showsRunning } from '@omni/shared/delegate-count.ts';
-import { threadGlyph } from '@omni/shared/status.ts';
+import { threadGlyph, threadPhase } from '@omni/shared/status.ts';
 
 /** Loads a thread list and keeps it current from /feed. With `archived`, the list holds archived threads only. */
 export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500, archived = false) {
@@ -73,12 +72,12 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
         <span className="relative mt-0.5 shrink-0">
           <Avatar name={t.channel_id} omni={t.channel_id === 'conductor'} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} avatarBg={channels.find((c) => c.id === t.channel_id)?.avatar_bg} size={32} />
           <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-            {t.done_at ? <DoneMark size={8} /> : <StatusDot status={threadGlyph(t)} size={8} />}
+            {t.done_at ? <DoneMark size={8} /> : <StatusDot status={threadGlyph(t)} phase={threadPhase(t)} size={8} />}
           </span>
         </span>
       ) : (
         <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          {t.done_at ? <DoneMark /> : <StatusDot status={threadGlyph(t)} size={10} />}
+          {t.done_at ? <DoneMark /> : <StatusDot status={threadGlyph(t)} phase={threadPhase(t)} size={10} />}
         </span>
       )}
       <div className="min-w-0 flex-1">
@@ -93,7 +92,6 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-fg-3">
           {showChannel && <span className="shrink-0 text-fg-2">#{t.channel_id}</span>}
           {t.branch && <span className="hidden shrink-0 rounded-full bg-surface-2 px-1.5 font-mono text-[10.5px] leading-[18px] text-fg-3 sm:inline">{t.branch}</span>}
-          {!t.last_text && showsRunning(t) && <Loader size={11} className="shrink-0" />}
           {mod && (
             <span className="max-w-[45%] shrink-0 truncate rounded-full bg-surface-2 px-1.5 text-[11px] leading-[18px] text-fg-3" title={`${mod.plugin}: ${mod.text}`}>
               {mod.text}
@@ -251,7 +249,7 @@ function FolderHeader({ channel, folder, count, running }: { channel: ChannelWit
           <Icon name="folder" size={13} className="shrink-0 text-fg-3" />
           <span className="min-w-0 truncate">{folder.name}</span>
           <span className="text-fg-3">{count}</span>
-          {running && <Loader size={11} className="shrink-0 text-live-text" />}
+          {running && <StatusDot status="running" size={7} className="shrink-0" />}
         </button>
       ) : (
         <div aria-label={label} className={cls}>

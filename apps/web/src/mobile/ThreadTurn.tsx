@@ -1,3 +1,4 @@
+import { PHASE, type TurnPhase } from '@omni/shared/status.ts';
 import { Fragment, useEffect, useMemo, useRef } from 'react';
 import { useApi, type Artifact, type BranchChanges, type Channel, type Thread } from '../api.ts';
 import { Attachments, SwitchLine } from '../components/Transcript.tsx';
@@ -22,7 +23,6 @@ import { shortTime } from './rows.ts';
 import { limitLabel } from '../limits.ts';
 import type { useShell, useThread } from './shell.tsx';
 import type { ThreadView as ThreadOf } from '@omni/shared/thread-view.ts';
-import { showsRunning } from '@omni/shared/delegate-count.ts';
 
 /** A worktree thread's changes since its base, again whenever a turn starts or ends. */
 export function useBranchChanges(thread: Thread | null, busy: boolean) {
@@ -56,10 +56,12 @@ export type TurnCtx = {
   shell: ReturnType<typeof useShell>;
   /** The running turn's latest status (`statusLabel`), null for the default. */
   status: string | null;
+  /** What the running turn is doing (`turnPhase`), for the thinking line's dot. */
+  turn: TurnPhase | null;
 };
 
 function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
-  const { view, conductor, conductorChannel, crew, ch, thread, changes, pr, now, shell } = c;
+  const { view, conductor, conductorChannel, ch, thread, changes, pr, now, shell } = c;
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
     const delegated = t.children.length > 0 && <Delegation kids={t.children} />;
@@ -69,7 +71,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
           {t.status === 'queued' ? (
             <NowLine now={{ verb: 'Waiting for a free slot', target: '' }} />
           ) : (
-            <ThinkingLine label={c.status ?? 'Thinking'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
+            <ThinkingLine label={c.status ?? (c.turn === 'starting' ? PHASE.starting.label : 'Thinking')} phase={c.turn ?? 'working'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
           )}
           {view.plan && <Plan plan={view.plan} />}
           {t.cloud && <CloudAgentCard p={t.cloud} />}
@@ -88,7 +90,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
             {conductorChannel && hasOwnLook(conductorChannel) ? (
               <Avatar name={conductorChannel.name} omni channelIcon={conductorChannel.icon} avatarBg={conductorChannel.avatar_bg} size={20} />
             ) : (
-              <OmniMark size={20} state={crew.some(showsRunning) ? 'delegating' : 'idle'} />
+              <OmniMark size={20} />
             )}
             Conductor
           </div>

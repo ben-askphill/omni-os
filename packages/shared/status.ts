@@ -53,6 +53,71 @@ export function threadGlyph(t: { status: string; delegating?: boolean; limit_sta
   return glyphFor(t.status);
 }
 
+/**
+ * What a working thread is doing, as far as the app knows it. Each phase draws its own running dot (StatusDot's
+ * `phase`; apps/web/src/index.css, .glyph[data-phase]): filled while the thread's own turn works, hollow or ringed
+ * while it waits on something else, which also pulses slower.
+ */
+export type Phase = 'starting' | 'working' | 'tool' | 'delegating' | 'checking';
+
+/** Each phase's name and what it means, for the dot's tooltip and accessible label. */
+export const PHASE: Record<Phase, { label: string; hint: string }> = {
+  starting: { label: 'Starting', hint: 'Its folder is being prepared, or the agent has not picked the message up yet' },
+  working: { label: 'Running', hint: 'Its own turn runs' },
+  tool: { label: 'Running a tool', hint: 'A tool call in its turn has not returned yet' },
+  delegating: { label: 'Waiting on crew', hint: 'Its own turn ended; threads or sub-agents it delegated still work' },
+  checking: { label: 'Checks running', hint: 'Checks on its pull request have not finished' },
+};
+
+/** The phases that wait on something other than the thread's own turn: their dot pulses slower. */
+export const waitsElsewhere = (p: Phase) => p === 'starting' || p === 'delegating' || p === 'checking';
+
+/** What a running turn is doing, read off the open thread's rows (turnPhase). The lists do not have the rows. */
+export type TurnPhase = Extract<Phase, 'starting' | 'working' | 'tool'>;
+
+/** The rows that show the harness took the message or answered: before the first of them, the turn is starting. */
+const TURN_LIVE = new Set(['user', 'crew_report', 'assistant_text', 'tool_use', 'tool_result', 'task']);
+/** How far back a turn is read. An open call older than this reads Working. */
+const TURN_ROWS = 600;
+
+/**
+ * The running turn's phase, from the thread's rows back to the last result: `starting` until the harness replays the
+ * message or says anything, `tool` while a call has no result yet, else `working`. Only meaningful while the thread's
+ * own turn runs.
+ */
+export function turnPhase(events: readonly { kind: string; payload?: string | null }[]): TurnPhase {
+  const returned = new Set<string>();
+  let live = false;
+  for (let k = events.length - 1, n = 0; k >= 0 && n < TURN_ROWS; k--, n++) {
+    const e = events[k];
+    if (e.kind === 'result') break;
+    if (TURN_LIVE.has(e.kind)) live = true;
+    if (e.kind !== 'tool_use' && e.kind !== 'tool_result') continue;
+    let p: { id?: unknown; tool_use_id?: unknown } | null = null;
+    try {
+      p = JSON.parse(e.payload ?? 'null');
+    } catch {
+      continue;
+    }
+    if (e.kind === 'tool_result') {
+      if (typeof p?.tool_use_id === 'string') returned.add(p.tool_use_id);
+    } else if (typeof p?.id === 'string' && !returned.has(p.id)) return 'tool';
+  }
+  return live ? 'working' : 'starting';
+}
+
+/**
+ * The phase a thread's running dot shows, or null when it is not at work. Its folder being prepared comes first
+ * (`setup`, runner/setup.ts), then its own turn (with `turn` where the rows are at hand), then the threads and
+ * sub-agents it delegated (`delegating`, apps/server/delegating.ts). Queued alone waits for a slot: no phase.
+ */
+export function threadPhase(t: { status: string; delegating?: boolean; setup?: string | null }, turn?: TurnPhase | null): Phase | null {
+  if (t.setup === 'preparing' && (t.status === 'running' || t.status === 'queued')) return 'starting';
+  if (t.status === 'running') return turn ?? 'working';
+  if (t.delegating && t.status !== 'queued') return 'delegating';
+  return null;
+}
+
 /** The glyph asks for Ben: he answers it, resumes it or looks into it. */
 export const asksForYou = (g: Glyph) => g === 'needs' || g === 'failed' || g === 'limited';
 

@@ -3,8 +3,7 @@ import { taskHost, type BackgroundTask, type ChannelWithRunning, type FolderWith
 import { FOLDER_NAME_MAX, drag, draftKey, useFolders } from '../../folders.tsx';
 import { openMenu } from '../ContextMenu.tsx';
 import { plural } from '../../format.ts';
-import { Loader } from '../brand.tsx';
-import { Icon } from '../ui.tsx';
+import { Icon, StatusDot } from '../ui.tsx';
 import { ChannelThreadEntry } from './SidebarRows.tsx';
 
 /** A folder's name being typed: Enter or leaving the field saves, Escape cancels. */
@@ -131,7 +130,7 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
           >
             <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-3" />
             <span className="min-w-0 flex-1 truncate">{f.name}</span>
-            {busy && <Loader size={11} className="shrink-0 text-live-text" />}
+            {busy && <StatusDot status="running" size={7} className="shrink-0" />}
             <span className="shrink-0 font-num text-[11px] text-fg-3 tabular-nums transition-opacity md:group-focus-within/folder:opacity-0 md:group-hover/folder:opacity-0">
               {f.count}
             </span>

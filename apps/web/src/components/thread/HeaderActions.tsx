@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Thread } from '../../api.ts';
+import type { TurnPhase } from '@omni/shared/status.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { useNow } from '../../store.tsx';
 import { threadPill } from './thread-state.ts';
@@ -21,6 +22,7 @@ export function HeaderActions({
   onPanel,
   artifactCount,
   asking = false,
+  turn,
 }: {
   thread: Thread;
   meter: ReactNode;
@@ -35,9 +37,11 @@ export function HeaderActions({
   artifactCount: number;
   /** The agent waits on a question card. */
   asking?: boolean;
+  /** What the running turn is doing, for the pill's dot. */
+  turn?: TurnPhase | null;
 }) {
   const now = useNow(60_000);
-  const pill = threadPill(thread, { asking, reconnecting, now });
+  const pill = threadPill(thread, { asking, reconnecting, now, turn });
   const archived = !!thread.archived;
   const doneable = !archived && (!!thread.done_at || canMarkDone(thread.status));
   return (
@@ -59,7 +63,7 @@ export function HeaderActions({
         </Button>
       )}
       <span className="inline-flex" title={reconnecting ? 'Reconnecting to the live stream. The thread keeps running on the server.' : undefined}>
-        <StatusPill status={pill.glyph} label={pill.label} />
+        <StatusPill status={pill.glyph} phase={pill.phase} label={pill.label} />
       </span>
       <IconButton
         icon="more"

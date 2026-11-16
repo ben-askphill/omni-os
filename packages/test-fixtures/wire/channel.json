@@ -43,6 +43,7 @@
       "parent_id": null,
       "source": "manual",
       "limit_state": null,
+      "setup": null,
       "delegating": false
     }
   ],
@@ -63,6 +64,7 @@
       "parent_id": null,
       "source": "manual",
       "limit_state": null,
+      "setup": null,
       "delegating": false
     }
   ],

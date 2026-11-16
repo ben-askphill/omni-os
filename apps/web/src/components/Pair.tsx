@@ -161,7 +161,7 @@ function PairScreen({ offline, connectError, onPaired }: { offline: boolean; con
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-bg p-4 sm:p-6">
       <form onSubmit={submit} className="w-full max-w-md rounded-[28px] bg-elev p-6 shadow-[var(--shadow-menu)] sm:p-8" aria-labelledby="pair-title">
-        <OmniMark size={32} state={busy ? 'thinking' : 'idle'} />
+        <OmniMark size={32} />
         <h1 id="pair-title" className="mt-5 text-[22px] font-semibold tracking-tight text-fg">
           Pair this browser
         </h1>

@@ -99,7 +99,7 @@ export function ThreadPanel({
                     {agents.length}
                   </span>
                 ) : t.id === 'prs' && prTab ? (
-                  <StatusDot status={PR_DOT[prTab.tone]} size={6} />
+                  <StatusDot status={PR_DOT[prTab.tone]} phase={prTab.tone === 'live' ? 'checking' : null} size={6} />
                 ) : t.id === 'artifacts' && fileCount ? (
                   <span className="font-num text-[10.5px] text-fg-3">{fileCount}</span>
                 ) : t.id === 'browser' && shotCount ? (
