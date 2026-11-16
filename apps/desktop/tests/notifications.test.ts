@@ -186,3 +186,23 @@ describe('notification settings', () => {
     expect(twice.notifications).toEqual({ enabled: true, kinds: { ...DEFAULT_DESKTOP_SETTINGS.notifications.kinds, prAttention: false }, muted: ['widgets'] });
   });
 });
+
+describe('the setup test notification', () => {
+  const ctx = (opened: string[]) => ({ paths: { icon: null }, showMain: () => void opened.push('main') }) as unknown as Parameters<typeof N.postTestNotification>[0];
+
+  it('posts the sample, and a click brings the main window forward', () => {
+    const shown: { title?: string; body?: string; click: () => void }[] = [];
+    const opened: string[] = [];
+    const ok = N.postTestNotification(ctx(opened), { isSupported: () => true, show: (o, click) => void shown.push({ title: o.title, body: o.body, click }) });
+    expect(ok).toBe(true);
+    expect(shown.map(({ title, body }) => ({ title, body }))).toEqual([N.TEST_NOTIFICATION]);
+    shown[0].click();
+    expect(opened).toEqual(['main']);
+  });
+
+  it('says so when the system cannot show notifications', () => {
+    const show = vi.fn();
+    expect(N.postTestNotification(ctx([]), { isSupported: () => false, show })).toBe(false);
+    expect(show).not.toHaveBeenCalled();
+  });
+});

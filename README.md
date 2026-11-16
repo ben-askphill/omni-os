@@ -26,7 +26,7 @@ Nothing extra. Omni runs each thread through the official CLI of the harness you
 > Install and sign in to at least one harness before your first thread. [Auto](docs/user/harnesses.md#auto) is the default for new threads and picks the harness, model and effort from the first prompt, unless you set a default or pick one. Some features (published artifacts, mods) work only with Claude Code.
 >
 > - Claude Code (Claude plan): `npm install -g @anthropic-ai/claude-code`, then run `claude` and `/login`
-> - Codex (ChatGPT plan): `npm install -g @openai/codex && codex login`
+> - Codex (ChatGPT plan): `npm install -g @openai/codex && codex login`. The Conductor has Codex review every pull request Claude wrote; without it, the Conductor asks you each time
 > - Cursor Agent (Cursor plan): `curl https://cursor.com/install -fsS | bash && cursor-agent login`
 > - Hermes (Anthropic API, on your own Linux server): no CLI on this machine. See [Harnesses](docs/user/harnesses.md#hermes-remote)
 > - Cursor Cloud (Cursor plan, a Cursor cloud agent on Cursor's machines): the secret `CURSOR_API_KEY`. See [Harnesses](docs/user/harnesses.md#cursor-cloud)

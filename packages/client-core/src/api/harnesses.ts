@@ -39,12 +39,14 @@ export interface HarnessInfo {
   available: boolean;
   /** The command that fixes availability, e.g. "codex login". Present when unavailable. */
   fix?: string;
+  /** Unavailable because the server found no binary for this CLI. */
+  missing?: true;
   models: ModelEntry[];
   /** Concurrency cap. */
   cap: number;
   /** Threads running on it now. */
   running: number;
-  /** How to install the CLI, when it can be installed. */
+  /** How to install the CLI, sent only while it is `missing`. */
   install?: string;
 }
 

@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import type { ServerOptionsState, SetupState } from '@omni/shared/settings.ts';
+import { BUNDLED, paths } from './config.ts';
 import { serverOptions } from './server-options.ts';
 import { getCrew } from './crew.ts';
 import { channels, threads } from './db.ts';
@@ -29,6 +30,7 @@ export const setupApi = new Hono();
 export function setupState(): SetupState {
   return {
     onboarded: isOnboarded(),
+    install: BUNDLED ? 'app' : 'checkout',
     path: tildify(configPath()),
     config: userConfig(),
     resolved: {
@@ -85,15 +87,31 @@ setupApi.post('/complete', async (c) => {
   return c.json({ ...setupState(), threadId: thread?.id ?? null });
 });
 
-export function welcomeText(name: string) {
+/** Where crew charters live on this install, for the welcome message. */
+export interface CrewPlace {
+  install: SetupState['install'];
+  /** The shipped charters: the checkout's crew/, or a folder inside the desktop app. */
+  crew: string;
+  /** The user's own copies, which replace a shipped charter with the same name. */
+  personalCrew: string;
+}
+
+export const crewPlace = (): CrewPlace => ({ install: BUNDLED ? 'app' : 'checkout', crew: tildify(paths.crew), personalCrew: tildify(paths.personalCrew) });
+
+/** The first message in #conductor. Every client shows it, so it names where things are on each layout. */
+export function welcomeText(name: string, place: CrewPlace = crewPlace()) {
+  const crew =
+    place.install === 'app'
+      ? `- Crew charters (the roles I hand work to) ship with the app. To change one just for you, save a copy with the same name, like \`builder.md\`, in \`${place.personalCrew}/\`. Settings > About shows where Omni keeps its files.`
+      : `- Crew charters live in \`${place.crew}/\`. To change one just for you, copy it into \`${place.personalCrew}/\` and edit that copy.`;
   return [
     `Welcome to Omni${name ? `, ${name}` : ''}. I'm the Conductor: tell me what you need and I hand it to the right crew role in the right channel, then report back here.`,
     '',
     'A few things to try:',
     '- Ask for something in plain words, like "research how other stores do size guides" or "fix the failing test in my repo channel".',
-    '- Add a channel per client or project from the sidebar (+). A channel with a repo gives every thread its own git worktree.',
+    '- Add a channel per client or project: Add channel (+) at the foot of the channel rail, or Settings > Channels on a phone. A channel with a repo gives every thread its own git worktree.',
     '- Settings holds your name, timezone, folders and integrations. You can run setup again from there.',
-    '- Crew charters live in `crew/`; to change one just for you, copy it into `data/crew/` and edit that copy.',
+    crew,
   ].join('\n');
 }
 

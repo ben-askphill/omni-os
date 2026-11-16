@@ -1,17 +1,35 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { NAME_MAX } from '@omni/shared/settings.ts';
 import { api, errorText, type SetupState, type UserConfigPatch } from '../api.ts';
+import { desktop } from '../desktop.ts';
+import { useLayout } from '../layout-pref.ts';
 import { navigate, href } from '../router.ts';
-import { useApp } from '../store.tsx';
+import { useApp, useIsMobile } from '../store.tsx';
 import { OmniMark } from './brand.tsx';
-import { HarnessScreen, PronounsInput, Row, Screen, Steps, Summary, TimezoneInput, browserTimezone, createChannel } from './onboarding-parts.tsx';
+import { HarnessScreen, NotificationsScreen, PronounsInput, Row, STEPS, Screen, Steps, Summary, TimezoneInput, browserTimezone, createChannel } from './onboarding-parts.tsx';
 import { Button, ErrorNote } from './ui.tsx';
 import { ModalFooter, SCRIM } from './ui/modal.tsx';
 
 export { PronounsInput, TimezoneInput } from './onboarding-parts.tsx';
 
-// Onboarding: five short screens on first run (no data/omni.config.json yet), or again from Settings. It writes the
-// user config through /api/setup; `npm run setup` asks the same questions.
+// Onboarding: six short screens on first run (no data/omni.config.json yet), or again from Settings. It writes the
+// user config through /api/setup. In a checkout, `npm run setup` asks the same questions, all but notifications.
+
+/** The last screen, which saves. */
+const DONE = STEPS.length - 1;
+
+/** Where to add a channel later, in the layout this wizard opened over. */
+export function addChannelHint(where: 'phone' | 'rail' | 'classic') {
+  if (where === 'phone') return 'Skip it and add channels later in Settings > Channels.';
+  if (where === 'rail') return 'Skip it and add channels later with Add channel (+) at the foot of the rail.';
+  return 'Skip it and add channels later with Add channel in the sidebar.';
+}
+
+/**
+ * Whether the Done screen offers `npm run setup`: only for a checkout's server seen outside the desktop app. The
+ * desktop app's server has no checkout, and the script writes a checkout's data/, which the app never reads.
+ */
+export const offersNpmSetup = (install: SetupState['install'], inApp: boolean) => install === 'checkout' && !inApp;
 
 export { NAME_MAX };
 
@@ -22,6 +40,8 @@ export function Onboarding() {
 
 function Wizard() {
   const { closeSetup, reloadProfile, reloadChannels } = useApp();
+  const phone = useIsMobile();
+  const layout = useLayout();
   const [state, setState] = useState<SetupState | null>(null);
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +107,7 @@ function Wizard() {
         setCreatedChannel(await createChannel(channelName, channelRepo, channelStore));
         reloadChannels();
       }
-      if (step === 4) return await finish(patch());
+      if (step === DONE) return await finish(patch());
       setStep((s) => s + 1);
     } catch (err) {
       setError(errorText(err));
@@ -152,7 +172,11 @@ function Wizard() {
           )}
           {state && step === 2 && <HarnessScreen />}
           {state && step === 3 && (
-            <Screen caption="First channel" title="Add a client or project" body="A channel holds the threads for one client or project. With a repo, every thread gets its own git worktree. Skip it and add channels later from the sidebar.">
+            <Screen
+              caption="First channel"
+              title="Add a client or project"
+              body={`A channel holds the threads for one client or project. With a repo, every thread gets its own git worktree. ${addChannelHint(phone ? 'phone' : layout)}`}
+            >
               {createdChannel ? (
                 <p className="rounded-[16px] bg-surface p-4 text-[13px] text-fg-2">
                   Created <span className="font-medium text-fg">#{createdChannel}</span>.
@@ -179,7 +203,8 @@ function Wizard() {
               )}
             </Screen>
           )}
-          {state && step === 4 && (
+          {state && step === 4 && <NotificationsScreen />}
+          {state && step === DONE && (
             <Screen caption="Done" title={`You're set${name.trim() ? `, ${name.trim().split(' ')[0]}` : ''}`} body={rerun ? 'Save to keep these settings.' : 'Omni opens #conductor with a welcome message. Tell the Conductor what you need and it hands the work to the right crew role.'}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-[16px] bg-surface p-4 text-[13px]">
                 <Summary k="Name" v={name.trim()} />
@@ -189,14 +214,12 @@ function Wizard() {
                 <Summary k="GitHub" v={githubOwner || 'not set'} mono />
                 {createdChannel && <Summary k="Channel" v={`#${createdChannel}`} />}
               </dl>
-              <p className="mt-3 text-[12px] text-fg-3">
-                Saved in <code className="font-mono">{state.path}</code>, which stays out of git. Change it any time in Settings, or run <code className="font-mono">npm run setup</code>.
-              </p>
+              <SavedNote path={state.path} install={state.install} />
             </Screen>
           )}
           {error && <ErrorNote className="mt-4">{error}</ErrorNote>}
         </div>
-        <ModalFooter hint={{ keys: ['↵'], label: step === 4 ? (rerun ? 'save' : 'open') : 'continue' }} className="pb-[calc(16px+env(safe-area-inset-bottom))] sm:px-8 sm:pb-5">
+        <ModalFooter hint={{ keys: ['↵'], label: step === DONE ? (rerun ? 'save' : 'open') : 'continue' }} className="pb-[calc(16px+env(safe-area-inset-bottom))] sm:px-8 sm:pb-5">
           {step === 0 ? (
             <Button variant="ghost" onClick={rerun ? closeSetup : skip} disabled={busy}>
               {rerun ? 'Cancel' : 'Skip setup'}
@@ -208,10 +231,25 @@ function Wizard() {
           )}
           {step === 3 && !createdChannel && !channelName.trim() && <span className="text-[12px] text-fg-3">Optional</span>}
           <Button type="submit" variant="primary" busy={busy} disabled={!state}>
-            {step === 4 ? (rerun ? 'Save' : 'Open Conductor') : step === 3 && !channelName.trim() && !createdChannel ? 'Skip' : 'Continue'}
+            {step === DONE ? (rerun ? 'Save' : 'Open Conductor') : step === 3 && !channelName.trim() && !createdChannel ? 'Skip' : 'Continue'}
           </Button>
         </ModalFooter>
       </form>
     </div>
+  );
+}
+
+export function SavedNote({ path, install }: { path: string; install: SetupState['install'] }) {
+  return (
+    <p className="mt-3 text-[12px] text-fg-3" data-install={install}>
+      Saved in <code className="font-mono">{path}</code>
+      {offersNpmSetup(install, !!desktop) ? (
+        <>
+          , which stays out of git. Change it any time in Settings, or run <code className="font-mono">npm run setup</code>.
+        </>
+      ) : (
+        '. Change it any time in Settings.'
+      )}
+    </p>
   );
 }

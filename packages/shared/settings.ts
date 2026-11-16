@@ -262,6 +262,11 @@ export interface UserConfigPatch {
 /** GET and PUT /api/setup, POST /api/setup/complete. */
 export interface SetupState {
   onboarded: boolean;
+  /**
+   * How this server is installed: the desktop app's bundle, which has no `npm run setup` and ships its crew inside the
+   * app, or a checkout of the repo.
+   */
+  install: 'app' | 'checkout';
   /** Where the file lives, with ~ for the home folder. */
   path: string;
   /** The saved values. Empty strings mean the default. */

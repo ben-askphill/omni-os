@@ -77,6 +77,8 @@ export interface CodexProbe {
   available: boolean;
   /** Why not, when unavailable. Signed out (CODEX_LOGIN) unless set. */
   fix?: string;
+  /** No codex binary was found (CODEX_NOT_FOUND). */
+  missing?: boolean;
   /** e.g. "plus" from account/read; shown as the plan when present. */
   planType?: string;
   /** From config/read: Ben's default model and effort, when set. */
@@ -94,7 +96,7 @@ export function codexHarness(probe: CodexProbe, cap: number): HarnessInfo {
     cap,
   };
   if (!probe.available) {
-    return { ...base, available: false, fix: probe.fix ?? CODEX_LOGIN, models: [] };
+    return { ...base, available: false, fix: probe.fix ?? CODEX_LOGIN, ...(probe.missing && { missing: true as const }), models: [] };
   }
   const models: ModelEntry[] = probe.models.map((m) => ({
     id: m.id,
@@ -117,6 +119,8 @@ export function codexHarness(probe: CodexProbe, cap: number): HarnessInfo {
 
 export interface CursorProbe {
   available: boolean;
+  /** No cursor-agent binary was found. */
+  missing?: boolean;
   /** Families already parsed from the CLI model list. */
   models: ModelEntry[];
 }
@@ -128,7 +132,7 @@ export function cursorHarness(probe: CursorProbe, cap: number): HarnessInfo {
     capabilities: CAPABILITIES.cursor,
     cap,
   };
-  if (!probe.available) return { ...base, available: false, fix: 'cursor-agent login', models: [] };
+  if (!probe.available) return { ...base, available: false, fix: 'cursor-agent login', ...(probe.missing && { missing: true as const }), models: [] };
   const models = probe.models;
   if (models.length && !models.some((m) => m.default)) models[0].default = true;
   return { ...base, available: true, models };

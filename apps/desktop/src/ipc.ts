@@ -34,6 +34,8 @@ export interface InvokeChannels {
   'omni:server:info': { args: []; result: DesktopServerInfo };
   'omni:quick-prompt:status': { args: []; result: QuickPromptStatus };
   'omni:native-browser:capture': { args: [webContentsId: number]; result: NativeBrowserShot };
+  /** Onboarding's sample notification. False when the system cannot show one. */
+  'omni:notifications:test': { args: []; result: boolean };
 }
 
 /** One way, page to main, through ipcRenderer.send and ipcMain.on. */

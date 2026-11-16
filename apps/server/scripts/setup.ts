@@ -26,6 +26,7 @@ import {
   userConfig,
   type UserConfigPatch,
 } from '../user-config.ts';
+import { HARNESS_CHECK_LABEL, harnessCheck } from '@omni/shared/harness-check.ts';
 import { apiToken } from '../api-token.ts';
 import { HARNESS_INSTALL, HARNESS_META, type HarnessId } from '../harness/types.ts';
 
@@ -72,14 +73,31 @@ const say = (s = '') => console.log(s);
 /** The running server takes only requests with this install's token (apps/server/api-token.ts). */
 const authed = (headers: Record<string, string> = {}) => ({ ...headers, authorization: `Bearer ${apiToken()}` });
 
+/**
+ * This checkout's running server: its URL when it takes this checkout's token, null when nothing answers. A server
+ * that answers but refuses the token belongs to another install, most likely the desktop app on :4747, which keeps its
+ * own settings in its own data folder: writing this checkout's file would not set it up, so setup stops there.
+ */
 async function serverUrl() {
   const url = process.env.OMNI_URL ?? `http://127.0.0.1:${process.env.OMNI_PORT ?? 4747}`;
+  let res: Response;
   try {
-    const res = await fetch(`${url}/api/setup`, { headers: authed(), signal: AbortSignal.timeout(1500) });
-    return res.ok ? url : null;
+    res = await fetch(`${url}/api/setup`, { headers: authed(), signal: AbortSignal.timeout(1500) });
   } catch {
     return null;
   }
+  if (res.ok) return url;
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(
+      [
+        `${url} answers but refuses this checkout's token, so it is another Omni: most likely the desktop app.`,
+        "The desktop app keeps its own settings and never reads this checkout's data/. Set it up in the app instead:",
+        'Settings > General > Run setup again.',
+        "To set up this checkout, quit the app or point OMNI_URL at this checkout's server, then run npm run setup again.",
+      ].join('\n'),
+    );
+  }
+  return null;
 }
 
 async function main() {
@@ -141,13 +159,14 @@ async function main() {
     ensureWorkspace();
   }
   say(`5. Done. Saved ${tildify(configPath())}.`);
-  say(server ? `   Open ${server} (or the desktop app).` : '   Start Omni with `npm run dev` (web on http://localhost:4748) or open the desktop app.');
+  say(server ? `   Open ${server}.` : '   Start Omni with `npm run dev` (web on http://localhost:4748).');
+  say("   The desktop app keeps its own settings and asks these questions itself; it does not read this checkout's data/.");
   say('   Change any of this later in Settings, or run `npm run setup` again.');
 }
 
 /** Which CLIs are installed and signed in, from the running server's probe when there is one. */
 async function harnesses(server: string | null) {
-  type H = { id: string; name: string; available: boolean; fix?: string; install?: string };
+  type H = { id: string; name: string; available: boolean; fix?: string; install?: string; missing?: boolean };
   let list: H[] | null = null;
   if (server) {
     try {
@@ -163,19 +182,22 @@ async function harnesses(server: string | null) {
       ['codex', 'codex', 'codex login'],
       ['cursor', 'cursor-agent', 'cursor-agent login'],
     ];
-    list = bins.map(([id, bin, fix]) => ({ id, name: HARNESS_META[id].name, available: has(bin), fix, install: HARNESS_INSTALL[id] }));
+    list = bins.map(([id, bin, fix]) => (has(bin) ? { id, name: HARNESS_META[id].name, available: true } : { id, name: HARNESS_META[id].name, available: false, missing: true, fix, install: HARNESS_INSTALL[id] }));
     say('   (Omni is not running, so this only checks the CLIs are on PATH, not that they are signed in.)');
   }
+  const pad = Math.max(...Object.values(HARNESS_CHECK_LABEL).map((l) => l.length));
+  const indent = ' '.repeat(pad + 5);
   for (const h of list) {
     // Remote harnesses are opt-in: listed once they work, never as missing.
     if ((h.id === 'hermes' || h.id === 'cursor-cloud') && !h.available) continue;
-    say(`   ${h.available ? 'ready  ' : 'missing'}  ${h.name}`);
-    if (!h.available) {
-      if (h.install) say(`            install: ${h.install}`);
-      if (h.fix) say(`            sign in: ${h.fix}`);
-    }
+    const check = harnessCheck(h);
+    say(`   ${HARNESS_CHECK_LABEL[check.state].toLowerCase().padEnd(pad)}  ${h.name}`);
+    if (h.id === 'codex') say(`${indent}Reviews the pull requests Claude writes. Without it, the Conductor asks you each time.`);
+    if (check.install) say(`${indent}install: ${check.install}`);
+    if (check.command) say(`${indent}sign in: ${check.command}`);
+    if (check.reason) say(`${indent}${check.reason}`);
   }
-  if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs; the others are optional.');
+  if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs. Codex reviews the pull requests Claude writes; Cursor Agent is optional.');
 }
 
 async function createChannel(server: string | null, name: string, repo: string, store: string) {

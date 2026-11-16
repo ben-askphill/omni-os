@@ -80,6 +80,8 @@ export interface HarnessInfo {
   available: boolean;
   /** The command that fixes availability, e.g. "codex login". Present when unavailable. */
   fix?: string;
+  /** Unavailable because Omni found no binary for this CLI, so installing it comes first. Only on Codex and Cursor Agent. */
+  missing?: true;
   models: ModelEntry[];
   /** Concurrency cap for this harness. */
   cap: number;
@@ -94,8 +96,8 @@ export const HARNESS_META: Record<HarnessId, { name: string; plan: string }> = {
 };
 
 /**
- * How to install each local CLI, for onboarding (the Web UI and `npm run setup`). `fix` on HarnessInfo says how to sign
- * in once it is installed. Hermes and Cursor Cloud run off this Mac, so they have none.
+ * How to install each local CLI, for onboarding (the Web UI and `npm run setup`), sent only while it is `missing`. `fix`
+ * on HarnessInfo says how to sign in once it is installed. Hermes and Cursor Cloud run off this Mac, so they have none.
  */
 export const HARNESS_INSTALL: Partial<Record<HarnessId, string>> = {
   'claude-code': 'npm install -g @anthropic-ai/claude-code',
