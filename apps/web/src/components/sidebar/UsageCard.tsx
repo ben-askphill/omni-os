@@ -47,8 +47,11 @@ function accountTitle(a: NonNullable<UsageRow['account']>): string {
 /** Why an account row has no numbers yet, and what fills it in. */
 function waitingTitle(harness: string, name: string, a: NonNullable<UsageRow['account']>): string {
   const on = a.machines.length ? ` on ${a.machines.join(' or ')}` : '';
-  const what = harness === 'claude-code' ? 'Claude Code turn' : `${name} run`;
-  return `No reading for ${a.label} yet. It fills in after the next ${what} signed in as this account${on}.`;
+  const when =
+    harness === 'claude-code'
+      ? 'after the next Claude Code turn signed in as this account'
+      : `the next time ${name} reads this account's limits (at startup, every 15 minutes, or during a run)`;
+  return `No reading for ${a.label} yet. It fills in ${when}${on}.`;
 }
 
 /**

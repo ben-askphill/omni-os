@@ -77,15 +77,26 @@ describe('usageRows', () => {
     const v = view(machine('omarchy', [acct('claude-code', 'a@x.com')], true), machine('air', [acct('claude-code', null)]));
     const rows = usageRows(['claude-code'], v, [rec('claude-code', 'old@x.com', week(0.1))], { 'claude-code': week(0.9) });
     // One account signed in, the other signed out. A record exists for an account that is gone: a@x.com still has none.
-    expect(rows).toEqual([{ key: expect.any(String), harness: 'claude-code', account: { label: 'a@x.com', org: null, plan: 'Max', machines: ['omarchy'] }, usage: null, several: false, waiting: true }]);
+    expect(rows).toEqual([{ key: expect.any(String), harness: 'claude-code', account: { label: 'a@x.com', org: null, plan: 'Max', machines: ['omarchy'] }, usage: null, several: false, waiting: false }]);
   });
 
   it("never puts a reading from another login (Cursor's IDE session) on an account's row", () => {
     const v = view(machine('omarchy', [acct('cursor', 'ben@askphill.com', { plan: 'Pro' })], true));
     const ide: PlanUsage = { monthly: { utilization: 0.79, resetsAt: 2_000_000_000 }, unattributed: true };
-    expect(usageRows(['cursor'], v, [], { cursor: ide })[0]).toMatchObject({ account: { label: 'ben@askphill.com' }, usage: null });
+    expect(usageRows(['cursor'], v, [], { cursor: ide })[0]).toMatchObject({ account: { label: 'ben@askphill.com' }, usage: null, waiting: false });
     // Read through cursor-agent's own login, the lone account's row still falls back to it until it has a record.
     expect(usageRows(['cursor'], v, [], { cursor: { ...ide, unattributed: undefined } })[0]!.usage).toMatchObject({ monthly: { utilization: 0.79 } });
+  });
+
+  it('waits for a first reading only on a harness that files one per account', () => {
+    const two = (h: string) => view(machine('omarchy', [acct(h, 'a@x.com')], true), machine('air', [acct(h, 'b@x.com')]));
+    const ide: PlanUsage = { monthly: { utilization: 0.5, resetsAt: 2_000_000_000 }, unattributed: true };
+    // Cursor's dashboard fallback is never filed per account, so a Cursor row with nothing would wait for ever.
+    expect(usageRows(['cursor'], two('cursor'), [], { cursor: ide }).map((r) => r.waiting)).toEqual([false, false]);
+    expect(usageRows(['cursor'], two('cursor'), []).map((r) => r.waiting)).toEqual([false, false]);
+    // Codex files each rate-limit read under its account: the one without a record is waiting, the other is not.
+    const codex = usageRows(['codex'], two('codex'), [rec('codex', 'a@x.com', week(0.2))]);
+    expect(codex.map((r) => [r.account!.label, r.waiting])).toEqual([['a@x.com', false], ['b@x.com', true]]);
   });
 
   it('shows a failed check as a plain row with no data, and every harness as today before the accounts load', () => {

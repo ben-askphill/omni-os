@@ -60,11 +60,15 @@ export interface UsageRow {
   /** The harness has more than one account, so this row names its account. */
   several: boolean;
   /**
-   * The account has no reading of its own yet, from any machine: readings are filed per account only since PR #750, and
-   * Claude Code's come in only with a turn. The row says so instead of a bare "no data".
+   * One of several accounts on a harness whose readings come in per account (Claude Code with each turn, Codex with each
+   * run and its limit checks), and this one has none of its own yet from any machine. The row says it is waiting for
+   * one instead of a bare "no data". Never set for Cursor, whose dashboard fallback is never filed per account.
    */
   waiting: boolean;
 }
+
+/** Harnesses whose readings each get filed under the account they ran as, so a missing one is only not in yet. */
+const FILED_PER_ACCOUNT = new Set(['claude-code', 'codex']);
 
 /** The latest record per account, by when it was read. */
 export function latestUsage(records: readonly AccountUsage[]): Map<string, AccountUsage> {
@@ -124,7 +128,7 @@ export function usageRows(
       // read through another login.
       const stand = legacy[h] && !legacy[h]!.unattributed ? legacy[h]! : null;
       const usage = own ? own.usage : !several && !anyRecord ? stand : null;
-      return { key: k, harness: h, account, usage, several, waiting: !own && !usage };
+      return { key: k, harness: h, account, usage, several, waiting: several && !own && !usage && FILED_PER_ACCOUNT.has(h) };
     });
   });
 }
