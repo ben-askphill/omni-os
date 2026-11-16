@@ -29,6 +29,14 @@ export function linkTarget(url: string, origins: { app: string; server: string }
   return { kind: 'none' };
 }
 
+/**
+ * True for a link opened by a plain click (or `window.open` with no size). Cmd- or Ctrl-click and a middle click open
+ * a background tab, Shift-click a new window: those still go to the browser as asked.
+ */
+export function plainClick(disposition: string): boolean {
+  return disposition === 'foreground-tab';
+}
+
 /** A navigation the window may make itself: the Web UI and the server (pairing redirects through /api/auth). */
 export function staysInWindow(url: string, origins: { app: string; server: string }): boolean {
   try {

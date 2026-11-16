@@ -200,6 +200,13 @@ export interface DesktopBridge {
    * then `route`. For a 401 after the install token rotated or the session ended. Older app builds lack it.
    */
   pairAgain?(route?: string): void;
+  /**
+   * Lets the page take this window's GitHub pull request links (@omni/shared/pr-links.ts) that would open in the
+   * browser: plain clicks only, such as one in an agent's HTML, which the page cannot see into. `decide` opens the PR's
+   * page in Omni and returns true, or returns false and the link opens in the browser. Returns the unsubscribe. Older
+   * app builds lack it.
+   */
+  routeLinks?(decide: (url: string) => boolean): () => void;
   settings: {
     get(): Promise<DesktopSettings>;
     set(patch: DesktopSettingsPatch): Promise<DesktopSettings>;

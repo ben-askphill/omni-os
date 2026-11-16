@@ -21,6 +21,8 @@ export interface Bootstrap {
 
 export const BOOTSTRAP = 'omni:bootstrap';
 export const EVENT = 'omni:event';
+/** Main to page: `(id, url)`, a link for the page to open itself if it can (bridge `routeLinks`). */
+export const LINK = 'omni:link';
 
 /** Request and reply, through ipcRenderer.invoke and ipcMain.handle. */
 export interface InvokeChannels {
@@ -41,6 +43,10 @@ export interface SendChannels {
   'omni:pair-again': [route?: string];
   'omni:appearance': [mode: 'system' | 'light' | 'dark'];
   'omni:layout': [layout: DesktopLayout];
+  /** The page takes links (`routeLinks`), or stopped. */
+  'omni:links:routing': [on: boolean];
+  /** The page's answer to a LINK: it opened the link itself, or the browser should. */
+  'omni:links:answer': [id: number, routed: boolean];
   'omni:quick-prompt:done': [route?: string];
   'omni:quick-prompt:open': [];
   'omni:quick-prompt:resize': [height: number];

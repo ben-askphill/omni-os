@@ -62,7 +62,7 @@ export function PRDetailTabBody({ tab, p, onFiles }: { tab: DetailTab; p: PRDeta
                     <span className="min-w-0 flex-1 truncate">{c.name}</span>
                     <span className={`font-num text-[11px] ${checkTone(c.state)}`}>{c.state.toLowerCase().replace(/_/g, ' ') || 'pending'}</span>
                     {c.url && (
-                      <IconLink href={c.url} icon="external" label="Open check" size={13} newTab />
+                      <IconLink href={c.url} icon="external" label="Open check" size={13} newTab external />
                     )}
                   </div>
                 ))}

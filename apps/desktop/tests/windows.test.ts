@@ -7,6 +7,7 @@ import {
   linkTarget,
   nextWindowState,
   parseWindowState,
+  plainClick,
   recentGesture,
   mayPairAgain,
   PAIR_AGAIN_MS,
@@ -17,6 +18,13 @@ import {
 } from '../src/window-rules.ts';
 
 const origins = { app: 'http://127.0.0.1:4747', server: 'http://127.0.0.1:4747' };
+
+describe('plainClick', () => {
+  it('is a plain click or window.open, not a modifier or middle click', () => {
+    expect(plainClick('foreground-tab')).toBe(true);
+    for (const d of ['background-tab', 'new-window', 'default', 'other']) expect(plainClick(d), d).toBe(false);
+  });
+});
 
 describe('linkTarget', () => {
   it('opens a Web UI route in an Omni window', () => {

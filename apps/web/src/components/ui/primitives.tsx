@@ -81,10 +81,12 @@ export function IconButton({
   );
 }
 
-export function IconLink({ href, icon, label, size = 15, download, newTab, className = '' }: { href: string; icon: IconName; label: string; size?: number; download?: boolean; newTab?: boolean; className?: string }) {
+/** `external`: the link goes where it says, even a GitHub PR that Omni has a page for (apps/web/src/pr-links.ts). */
+export function IconLink({ href, icon, label, size = 15, download, newTab, external, className = '' }: { href: string; icon: IconName; label: string; size?: number; download?: boolean; newTab?: boolean; external?: boolean; className?: string }) {
   return (
     <a
       href={href}
+      data-external={external || undefined}
       aria-label={label}
       title={label}
       download={download || undefined}
@@ -97,9 +99,10 @@ export function IconLink({ href, icon, label, size = 15, download, newTab, class
   );
 }
 
-export function LinkButton({ href, icon, children, className = '', variant = 'secondary', size = 'md', target }: { href: string; icon?: IconName; children?: ReactNode; className?: string; variant?: Variant; size?: 'sm' | 'md' | 'lg'; target?: string }) {
+/** `external`: the link goes where it says, even a GitHub PR that Omni has a page for (apps/web/src/pr-links.ts). */
+export function LinkButton({ href, icon, children, className = '', variant = 'secondary', size = 'md', target, external }: { href: string; icon?: IconName; children?: ReactNode; className?: string; variant?: Variant; size?: 'sm' | 'md' | 'lg'; target?: string; external?: boolean }) {
   return (
-    <a href={href} target={target} rel={target ? 'noopener noreferrer' : undefined} className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}>
+    <a href={href} target={target} data-external={external || undefined} rel={target ? 'noopener noreferrer' : undefined} className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}>
       {icon && <Icon name={icon} size={size === 'sm' ? 14 : 15} />}
       {children}
     </a>

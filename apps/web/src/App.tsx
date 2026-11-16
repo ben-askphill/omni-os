@@ -18,6 +18,7 @@ import { QuickPromptPage } from './pages/QuickPrompt.tsx';
 import { ChannelRail } from './components/rail/ChannelRail.tsx';
 import { ListPanel } from './components/rail/ListPanel.tsx';
 import { useLayout } from './layout-pref.ts';
+import { usePullRequestLinks } from './pr-links.ts';
 import { cameFromInbox, listMode, railSelection } from './rail-model.ts';
 
 const SIDEBAR_WIDTH = 252;
@@ -174,6 +175,7 @@ function Shell() {
  */
 function Shells() {
   const mobile = useIsMobile();
+  usePullRequestLinks();
   return (
     <>
       <DesktopHooks />

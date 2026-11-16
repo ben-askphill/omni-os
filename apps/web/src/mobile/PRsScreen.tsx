@@ -9,7 +9,7 @@ import { HeaderActions } from './HeaderActions.tsx';
 import { MoEmpty, MoHeader, MoScroll, MoTitle } from './parts.tsx';
 import { shortTime } from './rows.ts';
 
-/** The PRs tab: every channel's pull requests, open first, newest first. A row opens the PR on GitHub. */
+/** The PRs tab: every channel's pull requests, open first, newest first. A row opens the PR's page in Omni (pr-links.ts); Cmd-click opens it on GitHub. */
 export function PRsScreen() {
   const q = useAllPRs();
   const now = useNow(60_000);

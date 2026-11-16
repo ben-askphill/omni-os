@@ -13,6 +13,7 @@ import type { LaunchOptions } from './options.ts';
 import { handle, on, trusted, trustOrigins } from './handle.ts';
 import { BOOTSTRAP, EVENT, type Bootstrap } from './ipc.ts';
 import { installCommandLine, ownsUserCommand } from './cli-shim.ts';
+import { linkRouter } from './link-routing.ts';
 import { installLoginItem, LOGIN_ITEM_SUPPORTED } from './login-item.ts';
 import { installMenu, showServerLog } from './menu.ts';
 import { desktopPlatform } from './menu-template.ts';
@@ -164,6 +165,8 @@ async function boot(): Promise<void> {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) setWindowLayout(ctx, win, layout);
   });
+  on('omni:links:routing', (event, on) => linkRouter.setRouting(event.sender.id, on === true));
+  on('omni:links:answer', (event, id, routed) => linkRouter.answer(event.sender.id, id, routed === true));
   on('omni:pair-again', (event, route) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) pairWindowAgain(ctx, win, safeRoute(route));

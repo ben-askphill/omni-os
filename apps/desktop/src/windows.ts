@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { clampZoom, ZOOM_STEP, type DesktopLayout } from '@omni/shared/desktop-bridge.ts';
 import { redactNonce } from './backend/pairing.ts';
 import type { AppContext } from './context.ts';
+import { LINK } from './ipc.ts';
+import { linkRouter } from './link-routing.ts';
 import { editMenuTemplate } from './menu-template.ts';
 import { openExternal } from './open-external.ts';
 import { safeRoute } from './options.ts';
@@ -15,6 +17,7 @@ import {
   isGesture,
   linkTarget,
   mayPairAgain,
+  plainClick,
   nextWindowState,
   parseWindowState,
   recentGesture,
@@ -209,11 +212,25 @@ export function createOmniWindow(ctx: AppContext, input: { kind: WindowKind; rou
     // -3 is a load replaced by another, such as a click while it loads.
     if (isMainFrame && code !== -3) failedLoads.add(win);
   });
-  win.webContents.on('did-navigate', () => failedLoads.delete(win));
+  // Read once: a closed window's webContents can no longer say its id.
+  const contents = win.webContents;
+  const pageId = contents.id;
+  win.webContents.on('did-navigate', () => {
+    failedLoads.delete(win);
+    // A new document takes links only once it says so again (routeLinks).
+    linkRouter.setRouting(pageId, false);
+  });
 
   const origins = () => ({ app: ctx.appUrl(), server: ctx.backend.origin() });
   const gesture = trackGestures(win.webContents);
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  // A link leaving Omni. A plain click on a GitHub pull request link asks this window's page first, which opens the
+  // PR's page in Omni when it has one (link-routing.ts); `routed` runs when it did.
+  const leave = (url: string, plain: boolean, routed?: () => void) => {
+    if (plain && linkRouter.ask(pageId, url, (id, link) => contents.send(LINK, id, link), openExternal, routed)) return;
+    openExternal(url);
+  };
+  win.on('closed', () => linkRouter.setRouting(pageId, false));
+  win.webContents.setWindowOpenHandler(({ url, disposition }) => {
     // The Web UI opens windows from a click; an agent's HTML in the page could try on a timer, or in a loop.
     if (!gesture()) return { action: 'deny' };
     const target = linkTarget(url, origins());
@@ -234,7 +251,7 @@ export function createOmniWindow(ctx: AppContext, input: { kind: WindowKind; rou
           },
         };
       case 'external':
-        openExternal(target.url);
+        leave(target.url, plainClick(disposition));
         return { action: 'deny' };
       case 'none':
         return { action: 'deny' };
@@ -242,16 +259,18 @@ export function createOmniWindow(ctx: AppContext, input: { kind: WindowKind; rou
   });
   win.webContents.on('did-create-window', (child) => {
     const childGesture = trackGestures(child.webContents);
-    child.webContents.setWindowOpenHandler(({ url }) => {
+    // An agent's page in a window of its own: a PR link it opens shows in this Omni window, which comes forward.
+    const routed = () => bringForward(win);
+    child.webContents.setWindowOpenHandler(({ url, disposition }) => {
       const target = linkTarget(url, origins());
-      if (target.kind === 'external' && childGesture()) openExternal(target.url);
+      if (target.kind === 'external' && childGesture()) leave(target.url, plainClick(disposition), routed);
       return { action: 'deny' };
     });
     child.webContents.on('will-navigate', (event, url) => {
       if (staysInWindow(url, origins())) return;
       event.preventDefault();
       const target = linkTarget(url, origins());
-      if (target.kind === 'external' && childGesture()) openExternal(target.url);
+      if (target.kind === 'external' && childGesture()) leave(target.url, true, routed);
     });
   });
 

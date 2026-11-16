@@ -158,7 +158,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
             {p.title} <span className="font-num whitespace-nowrap text-fg-3">#{p.number}</span>
           </h2>
           <div className="order-last flex flex-row-reverse items-center justify-end gap-1.5 @3xl:order-none @3xl:col-start-2 @3xl:row-start-1 @3xl:flex-row @3xl:self-start">
-            <LinkButton size="sm" variant="ghost" icon="external" href={p.url} target="_blank">
+            <LinkButton size="sm" variant="ghost" icon="external" href={p.url} target="_blank" external>
               GitHub
             </LinkButton>
             {rerun.can && (

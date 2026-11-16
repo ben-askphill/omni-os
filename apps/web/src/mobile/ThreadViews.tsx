@@ -21,6 +21,7 @@ import { linkName } from '../components/ContinueLinks.tsx';
 import { fullDate, plural } from '../format.ts';
 import { runningSubagents, subagentKind } from '../subagents.ts';
 import { href, type Route } from '../router.ts';
+import { openOnGitHub } from '../pr-links.ts';
 import { RerunNote, useRerunFailedChecks } from '../components/RerunChecks.tsx';
 import { mergeNote } from '@omni/shared/pr-merge.ts';
 import { checkTone, STEP_WORKING, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
@@ -260,7 +261,7 @@ export function PRScreen() {
         onBack={shell.back}
         title={`#${p.number}`}
         sub={ch?.github_repo ?? undefined}
-        right={<MoRound icon="external" label="Open on GitHub" onClick={() => window.open(p.url, '_blank', 'noopener')} />}
+        right={<MoRound icon="external" label="Open on GitHub" onClick={() => openOnGitHub(p.url)} />}
       />
       <Body className="gap-4">
         <div className="flex flex-col gap-2.5">

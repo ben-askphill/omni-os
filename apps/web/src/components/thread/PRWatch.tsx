@@ -91,7 +91,7 @@ export function PRWakeList({ items, more = 0 }: { items: PRWakeItem[]; more?: nu
             <span className="max-w-[60%] shrink-0 truncate font-medium text-fg-2">{it.label}</span>
             {it.kind && <span className="min-w-0 truncate text-fg-3">{it.kind}</span>}
             {it.url && (
-              <a href={it.url} target="_blank" rel="noreferrer" aria-label={`Open ${it.label} on GitHub`} className="ml-auto grid shrink-0 text-fg-3 hover:text-fg">
+              <a href={it.url} target="_blank" rel="noreferrer" data-external aria-label={`Open ${it.label} on GitHub`} className="ml-auto grid shrink-0 text-fg-3 hover:text-fg">
                 <Icon name="external" size={12} />
               </a>
             )}
