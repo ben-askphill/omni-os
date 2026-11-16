@@ -161,6 +161,37 @@ describe('MCP clients across machines', () => {
   });
 });
 
+describe('a machine updating from the build before sync', () => {
+  it('keeps a removal it made on the old build over an approval another machine made earlier', async () => {
+    // Its database as the old build left it: no decided_at, a client Ben removed and one he approved there.
+    vi.resetModules();
+    const dir = mkdtempSync(join(tmpdir(), 'omni-sync-legacy-'));
+    process.env.OMNI_DATA_DIR = dir;
+    const { DatabaseSync } = await import('node:sqlite');
+    const old = new DatabaseSync(join(dir, 'omni.db'));
+    old.exec(`CREATE TABLE mcp_clients (id TEXT PRIMARY KEY, status TEXT NOT NULL, via TEXT, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL);
+      INSERT INTO mcp_clients VALUES ('cut-off', 'removed', NULL, '2026-11-01T00:00:00.000Z', '2026-11-01T00:00:00.000Z');
+      INSERT INTO mcp_clients VALUES ('kept', 'approved', 'client', '2026-11-01T00:00:00.000Z', '2026-11-01T00:00:00.000Z');`);
+    old.close();
+    const updatedAt = new Date().toISOString();
+    await import('../db.ts');
+    const { mcpClients } = await import('../mcp-clients.ts');
+    const earlier = new Date(Date.parse(updatedAt) - 60_000).toISOString();
+    const approval = { decision: 'approved' as const, decidedAt: earlier, firstSeen: earlier, lastSeen: earlier };
+    // An approval made on an updated machine before this one updated, arriving now.
+    expect(mcpClients.syncData('cut-off')!.decidedAt! >= updatedAt).toBe(true);
+    mcpClients.applyRemote('cut-off', approval);
+    expect(mcpClients.status('cut-off')).toBe('removed');
+    // An approval from the old build stays undated, so a dated removal from another machine still wins over it.
+    expect(mcpClients.syncData('kept')!.decidedAt).toBeNull();
+    mcpClients.applyRemote('kept', { ...approval, decision: 'removed' });
+    expect(mcpClients.status('kept')).toBe('removed');
+    // A new Approve here brings the cut-off client back, and goes out dated.
+    mcpClients.approve('cut-off');
+    expect(mcpClients.status('cut-off')).toBe('approved');
+  });
+});
+
 describe('who may approve a client through sync', () => {
   const at = () => new Date().toISOString();
   const approval = (machine: string, id: string, decidedAt = at()): Change => ({

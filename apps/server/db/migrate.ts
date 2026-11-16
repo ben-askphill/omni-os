@@ -613,7 +613,9 @@ export function migrate() {
   // OAuth clients that reached /mcp with a Clerk JWT for the owner (apps/server/mcp-clients.ts): which Ben approved,
   // which wait for approval and which he removed. Synced as a signed action (sync/handlers/mcp-client.ts), so a forged
   // sync change cannot approve a client. decided_at is when Ben last approved or removed it: the newest decision wins
-  // across machines. Null for a decision from before sync, which any dated one beats.
+  // across machines. An approval from before the column stays null, which any dated decision beats. A removal from
+  // before it is dated when the column is added, so an approval another machine made earlier, while this one still ran
+  // the old build, never undoes it. Bringing that client back takes a new Approve.
   db.exec(`CREATE TABLE IF NOT EXISTS mcp_clients (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL,
@@ -621,7 +623,9 @@ export function migrate() {
     first_seen TEXT NOT NULL,
     last_seen TEXT NOT NULL
   );`);
+  const datedDecisions = (db.prepare('PRAGMA table_info(mcp_clients)').all() as unknown as { name: string }[]).some((c) => c.name === 'decided_at');
   ensureColumn('mcp_clients', 'decided_at', 'TEXT');
+  if (!datedDecisions) db.prepare(`UPDATE mcp_clients SET decided_at = ? WHERE status = 'removed'`).run(new Date().toISOString());
   // When each metadata field of a thread was last edited, for the field-by-field merge of synced rows
   // (sync/thread-merge.ts). Rows from before it are seeded once with their updated_at (pinned_at and done_at with
   // their own times when set), which is what whole-row last-writer-wins compared before.

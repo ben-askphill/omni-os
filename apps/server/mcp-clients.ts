@@ -31,7 +31,7 @@ type Decision = 'approved' | 'removed';
 export interface McpClientSync {
   /** Ben's last decision on any machine, or null while he has made none. */
   decision: Decision | null;
-  /** When he made it. Null for a decision from before sync, which any dated one beats. */
+  /** When he made it. Null for an approval from before sync, which any dated decision beats (db/migrate.ts). */
   decidedAt: string | null;
   firstSeen: string;
   lastSeen: string;
