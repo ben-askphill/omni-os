@@ -58,10 +58,14 @@ export function parseStatus(raw: string): Tailnet | null {
  * Whether this Mac's Tailscale sees the device's node up. Unknown when either Mac has no Tailscale, or the node is not
  * among this Mac's peers (another tailnet): only a node Tailscale knows can be called offline.
  */
-export function reachabilityOf(net: Tailnet | null, d: Pick<DeviceRecord, 'tailscale'>): Pick<Device, 'reachability' | 'dnsName' | 'lastSeen'> {
+export function reachabilityOf(
+  net: Tailnet | null,
+  d: Pick<DeviceRecord, 'tailscale'> & { carriedNode?: true },
+): Pick<Device, 'reachability' | 'dnsName' | 'lastSeen'> {
   const peer = net && d.tailscale ? net.peers.get(d.tailscale.nodeId) : undefined;
   const dnsName = peer?.dnsName || d.tailscale?.dnsName || null;
-  if (!peer) return { reachability: 'unknown', dnsName, lastSeen: null };
+  // A node carried over from an older record may be a dead entry: up says the machine is there, down says nothing.
+  if (!peer || (d.carriedNode && !peer.online)) return { reachability: 'unknown', dnsName, lastSeen: null };
   return { reachability: peer.online ? 'online' : 'offline', dnsName, lastSeen: peer.lastSeen };
 }
 

@@ -110,7 +110,11 @@ describe('GET /api/machines', () => {
       const pro = named(v, 'mac-b');
       expect(pro).toMatchObject({ reachability: 'online', running: 1 });
       expect(pro.harnesses.find((h) => h.id === 'claude-code')?.cap).toEqual(expect.any(Number));
+      // The carried node may be a dead entry: offline there reads as unknown, never as offline.
+      a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: false, lastSeen: '2026-11-14T07:00:00Z' }]));
+      expect(named(await machines(a), 'mac-b')).toMatchObject({ reachability: 'unknown', lastSeen: null, running: 1 });
     } finally {
+      a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: true }]));
       a.db.db.prepare('DELETE FROM kv WHERE key = ?').run('devices.mac-b-old');
       put.run('devices.mac-b', JSON.stringify(rec));
     }

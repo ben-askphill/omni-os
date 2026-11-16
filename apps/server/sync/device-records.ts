@@ -1,5 +1,5 @@
 import type { DeviceRecord } from '@omni/shared/handoff.ts';
-import { kv } from '../db.ts';
+import { kv, outbox } from '../db.ts';
 
 // The synced machines' records in kv `devices.<sync id>`, read without the sync worker, so sync/owner.ts can name a
 // machine without importing it. apps/server/sync/devices.ts writes this machine's record and lists the others.
@@ -32,14 +32,18 @@ export const deviceRecord = (id: string): DeviceRecord | null => parse(PREFIX + 
 
 const newer = (a: DeviceRecord, b: DeviceRecord) => a.at > b.at || (a.at === b.at && a.id > b.id);
 
+/** A record as currentRecords hands it out. `carriedNode`: its node came from an older record of the same machine. */
+export type CurrentRecord = DeviceRecord & { carriedNode?: true };
+
 /**
  * One record per machine. A machine whose sync state was reset comes back under a new id and leaves its old record
- * behind; the newest record is the live one. Records on the same Tailscale node are one machine. A record without a
- * node (Tailscale did not answer when it announced itself) is the same machine as the records under its name, as long
- * as those carry at most one node between them: the newest record stands for it, with the node an older one knew.
- * Same-named records on two different nodes stay apart: two machines can carry one name.
+ * behind; the newest record is the live one. Records on the same Tailscale node are one machine. A name held by
+ * exactly two records, one on a node and one without (it announced itself while Tailscale did not answer), is one
+ * machine too: the newer record stands for it, and a live record without a node keeps the older one's node, marked
+ * carried. Anything less clear stays apart: same-named records without a node, or a name on two nodes, can be two
+ * machines. This machine's own record (`self`) is never dropped; a pair that would drop it stays apart.
  */
-export function currentRecords(records: DeviceRecord[]): DeviceRecord[] {
+export function currentRecords(records: DeviceRecord[], self: string | null = outbox.machineId()): CurrentRecord[] {
   const newest = new Map<string, DeviceRecord>();
   for (const d of records) {
     const node = d.tailscale?.nodeId;
@@ -54,17 +58,20 @@ export function currentRecords(records: DeviceRecord[]): DeviceRecord[] {
     const key = d.name.trim().toLowerCase();
     byName.set(key, [...(byName.get(key) ?? []), d]);
   }
-  const merged = new Map<DeviceRecord, DeviceRecord | null>();
+  const replaced = new Map<DeviceRecord, CurrentRecord | null>();
   for (const group of byName.values()) {
-    const nodes = new Set(group.flatMap((d) => d.tailscale?.nodeId ?? []));
-    if (group.length < 2 || nodes.size > 1 || group.every((d) => d.tailscale)) continue;
-    const live = group.reduce((a, b) => (newer(b, a) ? b : a));
-    const node = group.filter((d) => d.tailscale).reduce<DeviceRecord | null>((a, b) => (!a || newer(b, a) ? b : a), null)?.tailscale ?? null;
-    for (const d of group) merged.set(d, d === live ? { ...live, tailscale: live.tailscale ?? node } : null);
+    if (group.length !== 2) continue;
+    const noded = group.find((d) => d.tailscale);
+    const bare = group.find((d) => !d.tailscale);
+    if (!noded || !bare) continue;
+    const [live, stale] = newer(bare, noded) ? [bare, noded] : [noded, bare];
+    if (stale.id === self) continue;
+    replaced.set(stale, null);
+    if (live === bare) replaced.set(bare, { ...bare, tailscale: noded.tailscale, carriedNode: true });
   }
   return byNode.flatMap((d) => {
-    if (!merged.has(d)) return [d];
-    const m = merged.get(d);
-    return m ? [m] : [];
+    if (!replaced.has(d)) return [d];
+    const r = replaced.get(d);
+    return r ? [r] : [];
   });
 }
