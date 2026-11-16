@@ -37,7 +37,15 @@ export interface McpClientSync {
   lastSeen: string;
 }
 
-type Row = { id: string; status: ClientStatus; via: 'audience' | 'client' | null; first_seen: string; last_seen: string; decided_at: string | null };
+type Row = {
+  id: string;
+  status: ClientStatus;
+  via: 'audience' | 'client' | null;
+  first_seen: string;
+  last_seen: string;
+  decided_at: string | null;
+  future_decided_at: string | null;
+};
 const toClient = (r: Row): McpClient => ({ id: r.id, name: null, status: r.status, firstSeen: r.first_seen, lastSeen: r.last_seen, via: r.via });
 const row = (id: string) => db.prepare('SELECT * FROM mcp_clients WHERE id = ?').get(id) as Row | undefined;
 const isDecision = (s: unknown): s is Decision => s === 'approved' || s === 'removed';
@@ -137,16 +145,27 @@ export const mcpClients = {
     db.prepare('UPDATE mcp_clients SET first_seen = ?, last_seen = ?, status = ?, decided_at = ? WHERE id = ?').run(first, last, status, decidedAt, id);
     return true;
   },
+  /**
+   * Another machine sent a decision dated too far ahead of this clock to take as it is (sync/handlers/mcp-client.ts).
+   * Its date is kept apart and changes nothing here, but Ben's next decision here is dated after it, so that decision
+   * also wins on the machine whose clock is wrong. Call it once the row exists. True when the kept date moved.
+   */
+  noteFutureDecision: (id: string, at: string): boolean =>
+    db
+      .prepare('UPDATE mcp_clients SET future_decided_at = ? WHERE id = ? AND (future_decided_at IS NULL OR future_decided_at < ?)')
+      .run(at, id, at).changes > 0,
 };
 
 /**
  * Ben approved or removed a client here. It goes to the other machines, where it wins over any older decision. It is
- * dated after the decision it replaces, even one from a machine whose clock runs ahead, so it wins there too.
+ * dated after the decision it replaces, and after one this machine would not take for its date, even one from a
+ * machine whose clock runs ahead, so it wins there too.
  */
 function decide(id: string, decision: Decision) {
   tx(() => {
-    const before = row(id)?.decided_at;
-    const at = new Date(Math.min(LAST_DATE, Math.max(Date.now(), before ? Date.parse(before) + 1 : 0))).toISOString();
+    const r = row(id);
+    const before = Math.max(ms(r?.decided_at ?? null), ms(r?.future_decided_at ?? null));
+    const at = new Date(Math.min(LAST_DATE, Math.max(Date.now(), before + 1))).toISOString();
     db.prepare(
       `INSERT INTO mcp_clients (id, status, via, first_seen, last_seen, decided_at) VALUES (?, ?, NULL, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET status = excluded.status, decided_at = excluded.decided_at`,

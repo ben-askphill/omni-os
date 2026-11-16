@@ -271,19 +271,26 @@ describe('who may approve a client through sync', () => {
     expect(b.mcpClients.status('tie-approved-here')).toBe('removed');
   });
 
-  it('an approval dated over a week ahead is not applied; a removal that far ahead is, dated at the limit', async () => {
+  it('an approval dated over a week ahead is not applied, and a removal here then wins on the machine that sent it', async () => {
     const nextYear = new Date(Date.now() + 365 * 86_400_000).toISOString();
     await relay.push([signAs(decision('mac-c', 'broken-clock', 'approved', nextYear))]);
     await pull();
-    expect(b.mcpClients.status('broken-clock')).toBeNull();
+    // Listed so Ben can act on it, but not approved on C's word.
+    expect(b.mcpClients.status('broken-clock')).toBe('pending');
+    b.mcpClients.remove('broken-clock');
+    // Dated after C's approval, so C, which keeps that approval, takes the removal.
+    expect(b.mcpClients.syncData('broken-clock')!.decidedAt! > nextYear).toBe(true);
+  });
 
+  it('a removal dated over a week ahead applies at the limit, and an approval here then wins on the machine that sent it', async () => {
+    const nextYear = new Date(Date.now() + 365 * 86_400_000).toISOString();
     await relay.push([signAs(decision('mac-c', 'broken-removal', 'removed', nextYear))]);
     await pull();
     expect(b.mcpClients.status('broken-removal')).toBe('removed');
     expect(Date.parse(b.mcpClients.syncData('broken-removal')!.decidedAt!)).toBeLessThanOrEqual(Date.now() + 7 * 86_400_000);
-    // Ben can still bring it back here: his approval is dated after the capped removal.
     b.mcpClients.approve('broken-removal');
     expect(b.mcpClients.status('broken-removal')).toBe('approved');
+    expect(b.mcpClients.syncData('broken-removal')!.decidedAt! > nextYear).toBe(true);
   });
 
   it('a decision after one at the last four-digit date keeps a readable date, and a removal there still beats an approval', () => {
