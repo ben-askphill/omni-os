@@ -6,6 +6,23 @@ import { parsePullRequestUrl } from '@omni/shared/pr-links.ts';
 
 /** How long the page has to answer before the link opens in the browser anyway. */
 export const ANSWER_MS = 1500;
+/** Of that, the room left for the answer to travel back. The page refuses a link that reaches it later than this. */
+export const ANSWER_TRANSIT_MS = 300;
+
+/**
+ * The page's side of an ask (the preload runs it): `decide`, which may open the PR's page, runs only before
+ * `deadline`. A page that was too busy to see the link in time refuses it without moving, because by the time its
+ * answer arrives main has stopped waiting and opened the browser.
+ */
+export function answerLink(decide: (url: string) => boolean, url: string, deadline: number, now: number = Date.now()): boolean {
+  if (!Number.isFinite(deadline) || now > deadline) return false;
+  try {
+    return decide(url) === true;
+  } catch {
+    // A page that fails to decide leaves the link to the browser.
+    return false;
+  }
+}
 
 interface Ask {
   page: number;
@@ -15,7 +32,10 @@ interface Ask {
   timer: ReturnType<typeof setTimeout>;
 }
 
-export function createLinkRouter(timers: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: setTimeout, clear: clearTimeout }) {
+export function createLinkRouter(
+  timers: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: setTimeout, clear: clearTimeout },
+  now: () => number = Date.now,
+) {
   const routing = new Set<number>();
   const pending = new Map<number, Ask>();
   let next = 0;
@@ -36,15 +56,17 @@ export function createLinkRouter(timers: { set: typeof setTimeout; clear: typeof
       else routing.delete(page);
     },
     /**
-     * Asks `page` about a pull request link. True when it asked: the page opens the link, or `external` runs on its
-     * answer, or once ANSWER_MS passes with none. False for any other link, or a page that takes none: open it as before.
+     * Asks `page` about a pull request link, with the last moment it may still take it (answerLink). True when it
+     * asked: the page opens the link, or `external` runs on its answer, or once ANSWER_MS passes with none. False for
+     * any other link, or a page that takes none: open it as before.
      */
-    ask(page: number, url: string, send: (id: number, url: string) => void, external: (url: string) => void, routed?: () => void): boolean {
+    ask(page: number, url: string, send: (id: number, url: string, deadline: number) => void, external: (url: string) => void, routed?: () => void): boolean {
       if (!routing.has(page) || !parsePullRequestUrl(url)) return false;
       const id = ++next;
+      const deadline = now() + ANSWER_MS - ANSWER_TRANSIT_MS;
       pending.set(id, { page, url, external, routed, timer: timers.set(() => settle(id, false), ANSWER_MS) });
       try {
-        send(id, url);
+        send(id, url, deadline);
       } catch {
         settle(id, false);
       }

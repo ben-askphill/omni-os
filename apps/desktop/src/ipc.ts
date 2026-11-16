@@ -21,7 +21,7 @@ export interface Bootstrap {
 
 export const BOOTSTRAP = 'omni:bootstrap';
 export const EVENT = 'omni:event';
-/** Main to page: `(id, url)`, a link for the page to open itself if it can (bridge `routeLinks`). */
+/** Main to page: `(id, url, deadline)`, a link for the page to open itself if it can before `deadline` (bridge `routeLinks`). */
 export const LINK = 'omni:link';
 
 /** Request and reply, through ipcRenderer.invoke and ipcMain.handle. */

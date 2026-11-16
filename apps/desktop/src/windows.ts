@@ -226,7 +226,7 @@ export function createOmniWindow(ctx: AppContext, input: { kind: WindowKind; rou
   // A link leaving Omni. A plain click on a GitHub pull request link asks this window's page first, which opens the
   // PR's page in Omni when it has one (link-routing.ts); `routed` runs when it did.
   const leave = (url: string, plain: boolean, routed?: () => void) => {
-    if (plain && linkRouter.ask(pageId, url, (id, link) => contents.send(LINK, id, link), openExternal, routed)) return;
+    if (plain && linkRouter.ask(pageId, url, (id, link, deadline) => contents.send(LINK, id, link, deadline), openExternal, routed)) return;
     openExternal(url);
   };
   win.on('closed', () => linkRouter.setRouting(pageId, false));
