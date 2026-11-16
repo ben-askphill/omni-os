@@ -96,4 +96,23 @@ describe('GET /api/machines', () => {
     expect(pro.harnesses).toEqual([{ id: 'claude-code', running: 1, queued: 0, cap: null }]);
     a.db.db.prepare('UPDATE kv SET value = ? WHERE key = ?').run(JSON.stringify(rec), 'devices.mac-b');
   });
+
+  it('shows one tile for a machine with a stale record on its node and a live one without a node', async () => {
+    // Its sync state was reset (an old id still names its node) and it announced itself while Tailscale did not answer.
+    const rec = a.db.kv.get<Record<string, unknown>>('devices.mac-b')!;
+    const stale = { name: "Ben's MacBook Pro", tailscale: { nodeId: NODE_B.id, dnsName: NODE_B.dns }, at: '2026-11-01T00:00:00.000Z' };
+    const put = a.db.db.prepare('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)');
+    put.run('devices.mac-b-old', JSON.stringify(stale));
+    put.run('devices.mac-b', JSON.stringify({ ...rec, tailscale: null }));
+    try {
+      const v = await machines(a);
+      expect(v.machines.filter((m) => m.name === "Ben's MacBook Pro")).toHaveLength(1);
+      const pro = named(v, 'mac-b');
+      expect(pro).toMatchObject({ reachability: 'online', running: 1 });
+      expect(pro.harnesses.find((h) => h.id === 'claude-code')?.cap).toEqual(expect.any(Number));
+    } finally {
+      a.db.db.prepare('DELETE FROM kv WHERE key = ?').run('devices.mac-b-old');
+      put.run('devices.mac-b', JSON.stringify(rec));
+    }
+  });
 });

@@ -30,9 +30,14 @@ export const deviceRecords = (): DeviceRecord[] =>
 
 export const deviceRecord = (id: string): DeviceRecord | null => parse(PREFIX + id, kv.get<unknown>(PREFIX + id));
 
+const newer = (a: DeviceRecord, b: DeviceRecord) => a.at > b.at || (a.at === b.at && a.id > b.id);
+
 /**
- * One record per Tailscale node. A machine whose sync state was reset comes back under a new id and leaves its old
- * record behind; the newest record for a node is the live one. Records without a node are never merged.
+ * One record per machine. A machine whose sync state was reset comes back under a new id and leaves its old record
+ * behind; the newest record is the live one. Records on the same Tailscale node are one machine. A record without a
+ * node (Tailscale did not answer when it announced itself) is the same machine as the records under its name, as long
+ * as those carry at most one node between them: the newest record stands for it, with the node an older one knew.
+ * Same-named records on two different nodes stay apart: two machines can carry one name.
  */
 export function currentRecords(records: DeviceRecord[]): DeviceRecord[] {
   const newest = new Map<string, DeviceRecord>();
@@ -40,7 +45,26 @@ export function currentRecords(records: DeviceRecord[]): DeviceRecord[] {
     const node = d.tailscale?.nodeId;
     if (!node) continue;
     const had = newest.get(node);
-    if (!had || d.at > had.at || (d.at === had.at && d.id > had.id)) newest.set(node, d);
+    if (!had || newer(d, had)) newest.set(node, d);
   }
-  return records.filter((d) => !d.tailscale?.nodeId || newest.get(d.tailscale.nodeId) === d);
+  const byNode = records.filter((d) => !d.tailscale?.nodeId || newest.get(d.tailscale.nodeId) === d);
+
+  const byName = new Map<string, DeviceRecord[]>();
+  for (const d of byNode) {
+    const key = d.name.trim().toLowerCase();
+    byName.set(key, [...(byName.get(key) ?? []), d]);
+  }
+  const merged = new Map<DeviceRecord, DeviceRecord | null>();
+  for (const group of byName.values()) {
+    const nodes = new Set(group.flatMap((d) => d.tailscale?.nodeId ?? []));
+    if (group.length < 2 || nodes.size > 1 || group.every((d) => d.tailscale)) continue;
+    const live = group.reduce((a, b) => (newer(b, a) ? b : a));
+    const node = group.filter((d) => d.tailscale).reduce<DeviceRecord | null>((a, b) => (!a || newer(b, a) ? b : a), null)?.tailscale ?? null;
+    for (const d of group) merged.set(d, d === live ? { ...live, tailscale: live.tailscale ?? node } : null);
+  }
+  return byNode.flatMap((d) => {
+    if (!merged.has(d)) return [d];
+    const m = merged.get(d);
+    return m ? [m] : [];
+  });
 }
