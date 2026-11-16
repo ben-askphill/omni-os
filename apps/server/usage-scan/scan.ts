@@ -13,7 +13,7 @@ import { secretValues } from '../secrets.ts';
 import { readAsks, SCAN_ROLE, type Ask } from './asks.ts';
 import { clusterAsks, coveredBy, describeGroup, spread, type Cluster, type Group } from './cluster.ts';
 import { labelGroups, type Label } from './labels.ts';
-import { maskSecrets, MIN_EXACT } from './mask.ts';
+import { maskSecrets } from './mask.ts';
 
 export const SCAN_DAYS = 90;
 /** Haiku labels every group in one call; past this the scan goes on without labels. */
@@ -53,14 +53,13 @@ export interface ScanResult {
 
 /**
  * An ask with every secret masked: its title and text, and its commands. A command that holds a secret is dropped, not
- * masked: `/[masked]` would still group the asks by that secret. Commands are lowercase, so stored values match them
- * in any case.
+ * masked: `/[masked]` would still group the asks by that secret. Masking matches in any case, and commands are
+ * lowercase by then.
  */
 export function maskAsk(a: Ask, exact: readonly string[]): { ask: Ask; masked: number } {
   const title = maskSecrets(a.title, exact);
   const text = maskSecrets(a.text, exact);
-  const lower = exact.filter((v) => v.length >= MIN_EXACT).map((v) => v.toLowerCase());
-  const commands = a.commands.filter((c) => !maskSecrets(c).masked && !lower.some((v) => c.toLowerCase().includes(v)));
+  const commands = a.commands.filter((c) => !maskSecrets(c, exact).masked);
   return { ask: { ...a, title: title.text, text: text.text, commands }, masked: title.masked + text.masked + a.commands.length - commands.length };
 }
 
@@ -118,7 +117,8 @@ export async function startUsageScan(opts: { channel?: string | null }, deps: Sc
         enabled: a.enabled,
         when: a.on ? `on ${a.on.event}` : `cron "${a.cron}" (${a.timezone})`,
         channel: a.channel,
-        prompt: cut(mask(a.prompt.replace(/\s+/g, ' ')), 160),
+        // Masked before its whitespace is collapsed: a stored value can hold a line break.
+        prompt: cut(mask(a.prompt).replace(/\s+/g, ' '), 160),
         full: a.prompt,
       }));
     const prompt = scanPrompt({

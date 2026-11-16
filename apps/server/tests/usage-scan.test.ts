@@ -130,6 +130,28 @@ describe('the asks query', () => {
     for (const id of pasted) expect(ids).not.toContain(id);
   });
 
+  it('leaves out a thread continued from an automation run or an agent thread, however it got there', () => {
+    // continue.ts starts the new thread with no parent, source manual and no automation, and records its first message
+    // as Ben's even when the Conductor wrote it: only continued_from says where it came from.
+    const continued = (from: string, text: string) => {
+      const id = ask(text, at(7, 1));
+      db.prepare('UPDATE threads SET continued_from = ? WHERE id = ?').run(from, id);
+      return id;
+    };
+    const fromRun = continued(nightly, 'Translate the Dutch product descriptions for Acme into German again');
+    const fromCrewOfRun = continued(underNightly, 'Translate the Dutch product descriptions, continued from the crewmate');
+    const fromCrew = continued(crew, 'Translate the Dutch product descriptions with the glossary, continued');
+    const twice = continued(fromCrew, 'Translate the Dutch product descriptions, continued twice');
+    const fromBen = continued(translate[6], 'Translate the Dutch product descriptions for Acme, picking up where I left off');
+    const scan = readAsks(db, { days: 90 });
+    const ids = scan.asks.map((a) => a.thread_id);
+    for (const id of [fromRun, fromCrewOfRun, fromCrew, twice]) expect(ids).not.toContain(id);
+    // Continuing Ben's own thread is still his ask.
+    expect(ids).toContain(fromBen);
+    expect(scan.left_out).toMatchObject({ automation: 4, delegated: 3 });
+    db.prepare(`DELETE FROM events WHERE thread_id IN (${[fromRun, fromCrewOfRun, fromCrew, twice, fromBen].map(() => '?').join(', ')})`).run(fromRun, fromCrewOfRun, fromCrew, twice, fromBen);
+  });
+
   it('scans one channel when asked', () => {
     const one = readAsks(db, { days: 90, now: NOW, channel: 'conductor' });
     expect(one.asks.map((a) => a.thread_id)).toEqual([conductor]);
@@ -260,6 +282,43 @@ describe('the scan', () => {
     const lead = await waitFor(() => r.texts(result.thread.id, 'user')[0], 'the scan prompt');
     expect(haikuSaw).toHaveLength(1);
     for (const text of [lead, ...haikuSaw]) expect(text).not.toContain(BADGER);
+  });
+
+  it('keeps an access key used as a slash command out of both prompts, though the command is lowercased', async () => {
+    const AWS = 'AKIAABCDEFGHIJKLMNOP';
+    [0, 1, 2, 3, 4, 5].forEach((w) => ask(`Rotate /${AWS} for request ${w}`, at(w, 6, 1)));
+    expect(readAsks(db, { days: 90 }).asks.some((a) => a.commands.includes(`/${AWS.toLowerCase()}`))).toBe(true);
+    const haikuSaw: string[] = [];
+    const result = await startUsageScan({}, { secrets: async () => [], ask: async (p) => (haikuSaw.push(p), null) });
+    const lead = await waitFor(() => r.texts(result.thread.id, 'user')[0], 'the scan prompt');
+    for (const text of [lead, ...haikuSaw]) expect(text.toUpperCase()).not.toContain(AWS);
+  });
+
+  it('masks a stored value URL-encoded, form-encoded, in base64, JSON-escaped and with its spaces collapsed', async () => {
+    const VALUE = 'R0se+Fi  eld="7"';
+    const uri = encodeURIComponent(VALUE);
+    const b64 = Buffer.from(VALUE).toString('base64');
+    const forms = [
+      uri,
+      uri.toLowerCase(),
+      uri.replace(/%20/g, '+'),
+      b64,
+      b64.replace(/=+$/, ''),
+      Buffer.from(VALUE).toString('base64url'),
+      JSON.stringify(VALUE).slice(1, -1),
+      'R0se+Fi eld="7"',
+    ];
+    const line = forms.map((f, i) => `f${i}=${f}`).join(' ');
+    [0, 1, 2, 3, 4, 5].forEach((w) => ask(`Check the ledger endpoint with ${line} run ${w}`, at(w, 6, 3)));
+    const haikuSaw: string[] = [];
+    const result = await startUsageScan({}, { secrets: async () => [VALUE], ask: async (p) => (haikuSaw.push(p), null) });
+    const lead = await waitFor(() => r.texts(result.thread.id, 'user')[0], 'the scan prompt');
+    // The group and its examples did reach both prompts.
+    expect(lead).toContain('ledger endpoint');
+    expect(haikuSaw[0]).toContain('ledger endpoint');
+    // The scan collapses whitespace before it masks, so check each form that way too.
+    const all = [...forms, ...forms.map((f) => f.replace(/\s+/g, ' '))];
+    for (const text of [lead, ...haikuSaw]) for (const f of all) expect(text.toLowerCase()).not.toContain(f.toLowerCase());
   });
 
   it('goes on without labels when Haiku fails', async () => {

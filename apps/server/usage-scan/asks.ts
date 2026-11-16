@@ -2,6 +2,7 @@
 // Read-only and model-free. It takes the database as an argument, so scripts/repeated-asks.ts can run it against a
 // read-only handle on a live data/omni.db without the server's connection, migrations or sync.
 import type { DatabaseSync } from 'node:sqlite';
+import { descendantsCte } from '../lineage.ts';
 
 /** The crew role of a usage scan's own thread (crew/usage-scan.md). Its first message is Omni's report, not an ask. */
 export const SCAN_ROLE = 'usage-scan';
@@ -81,7 +82,10 @@ interface Row {
   harness: string;
   title: string;
   source: string;
+  /** An automation run, or a thread that came from one (lineage.ts). */
   ran: number;
+  /** A Conductor, team or other agent thread, or a thread that came from one. */
+  agent: number;
 }
 
 interface Payload {
@@ -101,8 +105,9 @@ const pastedKey = (text: string) => text.slice(0, 200).toLowerCase().replace(/\W
 
 /**
  * Ben's asks over the last `days`: the first message he typed in each thread he started, with the slash commands he
- * used there. Left out: threads an automation started and every thread below one, threads the Conductor or a team
- * lead started (their first message is a brief an agent wrote), usage scan threads, channels that opted out, and
+ * used there. Left out: threads an automation started and every thread that came from one, threads the Conductor, a
+ * team lead or another agent started and every thread that came from one (their first message is a brief an agent
+ * wrote; a continued thread records it as Ben's), usage scan threads, channels that opted out, and
  * threads whose text an agent wrote or that say too little. A thread counts when its first message from Ben falls in
  * the window.
  */
@@ -116,10 +121,10 @@ export function readAsks(db: DatabaseSync, opts: ReadAsksOptions = {}): AskScan 
   const skip = new Set(optedOut);
   const rows = db
     .prepare(
-      `WITH RECURSIVE ran(id) AS (
-         SELECT id FROM threads WHERE automation IS NOT NULL OR source = 'automation'
-         UNION SELECT t.id FROM threads t JOIN ran ON t.parent_id = ran.id)
-       SELECT e.thread_id, e.created_at, e.payload, t.channel_id, t.role, t.harness, t.title, t.source, t.id IN (SELECT id FROM ran) AS ran
+      `WITH RECURSIVE ${descendantsCte(db, 'ran', `SELECT id FROM threads WHERE automation IS NOT NULL OR source = 'automation'`)},
+         ${descendantsCte(db, 'agent', `SELECT id FROM threads WHERE source NOT IN (${[...BEN_THREADS].map((x) => `'${x}'`).join(', ')})`)}
+       SELECT e.thread_id, e.created_at, e.payload, t.channel_id, t.role, t.harness, t.title, t.source,
+              t.id IN (SELECT id FROM ran) AS ran, t.id IN (SELECT id FROM agent) AS agent
        FROM events e JOIN threads t ON t.id = e.thread_id
        WHERE e.kind = 'user' AND e.thread_id IN (SELECT DISTINCT thread_id FROM events WHERE kind = 'user' AND created_at >= ?)
          ${opts.channel ? 'AND t.channel_id = ?' : ''}
@@ -149,7 +154,7 @@ export function readAsks(db: DatabaseSync, opts: ReadAsksOptions = {}): AskScan 
     const why: LeftOut | null =
       row.ran || row.source === 'automation'
         ? 'automation'
-        : !BEN_THREADS.has(row.source)
+        : !BEN_THREADS.has(row.source) || row.agent
           ? 'delegated'
           : row.role === SCAN_ROLE
             ? 'scan'

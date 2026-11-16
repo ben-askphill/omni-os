@@ -1,3 +1,4 @@
+import { bus, SYNC_BATCH } from '../bus.ts';
 import { db, SEED_TS, syncMeta, tx, type SyncEntity } from '../db.ts';
 import type { RemoteChange } from './transport.ts';
 import { gateChange, logRefused } from './verify.ts';
@@ -113,8 +114,33 @@ export function applyChange(signed: RemoteChange, ctx: ApplyContext): ApplyOutco
 
 export function applyBatch(changes: RemoteChange[], ctx: ApplyContext): ApplyStats {
   const stats: ApplyStats = { applied: 0, skipped: 0, deferred: 0 };
-  for (const c of changes) stats[applyChange(c, ctx)]++;
+  const applied: RemoteChange[] = [];
+  applying++;
+  try {
+    for (const c of changes) {
+      const outcome = applyChange(c, ctx);
+      stats[outcome]++;
+      if (outcome === 'applied') applied.push(c);
+    }
+  } finally {
+    applying--;
+  }
+  batchDone(applied);
   return stats;
+}
+
+/** Inside applyBatch or retryDeferred: a write the bus reports now came from another machine, and its batch is not done. */
+let applying = 0;
+export const applyingSync = () => applying > 0;
+
+/** Tell listeners that need a whole batch (automation-pause.ts) which changes it applied. */
+function batchDone(applied: RemoteChange[]) {
+  if (!applied.length) return;
+  try {
+    bus.emit(SYNC_BATCH, applied);
+  } catch (err) {
+    console.error('[sync] a batch listener failed:', (err as Error).message);
+  }
 }
 
 /** The deferred queue in relay order, for retries and first-key pairing checks. */
@@ -125,16 +151,24 @@ export function deferredChanges(): RemoteChange[] {
 /** Try the deferred changes again, oldest first, until a pass applies nothing more. */
 export function retryDeferred(ctx: ApplyContext): ApplyStats {
   const stats: ApplyStats = { applied: 0, skipped: 0, deferred: 0 };
-  for (;;) {
-    const rows = deferredChanges();
-    let progress = 0;
-    stats.deferred = 0;
-    for (const r of rows) {
-      const outcome = applyChange(r, ctx);
-      if (outcome === 'deferred') stats.deferred++;
-      else (stats[outcome]++, progress++);
+  const applied: RemoteChange[] = [];
+  applying++;
+  try {
+    for (;;) {
+      const rows = deferredChanges();
+      let progress = 0;
+      stats.deferred = 0;
+      for (const r of rows) {
+        const outcome = applyChange(r, ctx);
+        if (outcome === 'deferred') stats.deferred++;
+        else (stats[outcome]++, progress++);
+        if (outcome === 'applied') applied.push(r);
+      }
+      if (!progress || !stats.deferred) return stats;
     }
-    if (!progress || !stats.deferred) return stats;
+  } finally {
+    applying--;
+    batchDone(applied);
   }
 }
 

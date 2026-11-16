@@ -10,6 +10,7 @@
 // command that calls the API without the header, or posts a message as Ben, is not stopped. Closing that needs tokens
 // scoped to one thread.
 import { db } from './db.ts';
+import { ancestry, automationOf } from './lineage.ts';
 import { userName } from './profile.ts';
 import { SCAN_ROLE } from './usage-scan/asks.ts';
 
@@ -37,32 +38,10 @@ export interface Lineage {
   scan: string | null;
 }
 
-/**
- * The threads above this one, nearest first, along both links a thread can have to the one it came from: `parent_id`
- * (delegate, delegate_team, review notes, PR review) and `continued_from` (continue.ts, which starts the new thread with
- * no parent, source manual and no automation). Other ways a thread moves (hand off, the run switch) keep its id. The walk
- * has no depth limit, so no chain is too deep to reach its automation; each thread is read once, so a cycle in bad data
- * still ends it.
- */
+/** Who this thread came from, along parent_id and continued_from at any depth (lineage.ts). */
 export function lineage(threadId: string): Lineage {
-  const get = db.prepare('SELECT id, parent_id, continued_from, automation, source, role FROM threads WHERE id = ?');
-  const seen = new Set<string>();
-  const queue = [threadId];
-  let automation: string | null = null;
-  let scan: string | null = null;
-  while (queue.length) {
-    const id = queue.shift()!;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const t = get.get(id) as
-      | { id: string; parent_id: string | null; continued_from: string | null; automation: string | null; source: string; role: string | null }
-      | undefined;
-    if (!t) continue;
-    if (!automation && (t.automation || t.source === 'automation')) automation = t.automation ?? t.id;
-    if (!scan && t.role === SCAN_ROLE) scan = t.id;
-    for (const up of [t.parent_id, t.continued_from]) if (up && !seen.has(up)) queue.push(up);
-  }
-  return { automation, scan };
+  const line = ancestry(db, threadId);
+  return { automation: automationOf(line), scan: line.find((t) => t.role === SCAN_ROLE)?.id ?? null };
 }
 
 /** Ben answered in the scan's thread: a message of his after Omni's report, or an answer to a question the lead asked. */

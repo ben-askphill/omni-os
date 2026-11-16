@@ -1,9 +1,7 @@
-import { bus, SYNCED_AUTOMATION_RUN } from '../../bus.ts';
 import { db } from '../../db.ts';
 import { registerHandler } from '../apply.ts';
 
-// Automation runs: insert-only, keyed by uid, like events. A run whose thread has not arrived yet waits for it. Each new
-// record rechecks its automation's failure streak (automation-pause.ts), since the run's failed thread can arrive first.
+// Automation runs: insert-only, keyed by uid, like events. A run whose thread has not arrived yet waits for it.
 
 interface RunData {
   uid: string;
@@ -33,8 +31,5 @@ registerHandler('automation_run', {
         )
         .run(change.entity_id, r.automation, r.thread_id ?? null, r.trigger, r.created_at ?? change.ts, r.skip_reason ?? null).changes > 0
     );
-  },
-  notify(change) {
-    if (change.op !== 'delete') bus.emit(SYNCED_AUTOMATION_RUN, (change.data as RunData).automation);
   },
 });
