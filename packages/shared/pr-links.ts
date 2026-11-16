@@ -28,6 +28,9 @@ export function parsePullRequestUrl(url: string): PullRequestRef | null {
   return { repo: `${m[1]}/${m[2]}`, number };
 }
 
+/** The PR's page on GitHub, for a repo written `owner/name`. */
+export const pullRequestUrl = (repo: string, number: number) => `https://github.com/${repo.trim()}/pull/${number}`;
+
 export interface RepoChannel {
   id: string;
   github_repo?: string | null;

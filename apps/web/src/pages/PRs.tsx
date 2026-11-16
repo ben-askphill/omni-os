@@ -4,6 +4,7 @@ import { api, errorText, useApi, type Channel, type Checks, type PRDetail as PRD
 import { Button, Chip, StatusDot, Empty, ErrorNote, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
 import { pageColumn, PageToolbar, RefreshButton } from '../components/ui/feedback.tsx';
 import { prBadge } from '@omni/shared/thread-glance.ts';
+import { pullRequestUrl } from '@omni/shared/pr-links.ts';
 import { href, navigate } from '../router.ts';
 import { DiffStat, PRDetailTabBody, type DetailTab } from './PRDetailTabs.tsx';
 import { PRMergePanel } from './PRMergePanel.tsx';
@@ -118,10 +119,14 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
     </a>
   );
   if (q.error && !q.data) {
+    // A PR link brings Ben here instead of GitHub (pr-links.ts), so when gh cannot answer, GitHub is one click away.
     return (
       <div className={`${pageColumn('page')} space-y-3 pt-6`}>
         {back}
         <ErrorNote onRetry={q.reload}>{q.error}</ErrorNote>
+        <LinkButton size="sm" variant="ghost" icon="external" href={pullRequestUrl(channel.github_repo, n)} target="_blank" external>
+          Open on GitHub
+        </LinkButton>
       </div>
     );
   }

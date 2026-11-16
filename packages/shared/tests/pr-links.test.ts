@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePullRequestUrl, pullRequestPage } from '../pr-links.ts';
+import { parsePullRequestUrl, pullRequestPage, pullRequestUrl } from '../pr-links.ts';
 
 describe('parsePullRequestUrl', () => {
   it('reads the repo and number of a PR and its tabs', () => {
@@ -57,5 +57,12 @@ describe('pullRequestPage', () => {
     expect(pullRequestPage('https://github.com/ben-askphill/omni-os/issues/5', channels)).toBeNull();
     expect(pullRequestPage('https://github.com/ben-askphill/omni-os', channels)).toBeNull();
     expect(pullRequestPage('https://github.com/ben-askphill/omni-os/pull/5', [])).toBeNull();
+  });
+});
+
+describe('pullRequestUrl', () => {
+  it('builds the GitHub link the parser reads back', () => {
+    expect(pullRequestUrl('acme/shop', 12)).toBe('https://github.com/acme/shop/pull/12');
+    expect(parsePullRequestUrl(pullRequestUrl(' acme/shop ', 12))).toEqual({ repo: 'acme/shop', number: 12 });
   });
 });
