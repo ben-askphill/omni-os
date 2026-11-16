@@ -12,6 +12,7 @@ Project context and conventions live in `CLAUDE.md`. Read it first.
 - Ship all three in the same PR. None of them is a follow-up. If one surface does not need the change, say why in the PR.
 - Check each surface before calling the work done: desktop browser, 390px phone width and the desktop app's QA harness (`apps/desktop/scripts/qa.ts`). A UI change carries screenshots of all three ([docs/pr-screenshots.md](docs/pr-screenshots.md)).
 - Why: folders once shipped web-only (#177) and never reached the old SwiftUI Mac app, and later the phone Channels screen ignored folder data.
+- The `omni` command (`apps/cli`) is not a surface: a feature does not grow a command. It keeps its six commands, and the MCP tools cover the rest ([ADR 0014](docs/adr/0014-omni-command-line.md)).
 
 ### New UI components go into the design system
 

@@ -59,7 +59,7 @@ scripts/qa-handoff-stack.sh down     # stops only what up started, deletes the r
 ## What a PR needs
 
 - **One problem per PR.** Include the server, client, test and doc changes that problem needs, and nothing unrelated.
-- **Every surface.** A feature or fix ships on desktop web, the phone web layout and the desktop app (`apps/desktop`) in the same PR. None of them is a follow-up. If one surface does not need it, say why.
+- **Every surface.** A feature or fix ships on desktop web, the phone web layout and the desktop app (`apps/desktop`) in the same PR. None of them is a follow-up. If one surface does not need it, say why. The `omni` command is not a surface: a feature does not get a command ([ADR 0014](docs/adr/0014-omni-command-line.md)).
 - **Design system.** A UI component the [Omni OS design system](https://claude.ai/design/p/a7120f6b-8577-40e3-9087-e512ce20d673) does not have yet gets added there in the same PR. Reuse what it has first.
 - **Evidence.** Say what you ran and what you saw. A visible change needs before and after screenshots of desktop web, phone web and the desktop app, taken against the throwaway stack and uploaded with `scripts/pr-screenshots.sh` ([how](docs/pr-screenshots.md)). A backend fix needs a test, or the request and response that show it working. Say what you could not check.
 - **Docs.** If the change makes a page in `docs/` wrong, fix that page in the same PR. Where a new doc goes: [docs/README.md](docs/README.md#where-a-new-doc-goes).

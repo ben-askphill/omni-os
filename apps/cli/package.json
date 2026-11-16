@@ -1,0 +1,26 @@
+{
+  "name": "@omni/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The omni command: a thin terminal client over Omni's HTTP API, for people and for agents in any harness.",
+  "exports": {
+    "./*": "./*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@omni/client-core": "*",
+    "@omni/shared": "*"
+  },
+  "devDependencies": {
+    "@omni/test-fixtures": "*",
+    "@omni/typescript-config": "*",
+    "@types/node": "^26.6.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

@@ -33,6 +33,17 @@ describe('machines', () => {
     ]);
   });
 
+  it("reads each machine's load, with or without its CPU and memory sample", async () => {
+    const view = { syncLive: false, lastSyncAt: null, machines: [] };
+    const { sent, api: a } = api({ json: view });
+    expect(await a.machineLoads()).toEqual(view);
+    await a.machineLoads(true);
+    expect(sent).toEqual([
+      { method: 'GET', url: at('/machines') },
+      { method: 'GET', url: at('/machines?stats=1') },
+    ]);
+  });
+
   it('reads the update fleet and asks it to update', async () => {
     const view = { machines: [], synced: true };
     const first = api({ json: view });

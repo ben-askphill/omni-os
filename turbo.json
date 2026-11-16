@@ -37,7 +37,10 @@
         "dependencies": { "deny": ["@omni/web", "@omni/server", "@omni/desktop"] }
       },
       "desktop": {
-        "dependencies": { "deny": ["@omni/web", "@omni/server", "@omni/mcp", "@omni/ios", "@omni/client-core"] }
+        "dependencies": { "deny": ["@omni/web", "@omni/server", "@omni/mcp", "@omni/ios", "@omni/client-core", "@omni/cli"] }
+      },
+      "cli": {
+        "dependencies": { "deny": ["@omni/web", "@omni/server", "@omni/mcp", "@omni/ios", "@omni/desktop", "@omni/relay"] }
       }
     }
   }

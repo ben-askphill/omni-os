@@ -1,6 +1,7 @@
 import type { Device, HandoffView } from '@omni/shared/handoff.ts';
 import type { FleetRequest, FleetResult, FleetView } from '@omni/shared/update-fleet.ts';
 import type { AccountsView } from '@omni/shared/harness-accounts.ts';
+import type { MachinesView } from '@omni/shared/machines.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 import type { Thread } from './threads.ts';
 
@@ -69,6 +70,8 @@ export function machinesApi(http: HttpClient) {
     syncStatus: () => http.request<SyncStatus>('GET', apiPath`/sync/status`),
     /** The other synced machines, never this one. Empty while sync is off. */
     devices: () => http.request<Device[]>('GET', apiPath`/devices`),
+    /** What each machine runs right now, this one first (@omni/shared/machines.ts). `stats` adds each one's CPU and memory sample. */
+    machineLoads: (stats = false) => http.request<MachinesView>('GET', apiPath`/machines`, { query: { stats: stats ? 1 : undefined } }),
     /**
      * Hands the thread to a synced machine (`to` is its device id). A running turn stops and continues there; an idle
      * thread goes between turns. Answers once the offer is written, and the thread's `handoff` follows. A 409 says why not.

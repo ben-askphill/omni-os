@@ -15,6 +15,7 @@
 - [claude.ai Artifacts](user/claude-artifacts.md): the list of your Artifacts on claude.ai beside the files threads made
 - [Link previews](user/link-previews.md)
 - [Mods](user/mods.md)
+- [The omni command](user/cli.md): `new`, `send`, `threads`/`show`, `status`, `doctor` and `open` from any terminal or agent shell, where the desktop app puts it, and the `--wait` exit codes
 - [Other ways in](user/entry-points.md): shell, Quick Prompt, history import, brain export
 - [Omni as an MCP server](user/external-mcp.md): use Omni from Claude Code, Codex, Cursor, Hermes, Claude Desktop, claude.ai, ChatGPT or Grok
 - [Known limits](user/limits.md), including Storage and worktree retention
@@ -38,7 +39,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Prototypes](../prototypes/README.md): standalone experiments outside the apps and packages (including the Activity Monitor sampler)
 - [Screenshots on PRs](pr-screenshots.md)
 - Reviews: [2026-11-07 iOS and phone web visual parity](reviews/2026-11-07-ios-visual-parity.md) · [2026-10-31 consolidation release, the KPIs re-measured](reviews/2026-10-31-consolidation-review.md) · [2026-10-22 bloat and dead code](reviews/2026-10-22-thermo-bloat-review.html) · [2026-10-16 thermo](reviews/2026-10-16-thermo-review.html)
-- Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) (superseded by 0010; the app is deleted) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md) · [0005 One execution owner](adr/0005-one-execution-owner.md) · [0006 Linux app is a window](adr/0006-linux-app-is-a-window.md) (superseded by 0010; the app is deleted) · [0007 Google sign-in through Clerk](adr/0007-google-sign-in-through-clerk.md) · [0008 Cloudflare relay](adr/0008-cloudflare-relay.md) · [0009 Omni Connect](adr/0009-omni-connect.md) · [0010 Desktop app is Electron](adr/0010-desktop-app-is-electron.md) · [0011 claude.ai Artifacts list](adr/0011-claude-artifacts-list.md) · [0012 Signed sync](adr/0012-signed-sync.md) · [0013 Paired machines are trusted](adr/0013-paired-machines-are-trusted.md)
+- Decisions: [0001 Codex app-server](adr/0001-codex-app-server.md) · [0002 Mac app is a client](adr/0002-mac-app-is-a-client.md) (superseded by 0010; the app is deleted) · [0003 Hermes remote harness](adr/0003-hermes-remote-harness.md) · [0004 Supabase sync](adr/0004-supabase-sync.md) · [0005 One execution owner](adr/0005-one-execution-owner.md) · [0006 Linux app is a window](adr/0006-linux-app-is-a-window.md) (superseded by 0010; the app is deleted) · [0007 Google sign-in through Clerk](adr/0007-google-sign-in-through-clerk.md) · [0008 Cloudflare relay](adr/0008-cloudflare-relay.md) · [0009 Omni Connect](adr/0009-omni-connect.md) · [0010 Desktop app is Electron](adr/0010-desktop-app-is-electron.md) · [0011 claude.ai Artifacts list](adr/0011-claude-artifacts-list.md) · [0012 Signed sync](adr/0012-signed-sync.md) · [0013 Paired machines are trusted](adr/0013-paired-machines-are-trusted.md) · [0014 The omni command](adr/0014-omni-command-line.md)
 
 ## Where a new doc goes
 

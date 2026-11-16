@@ -9,14 +9,16 @@ import { Backend } from './backend/index.ts';
 import { chooseDataDir } from './backend/data-dir.ts';
 import { checkoutMessage, checkoutProblem } from './backend/launch.ts';
 import type { AppContext, AppPaths } from './context.ts';
+import type { LaunchOptions } from './options.ts';
 import { handle, on, trusted, trustOrigins } from './handle.ts';
 import { BOOTSTRAP, EVENT, type Bootstrap } from './ipc.ts';
+import { installCommandLine, ownsUserCommand } from './cli-shim.ts';
 import { installLoginItem, LOGIN_ITEM_SUPPORTED } from './login-item.ts';
 import { installMenu, showServerLog } from './menu.ts';
 import { desktopPlatform } from './menu-template.ts';
 import { installNativeBrowser } from './native-browser.ts';
 import { installNotifications } from './notifications.ts';
-import { parseOptions, safeRoute } from './options.ts';
+import { DEFAULT_PORT, launchRoute, linkRoute, parseOptions, safeRoute, URL_SCHEME } from './options.ts';
 import { defaultDataDir, logsDir, serverLogFile, type PlatformDirs } from './paths.ts';
 import { installQuickPrompt } from './quick-prompt.ts';
 import { installQuitHold } from './quit.ts';
@@ -35,6 +37,20 @@ if ('error' in parsed) {
 }
 
 if (!app.requestSingleInstanceLock()) app.exit(0);
+
+/** A page asked for before the main window can show it: an omni:// link at launch, or a second launch while starting. */
+let pendingRoute: string | null = null;
+/** Shows a page once the app is up. Set by boot; until then a link waits in pendingRoute. */
+let showRoute: ((route: string) => void) | null = null;
+
+// macOS hands a link to the running app, or to the one it launches for it, as open-url, before ready on a launch.
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  const route = linkRoute(url);
+  if (!route) return;
+  if (showRoute) showRoute(route);
+  else pendingRoute = route;
+});
 
 async function boot(): Promise<void> {
   if ('error' in parsed) return;
@@ -168,12 +184,21 @@ async function boot(): Promise<void> {
   installLoginItem(ctx);
   installNotifications(ctx);
 
-  // Opening the app again while it runs: the main window once the server is up, else the failure screen. A start
-  // still under way opens the main window itself when it is ready (below, and the screen's Try Again).
-  app.on('second-instance', () => {
+  // Opening the app again while it runs, perhaps on a page (`omni open`, an omni:// link): the main window there once
+  // the server is up, else the failure screen. A start still under way opens the main window itself when it is ready
+  // (below, and the screen's Try Again), on the page asked for last.
+  showRoute = (route) => {
+    if (backend.current.kind === 'ready') ctx.showMain(route);
+    else pendingRoute = route;
+  };
+  app.on('second-instance', (_event, argv) => {
+    const route = launchRoute(argv);
     const state = backend.current;
-    if (state.kind === 'ready') ctx.showMain();
-    else if (!focusServerScreen() && state.kind === 'failed') showServerFailure(ctx, state.message);
+    if (state.kind === 'ready') ctx.showMain(route ?? undefined);
+    else {
+      if (route) pendingRoute = route;
+      if (!focusServerScreen() && state.kind === 'failed') showServerFailure(ctx, state.message);
+    }
   });
   app.on('activate', () => {
     if (backend.current.kind === 'ready') ctx.showMain();
@@ -186,11 +211,43 @@ async function boot(): Promise<void> {
   backend.onState((state) => {
     if (state.kind === 'failed') showServerFailure(ctx, state.message);
   });
+  installCommand(options, dirs, dataDir, dev);
+
   const state = await backend.start();
   if (state.kind === 'ready') {
-    ctx.showMain();
+    ctx.showMain(pendingRoute ?? undefined);
+    pendingRoute = null;
     installQuickPrompt(ctx);
   }
+}
+
+/**
+ * The `omni` command (cli-shim.ts) and omni:// links. Only the packaged app: a dev run has the checkout's
+ * scripts/omni.sh. Only the installed app's own launch claims ~/.local/bin and the link scheme.
+ */
+function installCommand(options: LaunchOptions, dirs: PlatformDirs, dataDir: string, dev: boolean): void {
+  if (dev) return;
+  // On Linux the binary lives inside the AppImage's mount, which goes away when the app quits.
+  const runs = process.env.APPIMAGE || process.execPath;
+  const owner = ownsUserCommand({
+    packaged: app.isPackaged,
+    dev,
+    customDataDir: options.dataDir !== null,
+    defaultPort: options.port === DEFAULT_PORT,
+    customUserData: app.commandLine.hasSwitch('user-data-dir'),
+    app: runs,
+  });
+  const results = installCommandLine({
+    facts: { app: runs, dataDir, logFile: serverLogFile(dirs), port: options.port },
+    binDir: join(dirs.userData, 'bin'),
+    userPath: owner ? join(dirs.home, '.local', 'bin', 'omni') : null,
+  });
+  for (const r of results) {
+    if (r.result === 'skipped') console.error(`[omni] left ${r.path} as it is: ${r.reason}. docs/user/cli.md says how to use the command anyway.`);
+    else if (r.result === 'written') console.log(`[omni] wrote the omni command to ${r.path}`);
+  }
+  // macOS reads the scheme from Info.plist (electron-builder's protocols); Linux needs the desktop entry to say so.
+  if (owner && !app.isDefaultProtocolClient(URL_SCHEME)) app.setAsDefaultProtocolClient(URL_SCHEME);
 }
 
 app.whenReady().then(boot, (err: unknown) => {

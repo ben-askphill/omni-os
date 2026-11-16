@@ -52,6 +52,8 @@ module.exports = {
     { from: 'build/omni', to: 'omni', filter: ['**/*'] },
     { from: 'build/omni/node_modules', to: 'omni/node_modules', filter: ['**/*'] },
   ],
+  // omni:// links (src/options.ts linkRoute): CFBundleURLTypes on a Mac, the desktop entry's MimeType on Linux.
+  protocols: [{ name: 'Omni', schemes: ['omni'] }],
   asar: true,
   // dist/ is bundled and app.asar holds no native code. build/omni carries node-pty already built.
   npmRebuild: false,

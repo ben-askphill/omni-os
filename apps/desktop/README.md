@@ -11,9 +11,10 @@ The desktop app is an Electron window on the Web UI that runs the Omni server it
 | `src/backend/` | Attach to this install's server or start one, restart it after exit 75, stop it on quit if this app started it (on this launch, or on an earlier one that kept it running, as a note in userData's `server-<port>.json` records). An attached server that stops answering shows the failure screen. `data-dir.ts` picks the data dir |
 | `src/ipc.ts`, `src/handle.ts`, `src/preload.ts` | The bridge: channel table, typed `ipcMain` handlers with an origin check, and `window.omniDesktop` |
 | `src/notifications.ts` | Native notifications: follows the server's feed and Needs you with the install's token, asks the shared tracker (`packages/shared/attention.ts`) what is news, posts it, and opens the thread on click. The bridge's `nativeNotifications` tells the page to post none of its own. See [docs/user/notifications.md](../../docs/user/notifications.md) |
-| `src/options.ts`, `src/paths.ts`, `src/settings.ts` | Command line, per-OS default paths, the app's own settings file |
+| `src/options.ts`, `src/paths.ts`, `src/settings.ts` | Command line (with `--route` and `omni://` links, from this launch or a second one while it runs), per-OS default paths, the app's own settings file |
+| `src/cli-shim.ts` | The `omni` command: the shim the app writes on each launch, which runs the bundled `apps/cli` on this binary as Node ([ADR 0014](../../docs/adr/0014-omni-command-line.md), [docs/user/cli.md](../../docs/user/cli.md)) |
 | `scripts/build.ts` | Builds `dist/main.cjs`, `dist/preload.cjs` and `dist/pick-preload.cjs` |
-| `scripts/stage.ts`, `scripts/dist.ts`, `electron-builder.config.cjs` | Stage the server bundle and package the app |
+| `scripts/stage.ts`, `scripts/dist.ts`, `electron-builder.config.cjs` | Stage the server and `omni` command bundles and package the app |
 | `scripts/qa.ts` | The QA harness |
 | `scripts/update-check.ts` | The self-update, end to end on Linux: every way of quitting with an update downloaded |
 | `scripts/version.ts`, `RELEASE.md` | The version bump the release workflow (`.github/workflows/desktop-release.yml`) runs, and how to release |
@@ -165,5 +166,6 @@ npx tsx scripts/update-check.ts
 | Server data | `~/Library/Application Support/Omni/data` | `$XDG_DATA_HOME/omni-os/data` (`~/.local/share/omni-os/data`) |
 | Server log | `~/Library/Logs/Omni/server.log` | `$XDG_STATE_HOME/omni-os/server.log` (`~/.local/state/omni-os/server.log`) |
 | App settings (`settings.json`), the data-dir choice (`data-dir.json`) | `~/Library/Application Support/Omni` | `~/.config/Omni` |
+| The `omni` command (`src/cli-shim.ts`): the agents' copy, and yours | `~/Library/Application Support/Omni/bin/omni`, `~/.local/bin/omni` | `~/.config/Omni/bin/omni`, `~/.local/bin/omni` |
 
 On first launch, when the SwiftUI app (its `repoPath`, or `~/omni-os`) or the Linux launcher (the checkout in its `omni-os.desktop` entry) left an `omni.db` in a checkout's `data/`, the app asks once whether to use that folder in place or start fresh. It only reads the old folder to decide, and never copies or moves it. `--data-dir` and `--dev` skip the question. In development the default is the checkout's own `data/`. Server, Show Server Log opens the log.

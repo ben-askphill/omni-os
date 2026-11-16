@@ -1,5 +1,6 @@
 // The command line the app takes. A packaged app usually gets none; development and the QA harness
-// (scripts/qa.ts) name the port and data dir of a server to start or attach to.
+// (scripts/qa.ts) name the port and data dir of a server to start or attach to. `omni open` (apps/cli) passes
+// `--route`, and the OS passes an omni:// link, to this launch or, through the single-instance lock, to the one running.
 
 export interface LaunchOptions {
   /** Run the server from this checkout's TypeScript instead of the packaged bundle. */
@@ -50,9 +51,13 @@ export function parseOptions(argv: readonly string[]): LaunchOptions | { error: 
         out.route = text;
         break;
       }
-      default:
+      default: {
+        // An omni:// link the OS opened the app with (Linux; macOS sends open-url instead).
+        const linked = linkRoute(arg);
+        if (linked) out.route = linked;
         // Chromium and the OS add switches of their own (macOS's -psn_..., --no-sandbox): leave them be.
         break;
+      }
     }
   }
   return out;
@@ -62,4 +67,28 @@ export function parseOptions(argv: readonly string[]): LaunchOptions | { error: 
 export function safeRoute(route: unknown): string | null {
   if (typeof route !== 'string' || !route.startsWith('#/') || route.length > 2000) return null;
   return /[\s<>"'`\\]/.test(route) ? null : route;
+}
+
+/** The scheme of Omni's links: omni://t/<thread id> opens a thread, omni://c/<channel> a channel (docs/user/cli.md). */
+export const URL_SCHEME = 'omni';
+
+/** The page an omni:// link names: the hash route after the scheme. Null for any other text or an unsafe route. */
+export function linkRoute(url: string): string | null {
+  const prefix = `${URL_SCHEME}://`;
+  if (url.slice(0, prefix.length).toLowerCase() !== prefix) return null;
+  return safeRoute(`#/${url.slice(prefix.length).replace(/^\/+/, '')}`);
+}
+
+/**
+ * The page a second launch asks the running app for, from its whole argv: `--route=<route>`, a route on its own, or an
+ * omni:// link. The last one wins; null when it names none. Not parseOptions: Chromium moves every argument that is
+ * not a switch to the end of this argv, so `--port 4747` arrives as `--port` with its value far behind it.
+ */
+export function launchRoute(argv: readonly string[]): string | null {
+  let route: string | null = null;
+  for (const arg of argv.slice(1)) {
+    const found = arg.startsWith('--route=') ? safeRoute(arg.slice('--route='.length)) : arg.startsWith('#/') ? safeRoute(arg) : linkRoute(arg);
+    if (found) route = found;
+  }
+  return route;
 }

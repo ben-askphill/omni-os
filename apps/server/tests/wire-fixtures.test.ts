@@ -43,7 +43,11 @@ const NAMES = [
   'harnesses.json',
   'crew.json',
   'thread-created.json',
+  // POST /threads/:id/messages: the thread with the message's acceptance, as `omni send` reads it.
+  'message-sent.json',
   'status.json',
+  // GET /machines with one thread running, as `omni status --machine` reads it.
+  'machines.json',
   'channels.json',
   'channel.json',
   'thread.json',
@@ -420,13 +424,14 @@ async function scenario() {
   }, 'the first turn to finish');
 
   // A second turn busy in its tool, with a third message held until it ends: the running and pending shapes.
-  await call('POST', `/threads/${id}/messages`, { prompt: 'TOOL:4000 and the tests', mode: 'steer' });
+  keep('message-sent.json', await call('POST', `/threads/${id}/messages`, { prompt: 'TOOL:4000 and the tests', mode: 'steer' }));
   await eventually(async () => {
     const d = await detail(id);
     return d.thread.status === 'running' && count(d, 'tool_use') === 2;
   }, 'the second turn to run its tool');
   await call('POST', `/threads/${id}/messages`, { prompt: 'then tidy up', mode: 'queue' });
   keep('status.json', await get('/status'));
+  keep('machines.json', await get('/machines'));
   keep('channels.json', await get('/channels'));
   keep('channel.json', await get('/channels/acme'));
   const busy = keep('thread.json', await detail(id)) as Detail;

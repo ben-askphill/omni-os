@@ -1,0 +1,55 @@
+{
+  "syncLive": false,
+  "lastSyncAt": null,
+  "machines": [
+    {
+      "id": null,
+      "name": "Omni's Mac",
+      "here": true,
+      "reachability": "online",
+      "lastSeen": null,
+      "lastChangeAt": null,
+      "running": 1,
+      "queued": 0,
+      "delegated": 0,
+      "harnesses": [
+        {
+          "id": "claude-code",
+          "running": 1,
+          "queued": 0,
+          "cap": 12
+        },
+        {
+          "id": "codex",
+          "running": 0,
+          "queued": 0,
+          "cap": 12
+        },
+        {
+          "id": "cursor",
+          "running": 0,
+          "queued": 0,
+          "cap": 12
+        },
+        {
+          "id": "hermes",
+          "running": 0,
+          "queued": 0,
+          "cap": 12
+        },
+        {
+          "id": "cursor-cloud",
+          "running": 0,
+          "queued": 0,
+          "cap": 12
+        }
+      ],
+      "threadIds": [
+        "00000000-0000-4000-8000-000000000001"
+      ],
+      "agents": 0,
+      "needsYou": 0,
+      "stats": null
+    }
+  ]
+}

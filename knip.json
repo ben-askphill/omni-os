@@ -63,6 +63,13 @@
         "tests/**/*.test.ts"
       ]
     },
+    "apps/cli": {
+      "entry": [
+        "src/main.ts",
+        "scripts/*.ts",
+        "tests/**/*.test.ts"
+      ]
+    },
     "apps/desktop": {
       "entry": [
         "src/main.ts",

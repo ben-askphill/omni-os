@@ -389,6 +389,9 @@ export async function stage(args: StageArgs, out = STAGE_DIR): Promise<void> {
 
   say(`Bundling the server and MCP scripts (${label})`);
   run('npx', ['--no-install', 'tsx', join(REPO, 'apps/server/scripts/bundle.ts'), out], REPO);
+  // The omni command, which the app's shim runs from <resources>/omni/apps/cli/omni.mjs (src/cli-shim.ts).
+  say('Bundling the omni command');
+  run('npx', ['--no-install', 'tsx', join(REPO, 'apps/cli/scripts/bundle.ts'), out], REPO);
 
   const webDist = join(REPO, 'apps/web/dist');
   if (!args.skipWeb) {

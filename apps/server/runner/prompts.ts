@@ -5,6 +5,8 @@ import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
+import { closeSync, openSync, readSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 
 /** Claude Code's Artifact tool publishes to claude.ai. Omni links a publish to its file and keeps the URL per channel. */
 function publishedLines(channelId: string) {
@@ -16,6 +18,46 @@ function publishedLines(channelId: string) {
     ...(pages.length
     ? ['Pages this channel already published, newest first:', ...pages.map((a) => `- ${a.name}: ${a.url} (thread "${a.thread_title}")`)]
     : []),
+  ];
+}
+
+/** On the shim the desktop app writes for the `omni` command (apps/desktop/src/cli-shim.ts SHIM_MARK). */
+const OMNI_SHIM_MARK = '# omni-cli-shim';
+
+function isOmniShim(file: string): boolean {
+  let fd: number | null = null;
+  try {
+    fd = openSync(file, 'r');
+    const head = Buffer.alloc(512);
+    return head.subarray(0, readSync(fd, head, 0, head.length, 0)).toString('utf8').includes(OMNI_SHIM_MARK);
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) closeSync(fd);
+  }
+}
+
+let omniCommand: { path: string; found: boolean } | null = null;
+
+/**
+ * Whether threads have the `omni` command (apps/cli): the desktop app writes it into its bin folder, which is on
+ * this server's PATH and so on the harnesses' (ADR 0014). Another program named omni does not count.
+ */
+export function hasOmniCommand(path = process.env.PATH ?? ''): boolean {
+  if (omniCommand?.path !== path) omniCommand = { path, found: path.split(delimiter).some((dir) => !!dir && isOmniShim(join(dir, 'omni'))) };
+  return omniCommand.found;
+}
+
+/**
+ * The `omni` command for a thread without the Conductor's MCP tools, so an agent in any local harness messages and
+ * starts threads with one command instead of curl.
+ */
+function commandLineLines(thread: Thread, role?: CrewRole) {
+  if (isProviderHarness(thread.harness) || role?.mcp.includes('omni') || !hasOmniCommand()) return [];
+  return [
+    '',
+    '## Omni from the shell',
+    `The \`omni\` command reaches this Omni from your shell in any harness. \`omni send parent "…"\` messages the thread that started you (or any thread by id), \`omni new "…" -c <channel> -r <role>\` starts a thread under yours, \`omni show <id>\` reads one and \`omni threads --needs-you\` lists what waits on ${userName()}. Use it instead of curl against OMNI_URL; \`omni --help\` has the rest.`,
   ];
 }
 
@@ -103,6 +145,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
         ]
       : []),
     ...(hands ? workspaceLines(thread, channel) : []),
+    ...commandLineLines(thread, role),
     '',
     ...(cloud
       ? [
