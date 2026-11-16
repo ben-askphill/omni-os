@@ -23,6 +23,7 @@
     "mcp:config": "npm run mcp-config --workspace @omni/server --",
     "relay:config": "npm run relay-config --workspace @omni/server --",
     "unused": "knip",
+    "test:rust": "cargo test --workspace --locked",
     "check": "npm run typecheck && npm run unused && npm test"
   },
   "engines": {

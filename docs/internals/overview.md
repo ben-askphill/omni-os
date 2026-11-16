@@ -68,6 +68,7 @@ packages/shared/            @omni/shared: pure TypeScript the web, desktop and i
 packages/client-core/       @omni/client-core: typed HTTP and thread stream for the iOS app
 packages/test-fixtures/     @omni/test-fixtures: fake CLIs, corpora and wire fixtures the tests share
 packages/typescript-config/ @omni/typescript-config: the tsconfig bases every package extends
+crates/                     Rust (Cargo workspace at the root): omni-mcp, the per-thread MCP servers, and omni-core. See rust-port.md
 crew/                       shared role charters (yours override them from data/crew/)
 automations/                shared automation YAML, cron or events (yours go in data/automations/)
 prototypes/                 standalone experiments (not npm workspaces; see prototypes/README.md)

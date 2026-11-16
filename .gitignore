@@ -9,3 +9,4 @@ xcuserdata/
 .wrangler/
 .dev.vars
 .claude/worktrees/
+target/
