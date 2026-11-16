@@ -9,6 +9,7 @@ import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { GoalLine } from '../components/thread/GoalLine.tsx';
 import { HistoryCtx, HistoryEdgeRow } from '../components/thread/HistoryEdgeRow.tsx';
 import { historyEdges } from '@omni/shared/history.ts';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
 import { TakeoverConfirm } from '../components/thread/Takeover.tsx';
 import { useThreadMachine } from '../components/composer/MachineChip.tsx';
@@ -129,7 +130,8 @@ export function ThreadScreen() {
   const reconnecting = !s.live && ready;
   const own = threadPill(thread, { asking: view.asking, reconnecting, now });
   const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: STATUS[needs].label } : own;
-  const ctx: TurnCtx = { thread, view, history, conductor, crew, ch, changes, pr, now, shell, status };
+  const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
+  const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, ch, changes, pr, now, shell, status };
 
   const openFromCard = (tab: PanelTab) => {
     setQuick(false);

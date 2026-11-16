@@ -5,10 +5,11 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-
 import { Text } from '../../ui/Text';
 
 import type { ThreadLive, ThreadView } from '../../live/hub';
-import { useMarkResultRead } from '../../live/react';
+import { useChannelLook, useMarkResultRead } from '../../live/react';
 import { openArtifact } from '../../navigation/open-artifact';
 import type { RootStackParamList } from '../../navigation/types';
 import { CLOSED, type Disclosure, threadRows, type ThreadRow } from '../../thread/rows';
+import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { fontSize, minTarget, space, useOmniTheme, weight } from '../../theme';
 import { CrewQuestions } from './CrewQuestions';
 import { NeedsCards } from './NeedsCards';
@@ -30,6 +31,8 @@ const toggled = <T,>(set: ReadonlySet<T>, v: T): ReadonlySet<T> => {
 function useThreadRows(view: ThreadView, disclosure: Disclosure): ThreadRow[] {
   const prev = useRef<readonly ThreadRow[]>([]);
   const { thread } = view;
+  const conductor = thread?.channel_id === CONDUCTOR_CHANNEL;
+  const look = useChannelLook(CONDUCTOR_CHANNEL);
   const rows = useMemo(() => {
     if (!thread) return [];
     return threadRows(
@@ -40,12 +43,13 @@ function useThreadRows(view: ThreadView, disclosure: Disclosure): ThreadRow[] {
         artifacts: view.artifacts,
         children: view.children,
         atStart: !view.hasOlder,
-        conductor: thread.channel_id === 'conductor',
+        conductor,
+        conductorChannel: conductor && look.name ? { name: look.name, icon: look.icon, avatar_bg: look.avatarBg } : null,
         disclosure,
       },
       prev.current,
     ).rows;
-  }, [thread, view.rows, view.spans, view.artifacts, view.children, view.hasOlder, disclosure]);
+  }, [thread, conductor, look.name, look.icon, look.avatarBg, view.rows, view.spans, view.artifacts, view.children, view.hasOlder, disclosure]);
   useEffect(() => {
     prev.current = rows;
   }, [rows]);

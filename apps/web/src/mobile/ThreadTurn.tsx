@@ -7,6 +7,8 @@ import { CloudAgentCard } from '../components/thread/CloudAgentCard.tsx';
 import { ClippedNote } from '../components/thread/HistoryEdgeRow.tsx';
 import type { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { OmniMark } from '../components/brand.tsx';
+import { Avatar } from '../components/ui.tsx';
+import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { changesView } from '@omni/shared/changes-view.ts';
@@ -44,6 +46,8 @@ export type TurnCtx = {
   view: ThreadOf<Artifact, Thread>;
   history: ReturnType<typeof useThread>['history'];
   conductor: boolean;
+  /** The Conductor's channel, for its saved icon and background on the turns it answered. */
+  conductorChannel: Channel | undefined;
   crew: Thread[];
   ch: Channel | undefined;
   changes: ReturnType<typeof useBranchChanges>;
@@ -55,7 +59,7 @@ export type TurnCtx = {
 };
 
 function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
-  const { view, conductor, crew, ch, thread, changes, pr, now, shell } = c;
+  const { view, conductor, conductorChannel, crew, ch, thread, changes, pr, now, shell } = c;
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
     const delegated = t.children.length > 0 && <Delegation kids={t.children} />;
@@ -74,13 +78,18 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         </>
       );
     }
-    // The Conductor's answer introduces what it delegated, so it reads before the card, under its own name.
+    // The Conductor's answer introduces what it delegated, so it reads before the card, under its own name and face:
+    // the icon and background saved for it, else the Omni mark.
     const quiet = conductor && t.status === 'done';
     return (
       <>
         {quiet && (t.prose || delegated) ? (
           <div className="flex items-center gap-2 text-[12.5px] leading-none text-fg-3">
-            <OmniMark size={20} state={crew.some(showsRunning) ? 'delegating' : 'idle'} />
+            {conductorChannel && hasOwnLook(conductorChannel) ? (
+              <Avatar name={conductorChannel.name} omni channelIcon={conductorChannel.icon} avatarBg={conductorChannel.avatar_bg} size={20} />
+            ) : (
+              <OmniMark size={20} state={crew.some(showsRunning) ? 'delegating' : 'idle'} />
+            )}
             Conductor
           </div>
         ) : (

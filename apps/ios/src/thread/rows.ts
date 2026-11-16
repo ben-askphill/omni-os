@@ -4,6 +4,7 @@ import { same, type CloudAgentP, type Item, type ModLine, type ReportP, type Swi
 import { threadView, type NowDoing, type PlanView, type Prompt, type ThreadView, type TurnView } from '@omni/shared/thread-view.ts';
 import type { ThreadQuestion } from '@omni/shared/question.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
+import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 
 import { harnessLabel } from './format';
 
@@ -23,7 +24,8 @@ export type ThreadRow =
   | { kind: 'report'; key: string; r: ReportP }
   | { kind: 'question'; key: string; q: ThreadQuestion }
   | { kind: 'outcome'; key: string; status: IosTurn['status']; tookMs: number | undefined; steps: number; harness: string }
-  | { kind: 'conductor'; key: string }
+  /** The quiet "Conductor" line over its answer. `look`: the icon and background saved for it, null for the Omni mark. */
+  | { kind: 'conductor'; key: string; look: ConductorLook | null }
   | { kind: 'error'; key: string; text: string }
   | { kind: 'cloud'; key: string; p: CloudAgentP }
   | { kind: 'prose'; key: string; text: string; clipped: number | null }
@@ -54,6 +56,13 @@ export const ITEM_ROWS: Record<Item['type'], readonly RowKind[]> = {
   question: ['question'],
 };
 
+/** The Conductor channel's saved look, as the thread list reads it. */
+export interface ConductorLook {
+  name: string;
+  icon: string | null;
+  avatar_bg: string | null;
+}
+
 export interface RowsInput {
   events: readonly HistoryEvent[];
   spans?: readonly Span[];
@@ -62,7 +71,13 @@ export interface RowsInput {
   children: Thread[];
   atStart: boolean;
   conductor?: boolean;
+  /** The Conductor's channel, for its saved icon and background on the turns it answered. */
+  conductorChannel?: { name: string; icon?: string | null; avatar_bg?: string | null } | null;
   disclosure?: Disclosure;
+}
+
+function conductorLook(c: RowsInput['conductorChannel']): ConductorLook | null {
+  return c && hasOwnLook(c) ? { name: c.name, icon: c.icon ?? null, avatar_bg: c.avatar_bg ?? null } : null;
 }
 
 function caption(thread: Thread, p: Prompt, first: boolean, k: number, atStart: boolean): string | null {
@@ -109,7 +124,7 @@ function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, in
     if (t.steps > 0) yield steps();
   } else {
     const quiet = input.conductor && t.status === 'done';
-    if (quiet && (t.prose || t.children.length)) yield { kind: 'conductor', key: `co${t.key}` };
+    if (quiet && (t.prose || t.children.length)) yield { kind: 'conductor', key: `co${t.key}`, look: conductorLook(input.conductorChannel) };
     else if (t.result || t.error || t.status !== 'done') yield { kind: 'outcome', key: `o${t.key}`, status: t.status, tookMs: t.result?.duration_ms, steps: t.steps, harness: t.harness };
     if (t.error) yield { kind: 'error', key: `e${t.key}`, text: t.error };
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };

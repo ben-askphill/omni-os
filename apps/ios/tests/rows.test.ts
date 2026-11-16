@@ -182,6 +182,27 @@ describe('threadRows', () => {
     expect(of(rows, 'conductor').length).toBeGreaterThan(0);
   });
 
+  it("draws the Conductor line with the Omni mark while the Conductor has no look of its own", () => {
+    for (const conductorChannel of [undefined, null, { name: 'Conductor', icon: null, avatar_bg: null }, { name: 'Conductor', icon: 'icon:not-a-glyph' }]) {
+      const { rows } = threadRows(input(rich, { conductor: true, conductorChannel }));
+      expect(of(rows, 'conductor').length).toBeGreaterThan(0);
+      for (const r of of(rows, 'conductor')) expect(r).toMatchObject({ look: null });
+    }
+  });
+
+  it("draws the Conductor line with the icon and background saved for it", () => {
+    const saved = threadRows(input(rich, { conductor: true, conductorChannel: { name: 'Conductor', icon: '🎼', avatar_bg: '#283c62' } })).rows;
+    for (const r of of(saved, 'conductor')) expect(r).toMatchObject({ look: { name: 'Conductor', icon: '🎼', avatar_bg: '#283c62' } });
+    const bgOnly = threadRows(input(rich, { conductor: true, conductorChannel: { name: 'Conductor', icon: null, avatar_bg: '#283c62' } })).rows;
+    for (const r of of(bgOnly, 'conductor')) expect(r).toMatchObject({ look: { icon: null, avatar_bg: '#283c62' } });
+  });
+
+  it('redraws the Conductor line when its look changes, and only that row', () => {
+    const plain = threadRows(input(rich, { conductor: true })).rows;
+    const saved = threadRows(input(rich, { conductor: true, conductorChannel: { name: 'Conductor', icon: 'icon:target', avatar_bg: null } }), plain).rows;
+    for (const [i, r] of saved.entries()) expect(r === plain[i]).toBe(r.kind !== 'conductor');
+  });
+
   it('does not rebuild a row that did not change when a call opens', () => {
     const a = threadRows(input(rich, { disclosure: CLOSED })).rows;
     const b = threadRows(input(rich, { disclosure: CLOSED }), a).rows;

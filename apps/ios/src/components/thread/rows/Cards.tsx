@@ -12,7 +12,7 @@ import { duration, plural } from '../../../thread/format';
 import { outcomeText, type ThreadRow } from '../../../thread/rows';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
 import { ContextChips } from '../../ContextChips';
-import { OmniMark } from '../../ChannelAvatar';
+import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
 import { glyphFor, StatusDot } from '../../StatusDot';
 import { Markdown } from '../Markdown';
 import { QuestionCard } from '../QuestionCard';
@@ -105,11 +105,13 @@ export function OutcomeRow({ row }: Of<'outcome'>) {
   );
 }
 
-export function ConductorRow() {
+/** The Conductor's name over its answer, with the icon and background saved for it, else the Omni mark (web: ThreadTurn). */
+export function ConductorRow({ row }: Of<'conductor'>) {
   const { colors } = useOmniTheme();
+  const { look } = row;
   return (
     <View style={styles.line}>
-      <OmniMark size={14} color={colors.fg3} />
+      {look ? <ChannelAvatar name={look.name} icon={look.icon} avatarBg={look.avatar_bg} conductor size={18} /> : <OmniMark size={14} color={colors.fg3} />}
       <Text style={[styles.meta, { color: colors.fg3 }]}>Conductor</Text>
     </View>
   );
