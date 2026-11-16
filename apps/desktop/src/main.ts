@@ -19,6 +19,7 @@ import { desktopPlatform } from './menu-template.ts';
 import { installNativeBrowser } from './native-browser.ts';
 import { installNotifications } from './notifications.ts';
 import { DEFAULT_PORT, launchRoute, linkRoute, parseOptions, safeRoute, URL_SCHEME } from './options.ts';
+import { PendingRoute } from './pending-route.ts';
 import { defaultDataDir, logsDir, serverLogFile, type PlatformDirs } from './paths.ts';
 import { installQuickPrompt } from './quick-prompt.ts';
 import { installQuitHold } from './quit.ts';
@@ -38,18 +39,14 @@ if ('error' in parsed) {
 
 if (!app.requestSingleInstanceLock()) app.exit(0);
 
-/** A page asked for before the main window can show it: an omni:// link at launch, or a second launch while starting. */
-let pendingRoute: string | null = null;
-/** Shows a page once the app is up. Set by boot; until then a link waits in pendingRoute. */
-let showRoute: ((route: string) => void) | null = null;
+/** A page asked for while the main window cannot show it yet (pending-route.ts). Boot attaches it to the app. */
+const pending = new PendingRoute();
 
 // macOS hands a link to the running app, or to the one it launches for it, as open-url, before ready on a launch.
 app.on('open-url', (event, url) => {
   event.preventDefault();
   const route = linkRoute(url);
-  if (!route) return;
-  if (showRoute) showRoute(route);
-  else pendingRoute = route;
+  if (route) pending.ask(route);
 });
 
 async function boot(): Promise<void> {
@@ -125,7 +122,9 @@ async function boot(): Promise<void> {
     backend,
     appUrl: () => options.appUrl ?? backend.origin(),
     mainWindow: () => (main && !main.isDestroyed() ? main : null),
-    showMain(route) {
+    showMain(asked) {
+      // A page held for the main window (pending-route.ts) opens now, unless this call names its own.
+      const route = pending.take(asked);
       const open = ctx.mainWindow();
       if (open) {
         // A window opened before the server was up shows an error page: it loads again, now that it is.
@@ -185,18 +184,15 @@ async function boot(): Promise<void> {
   installNotifications(ctx);
 
   // Opening the app again while it runs, perhaps on a page (`omni open`, an omni:// link): the main window there once
-  // the server is up, else the failure screen. A start still under way opens the main window itself when it is ready
-  // (below, and the screen's Try Again), on the page asked for last.
-  showRoute = (route) => {
-    if (backend.current.kind === 'ready') ctx.showMain(route);
-    else pendingRoute = route;
-  };
+  // the server is up, else the failure screen. Until then the page is held, and the next main window opens on the one
+  // asked for last: the first start (below), the screen's Try Again, or a restart that comes back (onState).
+  pending.attach({ ready: () => backend.current.kind === 'ready', showMain: (route) => ctx.showMain(route) });
   app.on('second-instance', (_event, argv) => {
     const route = launchRoute(argv);
     const state = backend.current;
     if (state.kind === 'ready') ctx.showMain(route ?? undefined);
     else {
-      if (route) pendingRoute = route;
+      if (route) pending.ask(route);
       if (!focusServerScreen() && state.kind === 'failed') showServerFailure(ctx, state.message);
     }
   });
@@ -210,13 +206,13 @@ async function boot(): Promise<void> {
 
   backend.onState((state) => {
     if (state.kind === 'failed') showServerFailure(ctx, state.message);
+    if (state.kind === 'ready') pending.serverReady();
   });
   installCommand(options, dirs, dataDir, dev);
 
   const state = await backend.start();
   if (state.kind === 'ready') {
-    ctx.showMain(pendingRoute ?? undefined);
-    pendingRoute = null;
+    ctx.showMain();
     installQuickPrompt(ctx);
   }
 }

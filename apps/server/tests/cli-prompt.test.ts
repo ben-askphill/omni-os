@@ -11,12 +11,14 @@ const { buildSystemPrompt, hasOmniCommand } = await import('../runner/prompts.ts
 const { getCrew } = await import('../crew.ts');
 
 const dirs: string[] = [];
-function binWith(text: string | null) {
+function binWith(text: string | null, mode = 0o755) {
   const dir = mkdtempSync(join(tmpdir(), 'omni-cli-prompt-'));
   dirs.push(dir);
-  if (text !== null) writeFileSync(join(dir, 'omni'), text, { mode: 0o755 });
+  if (text !== null) writeFileSync(join(dir, 'omni'), text, { mode });
   return dir;
 }
+const SHIM = '#!/bin/sh\n# omni-cli-shim 1\n';
+const FOREIGN = '#!/bin/sh\necho "some other omni"\n';
 const original = process.env.PATH;
 afterEach(() => {
   process.env.PATH = original;
@@ -43,6 +45,14 @@ describe('the omni command in the system prompt', () => {
   it('is left out when no omni is on PATH, or the omni there is another program', () => {
     expect(hasOmniCommand([binWith(null)].join(delimiter))).toBe(false);
     expect(hasOmniCommand([binWith('#!/usr/bin/env bash\nSERVICE=omni-os\n')].join(delimiter))).toBe(false);
-    expect(hasOmniCommand(['', binWith('#!/bin/sh\n# omni-cli-shim 1\n')].join(delimiter))).toBe(true);
+    expect(hasOmniCommand(['', binWith(SHIM)].join(delimiter))).toBe(true);
+  });
+
+  it('counts only the omni PATH resolves to: the first executable one, as a shell finds it', () => {
+    // The app's bin folder comes last on the server's PATH, so another omni earlier is what agents would run.
+    expect(hasOmniCommand([binWith(FOREIGN), binWith(SHIM)].join(delimiter))).toBe(false);
+    expect(hasOmniCommand([binWith(SHIM), binWith(FOREIGN)].join(delimiter))).toBe(true);
+    // A file a shell cannot run is passed over.
+    expect(hasOmniCommand([binWith(FOREIGN, 0o644), binWith(SHIM)].join(delimiter))).toBe(true);
   });
 });

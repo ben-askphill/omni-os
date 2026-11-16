@@ -5,7 +5,7 @@ import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
-import { closeSync, openSync, readSync } from 'node:fs';
+import { accessSync, closeSync, constants, openSync, readSync, statSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
 /** Claude Code's Artifact tool publishes to claude.ai. Omni links a publish to its file and keeps the URL per channel. */
@@ -37,14 +37,34 @@ function isOmniShim(file: string): boolean {
   }
 }
 
+/** The `omni` a shell runs from this PATH: the first executable file by that name, or null. */
+function resolveOmni(path: string): string | null {
+  for (const dir of path.split(delimiter)) {
+    if (!dir) continue;
+    const file = join(dir, 'omni');
+    try {
+      if (!statSync(file).isFile()) continue;
+      accessSync(file, constants.X_OK);
+      return file;
+    } catch {
+      // Not there, or not executable: a shell looks further too.
+    }
+  }
+  return null;
+}
+
 let omniCommand: { path: string; found: boolean } | null = null;
 
 /**
  * Whether threads have the `omni` command (apps/cli): the desktop app writes it into its bin folder, which is on
- * this server's PATH and so on the harnesses' (ADR 0014). Another program named omni does not count.
+ * this server's PATH and so on the harnesses' (ADR 0014). It counts only when it is the `omni` PATH resolves to: the
+ * app appends its folder last (apps/desktop/src/backend/index.ts), so another program named omni earlier wins.
  */
 export function hasOmniCommand(path = process.env.PATH ?? ''): boolean {
-  if (omniCommand?.path !== path) omniCommand = { path, found: path.split(delimiter).some((dir) => !!dir && isOmniShim(join(dir, 'omni'))) };
+  if (omniCommand?.path !== path) {
+    const file = resolveOmni(path);
+    omniCommand = { path, found: !!file && isOmniShim(file) };
+  }
   return omniCommand.found;
 }
 

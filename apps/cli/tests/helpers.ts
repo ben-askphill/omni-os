@@ -6,6 +6,7 @@ import type { FetchResponse } from '@omni/client-core';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import type { FileStat, Io, RunResult } from '../src/io.ts';
 import { run } from '../src/main.ts';
+import { proofFor } from '../src/proof.ts';
 
 /** A recorded answer, parsed fresh each time so a test can change its copy. Typed loosely: each test reads the fields it needs. */
 export const wire = (name: string): any => JSON.parse(readFileSync(join(WIRE_FIXTURES, name), 'utf8'));
@@ -43,6 +44,11 @@ export interface FakeOptions {
   disk?: Record<string, { free: number; total: number }>;
   launch?: (bin: string, args: string[]) => boolean;
   now?: number;
+  /**
+   * What answers GET /api/auth/proof when no route does: this install's Omni signing with TOKEN on 4747 (the default),
+   * an impostor whose proof does not match, or nothing.
+   */
+  proof?: 'mine' | 'wrong' | 'refused';
 }
 
 const GB = 1024 ** 3;
@@ -51,6 +57,9 @@ export function fake(o: FakeOptions = {}) {
   const out: string[] = [];
   const err: string[] = [];
   const sent: Sent[] = [];
+  /** GET /api/auth/proof calls, which carry no token: kept apart from `sent`. */
+  const probes: Sent[] = [];
+  let proofMode = o.proof ?? 'mine';
   const launched: [string, string[]][] = [];
   const ran: [string, string[]][] = [];
   const slept: number[] = [];
@@ -60,12 +69,21 @@ export function fake(o: FakeOptions = {}) {
 
   const fetch: Io['fetch'] = async (url, init) => {
     const path = url.startsWith(BASE) ? url.slice(BASE.length) : url;
-    sent.push({ method: init.method, path, ...(init.body !== undefined && { body: JSON.parse(init.body) }), auth: init.headers.authorization });
+    const isProbe = path.startsWith('/api/auth/proof?');
+    (isProbe ? probes : sent).push({ method: init.method, path, ...(init.body !== undefined && { body: JSON.parse(init.body) }), auth: init.headers.authorization });
     const route = routes.find((r) => r.method === init.method && (typeof r.path === 'string' ? r.path === path : r.path.test(path)));
-    if (!route) throw new Error(`no route for ${init.method} ${path}`);
-    const n = calls.get(route) ?? 0;
-    calls.set(route, n + 1);
-    const reply = Array.isArray(route.reply) ? route.reply[Math.min(n, route.reply.length - 1)] : route.reply;
+    let reply: Reply;
+    if (route) {
+      const n = calls.get(route) ?? 0;
+      calls.set(route, n + 1);
+      reply = Array.isArray(route.reply) ? route.reply[Math.min(n, route.reply.length - 1)] : route.reply;
+    } else if (isProbe) {
+      const nonce = new URL(path, BASE).searchParams.get('nonce') ?? '';
+      const proof = proofMode;
+      reply = proof === 'refused' ? { refused: true } : { json: { proof: proof === 'wrong' ? 'deadbeef' : proofFor(TOKEN, 4747, nonce) } };
+    } else {
+      throw new Error(`no route for ${init.method} ${path}`);
+    }
     if ('refused' in reply) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
     if ('hang' in reply) throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
     const text = JSON.stringify(reply.json ?? {});
@@ -104,10 +122,13 @@ export function fake(o: FakeOptions = {}) {
   return {
     io,
     sent,
+    probes,
     launched,
     ran,
     slept,
     route: (r: Route) => routes.unshift(r),
+    /** Changes what holds the port from here on: another program can take it while Omni restarts. */
+    setProof: (mode: NonNullable<FakeOptions['proof']>) => void (proofMode = mode),
     out: () => out.join(''),
     err: () => err.join(''),
     /** Runs `omni <argv>` and answers its exit code. */

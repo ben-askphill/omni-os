@@ -74,7 +74,7 @@ describe('omni show', () => {
   });
 
   it('says when the thread does not exist', async () => {
-    const f = fake({ routes: [{ method: 'GET', path: /^\/api\//, reply: { status: 404, json: wire('error-not-found.json') } }] });
+    const f = fake({ routes: [{ method: 'GET', path: /^\/api\/(threads|needs-you)/, reply: { status: 404, json: wire('error-not-found.json') } }] });
     expect(await f.run('show', ID)).toBe(3);
     expect(f.err()).toContain('has nothing by that id');
   });

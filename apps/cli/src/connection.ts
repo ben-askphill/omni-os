@@ -4,9 +4,10 @@
 // it does for its MCP servers. In a terminal the shim the desktop app writes (apps/desktop/src/cli-shim.ts) sets the
 // install's facts instead: OMNI_APP (the app it runs on), OMNI_INSTALL_DATA_DIR, OMNI_INSTALL_LOG and
 // OMNI_INSTALL_PORT. scripts/omni.sh sets OMNI_INSTALL_DATA_DIR to a checkout's data/. Nothing here guesses a path.
-import { createHttpClient, createOmniApi, parseBaseUrl, type BaseUrl, type OmniApi } from '@omni/client-core';
+import { createHttpClient, createOmniApi, OmniHttpError, parseBaseUrl, type BaseUrl, type OmniApi } from '@omni/client-core';
 import { join } from 'node:path';
 import { CliError, type Io } from './io.ts';
+import { PROBE_MS, probe } from './proof.ts';
 
 export const DEFAULT_PORT = 4747;
 
@@ -18,6 +19,11 @@ export interface Connection {
   port: number;
   /** OMNI_URL set the address, so it may be another machine. */
   remote: boolean;
+  /**
+   * The address is the install's port on this machine, not OMNI_URL: whatever holds that port proves it is this
+   * install's Omni (GET /api/auth/proof) before it gets the token.
+   */
+  proveFirst: boolean;
   tokenSource: TokenSource;
   /** Read again on every request, so a rotated token file is picked up. */
   token(): string | null;
@@ -64,6 +70,7 @@ export function connection(io: Pick<Io, 'env' | 'readFile'>): Connection {
     baseUrl,
     port: parsed ? (portOf(new URL(parsed).port) ?? (parsed.startsWith('https') ? 443 : 80)) : port,
     remote: !!parsed && !isLoopback(parsed),
+    proveFirst: !parsed,
     tokenSource,
     token,
     dataDir,
@@ -92,7 +99,46 @@ export interface Client {
   link(route: string): string;
 }
 
-export function client(io: Io, conn: Connection = connection(io)): Client {
-  const http = createHttpClient({ baseUrl: conn.baseUrl, token: conn.token, fetch: io.fetch, timeoutMs: 30_000 });
+/**
+ * Another program, or another install's Omni, can hold the install's port while this one is not running. On that
+ * address the token goes only to a server that proved it holds the same token, checked before the first request and
+ * again after the connection drops (a `--wait` can outlast a restart). `proven` says a probe already passed.
+ */
+export function client(io: Io, conn: Connection = connection(io), o: { proven?: boolean } = {}): Client {
+  let proven = !conn.proveFirst || !!o.proven;
+  let proving: Promise<void> | null = null;
+  async function prove(): Promise<void> {
+    const p = await probe(io, conn);
+    if (p.kind === 'omni' && p.mine) {
+      proven = true;
+      return;
+    }
+    // Nothing listens, or nothing answers yet: an unreachable server, which `--wait` waits through. Nothing is sent.
+    if (p.kind === 'free') throw new OmniHttpError({ kind: 'unreachable', detail: 'connection refused' });
+    if (p.kind === 'slow') throw new OmniHttpError({ kind: 'unreachable', detail: `no answer within ${PROBE_MS / 1000}s` });
+    const who = p.kind === 'omni' ? "answers as Omni, but not as this install's" : `answers, but not as Omni (${p.detail})`;
+    throw new CliError(`${conn.baseUrl} ${who}: another install or another program holds the port. The token was not sent. omni doctor says more.`);
+  }
+  // client-core reads the token before each request, outside its own error handling, so a refusal here stops the
+  // request unsent. Requests made together share one probe.
+  async function token(): Promise<string | null> {
+    const value = conn.token();
+    if (proven || !value) return value;
+    proving ??= prove().finally(() => {
+      proving = null;
+    });
+    await proving;
+    return value;
+  }
+  const fetch: Io['fetch'] = async (url, init) => {
+    try {
+      return await io.fetch(url, init);
+    } catch (err) {
+      // The server went away: whatever answers next proves itself again.
+      proven = !conn.proveFirst;
+      throw err;
+    }
+  };
+  const http = createHttpClient({ baseUrl: conn.baseUrl, token, fetch, timeoutMs: 30_000 });
   return { conn, api: createOmniApi(http), link: (route) => `${conn.baseUrl}/${route}` };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { proofFor } from '../src/commands/doctor.ts';
+import { proofFor } from '../src/proof.ts';
 import { fake, TOKEN, wire } from './helpers.ts';
 
 const DATA = '/home/me/.local/share/omni-os/data';
@@ -61,7 +61,8 @@ describe('omni doctor', () => {
     expect(other.out()).toMatch(/^FAIL\s+server\s+.*answers as Omni, but not with this token/m);
     // Whatever holds the port did not prove it has the token, so it never gets it.
     expect(other.out()).toMatch(/^ok\s+token\s+.*\(not sent: the server on that port is not this install\)$/m);
-    expect(other.sent.map((s) => s.auth)).toEqual([undefined]);
+    expect(other.sent).toEqual([]);
+    expect(other.probes.map((s) => s.auth)).toEqual([undefined]);
     const stranger = fake({ ...install(), run: signedIn, routes: [{ method: 'GET', path: /^\/api\/auth\/proof/, reply: { status: 404, json: {} } }] });
     expect(await stranger.run('doctor')).toBe(1);
     expect(stranger.out()).toMatch(/^FAIL\s+server\s+.*answers, but not as Omni/m);

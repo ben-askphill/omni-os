@@ -7,7 +7,7 @@
 The desktop app installs it each time it starts:
 
 - **In your terminal:** `~/.local/bin/omni`. Claude Code's native installer uses the same folder, so it is often on your PATH already. If `omni` is not found, add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile.
-- **For agents:** a second copy in the app's own `bin` folder, which is on every thread's PATH, so Claude Code, Codex and Cursor Agent threads have it whatever your PATH says. Threads without the Conductor's MCP tools are told about it in their system prompt.
+- **For agents:** a second copy in the app's own `bin` folder, which comes last on every thread's PATH, so Claude Code, Codex and Cursor Agent threads have it even when your PATH lacks `~/.local/bin`. Threads without the Conductor's MCP tools are told about it in their system prompt, unless another program named `omni` comes first on PATH.
 
 The command is a small shell script that runs the CLI bundled in the app, on the app itself, so it updates when the app does and needs no Node.
 
@@ -48,7 +48,7 @@ The command is a small shell script that runs the CLI bundled in the app, on the
 | 0 | Done (`--wait`), or the command worked |
 | 1 | The thread failed or was stopped (`--wait`), or a `doctor` check failed |
 | 2 | The thread needs you (`--wait`): a question, a usage limit, a worktree that could not be made, messages to resume, or a delegated thread that failed |
-| 3 | Omni refused the request or is not reachable |
+| 3 | Omni refused the request, is not reachable, or something else holds its port |
 | 64 | The command line was wrong |
 
 ```sh
@@ -62,6 +62,10 @@ Inside an Omni thread the server sets `OMNI_URL`, `OMNI_TOKEN` or `OMNI_TOKEN_FI
 - `omni send parent "blocked on the Directus password"` reaches the thread that started this one mid-turn. Its final reply still reports back on its own.
 - `omni new "…" -c volero -r researcher` from inside a thread files the new thread under it, as the Conductor's delegate does, and its report comes back.
 - A message from inside a thread counts as the Conductor's, so a thread whose session went cold refuses it, as `message_thread` does.
+
+## Which server gets the token
+
+Without `OMNI_URL`, the command talks to this machine's Omni on its port and first asks it to prove it holds the same token (`GET /api/auth/proof`, as the desktop app does). If another install or another program holds the port, the command stops with exit 3 and sends neither the token nor your prompt. `omni doctor` shows what is there.
 
 ## Another machine
 

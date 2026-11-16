@@ -1,6 +1,5 @@
 // `omni doctor`: why Omni is not working, without needing the server. Every check reads this machine; the server is
 // asked only whether it answers, and whether it takes the token.
-import { createHmac } from 'node:crypto';
 import { join } from 'node:path';
 import { OmniHttpError } from '@omni/client-core';
 import { diskLevel, freeSize } from '@omni/shared/disk-space.ts';
@@ -8,6 +7,7 @@ import { flag, parseArgs } from '../args.ts';
 import { client, connection, describeSource, type Connection } from '../connection.ts';
 import { clip, json, when } from '../format.ts';
 import { EXIT, UsageError, type Io } from '../io.ts';
+import { probe, PROBE_MS, type Probe } from '../proof.ts';
 import { VERSION } from '../version.ts';
 
 export type Level = 'ok' | 'warn' | 'fail';
@@ -20,46 +20,7 @@ export interface Check {
   lines?: string[];
 }
 
-const PROBE_MS = 2000;
 const LOGIN_MS = 10_000;
-
-/** What answers on the port: the same probe the desktop app makes before it starts or attaches (apps/desktop/src/backend/launch.ts). */
-export type Probe = { kind: 'free' } | { kind: 'slow' } | { kind: 'not-omni'; detail: string } | { kind: 'omni'; mine: boolean | null };
-
-/** The proof an Omni server answers GET /api/auth/proof with: an HMAC of its port and the nonce under its token. */
-export const proofFor = (token: string, port: number, nonce: string) => createHmac('sha256', token).update(`omni-proof:${port}:${nonce}`).digest('hex');
-
-function errnoOf(err: unknown): string | undefined {
-  const cause = (err as { cause?: { code?: string; errors?: { code?: string }[] } } | null)?.cause;
-  return cause?.code ?? cause?.errors?.find((e) => e.code)?.code;
-}
-
-export async function probe(io: Io, conn: Connection): Promise<Probe> {
-  const nonce = io.uuid().replace(/-/g, '');
-  let status: number;
-  let body: string;
-  try {
-    const res = await io.fetch(`${conn.baseUrl}/api/auth/proof?nonce=${nonce}`, { method: 'GET', headers: {}, redirect: 'manual', signal: AbortSignal.timeout(PROBE_MS) });
-    status = res.status;
-    body = await res.text();
-  } catch (err) {
-    if (errnoOf(err) === 'ECONNREFUSED') return { kind: 'free' };
-    const name = err instanceof Error ? err.name : '';
-    if (name === 'TimeoutError' || name === 'AbortError') return { kind: 'slow' };
-    return { kind: 'not-omni', detail: 'nothing answered as HTTP' };
-  }
-  let proof: unknown = null;
-  try {
-    proof = (JSON.parse(body) as { proof?: unknown }).proof;
-  } catch {
-    proof = null;
-  }
-  if (status !== 200 || typeof proof !== 'string') return { kind: 'not-omni', detail: `it answered ${status}, not an Omni proof` };
-  const token = conn.token();
-  // Through a tunnel or proxy the server signs its own port, not the one in OMNI_URL: only a local proof can be checked.
-  if (!token || conn.remote) return { kind: 'omni', mine: null };
-  return { kind: 'omni', mine: proof === proofFor(token, conn.port, nonce) };
-}
 
 function serverCheck(p: Probe, conn: Connection): Check {
   const at = conn.baseUrl;
@@ -90,7 +51,8 @@ async function tokenCheck(io: Io, conn: Connection, p: Probe): Promise<Check> {
   // A wrong proof means whatever holds the port is not this install: it does not get the token.
   if (p.mine === false) return { name: 'token', level: 'ok', detail: `${where} (not sent: the server on that port is not this install)` };
   try {
-    await client(io, conn).api.status();
+    // The probe above is the proof, so the client does not ask again.
+    await client(io, conn, { proven: p.mine === true }).api.status();
     return { name: 'token', level: 'ok', detail: `${where}, and the server takes it` };
   } catch (err) {
     if (err instanceof OmniHttpError && err.failure.kind === 'http' && err.failure.status === 401) {
