@@ -27,7 +27,8 @@ import { DoneConfirmProvider } from '../src/done-confirm.tsx';
 import { needsCard } from '../src/mobile/activity.ts';
 import { NeedsActions } from '../src/mobile/NeedsCard.tsx';
 import { ChannelThreadEntry } from '../src/components/sidebar/SidebarRows.tsx';
-import { useJobTree, type JobTree } from '../src/thread-tree.ts';
+import { useJobTree, useTreesFold, type JobTree, type TreesFold } from '../src/thread-tree.ts';
+import { FoldTrees } from '../src/components/ThreadTree.tsx';
 
 // The thread tree in the views that show it: its open state across a job's runs (apps/web/src/thread-tree.ts), the
 // phone card's Done question (apps/web/src/mobile/NeedsCard.tsx) and sub-agents in the classic sidebar
@@ -84,6 +85,62 @@ describe('a tree Ben closed by hand', () => {
 
     await at('done', 'running');
     expect(tree!.open).toBe(true);
+  });
+});
+
+describe('Collapse all on the Working shelf', () => {
+  const trees: Record<string, JobTree | null> = {};
+  let fold: TreesFold | null = null;
+  const Card = ({ job }: { job: ThreadStub }) => {
+    trees[job.id] = useJobTree(job, 'inbox');
+    return null;
+  };
+  const Shelf = ({ jobs }: { jobs: ThreadStub[] }) => {
+    fold = useTreesFold(jobs, 'inbox');
+    return createElement('div', null, createElement(FoldTrees, { fold, size: 13 }), ...jobs.map((job) => createElement(Card, { key: job.id, job })));
+  };
+  const a = s('a', 'conductor', 'running', { delegating: true });
+  const b = s('b', 'conductor', 'running', { delegating: true });
+  const lone = s('lone', 'conductor', 'running');
+  const shelf = async () => {
+    app.channels = [
+      channel('conductor', { handoffs: [{ parent: a, children: [s('a1', 'omni-os', 'running')] }, { parent: b, children: [s('b1', 'omni-os', 'running')] }] }),
+      channel('omni-os'),
+    ];
+    await render(createElement(Shelf, { jobs: [a, b, lone] }));
+  };
+  const button = () => host.querySelector<HTMLButtonElement>('[data-fold-trees]')!;
+
+  it('closes every tree, then opens them all, and counts only the threads with a tree', async () => {
+    await shelf();
+    expect(fold!.trees).toBe(2);
+    expect(button().getAttribute('aria-label')).toBe('Collapse all sub-threads');
+    await act(async () => button().click());
+    expect([trees.a!.open, trees.b!.open]).toEqual([false, false]);
+    expect(button().getAttribute('aria-label')).toBe('Expand all sub-threads');
+    await act(async () => button().click());
+    expect([trees.a!.open, trees.b!.open]).toEqual([true, true]);
+  });
+
+  it('follows the chevrons: one open tree turns it back to Collapse all, and each chevron still works alone', async () => {
+    await shelf();
+    await act(async () => button().click());
+    await act(async () => trees.b!.toggle());
+    expect([trees.a!.open, trees.b!.open]).toEqual([false, true]);
+    expect(fold!.action).toBe('collapse');
+    await act(async () => trees.b!.toggle());
+    expect(fold!.action).toBe('expand');
+  });
+
+  it('saves the same per-job choice a chevron saves, so it survives a reload', async () => {
+    await shelf();
+    await act(async () => button().click());
+    expect(JSON.parse(localStorage.getItem(`omni.${treePrefKey('inbox', 'a')}`)!)).toEqual({ open: false, phase: 'running' });
+    act(() => root.unmount());
+    root = createRoot(host);
+    await shelf();
+    expect([trees.a!.open, trees.b!.open]).toEqual([false, false]);
+    expect(fold!.action).toBe('expand');
   });
 });
 

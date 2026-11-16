@@ -3,9 +3,9 @@
 // siblings of its button, so tapping one never opens the thread.
 import { errorText, type Thread } from '../api.ts';
 import type { InboxShelf } from '../app/useInbox.ts';
-import { AgentRows, TreeRows, TreeToggle, TreeToggleSpace } from '../components/ThreadTree.tsx';
+import { AgentRows, FoldTrees, TreeRows, TreeToggle, TreeToggleSpace } from '../components/ThreadTree.tsx';
 import { useMarkDone } from '../done-confirm.tsx';
-import { useJobTree } from '../thread-tree.ts';
+import { useJobTree, type TreesFold } from '../thread-tree.ts';
 import { DoneMark, Icon, type IconName } from '../components/ui.tsx';
 import { RunElapsed } from '../components/RunElapsed.tsx';
 import { ranOnLine } from '@omni/shared/ran-on.ts';
@@ -160,13 +160,16 @@ export function MoDoneRow({ t, last }: { t: InboxThread; last: boolean }) {
 }
 
 /** A shelf's header: its name, how many it holds, and a chevron that turns as it folds. */
-export function MoShelf({ label, shelf }: { label: string; shelf: InboxShelf }) {
+export function MoShelf({ label, shelf, fold }: { label: string; shelf: InboxShelf; fold?: TreesFold }) {
   return (
-    <button type="button" onClick={shelf.toggle} aria-expanded={shelf.open} className="mo-row flex h-11 w-full items-center gap-1.5 px-1 text-left">
-      <span className="text-[12px] leading-[1.3] font-medium text-fg-3">{label}</span>
-      <span className="text-[12px] leading-[1.3] text-fg-3 tabular-nums">{shelf.count}</span>
-      <Icon name="chevronDown" size={14} className={`ml-auto text-fg-3 transition-transform ${shelf.open ? '' : '-rotate-90'}`} />
-    </button>
+    <div className="grid grid-cols-1">
+      <button type="button" onClick={shelf.toggle} aria-expanded={shelf.open} className="mo-row flex h-11 w-full items-center gap-1.5 px-1 text-left [grid-area:1/1]">
+        <span className="text-[12px] leading-[1.3] font-medium text-fg-3">{label}</span>
+        <span className="text-[12px] leading-[1.3] text-fg-3 tabular-nums">{shelf.count}</span>
+        <Icon name="chevronDown" size={14} className={`ml-auto text-fg-3 transition-transform ${shelf.open ? '' : '-rotate-90'}`} />
+      </button>
+      {shelf.open && fold && fold.trees > 0 && <FoldTrees fold={fold} className="mr-6 h-11 w-11 self-center justify-self-end [grid-area:1/1]" size={16} />}
+    </div>
   );
 }
 

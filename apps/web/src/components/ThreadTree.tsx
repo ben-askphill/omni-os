@@ -8,7 +8,7 @@ import type { BackgroundTask } from '../api.ts';
 import { duration, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
-import type { JobTree, StubNode } from '../thread-tree.ts';
+import type { JobTree, StubNode, TreesFold } from '../thread-tree.ts';
 import { HarnessLogo, Loader, harnessLabel } from './brand.tsx';
 import { DoneMark, Icon, StatusDot, statusLabel } from './ui.tsx';
 
@@ -89,6 +89,23 @@ function ToggleFace({ tree, label }: { tree: JobTree; label?: string }) {
       <TreeTally tally={tree.tally} />
       <Icon name={tree.open ? 'chevronDown' : 'chevronRight'} size={11} className="-mr-0.5 shrink-0 text-fg-3" />
     </>
+  );
+}
+
+/** Collapse all / Expand all for the threads under every card on a shelf. */
+export function FoldTrees({ fold, className = '', size }: { fold: TreesFold; className?: string; size: number }) {
+  const label = fold.action === 'collapse' ? 'Collapse all sub-threads' : 'Expand all sub-threads';
+  return (
+    <button
+      type="button"
+      onClick={fold.toggle}
+      aria-label={label}
+      title={label}
+      data-fold-trees={fold.action}
+      className={`hov z-[2] grid shrink-0 place-items-center rounded-full text-fg-3 transition-colors hover:text-fg ${className}`}
+    >
+      <Icon name={fold.action === 'collapse' ? 'foldAll' : 'unfoldAll'} size={size} />
+    </button>
   );
 }
 

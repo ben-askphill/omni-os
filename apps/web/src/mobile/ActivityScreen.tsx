@@ -14,6 +14,7 @@ import { HeaderActions } from './HeaderActions.tsx';
 import { MoDoneRow, MoInboxRow, MoShelf, MoShowMore } from './InboxRows.tsx';
 import { MoEmpty, MoHeader, MoScroll, MoTitle } from './parts.tsx';
 import { useShell } from './shell.tsx';
+import { useTreesFold } from '../thread-tree.ts';
 
 /**
  * Home on a phone: the sidebar's Inbox as a list. Pinned threads, then the threads waiting on Ben, the latest back
@@ -23,6 +24,7 @@ export function ActivityScreen() {
   const shell = useShell();
   const now = useNow(60_000);
   const { pinned, inbox, working, done, loaded, status } = useInbox();
+  const fold = useTreesFold(working.threads, 'inbox');
   const machines = useMachines().data;
   const conductor = useApp().channel(CONDUCTOR_CHANNEL);
   const waiting = [...pinned, ...inbox];
@@ -66,7 +68,7 @@ export function ActivityScreen() {
           {working.count > 0 && (
             <>
               <div aria-hidden className="mt-2 mb-1 border-t border-line" />
-              <MoShelf label="Working" shelf={working} />
+              <MoShelf label="Working" shelf={working} fold={fold} />
               {working.rows.map((t, i) => (
                 <MoInboxRow key={t.id} t={t} status={status(t)} working last={i === working.rows.length - 1} />
               ))}

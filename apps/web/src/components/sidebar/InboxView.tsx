@@ -13,8 +13,8 @@ import { useApp, useNow } from '../../store.tsx';
 import { HarnessLogo, Loader, OmniMark } from '../brand.tsx';
 import { Avatar, ChannelMark, DoneMark, Icon, StatusDot } from '../ui.tsx';
 import { useMarkDone } from '../../done-confirm.tsx';
-import { useJobTree } from '../../thread-tree.ts';
-import { AgentRows, TreeRows, TreeToggle, TreeToggleSpace } from '../ThreadTree.tsx';
+import { useJobTree, useTreesFold, type TreesFold } from '../../thread-tree.ts';
+import { AgentRows, FoldTrees, TreeRows, TreeToggle, TreeToggleSpace } from '../ThreadTree.tsx';
 import { RunElapsed } from '../RunElapsed.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
 
@@ -30,6 +30,7 @@ export function InboxView({ onNavigate, links = true }: { onNavigate?: () => voi
   const markDone = useMarkDone();
   const { pinned, inbox, needs, finished, working, done, loaded, openId, status } = useInbox();
   const channelOf = (id: string) => channels.find((c) => c.id === id);
+  const fold = useTreesFold(working.threads, 'inbox');
   useDoneKey((focusedId) => {
     const id = focusedId ?? openId;
     const t = id ? [...pinned, ...inbox, ...working.rows].find((r) => r.id === id) : undefined;
@@ -72,7 +73,7 @@ export function InboxView({ onNavigate, links = true }: { onNavigate?: () => voi
       {working.count > 0 && (
         <div className="space-y-px pt-1">
           <div aria-hidden className="mx-3 mb-3 border-t border-line" />
-          <Shelf label="Working" count={working.count} open={working.open} onToggle={working.toggle} />
+          <Shelf label="Working" count={working.count} open={working.open} onToggle={working.toggle} fold={working.open ? fold : undefined} />
           {working.rows.map((t) => card(t, false, tasks))}
         </div>
       )}
@@ -112,20 +113,26 @@ function ShelfLabel({ label, count }: { label: string; count: number }) {
   );
 }
 
-/** A shelf's header: its name, how many it holds, and a chevron that turns as it folds. */
-function Shelf({ label, count, open, onToggle }: { label: string; count: number; open: boolean; onToggle: () => void }) {
+/**
+ * A shelf's header: its name, how many it holds, and a chevron that turns as it folds. `fold`: Working's button left
+ * of the chevron that closes every card's tree at once, or opens them all again.
+ */
+function Shelf({ label, count, open, onToggle, fold }: { label: string; count: number; open: boolean; onToggle: () => void; fold?: TreesFold }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
-      title={open ? `Hide ${label.toLowerCase()} threads` : `Show ${label.toLowerCase()} threads`}
-      className="caption flex h-8 w-full items-center gap-2 px-3 text-left transition-colors hover:text-fg-2"
-    >
-      {label}
-      <span className="font-num font-normal text-fg-3 tabular-nums">{count}</span>
-      <Icon name="chevronDown" size={11} className={`ml-auto text-fg-3 transition-transform ${open ? '' : '-rotate-90'}`} />
-    </button>
+    <div className="grid grid-cols-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        title={open ? `Hide ${label.toLowerCase()} threads` : `Show ${label.toLowerCase()} threads`}
+        className="caption flex h-8 w-full items-center gap-2 px-3 text-left transition-colors [grid-area:1/1] hover:text-fg-2"
+      >
+        {label}
+        <span className="font-num font-normal text-fg-3 tabular-nums">{count}</span>
+        <Icon name="chevronDown" size={11} className={`ml-auto text-fg-3 transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      {fold && fold.trees > 0 && <FoldTrees fold={fold} className="mr-7 h-6 w-6 self-center justify-self-end [grid-area:1/1]" size={13} />}
+    </div>
   );
 }
 
