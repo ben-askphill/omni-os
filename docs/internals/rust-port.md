@@ -78,7 +78,7 @@ In this order. Each row is one slice.
 Per slice:
 
 1. **Port.** The crate, the recorded fixtures, tests on both sides. Nothing runs the binary yet.
-2. **Ship.** The desktop build compiles the binary for macOS (universal) and Linux and puts it beside the server. The server starts the binary when it is there and the TypeScript when it is not, and logs which.
+2. **Ship.** The desktop build compiles the binary for macOS (universal) and Linux and puts it beside the server. The server, or the app for the `omni` command, starts the binary when it is there and the TypeScript when it is not, and logs which.
 3. **Remove.** After a release has carried the binary, delete the TypeScript twin and its bundle entry.
 
 ## Status
@@ -88,7 +88,7 @@ Per slice:
 | Module | Status | Reason or next step |
 | --- | --- | --- |
 | `apps/mcp` `ask.ts`, `render.ts`, `threads.ts`, `referenced-thread.ts`, `api.ts` | in progress | Slice 1. Steps 1 and 2 are done: `crates/omni-mcp` passes the record, the desktop build ships it and the server starts it when it is there. The TypeScript stays as the fallback until step 3, after a release has carried the binary |
-| `apps/cli` | in progress | Slice 2. Step 1 is done: `crates/omni-cli` passes the record of all six commands ([ADR 0014](../adr/0014-omni-command-line.md)). Nothing runs it yet. Step 2 makes the desktop app's shim start it |
+| `apps/cli` | in progress | Slice 2. Steps 1 and 2 are done: `crates/omni-cli` passes the record of all six commands ([ADR 0014](../adr/0014-omni-command-line.md)), the desktop build ships it and the app's `omni` command starts it when it is there. The TypeScript stays as the fallback, and for `scripts/omni.sh` from a checkout, until step 3 |
 | `apps/mcp` `omni.ts`, `pull-requests.ts` | planned | Slice 3 |
 | `apps/mcp` `external/` | kept | The HTTP transport runs inside the server and shares `tools.ts` with the stdio one. Porting only stdio would leave two copies of 20 tools. Moves with the server or not at all |
 | `apps/server` `runner/`, `harness/` | kept | They start a CLI and wait on its stream. The adapters change with every harness release, and 50,000 lines of tests hold them in TypeScript. No runtime cost to win back |
@@ -139,7 +139,7 @@ The tool descriptions and limits in `ask.rs` and `render.rs` are copies of `pack
 
 ## Slice 2: the `omni` command
 
-`crates/omni-cli` builds one binary, `omni`, with the six commands of `apps/cli`: `new`, `send`, `threads` and `show`, `status`, `doctor`, `open`. It prints the same text, sends the same requests and exits with the same codes. Nothing runs it yet: the desktop app's shim still starts the TypeScript command.
+`crates/omni-cli` builds one binary, `omni`, with the six commands of `apps/cli`: `new`, `send`, `threads` and `show`, `status`, `doctor`, `open`. It prints the same text, sends the same requests and exits with the same codes. The desktop app's `omni` command starts it. From a checkout, `scripts/omni.sh` still runs the TypeScript.
 
 - **How it is built.** It is synchronous and has no async runtime. HTTP is `ureq` with `rustls` and the Mozilla root certificates, because `OMNI_URL` can be an `https` address on another machine. API answers stay the JSON values of `omni-core`, so a field the command does not know prints as the TypeScript one prints it. Column widths and cut-off points count UTF-16 units, as JavaScript strings do.
 - **The token.** On the install port the command first asks the server to prove it holds the token (an HMAC over a nonce) and sends the token only after that, as the TypeScript command does. With no token it sends nothing.
@@ -150,11 +150,14 @@ The tool descriptions and limits in `ask.rs` and `render.rs` are copies of `pack
 - **On a Mac.** Both test runners pass on macOS 27 (arm64) as on Linux, and the two commands print the same `doctor`, with the Mac's disk sizes, against a closed port.
 - **Against a real server.** Both commands ran against one throwaway Omni server (`scripts/qa-stack.sh`): 23 read commands in each of the two ways to find the server, and seven `new` and `send` runs with and without `--wait` and `--json`. The output and exit code were the same in all of them. `status --json` differed only in the server's own `since` time, which changed between the two requests.
 
-### What step 2 needs
+### How it ships and runs
 
-- **A C compiler for the static Linux build.** `native.ts` builds `omni-mcp` for `x86_64-unknown-linux-musl`. `ring` needs `musl-gcc` for that target, so the release job installs `musl-tools` first. A Mac needs nothing more than Xcode's command line tools.
-- **A path outside the AppImage.** The shim in `~/.local/bin/omni` starts the app's own Node today. A binary inside a mounted AppImage has no path a shim can name, so the Linux app copies `omni` into its `bin` folder at start. The Mac app's shim can name the binary inside `Omni.app`.
-- **The fallback.** The shim starts the binary when it is there and the TypeScript command when it is not, as the server does for the MCP servers.
+- **The build.** `native.ts` compiles `omni-cli` beside `omni-mcp` and stages it as `bin/omni` in the app root, with the app's version compiled in (`OMNI_CLI_VERSION`), so `omni --version` names the app it came with. Each binary builds by itself: in `--native auto` a machine that cannot build one still ships the other.
+- **A C compiler.** The command's TLS library (`ring`) compiles C. A Mac build needs Xcode's command line tools. The static Linux build needs `musl-gcc`, which the release workflow installs (`musl-tools`). A Linux machine without it ships the MCP servers and leaves the command on the app's Node.
+- **The app.** `apps/desktop/src/cli-shim.ts` decides once per launch (`nativeCommand`). It runs `bin/omni --version`, and when that prints a version the shim it writes starts the binary. The main process log says which: `[omni] the omni command runs on the Rust build: <path> (<version>)`, or the reason the binary did not start. An app without the binary logs nothing and writes the shim as before.
+- **An AppImage.** Its files sit in a mount that goes away when the app quits, and the command has to work then too. The app copies the binary to `native/omni` in its own folder (`~/.config/Omni`) at each launch and replaces the copy only when the build changed. A Mac app's shim names the binary inside `Omni.app`.
+- **The fallback.** The shim checks that the binary is there on every call. When it is gone, the bundled CLI runs on the app's Node as before. `OMNI_NATIVE_CLI=0` in the environment of a call does the same for that call.
+- **Start time.** Through the shim of a packaged AppImage, `omni --version` took 1 ms on the Rust build and 190 ms on the bundled CLI. `omni threads` against a local server took 2 ms and 245 ms.
 
 ## Known differences
 
@@ -188,4 +191,4 @@ What the Rust build does differently on purpose. None of these has been seen fro
 - **The server.** It stays in TypeScript under this plan. A full port is possible, and the wire fixtures in `packages/test-fixtures/wire/` would be its parity record, but it is 47,766 lines with 49,785 lines of tests, and until the last route moved there would be two implementations of the schema side by side. It buys lower idle memory and one binary to ship. It does not make threads faster. Say so if you want it anyway and it becomes slice 4, route group by route group behind the same port.
 - **The desktop shell.** Tauri would replace Electron's Chromium with the system web view and make the download much smaller. It cannot run the bundled Node server, so it needs either a separate Node in the app or the server port above. It also trades one Chromium for WebKit on macOS and WebKitGTK on Linux, which the Web UI has never been tested on. Kept on Electron until the server decision is made.
 - **The iOS app.** No Rust planned. Say so if you want a shared native core for a later Android app.
-- **Rust as a build requirement.** The release workflow now needs a Rust toolchain, which GitHub's runners have. A local desktop build without `cargo` still works and ships the TypeScript servers only. Development from a checkout needs no Rust. Say so if you would rather the release also fell back without Rust.
+- **Rust as a build requirement.** The release workflow now needs a Rust toolchain, which GitHub's runners have, and its Linux job installs `musl-tools` for the `omni` command's C code. A local desktop build without `cargo` still works and ships the TypeScript only. Development from a checkout needs no Rust. Say so if you would rather the release also fell back without Rust.

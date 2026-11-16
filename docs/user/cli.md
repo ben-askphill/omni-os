@@ -9,13 +9,14 @@ The desktop app installs it each time it starts:
 - **In your terminal:** `~/.local/bin/omni`. Claude Code's native installer uses the same folder, so it is often on your PATH already. If `omni` is not found, add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile.
 - **For agents:** a second copy in the app's own `bin` folder, which comes last on every thread's PATH, so Claude Code, Codex and Cursor Agent threads have it even when your PATH lacks `~/.local/bin`. Threads without the Conductor's MCP tools are told about it in their system prompt, unless another program named `omni` comes first on PATH.
 
-The command is a small shell script that runs the CLI bundled in the app, on the app itself, so it updates when the app does and needs no Node.
+The command is a small shell script. It starts the native build of the CLI that the app carries, so a call starts in a few milliseconds. When that binary is missing, or with `OMNI_NATIVE_CLI=0` set for a call, it runs the same CLI bundled in the app, on the app itself. Either way it updates when the app does and needs no Node.
 
 | | Mac | Linux (AppImage) |
 | --- | --- | --- |
 | Your command | `~/.local/bin/omni` | `~/.local/bin/omni` |
 | The agents' copy | `~/Library/Application Support/Omni/bin/omni` | `~/.config/Omni/bin/omni` |
-| What it runs | `/Applications/Omni.app/Contents/MacOS/Omni` | the `.AppImage` file itself |
+| What it runs | `bin/omni` inside `Omni.app` | `~/.config/Omni/native/omni`, a copy the app refreshes at each launch |
+| What it falls back to | `/Applications/Omni.app/Contents/MacOS/Omni` | the `.AppImage` file itself |
 
 - **A file already called `omni` there:** the app replaces its own older copies and Omni's old launchers (the Linux service control script, a link to `scripts/omni.sh`). Anything else it leaves alone and notes in the server log. Use the agents' copy by its full path, or move the other program.
 - **Moved or updated the app:** the next launch rewrites the command. Until then it says the app is gone.

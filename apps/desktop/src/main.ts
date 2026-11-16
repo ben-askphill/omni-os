@@ -12,7 +12,7 @@ import type { AppContext, AppPaths } from './context.ts';
 import type { LaunchOptions } from './options.ts';
 import { handle, on, trusted, trustOrigins } from './handle.ts';
 import { BOOTSTRAP, EVENT, type Bootstrap } from './ipc.ts';
-import { installCommandLine, ownsUserCommand } from './cli-shim.ts';
+import { installCommandLine, nativeCommand, ownsUserCommand } from './cli-shim.ts';
 import { linkRouter } from './link-routing.ts';
 import { installLoginItem, LOGIN_ITEM_SUPPORTED } from './login-item.ts';
 import { installMenu, showServerLog } from './menu.ts';
@@ -236,8 +236,12 @@ function installCommand(options: LaunchOptions, dirs: PlatformDirs, dataDir: str
     customUserData: app.commandLine.hasSwitch('user-data-dir'),
     app: runs,
   });
+  // The Rust build of the command, when this app carries one. An AppImage's copy goes beside the data, out of the mount.
+  const native = nativeCommand({ appRoot: join(process.resourcesPath, 'omni'), copyTo: process.env.APPIMAGE ? join(dirs.userData, 'native', 'omni') : null });
+  if (native.path !== null) console.log(`[omni] the omni command runs on the Rust build: ${native.path} (${native.version})`);
+  else if (native.reason) console.error(`[omni] the omni command stays on the bundled CLI: ${native.reason}`);
   const results = installCommandLine({
-    facts: { app: runs, dataDir, logFile: serverLogFile(dirs), port: options.port },
+    facts: { app: runs, dataDir, logFile: serverLogFile(dirs), port: options.port, native: native.path },
     binDir: join(dirs.userData, 'bin'),
     userPath: owner ? join(dirs.home, '.local', 'bin', 'omni') : null,
   });

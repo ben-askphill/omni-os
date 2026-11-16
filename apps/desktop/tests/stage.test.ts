@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { builderArgs } from '../scripts/dist.ts';
 import { NATIVE_BINARIES, NATIVE_DIR, rustTriple, stagedNativeProblems, stageNative } from '../scripts/native.ts';
+import { NATIVE_CLI } from '../src/cli-shim.ts';
 import {
   compareVersions,
   copyProblem,
@@ -266,7 +267,12 @@ describe('the Rust binaries', () => {
     // apps/desktop never imports apps/server, so the server's path is read from its source.
     const server = readFileSync(join(import.meta.dirname, '../../server/native-mcp.ts'), 'utf8');
     const parts = server.match(/NATIVE_MCP_PATH = join\(([^)]+)\)/)?.[1] ?? '';
-    expect([...parts.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([NATIVE_DIR, NATIVE_BINARIES[0]]);
+    expect([...parts.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([NATIVE_DIR, NATIVE_BINARIES[0].file]);
+  });
+
+  it("stages the omni command where the app's shim looks", () => {
+    expect(NATIVE_BINARIES.map((binary) => binary.crate)).toEqual(['omni-mcp', 'omni-cli']);
+    expect([NATIVE_DIR, NATIVE_BINARIES[1].file]).toEqual([...NATIVE_CLI]);
   });
 
   it('refuses a Linux binary that needs glibc, or one that cannot be run', () => {
@@ -297,7 +303,7 @@ describe('the Rust binaries', () => {
   it('leaves them out when told to, without running cargo', () => {
     const dir = scratch();
     try {
-      expect(stageNative(linux, dir, 'off')).toBe(false);
+      expect(stageNative(linux, dir, 'off')).toEqual([]);
       expect(existsSync(join(dir, NATIVE_DIR))).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });

@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { BOOT, CLI_SCRIPT, installCommandLine, legacyLauncher, ownsUserCommand, planShim, shimText, type ShimFacts } from '../src/cli-shim.ts';
+import { BOOT, CLI_SCRIPT, installCommandLine, legacyLauncher, NATIVE_CLI, nativeCommand, ownsUserCommand, planShim, shimText, type ShimFacts } from '../src/cli-shim.ts';
 
 const REPO = resolve(import.meta.dirname, '../../..');
 const tmp = mkdtempSync(join(tmpdir(), 'omni-cli-shim-'));
@@ -18,7 +18,8 @@ describe('the omni shim', () => {
   it('names the install it was written for, quoting paths with spaces and quotes', () => {
     const text = shimText(facts);
     expect(text.startsWith('#!/bin/sh\n')).toBe(true);
-    expect(text).toContain('# omni-cli-shim 1');
+    expect(text).toContain('# omni-cli-shim 2');
+    expect(text).not.toContain('omni_native');
     expect(text).toContain(`export OMNI_APP='/Users/me/Apps/Omni'\\''s.app/Contents/MacOS/Omni'`);
     expect(text).toContain(`export OMNI_INSTALL_DATA_DIR='/Users/me/Library/Application Support/Omni/data'`);
     expect(text).toContain('export OMNI_INSTALL_PORT=4747');
@@ -57,6 +58,66 @@ describe('the omni shim', () => {
     const bad = spawnSync(process.execPath, ['--import', preload, '-e', BOOT, '--', 'nonsense'], { encoding: 'utf8' });
     expect(bad.status).toBe(64);
   }, 60_000);
+});
+
+describe('the Rust build of the command', () => {
+  /** Stands in for the Electron binary and for the Rust one: each prints who it is and what it was started with. */
+  const program = (name: string, body: string) => {
+    const path = join(tmp, name);
+    writeFileSync(path, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+    return path;
+  };
+  const app = program('fake-electron', 'echo "the app as node"');
+  const says = 'echo "native port=$OMNI_INSTALL_PORT app=$OMNI_APP"; for a in "$@"; do echo "[$a]"; done';
+
+  it('is started by the shim with every argument and the facts of the install', () => {
+    const native = program("omni's native", says);
+    const shim = program('omni-native-run', '');
+    writeFileSync(shim, shimText({ ...facts, app, native }), { mode: 0o755 });
+    const out = execFileSync(shim, ['send', 'parent', "it's $HOME"], { encoding: 'utf8' });
+    expect(out.split('\n')).toEqual([`native port=4747 app=${app}`, '[send]', '[parent]', "[it's $HOME]", '']);
+  });
+
+  it('gives way to the bundled CLI when the binary is gone, or when the call says OMNI_NATIVE_CLI=0', () => {
+    const native = program('omni-native-there', says);
+    const shim = program('omni-native-fallback', '');
+    writeFileSync(shim, shimText({ ...facts, app, native }), { mode: 0o755 });
+    expect(execFileSync(shim, ['status'], { encoding: 'utf8' })).toContain('native port=4747');
+    expect(execFileSync(shim, ['status'], { encoding: 'utf8', env: { ...process.env, OMNI_NATIVE_CLI: '0' } })).toBe('the app as node\n');
+    rmSync(native);
+    expect(execFileSync(shim, ['status'], { encoding: 'utf8' })).toBe('the app as node\n');
+  });
+
+  it('is used only when the app carries it and it prints its version', () => {
+    const appRoot = join(tmp, 'app-root');
+    expect(nativeCommand({ appRoot, copyTo: null })).toEqual({ path: null, reason: null });
+    const shipped = join(appRoot, ...NATIVE_CLI);
+    mkdirSync(join(shipped, '..'), { recursive: true });
+    writeFileSync(shipped, '#!/bin/sh\necho "omni 1.2.3"\n', { mode: 0o755 });
+    expect(nativeCommand({ appRoot, copyTo: null })).toEqual({ path: shipped, version: '1.2.3' });
+    writeFileSync(shipped, '#!/bin/sh\nexit 3\n', { mode: 0o755 });
+    expect(nativeCommand({ appRoot, copyTo: null })).toEqual({ path: null, reason: `${shipped} did not start (--version exited with 3)` });
+    writeFileSync(shipped, '#!/bin/sh\necho "something else"\n', { mode: 0o755 });
+    expect(nativeCommand({ appRoot, copyTo: null })).toEqual({ path: null, reason: `${shipped} did not start (something else)` });
+    writeFileSync(shipped, 'not a program', { mode: 0o755 });
+    expect(nativeCommand({ appRoot, copyTo: null })).toMatchObject({ path: null, reason: expect.stringContaining('did not start') });
+  });
+
+  it("is copied out of an AppImage's mount, and replaced only by another build", () => {
+    const appRoot = join(tmp, 'mounted-root');
+    const shipped = join(appRoot, ...NATIVE_CLI);
+    mkdirSync(join(shipped, '..'), { recursive: true });
+    writeFileSync(shipped, '#!/bin/sh\necho "omni 1.2.3"\n', { mode: 0o644 });
+    const copyTo = join(tmp, 'userData', 'native', 'omni');
+    expect(nativeCommand({ appRoot, copyTo })).toEqual({ path: copyTo, version: '1.2.3' });
+    expect(statSync(copyTo).mode & 0o111).toBe(0o111);
+    const first = statSync(copyTo).ino;
+    expect(nativeCommand({ appRoot, copyTo })).toEqual({ path: copyTo, version: '1.2.3' });
+    expect(statSync(copyTo).ino).toBe(first);
+    writeFileSync(shipped, '#!/bin/sh\necho "omni 1.2.4"\n');
+    expect(nativeCommand({ appRoot, copyTo })).toEqual({ path: copyTo, version: '1.2.4' });
+    expect(statSync(copyTo).ino).not.toBe(first);
+  });
 });
 
 describe('what the app does with a file already called omni', () => {
