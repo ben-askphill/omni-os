@@ -5,7 +5,10 @@
 //   ("Loop-spawned threads cannot create loops").
 // - A usage scan's lead (crew/usage-scan.md) only creates, only after Ben has answered in its thread, and what it
 //   creates starts off (the route sets `enabled: false`).
-// The header only ever narrows what a call may do, so a caller that names another thread gains nothing.
+// The header only ever narrows what a call may do, so a caller that names another thread gains nothing. It holds the
+// path agents are told to use, not a determined one: every thread can read the install token (sandbox.ts), so a shell
+// command that calls the API without the header, or posts a message as Ben, is not stopped. Closing that needs tokens
+// scoped to one thread.
 import { db } from './db.ts';
 import { userName } from './profile.ts';
 import { SCAN_ROLE } from './usage-scan/asks.ts';

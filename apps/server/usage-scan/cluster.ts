@@ -3,6 +3,7 @@
 // gui/plugins/automations/skills/workflow-scan/extract.py `features` and `cmd_groups`, Apache 2.0): score each feature
 // by asks x weeks x weight, then take the best one's asks as a group, again and again. Pure: no db, no model.
 import type { Ask } from './asks.ts';
+import { maskSecrets } from './mask.ts';
 
 /** Words that say how to answer or are too common to name a task (Cloudroom's STOP list). */
 const STOP = new Set(
@@ -13,7 +14,7 @@ dont don't can't cant im i'm i've ive we're were we've weve it you're youre that
 answer short shorter plain english concise verbose simple simpler format markdown readable newlines attached image images
 first local other going create analyze check think look know everything something right still actually maybe without before
 after these those which where their every while again today current currently working work works latest great good better best
-help start started find found give make made take show tell said says able there's lot lots much many sure`.split(/\s+/),
+help start started find found give make made take show tell said says able there's lot lots much many sure masked`.split(/\s+/),
 );
 const WORD = /[a-z][a-z0-9-]{2,}/g;
 const SLASH = /(?<![\w/])\/[a-z][a-z0-9-]{2,}(?![\w/.-])/g;
@@ -92,9 +93,10 @@ export function linkFeature(url: string): string | null {
 /**
  * What an ask is about, from the start of its first message (later ones are mostly follow-ups and style), its commands
  * and the sites it links to. Links and paths are taken out before the words: their parts would group asks by host name.
+ * Secrets that match a pattern are masked first, so a token pasted into many asks never becomes a group's key.
  */
 export function features(ask: Pick<Ask, 'text' | 'commands'>): Set<string> {
-  const head = ask.text.slice(0, 300);
+  const head = maskSecrets(ask.text).text.slice(0, 300);
   const links = head.match(URL_RE) ?? [];
   const low = head.replace(URL_RE, ' ').replace(PATH_RE, ' ').toLowerCase();
   const words = (low.replace(SLASH, ' ').match(WORD) ?? []).filter((w) => !STOP.has(w));

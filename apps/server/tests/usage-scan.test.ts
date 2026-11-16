@@ -162,6 +162,12 @@ describe('grouping', () => {
     expect([...f].some((x) => x.includes('users') || x.includes('ben '))).toBe(false);
   });
 
+  it('masks a token before reading features, so a pasted token never becomes a key', () => {
+    const f = [...features({ text: `Rotate the billing webhook with ${GITHUB_TOKEN} today`, commands: [] })];
+    expect(f.some((x) => x.includes('a1b2') || x.includes('ghp') || x.includes('masked'))).toBe(false);
+    expect(f).toContain('billing webhook');
+  });
+
   it('suggests a schedule an hour before the asks usually come in', () => {
     const weekdays = [0, 1, 2, 3, 4].map((d) => ({ at: at(d % 2, d, 1) }));
     expect(cadence(weekdays, 'UTC')).toMatchObject({ hour: 10, cron: '0 9 * * 1-5', label: 'weekdays at 09:00' });
@@ -211,6 +217,28 @@ describe('the scan', () => {
     expect(prompt).not.toContain('made up');
     // The scan's own thread is never one of Ben's asks next time.
     expect(readAsks(db, { days: 90 }).asks.map((a) => a.thread_id)).not.toContain(t.id);
+  });
+
+  it("never lets a stored secret's value name a group, and leaves an opted-out channel's automations out", async () => {
+    // A stored value that looks like a word, in 6 asks over 6 weeks that share nothing else: unmasked, "via <value>"
+    // would be the strongest phrase they share.
+    const VAULT = 'tulip7orchard';
+    ['Rotate billing webhooks', 'Reconnect inventory feed', 'Refresh analytics export', 'Restore shipping rates', 'Rebuild search index', 'Reload pricing sheet'].forEach(
+      (task, w) => ask(`${task} via ${VAULT}`, at(w, 4, 2)),
+    );
+    expect(clusterAsks(readAsks(db, { days: 90 }).asks, { timezone: 'UTC' }).some((c) => c.key.includes(VAULT))).toBe(true);
+    const save = (name: string, channel: string, prompt: string) =>
+      app.request('/api/automations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fields: { name, enabled: false, cron: '0 9 * * 1', channel, prompt } }) });
+    expect((await save('Hush weekly digest', 'hush', 'Summarize the hush pipeline')).status).toBe(201);
+    expect((await save('Acme copy check', 'acme', 'Check the Acme product copy')).status).toBe(201);
+
+    const haikuSaw: string[] = [];
+    const result = await startUsageScan({}, { secrets: async () => [STORED, VAULT], ask: async (p) => (haikuSaw.push(p), null) });
+    expect(result.groups).toBe(2);
+    const prompt = await waitFor(() => r.texts(result.thread.id, 'user')[0], 'the scan prompt');
+    for (const text of [prompt, ...haikuSaw]) expect(text).not.toContain(VAULT);
+    expect(prompt).toContain('Acme copy check');
+    expect(prompt).not.toMatch(/hush pipeline|Hush weekly/i);
   });
 
   it('goes on without labels when Haiku fails', async () => {

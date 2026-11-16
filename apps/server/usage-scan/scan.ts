@@ -45,7 +45,7 @@ export interface ScanResult {
   asks: number;
   groups: number;
   pasted: number;
-  /** Secrets replaced with [masked] in what went to Haiku and the lead. */
+  /** Secrets replaced with [masked] in the asks and automations read, before any grouping or model call. */
   masked: number;
   /** Haiku labelled the groups; false when its call failed and the lead got them unlabelled. */
   labelled: boolean;
@@ -66,38 +66,44 @@ export async function startUsageScan(opts: { channel?: string | null }, deps: Sc
   starting = true;
   try {
     const scan = readAsks(db, { days: SCAN_DAYS, channel });
-    const clusters = clusterAsks(scan.asks, { timezone: config.timezone });
-    const pasted = scan.pasted.map((p) => describeGroup(p.asks, config.timezone));
+    // Mask every ask before grouping, so a stored secret's value can never become a group's key either.
+    const exact = await deps.secrets();
+    let masked = 0;
+    const mask = (s: string) => {
+      const m = maskSecrets(s, exact);
+      masked += m.masked;
+      return m.text;
+    };
+    const clean = (a: Ask): Ask => ({ ...a, title: mask(a.title), text: mask(a.text) });
+    const clusters = clusterAsks(scan.asks.map(clean), { timezone: config.timezone });
+    const pasted = scan.pasted.map((p) => describeGroup(p.asks.map(clean), config.timezone));
     if (!clusters.length && !pasted.length)
       throw refused(
         `Nothing repeats enough to suggest an automation yet: ${scan.asks.length} asks in the last ${SCAN_DAYS} days${channel ? ` in #${channel}` : ''}, and no 6 of them share a command, link or phrase over 3 or more weeks.`,
         409,
       );
 
-    const exact = await deps.secrets();
-    let masked = 0;
-    const mask = (s: string, max: number) => {
-      const m = maskSecrets(s, exact);
-      masked += m.masked;
-      return cut(m.text, max);
-    };
     const examples = new Map<Group, { ask: Ask; title: string; text: string }[]>();
     for (const g of [...clusters, ...pasted])
-      examples.set(g, spread(g.asks, EXAMPLES).map((a) => ({ ask: a, title: mask(a.title, 90), text: mask(a.text, EXAMPLE_CHARS) })));
+      examples.set(g, spread(g.asks, EXAMPLES).map((a) => ({ ask: a, title: cut(a.title, 90), text: cut(a.text, EXAMPLE_CHARS) })));
 
     const result = await labelGroups(
       clusters.map((c) => ({ id: c.id, key: c.key, samples: examples.get(c)!.map((e) => cut(e.text, LABEL_CHARS)) })),
       deps.ask,
     );
-    const automations = loadAutomations().map((a) => ({
-      id: a.id,
-      name: mask(a.name, 80),
-      enabled: a.enabled,
-      when: a.on ? `on ${a.on.event}` : `cron "${a.cron}" (${a.timezone})`,
-      channel: a.channel,
-      prompt: mask(a.prompt.replace(/\s+/g, ' '), 160),
-      full: a.prompt,
-    }));
+    // The automations of a channel that opted out stay out too: the opt-out promises none of its text reaches a model.
+    const optedOut = new Set(scan.opted_out);
+    const automations = loadAutomations()
+      .filter((a) => !optedOut.has(a.channel))
+      .map((a) => ({
+        id: a.id,
+        name: cut(mask(a.name), 80),
+        enabled: a.enabled,
+        when: a.on ? `on ${a.on.event}` : `cron "${a.cron}" (${a.timezone})`,
+        channel: a.channel,
+        prompt: cut(mask(a.prompt.replace(/\s+/g, ' ')), 160),
+        full: a.prompt,
+      }));
     const prompt = scanPrompt({
       channel,
       days: SCAN_DAYS,
