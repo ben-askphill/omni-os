@@ -10,8 +10,13 @@ import { registerHandler } from '../apply.ts';
 // would store a different date on each machine, and a skewed machine would keep its own: Ben's later removal elsewhere
 // would lose there, and its next send would win again. Instead a decision made here is dated after the one it replaces
 // (mcp-clients.ts decide), so it wins on every machine whatever their clocks say.
+//
+// A date more than a week ahead of this machine's clock comes from a clock that is broken, not skewed. Its approval
+// never applies here: no client gets in on a date this machine cannot believe. Its removal does, dated at that limit.
 
-/** An ISO time with a four-digit year, so dates compare as strings. Null for anything else. */
+const HORIZON_MS = 7 * 86_400_000;
+
+/** An ISO time with a four-digit year, the form every machine writes and reads. Null for anything else. */
 const time = (v: unknown): string | null => {
   if (typeof v !== 'string' || Number.isNaN(Date.parse(v))) return null;
   const iso = new Date(v).toISOString();
@@ -29,8 +34,16 @@ registerHandler('mcp_client', {
     const lastSeen = time(d.lastSeen);
     const decision = d.decision === 'approved' || d.decision === 'removed' ? d.decision : null;
     if (!firstSeen || !lastSeen || (d.decision != null && !decision)) return false;
-    const decidedAt = decision ? time(d.decidedAt) : null;
+    let decidedAt = decision ? time(d.decidedAt) : null;
     if (decision && d.decidedAt != null && !decidedAt) return false;
+    const limit = Date.now() + HORIZON_MS;
+    if (decidedAt && Date.parse(decidedAt) > limit) {
+      if (decision === 'approved') {
+        console.warn(`[sync] not approving MCP client ${change.entity_id}: ${change.machine_id} dated it ${decidedAt}, over a week ahead of this clock`);
+        return false;
+      }
+      decidedAt = new Date(limit).toISOString();
+    }
     const remote: McpClientSync = { decision, decidedAt, firstSeen, lastSeen };
     return mcpClients.applyRemote(change.entity_id, remote);
   },

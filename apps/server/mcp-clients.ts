@@ -56,9 +56,15 @@ const configured = () =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+/** A decision's time as a number, so no date format sorts wrongly as text. Undated (from before sync) is oldest. */
+const ms = (t: string | null) => (t ? Date.parse(t) : -Infinity);
+
+/** The last moment with a four-digit year: a decision is never dated later, so every machine can read its date. */
+export const LAST_DATE = Date.parse('9999-12-31T23:59:59.999Z');
+
 /** Whether a decision made at `at` replaces one made at `hereAt`. Same time: a removal wins, the safer of the two. */
 const replaces = (decision: Decision, at: string | null, here: Decision, hereAt: string | null) =>
-  (at ?? '') > (hereAt ?? '') || ((at ?? '') === (hereAt ?? '') && decision === 'removed' && here !== 'removed');
+  ms(at) > ms(hereAt) || (ms(at) === ms(hereAt) && decision === 'removed' && here !== 'removed');
 
 export const mcpClients = {
   list: (): McpClient[] => (db.prepare('SELECT * FROM mcp_clients ORDER BY last_seen DESC').all() as Row[]).map(toClient),
@@ -140,8 +146,7 @@ export const mcpClients = {
 function decide(id: string, decision: Decision) {
   tx(() => {
     const before = row(id)?.decided_at;
-    let at = now();
-    if (before && at <= before) at = new Date(Date.parse(before) + 1).toISOString();
+    const at = new Date(Math.min(LAST_DATE, Math.max(Date.now(), before ? Date.parse(before) + 1 : 0))).toISOString();
     db.prepare(
       `INSERT INTO mcp_clients (id, status, via, first_seen, last_seen, decided_at) VALUES (?, ?, NULL, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET status = excluded.status, decided_at = excluded.decided_at`,

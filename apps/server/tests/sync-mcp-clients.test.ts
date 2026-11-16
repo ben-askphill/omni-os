@@ -270,4 +270,31 @@ describe('who may approve a client through sync', () => {
     await pull();
     expect(b.mcpClients.status('tie-approved-here')).toBe('removed');
   });
+
+  it('an approval dated over a week ahead is not applied; a removal that far ahead is, dated at the limit', async () => {
+    const nextYear = new Date(Date.now() + 365 * 86_400_000).toISOString();
+    await relay.push([signAs(decision('mac-c', 'broken-clock', 'approved', nextYear))]);
+    await pull();
+    expect(b.mcpClients.status('broken-clock')).toBeNull();
+
+    await relay.push([signAs(decision('mac-c', 'broken-removal', 'removed', nextYear))]);
+    await pull();
+    expect(b.mcpClients.status('broken-removal')).toBe('removed');
+    expect(Date.parse(b.mcpClients.syncData('broken-removal')!.decidedAt!)).toBeLessThanOrEqual(Date.now() + 7 * 86_400_000);
+    // Ben can still bring it back here: his approval is dated after the capped removal.
+    b.mcpClients.approve('broken-removal');
+    expect(b.mcpClients.status('broken-removal')).toBe('approved');
+  });
+
+  it('a decision after one at the last four-digit date keeps a readable date, and a removal there still beats an approval', () => {
+    const last = '9999-12-31T23:59:59.999Z';
+    b.mcpClients.applyRemote('last-date', { decision: 'approved', decidedAt: last, firstSeen: last, lastSeen: last });
+    b.mcpClients.remove('last-date');
+    // Not '+010000-01-01T00:00:00.000Z', which sorts before every real date as text and other machines drop.
+    expect(b.mcpClients.syncData('last-date')!.decidedAt).toBe(last);
+    const nowIso = new Date().toISOString();
+    b.mcpClients.applyRemote('last-date', { decision: 'approved', decidedAt: nowIso, firstSeen: nowIso, lastSeen: nowIso });
+    b.mcpClients.applyRemote('last-date', { decision: 'approved', decidedAt: last, firstSeen: last, lastSeen: last });
+    expect(b.mcpClients.status('last-date')).toBe('removed');
+  });
 });
