@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { Text } from '../ui/Text';
 
 import type { RootScreenProps } from '../navigation/types';
-import { describePairingError } from '../pairing/messages';
+import { CONNECT_HINT, describePairingError } from '../pairing/messages';
 import { usePairing } from '../pairing/PairingProvider';
 import { normalizePairingCode, normalizeServerOrigin } from '../pairing/pairingInput';
 import { fontSize, lineHeight, space, useOmniTheme } from '../theme';
@@ -69,9 +69,7 @@ export function ConnectScreen({ navigation }: RootScreenProps<'Connect' | 'AddSe
         </Callout>
       )}
 
-      <Text style={[styles.body, { color: colors.fg3 }]}>
-        Pair this phone with your Omni server. Make a pairing code in Omni on your computer.
-      </Text>
+      <Text style={[styles.body, { color: colors.fg3 }]}>{CONNECT_HINT}</Text>
 
       <SegmentedControl options={MODES} value={mode} onChange={changeMode} />
 

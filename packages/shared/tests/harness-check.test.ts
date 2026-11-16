@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HARNESS_CHECK_LABEL, fixIsCommand, harnessCheck } from '../harness-check.ts';
+import { HARNESS_CHECK_LABEL, fixIsCommand, harnessAccountLine, harnessCheck } from '../harness-check.ts';
 
 // The onboarding harness check: a missing CLI gets its install command, a signed-out one its sign-in command, and a
 // sentence is read as a reason, never offered as a command to copy (#757).
@@ -55,5 +55,19 @@ describe('fixIsCommand', () => {
     expect(fixIsCommand(' claude (then /login) ')).toBe(true);
     expect(fixIsCommand('Run codex app-server now')).toBe(false);
     expect(fixIsCommand('')).toBe(false);
+  });
+});
+
+describe('harnessAccountLine', () => {
+  const base = { harness: 'claude-code', org: null, note: null, switched: null } as const;
+  it('a signed-in harness names its account and plan, with an org that is not its own', () => {
+    expect(harnessAccountLine({ ...base, state: 'signed-in', label: 'ada@example.com', plan: 'Max', org: 'Acme' })).toBe('Signed in as ada@example.com · Max (Acme)');
+    expect(harnessAccountLine({ ...base, state: 'signed-in', label: 'ada@example.com', plan: null, org: "ada@example.com's Organization" })).toBe('Signed in as ada@example.com');
+  });
+
+  it('nothing for any other state, or no reading', () => {
+    expect(harnessAccountLine({ ...base, state: 'signed-out', label: null, plan: null })).toBeNull();
+    expect(harnessAccountLine({ ...base, state: 'unknown', label: null, plan: null })).toBeNull();
+    expect(harnessAccountLine(undefined)).toBeNull();
   });
 });

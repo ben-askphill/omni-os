@@ -47,7 +47,7 @@ Open the installed Omni OS development client and select the Metro server. If th
 
 ## Connect to a server
 
-Make a pairing code on your computer, then scan its QR code or type the server address and code. The app trades the code for a session token and keeps the token in the Keychain, one entry per server. Pair several servers and switch between them from the Servers screen.
+Make a pairing code on your computer (Settings > Sharing & access > Omni for iOS), then scan its QR code or type the server address and code. The app trades the code for a session token and keeps the token in the Keychain, one entry per server. Pair several servers and switch between them from the Servers screen.
 
 The app accepts only an `https://` server origin. It checks the server's capabilities after pairing and whenever it returns to the foreground. The contract is in `packages/shared/app-pairing.ts`.
 
