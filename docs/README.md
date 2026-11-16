@@ -4,11 +4,11 @@
 
 - [Install and first run](user/install.md): the desktop app, running from a checkout, and the step-by-step agent instructions
 - [Configuration](user/configuration.md): your config, `.env`, placeholders, secrets, Appearance (Classic sidebar, Full color, Press I for Inbox, Press E to mark done), Accounts, Branch steps, worktree copy/shared directories, teardown actions and channel avatar backgrounds
-- [Threads](user/threads.md): Inbox (machine and run time on each card) and Needs you, Claude Code `/goal`, machine tiles (CPU and RAM), Mark done, the composer (including Open PR when the agent asks and To Grok Bot), the quick-actions card, context chips, review notes, Auto-merge, Rerun failed checks, history, channel actions, Watch PR and Send to Grok Bot
-- [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud, and Settings > Accounts for which account each is signed in to per machine
-- [Crew and Conductor](user/crew.md)
-- [Notifications](user/notifications.md): what notifies (questions, failures, finishes, crew reports, PRs), native notifications in the desktop app, browser notifications, and turning kinds and channels off
-- [Automations](user/automations.md): edit in Omni (Form or YAML, machine per automation), cron, GitHub PR events, published pages and signed GitHub webhooks, with optional `precheck` and `catchup_max_age` skips
+- [Threads](user/threads.md): Inbox (machine and run time on each card), status marks (no spinners), the thread tree under a job, Open items after a finished turn, Claude Code `/goal`, machine tiles (CPU and RAM), Mark done, the composer (including Open PR when the agent asks, To Grok Bot, and Reference a thread on a new thread), the quick-actions card (PRs, not lineage), context chips, review notes, Auto-merge, Rerun failed checks, history, channel actions, Watch PR and Send to Grok Bot
+- [Harnesses](user/harnesses.md): Claude Code, Codex, Cursor Agent, Hermes and Cursor Cloud, Settings > Accounts per machine, and the Usage card (one row per signed-in account, reset times, "no reading yet")
+- [Crew and Conductor](user/crew.md): Goal / Done when / Proof back briefs, answering a crew question from the parent, and reviewing a crew PR on the other model family
+- [Notifications](user/notifications.md): what notifies (questions, failures, finishes, crew reports, PRs), native notifications in the desktop app, browser notifications, iPhone push (including watched PRs) and turning kinds and channels off
+- [Automations](user/automations.md): edit in Omni (Form or YAML, machine per automation), Scan my usage suggestions, turn off after three failed runs, cron, GitHub PR events, published pages and signed GitHub webhooks, with optional `precheck` and `catchup_max_age` skips
 - [Sync between two Macs](user/sync.md): signed changes, first-key trust for Omni Connect machines ([ADR 0013](adr/0013-paired-machines-are-trusted.md)), handoff and repo clone on a machine without the checkout
 - [Remote access and security](user/remote-access.md), including the phone layout, home-screen setup and pairing the native iOS app
 - [Omni Connect](user/omni-connect.md): open any machine from a phone through your relay, without Tailscale
@@ -17,7 +17,7 @@
 - [Mods](user/mods.md)
 - [The omni command](user/cli.md): `new`, `send`, `threads`/`show`, `status`, `doctor` and `open` from any terminal or agent shell, where the desktop app puts it, and the `--wait` exit codes
 - [Other ways in](user/entry-points.md): shell, Quick Prompt, history import, brain export
-- [Omni as an MCP server](user/external-mcp.md): use Omni from Claude Code, Codex, Cursor, Hermes, Claude Desktop, claude.ai, ChatGPT or Grok
+- [Omni as an MCP server](user/external-mcp.md): use Omni from Claude Code, Codex, Cursor, Hermes, Claude Desktop, claude.ai, ChatGPT or Grok; MCP client approval syncs across machines
 - [Known limits](user/limits.md), including Storage and worktree retention
 - [Forking Omni](../FORKING.md)
 

@@ -29,7 +29,7 @@ _Avoid_: Agent, persona, bot
 The crew role the user talks to, which delegates work to crew threads in other channels.
 
 **Automation**:
-A cron schedule, or an event (`on:`), that starts a new thread on every run. Events can be GitHub PR changes, a page a thread published, or a signed GitHub webhook.
+A cron schedule, or an event (`on:`), that starts a new thread on every run. Events can be GitHub PR changes, a page a thread published, or a signed GitHub webhook. Scan my usage on the Automations page (and the Conductor's `scan_usage`) suggests new ones from repeated asks. Three failed runs in a row turn an automation off in its YAML.
 
 **Request**:
 A message sent to a thread through the API, saved before the client hears it was accepted. It carries the client's request id, which stays the same across retries. A retry with the same id gets the first acceptance back, and Omni refuses the same id with a different message. It is local to the Mac that accepted it (`message_requests`, `apps/server/db/repos/requests.ts`).
@@ -60,7 +60,7 @@ A **Turn** its **Harness** ended because the plan's usage limit refused it, as C
 _Avoid_: Rate limit (the meter), quota error
 
 **Quick-actions card**:
-The compact card a **Thread** opens on beside the transcript on desktop web and in the **Desktop app** (a header popover on phone web): machine, path, harness, model, run state, branch and PR, plus **Lineage** when the thread has a parent or agents still run. Rows and **All details** open the full inspector; the header toggle hides the card. Not on iOS.
+The compact card a **Thread** opens on beside the transcript on desktop web and in the **Desktop app** (a header popover on phone web): machine, path, harness, model, run state, branch, and the thread's pull requests (including ones its delegated threads opened). Lineage and running agents live on the inspector's Details tab, not on this card. Rows and **All details** open the full inspector; the header toggle hides the card. Not on iOS.
 _Avoid_: Side panel (the full inspector), Details tab
 
 **Continuation**:
@@ -68,8 +68,12 @@ What resuming a **Limit stop** sends: Omni's "continue where you left off". Omni
 _Avoid_: Retry, auto-resume
 
 **Question card**:
-Questions an agent asks the user with Omni's `ask_user_question` tool: one to four, each with two to four options plus a free-text Other. It sits in the thread where the agent asked, and in **Needs you** until the user answers, skips or writes a message instead, which dismisses it. The first of those wins. The answers go back as the waiting tool call's result; when that call is gone (a restart, Stop, the harness's own timeout), they reach the thread as a message. A thread that runs on another machine still takes the answer from the hub (its own card or a parent's), including one the Conductor delegated there. While a turn runs, the waiting call returns on that machine; between turns, the hub forwards the answer as a message.
+Questions an agent asks the user with Omni's `ask_user_question` tool: one to four, each with two to four options plus a free-text Other. It sits in the thread where the agent asked, and in **Needs you** until the user answers, skips or writes a message instead, which dismisses it. The first of those wins. The answers go back as the waiting tool call's result; when that call is gone (a restart, Stop, the harness's own timeout), they reach the thread as a message. A thread that runs on another machine still takes the answer from the hub (its own card or a parent's), including one the Conductor delegated there. While a turn runs, the waiting call returns on that machine; between turns, the hub forwards the answer as a message. A long header is shortened so the call still lands.
 _Avoid_: Prompt, form, AskUserQuestion (Claude Code's own tool, off in Omni)
+
+**Open items**:
+After a finished **Turn**, a card under the transcript that lists up to five things still for the user to resolve (a question, a decision or a blocker). The user can answer in place, open a new thread from an item or dismiss the card. Desktop web, phone web, the **Desktop app** and the iOS app show it. Delegated threads report to their parent, so they get none.
+_Avoid_: Question card (the live ask during a turn), follow-up suggestion
 
 **Inbox**:
 The rail's Inbox list (`#/inbox`, the Inbox disc) and the Classic sidebar's view toggled against Projects, on desktop web and in the **Desktop app**: pinned threads, then the Needs you, Finished, Working and Done shelves. Each card names the machine the thread runs on (or last ran on) and, while a turn runs, how long it has gone. On the channel rail the same list fills the panel beside the rail. On a phone, Activity shows the same list. When Appearance's **Press I for the Inbox** is on, pressing `i` outside a text field opens it. It is a view over **Needs you** and related shelves, not another name for **Needs you**. Overview (`#/`) is the usage dashboard, not this list; on the rail it is the page beside the Inbox list.
@@ -98,7 +102,7 @@ The agent a thread runs in, together with what it bills: Claude Code (Claude pla
 _Avoid_: Provider, engine, backend, runtime
 
 **Account**:
-Who a **Harness** is signed in as on one machine: an email or name, with its org and plan when the harness says them. Each machine reads its own and syncs it. A **Thread** keeps the account its harness ran as.
+Who a **Harness** is signed in as on one machine: an email or name, with its org and plan when the harness says them. Each machine reads its own and syncs it. A **Thread** keeps the account its harness ran as. The Usage card on desktop web and in the **Desktop app** shows one row per signed-in account, with that account's own plan numbers and when each limit resets; an account with no reading of its own yet says "no reading yet".
 _Avoid_: Login, profile, user (Ben, who may have several accounts per harness)
 
 **Model**:
