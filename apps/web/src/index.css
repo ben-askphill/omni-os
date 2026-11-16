@@ -522,20 +522,20 @@
   /* ---- a row with its tree, as one block (InboxView.tsx, SidebarRows.tsx) ----
      A job whose rows show under it sits apart from its neighbours in a list, with space and a hairline inset like the
      rows' wash, so one job's last row and the next job's header don't read as one run. Rows with nothing nested under
-     them (no tree, or a closed one with nothing waiting on Ben) stay packed. */
+     them (no tree, or a closed one with nothing waiting on Ben) stay packed. Padding, not margin: the lists' space-y-*
+     sets every card's top margin from the utilities layer, which beats this one. */
   .tree-group {
     position: relative;
   }
   .tree-group:has(.tree-node, [data-agent-row]) + .tree-group,
   .tree-group + .tree-group:has(.tree-node, [data-agent-row]) {
-    margin-block-start: 8px;
-    padding-block-start: 6px;
+    padding-block-start: 14px;
   }
   .tree-group:has(.tree-node, [data-agent-row]) + .tree-group::before,
   .tree-group + .tree-group:has(.tree-node, [data-agent-row])::before {
     content: "";
     position: absolute;
-    top: 0;
+    top: 8px;
     inset-inline: 12px;
     border-top: 1px solid var(--line);
     pointer-events: none;
