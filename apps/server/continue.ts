@@ -205,7 +205,7 @@ interface Captured {
 const WORKSPACE: Record<Checkout['kind'], ContinuePreview['workspace']> = { snapshot: 'worktree', head: 'worktree', branch: 'branch', gone: 'fresh', folder: 'folder' };
 
 /** The source as the continued thread would start from it now, and the preview of that. */
-async function capture(sourceId: string, to: RunName, picked: readonly string[], route: Route | null): Promise<Captured> {
+async function capture(sourceId: string, to: RunName, picked: readonly string[], route: Route | null, machineBlocked = false): Promise<Captured> {
   const source = threads.get(sourceId);
   if (!source) throw refusal('thread not found', 404);
   const blocked = sourceBlock(source);
@@ -238,7 +238,7 @@ async function capture(sourceId: string, to: RunName, picked: readonly string[],
     parked: messageRequests.parked(sourceId).map((r) => (typeof r.payload?.text === 'string' ? r.payload.text : r.prompt)),
     attachments: plan.items,
     uploads: [uploadsDir(sourceId), real(uploadsDir(sourceId))],
-    machine: machinesOf(sourceId, route),
+    machine: machineBlocked ? null : machinesOf(sourceId, route),
   });
   const revision = createHash('sha256')
     .update(JSON.stringify([events.uidOf(guard) ?? guard, repo?.head ?? '', repo?.tree ?? '', body, planSignature(plan)]))
@@ -288,7 +288,7 @@ export async function previewContinue(sourceId: string, run: Run, attachments: r
   const to = await targetRun(run);
   // The Carryover says which machine it runs on, so the machine is known before the capture.
   const machine = await machineFor(device);
-  const { preview } = await capture(sourceId, to, attachments, machine.route);
+  const { preview } = await capture(sourceId, to, attachments, machine.route, !!machine.block);
   return { ...preview, blocked: preview.blocked ?? machine.block, runs_on: machine.route?.to ?? null };
 }
 
@@ -327,8 +327,9 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   const idle = sourceBlock(threads.get(sourceId) ?? first);
   if (idle) throw busy(idle);
   const cap = await capture(sourceId, to, body.attachments ?? [], route);
+  const runs_on = route?.to ?? null;
   if (cap.preview.blocked) throw busy(cap.preview.blocked);
-  if (cap.preview.revision !== body.revision) throw changed(cap.preview);
+  if (cap.preview.revision !== body.revision) throw changed({ ...cap.preview, runs_on });
 
   const channel = channels.get((threads.get(sourceId) ?? first).channel_id)!;
   const id = randomUUID();
@@ -396,7 +397,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   if (!made) {
     discard();
     if (lost) throw busy(lost);
-    throw changed({ ...(await capture(sourceId, to, body.attachments ?? [], route)).preview, runs_on: route?.to ?? null });
+    throw changed({ ...(await capture(sourceId, to, body.attachments ?? [], route)).preview, runs_on });
   }
 
   emitThread(id);

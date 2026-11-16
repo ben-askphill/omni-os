@@ -195,6 +195,22 @@ describe('a fork with a machine picked in the dialog', () => {
     expect(there.body.carryover.constraints.join('\n')).not.toMatch(/^Machine:/m);
   }, T.timeout);
 
+  it('writes no Machine: line for a blocked pick, and keeps runs_on in a changed refusal', async () => {
+    expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: '' } } })).status).toBe(200);
+    const t = await b.runner.createThread({ channel: 'code', prompt: 'edit a.txt on B too', title: 'Edit a on B too', device: 'here' });
+    await b.untilResults(t.id, 1);
+    await both();
+    await waitFor(() => a.db.threads.get(t.id)?.status === 'done' && a.db.assignments.holder(t.id) === 'box-b', 'the thread B ran to sync to A');
+
+    const blocked = await a.json(`/threads/${t.id}/continue/preview`, { body: { ...claude, device: 'nowhere' } });
+    expect(blocked.body.blocked).toMatchObject({ code: 'machine' });
+    expect(blocked.body.carryover.constraints.join('\n')).not.toMatch(/^Machine:/m);
+
+    const stale = await a.json(`/threads/${t.id}/continue`, { body: { ...claude, device: 'box-b', text: 'x', request_id: randomUUID(), revision: 'stale' } });
+    expect(stale.status).toBe(409);
+    expect(stale.body).toMatchObject({ code: 'changed', preview: { runs_on: { id: 'box-b' } } });
+  }, T.timeout);
+
   it('takes the machine through the transitions API too', async () => {
     expect((await a.json('/setup', { method: 'PUT', body: { runOn: { device: '' } } })).status).toBe(200);
     const p = await a.json(`/threads/${source}/transitions/preview`, { body: { kind: 'fork', run: claude, device: 'box-b' } });
