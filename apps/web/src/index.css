@@ -519,6 +519,28 @@
     border-bottom-left-radius: 6px;
   }
 
+  /* ---- a row with its tree, as one block (InboxView.tsx, SidebarRows.tsx) ----
+     A job whose rows show under it sits apart from its neighbours in a list, with space and a hairline inset like the
+     rows' wash, so one job's last row and the next job's header don't read as one run. Rows with nothing nested under
+     them (no tree, or a closed one with nothing waiting on Ben) stay packed. */
+  .tree-group {
+    position: relative;
+  }
+  .tree-group:has(.tree-node, [data-agent-row]) + .tree-group,
+  .tree-group + .tree-group:has(.tree-node, [data-agent-row]) {
+    margin-block-start: 8px;
+    padding-block-start: 6px;
+  }
+  .tree-group:has(.tree-node, [data-agent-row]) + .tree-group::before,
+  .tree-group + .tree-group:has(.tree-node, [data-agent-row])::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    inset-inline: 12px;
+    border-top: 1px solid var(--line);
+    pointer-events: none;
+  }
+
   /* ---- channel rail items (ChannelRail.tsx) ----
      Discs rest in greyscale and take their colour back on hover or keyboard focus, unless Settings, Appearance sets
      the rail to full colour (data-color="full"). The selected disc and the status badges (outside the disc) always

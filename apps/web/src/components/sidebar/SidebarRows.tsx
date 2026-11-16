@@ -142,6 +142,7 @@ function AgentLink({ t, last, flush = false, onNavigate }: { t: BackgroundTask; 
       href={href.thread(t.thread_id)}
       onClick={onNavigate}
       title={tip}
+      data-agent-row
       className={`item relative flex h-8 items-center gap-2 pr-3 pl-4 text-[12.5px] text-fg-3 hover:text-fg md:h-7 md:text-[12px] ${flush ? 'ml-[19px]' : 'ml-[43px]'}`}
     >
       <span
@@ -168,8 +169,9 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
   const own = !showsAgents(t, tree?.phase) ? [] : tree ? tasks.filter((k) => k.thread_id === t.id) : tasks;
   const agents = own.length;
   const busy = showsRunning(t) || agents > 0;
+  // One block with its tree and sub-agents, so a job stands apart from the next row (index.css, .tree-group).
   return (
-    <>
+    <div className="tree-group space-y-px">
     <div className="group/pin flex items-center">
       <a
         href={href.thread(t.id)}
@@ -205,7 +207,7 @@ export function SectionLink({ t, channel, active, home = false, tasks, unpin, tr
     </div>
     {home && tree && <TreeUnder t={t} tree={tree} at={{ line: 'ml-[19px]', meta: 'ml-[37px]' }} onNavigate={onNavigate} />}
     {home && own.map((k, i) => <AgentLink key={k.task_id} t={k} last={i === agents - 1} flush onNavigate={onNavigate} />)}
-    </>
+    </div>
   );
 }
 

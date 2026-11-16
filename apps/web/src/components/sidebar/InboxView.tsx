@@ -177,7 +177,7 @@ function InboxCard({
     </span>
   );
   return (
-    <div className="group/row grid grid-cols-1" data-inbox-thread={t.id}>
+    <div className="tree-group group/row grid grid-cols-1" data-inbox-thread={t.id}>
       <a
         href={href.thread(t.id)}
         onClick={onNavigate}
