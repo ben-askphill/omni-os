@@ -88,6 +88,36 @@ describe('a tree Ben closed by hand', () => {
   });
 });
 
+describe('a chevron with storage that refuses writes', () => {
+  let tree: JobTree | null = null;
+  const Probe = ({ job }: { job: ThreadStub }) => {
+    tree = useJobTree(job, 'inbox');
+    return null;
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('still opens and closes a running tree', async () => {
+    // Private mode: every write throws. A spy on Storage.prototype misses happy-dom's localStorage once an earlier
+    // test used it (its proxy answers setItem itself), so the whole store is swapped for one that refuses writes.
+    const refusing = {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+      },
+      removeItem: () => {},
+    };
+    vi.stubGlobal('localStorage', refusing);
+    const job = s('job', 'conductor', 'done', { delegating: true });
+    app.channels = conductor(job, [s('child', 'omni-os', 'running')]);
+    await render(createElement(Probe, { job }));
+    expect(tree!.open).toBe(true);
+    await act(async () => tree!.toggle());
+    expect(tree!.open).toBe(false);
+    await act(async () => tree!.toggle());
+    expect(tree!.open).toBe(true);
+  });
+});
+
 describe('Collapse all on the Working shelf', () => {
   const trees: Record<string, JobTree | null> = {};
   let fold: TreesFold | null = null;

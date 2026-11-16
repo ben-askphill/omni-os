@@ -83,8 +83,10 @@ export function useJobTree(parent: ThreadStub, view: TreeView): JobTree | null {
     toggle: () => {
       const next: SavedOpen = { open: !open, phase };
       writePref(key, next);
-      setSaved(next);
+      // Tell the other trees first: this tree's own listener re-reads storage, which holds nothing when the write
+      // failed (private mode), and setting `next` after it keeps the chevron working anyway.
       savedChanged();
+      setSaved(next);
     },
     tally: treeTally(nodes),
     spans: spansChannels(nodes),
