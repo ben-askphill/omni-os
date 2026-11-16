@@ -105,9 +105,9 @@ npm run setup
 
 1. **You**: your name (what Omni and its agents call you), email, timezone (prefilled from the system) and pronouns (default they/them)
 2. **Workspace**: the workspace folder (default `~/Omni`; threads without a repo run there and its CLAUDE.md and skills load in every Claude thread), your repos folder (default `~/code`) and your GitHub owner
-3. **Harnesses**: whether Claude Code, Codex and Cursor Agent are ready, not installed, signed out or failing, with the install command for a missing one, the sign-in command for a signed-out one, and the reason for any other
+3. **Harnesses**: whether Claude Code, Codex and Cursor Agent are ready, not installed, signed out or failing, with the install command for a missing one, the sign-in command for a signed-out one, and the reason for any other. A ready one names the account it is signed in to, so a work or personal mix-up shows here. The GitHub CLI gets a row too, with the login `gh` uses, because the PR steps, PR alerts and the Conductor's PR reviews all run it
 4. **First channel**: a client or project with an optional repo and Shopify store, or skip
-5. **Done**: saves `data/omni.config.json` and, in the Web UI, opens #conductor with a welcome message
+5. **Done**: saves `data/omni.config.json` and, in the Web UI, opens #conductor with a welcome message. It also points at what to set up next: the iPhone app (Settings > Sharing & access), a second machine (Settings > Sync) and the [`omni` command](cli.md) (`scripts/omni.sh` in a checkout; a phone gets no command)
 
 The first-run screens add **Notifications** before Done: in a browser, a switch that turns on browser notifications and asks the browser for permission; in the desktop app, a test notification, so macOS asks for permission during setup rather than at the first alert ([Notifications](notifications.md)).
 

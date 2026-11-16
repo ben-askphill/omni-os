@@ -4,10 +4,14 @@ import { VaultError } from './vault';
 
 const INPUT_MESSAGES: Record<PairingInputReason, string> = {
   empty: 'Enter the server address and the pairing code.',
-  'not-https': 'The server address must start with https://.',
+  'not-https': 'The server address must start with https://. Use your Omni Connect address or your tailscale serve .ts.net address.',
   invalid: 'Check the address and code.',
   'not-omni-qr': "This QR code isn't an Omni pairing code.",
 };
+
+/** The Connect screen's first line: what pairing does, and where on the computer the code is made. */
+export const CONNECT_HINT =
+  'Pair this phone with your Omni server. On your computer, open Omni and go to Settings > Sharing & access > Omni for iOS to make a pairing code.';
 
 export function describePairingError(error: unknown): string {
   if (error instanceof PairingInputError) return INPUT_MESSAGES[error.reason];

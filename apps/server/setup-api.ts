@@ -6,6 +6,7 @@ import type { ServerOptionsState, SetupState } from '@omni/shared/settings.ts';
 import { BUNDLED, paths } from './config.ts';
 import { serverOptions } from './server-options.ts';
 import { getCrew } from './crew.ts';
+import { githubAuth } from './github-auth.ts';
 import { channels, threads } from './db.ts';
 import { prepareWorkdir } from './sandbox.ts';
 import { addEvent, emitThread } from './runner/state.ts';
@@ -59,6 +60,9 @@ setupApi.get('/', (c) => c.json(setupState()));
 // The .env options Settings shows read-only beside the config, each with where its value came from.
 setupApi.get('/server', (c) => c.json({ options: serverOptions() } satisfies ServerOptionsState));
 
+// Whether gh is installed and signed in: the PR steps, PR alerts and crew PR review all run it (github-auth.ts).
+setupApi.get('/github', async (c) => c.json(await githubAuth()));
+
 // JSON only, as links-api.ts: a page in a browser cannot send that cross-origin without a preflight, so it cannot
 // point the Hermes URL (and with it the secret store token) or the workspace somewhere else.
 setupApi.use('*', async (c, next) => {
@@ -108,7 +112,10 @@ export function welcomeText(name: string, place: CrewPlace = crewPlace()) {
     `Welcome to Omni${name ? `, ${name}` : ''}. I'm the Conductor: tell me what you need and I hand it to the right crew role in the right channel, then report back here.`,
     '',
     'A few things to try:',
-    '- Ask for something in plain words, like "research how other stores do size guides" or "fix the failing test in my repo channel".',
+    '- Ask in plain words and say what done looks like, like "research how other stores do size guides and send me a table of 5 stores with links" or "fix the failing test in my repo channel and open a PR". If I can\'t tell what done looks like, I\'ll ask you a few questions first.',
+    '- The Inbox lists what needs you, what is working and what finished. Open it with the Inbox disc on the channel rail or by pressing I, or from Activity on a phone. Mark a thread done once you have dealt with it (E on a keyboard).',
+    '- When a crew thread I started has a question for you, it shows up in the Conductor thread you asked me in. Answer it there; you don\'t need to open the crew thread.',
+    '- #inbox is a channel for quick asks that belong to no client or project.',
     '- Add a channel per client or project: Add channel (+) at the foot of the channel rail, or Settings > Channels on a phone. A channel with a repo gives every thread its own git worktree.',
     '- Settings holds your name, timezone, folders and integrations. You can run setup again from there.',
     crew,

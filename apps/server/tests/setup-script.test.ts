@@ -34,11 +34,14 @@ async function fakeServer(answer: (path: string, method: string) => { status: nu
 
 let n = 0;
 /** Runs the script with every default taken, in a fresh data dir, with only `bins` (and the system's) on PATH. */
-async function setup(url: string, bins: string[] = []) {
+async function setup(url: string, bins: (string | [name: string, script: string])[] = []) {
   const dir = join(tmp, `run-${n++}`);
   const bin = join(dir, 'bin');
   mkdirSync(bin, { recursive: true });
-  for (const b of bins) writeFileSync(join(bin, b), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  for (const b of bins) {
+    const [name, script] = typeof b === 'string' ? [b, 'exit 0'] : b;
+    writeFileSync(join(bin, name), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+  }
   const env: Record<string, string> = { HOME: dir, PATH: `${bin}:/usr/bin:/bin`, OMNI_DATA_DIR: join(dir, 'data'), OMNI_URL: url, TMPDIR: tmpdir() };
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', 'tsx', 'scripts/setup.ts', '--yes', '--name', 'Ada'], { cwd: SERVER, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
@@ -98,5 +101,55 @@ describe('npm run setup', () => {
     expect(lines).toContain('Start Omni with `npm run dev` (web on http://localhost:4748).');
     expect(lines).toContain("The desktop app keeps its own settings and asks these questions itself; it does not read this checkout's data/.");
     expect(existsSync(r.config)).toBe(true);
+  }, 60_000);
+
+  it("with a server: the account each ready harness runs as, the GitHub CLI's login, and what to set up next", async () => {
+    const rows = [
+      { id: 'claude-code', name: 'Claude Code', available: true },
+      { id: 'codex', name: 'Codex', available: true },
+    ];
+    const accounts = {
+      synced: false,
+      machines: [
+        {
+          id: 'local',
+          name: 'studio',
+          current: true,
+          checkedAt: null,
+          accounts: [
+            { harness: 'claude-code', state: 'signed-in', label: 'ada@example.com', org: 'Acme', plan: 'Max', note: null, switched: null, notice: false },
+            { harness: 'codex', state: 'signed-in', label: 'ada@example.com', org: null, plan: 'Plus', note: null, switched: null, notice: false },
+          ],
+        },
+      ],
+    };
+    const url = await fakeServer((path) =>
+      path === '/api/harnesses'
+        ? { status: 200, body: rows }
+        : path === '/api/accounts'
+          ? { status: 200, body: accounts }
+          : path === '/api/setup/github'
+            ? { status: 200, body: { state: 'ready', login: 'ada-l' } }
+            : { status: 200, body: {} },
+    );
+    const r = await setup(url);
+    expect(r.code).toBe(0);
+    const lines = r.out.split('\n').map((l) => l.trim());
+    expect(lines).toContain('Signed in as ada@example.com · Max (Acme)');
+    expect(lines).toContain('Signed in as ada@example.com · Plus');
+    expect(lines).toContain('ready          GitHub CLI (gh)');
+    expect(lines).toContain('Signed in as ada-l');
+    expect(lines).toContain('- Add your iPhone: make a pairing code in Settings > Sharing & access > Omni for iOS.');
+    expect(lines).toContain('- Run threads on a second machine: turn on Settings > Sync on both, then pick one with Run on.');
+    expect(lines).toContain('- From this checkout, start a thread or check the install: scripts/omni.sh new "…", scripts/omni.sh doctor.');
+  }, 60_000);
+
+  it('without a server: checks gh itself, signed out gets gh auth login', async () => {
+    const r = await setup('http://127.0.0.1:9', ['claude', ['gh', 'echo "You are not logged into any GitHub hosts. To log in, run: gh auth login" >&2; exit 1']]);
+    expect(r.code).toBe(0);
+    const lines = r.out.split('\n').map((l) => l.trim());
+    expect(lines).toContain('signed out     GitHub CLI (gh)');
+    expect(lines).toContain('sign in: gh auth login');
+    expect(r.out).not.toContain('install: brew install gh');
   }, 60_000);
 });

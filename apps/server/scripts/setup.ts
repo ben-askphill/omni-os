@@ -26,7 +26,10 @@ import {
   userConfig,
   type UserConfigPatch,
 } from '../user-config.ts';
-import { HARNESS_CHECK_LABEL, harnessCheck } from '@omni/shared/harness-check.ts';
+import { HARNESS_CHECK_LABEL, harnessAccountLine, harnessCheck } from '@omni/shared/harness-check.ts';
+import { githubLine, type GithubCheck } from '@omni/shared/github-check.ts';
+import { accountsByHarness, machineAccounts, type AccountsView, type HarnessAccountView } from '@omni/shared/harness-accounts.ts';
+import { githubAuth } from '../github-auth.ts';
 import { apiToken } from '../api-token.ts';
 import { HARNESS_INSTALL, HARNESS_META, type HarnessId } from '../harness/types.ts';
 
@@ -162,19 +165,36 @@ async function main() {
   say(server ? `   Open ${server}.` : '   Start Omni with `npm run dev` (web on http://localhost:4748).');
   say("   The desktop app keeps its own settings and asks these questions itself; it does not read this checkout's data/.");
   say('   Change any of this later in Settings, or run `npm run setup` again.');
+  say('');
+  say('   Next:');
+  say('   - Add your iPhone: make a pairing code in Settings > Sharing & access > Omni for iOS.');
+  say('   - Run threads on a second machine: turn on Settings > Sync on both, then pick one with Run on.');
+  say('   - From this checkout, start a thread or check the install: scripts/omni.sh new "…", scripts/omni.sh doctor.');
 }
 
 /** Which CLIs are installed and signed in, from the running server's probe when there is one. */
 async function harnesses(server: string | null) {
   type H = { id: string; name: string; available: boolean; fix?: string; install?: string; missing?: boolean };
   let list: H[] | null = null;
+  let accounts: Record<string, HarnessAccountView> = {};
+  let github: GithubCheck | null = null;
   if (server) {
-    try {
-      list = (await (await fetch(`${server}/api/harnesses`, { headers: authed() })).json()) as H[];
-    } catch {
-      list = null;
-    }
+    const get = async <T>(path: string): Promise<T | null> => {
+      try {
+        const res = await fetch(`${server}/api${path}`, { headers: authed() });
+        return res.ok ? ((await res.json()) as T) : null;
+      } catch {
+        return null;
+      }
+    };
+    const [h, a, g] = await Promise.all([get<H[]>('/harnesses'), get<AccountsView>('/accounts'), get<GithubCheck>('/setup/github')]);
+    list = h;
+    // An older server answers these with something else: no accounts, and gh checked here instead.
+    accounts = Array.isArray(a?.machines) ? accountsByHarness(machineAccounts(a, 'here')) : {};
+    github = g && g.state in HARNESS_CHECK_LABEL ? g : null;
   }
+  // The same check the server runs, here when it is not running (or is older than GET /api/setup/github).
+  github ??= await githubAuth();
   if (!list) {
     const has = (bin: string) => !!sh('/bin/sh', ['-c', `command -v ${bin}`]);
     const bins: [HarnessId, string, string][] = [
@@ -196,7 +216,17 @@ async function harnesses(server: string | null) {
     if (check.install) say(`${indent}install: ${check.install}`);
     if (check.command) say(`${indent}sign in: ${check.command}`);
     if (check.reason) say(`${indent}${check.reason}`);
+    const account = harnessAccountLine(accounts[h.id]);
+    if (account) say(`${indent}${account}`);
   }
+  const gh = github;
+  say(`   ${HARNESS_CHECK_LABEL[gh.state].toLowerCase().padEnd(pad)}  GitHub CLI (gh)`);
+  say(`${indent}Watching pull requests, Auto-merge, rerunning failed checks and the Conductor's PR reviews all run gh.`);
+  if (gh.install) say(`${indent}install: ${gh.install}`);
+  if (gh.command) say(`${indent}sign in: ${gh.command}`);
+  if (gh.reason) say(`${indent}${gh.reason}`);
+  const ghWho = githubLine(gh);
+  if (ghWho) say(`${indent}${ghWho}`);
   if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs. Codex reviews the pull requests Claude writes; Cursor Agent is optional.');
 }
 

@@ -31,6 +31,54 @@ export function addChannelHint(where: 'phone' | 'rail' | 'classic') {
  */
 export const offersNpmSetup = (install: SetupState['install'], inApp: boolean) => install === 'checkout' && !inApp;
 
+/** One line on the Done screen: what it is for, and where. `code` is shown as a command. */
+export interface DoneTip {
+  id: 'phone' | 'machine' | 'cli';
+  text: string;
+  code?: string;
+}
+
+/**
+ * What to set up next, on the Done screen: the iPhone app and a second machine on every layout, and the `omni`
+ * command where a terminal is likely. The desktop app puts `omni` on PATH (apps/desktop/src/cli-shim.ts); a checkout
+ * runs it as scripts/omni.sh. A phone has no terminal, so it gets no command.
+ */
+export function doneTips(install: SetupState['install'], where: 'phone' | 'rail' | 'classic'): DoneTip[] {
+  const tips: DoneTip[] = [
+    { id: 'phone', text: 'Add your iPhone: make a pairing code in Settings > Sharing & access > Omni for iOS.' },
+    { id: 'machine', text: 'Run threads on a second machine: turn on Settings > Sync on both, then pick one with Run on.' },
+  ];
+  if (where !== 'phone') {
+    tips.push(
+      install === 'app'
+        ? { id: 'cli', text: 'From a terminal, start a thread or check this install:', code: 'omni new "…"  ·  omni doctor' }
+        : { id: 'cli', text: 'From a terminal in this checkout, start a thread or check the install:', code: 'scripts/omni.sh new "…"  ·  scripts/omni.sh doctor' },
+    );
+  }
+  return tips;
+}
+
+export function DoneTips({ tips }: { tips: DoneTip[] }) {
+  return (
+    <div className="mt-4">
+      <div className="caption mb-1.5">Next</div>
+      <ul className="space-y-1.5 text-[12.5px] leading-relaxed text-fg-2">
+        {tips.map((t) => (
+          <li key={t.id} data-tip={t.id}>
+            {t.text}
+            {t.code && (
+              <>
+                {' '}
+                <code className="font-mono text-[12px] text-fg">{t.code}</code>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export { NAME_MAX };
 
 export function Onboarding() {
@@ -215,6 +263,7 @@ function Wizard() {
                 {createdChannel && <Summary k="Channel" v={`#${createdChannel}`} />}
               </dl>
               <SavedNote path={state.path} install={state.install} />
+              {!rerun && <DoneTips tips={doneTips(state.install, phone ? 'phone' : layout)} />}
             </Screen>
           )}
           {error && <ErrorNote className="mt-4">{error}</ErrorNote>}

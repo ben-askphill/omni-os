@@ -1,6 +1,8 @@
 // What onboarding says about one harness: the wizard's Harnesses step (apps/web/src/components/onboarding-parts.tsx)
 // and `npm run setup` (apps/server/scripts/setup.ts) read a row of GET /api/harnesses through this.
 
+import { accountDetail, accountLine, type HarnessAccount } from './harness-accounts.ts';
+
 /** Ready; no CLI on this machine; installed but signed out; or something else stops it, said in a sentence. */
 export type HarnessCheckState = 'ready' | 'missing' | 'signed-out' | 'error';
 
@@ -39,4 +41,15 @@ export function harnessCheck(h: { available: boolean; fix?: string; install?: st
   if (h.missing) return { state: 'missing', ...(h.install ? { install: h.install } : {}), ...said };
   if ('command' in said) return { state: 'signed-out', ...said };
   return { state: 'error', ...said };
+}
+
+/**
+ * Who a ready harness runs as, under its row: "Signed in as ben@example.com · Max", with the org when it is not the
+ * account's own. Null when GET /api/accounts has no signed-in account for it, so a wrong account (work or personal)
+ * shows during setup, not at the first bill.
+ */
+export function harnessAccountLine(a: HarnessAccount | null | undefined): string | null {
+  if (a?.state !== 'signed-in' || !a.label) return null;
+  const detail = accountDetail(a);
+  return `Signed in as ${accountLine(a)}${detail ? ` (${detail})` : ''}`;
 }

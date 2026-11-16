@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PairingApiError } from './api';
-import { describePairingError, revokedNotice } from './messages';
+import { CONNECT_HINT, describePairingError, revokedNotice } from './messages';
 import { PairingInputError } from './pairingInput';
 
 const origin = 'https://omni.example.com:8443';
@@ -26,8 +26,14 @@ describe('describePairingError', () => {
 
   it('explains an input error without leaking internals', () => {
     expect(describePairingError(new PairingInputError('not-https'))).toBe(
-      'The server address must start with https://.',
+      'The server address must start with https://. Use your Omni Connect address or your tailscale serve .ts.net address.',
     );
+  });
+
+  it('says where an https address comes from', () => {
+    const text = describePairingError(new PairingInputError('not-https'));
+    expect(text).toContain('Omni Connect');
+    expect(text).toContain('.ts.net');
   });
 
   it('falls back to a generic message for an unknown error', () => {
@@ -40,5 +46,11 @@ describe('revokedNotice', () => {
     expect(revokedNotice('Studio Mac')).toBe(
       'Your access to Studio Mac was removed on the server. Pair again to continue.',
     );
+  });
+});
+
+describe('CONNECT_HINT', () => {
+  it('names where on the computer the pairing code is made', () => {
+    expect(CONNECT_HINT).toContain('Settings > Sharing & access > Omni for iOS');
   });
 });

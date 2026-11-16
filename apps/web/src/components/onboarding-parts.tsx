@@ -2,7 +2,9 @@
 // harness check, and the timezone and pronoun fields Settings reuses.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { DesktopBridge } from '@omni/shared/desktop-bridge.ts';
-import { HARNESS_CHECK_LABEL, harnessCheck } from '@omni/shared/harness-check.ts';
+import { githubLine, type GithubCheck } from '@omni/shared/github-check.ts';
+import { accountsByHarness, machineAccounts, type AccountsView, type HarnessAccountView } from '@omni/shared/harness-accounts.ts';
+import { HARNESS_CHECK_LABEL, harnessAccountLine, harnessCheck, type HarnessCheck } from '@omni/shared/harness-check.ts';
 import { api, errorText, type HarnessWithRunning } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { desktop } from '../desktop.ts';
@@ -34,23 +36,51 @@ const HARNESS_NOTE: Partial<Record<string, string>> = {
   codex: 'Reviews the pull requests Claude writes. Without it, the Conductor asks you what to do each time.',
 };
 
+/** The rows the Harnesses step lists: each harness, then the GitHub CLI the PR steps run. */
+export interface HarnessRows {
+  harnesses: HarnessWithRunning[];
+  /** This machine's accounts by harness (GET /api/accounts). Empty when it could not be read. */
+  accounts: Record<string, HarnessAccountView>;
+  /** Null when this server has no /api/setup/github (an older one) or the check failed. */
+  github: GithubCheck | null;
+}
+
+async function loadRows(): Promise<HarnessRows> {
+  const [harnesses, accounts, github] = await Promise.all([
+    api.get<HarnessWithRunning[]>('/harnesses'),
+    api
+      .get<AccountsView>('/accounts')
+      .then((v): Record<string, HarnessAccountView> => (Array.isArray(v?.machines) ? accountsByHarness(machineAccounts(v, 'here')) : {}))
+      .catch(() => ({})),
+    // An older server has no /api/setup/github: no row then.
+    api
+      .get<GithubCheck>('/setup/github')
+      .then((g) => (g && g.state in HARNESS_CHECK_LABEL ? g : null))
+      .catch(() => null),
+  ]);
+  // Hermes and Cursor Cloud run off this Mac: listed once they work, never as something to install.
+  return { harnesses: harnesses.filter((h) => (h.id !== 'hermes' && h.id !== 'cursor-cloud') || h.available), accounts, github };
+}
+
 export function HarnessScreen() {
-  const [list, setList] = useState<HarnessWithRunning[] | null>(null);
+  const [rows, setRows] = useState<HarnessRows | null>(null);
   const [checking, setChecking] = useState(false);
   const load = async () => {
     setChecking(true);
     try {
-      // Hermes and Cursor Cloud run off this Mac: listed once they work, never as something to install.
-      setList((await api.get<HarnessWithRunning[]>('/harnesses')).filter((h) => (h.id !== 'hermes' && h.id !== 'cursor-cloud') || h.available));
+      setRows(await loadRows());
     } finally {
       setChecking(false);
     }
   };
   useEffect(() => {
-    load().catch(() => setList([]));
+    load().catch(() => setRows({ harnesses: [], accounts: {}, github: null }));
   }, []);
+  const list = rows?.harnesses;
   const claude = list?.find((h) => h.id === 'claude-code');
   const codex = list?.find((h) => h.id === 'codex');
+  const github = rows?.github;
+  const signedIn = list?.some((h) => harnessAccountLine(rows?.accounts[h.id]));
   return (
     <Screen
       caption="Harnesses"
@@ -58,46 +88,60 @@ export function HarnessScreen() {
       body="Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code. Codex reviews the pull requests Claude writes. Cursor Agent is optional."
     >
       <ul className="space-y-2">
-        {(list ?? []).map((h) => {
-          const check = harnessCheck(h);
-          const ready = check.state === 'ready';
-          const note = HARNESS_NOTE[h.id];
-          return (
-            <li key={h.id} className="rounded-[16px] bg-surface p-3.5" data-harness={h.id} data-state={check.state}>
-              <div className="flex items-center gap-2.5">
-                <span className={`grid h-6 w-6 place-items-center rounded-full ${ready ? 'bg-done text-on-done' : 'bg-bg text-fg-3'}`}>
-                  <Icon name={ready ? 'check' : 'x'} size={13} />
-                </span>
-                <span className="text-[13.5px] font-medium">{h.name}</span>
-                <span className="text-[12px] text-fg-3">{h.plan}</span>
-                <span className={`ml-auto text-[12px] ${ready ? 'text-fg-2' : 'text-fg-3'}`}>{HARNESS_CHECK_LABEL[check.state]}</span>
-              </div>
-              {(note || !ready) && (
-                <div className="mt-2.5 space-y-1.5 pl-[34px]">
-                  {note && <p className="text-[12px] leading-relaxed text-fg-3">{note}</p>}
-                  {check.install && <Command label="Install" cmd={check.install} />}
-                  {check.command && <Command label="Sign in" cmd={check.command} />}
-                  {check.reason && <p className="text-[12px] leading-relaxed text-fg-2">{check.reason}</p>}
-                </div>
-              )}
-            </li>
-          );
-        })}
+        {(list ?? []).map((h) => (
+          <CheckRow key={h.id} id={h.id} name={h.name} plan={h.plan} check={harnessCheck(h)} note={HARNESS_NOTE[h.id]} account={harnessAccountLine(rows?.accounts[h.id])} />
+        ))}
+        {github && <CheckRow id="github" name="GitHub CLI" plan="gh" check={github} note={GITHUB_NOTE} account={githubLine(github)} />}
         {!list && <li className="py-6 text-center text-[13px] text-fg-3">Checking…</li>}
       </ul>
+      {signedIn && <p className="text-[12px] leading-relaxed text-fg-3">Wrong account? Sign in to the right one in a terminal, then Check again. Settings {'>'} Accounts lists them later, for each of your machines.</p>}
       <div className="mt-3 flex items-center justify-between gap-3">
         <span className="text-[12px] text-fg-3">
           {claude && !claude.available
             ? 'Set up Claude Code before your first thread.'
             : codex && !codex.available
               ? 'Set up Codex for PR reviews, or the Conductor asks you each time.'
-              : 'You can add the others any time.'}
+              : github && github.state !== 'ready'
+                ? 'Set up the GitHub CLI before you work on pull requests.'
+                : 'You can add the others any time.'}
         </span>
         <Button variant="ghost" busy={checking} onClick={() => void load()}>
           Check again
         </Button>
       </div>
     </Screen>
+  );
+}
+
+const GITHUB_NOTE = 'Pull requests: watching them, Auto-merge, rerunning failed checks and the Conductor’s PR reviews all run gh.';
+
+/** One harness, or the GitHub CLI: ready or not, who it is signed in as, and what to run when it is not ready. */
+function CheckRow({ id, name, plan, check, note, account }: { id: string; name: string; plan: string; check: HarnessCheck; note?: string; account?: string | null }) {
+  const ready = check.state === 'ready';
+  return (
+    <li className="rounded-[16px] bg-surface p-3.5" data-harness={id} data-state={check.state}>
+      <div className="flex items-center gap-2.5">
+        <span className={`grid h-6 w-6 place-items-center rounded-full ${ready ? 'bg-done text-on-done' : 'bg-bg text-fg-3'}`}>
+          <Icon name={ready ? 'check' : 'x'} size={13} />
+        </span>
+        <span className="text-[13.5px] font-medium">{name}</span>
+        <span className="text-[12px] text-fg-3">{plan}</span>
+        <span className={`ml-auto text-[12px] ${ready ? 'text-fg-2' : 'text-fg-3'}`}>{HARNESS_CHECK_LABEL[check.state]}</span>
+      </div>
+      {(account || note || !ready) && (
+        <div className="mt-2.5 space-y-1.5 pl-[34px]">
+          {account && (
+            <p className="truncate text-[12px] text-fg-2" data-account>
+              {account}
+            </p>
+          )}
+          {note && <p className="text-[12px] leading-relaxed text-fg-3">{note}</p>}
+          {check.install && <Command label="Install" cmd={check.install} />}
+          {check.command && <Command label="Sign in" cmd={check.command} />}
+          {check.reason && <p className="text-[12px] leading-relaxed text-fg-2">{check.reason}</p>}
+        </div>
+      )}
+    </li>
   );
 }
 
