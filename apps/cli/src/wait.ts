@@ -61,6 +61,8 @@ const UNREACHABLE_TRIES = 60;
 export async function waitFor(c: Client, io: Io, id: string, seen: Seen): Promise<Outcome> {
   let unreachable = 0;
   for (let tick = 0; ; tick++) {
+    // After a sleep the server may be another one: it proves itself again before the poll gets the token.
+    if (tick > 0) c.forget();
     let d: ThreadOpen;
     let needs: NeedsYouItem | null;
     try {

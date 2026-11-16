@@ -71,5 +71,7 @@ describe('omni open', () => {
     expect(await f.run('open', ID, '--pair')).toBe(0);
     expect(f.out()).toBe(`${BASE}/#/t/${ID}?pair=${TOKEN}\n`);
     expect(f.launched).toEqual([]);
+    // The link carries the token, so the server proved itself first, without it.
+    expect(f.probes.map((p) => p.auth)).toEqual([undefined]);
   });
 });

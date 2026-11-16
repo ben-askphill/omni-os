@@ -33,6 +33,7 @@ export function nodeIo(): Io {
     fetch: globalThis.fetch as unknown as Fetch,
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     now: () => Date.now(),
+    clock: () => performance.now(),
     uuid: () => randomUUID(),
     run(bin, args, timeoutMs) {
       return new Promise<RunResult>((resolve) => {

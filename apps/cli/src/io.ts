@@ -30,6 +30,8 @@ export interface Io {
   fetch: Fetch;
   sleep(ms: number): Promise<void>;
   now(): number;
+  /** Milliseconds on a monotonic clock, for intervals: unlike now(), it never jumps when the system time is set. */
+  clock(): number;
   uuid(): string;
   /** Runs a program for its output. Never rejects. */
   run(bin: string, args: string[], timeoutMs: number): Promise<RunResult>;

@@ -49,6 +49,8 @@ export interface FakeOptions {
    * an impostor whose proof does not match, or nothing.
    */
   proof?: 'mine' | 'wrong' | 'refused';
+  /** Time stands still even while the command sleeps, so only an explicit step can expire a proof. */
+  stillClock?: boolean;
 }
 
 const GB = 1024 ** 3;
@@ -61,7 +63,7 @@ export function fake(o: FakeOptions = {}) {
   const probes: Sent[] = [];
   let proofMode = o.proof ?? 'mine';
   /** Moves on only when the command sleeps, as a `--wait` does between polls. */
-  let clock = o.now ?? Date.parse('2026-01-05T09:05:00.000Z');
+  let time = o.now ?? Date.parse('2026-01-05T09:05:00.000Z');
   const launched: [string, string[]][] = [];
   const ran: [string, string[]][] = [];
   const slept: number[] = [];
@@ -105,9 +107,10 @@ export function fake(o: FakeOptions = {}) {
     fetch,
     sleep: async (ms) => {
       slept.push(ms);
-      clock += ms;
+      if (!o.stillClock) time += ms;
     },
-    now: () => clock,
+    now: () => time,
+    clock: () => time,
     uuid: () => `00000000-0000-4000-9000-${String(++uuids).padStart(12, '0')}`,
     async run(bin, args) {
       ran.push([bin, args]);

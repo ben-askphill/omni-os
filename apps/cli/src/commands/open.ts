@@ -83,6 +83,8 @@ export async function openCommand(argv: string[], io: Io): Promise<number> {
     // The page swaps ?pair= for a session cookie and drops it from the address bar (apps/web/src/components/Pair.tsx).
     const token = c.conn.token();
     if (!token) throw new CliError('No API token to pair with. Set OMNI_TOKEN, or run this on the machine Omni runs on.');
+    // The link carries the token: it names only a server that proved it holds it.
+    await c.prove();
     io.out(`${c.link(route)}?pair=${encodeURIComponent(token)}\n`);
     return EXIT.ok;
   }

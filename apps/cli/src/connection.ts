@@ -97,28 +97,35 @@ export interface Client {
   api: OmniApi;
   /** A thread's page in the Web UI. */
   link(route: string): string;
+  /**
+   * Makes sure the server may have the token, as before a request: for output that carries the token without a
+   * request first (`open --pair`). Throws as a refused request would.
+   */
+  prove(): Promise<void>;
+  /** Drops a passed proof, so the next request proves the server again: before each poll of a `--wait`. */
+  forget(): void;
 }
 
 /**
- * How long a passed proof covers further requests: the requests one command makes together. A `--wait` sleeps at
- * least this long between polls, so each poll proves the server again, and one that went away and was replaced
- * between polls never gets the token.
+ * How long a passed proof covers further requests, on the monotonic clock: the requests one command makes together.
+ * A `--wait` also drops the proof before each poll (wait.ts), so a server replaced between polls never gets the token.
  */
-export const PROOF_FRESH_MS = 1000;
+export const PROOF_FRESH_MS = 250;
 
 /**
  * Another program, or another install's Omni, can hold the install's port while this one is not running. On that
  * address the token goes only to a server that proved it holds the same token: before a request, unless a proof
- * passed within PROOF_FRESH_MS and the connection has not dropped since. `proven` says a probe just passed.
+ * passed within PROOF_FRESH_MS and the connection has not dropped since. With no token there is nothing to prove
+ * with, so nothing is sent at all. `proven` says a probe just passed.
  */
 export function client(io: Io, conn: Connection = connection(io), o: { proven?: boolean } = {}): Client {
-  let provenAt: number | null = o.proven ? io.now() : null;
-  const fresh = () => !conn.proveFirst || (provenAt !== null && io.now() - provenAt < PROOF_FRESH_MS);
+  let provenAt: number | null = o.proven ? io.clock() : null;
+  const fresh = () => provenAt !== null && io.clock() - provenAt < PROOF_FRESH_MS;
   let proving: Promise<void> | null = null;
-  async function prove(): Promise<void> {
+  async function check(): Promise<void> {
     const p = await probe(io, conn);
     if (p.kind === 'omni' && p.mine) {
-      provenAt = io.now();
+      provenAt = io.clock();
       return;
     }
     // Nothing listens, or nothing answers yet: an unreachable server, which `--wait` waits through. Nothing is sent.
@@ -127,16 +134,23 @@ export function client(io: Io, conn: Connection = connection(io), o: { proven?: 
     const who = p.kind === 'omni' ? "answers as Omni, but not as this install's" : `answers, but not as Omni (${p.detail})`;
     throw new CliError(`${conn.baseUrl} ${who}: another install or another program holds the port. The token was not sent. omni doctor says more.`);
   }
-  // client-core reads the token before each request, outside its own error handling, so a refusal here stops the
-  // request unsent. Requests made together share one probe.
-  async function token(): Promise<string | null> {
-    const value = conn.token();
-    if (fresh() || !value) return value;
-    proving ??= prove().finally(() => {
+  async function prove(): Promise<void> {
+    if (!conn.proveFirst) return;
+    // Without the token the proof cannot be checked, and the server would refuse the request anyway: a prompt or a
+    // message must not go out to whatever holds the port.
+    if (!conn.token()) throw new CliError(`No API token for ${conn.baseUrl}: ${describeSource(conn.tokenSource)}. Nothing was sent. omni doctor checks it.`);
+    if (fresh()) return;
+    // Requests made together share one probe.
+    proving ??= check().finally(() => {
       proving = null;
     });
     await proving;
-    return value;
+  }
+  // client-core reads the token before each request, outside its own error handling, so a refusal here stops the
+  // request unsent.
+  async function token(): Promise<string | null> {
+    await prove();
+    return conn.token();
   }
   const fetch: Io['fetch'] = async (url, init) => {
     try {
@@ -148,5 +162,11 @@ export function client(io: Io, conn: Connection = connection(io), o: { proven?: 
     }
   };
   const http = createHttpClient({ baseUrl: conn.baseUrl, token, fetch, timeoutMs: 30_000 });
-  return { conn, api: createOmniApi(http), link: (route) => `${conn.baseUrl}/${route}` };
+  return {
+    conn,
+    api: createOmniApi(http),
+    link: (route) => `${conn.baseUrl}/${route}`,
+    prove,
+    forget: () => void (provenAt = null),
+  };
 }

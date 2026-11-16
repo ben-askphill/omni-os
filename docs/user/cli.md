@@ -65,7 +65,7 @@ Inside an Omni thread the server sets `OMNI_URL`, `OMNI_TOKEN` or `OMNI_TOKEN_FI
 
 ## Which server gets the token
 
-Without `OMNI_URL`, the command talks to this machine's Omni on its port and first asks it to prove it holds the same token (`GET /api/auth/proof`, as the desktop app does). If another install or another program holds the port, the command stops with exit 3 and sends neither the token nor your prompt. `omni doctor` shows what is there.
+Without `OMNI_URL`, the command talks to this machine's Omni on its port and first asks it to prove it holds the same token (`GET /api/auth/proof`, as the desktop app does). `omni open --pair` does the same before it prints a link with the token in it. If another install or another program holds the port, the command stops with exit 3 and sends neither the token nor your prompt. With no token found, it sends nothing either. `omni doctor` shows what is there.
 
 ## Another machine
 

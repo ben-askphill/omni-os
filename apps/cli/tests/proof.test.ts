@@ -43,12 +43,14 @@ describe('an impostor on the install port', () => {
   });
 
   /** The real Io on the real network, as the shim runs it: the install's port and token, nothing from a thread. */
-  async function omni(...argv: string[]) {
+  const omni = (...argv: string[]) => omniWith({ OMNI_TOKEN: SECRET }, ...argv);
+
+  async function omniWith(auth: Record<string, string>, ...argv: string[]) {
     const out: string[] = [];
     const err: string[] = [];
     const io = {
       ...nodeIo(),
-      env: { OMNI_INSTALL_PORT: String(port), OMNI_TOKEN: SECRET, HOME: home, TMPDIR: home, PATH: process.env.PATH },
+      env: { OMNI_INSTALL_PORT: String(port), HOME: home, TMPDIR: home, PATH: process.env.PATH, ...auth },
       cwd: home,
       out: (t: string) => void out.push(t),
       err: (t: string) => void err.push(t),
@@ -79,6 +81,31 @@ describe('an impostor on the install port', () => {
     expect(r.err).toContain('The token was not sent');
     expect(seen.map((s) => s.url.replace(/nonce=\w+/, 'nonce=N'))).toEqual(['/api/auth/proof?nonce=N']);
     expect(seen.every((s) => s.auth === undefined && s.body === '')).toBe(true);
+  });
+
+  it.each([
+    ['open --pair', ['open', '--pair']],
+    ['open <id> --pair', ['open', ID, '--pair']],
+  ])('%s prints no link, since the link carries the token', async (_name, argv) => {
+    seen.length = 0;
+    const r = await omni(...argv);
+    expect(r.code).toBe(3);
+    expect(r.out).toBe('');
+    expect(r.err).not.toContain(SECRET);
+    expect(r.err).toContain("answers as Omni, but not as this install's");
+    expect(seen.map((s) => s.url.replace(/nonce=\w+/, 'nonce=N'))).toEqual(['/api/auth/proof?nonce=N']);
+  });
+
+  it.each([
+    ['new', ['new', 'the secret plan']],
+    ['send', ['send', ID, 'the secret plan']],
+  ])('%s with no token found sends the impostor nothing at all', async (_name, argv) => {
+    seen.length = 0;
+    // The install's data folder, but no api-token in it.
+    const r = await omniWith({ OMNI_INSTALL_DATA_DIR: home }, ...argv);
+    expect(r.code).toBe(3);
+    expect(r.err).toContain(`No API token for http://127.0.0.1:${port}: ${join(home, 'api-token')} (the install). Nothing was sent.`);
+    expect(seen).toEqual([]);
   });
 
   it('doctor says so, and keeps the token too', async () => {
@@ -122,25 +149,32 @@ describe('the proof before the token', () => {
   });
 
   it('is asked again on every poll of a --wait, not only once', async () => {
-    const running = detail('thread.json');
-    const done = detail('thread-open.json', { id: ID });
-    const f = fake({
-      routes: [
+    // A thread that runs for two polls and is done on the third.
+    const polls = () => {
+      const running = detail('thread.json');
+      const done = detail('thread-open.json', { id: ID });
+      return [
         { method: 'POST', path: '/api/threads', reply: { json: wire('thread-created.json') } },
         { method: 'GET', path: `/api/threads/${ID}?history=recent`, reply: [running, running, done].map((json) => ({ json })) },
         { method: 'GET', path: `/api/needs-you?thread=${ID}`, reply: [needsYouFor(ID, null), needsYouFor(ID, null), needsYouFor(ID, '001')].map((json) => ({ json })) },
-      ],
-    });
+      ];
+    };
+    const f = fake({ routes: polls() });
     expect(await f.run('new', 'fix the cart', '--wait')).toBe(0);
     expect(f.slept.length).toBe(2);
     // One for the start and the first poll together, then one per poll after each sleep.
     expect(f.probes).toHaveLength(f.slept.length + 1);
+    // The same with a clock that does not move: the poll drops the proof itself, whatever the time says.
+    const still = fake({ stillClock: true, routes: polls() });
+    expect(await still.run('new', 'fix the cart', '--wait')).toBe(0);
+    expect(still.probes).toHaveLength(still.slept.length + 1);
   });
 
   it('is asked again once it is older than a moment, so a server replaced between polls gets nothing', async () => {
     const f = fake({ routes: [{ method: 'GET', path: '/api/status', reply: { json: wire('status.json') } }] });
     const c = client(f.io);
     await c.api.status();
+    await f.io.sleep(PROOF_FRESH_MS - 1);
     await c.api.status();
     expect(f.probes).toHaveLength(1);
     // The real server stops and something else takes the port while the command sleeps; no request failed meanwhile.
