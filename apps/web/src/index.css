@@ -354,90 +354,58 @@
     transform: scale(0.96);
   }
 
-  /* ---- status glyphs (packages/shared/status.ts): running pings ultramarine, needs is a still vermilion diamond,
-     failed a vermilion cross, limited an amber ring, done a volt disc with an ink edge on white, settled is grey,
-     idle and queued are hollow ---- */
+  /* ---- status marks (Mark in packages/shared/status.ts, drawn by StatusDot) ----
+     Shape says who has the ball: a circle the agent, a square a system outside Omni, a diamond Ben, a cross or a
+     triangle that it broke. Color repeats it, so neither is needed alone: ultramarine, amber, vermilion, red, then
+     volt for done and grey where nothing happens. Fill says how far along, a satellite dot that it is the crew's.
+     The shapes are StatusDot's SVG; this sets their color only. Motion sits with .ping and .breathe below. */
   .glyph {
     position: relative;
     display: inline-block;
     flex: none;
+    /* Grey where nothing happens (queued, stopped, idle): a mark, never text. */
+    --mark: var(--fg-4);
+    color: var(--mark);
   }
-  .glyph > i {
+  .glyph > svg {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .glyph > .ping {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-  }
-  /* Running, by phase (StatusDot's `phase`, @omni/shared/status.ts). One motion for all of them: a halo leaves the
-     dot (omni-ping), slower for the phases that wait on something else. The shape says which phase without it:
-     starting is a hollow ring, working the filled dot, a tool the dot inside a ring, waiting on crew a ring around
-     a small core, checks the filled dot in amber. Loading is the working dot in the text's own color. */
-  .glyph[data-s="running"] {
-    color: var(--live);
-  }
-  .glyph[data-s="running"] > i {
     background: currentColor;
+    /* Seen only while it animates: still (reduced motion), no disc sits behind a hollow mark. */
+    opacity: 0;
   }
-  .glyph[data-phase="starting"] > i {
-    background: none;
-    box-shadow: inset 0 0 0 1.5px currentColor;
+  .glyph[data-family="agent"] {
+    --mark: var(--live);
   }
-  .glyph[data-phase="tool"] > i:not(.ping) {
-    outline: 1px solid color-mix(in srgb, currentColor 55%, transparent);
-    outline-offset: 1.5px;
+  .glyph[data-family="system"] {
+    --mark: var(--warn);
   }
-  .glyph[data-phase="delegating"] > i {
-    background: none;
-    box-shadow: inset 0 0 0 1.25px currentColor;
+  .glyph[data-family="you"] {
+    --mark: var(--needs);
   }
-  .glyph[data-phase="delegating"] > i:not(.ping) {
-    background: radial-gradient(circle closest-side, currentColor 34%, transparent 42%);
+  .glyph[data-family="broken"] {
+    --mark: var(--danger-text);
   }
-  .glyph[data-phase="checking"] {
-    color: var(--warn);
-  }
-  .glyph[data-phase="loading"] {
+  .glyph[data-mark="loading"] {
     color: inherit;
   }
-  .glyph[data-phase="loading"] > i {
-    inset: 25%;
+  /* Done is the volt disc with an ink edge on white, and an ink tick. */
+  .glyph .mark-done {
+    fill: var(--done);
+    stroke: var(--done-edge);
+    stroke-width: 1.6;
   }
-  .glyph[data-s="needs"] > i {
-    border-radius: 1.5px;
-    background: var(--needs);
-    transform: rotate(45deg) scale(0.86);
-  }
-  .glyph[data-s="failed"] > i {
-    border-radius: 0;
-  }
-  .glyph[data-s="failed"] > i::before,
-  .glyph[data-s="failed"] > i::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 120%;
-    height: 2px;
-    border-radius: 1px;
-    background: var(--needs);
-    translate: -50% -50%;
-    rotate: 45deg;
-  }
-  .glyph[data-s="failed"] > i::after {
-    rotate: -45deg;
-  }
-  .glyph[data-s="limited"] > i {
-    box-shadow: inset 0 0 0 2px var(--warn);
-  }
-  .glyph[data-s="done"] > i {
-    background: var(--done);
-    box-shadow: inset 0 0 0 1.5px var(--done-edge);
-  }
-  .glyph[data-s="settled"] > i {
-    background: var(--fg-4);
-  }
-  .glyph[data-s="idle"] > i,
-  .glyph[data-s="queued"] > i {
-    box-shadow: inset 0 0 0 1.5px var(--fg-4);
+  .glyph .mark-tick {
+    stroke: var(--on-done);
   }
   /* Status pill: neutral, except needs and done which fill with their pop and carry ink text. */
   .spill {
@@ -459,8 +427,8 @@
     background: var(--needs);
     color: var(--on-needs);
   }
-  .spill[data-s="needs"] .glyph > i {
-    background: var(--on-needs);
+  .spill[data-s="needs"] .glyph {
+    --mark: var(--on-needs);
   }
   .spill[data-s="failed"] {
     color: var(--danger-text);
@@ -472,9 +440,17 @@
     background: var(--done);
     color: var(--on-done);
   }
-  .spill[data-s="done"] .glyph > i {
-    background: var(--on-done);
-    box-shadow: none;
+  .spill[data-s="done"] .glyph .mark-done {
+    fill: var(--on-done);
+    stroke: none;
+  }
+  .spill[data-s="done"] .glyph .mark-tick {
+    stroke: var(--done);
+  }
+  /* Ready for review is a finished thread: its pill stays quiet and the diamond keeps its vermilion. */
+  .spill[data-mark="review"] {
+    background: var(--surface-2);
+    color: var(--fg-2);
   }
   /* The mark takes the text color; attention turns it vermilion. */
   .mark {
@@ -1209,12 +1185,22 @@
     opacity: 0;
   }
 }
+/* A status mark moves in one of two ways (StatusDot): a halo leaves it while the agent's own turn works (.ping), and
+   it fades and returns while it waits on other work, as crew, checks or a limit's clock (.breathe). */
 .ping {
   animation: omni-ping var(--dur-ping) var(--ease-out) infinite;
 }
-/* The phases that wait on something else breathe slower (the phase rules sit with .glyph). */
-.glyph:is([data-phase="starting"], [data-phase="delegating"], [data-phase="checking"]) > .ping {
-  animation-duration: calc(var(--dur-ping) * 1.5);
+@keyframes omni-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.breathe {
+  animation: omni-breathe calc(var(--dur-ping) * 1.5) var(--ease-fluid) infinite;
 }
 /* The browser panel's loading bar, Chrome style: a sliver sweeping under the address bar. */
 @keyframes omni-load {
@@ -1419,6 +1405,7 @@
   }
   .pulse,
   .ping,
+  .breathe,
   .shimmer-text {
     animation: none !important;
   }

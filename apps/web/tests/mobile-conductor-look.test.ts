@@ -14,6 +14,7 @@ import type { RowItem } from '../src/mobile/rows.ts';
 const state = vi.hoisted(() => ({ channels: [] as ChannelWithRunning[], waiting: [] as unknown[], threads: [] as unknown[] }));
 
 vi.mock('../src/store.tsx', () => ({
+  useNeedOf: () => undefined,
   useApp: () => ({
     channels: state.channels,
     channel: (id: string) => state.channels.find((c) => c.id === id),

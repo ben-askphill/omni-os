@@ -9,7 +9,7 @@ import { Attachments } from '../components/Transcript.tsx';
 import { Button, Icon, StatusDot, StatusPill } from '../components/ui.tsx';
 import { duration, plural } from '../format.ts';
 import { isOmnis, parkedLabel } from '../requests.ts';
-import { useApp, useNow } from '../store.tsx';
+import { useApp, useNeedOf, useNow } from '../store.tsx';
 import { href } from '../router.ts';
 import { needsCard } from './activity.ts';
 import { NeedsActions } from './NeedsCard.tsx';
@@ -17,7 +17,7 @@ import { MoAvatar, MoDiff, MoStripes } from './parts.tsx';
 import { useShell } from './shell.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../forwarded.ts';
 import type { NowDoing, PlanView, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
-import { threadGlyph } from '@omni/shared/status.ts';
+import { threadMark } from '@omni/shared/status.ts';
 
 /** The phone's turn, carrying the web's own artifact and thread rows. */
 export type TurnView = TurnOf<Artifact, Thread>;
@@ -149,6 +149,11 @@ export function Plan({ plan }: { plan: PlanView }) {
   );
 }
 
+/** A delegated thread's state, a question it asked through its job included. */
+function KidPill({ k }: { k: Thread }) {
+  return <StatusPill mark={threadMark(k, { need: useNeedOf(k.id) })} />;
+}
+
 /** The threads a Conductor turn delegated, each opening its thread, with Needs you's answer under one that waits. */
 export function Delegation({ kids }: { kids: Thread[] }) {
   const shell = useShell();
@@ -172,7 +177,7 @@ export function Delegation({ kids }: { kids: Thread[] }) {
                 <span className="truncate text-[14px] leading-[1.3]">{k.title || 'Untitled'}</span>
                 <span className="truncate text-[12px] leading-[1.3] text-fg-3">{[k.role, k.task_id, `#${channel(k.channel_id)?.name ?? k.channel_id}`].filter(Boolean).join(' · ')}</span>
               </span>
-              <StatusPill status={card?.glyph ?? threadGlyph(k)} />
+              <KidPill k={k} />
             </button>
             {card && (
               <div className="px-3 pb-3 pl-[54px]">

@@ -10,19 +10,38 @@ On desktop web and in the desktop app, the sidebar's Running and Pinned sections
 
 A thread shows as running everywhere while a thread it delegated (a team lead and its members included) or a sub-agent it started (an Agent call, workflow, fork or teammate) still works, even after its own turn ended. That covers its sidebar row, the Inbox's Working shelf, thread lists, its channel's running count and the thread's status pill. Every thread above it shows as running too. It goes back to done or idle when the last one finishes and Omni has handled its report. Background shells and monitors do not count, and neither do sub-agents left running by a stopped or failed turn. A delegated thread counts only while its own status is running or queued. A child that died stops counting once Omni marks it failed or stopped, which happens at its exit, on Stop or when Omni restarts. On your other machines, a thread that runs elsewhere shows as running from the sub-agent updates sync brings. A sub-agent there that sends nothing for 15 minutes stops counting, so a machine that went offline mid-run does not keep the thread busy everywhere.
 
-### The running dot
+### Status marks
 
-One pulsing dot says a thread is at work, on desktop web, phone web and the desktop app. Its shape says what it is doing, and its tooltip names it. Nothing spins. With reduced motion on, the dot holds still and the shape still tells the phases apart.
+Every thread carries one mark, on desktop web, phone web and the desktop app. The native iOS app keeps its own glyphs.
 
-| Dot | Phase | When |
+- **Shape says who has the ball.** A circle is the agent, a square is a system outside Omni (checks, a usage limit), a diamond is you, a cross or triangle is broken.
+- **Color repeats it**: blue, amber, vermilion and red, with volt for done and grey for quiet states. No state depends on color alone.
+- **Fill says how far along**: hollow, half, filled.
+- **A small satellite dot** means the state belongs to a thread under this one.
+- **Motion**: a mark sends out a halo while the agent's own turn works, and breathes slowly while it waits on other work. Everything that waits on you, is broken or has settled holds still. Nothing spins. With reduced motion on, every mark holds still and the shapes still tell the states apart.
+
+| Mark | State | When |
 | --- | --- | --- |
-| Hollow blue ring, slow pulse | Starting | Omni prepares the thread's folder, or the open thread's turn has not shown anything yet |
-| Filled blue dot | Running | The thread's own turn runs |
-| Blue dot inside a thin ring | Running a tool | The open thread has a tool call with no result yet. Lists show Running, since they do not load a thread's rows |
-| Blue ring around a small core, slow pulse | Waiting on crew | Its own turn ended and a delegated thread or sub-agent still works |
-| Filled amber dot, slow pulse | Checks running | A pull request has checks in progress |
+| Grey dashed ring | Queued | The thread waits for a free slot |
+| Half-filled blue circle, halo | Starting | Omni prepares the thread's folder, or the open thread's turn has not shown anything yet |
+| Filled blue disc, halo | Running | The thread's own turn runs |
+| Blue dot inside a thin ring, halo | Running a tool | The open thread has a tool call with no result yet. Lists show Running, since they do not load a thread's rows |
+| Blue disc with a satellite, breathes | Waiting on crew | Its own turn ended and a delegated thread or sub-agent still works |
+| Filled amber square, breathes | Checks running | A pull request has checks in progress |
+| Half-filled amber square, breathes | Resumes at reset | A usage limit stopped it and it continues by itself when the limit resets |
+| Hollow amber square | Usage limit | A usage limit stopped it and nothing is scheduled |
+| Filled vermilion diamond | Waiting on you | The agent asked you a question |
+| Vermilion diamond with a satellite | Crew waits on you | A thread it delegated asked you a question |
+| Half-filled vermilion diamond | Ready for review | It finished and its branch has an open pull request that is not a draft. Shown where the pull request is loaded: channel thread lists, the thread's status pill and its quick card. Sidebar rows show Done |
+| Hollow vermilion diamond | Message held | A message of yours was held back or may not have arrived, and waits for you to send it again or drop it |
+| Red cross | Failed | The turn failed |
+| Red cross with a satellite | Crew failed | A thread it delegated failed |
+| Hollow red triangle | Setup failed | Omni could not prepare the thread's folder |
+| Volt disc with a tick | Done | The turn finished |
+| Grey bar | Stopped | You stopped the turn |
+| Small grey dot | Idle | It never ran, or it was imported |
 
-A queued thread keeps its still grey ring. A thread that waits on you keeps the vermilion diamond.
+A thread you marked done shows a plain tick instead.
 
 While Running is open, a thread in it has no second row under its channel or folder, so clicking it highlights one row. Fold Running and its threads show under their channels again. A pinned thread still shows under its channel too. For the latest threads by activity, use the Inbox view (or the Inbox disc when [Channel rail](configuration.md) is on) or Cmd-K.
 

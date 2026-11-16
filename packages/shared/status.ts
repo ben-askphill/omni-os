@@ -54,9 +54,7 @@ export function threadGlyph(t: { status: string; delegating?: boolean; limit_sta
 }
 
 /**
- * What a working thread is doing, as far as the app knows it. Each phase draws its own running dot (StatusDot's
- * `phase`; apps/web/src/index.css, .glyph[data-phase]): filled while the thread's own turn works, hollow or ringed
- * while it waits on something else, which also pulses slower.
+ * What a working thread is doing, as far as the app knows it. Each phase is a mark of its own (`Mark`, below).
  */
 export type Phase = 'starting' | 'working' | 'tool' | 'delegating' | 'checking';
 
@@ -68,9 +66,6 @@ export const PHASE: Record<Phase, { label: string; hint: string }> = {
   delegating: { label: 'Waiting on crew', hint: 'Its own turn ended; threads or sub-agents it delegated still work' },
   checking: { label: 'Checks running', hint: 'Checks on its pull request have not finished' },
 };
-
-/** The phases that wait on something other than the thread's own turn: their dot pulses slower. */
-export const waitsElsewhere = (p: Phase) => p === 'starting' || p === 'delegating' || p === 'checking';
 
 /** What a running turn is doing, read off the open thread's rows (turnPhase). The lists do not have the rows. */
 export type TurnPhase = Extract<Phase, 'starting' | 'working' | 'tool'>;
@@ -130,6 +125,107 @@ export const BLOCKER_GLYPH: Record<'question' | 'setup' | 'recovered' | 'uncerta
   uncertain: 'needs',
   recovered: 'needs',
 };
+
+/**
+ * The one vocabulary a status mark draws, for every state a thread can be in (StatusDot, apps/web/src/index.css
+ * .glyph). The shape says who has the ball: a circle while the agent has it, a square while a system outside Omni
+ * does (checks, a usage limit), a diamond when Ben does, a cross or a triangle when something broke. The fill says
+ * how far along: hollow before it starts or while it only waits, half while it is partway, filled while it is on.
+ * A small satellite dot says the state belongs to a thread under this one (its crew). The Web UI only: the iOS app
+ * draws `Glyph`.
+ */
+export type Mark =
+  | 'queued'
+  | Phase
+  | 'limited'
+  | 'resuming'
+  | 'question'
+  | 'crew_question'
+  | 'held'
+  | 'review'
+  | 'failed'
+  | 'crew_failed'
+  | 'setup_failed'
+  | 'done'
+  | 'stopped'
+  | 'idle';
+
+/** Who has the ball, which is the mark's color: the agent, an outside system, Ben, nobody because it broke, or nobody because it ended. */
+export type MarkFamily = 'agent' | 'system' | 'you' | 'broken' | 'settled' | 'quiet';
+
+/**
+ * How a mark moves. `ping`: a halo leaves it while the agent's own turn works. `breathe`: it fades and returns while
+ * it waits on other work (crew, checks, a limit's clock). `still`: it waits on Ben, or nothing happens.
+ */
+export type MarkMotion = 'ping' | 'breathe' | 'still';
+
+export const MARK: Record<Mark, { label: string; hint: string; family: MarkFamily; glyph: Glyph; motion: MarkMotion }> = {
+  queued: { label: 'Queued', hint: 'It waits for a free slot', family: 'quiet', glyph: 'queued', motion: 'still' },
+  starting: { ...PHASE.starting, family: 'agent', glyph: 'running', motion: 'ping' },
+  working: { ...PHASE.working, family: 'agent', glyph: 'running', motion: 'ping' },
+  tool: { ...PHASE.tool, family: 'agent', glyph: 'running', motion: 'ping' },
+  delegating: { ...PHASE.delegating, family: 'agent', glyph: 'running', motion: 'breathe' },
+  checking: { ...PHASE.checking, family: 'system', glyph: 'running', motion: 'breathe' },
+  limited: { label: 'Usage limit', hint: 'Its harness stopped the turn at the plan\'s usage limit', family: 'system', glyph: 'limited', motion: 'still' },
+  resuming: { label: 'Resumes at reset', hint: 'It hit the usage limit and continues by itself when the limit resets', family: 'system', glyph: 'limited', motion: 'breathe' },
+  question: { label: 'Waiting on you', hint: 'Its agent asked you a question and waits', family: 'you', glyph: 'needs', motion: 'still' },
+  crew_question: { label: 'Crew waits on you', hint: 'A thread under this one asked you a question and waits', family: 'you', glyph: 'needs', motion: 'still' },
+  held: { label: 'Message held', hint: 'A restart kept a message back: it is sent when you say so', family: 'you', glyph: 'needs', motion: 'still' },
+  review: { label: 'Ready for review', hint: 'It finished and its pull request is open', family: 'you', glyph: 'done', motion: 'still' },
+  failed: { label: 'Failed', hint: 'Its turn ended in an error', family: 'broken', glyph: 'failed', motion: 'still' },
+  crew_failed: { label: 'Crew failed', hint: 'A thread under this one failed and you have not opened it', family: 'broken', glyph: 'failed', motion: 'still' },
+  setup_failed: { label: 'Setup failed', hint: 'Its folder could not be prepared, so it never started', family: 'broken', glyph: 'failed', motion: 'still' },
+  done: { label: 'Done', hint: 'Its turn finished', family: 'settled', glyph: 'done', motion: 'still' },
+  stopped: { label: 'Stopped', hint: 'Its turn was stopped', family: 'quiet', glyph: 'settled', motion: 'still' },
+  idle: { label: 'Idle', hint: 'It has not run', family: 'quiet', glyph: 'idle', motion: 'still' },
+};
+
+const GLYPH_MARK: Record<Glyph, Mark> = { running: 'working', needs: 'question', limited: 'limited', failed: 'failed', done: 'done', settled: 'stopped', queued: 'queued', idle: 'idle' };
+
+/** The mark a bare glyph draws, with its phase while it is at work. */
+export const markOf = (glyph: Glyph, phase?: Phase | null): Mark => (phase && (glyph === 'running' || glyph === 'queued') ? phase : GLYPH_MARK[glyph]);
+
+/** What holds a thread up (a Needs you blocker), to its mark. `from`: the threads under it that asked. */
+export function blockerMark(b: { kind: keyof typeof BLOCKER_GLYPH; from?: readonly string[]; scheduled?: boolean }): Mark {
+  switch (b.kind) {
+    case 'question':
+      return b.from?.length ? 'crew_question' : 'question';
+    case 'child_failed':
+      return 'crew_failed';
+    case 'setup':
+      return 'setup_failed';
+    case 'limited':
+      return b.scheduled ? 'resuming' : 'limited';
+    default:
+      return 'held';
+  }
+}
+
+/** What a row knows about a thread beyond the thread itself. */
+export interface MarkContext {
+  /** The running turn's phase, where the rows are at hand (turnPhase). */
+  turn?: TurnPhase | null;
+  /** The thread's Needs you item: what holds it up comes first. */
+  need?: { blockers: readonly Parameters<typeof blockerMark>[0][] } | null;
+  /** The pull request on its branch, where the list loaded it (GET /channels/:id/thread-prs). */
+  pr?: { state?: string; isDraft: boolean } | null;
+}
+
+/**
+ * The mark a thread shows. What holds it up for Ben first, even while it runs (a question waits whatever else
+ * happens); then its phase while it is at work; then how it ended, where a finished thread with an open pull request
+ * reads Ready for review.
+ */
+export function threadMark(t: Parameters<typeof threadGlyph>[0] & { setup?: string | null }, ctx: MarkContext = {}): Mark {
+  const b = ctx.need?.blockers[0];
+  if (b) return blockerMark(b);
+  const phase = threadPhase(t, ctx.turn);
+  if (phase) return phase;
+  if (t.setup === 'failed') return 'setup_failed';
+  const glyph = threadGlyph(t);
+  if (glyph === 'done' && ctx.pr?.state === 'OPEN' && !ctx.pr.isDraft) return 'review';
+  return markOf(glyph);
+}
 
 /** How a turn ended, a Needs you result's status (done, failed or stopped), to its glyph. A stopped turn reads Stopped. */
 export const resultGlyph = (status: string): Glyph => (status === 'failed' ? 'failed' : status === 'stopped' ? 'settled' : 'done');

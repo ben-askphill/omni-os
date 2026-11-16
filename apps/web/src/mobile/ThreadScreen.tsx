@@ -36,7 +36,7 @@ import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { runningSubagents } from '../subagents.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
-import { STATUS, asksForYou, turnPhase, type Glyph } from '@omni/shared/status.ts';
+import { STATUS, asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
@@ -129,8 +129,8 @@ export function ThreadScreen() {
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
   const reconnecting = !s.live && ready;
-  const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn });
-  const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: STATUS[needs].label } : own;
+  const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn, need: item, pr: pr?.pr });
+  const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: STATUS[needs].label, mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
   const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
   const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, ch, changes, pr, now, shell, status, turn };
 
@@ -157,7 +157,7 @@ export function ThreadScreen() {
         sub={parent ? <span>{sub} · <a href={href.thread(parent.id)} className="text-fg-2 hover:text-fg" title={`Delegated from ${parent.title}`}>Parent: {parent.title}</a></span> : sub}
         right={
           <>
-            <StatusPill status={pill.glyph} phase={pill.phase} label={pill.label} />
+            <StatusPill mark={pill.mark} label={pill.label} />
             <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
             <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
           </>

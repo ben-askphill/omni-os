@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PHASE, STATUS, glyphFor, inboxStatus, resultGlyph, statusLabel, threadGlyph, threadPhase, turnPhase, waitsElsewhere } from '../status.ts';
+import { BLOCKER_GLYPH, MARK, PHASE, STATUS, blockerMark, glyphFor, inboxStatus, markOf, resultGlyph, statusLabel, threadGlyph, threadMark, threadPhase, turnPhase, type Mark } from '../status.ts';
 
 describe('status', () => {
   it('has one label for each state a person reads', () => {
@@ -91,8 +91,60 @@ describe('the phase a working thread shows', () => {
     expect(threadPhase({ status: 'queued', delegating: true })).toBeNull();
   });
 
-  it('pulses slower for the phases that wait on something else', () => {
-    expect((['starting', 'working', 'tool', 'delegating', 'checking'] as const).filter(waitsElsewhere)).toEqual(['starting', 'delegating', 'checking']);
+  it('moves a mark only while work goes on: a halo for its own turn, a breath while it waits on other work', () => {
+    const moving = (Object.keys(MARK) as Mark[]).filter((m) => MARK[m].motion !== 'still');
+    expect(moving).toEqual(['starting', 'working', 'tool', 'delegating', 'checking', 'resuming']);
+    for (const m of ['starting', 'working', 'tool'] as const) expect(MARK[m].motion).toBe('ping');
+    // Nothing that waits on Ben, broke or ended moves.
+    for (const m of Object.keys(MARK) as Mark[]) if (['you', 'broken', 'settled', 'quiet'].includes(MARK[m].family)) expect(MARK[m].motion).toBe('still');
+  });
+});
+
+describe('the mark a thread shows', () => {
+  it('keeps each phase as a mark of its own, with the phase\'s name', () => {
+    for (const p of Object.keys(PHASE) as (keyof typeof PHASE)[]) expect(MARK[p]).toMatchObject({ ...PHASE[p], glyph: 'running' });
+  });
+
+  it('draws a bare glyph as its plain mark, and a phase while it is at work', () => {
+    expect(markOf('running')).toBe('working');
+    expect(markOf('running', 'tool')).toBe('tool');
+    expect(markOf('queued', 'starting')).toBe('starting');
+    expect(markOf('done', 'working')).toBe('done');
+    expect(markOf('settled')).toBe('stopped');
+    for (const g of Object.keys(STATUS) as (keyof typeof STATUS)[]) expect(MARK[markOf(g)].glyph).toBe(g);
+  });
+
+  it('names each blocker, in the family of the glyph it already drew', () => {
+    expect(blockerMark({ kind: 'question' })).toBe('question');
+    expect(blockerMark({ kind: 'question', from: ['kid'] })).toBe('crew_question');
+    expect(blockerMark({ kind: 'child_failed' })).toBe('crew_failed');
+    expect(blockerMark({ kind: 'setup' })).toBe('setup_failed');
+    expect(blockerMark({ kind: 'limited' })).toBe('limited');
+    expect(blockerMark({ kind: 'limited', scheduled: true })).toBe('resuming');
+    expect(blockerMark({ kind: 'recovered' })).toBe('held');
+    expect(blockerMark({ kind: 'uncertain' })).toBe('held');
+    for (const kind of Object.keys(BLOCKER_GLYPH) as (keyof typeof BLOCKER_GLYPH)[]) expect(MARK[blockerMark({ kind })].glyph).toBe(BLOCKER_GLYPH[kind]);
+  });
+
+  it('puts what holds it up first, then its phase, then how it ended', () => {
+    expect(threadMark({ status: 'running' }, { need: { blockers: [{ kind: 'question' }] } })).toBe('question');
+    expect(threadMark({ status: 'running' }, { turn: 'tool' })).toBe('tool');
+    expect(threadMark({ status: 'done', delegating: true })).toBe('delegating');
+    expect(threadMark({ status: 'queued' })).toBe('queued');
+    expect(threadMark({ status: 'queued', setup: 'preparing' })).toBe('starting');
+    expect(threadMark({ status: 'failed', setup: 'failed' })).toBe('setup_failed');
+    expect(threadMark({ status: 'failed', limit_state: 'limited' })).toBe('limited');
+    expect(threadMark({ status: 'failed' })).toBe('failed');
+    expect(threadMark({ status: 'stopped' })).toBe('stopped');
+    expect(threadMark({ status: 'imported' })).toBe('idle');
+  });
+
+  it('reads Ready for review only on a finished thread whose pull request is open and not a draft', () => {
+    expect(threadMark({ status: 'done' }, { pr: { state: 'OPEN', isDraft: false } })).toBe('review');
+    expect(threadMark({ status: 'done' }, { pr: { state: 'OPEN', isDraft: true } })).toBe('done');
+    expect(threadMark({ status: 'done' }, { pr: { state: 'MERGED', isDraft: false } })).toBe('done');
+    expect(threadMark({ status: 'failed' }, { pr: { state: 'OPEN', isDraft: false } })).toBe('failed');
+    expect(threadMark({ status: 'done' })).toBe('done');
   });
 });
 

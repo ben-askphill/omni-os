@@ -1,11 +1,11 @@
-import type { Phase, TurnPhase } from '@omni/shared/status.ts';
+import { MARK, type Mark, type TurnPhase } from '@omni/shared/status.ts';
 import { useState, type ReactNode } from 'react';
 import type { BackgroundTask, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { HarnessMark, harnessLabel } from '../brand.tsx';
 import { useThreadAccount } from '../../accounts.ts';
 import { threadAccountLine } from '@omni/shared/harness-accounts.ts';
-import { Chip, copyText, Icon, IconButton, StatusDot, ThreadDot, type Glyph, type IconName } from '../ui.tsx';
+import { Chip, copyText, Icon, IconButton, StatusDot, ThreadDot, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
@@ -14,7 +14,7 @@ import { threadPill } from './thread-state.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
 import { toDate } from '@omni/shared/format.ts';
 import { duration } from '../../format.ts';
-import { useHereName, useNow } from '../../store.tsx';
+import { useHereName, useNeedOf, useNow } from '../../store.tsx';
 import { subagentKind, subagentTip } from '../../subagents.ts';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
@@ -124,8 +124,9 @@ export function ThreadQuickCard({
   const model = thread.model || init?.model;
   const now = useNow(60_000);
   // The run row says what the header pill says, except that a turn in progress reads as one.
-  const pill = threadPill(thread, { asking, reconnecting, now, turn });
-  const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? 'Waiting on you' : pill.label } : { glyph: 'running' as const, label: runningLabel(thread, 'Turn running'), phase: pill.phase };
+  const need = useNeedOf(thread.id);
+  const pill = threadPill(thread, { asking, reconnecting, now, turn, need, pr });
+  const run = reconnecting || asking || !slotBusy ? { ...pill, label: asking ? 'Waiting on you' : pill.label } : { glyph: 'running' as const, label: runningLabel(thread, 'Turn running'), phase: pill.phase, mark: pill.phase ?? ('working' as const) };
   const branchDisabled = !thread.branch;
   // The account its harness ran as when its process last started (apps/server/harness-accounts.ts), here or elsewhere.
   const ran = useThreadAccount(thread.id);
@@ -170,7 +171,7 @@ export function ThreadQuickCard({
         </QuickRow>
       )}
       <QuickRow icon={run.glyph === 'running' ? 'zap' : 'clock'}>
-        <StatusDot status={run.glyph} phase={run.phase} size={8} />
+        <StatusDot mark={run.mark} size={8} />
         <span className="truncate">
           {run.label}
           {warm !== undefined && !remote && !reconnecting && (
@@ -214,7 +215,7 @@ export function ThreadQuickCard({
           <span className="font-medium">All details</span>
         </QuickRow>
       </div>
-      <Lineage thread={thread} glyph={run.glyph} phase={run.phase} parent={parent} delegated={children.filter(isWorking)} agents={agents} onOpenThread={onOpenThread} onJump={onJump} />
+      <Lineage thread={thread} mark={run.mark} parent={parent} delegated={children.filter(isWorking)} agents={agents} onOpenThread={onOpenThread} onJump={onJump} />
     </section>
   );
 }
@@ -281,8 +282,7 @@ function SubagentLeaf({ t, last, indent, onJump }: { t: BackgroundTask; last: bo
  */
 function Lineage({
   thread,
-  glyph,
-  phase,
+  mark,
   parent,
   delegated,
   agents,
@@ -290,10 +290,8 @@ function Lineage({
   onJump,
 }: {
   thread: Thread;
-  /** The thread's own state, as the run row shows it. */
-  glyph: Glyph;
-  /** What its running dot says (threadPhase), when it is at work. */
-  phase?: Phase | null;
+  /** The thread's own mark, as the run row shows it. */
+  mark: Mark;
   parent: Thread | null;
   delegated: Thread[];
   agents: BackgroundTask[];
@@ -324,7 +322,7 @@ function Lineage({
       )}
       <div className={`${treeRow} font-medium`}>
         {parent && <Branch last />}
-        <StatusDot status={glyph} phase={phase} size={phase ? 8 : 7} />
+        <StatusDot mark={mark} size={MARK[mark].glyph === 'running' ? 8 : 7} />
         <span className="min-w-0 flex-1 truncate">{thread.title || 'This thread'}</span>
       </div>
       {delegated.map((c, i) => (

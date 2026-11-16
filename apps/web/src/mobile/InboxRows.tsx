@@ -9,11 +9,11 @@ import { useJobTree, type TreesFold } from '../thread-tree.ts';
 import { DoneMark, Icon, type IconName } from '../components/ui.tsx';
 import { RunElapsed } from '../components/RunElapsed.tsx';
 import { ranOnLine } from '@omni/shared/ran-on.ts';
-import { threadPhase, type RowStatus } from '@omni/shared/status.ts';
+import { blockerMark, threadPhase, type RowStatus } from '@omni/shared/status.ts';
 import type { InboxThread } from '../inbox.ts';
 import { canMarkDone } from '../needs-you.ts';
 import { href } from '../router.ts';
-import { useApp, useNow } from '../store.tsx';
+import { useApp, useNeedOf, useNow } from '../store.tsx';
 import { MoAvatar, MoRound } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import { useShell } from './shell.tsx';
@@ -85,6 +85,7 @@ export function MoInboxRow({
   const ch = channel(t.channel_id);
   const title = t.title || 'Untitled';
   const phase = threadPhase(t);
+  const blocker = useNeedOf(t.id)?.blockers[0];
   // The machine it runs on or last ran on, then the run's time; the branch only without a machine.
   const where = ranOnLine(t, now);
   const label = where.machine ?? where.branch;
@@ -97,7 +98,7 @@ export function MoInboxRow({
     <div>
     <div className="relative">
       <button type="button" onClick={() => shell.open(href.thread(t.id))} className="mo-row flex min-w-0 w-full items-center gap-3 px-1 py-2.5 text-left">
-        <MoAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} state={status?.glyph ?? (phase ? 'running' : t.status)} phase={phase} />
+        <MoAvatar role={t.role} channel={t.channel_id} channelIcon={ch?.icon} avatarBg={ch?.avatar_bg} state={status?.glyph ?? (phase ? 'running' : t.status)} phase={phase} mark={blocker ? blockerMark(blocker) : null} />
         <span className={`-mb-2.5 flex min-w-0 flex-1 flex-col gap-0.5 pb-2.5 ${last || under ? '' : 'border-b border-line'}`} style={{ paddingRight: reserve }}>
           <span className="flex items-baseline gap-2">
             <span className="min-w-0 flex-1 truncate text-[15px] leading-[1.3] text-fg">{title}</span>

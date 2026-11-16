@@ -155,7 +155,7 @@ describe('Needs you', () => {
   });
 
   it('lists a thread that waits on an answer, with the question', () => {
-    expect(reasonOf(item(1))).toEqual({ glyph: 'needs', label: 'Waiting on your answer', detail: DB.question });
+    expect(reasonOf(item(1))).toEqual({ glyph: 'needs', mark: 'question', label: 'Waiting on your answer', detail: DB.question });
     expect(reasonOf(item(2)).label).toBe('2 questions wait on your answer');
   });
 

@@ -223,6 +223,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             artifactCount,
             asking,
             turn,
+            pr: prs?.pr,
           }}
         />
 

@@ -25,12 +25,12 @@ export function NeedsYouRow({ item, showChannel }: { item: NeedsYouItem; showCha
         <span className="relative mt-0.5 shrink-0">
           <Avatar name={t.channel_id} omni={t.channel_id === 'conductor'} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} avatarBg={channels.find((c) => c.id === t.channel_id)?.avatar_bg} size={32} />
           <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-            <StatusDot status={reason.glyph} size={8} />
+            <StatusDot mark={reason.mark} size={8} />
           </span>
         </span>
       ) : (
         <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          <StatusDot status={reason.glyph} size={10} />
+          <StatusDot mark={reason.mark} size={10} />
         </span>
       )}
       <div className="min-w-0 flex-1">

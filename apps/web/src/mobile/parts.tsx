@@ -5,7 +5,7 @@ import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
 import { Folded } from '../components/Folded.tsx';
 import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
-import type { Phase } from '@omni/shared/status.ts';
+import type { Mark, Phase } from '@omni/shared/status.ts';
 import type { RowItem } from './rows.ts';
 
 /** Safe-area insets: a home-screen app draws under the status bar and the home indicator. */
@@ -108,7 +108,7 @@ export function MoEmpty({ children }: { children: ReactNode }) {
  * corner. A Conductor thread wears the Conductor's saved icon and background once it has them, as on the desktop Inbox
  * and the iPhone; its crew ring is only the default.
  */
-export function MoAvatar({ role, channel, channelIcon, avatarBg, state, phase, size = 36 }: { role?: string | null; channel?: string; channelIcon?: string | null; avatarBg?: string | null; state?: Glyph | string | null; phase?: Phase | null; size?: number }) {
+export function MoAvatar({ role, channel, channelIcon, avatarBg, state, phase, mark, size = 36 }: { role?: string | null; channel?: string; channelIcon?: string | null; avatarBg?: string | null; state?: Glyph | string | null; phase?: Phase | null; mark?: Mark | null; size?: number }) {
   const ring = isCrewRole(role) && !(role === 'conductor' && hasOwnLook({ icon: channelIcon, avatar_bg: avatarBg }));
   return (
     <span className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
@@ -121,7 +121,7 @@ export function MoAvatar({ role, channel, channelIcon, avatarBg, state, phase, s
       )}
       {state && (
         <span className="absolute -right-px -bottom-px grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-          <StatusDot status={state} phase={phase} size={8} />
+          <StatusDot status={state} phase={phase} mark={mark} size={8} />
         </span>
       )}
     </span>

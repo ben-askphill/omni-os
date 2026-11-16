@@ -101,6 +101,6 @@ describe('the card', () => {
     const { threadPill } = await import('../src/components/thread/thread-state.ts');
     const thread = { ...fixture<ThreadDetail>('thread-limited.json').thread, limit_resets_at: at(16) };
     // The turn ended failed, but the header reads Limited, not Failed.
-    expect(threadPill(thread, { now: NOW })).toEqual({ glyph: 'limited', label: 'Limited · resets 16:00' });
+    expect(threadPill(thread, { now: NOW })).toEqual({ glyph: 'limited', label: 'Limited · resets 16:00', mark: 'limited' });
   });
 });

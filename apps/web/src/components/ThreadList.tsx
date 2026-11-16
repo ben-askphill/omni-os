@@ -6,10 +6,9 @@ import { drag, useFolders } from '../folders.tsx';
 import { groupByDay, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp, useFeed, useNow } from '../store.tsx';
-import { Avatar, Button, Chip, DoneMark, Empty, ErrorNote, Icon, Loading, StatusDot } from './ui.tsx';
+import { Avatar, Button, Chip, Empty, ErrorNote, Icon, Loading, StatusDot, ThreadDot } from './ui.tsx';
 import { ThreadHandoffs } from './ThreadHandoffs.tsx';
 import { isWorking, showsRunning } from '@omni/shared/delegate-count.ts';
-import { threadGlyph, threadPhase } from '@omni/shared/status.ts';
 
 /** Loads a thread list and keeps it current from /feed. With `archived`, the list holds archived threads only. */
 export function useLiveThreads(path: string, accept: (t: Thread) => boolean, limit = 500, archived = false) {
@@ -72,12 +71,12 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
         <span className="relative mt-0.5 shrink-0">
           <Avatar name={t.channel_id} omni={t.channel_id === 'conductor'} channelIcon={channels.find((c) => c.id === t.channel_id)?.icon} avatarBg={channels.find((c) => c.id === t.channel_id)?.avatar_bg} size={32} />
           <span className="absolute -right-0.5 -bottom-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-bg">
-            {t.done_at ? <DoneMark size={8} /> : <StatusDot status={threadGlyph(t)} phase={threadPhase(t)} size={8} />}
+            <ThreadDot t={t} pr={pr} size={7} />
           </span>
         </span>
       ) : (
         <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface transition-colors group-hover:bg-bg">
-          {t.done_at ? <DoneMark /> : <StatusDot status={threadGlyph(t)} phase={threadPhase(t)} size={10} />}
+          <ThreadDot t={t} pr={pr} size={9} />
         </span>
       )}
       <div className="min-w-0 flex-1">

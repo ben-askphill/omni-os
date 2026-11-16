@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { PHASE, type Phase } from '@omni/shared/status.ts';
+import { MARK, PHASE, type Mark, type Phase } from '@omni/shared/status.ts';
 import { Loader, StatusDot, ThreadDot } from '../src/components/ui/status.tsx';
 import { threadPill } from '../src/components/thread/thread-state.ts';
 import { rowOf } from '../src/mobile/rows.ts';
@@ -18,21 +18,45 @@ describe('the status dot', () => {
   it('draws each phase as the running dot, named for its tooltip and for a screen reader', () => {
     for (const phase of Object.keys(PHASE) as Phase[]) {
       const html = dot({ status: 'running', phase });
-      expect(html).toContain(`data-s="running" data-phase="${phase}"`);
+      expect(html).toContain(`data-s="running" data-mark="${phase}"`);
+      expect(html).toContain(`data-phase="${phase}"`);
       expect(html).toContain(`aria-label="${PHASE[phase].label}"`);
       expect(html).toContain(`title="${PHASE[phase].label}. `);
-      expect(html).toContain('class="ping"');
+      // A halo while its own turn works, a breath while it waits on other work: never both.
+      expect(html.includes('class="ping"')).toBe(MARK[phase].motion === 'ping');
+      expect(html.includes('class="breathe"')).toBe(MARK[phase].motion === 'breathe');
     }
+  });
+
+  it('draws every state as a shape of its own, named and still unless it is at work', () => {
+    const shapes = new Map<string, Mark>();
+    for (const m of Object.keys(MARK) as Mark[]) {
+      const html = dot({ mark: m });
+      expect(html).toContain(`data-mark="${m}" data-family="${MARK[m].family}"`);
+      expect(html).toContain(`aria-label="${MARK[m].label}"`);
+      expect(html).toContain(`title="${MARK[m].label}. `);
+      if (MARK[m].motion === 'still') expect(html).not.toMatch(/class="(ping|breathe)"/);
+      // No two states share a drawing, so none leans on color or motion alone.
+      const shape = html.slice(html.indexOf('<svg')).replace(' class="breathe"', '');
+      expect(shapes.get(shape)).toBeUndefined();
+      shapes.set(shape, m);
+    }
+    expect(new Set(Object.values(MARK).map((k) => k.label)).size).toBe(Object.keys(MARK).length);
+  });
+
+  it('keeps the plain name on a bare status, which also marks things that are not threads', () => {
+    expect(dot({ status: 'done' })).toContain('title="Done"');
+    expect(dot({ status: 'needs' })).toContain('title="Needs you"');
   });
 
   it('is the plain running dot without a phase', () => {
     const html = dot({ status: 'running' });
     expect(html).toContain('title="Running"');
-    expect(html).not.toContain('data-phase');
+    expect(html).toContain('data-mark="working"');
   });
 
   it('shows Starting on a thread still queued while its folder is prepared', () => {
-    expect(dot({ status: 'queued', phase: 'starting' })).toContain('data-s="running" data-phase="starting"');
+    expect(dot({ status: 'queued', phase: 'starting' })).toContain('data-s="running" data-mark="starting"');
   });
 
   it('keeps a phase off a thread that is not at work', () => {
@@ -59,13 +83,21 @@ describe("a thread row's mark", () => {
     expect(mark({ t: { status: 'queued' } })).toContain('data-s="queued"');
     expect(mark({ t: { status: 'failed', limit_state: 'limited' } })).toContain('data-s="limited"');
   });
+
+  it('says how it ended beyond the status: a folder that never got ready, a pull request to review', () => {
+    expect(mark({ t: { status: 'failed', setup: 'failed' } })).toContain('data-mark="setup_failed"');
+    expect(mark({ t: { status: 'done' }, pr: { state: 'OPEN', isDraft: false } })).toContain('data-mark="review"');
+    expect(mark({ t: { status: 'done' }, pr: { state: 'OPEN', isDraft: true } })).toContain('data-mark="done"');
+    expect(mark({ t: { status: 'done' }, pr: { state: 'MERGED', isDraft: false } })).toContain('data-mark="done"');
+    expect(mark({ t: { status: 'running' }, pr: { state: 'OPEN', isDraft: false } })).toContain('data-mark="working"');
+  });
 });
 
 describe('loading', () => {
   it('is the same dot in the text color, not a spinner', () => {
     const html = renderToStaticMarkup(createElement(Loader, { size: 12 }));
-    expect(html).toContain('role="status" aria-label="Loading" data-s="running" data-phase="loading"');
-    expect(html).not.toContain('<svg');
+    expect(html).toContain('role="status" aria-label="Loading" data-s="running" data-mark="loading"');
+    expect(html).toContain('class="ping"');
   });
 });
 
@@ -77,10 +109,17 @@ describe('the phase a thread shows by name', () => {
   const t = { id: 't', channel_id: 'c', title: 'T', created_at: '2026-01-01T00:00:00.000Z', limit_state: null, limit_resets_at: null };
 
   it('names the phase on the thread header pill', () => {
-    expect(threadPill({ ...t, status: 'running' }, { turn: 'tool' })).toEqual({ glyph: 'running', label: 'Running a tool', phase: 'tool' });
-    expect(threadPill({ ...t, status: 'done', delegating: true })).toEqual({ glyph: 'running', label: 'Waiting on crew', phase: 'delegating' });
+    expect(threadPill({ ...t, status: 'running' }, { turn: 'tool' })).toEqual({ glyph: 'running', label: 'Running a tool', phase: 'tool', mark: 'tool' });
+    expect(threadPill({ ...t, status: 'done', delegating: true })).toEqual({ glyph: 'running', label: 'Waiting on crew', phase: 'delegating', mark: 'delegating' });
     expect(threadPill({ ...t, status: 'queued', setup: 'preparing' })).toMatchObject({ label: 'Starting', phase: 'starting' });
-    expect(threadPill({ ...t, status: 'queued' })).toEqual({ glyph: 'queued', label: 'Queued' });
+    expect(threadPill({ ...t, status: 'queued' })).toEqual({ glyph: 'queued', label: 'Queued', mark: 'queued' });
+  });
+
+  it('names what holds the thread up, and a review, on the pill', () => {
+    expect(threadPill({ ...t, status: 'running' }, { need: { blockers: [{ kind: 'question', from: ['kid'] }] } })).toEqual({ glyph: 'needs', label: 'Crew waits on you', mark: 'crew_question' });
+    expect(threadPill({ ...t, status: 'done' }, { need: { blockers: [{ kind: 'recovered' }] } })).toMatchObject({ label: 'Message held', mark: 'held' });
+    expect(threadPill({ ...t, status: 'done' }, { pr: { state: 'OPEN', isDraft: false } })).toEqual({ glyph: 'done', label: 'Ready for review', mark: 'review' });
+    expect(threadPill({ ...t, status: 'failed', setup: 'failed' })).toMatchObject({ glyph: 'failed', label: 'Setup failed', mark: 'setup_failed' });
   });
 
   it('names it on a phone list row', () => {
@@ -106,14 +145,16 @@ describe('no spinner says that something runs', () => {
     expect(found).toEqual([]);
   });
 
-  it('moves every running dot with the one halo, and not at all under reduced motion', () => {
+  it('moves a mark in two ways only, and not at all under reduced motion', () => {
     const css = readFileSync(join(SRC, 'index.css'), 'utf8');
-    // The phase rules draw shapes and colors only: the halo is the one .ping animation, slower for the waiting phases.
-    const phases = css.slice(css.indexOf('/* Running, by phase'), css.indexOf('.glyph[data-s="needs"]'));
-    expect(phases).not.toMatch(/animation|transition|@keyframes/);
+    // The mark rules set color only: the halo and the breath are the two animations, each one class.
+    const marks = css.slice(css.indexOf('/* ---- status marks'), css.indexOf('/* Status pill'));
+    expect(marks).not.toMatch(/animation|transition|@keyframes/);
     expect(css).toMatch(/\n\.ping \{\s*animation: omni-ping var\(--dur-ping\)/);
-    expect(css).toMatch(/\[data-phase="delegating"\][^{]*> \.ping \{\s*animation-duration: calc\(var\(--dur-ping\) \* 1\.5\)/);
+    expect(css).toMatch(/\n\.breathe \{\s*animation: omni-breathe /);
     const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(reduced).toMatch(/\.ping[^{]*\{\s*animation: none !important/);
+    expect(reduced).toMatch(/\.ping,\s*\.breathe[^{]*\{\s*animation: none !important/);
+    // Still, the halo is not drawn at all: no disc sits behind a hollow mark.
+    expect(marks).toMatch(/\.glyph > \.ping \{[^}]*opacity: 0;/);
   });
 });

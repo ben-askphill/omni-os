@@ -1,12 +1,14 @@
 // Needs you (apps/server/db/repos/needs-you.ts) from the Web UI's side: why each thread is there, and which result an
 // open thread has shown.
 import type { NeedsYou, NeedsYouItem, Thread } from './api.ts';
-import { BLOCKER_GLYPH, STATUS, asksForYou, resultGlyph, type Glyph } from '@omni/shared/status.ts';
+import { BLOCKER_GLYPH, STATUS, asksForYou, blockerMark, markOf, resultGlyph, type Glyph, type Mark } from '@omni/shared/status.ts';
 import { resetLabel } from './limits.ts';
 import { unreadResultOf, withoutRead } from '@omni/shared/needs-read.ts';
 
 export interface Reason {
   glyph: Glyph;
+  /** The mark its dot draws: which kind of blocker, or how the unread result ended. */
+  mark: Mark;
   label: string;
   /** The line under it: why Setup failed, or the result's last words. */
   detail: string | null;
@@ -16,6 +18,12 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many.r
 
 /** What to say about an item. A blocker comes first: it waits on Ben whether he read the result or not. */
 export function reasonOf(item: NeedsYouItem): Reason {
+  const said = sayOf(item);
+  const b = item.blockers[0];
+  return { ...said, mark: b ? blockerMark(b) : markOf(said.glyph) };
+}
+
+function sayOf(item: NeedsYouItem): Omit<Reason, 'mark'> {
   const preview = item.thread.last_text ? item.thread.last_text.replace(/\s+/g, ' ').trim().slice(0, 240) : null;
   const b = item.blockers[0];
   // The glyphs are the Inbox card's (inboxStatus), so Home and the Inbox never say two things about one thread.

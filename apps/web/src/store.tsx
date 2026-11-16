@@ -198,6 +198,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * A thread's Needs you item (what holds it up, its unread result), or undefined. A thread under a job asks through
+ * the job: its question sits on the job's blocker (`from`), so the asking thread reads as that question too. Safe
+ * outside the provider.
+ */
+export function useNeedOf(threadId: string | undefined): { blockers: readonly NeedsYou['items'][number]['blockers'][number][] } | undefined {
+  const items = useContext(Ctx)?.needsYou?.items;
+  return useMemo(() => {
+    if (!threadId || !items) return undefined;
+    const own = items.find((i) => i.thread.id === threadId);
+    if (own?.blockers.length) return own;
+    const asked = items.flatMap((i) => i.blockers).find((b) => b.kind === 'question' && b.from?.includes(threadId));
+    return asked ? { blockers: [{ ...asked, from: undefined }] } : own;
+  }, [items, threadId]);
+}
+
 export function useApp() {
   const v = useContext(Ctx);
   if (!v) throw new Error('useApp outside AppProvider');
