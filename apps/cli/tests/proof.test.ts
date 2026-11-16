@@ -6,11 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { OmniHttpError } from '@omni/client-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { client } from '../src/connection.ts';
+import { client, PROOF_FRESH_MS } from '../src/connection.ts';
 import { CliError } from '../src/io.ts';
 import { run } from '../src/main.ts';
 import { nodeIo } from '../src/node-io.ts';
-import { BASE, TOKEN, fake, wire } from './helpers.ts';
+import { BASE, TOKEN, detail, fake, needsYouFor, wire } from './helpers.ts';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 const SECRET = 'install-token-that-must-stay-home';
@@ -119,6 +119,36 @@ describe('the proof before the token', () => {
     expect(await f.run('new', 'hi')).toBe(3);
     expect(f.err()).toContain(`cannot reach Omni at ${BASE} (connection refused)`);
     expect(f.sent).toEqual([]);
+  });
+
+  it('is asked again on every poll of a --wait, not only once', async () => {
+    const running = detail('thread.json');
+    const done = detail('thread-open.json', { id: ID });
+    const f = fake({
+      routes: [
+        { method: 'POST', path: '/api/threads', reply: { json: wire('thread-created.json') } },
+        { method: 'GET', path: `/api/threads/${ID}?history=recent`, reply: [running, running, done].map((json) => ({ json })) },
+        { method: 'GET', path: `/api/needs-you?thread=${ID}`, reply: [needsYouFor(ID, null), needsYouFor(ID, null), needsYouFor(ID, '001')].map((json) => ({ json })) },
+      ],
+    });
+    expect(await f.run('new', 'fix the cart', '--wait')).toBe(0);
+    expect(f.slept.length).toBe(2);
+    // One for the start and the first poll together, then one per poll after each sleep.
+    expect(f.probes).toHaveLength(f.slept.length + 1);
+  });
+
+  it('is asked again once it is older than a moment, so a server replaced between polls gets nothing', async () => {
+    const f = fake({ routes: [{ method: 'GET', path: '/api/status', reply: { json: wire('status.json') } }] });
+    const c = client(f.io);
+    await c.api.status();
+    await c.api.status();
+    expect(f.probes).toHaveLength(1);
+    // The real server stops and something else takes the port while the command sleeps; no request failed meanwhile.
+    await f.io.sleep(PROOF_FRESH_MS);
+    f.setProof('wrong');
+    await expect(c.api.status()).rejects.toBeInstanceOf(CliError);
+    expect(f.probes).toHaveLength(2);
+    expect(f.sent).toHaveLength(2);
   });
 
   it('is asked again after the server goes away, so what takes the port during a restart gets nothing', async () => {

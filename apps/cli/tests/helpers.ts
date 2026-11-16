@@ -60,6 +60,8 @@ export function fake(o: FakeOptions = {}) {
   /** GET /api/auth/proof calls, which carry no token: kept apart from `sent`. */
   const probes: Sent[] = [];
   let proofMode = o.proof ?? 'mine';
+  /** Moves on only when the command sleeps, as a `--wait` does between polls. */
+  let clock = o.now ?? Date.parse('2026-01-05T09:05:00.000Z');
   const launched: [string, string[]][] = [];
   const ran: [string, string[]][] = [];
   const slept: number[] = [];
@@ -101,8 +103,11 @@ export function fake(o: FakeOptions = {}) {
     err: (t) => void err.push(t),
     stdin: async () => o.stdin ?? null,
     fetch,
-    sleep: async (ms) => void slept.push(ms),
-    now: () => o.now ?? Date.parse('2026-01-05T09:05:00.000Z'),
+    sleep: async (ms) => {
+      slept.push(ms);
+      clock += ms;
+    },
+    now: () => clock,
     uuid: () => `00000000-0000-4000-9000-${String(++uuids).padStart(12, '0')}`,
     async run(bin, args) {
       ran.push([bin, args]);

@@ -100,17 +100,25 @@ export interface Client {
 }
 
 /**
+ * How long a passed proof covers further requests: the requests one command makes together. A `--wait` sleeps at
+ * least this long between polls, so each poll proves the server again, and one that went away and was replaced
+ * between polls never gets the token.
+ */
+export const PROOF_FRESH_MS = 1000;
+
+/**
  * Another program, or another install's Omni, can hold the install's port while this one is not running. On that
- * address the token goes only to a server that proved it holds the same token, checked before the first request and
- * again after the connection drops (a `--wait` can outlast a restart). `proven` says a probe already passed.
+ * address the token goes only to a server that proved it holds the same token: before a request, unless a proof
+ * passed within PROOF_FRESH_MS and the connection has not dropped since. `proven` says a probe just passed.
  */
 export function client(io: Io, conn: Connection = connection(io), o: { proven?: boolean } = {}): Client {
-  let proven = !conn.proveFirst || !!o.proven;
+  let provenAt: number | null = o.proven ? io.now() : null;
+  const fresh = () => !conn.proveFirst || (provenAt !== null && io.now() - provenAt < PROOF_FRESH_MS);
   let proving: Promise<void> | null = null;
   async function prove(): Promise<void> {
     const p = await probe(io, conn);
     if (p.kind === 'omni' && p.mine) {
-      proven = true;
+      provenAt = io.now();
       return;
     }
     // Nothing listens, or nothing answers yet: an unreachable server, which `--wait` waits through. Nothing is sent.
@@ -123,7 +131,7 @@ export function client(io: Io, conn: Connection = connection(io), o: { proven?: 
   // request unsent. Requests made together share one probe.
   async function token(): Promise<string | null> {
     const value = conn.token();
-    if (proven || !value) return value;
+    if (fresh() || !value) return value;
     proving ??= prove().finally(() => {
       proving = null;
     });
@@ -135,7 +143,7 @@ export function client(io: Io, conn: Connection = connection(io), o: { proven?: 
       return await io.fetch(url, init);
     } catch (err) {
       // The server went away: whatever answers next proves itself again.
-      proven = !conn.proveFirst;
+      provenAt = null;
       throw err;
     }
   };
