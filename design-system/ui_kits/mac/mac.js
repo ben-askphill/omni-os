@@ -7,7 +7,8 @@ const H={claude:"m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.789
 const WM="M46 90A40 40 0 0 0 86 50A40 40 0 0 0 46 10A40 40 0 0 0 6 50A40 40 0 0 0 46 90L92 90A26 26 0 0 0 118 64L118 34A24 24 0 0 1 166 34L166 74A16 16 0 0 0 198 74L198 34A24 24 0 0 1 246 34L246 74A16 16 0 0 0 278 74L278 38A28 28 0 0 1 334 38L334 74A16 16 0 0 0 366 74L366 10";
 const icon=(n,s,w)=>`<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${n==='more'?3:w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[n]||P.more}"/></svg>`;
 const harn=(n,s)=>H[n]?`<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${H[n]}"/></svg>`:`<span style="font:500 ${Math.max(7,s*.62)}px var(--sans)">HE</span>`;
-const loader=s=>`<svg class="i ld" width="${s}" height="${s}" viewBox="0 0 128 128" aria-label="Loading"><circle cx="64" cy="64" r="40" fill="none" stroke="currentColor" stroke-width="20"/><circle class="ldb" cx="64" cy="10" r="13" fill="currentColor"/></svg>`;
+/* Loader and the running status mark (PR #755): a dot with a halo, never a spinner. In a status slot (.s) it is the full running disc. */
+const loader=(s,full)=>`<span class="i ld" style="width:${s}px;height:${s}px" role="status" aria-label="${full?'Running':'Loading'}"><i class="ldp"></i><svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="${full?7:4}"/></svg></span>`;
 const mark=(s,ring)=>`<svg class="i" width="${s}" height="${s}" viewBox="-64 -64 128 128" aria-hidden="true"><g transform="translate(-4 3) scale(.92) skewX(-10)"><circle r="40" fill="none" stroke="currentColor" stroke-width="20"/>${ring?'':'<circle cx="49.5" cy="-49.5" r="12" fill="currentColor"/>'}</g></svg>`;
 const wordmark=h=>`<svg class="i" height="${h}" width="${(h*391/102).toFixed(1)}" viewBox="-15 -1 391 102" aria-label="omni"><path pathLength="1" transform="skewX(-10)" d="${WM}" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const crew=(r,s)=>{const body={conductor:'<circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="3.6"/>',researcher:'<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/>',builder:'<rect x="4" y="4" width="16" height="16" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.75"/><rect x="12" y="12" width="8" height="8" rx="2" fill="currentColor"/>'}[r];return body?`<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`:icon('layers',s*.9,1.75)};
@@ -19,7 +20,7 @@ const swap=(e,html)=>{const t=document.createElement('template');t.innerHTML=htm
 function render(root){
   root.querySelectorAll('i[data-i]').forEach(e=>swap(e,icon(e.dataset.i,+e.dataset.s||16,+e.dataset.w||1.75)));
   root.querySelectorAll('i[data-h]').forEach(e=>swap(e,harn(e.dataset.h,+e.dataset.s||14)));
-  root.querySelectorAll('i[data-ld]').forEach(e=>swap(e,loader(+e.dataset.ld||14)));
+  root.querySelectorAll('i[data-ld]').forEach(e=>swap(e,loader(+e.dataset.ld||14,!!e.closest('.s'))));
   root.querySelectorAll('i[data-mk]').forEach(e=>swap(e,mark(+e.dataset.mk||32,e.hasAttribute('data-ring'))));
   root.querySelectorAll('i[data-wm]').forEach(e=>swap(e,wordmark(+e.dataset.wm||18)));
   root.querySelectorAll('i[data-crew]').forEach(e=>swap(e,crew(e.dataset.crew,+e.dataset.s||16)));

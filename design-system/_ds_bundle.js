@@ -1,4 +1,4 @@
-/* @ds-bundle: {"format":4,"namespace":"OmniOSDesignSystem_a7120f","components":[{"name":"Loader","sourcePath":"components/brand/Loader.jsx"},{"name":"OmniLogo","sourcePath":"components/brand/OmniLogo.jsx"},{"name":"StaticMark","sourcePath":"components/brand/OmniMark.jsx"},{"name":"OmniMark","sourcePath":"components/brand/OmniMark.jsx"},{"name":"Button","sourcePath":"components/core/Button.jsx"},{"name":"IconButton","sourcePath":"components/core/IconButton.jsx"},{"name":"Input","sourcePath":"components/core/Input.jsx"},{"name":"Kbd","sourcePath":"components/core/Kbd.jsx"},{"name":"Monogram","sourcePath":"components/core/Monogram.jsx"},{"name":"TaskId","sourcePath":"components/core/Monogram.jsx"},{"name":"Chip","sourcePath":"components/core/Monogram.jsx"},{"name":"STATUS_LABEL","sourcePath":"components/core/Status.jsx"},{"name":"StatusGlyph","sourcePath":"components/core/Status.jsx"},{"name":"Status","sourcePath":"components/core/Status.jsx"},{"name":"Toast","sourcePath":"components/feedback/Toast.jsx"},{"name":"CheckItem","sourcePath":"components/forms/CheckItem.jsx"},{"name":"Ticks","sourcePath":"components/forms/CheckItem.jsx"},{"name":"InlineConfirm","sourcePath":"components/forms/InlineConfirm.jsx"},{"name":"Picker","sourcePath":"components/forms/Picker.jsx"},{"name":"Thumb","sourcePath":"components/forms/Segmented.jsx"},{"name":"Segmented","sourcePath":"components/forms/Segmented.jsx"},{"name":"SlideToConfirm","sourcePath":"components/forms/SlideToConfirm.jsx"},{"name":"Toggle","sourcePath":"components/forms/Toggle.jsx"},{"name":"CREW_ROLES","sourcePath":"components/icons/CrewMark.jsx"},{"name":"CrewMark","sourcePath":"components/icons/CrewMark.jsx"},{"name":"HarnessLogo","sourcePath":"components/icons/HarnessMark.jsx"},{"name":"HarnessMark","sourcePath":"components/icons/HarnessMark.jsx"},{"name":"ICON_PATHS","sourcePath":"components/icons/Icon.jsx"},{"name":"Icon","sourcePath":"components/icons/Icon.jsx"},{"name":"CommandPalette","sourcePath":"components/navigation/CommandPalette.jsx"},{"name":"Rail","sourcePath":"components/navigation/Rail.jsx"},{"name":"TabStack","sourcePath":"components/navigation/TabStack.jsx"},{"name":"GitHubPanel","sourcePath":"components/panels/GitHubPanel.jsx"},{"name":"Panel","sourcePath":"components/panels/Panel.jsx"},{"name":"PanelSection","sourcePath":"components/panels/Panel.jsx"},{"name":"UsageMeter","sourcePath":"components/panels/UsageMeter.jsx"},{"name":"ArtifactEmbed","sourcePath":"components/thread/ArtifactEmbed.jsx"},{"name":"Composer","sourcePath":"components/thread/Composer.jsx"},{"name":"CrewReport","sourcePath":"components/thread/CrewReport.jsx"},{"name":"Delegation","sourcePath":"components/thread/Delegation.jsx"},{"name":"Message","sourcePath":"components/thread/Message.jsx"},{"name":"ResultLine","sourcePath":"components/thread/Message.jsx"},{"name":"ThreadRow","sourcePath":"components/thread/ThreadRow.jsx"},{"name":"ThreadGroup","sourcePath":"components/thread/ThreadRow.jsx"},{"name":"ToolCall","sourcePath":"components/thread/ToolCall.jsx"},{"name":"ToolCalls","sourcePath":"components/thread/ToolCall.jsx"}],"sourceHashes":{"assets/ds-fallback.js":"8acf6e62d3de","components/brand/Loader.jsx":"8a90809f227d","components/brand/OmniLogo.jsx":"02b729ba1bff","components/brand/OmniMark.jsx":"949b2a806878","components/core/Button.jsx":"45901b3529a1","components/core/IconButton.jsx":"ffe263c44901","components/core/Input.jsx":"9d5e4ac29ca9","components/core/Kbd.jsx":"ac361057f844","components/core/Monogram.jsx":"01ddb38f68bc","components/core/Status.jsx":"ba32648aa009","components/feedback/Toast.jsx":"7c909378ee4a","components/forms/CheckItem.jsx":"27ea3ea3af89","components/forms/InlineConfirm.jsx":"e552144d7e79","components/forms/Picker.jsx":"05cb9d445dba","components/forms/Segmented.jsx":"8539d8dd82cd","components/forms/SlideToConfirm.jsx":"20f841f34fb4","components/forms/Toggle.jsx":"524954fd7b59","components/icons/CrewMark.jsx":"bd7c34bc71ef","components/icons/HarnessMark.jsx":"2f1ef111e1b7","components/icons/Icon.jsx":"4023d166e29f","components/navigation/CommandPalette.jsx":"3be0696c5c3b","components/navigation/Rail.jsx":"952a16c33d70","components/navigation/TabStack.jsx":"6e90efa5fb0f","components/panels/GitHubPanel.jsx":"a733d5cc8864","components/panels/Panel.jsx":"aad2468eb5e6","components/panels/UsageMeter.jsx":"8b35487d8fb8","components/thread/ArtifactEmbed.jsx":"7247ad8bec02","components/thread/Composer.jsx":"e2eb6f1d7dc9","components/thread/CrewReport.jsx":"77b493f5a7c7","components/thread/Delegation.jsx":"7a2bf635b0db","components/thread/Message.jsx":"fb8ac6a2c7b7","components/thread/ThreadRow.jsx":"36e63b0d14cd","components/thread/ToolCall.jsx":"a86a9c7a7fc0","ui_kits/mac/mac.js":"17a56b48b3da","ui_kits/omni-mobile/MobileApp.jsx":"965d83b2c561","ui_kits/omni-mobile/MobileDocs.jsx":"a3f90638d6bd","ui_kits/omni-mobile/MobileParts.jsx":"f5a7a2553b2d","ui_kits/omni-mobile/MobileScreens.jsx":"ef4f8f7a41d5","ui_kits/omni-mobile/MobileThread.jsx":"30b9eb27dc03","ui_kits/omni-mobile/mobile-data.js":"0b9dba0adfa9","ui_kits/omni-os/App.jsx":"a28c41321fcf","ui_kits/omni-os/ChannelScreen.jsx":"c351278fc1ac","ui_kits/omni-os/ConductorScreen.jsx":"6b1f593c2445","ui_kits/omni-os/PhoneConductor.jsx":"cb15a3a11509","ui_kits/omni-os/data.js":"af0774321fc5","ui_kits/omni-os/ios-frame.jsx":"24642b887be3"},"inlinedExternals":[],"unexposedExports":[{"name":"harnessFor","sourcePath":"components/icons/HarnessMark.jsx"},{"name":"markFrame","sourcePath":"components/brand/OmniMark.jsx"},{"name":"markTransform","sourcePath":"components/brand/OmniMark.jsx"},{"name":"useSlidingThumb","sourcePath":"components/forms/Segmented.jsx"}]} */
+/* @ds-bundle: {"format":4,"namespace":"OmniOSDesignSystem_a7120f","components":[{"name":"Loader","sourcePath":"components/brand/Loader.jsx"},{"name":"OmniLogo","sourcePath":"components/brand/OmniLogo.jsx"},{"name":"StaticMark","sourcePath":"components/brand/OmniMark.jsx"},{"name":"OmniMark","sourcePath":"components/brand/OmniMark.jsx"},{"name":"Button","sourcePath":"components/core/Button.jsx"},{"name":"IconButton","sourcePath":"components/core/IconButton.jsx"},{"name":"Input","sourcePath":"components/core/Input.jsx"},{"name":"Kbd","sourcePath":"components/core/Kbd.jsx"},{"name":"Monogram","sourcePath":"components/core/Monogram.jsx"},{"name":"TaskId","sourcePath":"components/core/Monogram.jsx"},{"name":"Chip","sourcePath":"components/core/Monogram.jsx"},{"name":"STATUS_LABEL","sourcePath":"components/core/Status.jsx"},{"name":"StatusDot","sourcePath":"components/core/Status.jsx"},{"name":"StatusGlyph","sourcePath":"components/core/Status.jsx"},{"name":"Status","sourcePath":"components/core/Status.jsx"},{"name":"Toast","sourcePath":"components/feedback/Toast.jsx"},{"name":"CheckItem","sourcePath":"components/forms/CheckItem.jsx"},{"name":"Ticks","sourcePath":"components/forms/CheckItem.jsx"},{"name":"InlineConfirm","sourcePath":"components/forms/InlineConfirm.jsx"},{"name":"Picker","sourcePath":"components/forms/Picker.jsx"},{"name":"Thumb","sourcePath":"components/forms/Segmented.jsx"},{"name":"Segmented","sourcePath":"components/forms/Segmented.jsx"},{"name":"SlideToConfirm","sourcePath":"components/forms/SlideToConfirm.jsx"},{"name":"Toggle","sourcePath":"components/forms/Toggle.jsx"},{"name":"CREW_ROLES","sourcePath":"components/icons/CrewMark.jsx"},{"name":"CrewMark","sourcePath":"components/icons/CrewMark.jsx"},{"name":"HarnessLogo","sourcePath":"components/icons/HarnessMark.jsx"},{"name":"HarnessMark","sourcePath":"components/icons/HarnessMark.jsx"},{"name":"ICON_PATHS","sourcePath":"components/icons/Icon.jsx"},{"name":"Icon","sourcePath":"components/icons/Icon.jsx"},{"name":"CommandPalette","sourcePath":"components/navigation/CommandPalette.jsx"},{"name":"Rail","sourcePath":"components/navigation/Rail.jsx"},{"name":"TabStack","sourcePath":"components/navigation/TabStack.jsx"},{"name":"GitHubPanel","sourcePath":"components/panels/GitHubPanel.jsx"},{"name":"Panel","sourcePath":"components/panels/Panel.jsx"},{"name":"PanelSection","sourcePath":"components/panels/Panel.jsx"},{"name":"UsageMeter","sourcePath":"components/panels/UsageMeter.jsx"},{"name":"ArtifactEmbed","sourcePath":"components/thread/ArtifactEmbed.jsx"},{"name":"Composer","sourcePath":"components/thread/Composer.jsx"},{"name":"CrewReport","sourcePath":"components/thread/CrewReport.jsx"},{"name":"Delegation","sourcePath":"components/thread/Delegation.jsx"},{"name":"Message","sourcePath":"components/thread/Message.jsx"},{"name":"ResultLine","sourcePath":"components/thread/Message.jsx"},{"name":"ThreadRow","sourcePath":"components/thread/ThreadRow.jsx"},{"name":"ThreadGroup","sourcePath":"components/thread/ThreadRow.jsx"},{"name":"ToolCall","sourcePath":"components/thread/ToolCall.jsx"},{"name":"ToolCalls","sourcePath":"components/thread/ToolCall.jsx"}],"sourceHashes":{"assets/ds-fallback.js":"8acf6e62d3de","components/brand/Loader.jsx":"8a90809f227d","components/brand/OmniLogo.jsx":"02b729ba1bff","components/brand/OmniMark.jsx":"949b2a806878","components/core/Button.jsx":"45901b3529a1","components/core/IconButton.jsx":"ffe263c44901","components/core/Input.jsx":"9d5e4ac29ca9","components/core/Kbd.jsx":"ac361057f844","components/core/Monogram.jsx":"01ddb38f68bc","components/core/Status.jsx":"ba32648aa009","components/feedback/Toast.jsx":"7c909378ee4a","components/forms/CheckItem.jsx":"27ea3ea3af89","components/forms/InlineConfirm.jsx":"e552144d7e79","components/forms/Picker.jsx":"05cb9d445dba","components/forms/Segmented.jsx":"8539d8dd82cd","components/forms/SlideToConfirm.jsx":"20f841f34fb4","components/forms/Toggle.jsx":"524954fd7b59","components/icons/CrewMark.jsx":"bd7c34bc71ef","components/icons/HarnessMark.jsx":"2f1ef111e1b7","components/icons/Icon.jsx":"4023d166e29f","components/navigation/CommandPalette.jsx":"3be0696c5c3b","components/navigation/Rail.jsx":"952a16c33d70","components/navigation/TabStack.jsx":"6e90efa5fb0f","components/panels/GitHubPanel.jsx":"a733d5cc8864","components/panels/Panel.jsx":"aad2468eb5e6","components/panels/UsageMeter.jsx":"8b35487d8fb8","components/thread/ArtifactEmbed.jsx":"7247ad8bec02","components/thread/Composer.jsx":"e2eb6f1d7dc9","components/thread/CrewReport.jsx":"77b493f5a7c7","components/thread/Delegation.jsx":"7a2bf635b0db","components/thread/Message.jsx":"fb8ac6a2c7b7","components/thread/ThreadRow.jsx":"36e63b0d14cd","components/thread/ToolCall.jsx":"a86a9c7a7fc0","ui_kits/mac/mac.js":"17a56b48b3da","ui_kits/omni-mobile/MobileApp.jsx":"965d83b2c561","ui_kits/omni-mobile/MobileDocs.jsx":"a3f90638d6bd","ui_kits/omni-mobile/MobileParts.jsx":"f5a7a2553b2d","ui_kits/omni-mobile/MobileScreens.jsx":"ef4f8f7a41d5","ui_kits/omni-mobile/MobileThread.jsx":"30b9eb27dc03","ui_kits/omni-mobile/mobile-data.js":"0b9dba0adfa9","ui_kits/omni-os/App.jsx":"a28c41321fcf","ui_kits/omni-os/ChannelScreen.jsx":"c351278fc1ac","ui_kits/omni-os/ConductorScreen.jsx":"6b1f593c2445","ui_kits/omni-os/PhoneConductor.jsx":"cb15a3a11509","ui_kits/omni-os/data.js":"af0774321fc5","ui_kits/omni-os/ios-frame.jsx":"24642b887be3"},"inlinedExternals":[],"unexposedExports":[{"name":"harnessFor","sourcePath":"components/icons/HarnessMark.jsx"},{"name":"markFrame","sourcePath":"components/brand/OmniMark.jsx"},{"name":"markTransform","sourcePath":"components/brand/OmniMark.jsx"},{"name":"useSlidingThumb","sourcePath":"components/forms/Segmented.jsx"}]} */
 
 (() => {
 
@@ -317,6 +317,8 @@ function OmniMark({
   className = '',
   style
 }) {
+  /* The mark never shows that something runs: that is StatusDot's job (PR #755). The working states fold to idle. */
+  if (state === 'thinking' || state === 'delegating' || state === 'report') state = 'idle';
   const reduced = useReducedMotion();
   const idRef = useRef(null);
   if (!idRef.current) idRef.current = 'om-goo-' + ++UID;
@@ -480,69 +482,17 @@ Object.assign(__ds_scope, { markTransform, markFrame, StaticMark, OmniMark });
 
 // components/brand/Loader.jsx
 try { (() => {
-const {
-  useRef
-} = React;
-let LID = 0;
-/* Loader: a bead of the ring's own liquid travels around it — a bulge, not a spinner. */
-function Loader({
-  size = 20,
-  label,
-  color
-}) {
-  const id = useRef('om-lgoo-' + ++LID).current;
-  const reduced = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  return /*#__PURE__*/React.createElement("span", {
-    className: "om-loader",
-    role: "status",
-    "aria-label": label || 'Loading',
-    style: {
-      color
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    width: size,
-    height: size,
-    viewBox: "-64 -64 128 128",
-    style: {
-      display: 'block',
-      overflow: 'visible',
-      color: color || 'var(--text-1)'
-    },
-    "aria-hidden": "true"
-  }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("filter", {
-    id: id,
-    x: "-120",
-    y: "-120",
-    width: "240",
-    height: "240",
-    filterUnits: "userSpaceOnUse"
-  }, /*#__PURE__*/React.createElement("feGaussianBlur", {
-    stdDeviation: "5"
-  }), /*#__PURE__*/React.createElement("feColorMatrix", {
-    values: "1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8"
-  }))), /*#__PURE__*/React.createElement("g", {
-    filter: 'url(#' + id + ')'
-  }, /*#__PURE__*/React.createElement("g", {
-    transform: __ds_scope.markTransform
-  }, /*#__PURE__*/React.createElement("circle", {
-    r: "40",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "20"
-  }), /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("circle", {
-    cx: "0",
-    cy: "-55",
-    r: "12",
-    fill: "currentColor"
-  }), !reduced && /*#__PURE__*/React.createElement("animateTransform", {
-    attributeName: "transform",
-    type: "rotate",
-    from: "0 0 0",
-    to: "360 0 0",
-    dur: "1.6s",
-    repeatCount: "indefinite"
-  }))))), label && /*#__PURE__*/React.createElement("span", null, label));
+/* Loader: something loads that is not a thread at work (a button's request, a list being read). It is the running
+   status dot in the text's own colour, half its box, with the same halo: no spinner, no travelling bead (PR #755). */
+const h = React.createElement;
+function Loader({ size = 14, label, color }) {
+  return h('span', { className: 'om-loader', role: 'status', 'aria-label': label || 'Loading', style: color ? { color } : undefined },
+    h('span', { className: 'om-glyph', 'data-mark': 'loading', style: { width: size, height: size } },
+      h('i', { className: 'om-glyph__ping' }),
+      h('svg', { viewBox: '0 0 16 16', fill: 'currentColor', 'aria-hidden': 'true' }, h('circle', { cx: 8, cy: 8, r: 4 }))),
+    label ? h('span', null, label) : null);
 }
+
 Object.assign(__ds_scope, { Loader });
 })(); } catch (e) { __ds_ns.__errors.push({ path: "components/brand/Loader.jsx", error: String((e && e.message) || e) }); }
 
@@ -667,57 +617,114 @@ Object.assign(__ds_scope, { Kbd });
 
 // components/core/Status.jsx
 try { (() => {
-const STATUS_LABEL = {
-  running: 'Running',
-  needs: 'Needs you',
-  done: 'Done',
-  settled: 'Done',
-  idle: 'Idle',
-  queued: 'Queued',
-  failed: 'Failed',
-  stopped: 'Stopped'
+/* One status vocabulary for every thread state (Mark in packages/shared/status.ts, StatusDot in
+   apps/web/src/components/ui/status.tsx, PR #755). Shape says who has the ball: a circle the agent, a square a system
+   outside Omni (checks, a usage limit), a diamond Ben, a cross or a triangle that it broke. Colour repeats it:
+   ultramarine, amber, vermilion, red, then volt for done and grey where nothing happens. Fill says how far along:
+   hollow, half, filled. A satellite dot says the state belongs to a thread under this one. Two motions only: a halo
+   leaves the mark while the agent's own turn works (ping), and it breathes while it waits on other work. Nothing
+   spins; reduced motion stops both, and the shapes still tell every state apart. */
+const h = React.createElement;
+const MARK = {
+  queued: { label: 'Queued', hint: 'It waits for a free slot', family: 'quiet', glyph: 'queued', motion: 'still', look: 'Grey dashed ring' },
+  starting: { label: 'Starting', hint: 'Its folder is being prepared, or the agent has not picked the message up yet', family: 'agent', glyph: 'running', motion: 'ping', look: 'Half-filled blue circle, halo' },
+  working: { label: 'Running', hint: 'Its own turn runs', family: 'agent', glyph: 'running', motion: 'ping', look: 'Filled blue disc, halo' },
+  tool: { label: 'Running a tool', hint: 'A tool call in its turn has not returned yet', family: 'agent', glyph: 'running', motion: 'ping', look: 'Blue dot inside a thin ring, halo' },
+  delegating: { label: 'Waiting on crew', hint: 'Its own turn ended; threads or sub-agents it delegated still work', family: 'agent', glyph: 'running', motion: 'breathe', look: 'Blue disc with a satellite, breathes' },
+  checking: { label: 'Checks running', hint: 'Checks on its pull request have not finished', family: 'system', glyph: 'running', motion: 'breathe', look: 'Filled amber square, breathes' },
+  resuming: { label: 'Resumes at reset', hint: 'It hit the usage limit and continues by itself when the limit resets', family: 'system', glyph: 'limited', motion: 'breathe', look: 'Half-filled amber square, breathes' },
+  limited: { label: 'Usage limit', hint: "Its harness stopped the turn at the plan's usage limit", family: 'system', glyph: 'limited', motion: 'still', look: 'Hollow amber square' },
+  question: { label: 'Waiting on you', hint: 'Its agent asked you a question and waits', family: 'you', glyph: 'needs', motion: 'still', look: 'Filled vermilion diamond' },
+  crew_question: { label: 'Crew waits on you', hint: 'A thread under this one asked you a question and waits', family: 'you', glyph: 'needs', motion: 'still', look: 'Vermilion diamond with a satellite' },
+  review: { label: 'Ready for review', hint: 'It finished and its pull request is open', family: 'you', glyph: 'done', motion: 'still', look: 'Half-filled vermilion diamond' },
+  held: { label: 'Message held', hint: 'A restart kept a message back: it is sent when you say so', family: 'you', glyph: 'needs', motion: 'still', look: 'Hollow vermilion diamond' },
+  failed: { label: 'Failed', hint: 'Its turn ended in an error', family: 'broken', glyph: 'failed', motion: 'still', look: 'Red cross' },
+  crew_failed: { label: 'Crew failed', hint: 'A thread under this one failed and you have not opened it', family: 'broken', glyph: 'failed', motion: 'still', look: 'Red cross with a satellite' },
+  setup_failed: { label: 'Setup failed', hint: 'Its folder could not be prepared, so it never started', family: 'broken', glyph: 'failed', motion: 'still', look: 'Hollow red triangle' },
+  done: { label: 'Done', hint: 'Its turn finished', family: 'settled', glyph: 'done', motion: 'still', look: 'Volt disc with a tick' },
+  stopped: { label: 'Stopped', hint: 'Its turn was stopped', family: 'quiet', glyph: 'settled', motion: 'still', look: 'Grey bar' },
+  idle: { label: 'Idle', hint: 'It has not run', family: 'quiet', glyph: 'idle', motion: 'still', look: 'Small grey dot' }
 };
-const norm = s => s === 'failed' ? 'needs' : s === 'stopped' ? 'settled' : s || 'settled';
+/* The order the legend reads in: who has the ball, then how far along. */
+const MARK_ORDER = Object.keys(MARK);
+/* Not built: each needs data the server does not send yet (PR #755). Shown in the legend only, marked "needs data". */
+const MARK_NEEDS_DATA = [
+  { label: 'Asked permission', why: 'Threads run headless, so no permission prompt reaches Omni.' },
+  { label: 'Finishing', why: 'Nothing arrives before the result.' },
+  { label: 'Stalled', why: 'There is no heartbeat, and a long tool call looks the same.' },
+  { label: 'Running a tool, in list rows', why: 'Lists carry no transcript rows; this needs an activity field from the server.' }
+];
+/* A thread's plain status word (Glyph) to its mark, so older call sites keep working. */
+const GLYPH_MARK = { running: 'working', needs: 'question', limited: 'limited', failed: 'failed', done: 'done', settled: 'stopped', stopped: 'stopped', queued: 'queued', idle: 'idle', reconnecting: 'starting', review: 'review' };
+const STATUS_LABEL = { running: 'Running', needs: 'Needs you', limited: 'Limited', failed: 'Failed', done: 'Done', settled: 'Stopped', stopped: 'Stopped', idle: 'Idle', queued: 'Queued', reconnecting: 'Reconnecting' };
+const markOf = (state) => (MARK[state] ? state : GLYPH_MARK[state] || 'stopped');
 
-/* StatusDot (web/src ui.tsx) with the Omni pops: running pings in ultramarine, needs is a still vermilion diamond,
-   done is a volt disc with an ink edge on white. */
-function StatusGlyph({
-  state = 'settled',
-  size = 8,
-  className = ''
-}) {
-  const s = norm(state);
-  return /*#__PURE__*/React.createElement("span", {
-    className: 'om-dot om-dot--' + s + (className ? ' ' + className : ''),
-    style: {
-      width: size,
-      height: size
-    },
-    title: STATUS_LABEL[state] || state,
-    "aria-hidden": "true"
-  }, s === 'running' && /*#__PURE__*/React.createElement("i", {
-    className: "ping"
-  }), /*#__PURE__*/React.createElement("i", null));
+const line = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' };
+const SAT = () => h('circle', { cx: 13.25, cy: 2.75, r: 2.6 });
+/* Every mark on a 16 unit box, in the mark's own colour. */
+const SHAPE = {
+  queued: () => h('circle', { cx: 8, cy: 8, r: 5.75, ...line, strokeLinecap: 'butt', strokeWidth: 2.5, strokeDasharray: '5.5 3.53' }),
+  starting: () => [h('circle', { key: 'r', cx: 8, cy: 8, r: 6.25, ...line, strokeWidth: 2.5 }), h('path', { key: 'f', d: 'M8 .5A7.5 7.5 0 0 0 8 15.5Z' })],
+  working: () => h('circle', { cx: 8, cy: 8, r: 7 }),
+  tool: () => [h('circle', { key: 'd', cx: 8, cy: 8, r: 3.75 }), h('circle', { key: 'r', cx: 8, cy: 8, r: 6.9, ...line, strokeWidth: 1.6 })],
+  delegating: () => [h('circle', { key: 'd', cx: 6, cy: 10, r: 5.5 }), h(SAT, { key: 's' })],
+  loading: () => h('circle', { cx: 8, cy: 8, r: 4 }),
+  checking: () => h('rect', { x: 1.5, y: 1.5, width: 13, height: 13, rx: 3 }),
+  limited: () => h('rect', { x: 2.5, y: 2.5, width: 11, height: 11, rx: 2.5, ...line, strokeWidth: 2.5 }),
+  resuming: () => [h('rect', { key: 'r', x: 2.5, y: 2.5, width: 11, height: 11, rx: 2.5, ...line, strokeWidth: 2.5 }), h('path', { key: 'f', d: 'M8 2.5H5A2.5 2.5 0 0 0 2.5 5v6A2.5 2.5 0 0 0 5 13.5h3Z' })],
+  question: () => h('path', { d: 'M8 1.2 14.8 8 8 14.8 1.2 8Z', stroke: 'currentColor', strokeWidth: 1.6, strokeLinejoin: 'round' }),
+  crew_question: () => [h('path', { key: 'd', d: 'M6.5 3.9 12.1 9.5 6.5 15.1.9 9.5Z', stroke: 'currentColor', strokeWidth: 1.2, strokeLinejoin: 'round' }), h(SAT, { key: 's' })],
+  held: () => h('path', { d: 'M8 2 14 8 8 14 2 8Z', ...line, strokeWidth: 2.4 }),
+  review: () => [h('path', { key: 'o', d: 'M8 2 14 8 8 14 2 8Z', ...line, strokeWidth: 2.4 }), h('path', { key: 'f', d: 'M8 2 2 8 8 14Z' })],
+  failed: () => h('path', { d: 'M3 3 13 13M13 3 3 13', ...line, strokeWidth: 3 }),
+  crew_failed: () => [h('path', { key: 'x', d: 'M1.6 6 10 14.4M10 6 1.6 14.4', ...line, strokeWidth: 2.8 }), h(SAT, { key: 's' })],
+  setup_failed: () => h('path', { d: 'M8 2.8 14 13.2H2Z', ...line, strokeWidth: 2.4 }),
+  done: () => [h('circle', { key: 'd', cx: 8, cy: 8, r: 6.8, className: 'om-glyph__done' }), h('path', { key: 't', d: 'M4.7 8.4 7 10.6 11.3 5.7', ...line, strokeWidth: 2, className: 'om-glyph__tick' })],
+  stopped: () => h('rect', { x: 1.5, y: 5.5, width: 13, height: 5, rx: 2.5 }),
+  idle: () => h('circle', { cx: 8, cy: 8, r: 3.25 })
+};
+/* A shape that is not a plain dot loses itself below 8px, and one with a satellite below 9. */
+const PLAIN = { working: 1, idle: 1, starting: 1 };
+const CREW = { delegating: 1, crew_question: 1, crew_failed: 1 };
+const boxOf = (m, size) => (CREW[m] ? Math.max(size, 9) : PLAIN[m] ? size : Math.max(size, 8));
+
+/* StatusDot: the one status mark. `mark` names the state outright; `state` takes the plain status words. */
+function StatusDot({ mark, state, size = 8, title, className = '' }) {
+  const m = mark && MARK[mark] ? mark : markOf(state);
+  const def = MARK[m];
+  const label = title || (mark ? def.label : STATUS_LABEL[state] || def.label);
+  const box = boxOf(m, size);
+  return h('span', {
+    className: 'om-glyph' + (className ? ' ' + className : ''),
+    role: 'img',
+    'aria-label': label,
+    title: mark ? def.label + '. ' + def.hint + '.' : label,
+    'data-mark': m,
+    'data-family': def.family,
+    'data-s': def.glyph,
+    style: { width: box, height: box }
+  },
+    def.motion === 'ping' ? h('i', { className: 'om-glyph__ping' }) : null,
+    h('svg', { viewBox: '0 0 16 16', fill: 'currentColor', 'aria-hidden': 'true', className: def.motion === 'breathe' ? 'om-glyph__breathe' : undefined }, SHAPE[m]()));
 }
-function Status({
-  state = 'settled',
-  label,
-  showLabel = true
-}) {
-  const s = norm(state);
-  const text = label ?? STATUS_LABEL[state] ?? state;
-  if (!showLabel) return /*#__PURE__*/React.createElement(StatusGlyph, {
-    state: state
-  });
-  return /*#__PURE__*/React.createElement("span", {
-    className: 'om-spill om-spill--' + s,
-    role: "status"
-  }, /*#__PURE__*/React.createElement(StatusGlyph, {
-    state: state,
-    size: 6
-  }), text);
+
+/* StatusGlyph: the older name, kept so every list, row and kit draws the same marks. */
+function StatusGlyph({ state = 'settled', mark, size = 8, className = '' }) {
+  return h(StatusDot, { state, mark, size, className });
 }
-Object.assign(__ds_scope, { STATUS_LABEL, StatusGlyph, Status });
+
+/* Status: the pill. Needs and done fill with their pop and carry ink text; failed announces itself (role="alert"). */
+function Status({ state = 'settled', mark, label, showLabel = true }) {
+  const m = mark && MARK[mark] ? mark : markOf(state);
+  const s = MARK[m].glyph;
+  const text = label ?? (mark ? MARK[m].label : STATUS_LABEL[state] ?? MARK[m].label);
+  if (!showLabel) return h(StatusDot, { mark: mark || undefined, state, size: 8 });
+  return h('span', { className: 'om-spill om-spill--' + s, 'data-mark': m, role: s === 'failed' ? 'alert' : 'status' },
+    h(StatusDot, { mark: m, size: 7, title: text }), text);
+}
+
+
+Object.assign(__ds_scope, { MARK, MARK_ORDER, MARK_NEEDS_DATA, STATUS_LABEL, StatusDot, StatusGlyph, Status });
 })(); } catch (e) { __ds_ns.__errors.push({ path: "components/core/Status.jsx", error: String((e && e.message) || e) }); }
 
 // components/forms/CheckItem.jsx
@@ -10170,6 +10177,14 @@ __ds_ns.Chip = __ds_scope.Chip;
 __ds_ns.STATUS_LABEL = __ds_scope.STATUS_LABEL;
 
 __ds_ns.StatusGlyph = __ds_scope.StatusGlyph;
+
+__ds_ns.MARK_NEEDS_DATA = __ds_scope.MARK_NEEDS_DATA;
+
+__ds_ns.MARK_ORDER = __ds_scope.MARK_ORDER;
+
+__ds_ns.MARK = __ds_scope.MARK;
+
+__ds_ns.StatusDot = __ds_scope.StatusDot;
 
 __ds_ns.Status = __ds_scope.Status;
 

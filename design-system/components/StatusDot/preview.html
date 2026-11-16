@@ -1,0 +1,79 @@
+<!-- @dsCard group="08 Core" name="StatusDot — 18 states" subtitle="Shape says who has the ball, colour repeats it, fill says how far along; light and dark" width=1120 height=1700 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../assets/ds-fallback.js" data-root="../.."></script>
+<style>
+body{margin:0;padding:20px 24px;background:var(--canvas);color:var(--fg);font:var(--type-body)}
+.sheet{display:grid;gap:16px}
+.rule{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.rule div{padding:12px 14px;border-radius:var(--r-md);background:var(--surface)}
+.rule b{display:block;font:500 13px/1.3 var(--font-sans);color:var(--fg)}
+.rule span{display:block;margin-top:4px;font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3)}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.pane{min-width:0;padding:6px 16px 12px;border-radius:var(--r-2xl);background:var(--bg);color:var(--fg);box-shadow:0 0 0 1px var(--line)}
+.pane h3{margin:10px 0 6px;font:500 12px/1.2 var(--font-sans);color:var(--fg-3)}
+.fam{margin:12px 0 2px;font:500 11px/1.2 var(--font-sans);color:var(--fg-3)}
+.row{display:grid;grid-template-columns:22px 14px minmax(0,1fr);align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.big,.small{display:grid;place-items:center}
+.row b{font:500 13px/1.3 var(--font-sans);color:var(--fg)}
+.row p{margin:1px 0 0;font:400 12px/1.35 var(--font-sans);color:var(--fg-3);overflow-wrap:anywhere}
+.row em{font-style:normal;color:var(--fg-2)}
+.notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.note{padding:14px 16px;border-radius:var(--r-xl);background:var(--surface)}
+.note h4{margin:0 0 8px;font:500 13px/1.3 var(--font-sans);color:var(--fg)}
+.note p,.note li{font:400 12.5px/1.45 var(--font-sans);color:var(--fg-2)}
+.note p{margin:0 0 6px}
+.note ul{margin:0;padding-left:16px}
+.tag{display:inline-flex;align-items:center;height:18px;margin-left:6px;padding:0 7px;border-radius:var(--r-pill);box-shadow:inset 0 0 0 1px var(--line-strong);font:500 10.5px/1 var(--font-sans);color:var(--fg-3);vertical-align:1px}
+.pills{display:flex;flex-wrap:wrap;gap:8px;padding:10px 0 2px}
+@media (max-width:720px){.rule{grid-template-columns:1fr 1fr}.pair,.notes{grid-template-columns:1fr}}
+</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+omReady(({ StatusDot, Status, MARK, MARK_ORDER, MARK_NEEDS_DATA }) => {
+const FAMILY = { agent: 'Circle · blue · the agent has it', system: 'Square · amber · a system outside Omni has it', you: 'Diamond · vermilion · you have it', broken: 'Cross or triangle · red · it broke', settled: 'Volt · it ended', quiet: 'Grey · nothing happens' };
+const RULE = [
+  ['Shape', 'Who has the ball: circle the agent, square an outside system, diamond you, cross or triangle broken.'],
+  ['Colour', 'Repeats the shape: blue, amber, vermilion, red, volt for done, grey for quiet. Never alone.'],
+  ['Fill', 'How far along: hollow, half, filled.'],
+  ['Satellite', 'A small dot top right: the state belongs to a thread under this one.'],
+  ['Motion', 'Two only. A halo while the agent’s own turn works; a slow breathe while it waits on other work. Nothing spins.'],
+];
+const MOTION = { ping: 'halo', breathe: 'breathes', still: 'still' };
+function Pane({ theme }) {
+  let fam = null;
+  return <div className="pane" data-theme={theme}>
+    <h3>{theme === 'light' ? 'Light' : 'Dark'} · 16px and row size (8px)</h3>
+    {MARK_ORDER.map((m) => {
+      const d = MARK[m];
+      const head = d.family !== fam ? <div className="fam">{FAMILY[d.family]}</div> : null;
+      fam = d.family;
+      return <React.Fragment key={m}>{head}<div className="row">
+        <span className="big"><StatusDot mark={m} size={16}/></span>
+        <span className="small"><StatusDot mark={m} size={8}/></span>
+        <div><b>{d.label}</b><p>{d.hint}. <em>{d.look}</em> · {MOTION[d.motion]}</p></div>
+      </div></React.Fragment>;
+    })}
+    <div className="pills"><Status mark="working"/><Status mark="question"/><Status mark="review"/><Status mark="failed"/><Status mark="done"/><Status mark="stopped"/></div>
+  </div>;
+}
+function App() {
+  return <div className="sheet">
+    <div className="rule">{RULE.map(([t, s]) => <div key={t}><b>{t}</b><span>{s}</span></div>)}</div>
+    <div className="pair"><Pane theme="light"/><Pane theme="dark"/></div>
+    <div className="notes">
+      <div className="note"><h4>Colour-blind check</h4>
+        <p>Under deuteranopia and protanopia, amber, vermilion and red collapse into one olive-brown (light mode ΔE 3 to 19 deuteranopia, 6 to 14 protanopia, Machado matrices).</p>
+        <p>So those three families never share a shape: amber is always a square, vermilion a diamond, red a cross or triangle. Blue, volt and grey stay apart from each other and from the rest. No two marks share a drawing, so the set reads without colour or motion.</p></div>
+      <div className="note"><h4>Not built: needs data <span className="tag">needs data</span></h4>
+        <ul>{MARK_NEEDS_DATA.map((n) => <li key={n.label}><b style={{fontWeight:500,color:'var(--fg)'}}>{n.label}.</b> {n.why}</li>)}</ul></div>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

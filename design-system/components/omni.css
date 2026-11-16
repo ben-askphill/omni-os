@@ -69,6 +69,30 @@ button.om-tid{background:none;border:0;padding:0;cursor:pointer}
 .om-spill--done{background:var(--done);color:var(--on-done)}
 .om-spill--done .om-dot i{background:var(--on-done);box-shadow:none}
 
+/* ---------- StatusDot: one mark per thread state (PR #755, apps/web/src/index.css .glyph) ----------
+   Shape says who has the ball (circle the agent, square an outside system, diamond Ben, cross or triangle broken).
+   Colour repeats it, so neither is needed alone. Fill says how far along, a satellite dot that the state is its crew's.
+   Two motions: a halo while the agent's own turn works, a slow breathe while it waits on other work. */
+.om-glyph{position:relative;display:inline-block;flex:none;--om-mark:var(--fg-4);color:var(--om-mark)}
+.om-glyph>svg{position:absolute;inset:0;display:block;width:100%;height:100%;overflow:visible}
+.om-glyph>.om-glyph__ping{position:absolute;inset:0;border-radius:50%;background:currentColor;opacity:0;animation:om-ping var(--dur-ping,1600ms) var(--ease-out) infinite}
+.om-glyph__breathe{animation:om-breathe calc(var(--dur-ping,1600ms) * 1.5) var(--ease-fluid,cubic-bezier(.37,0,.63,1)) infinite}
+@keyframes om-breathe{0%,100%{opacity:1}50%{opacity:.35}}
+.om-glyph[data-family="agent"]{--om-mark:var(--live)}
+.om-glyph[data-family="system"]{--om-mark:var(--warn)}
+.om-glyph[data-family="you"]{--om-mark:var(--needs)}
+.om-glyph[data-family="broken"]{--om-mark:var(--danger-text)}
+.om-glyph[data-mark="loading"]{color:inherit}
+.om-glyph .om-glyph__done{fill:var(--done);stroke:var(--done-edge);stroke-width:1.6}
+.om-glyph .om-glyph__tick{stroke:var(--on-done)}
+.om-spill--needs .om-glyph{--om-mark:var(--on-needs)}
+.om-spill--done .om-glyph .om-glyph__done{fill:var(--on-done);stroke:none}
+.om-spill--done .om-glyph .om-glyph__tick{stroke:var(--done)}
+/* Ready for review is a finished thread: its pill stays quiet and the diamond keeps its vermilion. */
+.om-spill[data-mark="review"]{background:var(--surface-2);color:var(--fg-2)}
+.om-spill[data-mark="review"] .om-glyph{--om-mark:var(--needs)}
+@media (prefers-reduced-motion:reduce){.om-glyph__ping,.om-glyph__breathe{animation:none!important}}
+
 /* ---------- Segmented + sliding thumb (Bencho "pill") ---------- */
 .om-seg{position:relative;display:inline-flex;gap:2px;padding:3px;border-radius:var(--r-pill);background:var(--surface-2)}
 .om-seg[data-orientation="vertical"]{flex-direction:column;border-radius:18px}

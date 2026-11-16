@@ -1,0 +1,36 @@
+<!-- @dsCard group="12 Thread" name="ThinkingLine" subtitle="Running dot by phase (running, tool, starting), agent status, Reduce Motion" width=860 height=300 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>body{margin:0;padding:20px 24px;background:var(--canvas);font-family:var(--font-sans)}
+.pair{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.th{flex:1 1 340px;min-width:0;background:var(--bg);color:var(--fg);border-radius:22px;box-shadow:0 0 0 1px var(--line);padding:16px}
+.cap{font:500 11.5px/1.2 var(--font-sans);color:var(--fg-3);margin:0 0 10px}
+.stack{display:grid;gap:10px}
+.line{display:flex;align-items:center;gap:8px;color:var(--fg-3);font:var(--fw-regular, 500) 14px/1.3 var(--font-sans);border-radius:16px;background:var(--surface);padding:12px 14px;min-width:0}
+.line.bare{background:none;padding:0;font-size:12.5px}
+.label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.took{flex:none;font-variant-numeric:tabular-nums}
+.dotbox{flex:none;display:grid;place-items:center;width:16px}
+.still .om-glyph__ping{animation:none}
+@keyframes omni-shimmer{from{background-position:115% 0}to{background-position:-15% 0}}
+.shimmer-text{background:linear-gradient(90deg,var(--fg-4) 0%,var(--fg-4) 14%,color-mix(in srgb,var(--fg-4) 30%,var(--vermilion)) 26%,color-mix(in srgb,var(--fg-3) 10%,var(--vermilion)) 38%,var(--vermilion) 50%,color-mix(in srgb,var(--fg-3) 10%,var(--vermilion)) 62%,color-mix(in srgb,var(--fg-4) 30%,var(--vermilion)) 74%,var(--fg-4) 86%,var(--fg-4) 100%) 115% 0/480% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:omni-shimmer 1.75s var(--ease-fluid, cubic-bezier(.37,0,.63,1)) infinite}
+.still .shimmer-text{animation:none;background:none;color:var(--fg-3)}
+@media (prefers-reduced-motion:reduce){.shimmer-text{animation:none;background:none;color:var(--fg-3)}}
+</style>
+</head><body>
+<div class="pair">
+<div class="th" data-theme="light"><p class="cap">Thinking line: desktop bare, phone web and iOS as a card</p><div class="stack">
+<div class="line bare"><span class="dotbox"><span class="om-glyph" data-family="agent" style="width:8px;height:8px"><i class="om-glyph__ping"></i><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg></span></span><span class="label shimmer-text">Thinking</span><span class="took">42s</span></div>
+<div class="line"><span class="dotbox"><span class="om-glyph" data-family="agent" style="width:8px;height:8px"><i class="om-glyph__ping"></i><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="3.75"/><circle cx="8" cy="8" r="6.9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span></span><span class="label shimmer-text">Compacting the conversation</span><span class="took">3m 12s</span></div>
+<div class="line"><span class="dotbox"><span class="om-glyph" data-family="agent" style="width:8px;height:8px"><i class="om-glyph__ping"></i><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 .5A7.5 7.5 0 0 0 8 15.5Z"/></svg></span></span><span class="label shimmer-text">Compacting the conversation so the next turn has room to keep going</span><span class="took">10m 9s</span></div>
+<div class="line still"><span class="dotbox"><span class="om-glyph" data-family="agent" style="width:8px;height:8px"><i class="om-glyph__ping"></i><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg></span></span><span class="label shimmer-text">Thinking (Reduce Motion)</span><span class="took">42s</span></div>
+</div></div>
+<div class="th" data-theme="dark"><p class="cap">Thinking line: desktop bare, phone web and iOS as a card</p><div class="stack">
+<div class="line bare"><span class="dotbox"><span class="om-glyph" data-family="agent" style="width:8px;height:8px"><i class="om-glyph__ping"></i><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg></span></span><span class="label shimmer-text">Thinking</span><span class="took">42s</span></div>
+<div class="line"><span class="dotbox"><span class="om-glyph" data-family="agent" style="width:8px;height:8px"><i class="om-glyph__ping"></i><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="3.75"/><circle cx="8" cy="8" r="6.9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span></span><span class="label shimmer-text">Compacting the conversation</span><span class="took">3m 12s</span></div>
+<div class="line"><span class="dotbox"><span class="om-glyph" data-family="agent" style="width:8px;height:8px"><i class="om-glyph__ping"></i><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 .5A7.5 7.5 0 0 0 8 15.5Z"/></svg></span></span><span class="label shimmer-text">Compacting the conversation so the next turn has room to keep going</span><span class="took">10m 9s</span></div>
+<div class="line still"><span class="dotbox"><span class="om-glyph" data-family="agent" style="width:8px;height:8px"><i class="om-glyph__ping"></i><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg></span></span><span class="label shimmer-text">Thinking (Reduce Motion)</span><span class="took">42s</span></div>
+</div></div>
+</div>
+</body></html>

@@ -92,6 +92,8 @@ export function StaticMark({ size = 32, color, title = 'Omni', ring = false, cla
 }
 
 export function OmniMark({ state = 'idle', size = 48, droplets = 3, interactive = true, color, title = 'Omni', time, lean, leanAngle = -2.4, onAcknowledge, className = '', style }) {
+  /* The mark never shows that something runs: that is StatusDot's job (PR #755). The working states fold to idle. */
+  if (state === 'thinking' || state === 'delegating' || state === 'report') state = 'idle';
   const reduced = useReducedMotion();
   const idRef = useRef(null); if (!idRef.current) idRef.current = 'om-goo-' + ++UID;
   const svgRef = useRef(null), pathRef = useRef(null), dropRefs = useRef([]);

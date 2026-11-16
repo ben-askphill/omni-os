@@ -10,7 +10,7 @@ The phone is where Ben checks on his agents. It answers three questions in order
 - **Actions in the thumb zone.** Tab bar, new delegation, action chips and the answer buttons sit in the bottom third.
 - **Colour is the signal.** The phone uses the same three pops as the desktop, and they carry the screen: a vermilion answer button, ultramarine progress and pings, volt done discs. Everything else is neutral, so the colour that is there means something. A phone screen with no colour on it should mean nothing is happening.
 - **Depth from shadows, not borders.** The tab bar and sheets float on `shadow-menu`; white sheets inside surface cards get `shadow-card`. Cards themselves are flat surface fills.
-- **Motion from the springs.** Presses scale to .96 with the settle; the tab thumb and toasts use the spring. The running ping is the only thing that moves on its own. Reduced motion turns all of it off.
+- **Motion from the springs.** Presses scale to .96 with the settle; the tab thumb and toasts use the spring. Status marks are the only things that move on their own: a halo while the agent's own turn works, a slow breathe while it waits on other work (StatusDot, PR #755). Reduced motion turns all of it off.
 
 ## Metrics
 

@@ -1,6 +1,6 @@
 /**
- * Loading indicator: a droplet circling the ring, merged into it as a travelling bulge.
- * Use instead of skeleton shimmer. Label in mono ("fetching 3 PRs").
+ * Loading indicator for a wait that is not a thread at work (a button's request, a list being read): the running
+ * status dot at half its box, in the text colour, with the same halo. No spinner (PR #755). Reduced motion keeps the dot.
  */
 export interface LoaderProps {
   size?: number;

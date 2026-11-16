@@ -7,8 +7,10 @@ a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--line-str
 button{font:inherit;color:inherit;cursor:pointer}button[disabled]{cursor:default}
 svg.i{display:inline-block;flex:none;vertical-align:middle;overflow:visible}
 .mono{font-family:var(--mono)}.f4{color:var(--fg-4)}.f3{color:var(--fg-3)}.f2{color:var(--fg-2)}.lv{color:var(--live)}.nd-t{color:var(--needs)}
-.ld .ldb{transform-box:view-box;transform-origin:64px 64px;animation:m-spin 1.6s linear infinite}
-@keyframes m-spin{to{transform:rotate(360deg)}}
+.ld{position:relative;display:inline-block;flex:none}.ld>svg{position:absolute;inset:0;overflow:visible}
+.ld .ldp{position:absolute;inset:0;border-radius:50%;background:currentColor;opacity:0;animation:m-ping 1.6s cubic-bezier(.22,1,.36,1) infinite}
+@keyframes m-ping{0%{transform:scale(1);opacity:.55}80%,100%{transform:scale(2.6);opacity:0}}
+@media (prefers-reduced-motion:reduce){.ld .ldp{animation:none}}
 @keyframes m-ping{0%{transform:scale(1);opacity:.55}100%{transform:scale(2.6);opacity:0}}
 @keyframes m-pulse{50%{opacity:.45;transform:scale(.82)}}
 @keyframes m-sweep{from{transform:translateX(-100%)}to{transform:translateX(290%)}}

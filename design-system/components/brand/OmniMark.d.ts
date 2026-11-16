@@ -1,17 +1,18 @@
 /**
  * The fluid Omni mark. A ring with surface tension; every state means something.
  * idle = barely-breathing, satellite droplet bobs · hover = surface leans toward pointer
- * thinking = surface ripples · delegating = one droplet pinches off per crew thread spawned, then orbits
- * report = a droplet falls back in and merges · attention = held, tense, vermilion, until acknowledged.
+ * attention = held, tense, vermilion, until acknowledged. thinking, delegating and report draw idle: the mark never
+ * shows that something runs; that is StatusDot's job (PR #755).
  * Honors prefers-reduced-motion (renders StaticMark). Pass `time` to freeze a keyframe.
- * @startingPoint section="Brand" subtitle="Fluid logo mark with six motion states" viewport="700x260"
+ * @startingPoint section="Brand" subtitle="Fluid logo mark: idle, hover, attention" viewport="700x260"
  */
+/** thinking, delegating and report are kept for old call sites and draw idle. */
 export type MarkState = 'idle' | 'hover' | 'thinking' | 'delegating' | 'report' | 'attention';
 export interface OmniMarkProps {
   state?: MarkState;
   /** Rendered px of the 128-unit box (ring ≈ 78% of it). */
   size?: number;
-  /** Delegating: number of droplets (crew threads spawned). Default 3. */
+  /** Unused since the working states draw idle. Default 3. */
   droplets?: number;
   /** Lean toward the pointer when it comes near. Default true. */
   interactive?: boolean;

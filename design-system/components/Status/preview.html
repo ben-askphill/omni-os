@@ -1,4 +1,4 @@
-<!-- @dsCard group="08 Core" viewport="720x110" name="Status — pill" subtitle="running, needs, done, settled, queued, failed, stopped" width=720 height=110 -->
+<!-- @dsCard group="08 Core" viewport="720x160" name="Status — pill" subtitle="Plain words, then named marks: starting, waiting on crew, checks, review, held" width=720 height=160 -->
 <!doctype html>
 <html><head><meta charset="utf-8">
 <link rel="stylesheet" href="../../styles.css">
@@ -9,7 +9,7 @@
 <script type="text/babel">
 omReady(({ Status }) => {
 
-function App(){return <div className="cells"><div className="cell"><span className="om-caption">running</span><Status state="running"/></div><div className="cell"><span className="om-caption">needs</span><Status state="needs"/></div><div className="cell"><span className="om-caption">done</span><Status state="done"/></div><div className="cell"><span className="om-caption">settled</span><Status state="settled"/></div><div className="cell"><span className="om-caption">queued</span><Status state="queued"/></div><div className="cell"><span className="om-caption">failed</span><Status state="failed"/></div><div className="cell"><span className="om-caption">stopped</span><Status state="stopped"/></div></div>}
+function App(){return <div className="cells"><div className="cell"><span className="om-caption">running</span><Status state="running"/></div><div className="cell"><span className="om-caption">needs</span><Status state="needs"/></div><div className="cell"><span className="om-caption">done</span><Status state="done"/></div><div className="cell"><span className="om-caption">settled</span><Status state="settled"/></div><div className="cell"><span className="om-caption">queued</span><Status state="queued"/></div><div className="cell"><span className="om-caption">failed</span><Status state="failed"/></div><div className="cell"><span className="om-caption">stopped</span><Status state="stopped"/></div>{["starting","delegating","checking","resuming","review","held","crew_failed","setup_failed"].map((m)=><div key={m} className="cell"><span className="om-caption">{m}</span><Status mark={m}/></div>)}</div>}
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 });
 </script>

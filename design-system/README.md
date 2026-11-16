@@ -38,7 +38,7 @@ Vocabulary is from the repo's `CONTEXT.md`:
 - `components/<Name>/preview.html` + `README.md` — each component's live card and guide; `components/bundle.js` (namespace `OmniOSDesignSystem_a7120f`) and `components/index.d.ts` (props).
 
 ### Components
-- **core/** — `Button`, `IconButton`, `Input`, `Kbd`, `Status` (+ `StatusGlyph`), `Monogram` (+ `TaskId`, `Chip`)
+- **core/** — `Button`, `IconButton`, `Input`, `Kbd`, `Status` (+ `StatusDot`, `StatusGlyph`), `Monogram` (+ `TaskId`, `Chip`)
 - **forms/** (Bencho blocks from ui.tsx) — `Segmented` (+ `useSlidingThumb`, `Thumb`), `Toggle`, `InlineConfirm`, `SlideToConfirm`, `Picker`, `ModelPicker` (+ `EffortPicker`), `CheckItem` (+ `Ticks`)
 - **feedback/** — `Toast`
 - **icons/** — `Icon`, `CrewMark`, `HarnessMark`
@@ -76,7 +76,7 @@ Intentional additions (not in web/src): `OmniMark`/`OmniLogo`/`Loader` (the flui
 - **Elevation.** `--shadow-card` (hairline + 1px), `--shadow-thumb`, `--shadow-menu` (palette, picker, toast). Scrim is ink 22% (50% dark), **no blur**.
 - **Backgrounds.** Solid only. No gradients, textures or illustrations; imagery lives inside artifacts.
 - **Hover.** Bencho wash: a `--wash` layer scales in from .72 with the spring (320ms). **Press:** scale .96 with the settle (220ms). Pills darken one surface step.
-- **Motion.** `--ease-spring`, `--ease-settle`, `--ease-stretch`, `--ease-out` from index.css. Thumbs stretch (190ms) then settle (420ms); menus pop (340–420ms); lists rise with a 28ms stagger; panels slide 18px and settle. Alive states: running ping (1.6s), plan bead pulse, signal rise, the liquid mark. Attention never animates. Reduced motion collapses everything to 1ms.
+- **Motion.** `--ease-spring`, `--ease-settle`, `--ease-stretch`, `--ease-out` from index.css. Thumbs stretch (190ms) then settle (420ms); menus pop (340–420ms); lists rise with a 28ms stagger; panels slide 18px and settle. Alive states: the status mark's halo while the agent's own turn works (1.6s) and its slow breathe while it waits on other work, plan bead pulse, signal rise, the liquid mark at rest. Nothing spins. Attention never animates. Reduced motion collapses everything to 1ms.
 - **Transparency.** Only `--wash`, the scrim and the 70% white search/usage pills.
 - **Density.** Code-true heights (nav 32, rows ~60, palette 48). Quiet by default: settled rows regular weight in fg-2. Compact (`data-density="compact"`) drops the second line of thread rows.
 
@@ -85,12 +85,12 @@ Intentional additions (not in web/src): `OmniMark`/`OmniLogo`/`Loader` (the flui
 - **Set:** the web app's hand-drawn icons — 24-unit grid, 1.75 stroke, round caps and joins, `currentColor` (`components/icons/Icon.jsx`, SVGs in `assets/icons/`) — plus Omni additions on the same grid: delegate, split, sidebar, browser, gauge, pause, diff, more. Old v1 names resolve via aliases.
 - **Crew marks:** ring-derived (conductor ring, researcher aperture, builder block, store-ops tag, inbox tray), shown in 28px surface-2 circles.
 - **Harness marks** (`HarnessMark`, `HarnessLogo`): the vendors' own monochrome logos — Claude (Claude Code), OpenAI (Codex), Cursor (Cursor Agent and Cursor Cloud share it; the label tells them apart) — copied verbatim from Simple Icons into `assets/harness/*.svg`, rendered in `currentColor` inside a 20px soft disc. Never redraw, recolor with a status pop, or modify them; logos remain their owners' trademarks. Use them everywhere a harness is named — thread rows, delegation branches, palette rows, composer picker, usage meters and the sidebar usage card (`harnessFor(name)` maps "Claude" / "Codex" / "Cursor" / "Cursor Cloud" to an id). Never CC / CX / CU abbreviations.
-- **Status** is shape + color: pinging disc, still diamond, edged volt disc, grey dot, hollow ring.
+- **Status** is one mark per thread state, 18 in all (`StatusDot`, PR #755). Shape says who has the ball: circle the agent, square a system outside Omni, diamond you, cross or triangle broken. Colour repeats it: blue, amber, vermilion, red, volt for done, grey for quiet. Fill says how far along (hollow, half, filled); a satellite dot says the state is its crew's. Two motions: a halo while the agent's own turn works, a slow breathe while it waits on other work. Amber, vermilion and red collapse under deuteranopia and protanopia, so they never share a shape. Permission wait, finishing, stalled and the tool phase in list rows need data the server does not send yet and are not built.
 - **Unicode** only for keys (⌘ ⇧ ↵ ↑ ↓) and arrows. **Emoji: never.** No sparkle icons for "AI".
 
 ## Logo
 
-- **Mark:** a ring (r40, stroke 20 — the wordmark's o — leaning 10°, in a 128 box) with a satellite droplet — the frozen moment of delegation. SVG + goo filter. `OmniMark` states: idle, hover (leans to pointer), thinking (ripples), delegating (a droplet per crew thread pinches off and orbits), report (a droplet falls in and merges), attention (tense, vermilion, until acknowledged). Lives in the sidebar's Conductor row.
+- **Mark:** a ring (r40, stroke 20 — the wordmark's o — leaning 10°, in a 128 box) with a satellite droplet — the frozen moment of delegation. SVG + goo filter. `OmniMark` states: idle, hover (leans to pointer), attention (tense, vermilion, until acknowledged). It never shows that something runs: thinking, delegating and report draw idle, and a running thread shows its StatusDot (PR #755). Lives in the sidebar's Conductor row.
 - **Wordmark:** "omni" as one continuous 20u line leaning 10° (o r40 · m r24 · n r28 · baseline turns r16 · 12u gap wherever strokes meet), in `assets/logo/omni-wordmark*.svg`. The o is the mark's ring. Always just "omni" — no "OS" lockup.
 - **Small sizes:** `favicon-16.svg` has its own geometry; `favicon-ring-16.svg` drops the droplet. One-colour black/white in `assets/logo/`.
 

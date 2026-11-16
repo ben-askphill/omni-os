@@ -2,11 +2,13 @@
 /* Values that tokens.json declares come from tokens.css (imported first by styles.css); this sheet keeps what tokens.json cannot hold. */
 :root{
 color-scheme:light;
+/* danger-text (tokens.json): the broken status family (Failed, Crew failed, Setup failed) and destructive labels */
+--danger-text:#c0300f;
 /* diffs: the one place a line gets a wash */
 --diff-add:color-mix(in srgb,var(--done) 22%,transparent);
 --diff-del:color-mix(in srgb,var(--needs) 12%,transparent);
 }
-[data-theme="dark"],.scheme-dark{color-scheme:dark}
+[data-theme="dark"],.scheme-dark{color-scheme:dark;--danger-text:#ff8a6e}
 /* .scheme-dark: the sidebar always draws with the dark tokens */
 .scheme-dark{
 --canvas:#0c0d0f;
