@@ -143,7 +143,7 @@ export function ChannelScreen({ id }: { id: string }) {
   const name = conductor ? 'Conductor' : `#${ch?.name ?? id}`;
 
   const { active, recent, activeFolders, recentFolders } = useMemo(() => {
-    const info = ch ? { name: ch.name, icon: ch.icon } : undefined;
+    const info = ch ? { name: ch.name, icon: ch.icon, avatar_bg: ch.avatar_bg } : undefined;
     const needs = new Map((inChannel(needsYou, id)?.items ?? []).map((i) => [i.thread.id, i]));
     const folderMap = new Map<string, { active: RowItem[]; recent: RowItem[] }>();
     const activeRows: RowItem[] = [];
