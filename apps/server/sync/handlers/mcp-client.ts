@@ -5,8 +5,18 @@ import { registerHandler } from '../apply.ts';
 // seen widen, and Ben's newest approve or remove decides, so a client merely seen on one machine never undoes a
 // decision made on another. A signed action (sync/verify.ts): it applies only from a trusted machine, so no relay
 // writer can approve a client. Nothing deletes a row; removing a client is a decision like approving one.
+//
+// A decision keeps the date its machine gave it, even one in the future from a clock that runs ahead. Capping it here
+// would store a different date on each machine, and a skewed machine would keep its own: Ben's later removal elsewhere
+// would lose there, and its next send would win again. Instead a decision made here is dated after the one it replaces
+// (mcp-clients.ts decide), so it wins on every machine whatever their clocks say.
 
-const time = (v: unknown): string | null => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : null);
+/** An ISO time with a four-digit year, so dates compare as strings. Null for anything else. */
+const time = (v: unknown): string | null => {
+  if (typeof v !== 'string' || Number.isNaN(Date.parse(v))) return null;
+  const iso = new Date(v).toISOString();
+  return /^\d{4}-/.test(iso) ? iso : null;
+};
 
 registerHandler('mcp_client', {
   serialize(id) {
@@ -19,9 +29,8 @@ registerHandler('mcp_client', {
     const lastSeen = time(d.lastSeen);
     const decision = d.decision === 'approved' || d.decision === 'removed' ? d.decision : null;
     if (!firstSeen || !lastSeen || (d.decision != null && !decision)) return false;
-    // A decision is no newer than the change that carries it, so a skewed clock cannot make one outlast every later one.
-    const at = time(d.decidedAt);
-    const decidedAt = decision && at ? (at > change.ts ? change.ts : at) : null;
+    const decidedAt = decision ? time(d.decidedAt) : null;
+    if (decision && d.decidedAt != null && !decidedAt) return false;
     const remote: McpClientSync = { decision, decidedAt, firstSeen, lastSeen };
     return mcpClients.applyRemote(change.entity_id, remote);
   },

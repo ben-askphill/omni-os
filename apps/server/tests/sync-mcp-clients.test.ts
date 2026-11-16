@@ -194,18 +194,20 @@ describe('a machine updating from the build before sync', () => {
 
 describe('who may approve a client through sync', () => {
   const at = () => new Date().toISOString();
-  const approval = (machine: string, id: string, decidedAt = at()): Change => ({
+  const decision = (machine: string, id: string, made: 'approved' | 'removed', decidedAt = at(), ts = at()): Change => ({
     machine_id: machine,
     entity: 'mcp_client',
     entity_id: id,
     op: 'upsert',
-    data: { decision: 'approved', decidedAt, firstSeen: decidedAt, lastSeen: decidedAt },
-    ts: at(),
+    data: { decision: made, decidedAt, firstSeen: decidedAt, lastSeen: decidedAt },
+    ts,
   });
+  const approval = (machine: string, id: string, decidedAt?: string, ts?: string) => decision(machine, id, 'approved', decidedAt, ts);
+  const pull = async () => expect((await b.worker.syncNow()).error).toBeUndefined();
 
   it('refuses an unsigned approval, so a relay writer cannot let a client in', async () => {
     await relay.push([approval('mac-a', 'forged-unsigned')]);
-    expect((await b.worker.syncNow()).error).toBeUndefined();
+    await pull();
     expect(b.mcpClients.status('forged-unsigned')).toBeNull();
     expect(b.verify.refusedChanges().some((r) => r.entityId === 'forged-unsigned' && r.reason === 'unsigned')).toBe(true);
   });
@@ -215,7 +217,7 @@ describe('who may approve a client through sync', () => {
     relay.pairedMachines = async () => new Set([...(await paired())].filter((m) => m !== 'mac-x'));
     try {
       await relay.push([signAs(approval('mac-x', 'from-stranger'))]);
-      expect((await b.worker.syncNow()).error).toBeUndefined();
+      await pull();
       expect(b.mcpClients.status('from-stranger')).toBeNull();
       expect(b.verify.heldActions()).toContainEqual(expect.objectContaining({ machine: 'mac-x', reason: 'untrusted' }));
     } finally {
@@ -223,18 +225,49 @@ describe('who may approve a client through sync', () => {
     }
   });
 
-  it('takes a signed approval from a paired machine, dated no later than the change that carries it', async () => {
-    const future = new Date(Date.now() + 86_400_000).toISOString();
-    const signed = signAs(approval('mac-c', 'from-paired', future));
-    await relay.push([signed]);
-    expect((await b.worker.syncNow()).error).toBeUndefined();
-    expect(b.mcpClients.status('from-paired')).toBe('approved');
-    // The future date is cut to the change's own time, so Ben's later removal on B wins, even over the same change
-    // delivered again.
-    await tick();
-    b.mcpClients.remove('from-paired');
-    await relay.push([signed]);
-    expect((await b.worker.syncNow()).error).toBeUndefined();
-    expect(b.mcpClients.status('from-paired')).toBe('removed');
+  it("a removal made after a skewed machine's approval arrived stays, when that machine sends the client again", async () => {
+    // C's clock runs a day ahead: its change and its decision are both dated tomorrow.
+    const tomorrow = Date.now() + 86_400_000;
+    const iso = (ms: number) => new Date(ms).toISOString();
+    await relay.push([signAs(approval('mac-c', 'skewed', iso(tomorrow), iso(tomorrow)))]);
+    await pull();
+    expect(b.mcpClients.status('skewed')).toBe('approved');
+    b.mcpClients.remove('skewed');
+    await pull();
+    // The removal B sends is dated after the approval it replaces, so C takes it too instead of keeping its own.
+    const removal = relay.changes.filter((c) => c.entity === 'mcp_client' && c.entity_id === 'skewed' && c.machine_id === 'mac-b').at(-1)!;
+    const sent = unsigned(removal).change.data as { decision: string; decidedAt: string };
+    expect(sent.decision).toBe('removed');
+    expect(sent.decidedAt > iso(tomorrow)).toBe(true);
+    // The client reaches C's /mcp ten minutes later, before C has heard of the removal: C sends its approval again.
+    const again = approval('mac-c', 'skewed', iso(tomorrow), iso(tomorrow + 600_000));
+    again.data = { ...(again.data as object), lastSeen: iso(tomorrow + 600_000) };
+    await relay.push([signAs(again)]);
+    await pull();
+    expect(b.mcpClients.status('skewed')).toBe('removed');
+    expect(b.mcpClients.get('skewed')!.lastSeen).toBe(iso(tomorrow + 600_000));
+  });
+
+  it('a decision made here is dated after the one it replaces, even when that one is in the future', () => {
+    const ahead = new Date(Date.now() + 3_600_000).toISOString();
+    b.mcpClients.applyRemote('ahead', { decision: 'removed', decidedAt: ahead, firstSeen: ahead, lastSeen: ahead });
+    b.mcpClients.approve('ahead');
+    expect(b.mcpClients.syncData('ahead')!.decidedAt).toBe(new Date(Date.parse(ahead) + 1).toISOString());
+  });
+
+  it('an approval from another machine made at the same moment as a removal here leaves it removed', async () => {
+    b.mcpClients.remove('tie-removed-here');
+    const t1 = b.mcpClients.syncData('tie-removed-here')!.decidedAt!;
+    await relay.push([signAs(decision('mac-c', 'tie-removed-here', 'approved', t1))]);
+    await pull();
+    expect(b.mcpClients.status('tie-removed-here')).toBe('removed');
+  });
+
+  it('a removal from another machine made at the same moment as an approval here removes it', async () => {
+    b.mcpClients.approve('tie-approved-here');
+    const t2 = b.mcpClients.syncData('tie-approved-here')!.decidedAt!;
+    await relay.push([signAs(decision('mac-c', 'tie-approved-here', 'removed', t2))]);
+    await pull();
+    expect(b.mcpClients.status('tie-approved-here')).toBe('removed');
   });
 });

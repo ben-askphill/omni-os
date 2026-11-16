@@ -133,10 +133,15 @@ export const mcpClients = {
   },
 };
 
-/** Ben approved or removed a client here. It goes to the other machines, where it wins over any older decision. */
+/**
+ * Ben approved or removed a client here. It goes to the other machines, where it wins over any older decision. It is
+ * dated after the decision it replaces, even one from a machine whose clock runs ahead, so it wins there too.
+ */
 function decide(id: string, decision: Decision) {
-  const at = now();
   tx(() => {
+    const before = row(id)?.decided_at;
+    let at = now();
+    if (before && at <= before) at = new Date(Date.parse(before) + 1).toISOString();
     db.prepare(
       `INSERT INTO mcp_clients (id, status, via, first_seen, last_seen, decided_at) VALUES (?, ?, NULL, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET status = excluded.status, decided_at = excluded.decided_at`,
