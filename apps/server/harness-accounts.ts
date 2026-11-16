@@ -234,7 +234,12 @@ async function checkHarness(harness: HarnessId): Promise<RecordedAccount> {
   const now = Date.now();
   const at = new Date(now).toISOString();
   const prev = own?.record ?? storedOwn();
-  const next = nextAccount(prev?.accounts.find((a) => a.harness === harness), result, at);
+  const had = prev?.accounts.find((a) => a.harness === harness);
+  // A check that failed (a timeout, a CLI hiccup) says nothing about who is signed in. Over a signed-in account it is
+  // not kept: Settings would say "Could not check" and the Usage row would go for one bad check. Handed back, it only
+  // drops the reading it was for; the next check that answers files the next one.
+  if (result.state === 'unknown' && had && identityOf(had)) return sanitize(result, harness);
+  const next = nextAccount(had, result, at);
   if (prev) {
     const accounts = prev.accounts.some((a) => a.harness === harness) ? prev.accounts.map((a) => (a.harness === harness ? next : a)) : [...prev.accounts, next];
     saveOwn(prev, { ...prev, id: selfId(), accounts }, now, false);

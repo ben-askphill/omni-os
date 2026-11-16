@@ -22,10 +22,17 @@ const who: Record<string, Record<string, string>> = {
   'mac-a': { 'claude-code': 'ben@work.example', codex: 'a-codex@example.com' },
   'mac-b': { 'claude-code': 'ben@work.example', codex: 'b-codex@example.com' },
 };
-const reader = (machine: string) => async (harness: string): Promise<HarnessAccount> =>
-  who[machine]![harness]
+/** The next check of this harness on this machine fails, as a CLI that times out does. */
+const failNext: Record<string, string | null> = { 'mac-a': null, 'mac-b': null };
+const reader = (machine: string) => async (harness: string): Promise<HarnessAccount> => {
+  if (failNext[machine] === harness) {
+    failNext[machine] = null;
+    return { harness, state: 'unknown', label: null, org: null, plan: null, note: 'claude auth status did not answer', switched: null };
+  }
+  return who[machine]![harness]
     ? { harness, state: 'signed-in', label: who[machine]![harness]!, org: null, plan: 'Max', note: null, switched: null }
     : { harness, state: 'not-installed', label: null, org: null, plan: null, note: null, switched: null };
+};
 
 async function boot(id: string, name: string, node: typeof NODE_A, peer: typeof NODE_A) {
   const m = await bootMac(id, name, relay);
@@ -117,6 +124,33 @@ describe('filing plan usage per account across two machines', () => {
     rows = await rowsOn(b, 'claude-code');
     expect(rowOf(rows, 'ben@personal.example')!.usage).toMatchObject({ seven_day: { utilization: 0.5 } });
     expect(rowOf(rows, 'ben@work.example')!.usage).toMatchObject({ seven_day: { utilization: 0.2 } });
+  });
+
+  it('keeps the account through a check that fails, drops only the reading it was for, and files the next one', async () => {
+    // From the test before: A's Claude runs as ben@personal.example, with a 0.5 week filed.
+    const claudeOnA = async () => (await a.json('/accounts')).body.machines[0].accounts.find((x: any) => x.harness === 'claude-code');
+    expect(await claudeOnA()).toMatchObject({ state: 'signed-in', label: 'ben@personal.example' });
+    const heard: string[] = [];
+    const listen = (e: any) => heard.push(e.type);
+    a.bus.on('feed', listen);
+    try {
+      failNext['mac-a'] = 'claude-code';
+      await record(a, 'claude-code', week(0.77));
+      expect(failNext['mac-a']).toBeNull();
+    } finally {
+      a.bus.off('feed', listen);
+    }
+    // The failed check changed nothing: Settings still shows the account, no accounts event went out, and A's row stays.
+    expect(await claudeOnA()).toMatchObject({ state: 'signed-in', label: 'ben@personal.example' });
+    expect(heard).not.toContain('accounts');
+    expect(heard).not.toContain('account_usage');
+    let rows = await rowsOn(a, 'claude-code');
+    expect(rowOf(rows, 'ben@personal.example')!.usage).toMatchObject({ seven_day: { utilization: 0.5 } });
+
+    // The next reading, with a check that answers, files as usual.
+    await record(a, 'claude-code', week(0.78));
+    rows = await rowsOn(a, 'claude-code');
+    expect(rowOf(rows, 'ben@personal.example')!.usage).toMatchObject({ seven_day: { utilization: 0.78 } });
   });
 
   it('files nothing for a harness that is not signed in', async () => {
