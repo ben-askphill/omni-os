@@ -7,11 +7,27 @@ import type { Branch } from '../transcript/delegation.ts';
 import { CrewMark, HarnessMark, isCrewRole } from './brand.tsx';
 import { Icon, StatusPill } from './ui.tsx';
 
-/** A row on the card's rail. The row's pill carries its state, so the connector into it stays neutral. */
-export function RailItem({ children }: { children: ReactNode }) {
+// The rail's ink: --line-strong flattened onto the page, so the rail and an elbow do not darken where they overlap.
+const RAIL_INK = 'border-[color:color-mix(in_srgb,var(--fg)_16%,var(--bg))]';
+
+/**
+ * A row on the card's rail. The rail runs down the list's left edge, under the centre of the header's mark. Each
+ * row's elbow leaves it and ends level with the middle of `row`, the row's card, however tall that is. After the last
+ * row the rail stops at its elbow. `children`: what opens under the card. The row's pill carries its state, so the
+ * connector into it stays neutral.
+ */
+export function RailItem({ row, children }: { row: ReactNode; children?: ReactNode }) {
   return (
-    <li className="relative pl-6">
-      <span aria-hidden className="absolute top-0 left-0 h-[34px] w-5 rounded-bl-[14px] border-b-[1.5px] border-l-[1.5px] border-line-strong" />
+    <li className="group/rail relative pl-6">
+      {/* On to the next row: half the gap between rows here, the other half from that row's elbow (-top-1). */}
+      <span aria-hidden className={`pointer-events-none absolute -top-1 -bottom-1 left-[-0.75px] border-l-[1.5px] group-last/rail:hidden ${RAIL_INK}`} />
+      <div className="relative">
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute -top-1 left-[-24.75px] h-[calc(50%+4.75px)] w-[20.75px] rounded-bl-[14px] border-b-[1.5px] border-l-[1.5px] ${RAIL_INK}`}
+        />
+        {row}
+      </div>
       {children}
     </li>
   );
@@ -44,17 +60,19 @@ function BranchRow({ b, report }: { b: Branch; report?: string }) {
   const when = b.updated_at ? relTime(b.updated_at) : null;
   const detail = busy ? (b.status === 'queued' ? 'waiting for a slot' : when && `started ${when}`) : report ?? (when && `report in · ${when}`);
   return (
-    <RailItem>
-      <a href={href.thread(b.id)} className={ROW_CARD}>
-        <BranchFace role={b.role} title={b.title} status={b.status}>
-          {b.role && <span>{b.role}</span>}
-          {b.channel && <span>#{b.channel}</span>}
-          <HarnessMark harness={b.harness} />
-          {b.task_id && <span className="font-mono text-[11.5px] text-fg-2">{b.task_id}</span>}
-          {detail && <span className={report && !busy ? 'font-medium text-fg-2' : 'text-fg-3'}>{detail}</span>}
-        </BranchFace>
-      </a>
-    </RailItem>
+    <RailItem
+      row={
+        <a href={href.thread(b.id)} className={ROW_CARD}>
+          <BranchFace role={b.role} title={b.title} status={b.status}>
+            {b.role && <span>{b.role}</span>}
+            {b.channel && <span>#{b.channel}</span>}
+            <HarnessMark harness={b.harness} />
+            {b.task_id && <span className="font-mono text-[11.5px] text-fg-2">{b.task_id}</span>}
+            {detail && <span className={report && !busy ? 'font-medium text-fg-2' : 'text-fg-3'}>{detail}</span>}
+          </BranchFace>
+        </a>
+      }
+    />
   );
 }
 
@@ -100,7 +118,8 @@ export function DelegationCard({
           </span>
         )}
       </header>
-      <ol className="ml-2 flex flex-col gap-2 border-l-[1.5px] border-line-strong pt-1">
+      {/* ml-3: the rail sits under the centre of the header's mark (the header's px-1 plus half the 16px mark). */}
+      <ol className="ml-3 flex flex-col gap-2 pt-1">
         {branches.map((b) => (
           <BranchRow key={b.id} b={b} report={reports?.get(b.id)} />
         ))}

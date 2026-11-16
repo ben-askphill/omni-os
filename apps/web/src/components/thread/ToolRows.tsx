@@ -202,20 +202,23 @@ export function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null
   const calls = task?.tool_uses ?? countCalls(c);
   const err = c.result?.is_error && !stopped;
   return (
-    <RailItem>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={ROW_CARD}>
-        <BranchFace role={type} title={str(c.input.description) || 'Sub-agent'} status={status}>
-          <span>{type || 'agent'}</span>
-          {(task?.background || c.input.run_in_background === true) && <span>background</span>}
-          {calls > 0 && <span className="font-num">{plural(calls, 'tool')}</span>}
-          {task && (
-            <span className="font-num text-fg-3 tabular-nums">
-              {busy ? <Elapsed since={task.started} /> : task.ended ? duration(toDate(task.ended).getTime() - toDate(task.started).getTime()) : null}
-            </span>
-          )}
-          <Icon name="chevronRight" size={11} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
-        </BranchFace>
-      </button>
+    <RailItem
+      row={
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={ROW_CARD}>
+          <BranchFace role={type} title={str(c.input.description) || 'Sub-agent'} status={status}>
+            <span>{type || 'agent'}</span>
+            {(task?.background || c.input.run_in_background === true) && <span>background</span>}
+            {calls > 0 && <span className="font-num">{plural(calls, 'tool')}</span>}
+            {task && (
+              <span className="font-num text-fg-3 tabular-nums">
+                {busy ? <Elapsed since={task.started} /> : task.ended ? duration(toDate(task.ended).getTime() - toDate(task.started).getTime()) : null}
+              </span>
+            )}
+            <Icon name="chevronRight" size={11} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
+          </BranchFace>
+        </button>
+      }
+    >
       {open && (
         <div className="fade-in mt-2 space-y-1.5 px-1">
           <ToolInput c={c} />
