@@ -271,26 +271,72 @@ describe('who may approve a client through sync', () => {
     expect(b.mcpClients.status('tie-approved-here')).toBe('removed');
   });
 
-  it('an approval dated over a week ahead is not applied, and a removal here then wins on the machine that sent it', async () => {
-    const nextYear = new Date(Date.now() + 365 * 86_400_000).toISOString();
-    await relay.push([signAs(decision('mac-c', 'broken-clock', 'approved', nextYear))]);
-    await pull();
-    // Listed so Ben can act on it, but not approved on C's word.
-    expect(b.mcpClients.status('broken-clock')).toBe('pending');
-    b.mcpClients.remove('broken-clock');
-    // Dated after C's approval, so C, which keeps that approval, takes the removal.
-    expect(b.mcpClients.syncData('broken-clock')!.decidedAt! > nextYear).toBe(true);
+  // Clocks far ahead: every machine keeps the date C gave, so Ben's next decision is dated after it everywhere.
+  const YEAR = 365 * 86_400_000;
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const sleep = (n: number) => new Promise((r) => setTimeout(r, n));
+  const pullOn = async (m: typeof a) => expect((await m.worker.syncNow()).error).toBeUndefined();
+  const both = (id: string) => [a.mcpClients.status(id), b.mcpClients.status(id)];
+  const fromB = (id: string) => {
+    const c = relay.changes.filter((x) => x.entity === 'mcp_client' && x.entity_id === id && x.machine_id === 'mac-b').at(-1)!;
+    return unsigned(c).change.data as { decision: string; decidedAt: string };
+  };
+
+  it('a removal from a clock a year ahead, then Ben approves on B, then C sends its removal again: approved on A and B', async () => {
+    const far = iso(Date.now() + YEAR);
+    await relay.push([signAs(decision('mac-c', 'far-removal', 'removed', far))]);
+    await pullOn(b);
+    await sleep(20);
+    await pullOn(a);
+    expect(both('far-removal')).toEqual(['removed', 'removed']);
+    // Both keep the date C gave, not a date of their own.
+    expect(a.mcpClients.syncData('far-removal')!.decidedAt).toBe(far);
+    expect(b.mcpClients.syncData('far-removal')!.decidedAt).toBe(far);
+
+    b.mcpClients.approve('far-removal');
+    await pullOn(b);
+    await sleep(20);
+    await pullOn(a);
+    expect(both('far-removal')).toEqual(['approved', 'approved']);
+    // Dated after C's removal, so C, which keeps that removal, takes the approval too.
+    expect(fromB('far-removal')).toMatchObject({ decision: 'approved' });
+    expect(fromB('far-removal').decidedAt > far).toBe(true);
+
+    await sleep(20);
+    await relay.push([signAs(decision('mac-c', 'far-removal', 'removed', far, iso(Date.now() + 1000)))]);
+    await pullOn(b);
+    await pullOn(a);
+    expect(both('far-removal')).toEqual(['approved', 'approved']);
   });
 
-  it('a removal dated over a week ahead applies at the limit, and an approval here then wins on the machine that sent it', async () => {
-    const nextYear = new Date(Date.now() + 365 * 86_400_000).toISOString();
-    await relay.push([signAs(decision('mac-c', 'broken-removal', 'removed', nextYear))]);
-    await pull();
-    expect(b.mcpClients.status('broken-removal')).toBe('removed');
-    expect(Date.parse(b.mcpClients.syncData('broken-removal')!.decidedAt!)).toBeLessThanOrEqual(Date.now() + 7 * 86_400_000);
-    b.mcpClients.approve('broken-removal');
-    expect(b.mcpClients.status('broken-removal')).toBe('approved');
-    expect(b.mcpClients.syncData('broken-removal')!.decidedAt! > nextYear).toBe(true);
+  it("Ben's approval after a far-ahead removal reaches A even while A's clock runs a second behind B's", async () => {
+    const far = iso(Date.now() + YEAR);
+    await relay.push([signAs(decision('mac-c', 'far-behind', 'removed', far))]);
+    await pullOn(a);
+    await sleep(20);
+    await pullOn(b);
+    b.mcpClients.approve('far-behind');
+    await pullOn(b);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.now() - 1000));
+    try {
+      await pullOn(a);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(both('far-behind')).toEqual(['approved', 'approved']);
+  });
+
+  it('drops a decision dated past year 9999, which no later decision could outdate', async () => {
+    const past9999 = '+010000-01-01T00:00:00.000Z';
+    await relay.push([signAs(decision('mac-c', 'past-9999', 'approved', past9999))]);
+    await pullOn(b);
+    expect(b.mcpClients.status('past-9999')).toBeNull();
+    b.mcpClients.seen('past-9999', null);
+    b.mcpClients.remove('past-9999');
+    await relay.push([signAs(decision('mac-c', 'past-9999', 'approved', past9999, iso(Date.now() + 1000)))]);
+    await pullOn(b);
+    expect(b.mcpClients.status('past-9999')).toBe('removed');
   });
 
   it('a decision after one at the last four-digit date keeps a readable date, and a removal there still beats an approval', () => {

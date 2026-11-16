@@ -9,16 +9,13 @@ import { registerHandler } from '../apply.ts';
 // A decision keeps the date its machine gave it, even one in the future from a clock that runs ahead. Capping it here
 // would store a different date on each machine, and a skewed machine would keep its own: Ben's later removal elsewhere
 // would lose there, and its next send would win again. Instead a decision made here is dated after the one it replaces
-// (mcp-clients.ts decide), so it wins on every machine whatever their clocks say.
-//
-// A date more than a week ahead of this machine's clock comes from a clock that is broken, not skewed. Its approval
-// never applies here: no client gets in on a date this machine cannot believe, and the client is listed as it was
-// (pending when new). Its removal does, dated at that limit. Either way its date is kept apart, so Ben's next decision
-// here is dated after it and also wins on the machine with the broken clock.
+// (mcp-clients.ts decide), so it wins on every machine whatever their clocks say. A clock that runs ahead wins only
+// against a decision made at the same time on another machine, before either had heard of the other.
 
-const HORIZON_MS = 7 * 86_400_000;
-
-/** An ISO time with a four-digit year, the form every machine writes and reads. Null for anything else. */
+/**
+ * An ISO time with a four-digit year, the form every machine writes and reads. Null for anything else, so a decision
+ * dated past 9999 is dropped: no decision here could be dated after it (mcp-clients.ts LAST_DATE), and it would stand.
+ */
 const time = (v: unknown): string | null => {
   if (typeof v !== 'string' || Number.isNaN(Date.parse(v))) return null;
   const iso = new Date(v).toISOString();
@@ -38,15 +35,6 @@ registerHandler('mcp_client', {
     if (!firstSeen || !lastSeen || (d.decision != null && !decision)) return false;
     const decidedAt = decision ? time(d.decidedAt) : null;
     if (decision && d.decidedAt != null && !decidedAt) return false;
-    const id = change.entity_id;
-    const limit = Date.now() + HORIZON_MS;
-    if (!decidedAt || Date.parse(decidedAt) <= limit) return mcpClients.applyRemote(id, { decision, decidedAt, firstSeen, lastSeen });
-    const sent = decidedAt;
-    let changed: boolean;
-    if (decision === 'approved') {
-      console.warn(`[sync] not approving MCP client ${id}: ${change.machine_id} dated it ${sent}, over a week ahead of this clock`);
-      changed = mcpClients.applyRemote(id, { decision: null, decidedAt: null, firstSeen, lastSeen });
-    } else changed = mcpClients.applyRemote(id, { decision, decidedAt: new Date(limit).toISOString(), firstSeen, lastSeen });
-    return mcpClients.noteFutureDecision(id, sent) || changed;
+    return mcpClients.applyRemote(change.entity_id, { decision, decidedAt, firstSeen, lastSeen });
   },
 });

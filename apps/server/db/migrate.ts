@@ -626,9 +626,6 @@ export function migrate() {
   const datedDecisions = (db.prepare('PRAGMA table_info(mcp_clients)').all() as unknown as { name: string }[]).some((c) => c.name === 'decided_at');
   ensureColumn('mcp_clients', 'decided_at', 'TEXT');
   if (!datedDecisions) db.prepare(`UPDATE mcp_clients SET decided_at = ? WHERE status = 'removed'`).run(new Date().toISOString());
-  // The newest date of a decision another machine sent too far ahead of this clock to take (sync/handlers/mcp-client.ts).
-  // It changes nothing here; Ben's next decision is dated after it, so it also wins on the machine that sent it.
-  ensureColumn('mcp_clients', 'future_decided_at', 'TEXT');
   // When each metadata field of a thread was last edited, for the field-by-field merge of synced rows
   // (sync/thread-merge.ts). Rows from before it are seeded once with their updated_at (pinned_at and done_at with
   // their own times when set), which is what whole-row last-writer-wins compared before.
