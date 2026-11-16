@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { tokensOf, type InsightRange, type InsightsUsage, type UsageSource } from '@omni/shared/insights.ts';
-import { untilLabel, windowPct } from '../../format.ts';
-import { useApp } from '../../store.tsx';
+import type { UsageRow } from '@omni/shared/account-usage.ts';
+import { resetSentence } from '@omni/shared/usage-reset.ts';
+import { windowPct } from '../../format.ts';
+import { useNow } from '../../store.tsx';
+import { ResetTime, useUsageRows } from '../sidebar/UsageCard.tsx';
 import { HarnessLogo } from '../brand.tsx';
 import { Chip, Loader, Segmented, Ticks } from '../ui.tsx';
 import { compact, dayLabel, grouped, pct, SOURCE_COLOR, SOURCE_NAME, SOURCE_ORDER, usd } from './numbers.ts';
@@ -9,21 +12,39 @@ import { UsageChart } from './UsageChart.tsx';
 
 const RANGE_LABEL: Record<InsightRange, string> = { today: 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days' };
 
-/** The Claude plan's week, from the same reading as the sidebar's Usage card. */
-function PlanPill() {
-  const { usage } = useApp();
-  const week = usage['claude-code']?.seven_day;
-  const p = windowPct(week);
-  if (p === null) return null;
+/**
+ * The Claude plan's week per signed-in account, from the same rows as the sidebar's Usage card, each with when its
+ * week resets. Several accounts get a pill each, named by account.
+ */
+function PlanPills() {
+  const rows = useUsageRows().filter((r) => r.harness === 'claude-code' && windowPct(r.usage?.seven_day) !== null);
+  if (!rows.length) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {rows.map((r) => (
+        <PlanPill key={r.key} row={r} />
+      ))}
+    </div>
+  );
+}
+
+function PlanPill({ row }: { row: UsageRow }) {
+  const now = useNow(60_000);
+  const week = row.usage!.seven_day!;
+  const p = windowPct(week)!;
+  const name = row.several && row.account ? `Claude · ${row.account.label}` : 'Claude plan';
+  const reset = resetSentence(week.resetsAt, now);
   return (
     <span
-      className="inline-flex h-7 items-center gap-2 rounded-full bg-surface px-3 text-[11.5px] text-fg-2"
-      title={`Claude plan: ${Math.round(p * 100)}% of this week used, resets ${untilLabel(week!.resetsAt)}`}
+      className="inline-flex h-7 min-w-0 max-w-full items-center gap-2 rounded-full bg-surface px-3 text-[11.5px] text-fg-2"
+      title={`${name}: ${Math.round(p * 100)}% of this week used.${reset ? ` ${reset}` : ''}`}
+      data-testid="plan-pill"
     >
       <HarnessLogo harness="claude-code" size={12} />
-      Claude plan
-      <Ticks value={p} count={12} height={10} tone={p >= 0.9 ? 'needs' : undefined} label="Claude plan week usage" className="w-[64px]" />
+      <span className="min-w-0 truncate">{name}</span>
+      <Ticks value={p} count={12} height={10} tone={p >= 0.9 ? 'needs' : undefined} label={`${name} week usage`} className="w-[64px] shrink-0" />
       <span className="font-num tabular-nums">{Math.round(p * 100)}%</span>
+      <ResetTime resetsAt={week.resetsAt} label={`${name} week`} className="shrink-0 text-[11px]" />
     </span>
   );
 }
@@ -122,7 +143,7 @@ export function UsageSection({ usage, range, from, to, loading }: { usage: Insig
           </span>
         )}
       </h2>
-      <PlanPill />
+      <PlanPills />
     </div>
   );
   if (!usage)

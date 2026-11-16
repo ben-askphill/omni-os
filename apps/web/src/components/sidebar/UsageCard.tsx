@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { accountUsageKey, usageRows, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
 import { type MonthlyUsage, type UsageWindow } from '../../api.ts';
 import { useAccounts } from '../../accounts.ts';
-import { monthlyTitle, untilLabel, windowPct } from '../../format.ts';
+import { resetAt, resetAtShort, resetIn, resetSentence } from '@omni/shared/usage-reset.ts';
+import { monthlyTitle, windowPct } from '../../format.ts';
 import { readPref, useApp, useFeed, useNow, writePref } from '../../store.tsx';
 import { HARNESS_ROWS, HarnessLogo, SLOT_ROWS } from '../brand.tsx';
 import { Icon, Ticks } from '../ui.tsx';
@@ -10,30 +11,69 @@ import { Icon, Ticks } from '../ui.tsx';
 const HARNESS_IDS = HARNESS_ROWS.map((r) => r.id);
 const NAMES: Record<string, string> = Object.fromEntries(HARNESS_ROWS.map((r) => [r.id, r.name]));
 
-/** One window's tick bar and percentage, with the reset time on hover. */
+/**
+ * When a window resets: "resets in 2h 10m" by its bar, the local time on hover, and a tap swaps the two (touch has no
+ * hover). `compact`, for the Usage card's narrow columns: "in 2h 10m", and "at 14:20" or "Fri 09:00" on a tap. Nothing
+ * when the source sent no reset time, or once it has passed.
+ */
+export function ResetTime({ resetsAt, label, compact = false, className = '' }: { resetsAt: number | undefined; label: string; compact?: boolean; className?: string }) {
+  const now = useNow(60_000);
+  const [local, setLocal] = useState(false);
+  const left = resetIn(resetsAt, now);
+  const at = resetAt(resetsAt, now);
+  if (!left || !at) return null;
+  const text = compact ? (local ? resetAtShort(resetsAt, now) : `in ${left}`) : local ? `resets ${at}` : `resets in ${left}`;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setLocal((v) => !v);
+      }}
+      title={`${label}: ${resetSentence(resetsAt, now)}`}
+      aria-label={`${label} resets in ${left}, ${at}`}
+      data-testid="usage-reset"
+      className={`block max-w-full truncate text-left font-num text-[10px] leading-tight text-fg-3 tabular-nums hover:text-fg-2 ${className}`}
+    >
+      {text}
+    </button>
+  );
+}
+
+/** What a window's tooltip says: the percent, then the reset when the source gave one. */
+function windowTitle(label: string, pct: number, resetsAt: number | undefined, now: number): string {
+  const reset = resetSentence(resetsAt, now);
+  return `${label}: ${Math.round(pct * 100)}% used.${reset ? ` ${reset}` : ''}`;
+}
+
+/** One window's tick bar and percentage, with when it resets under it. */
 function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
+  const now = useNow(60_000);
   const pct = windowPct(w);
   if (pct === null) return <span className="flex-1 text-center font-num text-[10px] text-fg-3">—</span>;
   const tone = pct >= 0.9 ? 'needs' : undefined;
   return (
-    <div
-      className="flex min-w-0 flex-1 items-center gap-1.5"
-      title={`${label}: ${Math.round(pct * 100)}% used, resets ${new Date(w!.resetsAt * 1000).toLocaleString('en-GB')} (${untilLabel(w!.resetsAt)})`}
-    >
-      <Ticks responsive value={pct} count={10} height={10} tone={tone} className="min-w-0 flex-1" label={`${label} usage`} />
-      <span className="w-[26px] shrink-0 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
+    <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 items-center gap-1.5" title={windowTitle(label, pct, w!.resetsAt, now)}>
+        <Ticks responsive value={pct} count={10} height={10} tone={tone} className="min-w-0 flex-1" label={`${label} usage`} />
+        <span className="w-[26px] shrink-0 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
+      </div>
+      <ResetTime compact resetsAt={w!.resetsAt} label={label} className="pt-0.5" />
     </div>
   );
 }
 
-/** A monthly cycle across both columns: one tick bar, the percent, and "mo". */
+/** A monthly cycle across both columns: one tick bar, the percent, "mo", and when the cycle resets. */
 function MonthCell({ m, name }: { m: MonthlyUsage; name: string }) {
   const pct = windowPct(m)!;
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1.5" title={monthlyTitle(name, m)}>
-      <Ticks responsive value={pct} count={20} height={10} tone={pct >= 0.9 ? 'needs' : undefined} className="min-w-0 flex-1" label={`${name} month usage`} />
-      <span className="w-[26px] shrink-0 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
-      <span className="text-[10px] text-fg-3">mo</span>
+    <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 items-center gap-1.5" title={monthlyTitle(name, m)}>
+        <Ticks responsive value={pct} count={20} height={10} tone={pct >= 0.9 ? 'needs' : undefined} className="min-w-0 flex-1" label={`${name} month usage`} />
+        <span className="w-[26px] shrink-0 text-right font-num text-[10px] text-fg-2 tabular-nums">{Math.round(pct * 100)}%</span>
+        <span className="text-[10px] text-fg-3">mo</span>
+      </div>
+      <ResetTime compact resetsAt={m.resetsAt} label={`${name} month`} className="pt-0.5" />
     </div>
   );
 }
@@ -70,8 +110,8 @@ function UsageRowView({ row }: { row: UsageRow }) {
   const label = row.several && row.account ? `${name} (${row.account.label})` : name;
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <span className="caption inline-flex w-[66px] shrink-0 items-center gap-1.5 text-fg-2" title={who ?? undefined}>
+      <div className="flex items-start gap-2">
+        <span className="caption inline-flex h-[14px] w-[66px] shrink-0 items-center gap-1.5 text-fg-2" title={who ?? undefined}>
           <span className="text-fg"><HarnessLogo harness={row.harness} size={12} /></span>
           {name}
         </span>
@@ -105,7 +145,7 @@ function UsageRowView({ row }: { row: UsageRow }) {
  * The card's rows: one per signed-in account (GET /api/accounts), each with its own reading. Readings that come in on
  * the feed replace the listed one for that account until the list loads again.
  */
-function useUsageRows(): UsageRow[] {
+export function useUsageRows(): UsageRow[] {
   const { usage } = useApp();
   const accounts = useAccounts();
   const [live, setLive] = useState<Record<string, AccountUsage>>({});
