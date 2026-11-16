@@ -353,6 +353,8 @@ export function migrate() {
   ensureColumn('channels', 'design_system_name', 'TEXT');
   // The channel's own Open PR, Fix conflicts and Fix checks prompts (packages/shared/thread-glance.ts stepPrompts). Null is the built-in one.
   for (const col of ['prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks']) ensureColumn('channels', col, 'TEXT');
+  // 1 keeps the channel's threads out of usage scans (usage-scan/asks.ts): a client channel with data that should not reach a model.
+  ensureColumn('channels', 'scan_opt_out', 'INTEGER NOT NULL DEFAULT 0');
   // The claude.ai page an artifact was published as (packages/shared/published.ts), and what the publish said it was.
   ensureColumn('artifacts', 'url', 'TEXT');
   ensureColumn('artifacts', 'description', 'TEXT');

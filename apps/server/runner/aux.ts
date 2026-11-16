@@ -37,14 +37,27 @@ function removeRunDir(cwd: string) {
   }
 }
 
-/** One Haiku call with no tools and no session. `done` gets its trimmed output, or null when it failed. */
-function haiku(entrypoint: string, prompt: string, done: (out: string | null) => void) {
+/**
+ * One Haiku call with no tools and no session. `done` gets its trimmed output once, or null when it failed, timed out
+ * or could not start (without a private folder the call is skipped: titles keep their placeholder, no suggestion).
+ */
+function haiku(entrypoint: string, prompt: string, done: (out: string | null) => void, timeoutMs = 45_000) {
+  let settled = false;
+  const finish = (out: string | null) => {
+    if (settled) return;
+    settled = true;
+    // Nobody waits on these calls: a shutdown may have closed the db by the time one ends.
+    try {
+      done(out);
+    } catch {
+      return;
+    }
+  };
   let cwd: string;
   try {
     cwd = auxRunDir();
   } catch {
-    // Without a private folder the call is skipped: titles keep their placeholder and no suggestion is offered.
-    return;
+    return finish(null);
   }
   let child;
   try {
@@ -61,21 +74,28 @@ function haiku(entrypoint: string, prompt: string, done: (out: string | null) =>
   child.stdin.on('error', () => {});
   child.stdin.end(prompt);
   let out = '';
-  const timer = setTimeout(() => child.kill('SIGKILL'), 45_000);
+  const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
   child.stdout.on('data', (d) => (out += d));
   child.on('close', (code) => {
     clearTimeout(timer);
     removeRunDir(cwd);
-    // Nobody waits on these calls: a shutdown may have closed the db by the time one ends.
-    try {
-      done(code === 0 ? out.trim() : null);
-    } catch {
-      return;
-    }
+    finish(code === 0 ? out.trim() : null);
   });
   child.on('error', () => {
     clearTimeout(timer);
     removeRunDir(cwd);
+    finish(null);
+  });
+}
+
+/** One Haiku call as a promise: its trimmed output, or null when it failed or ran past `timeoutMs`. For the usage scan's labels. */
+export function askHaiku(entrypoint: string, prompt: string, timeoutMs: number): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    try {
+      haiku(entrypoint, prompt, resolve, timeoutMs);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 

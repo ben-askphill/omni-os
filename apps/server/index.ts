@@ -31,6 +31,7 @@ const { stopAllRuns } = await import('./actions.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
 const { backfillPublished } = await import('./published.ts');
 const { startScheduler } = await import('./automations.ts');
+const { watchAutomationFailures } = await import('./automation-pause.ts');
 const { startClaudeArtifacts } = await import('./claude-artifacts.ts');
 const { startEventWatch } = await import('./automation-watch.ts');
 const { startTriggerDeliveries } = await import('./automation-triggers.ts');
@@ -81,6 +82,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startArtifactWatcher();
   backfillPublished();
   startScheduler();
+  watchAutomationFailures();
   // Lists Ben's claude.ai Artifacts when Settings' schedule is due (hourly check). Off with OMNI_CLAUDE_ARTIFACTS=0.
   startClaudeArtifacts();
   startEventWatch();

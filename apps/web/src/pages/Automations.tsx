@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { api, errorText, useApi, type Automation, type Thread, type SyncStatus } from '../api.ts';
 import { DeliveryHistory } from '../components/DeliveryHistory.tsx';
 import { AutomationEditor, type EditorTarget } from '../components/AutomationEditor.tsx';
-import { Button, Chip, ConfirmDialog, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, Picker, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { Button, Chip, ConfirmDialog, CopyButton, Empty, ErrorNote, Icon, InlineConfirm, Loading, PageHeader, Picker, Segmented, StatusDot, Toggle, type PickerOption } from '../components/ui.tsx';
 import { pageColumn, PageToolbar, RefreshButton, SearchField } from '../components/ui/feedback.tsx';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
 import { statusLabel } from '@omni/shared/status.ts';
@@ -46,14 +46,17 @@ function SkippedRun({ run }: { run: Automation['runs'][number] }) {
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-2.5">
           <span className="min-w-0 flex-1 truncate font-num">{relTime(run.created_at)}</span>
-          {run.trigger !== 'cron' && <span className="shrink-0 font-num text-[length:var(--fs-meta)]">{run.trigger}</span>}
-          <span className="shrink-0 text-right text-[length:var(--fs-12)]">Skipped</span>
+          {run.trigger !== 'cron' && run.trigger !== PAUSE_TRIGGER && <span className="shrink-0 font-num text-[length:var(--fs-meta)]">{run.trigger}</span>}
+          <span className="shrink-0 text-right text-[length:var(--fs-12)]">{run.trigger === PAUSE_TRIGGER ? 'Turned off' : 'Skipped'}</span>
         </span>
         <span className="mt-0.5 block font-mono text-[11px] leading-snug break-words">{run.skip_reason}</span>
       </span>
     </li>
   );
 }
+
+/** The history row Omni adds when it turns an automation off after 3 failed runs in a row (apps/server/automation-pause.ts). */
+const PAUSE_TRIGGER = 'pause';
 
 const TRIGGER_CHIP = 'inline-flex h-6 items-center gap-1.5 rounded-full bg-bg px-2.5 whitespace-nowrap';
 const FILTER_CHIP = 'inline-flex min-h-6 max-w-full items-center rounded-[12px] px-2 py-0.5 font-mono text-[11px] leading-snug break-words text-fg-3 shadow-[inset_0_0_0_1px_var(--line)]';
@@ -277,7 +280,7 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
         </span>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <h2 className="font-display text-[length:var(--fs-heading)]">{a.name}</h2>
-          {!enabled && !a.error && <Chip tone="outline">Paused</Chip>}
+          {!enabled && !a.error && (a.runs[0]?.trigger === PAUSE_TRIGGER ? <Chip tone="needs" title={a.runs[0].skip_reason ?? undefined}>Turned off after 3 failed runs</Chip> : <Chip tone="outline">Paused</Chip>)}
           {a.error && <Chip tone="needs">Invalid</Chip>}
         </div>
         <div className="flex shrink-0 items-center gap-2.5 md:row-span-2">
@@ -507,6 +510,52 @@ function AutomationMachine({ refreshing }: { refreshing: boolean }) {
   );
 }
 
+/**
+ * Scan my usage (apps/server/usage-scan/): groups what Ben asks his agents for again and again, then starts a thread
+ * that suggests up to three automations. Starting it can take a minute or two while Haiku labels the groups.
+ */
+function UsageScanDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { channels } = useApp();
+  const [scope, setScope] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const options = useMemo<PickerOption<string>[]>(
+    () => [
+      { value: '', label: 'All channels', icon: 'layers', avatar: false },
+      ...channels
+        .filter((c) => !c.archived)
+        .map((c) => ({ value: c.id, label: c.name, channelIcon: c.icon, avatarBg: c.avatar_bg, ...(c.scan_opt_out ? { disabled: true, sub: 'Left out of usage scans' } : {}) })),
+    ],
+    [channels],
+  );
+  const close = () => {
+    setError(null);
+    onClose();
+  };
+  const start = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.post<{ thread: Thread }>('/usage-scan', scope ? { channel: scope } : {});
+      close();
+      navigate(`/t/${r.thread.id}`);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <ConfirmDialog open={open} title="Scan my usage" confirmLabel={busy ? 'Scanning' : 'Start scan'} busy={busy} error={error} onConfirm={() => void start()} onCancel={close}>
+      <p>Omni reads the messages you typed to your agents in the last 90 days, groups what you ask for again and again, and starts a thread in #Inbox that suggests up to three automations.</p>
+      <p className="text-[12.5px] text-fg-3">
+        Secrets are masked first, and Haiku labels the groups on this machine. Nothing is saved until you pick suggestions in that thread, and what it saves starts off. Channels set to Leave out of usage scans are skipped.
+      </p>
+      <Picker size="field" label="Channels to scan" value={scope} onChange={setScope} options={options} searchable />
+    </ConfirmDialog>
+  );
+}
+
 const TRIGGER_FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'schedule', label: 'Scheduled' },
@@ -533,6 +582,7 @@ export function AutomationsPage() {
   }, [reloadList, reloadDevices]);
   const [deleting, setDeleting] = useState<Automation | null>(null);
   const [editing, setEditing] = useState<EditorTarget | null>(null);
+  const [scanning, setScanning] = useState(false);
   // Keep run and delivery statuses fresh when an automation thread or delivery changes state (debounced, threads update often).
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useFeed((e) => {
@@ -568,6 +618,9 @@ export function AutomationsPage() {
           className="mb-4"
           right={
             <span className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" icon="gauge" onClick={() => setScanning(true)}>
+                Scan my usage
+              </Button>
               <Button size="sm" variant="primary" icon="plus" onClick={() => setEditing({ id: null })}>
                 New
               </Button>
@@ -611,6 +664,7 @@ export function AutomationsPage() {
       </div>
       <DeleteAutomationDialog a={deleting} onClose={() => setDeleting(null)} onDeleted={reload} />
       <AutomationEditor target={editing} onClose={() => setEditing(null)} onSaved={reload} />
+      <UsageScanDialog open={scanning} onClose={() => setScanning(false)} />
     </div>
   );
 }

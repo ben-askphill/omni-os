@@ -73,9 +73,11 @@ describe('parseCrewFile', () => {
     expect(crew.length).toBeGreaterThan(0);
     expect(crew[0].id).toBe('conductor');
     expect(crew.find((r) => r.id === 'conductor')!.mcp).toContain('omni');
-    // The Conductor routes work and never does it; the crew it routes to do the work.
+    // The Conductor routes work and never does it; the crew it routes to do the work. A usage scan's lead has no
+    // working tools either: it reads its first message and saves what Ben picks through the omni tools.
     expect(crew.find((r) => r.id === 'conductor')!.delegateOnly).toBe(true);
-    expect(crew.filter((r) => r.delegateOnly).map((r) => r.id)).toEqual(['conductor']);
+    expect(crew.filter((r) => r.delegateOnly).map((r) => r.id)).toEqual(['conductor', 'usage-scan']);
+    expect(crew.find((r) => r.id === 'usage-scan')).toMatchObject({ mcp: ['omni'], channel: 'inbox', harness: 'claude-code' });
     for (const r of crew) expect(r.charter.length).toBeGreaterThan(0);
   });
 });

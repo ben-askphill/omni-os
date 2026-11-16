@@ -601,7 +601,8 @@ server.registerTool(
     description:
       `Create or change an automation, only when ${USER} asks. Writes its YAML in data/automations/ (a shipped one becomes ${USER}'s own copy, comments kept) and syncs it to the other machines. ` +
       'Pass fields (all of them: start from get_automation) or yaml (the whole file). Without id it creates one, its id made from the name. ' +
-      'fields.machine picks the synced machine that runs it: an id or name from list_devices, here, or empty to follow set_automations_machine. Set cron or on, not both.',
+      'fields.machine picks the synced machine that runs it: an id or name from list_devices, here, or empty to follow set_automations_machine. Set cron or on, not both. ' +
+      'A thread an automation started (or one below it) cannot create, change, turn on or run automations; Omni refuses it.',
     inputSchema: {
       id: z.string().trim().min(1).max(64).optional(),
       create: z.boolean().optional().describe('Make a new one. Needs fields.'),
@@ -632,6 +633,22 @@ server.registerTool(
       return text(await call('/automations', { method: 'POST', body: JSON.stringify({ ...(id && { id }), fields }) }));
     }
     return text(await call(`/automations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(fields ? { fields } : { yaml }) }));
+  },
+);
+
+server.registerTool(
+  'scan_usage',
+  {
+    description:
+      `Start a usage scan, only when ${USER} asks: Omni groups what ${USER} asked their agents for again and again over the last 90 days ` +
+      '(their own typed messages only, secrets masked), Haiku labels the groups on this machine, and a usage-scan thread in #inbox suggests up to 3 automations. ' +
+      `Nothing is created until ${USER} answers in that thread, and what it saves starts off. channel scans one channel; channels set to "Leave out of usage scans" are skipped. ` +
+      'Returns the new thread id. Refused while another scan starts, or when nothing repeats enough.',
+    inputSchema: { channel: z.string().optional().describe('One channel id to scan, from list_channels. Omit for all channels.') },
+  },
+  async ({ channel }) => {
+    const r = await call('/usage-scan', { method: 'POST', body: JSON.stringify(channel ? { channel } : {}) });
+    return text({ thread_id: r.thread.id, title: r.thread.title, asks: r.asks, groups: r.groups, masked: r.masked, labelled: r.labelled });
   },
 );
 

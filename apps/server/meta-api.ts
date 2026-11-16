@@ -2,6 +2,7 @@
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { deleteAutomation, lastRuns, loadAutomations, runAutomation } from './automations.ts';
+import { automationRefusal, CALLER_HEADER, lineage, type AutomationWrite } from './automation-guard.ts';
 import { automationFields, createAutomation, definitionOf, resetAutomation, saveAutomation, setAutomationEnabled, sourceKind } from './automation-files.ts';
 import { ownerOf } from './sync/owner.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
@@ -102,6 +103,8 @@ metaApi.get('/automations', (c) => {
   );
 });
 metaApi.post('/automations/:id/run', async (c) => {
+  const no = refusal(c, 'run');
+  if (no) return no;
   const a = loadAutomations().find((x) => x.id === c.req.param('id'));
   if (!a) return c.json({ error: 'not found' }, 404);
   if (a.error) return c.json({ error: a.error }, 400);
@@ -111,6 +114,8 @@ metaApi.post('/automations/:id/run', async (c) => {
 // The id is matched against the listed automations, never joined into a path; one that looks like a path is refused first.
 metaApi.delete('/automations/:id', async (c) => {
   const id = c.req.param('id');
+  const no = refusal(c, 'delete');
+  if (no) return no;
   if (!/^(?!\.)[^/\\\0]+$/.test(id)) return c.json({ error: 'invalid automation id' }, 400);
   const a = loadAutomations().find((x) => x.id === id);
   if (!a) return c.json({ error: 'not found' }, 404);
@@ -124,6 +129,8 @@ metaApi.delete('/automations/:id', async (c) => {
 // On or off, written into its YAML (automation-files.ts): a shipped one becomes the user's own copy first.
 metaApi.post('/automations/:id/enabled', async (c) => {
   const { enabled } = z.object({ enabled: z.boolean() }).parse(await c.req.json());
+  const no = refusal(c, enabled ? 'enable' : 'disable');
+  if (no) return no;
   return edit(c, () => (setAutomationEnabled(c.req.param('id'), enabled), { ok: true }));
 });
 
@@ -137,16 +144,29 @@ const saveInput = z.union([z.object({ fields: automationFields }).strict(), z.ob
 metaApi.put('/automations/:id', async (c) => {
   const parsed = saveInput.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid automation' }, 400);
+  const no = refusal(c, 'edit');
+  if (no) return no;
   return edit(c, () => saveAutomation(c.req.param('id'), parsed.data));
 });
 // A new automation in data/automations/<id>.yaml. `id` is optional: one is made from the name.
 metaApi.post('/automations', async (c) => {
   const parsed = z.object({ id: z.string().max(64).optional(), fields: automationFields }).strict().safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid automation' }, 400);
-  return edit(c, () => createAutomation(parsed.data.fields, parsed.data.id), 201);
+  const no = refusal(c, 'create');
+  if (no) return no;
+  // What a usage scan saves starts off: Ben turns each one on himself (automation-guard.ts).
+  const caller = c.req.header(CALLER_HEADER);
+  const fields = caller && lineage(caller).scan ? { ...parsed.data.fields, enabled: false } : parsed.data.fields;
+  return edit(c, () => createAutomation(fields, parsed.data.id), 201);
 });
 // Drop the user's copy of a shipped automation, so the shipped YAML loads again.
-metaApi.post('/automations/:id/reset', (c) => edit(c, () => resetAutomation(c.req.param('id'))));
+metaApi.post('/automations/:id/reset', (c) => refusal(c, 'edit') ?? edit(c, () => resetAutomation(c.req.param('id'))));
+
+/** A 403 when the agent thread making this call may not (automation-guard.ts). Ben's own clients name no thread and pass. */
+function refusal(c: Context, write: AutomationWrite) {
+  const no = automationRefusal(c.req.header(CALLER_HEADER), write);
+  return no ? c.json({ error: no }, 403) : null;
+}
 
 /** A refused edit's message and status (automation-files.ts sets one), else a 500. */
 function edit(c: Context, run: () => unknown, ok: 200 | 201 = 200) {

@@ -14,7 +14,7 @@ const COLUMNS = [
   'id', 'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir', 'store_domain', 'portal_slug',
   'browser_headless', 'notes', 'icon', 'avatar_bg', 'avatar_bg_manual', 'design_system', 'design_system_name', 'archived', 'created_at',
   'default_harness', 'default_model', 'default_effort', 'worktree_include', 'worktree_shared',
-  'prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks',
+  'prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks', 'scan_opt_out',
 ] as const;
 const PATHS = new Set<string>(['repo_path', 'base_dir']);
 
@@ -54,7 +54,7 @@ registerHandler('channel', {
     const sent = (c: string) => Object.prototype.hasOwnProperty.call(data, c);
     const ch = {
       kind: 'client', use_worktree: 1, browser_headless: 1, archived: 0, created_at: change.ts,
-      avatar_bg_manual: 0, ...channels.get(change.entity_id), ...data, id: change.entity_id,
+      avatar_bg_manual: 0, scan_opt_out: 0, ...channels.get(change.entity_id), ...data, id: change.entity_id,
     } as Channel;
     upsert.run(
       ...COLUMNS.map((c) => {

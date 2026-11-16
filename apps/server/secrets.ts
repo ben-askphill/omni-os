@@ -89,6 +89,19 @@ export async function globalSecret(name: string): Promise<string | null> {
   return readSecret('global', name);
 }
 
+/**
+ * Every stored secret's value, in every scope, so text can be masked before it reaches a model (usage-scan/mask.ts).
+ * A value the store cannot read is skipped. Never log or return these.
+ */
+export async function secretValues(): Promise<string[]> {
+  const out: string[] = [];
+  for (const r of listSecrets()) {
+    const v = await readSecret(r.scope, r.name).catch(() => null);
+    if (v) out.push(v);
+  }
+  return out;
+}
+
 /** Global secrets, overridden by channel-scoped ones with the same name. Sync credentials and the Grok Bot webhook stay out. */
 export async function secretsEnv(channelId: string): Promise<Record<string, string>> {
   const rows = db
