@@ -87,6 +87,8 @@ async function tokenCheck(io: Io, conn: Connection, p: Probe): Promise<Check> {
     if (st.mode & 0o077) return { name: 'token', level: 'warn', detail: `${where} can be read by other users (mode ${(st.mode & 0o777).toString(8)}). It should be 600.` };
   }
   if (p.kind !== 'omni') return { name: 'token', level: 'ok', detail: `${where} (not checked: the server is not answering)` };
+  // A wrong proof means whatever holds the port is not this install: it does not get the token.
+  if (p.mine === false) return { name: 'token', level: 'ok', detail: `${where} (not sent: the server on that port is not this install)` };
   try {
     await client(io, conn).api.status();
     return { name: 'token', level: 'ok', detail: `${where}, and the server takes it` };
