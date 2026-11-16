@@ -64,6 +64,7 @@ const ENTITY_LABEL: Record<string, string> = {
   assignment: 'Thread assignment',
   secret_drop: 'Secret',
   'automations.owner': 'Automations owner',
+  mcp_client: 'MCP client',
   thread: 'Thread',
   channel: 'Channel',
 };

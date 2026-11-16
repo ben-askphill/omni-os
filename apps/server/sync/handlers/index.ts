@@ -13,3 +13,4 @@ import './remote-command.ts';
 import './assignment.ts';
 import './review-note.ts';
 import './automation-file.ts';
+import './mcp-client.ts';

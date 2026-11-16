@@ -4,11 +4,12 @@ import { db, now, tx } from './connection.ts';
 /**
  * What the sync relay carries. Events, artifacts, automation runs, completions and trigger deliveries are keyed by their uid, a
  * result_read, a limit_stop and an assignment by their thread's id, a remote_command by its command id, the rest by id or key.
- * A review_note is keyed by its id, an automation_file (a YAML in data/automations/) by its automation id.
+ * A review_note is keyed by its id, an automation_file (a YAML in data/automations/) by its automation id, an
+ * mcp_client (an OAuth client that reached /mcp, mcp-clients.ts) by its client id.
  */
 export type SyncEntity =
   | 'channel' | 'folder' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv' | 'completion' | 'result_read' | 'limit_stop'
-  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file';
+  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file' | 'mcp_client';
 export type SyncOp = 'upsert' | 'delete';
 
 export interface OutboxRow {
@@ -82,6 +83,7 @@ function seed(machineId: string) {
   q('assignment', 'SELECT thread_id AS k FROM assignments ORDER BY at, thread_id');
   q('review_note', 'SELECT id AS k FROM review_notes ORDER BY created_at, id');
   q('kv', `SELECT key AS k FROM kv WHERE key NOT LIKE 'sync.%' ORDER BY key`);
+  q('mcp_client', MCP_CLIENTS);
   db.prepare(
     `INSERT OR REPLACE INTO sync_meta (entity, entity_id, ts, machine_id)
      SELECT entity, entity_id, ts, ? FROM sync_outbox WHERE entity IN ('channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note')`,
@@ -99,6 +101,13 @@ function seedFolders(machineId: string) {
   ).run(SEED_TS, machineId);
   const filed = db.prepare('SELECT id FROM threads WHERE folder_id IS NOT NULL ORDER BY created_at, rowid').all() as { id: string }[];
   for (const t of filed) record('thread', t.id);
+}
+
+const MCP_CLIENTS = 'SELECT id AS k FROM mcp_clients ORDER BY first_seen, id';
+
+/** MCP clients synced from this build on. A Mac that armed before then queues the ones it has once. Call it armed. */
+function seedMcpClients() {
+  db.prepare(`INSERT INTO sync_outbox (entity, entity_id, op, ts) SELECT 'mcp_client', k, 'upsert', ? FROM (${MCP_CLIENTS})`).run(now());
 }
 
 /** The same read as kv.get. Inlined so this module does not import kv, which records through here. */
@@ -125,6 +134,7 @@ export const outbox = {
       if (hardware && stored !== hardware) setLocal('sync.hardware_id', hardware);
       if (armedId && !(hardware && stored && stored !== hardware)) {
         if (!kvGet<boolean>('sync.folders_seeded')) seedFolders(armedId), setLocal('sync.folders_seeded', true);
+        if (!kvGet<boolean>('sync.mcp_clients_seeded')) seedMcpClients(), setLocal('sync.mcp_clients_seeded', true);
         return armedId;
       }
       const moved = !!armedId;
@@ -143,6 +153,7 @@ export const outbox = {
       db.prepare(`UPDATE threads SET run_machine = ? WHERE status IN ('running','queued') AND run_machine IS NULL`).run(id);
       seed(id);
       setLocal('sync.folders_seeded', true);
+      setLocal('sync.mcp_clients_seeded', true);
       armedId = id;
       return id;
     });

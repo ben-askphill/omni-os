@@ -1080,13 +1080,13 @@ server.registerTool('rotate_install_token', {
 
 server.registerTool('mcp_clients', {
   description:
-    `Read-only: the OAuth clients (claude.ai, ChatGPT, Grok and others) that connected to this Omni's /mcp with ${USER}'s Google sign-in, ` +
-    'with status (approved, bound, pending, removed; bound means its token names this Omni\'s /mcp resource; removed wins over the rest), when each was first and last seen, and how it was matched (token audience or client id).',
+    `Read-only: the OAuth clients (claude.ai, ChatGPT, Grok and others) that connected to /mcp on this Omni or another synced machine with ${USER}'s Google sign-in, ` +
+    'with status (approved, bound, pending, removed; bound means its token names this Omni\'s /mcp resource; removed wins over the rest; approved and removed are the same on every synced machine), when each was first and last seen, and how it was matched (token audience or client id).',
   inputSchema: {},
 }, async () => text(await call('/mcp/clients')));
 
 server.registerTool('remove_mcp_client', {
-  description: `Remove one OAuth client from /mcp by id from mcp_clients, only when ${USER} asks. Its tokens are refused from then on; it has to be approved again in Settings to reconnect.`,
+  description: `Remove one OAuth client from /mcp by id from mcp_clients, only when ${USER} asks. Its tokens are refused from then on, on every synced machine; it has to be approved again in Settings to reconnect.`,
   inputSchema: { client_id: z.string().min(1).max(200) },
 }, async ({ client_id }) => text(await call(`/mcp/clients/${encodeURIComponent(client_id)}`, { method: 'DELETE' })));
 

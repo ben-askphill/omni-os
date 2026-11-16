@@ -28,7 +28,7 @@ describe('sync backfill', () => {
     expect(() => backfill.backfill()).toThrow(/not set up/);
   });
 
-  it('queues every row once, parents first, and nothing twice', () => {
+  it('queues every row once, parents first, and nothing twice', async () => {
     db.outbox.arm('mac-a');
     db.channels.create({ id: 'acme', name: 'Acme' });
     const t = { channel_id: 'acme', title: 't', status: 'done', role: null, model: null, cwd: '/tmp', branch: null, parent_id: null, task_id: null, source: 'manual', automation: null } as const;
@@ -39,6 +39,8 @@ describe('sync backfill', () => {
     db.automationRuns.add('daily', 't1', 'cron');
     db.kv.set('pinned', ['t1']);
     db.kv.set('sync.path_map', { '~/a': '~/b' });
+    const { mcpClients } = await import('../mcp-clients.ts');
+    mcpClients.seen('claude-ai', null);
     // Another machine wrote t2 last: it is that machine's to send.
     db.syncMeta.set('thread', 't2', '2999-01-01T00:00:00.000Z', 'mac-z');
     // As if everything had been pushed.
@@ -47,13 +49,14 @@ describe('sync backfill', () => {
 
     const seen: string[] = [];
     const report = backfill.backfill({ onProgress: (r) => seen.push(r.entity) });
-    expect(seen).toEqual(['channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'completion', 'result_read', 'limit_stop', 'trigger_delivery', 'remote_command', 'assignment', 'review_note', 'kv']);
+    expect(seen).toEqual(['channel', 'folder', 'thread', 'event', 'artifact', 'automation_run', 'completion', 'result_read', 'limit_stop', 'trigger_delivery', 'remote_command', 'assignment', 'review_note', 'mcp_client', 'kv']);
     const by = Object.fromEntries(report.map((r) => [r.entity, r]));
     expect(by.channel).toMatchObject({ queued: 3, alreadyQueued: 0, elsewhere: 0 });
     expect(by.thread).toMatchObject({ queued: 1, elsewhere: 1 });
     expect(by.event).toMatchObject({ queued: 2 });
     expect(by.automation_run).toMatchObject({ queued: 1 });
     expect(by.kv).toMatchObject({ queued: 1 });
+    expect(by.mcp_client).toMatchObject({ queued: 1 });
     const rows = outboxRows();
     expect(rows.filter((r) => r.entity === 'kv').map((r) => r.entity_id)).toEqual(['pinned']);
     expect(rows.some((r) => r.entity === 'thread' && r.entity_id === 't2')).toBe(false);

@@ -31,6 +31,7 @@ const SOURCES: [SyncEntity, string][] = [
   ['remote_command', 'SELECT id AS k, created_at AS o1, id AS o2 FROM remote_commands'],
   ['assignment', 'SELECT thread_id AS k, at AS o1, thread_id AS o2 FROM assignments'],
   ['review_note', 'SELECT id AS k, created_at AS o1, id AS o2 FROM review_notes'],
+  ['mcp_client', 'SELECT id AS k, first_seen AS o1, id AS o2 FROM mcp_clients'],
   ['kv', `SELECT key AS k, key AS o1, 0 AS o2 FROM kv WHERE key NOT LIKE 'sync.%'`],
 ];
 

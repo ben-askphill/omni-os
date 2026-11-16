@@ -611,7 +611,9 @@ export function migrate() {
   // no collapse id and no pull request alerts, which that build could not tell apart or open.
   ensureColumn('push_tokens', 'features', `TEXT NOT NULL DEFAULT '[]'`);
   // OAuth clients that reached /mcp with a Clerk JWT for the owner (apps/server/mcp-clients.ts): which Ben approved,
-  // which wait for approval and which he removed. Local, never synced: a forged sync change must not approve a client.
+  // which wait for approval and which he removed. Synced as a signed action (sync/handlers/mcp-client.ts), so a forged
+  // sync change cannot approve a client. decided_at is when Ben last approved or removed it: the newest decision wins
+  // across machines. Null for a decision from before sync, which any dated one beats.
   db.exec(`CREATE TABLE IF NOT EXISTS mcp_clients (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL,
@@ -619,6 +621,7 @@ export function migrate() {
     first_seen TEXT NOT NULL,
     last_seen TEXT NOT NULL
   );`);
+  ensureColumn('mcp_clients', 'decided_at', 'TEXT');
   // When each metadata field of a thread was last edited, for the field-by-field merge of synced rows
   // (sync/thread-merge.ts). Rows from before it are seeded once with their updated_at (pinned_at and done_at with
   // their own times when set), which is what whole-row last-writer-wins compared before.
