@@ -37,6 +37,13 @@ describe('a delegate-only role', () => {
     const builder = buildSystemPrompt(thread, channel, getCrew('builder'));
     expect(builder).toContain('## Artifacts');
     expect(builder).not.toContain('You route work');
+
+    // A usage scan's lead has the omni tools to save what Ben picks, but does its own analysis: no delegation rules.
+    const scan = buildSystemPrompt(thread, channel, getCrew('usage-scan'));
+    expect(scan).not.toContain('## Thread delegation');
+    expect(scan).not.toContain('You route work');
+    expect(scan).toContain('never call delegate or delegate_team');
+    expect(scan).not.toContain('## Browser');
   });
 
   it('tells the Conductor and every crew role to render a "show me" answer, except where html_render is missing', async () => {

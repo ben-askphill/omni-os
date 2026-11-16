@@ -101,6 +101,7 @@ const channelSchema = z.object({
   prompt_open_pr: stepPrompt,
   prompt_fix_conflicts: stepPrompt,
   prompt_fix_checks: stepPrompt,
+  scan_opt_out: z.coerce.number().int().min(0).max(1).optional(),
 });
 
 /** A channel's latest threads of any status, so the sidebar can keep finished ones findable. */

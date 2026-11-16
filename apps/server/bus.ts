@@ -45,3 +45,6 @@ export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:
 
 /** A sub-agent's task row came in from another machine (sync/handlers/event.ts), so `delegating` may have changed. */
 export const SYNCED_TASK = 'synced_task';
+
+/** A batch of changes from another machine finished applying (sync/apply.ts). The payload is the changes that applied. */
+export const SYNC_BATCH = 'sync_batch';

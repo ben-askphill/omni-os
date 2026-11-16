@@ -21,6 +21,12 @@ function readToken(file?: string) {
 /** The thread this server was started for. */
 export const SELF = process.env.OMNI_THREAD_ID ?? null;
 
+/**
+ * Names that thread on every call, so the API can hold an agent thread to what it may do: one an automation started
+ * cannot create or run automations (apps/server/automation-guard.ts). Ben's own clients send none.
+ */
+const CALLER: Record<string, string> = SELF ? { 'x-omni-thread': SELF } : {};
+
 /** A request the API answered with an error status. A 4xx means the call itself was wrong, so trying again won't help. */
 export class ApiError extends Error {
   constructor(
@@ -35,7 +41,7 @@ export async function call(path: string, init?: RequestInit) {
   const send = (bearer: string) =>
     fetch(`${BASE}/api${path}`, {
       ...init,
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}`, ...(init?.headers ?? {}) },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}`, ...CALLER, ...(init?.headers ?? {}) },
     });
   // Compare against the token this request sent, not the shared one: a parallel call may have swapped it already.
   const sent = token;

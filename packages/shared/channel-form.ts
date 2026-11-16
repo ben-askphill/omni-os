@@ -39,6 +39,8 @@ export interface ChannelRecord {
   prompt_open_pr?: string | null;
   prompt_fix_conflicts?: string | null;
   prompt_fix_checks?: string | null;
+  /** 1 leaves the channel out of usage scans. Missing from an older server. */
+  scan_opt_out?: number;
 }
 
 /** A channel's default run as a picker choice: model '' is the harness default, model "auto" is Auto. All '' is no default, which runs Auto too. */
@@ -68,6 +70,8 @@ export interface ChannelForm {
   worktree_shared: string;
   /** The channel's own prompt per branch step, '' for the built-in one. */
   prompts: Record<PRStep, string>;
+  /** Leave the channel's threads out of usage scans. */
+  scanOptOut: boolean;
 }
 
 /** A new channel's form when `c` is left out. */
@@ -91,6 +95,7 @@ export function channelForm(c?: ChannelRecord): ChannelForm {
     worktree_include: c?.worktree_include ?? '',
     worktree_shared: c?.worktree_shared ?? '',
     prompts: { open: c?.prompt_open_pr ?? '', conflicts: c?.prompt_fix_conflicts ?? '', checks: c?.prompt_fix_checks ?? '' },
+    scanOptOut: c?.scan_opt_out === 1,
   };
 }
 
@@ -157,6 +162,7 @@ export function channelBody(f: ChannelForm, opts: { system: boolean; github: boo
     worktree_include: storedList(f.worktree_include),
     worktree_shared: storedList(f.worktree_shared),
     ...promptsBody(f.prompts),
+    scan_opt_out: f.scanOptOut ? 1 : 0,
   };
   if (!opts.system) body.kind = f.kind;
   if (opts.github) body.github_repo = orNull(f.github_repo);

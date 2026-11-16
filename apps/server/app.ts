@@ -49,6 +49,7 @@ import { browserName, createSession, sessionFor } from './google-auth.ts';
 import { toolFailuresApi } from './tool-failures-api.ts';
 import { worktreesApi } from './worktrees-api.ts';
 import { updateApi } from './update-api.ts';
+import { usageScanApi } from './usage-scan/api.ts';
 
 // Every /api route, and the Web UI. apps/server/index.ts boots it.
 export const app = new Hono();
@@ -116,6 +117,7 @@ api.route('/tool-failures', toolFailuresApi);
 api.route('/worktrees', worktreesApi);
 api.route('/update', updateApi);
 api.route('/accounts', accountsApi);
+api.route('/usage-scan', usageScanApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));

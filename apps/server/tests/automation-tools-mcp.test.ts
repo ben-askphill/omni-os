@@ -11,6 +11,8 @@ import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '../../..');
 const seen: { method: string; url: string; body: any }[] = [];
+/** The thread each request named (apps/mcp/api.ts), for the API's automation guard. */
+const callers: (string | string[] | undefined)[] = [];
 
 const automations = [
   {
@@ -40,6 +42,8 @@ function answer(method: string, url: string): [number, unknown] {
   if (method === 'DELETE' && url === '/api/automations/daily-brief') return [200, { ok: true, removed: 'file' }];
   if (method === 'DELETE' && url === '/api/automations/nope') return [404, { error: 'not found' }];
   if (method === 'GET' && url === '/api/channels/shop/actions') return [200, [action]];
+  if (method === 'POST' && url === '/api/usage-scan')
+    return [201, { thread: { id: 'scan-thread', title: 'Usage scan · 16 Nov', channel_id: 'inbox' }, asks: 40, groups: 3, pasted: 0, masked: 2, labelled: true }];
   if (method === 'GET' && url === '/api/threads/th-1/actions') return [200, { actions: [action], runs: [run(`${'a'.repeat(3000)}http://127.0.0.1:9301`)], blocked: null, setup_run: null, clone: null }];
   if (method === 'POST' && url === '/api/threads/th-1/actions/act-1/run') return [201, run('')];
   return [404, { error: `no fake for ${method} ${url}` }];
@@ -92,6 +96,7 @@ beforeAll(async () => {
     req.on('data', (c) => (data += c));
     req.on('end', () => {
       seen.push({ method: req.method!, url: req.url!, body: data ? JSON.parse(data) : undefined });
+      callers.push(req.headers['x-omni-thread']);
       const [status, body] = answer(req.method!, req.url!);
       res.statusCode = status;
       res.setHeader('content-type', 'application/json');
@@ -103,7 +108,7 @@ beforeAll(async () => {
   const base = `http://127.0.0.1:${(api.address() as AddressInfo).port}`;
   omni = new McpClient(
     spawn(join(ROOT, 'node_modules/.bin/tsx'), [join(ROOT, 'apps/mcp/omni.ts')], {
-      env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', OMNI_URL: base, OMNI_TOKEN: 'test-token', OMNI_USER: 'Ben' },
+      env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', OMNI_URL: base, OMNI_TOKEN: 'test-token', OMNI_USER: 'Ben', OMNI_THREAD_ID: 'conductor-thread' },
       stdio: ['pipe', 'pipe', 'inherit'],
     }),
   );
@@ -118,6 +123,19 @@ afterAll(() => {
 const T = { timeout: 30_000 };
 
 describe('Conductor automation tools', () => {
+  it('every call names the thread the server serves, so the API can refuse automation threads', T, async () => {
+    callers.length = 0;
+    await tool('list_automations');
+    expect(callers).toEqual(['conductor-thread']);
+  });
+
+  it('scan_usage starts a usage scan and returns its thread', T, async () => {
+    const { isError, body, requests } = await tool('scan_usage', { channel: 'acme' });
+    expect(isError).toBe(false);
+    expect(requests).toEqual([{ method: 'POST', url: '/api/usage-scan', body: { channel: 'acme' } }]);
+    expect(body).toEqual({ thread_id: 'scan-thread', title: 'Usage scan · 16 Nov', asks: 40, groups: 3, masked: 2, labelled: true });
+  });
+
   it('registers them, and delete says it is destructive', T, async () => {
     const { tools } = (await omni.request('tools/list')) as { tools: { name: string; description: string }[] };
     const names = tools.map((t) => t.name);

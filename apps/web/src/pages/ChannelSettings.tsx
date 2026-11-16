@@ -360,7 +360,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
       {/* Id, GitHub repo and base directory fill themselves in; each shows as a field only when Omni could not work
           it out or you choose to change it, and a failure opens the fold (#405). */}
-      <Advanced summary="Id, GitHub repo, worktrees and the browser window" open={idFailed || githubFailed}>
+      <Advanced summary="Id, GitHub repo, worktrees, the browser window and usage scans" open={idFailed || githubFailed}>
         {showId ? (
           <Field label="Id" htmlFor="ch-id" hint="Lowercase slug, used in URLs and by the Conductor. Cannot change later.">
             <input
@@ -453,6 +453,13 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             <div className="text-[12px] text-fg-3">Off runs the channel browser headless. Turn on to watch it or to log in by hand. Logins persist per channel.</div>
           </div>
           <Toggle checked={f.showBrowser} onChange={(v) => set('showBrowser', v)} label="Show the browser window" />
+        </div>
+        <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
+          <div>
+            <div className="text-[13px] font-medium text-fg">Leave out of usage scans</div>
+            <div className="text-[12px] text-fg-3">Scan my usage on the Automations page skips this channel’s threads, so none of their text reaches a model.</div>
+          </div>
+          <Toggle checked={f.scanOptOut} onChange={(v) => set('scanOptOut', v)} label="Leave out of usage scans" />
         </div>
       </Advanced>
 

@@ -45,7 +45,14 @@ describe('channel form', () => {
       prompt_open_pr: 'Use the pr-writer skill.',
       prompt_fix_conflicts: null,
       prompt_fix_checks: null,
+      scan_opt_out: 0,
     });
+  });
+
+  it('keeps a channel out of usage scans once it opted out, and reads an older server as opted in', () => {
+    expect(channelForm({ ...acme, scan_opt_out: 1 }).scanOptOut).toBe(true);
+    expect(channelBody(channelForm({ ...acme, scan_opt_out: 1 }), { system: false, github: false }).scan_opt_out).toBe(1);
+    expect(channelForm(acme).scanOptOut).toBe(false);
   });
 
   it('sends a blank step prompt as null, which goes back to the built-in one', () => {

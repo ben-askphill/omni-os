@@ -32,6 +32,8 @@ export interface Channel {
   prompt_open_pr: string | null;
   prompt_fix_conflicts: string | null;
   prompt_fix_checks: string | null;
+  /** 1 leaves the channel's threads out of usage scans (usage-scan/asks.ts). */
+  scan_opt_out: number;
   /** A standalone HTML file the channel's threads follow for the pages they write. Kept out of the API: see publicChannel. */
   design_system: string | null;
   design_system_name: string | null;
@@ -59,8 +61,8 @@ export const channels = {
     return tx(() => {
       db.prepare(
         `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes, icon, avatar_bg, avatar_bg_manual,
-           default_harness, default_model, default_effort, worktree_include, worktree_shared, prompt_open_pr, prompt_fix_conflicts, prompt_fix_checks)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           default_harness, default_model, default_effort, worktree_include, worktree_shared, prompt_open_pr, prompt_fix_conflicts, prompt_fix_checks, scan_opt_out)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         c.id,
         c.name,
@@ -84,6 +86,7 @@ export const channels = {
         c.prompt_open_pr ?? null,
         c.prompt_fix_conflicts ?? null,
         c.prompt_fix_checks ?? null,
+        c.scan_opt_out ?? 0,
       );
       record('channel', c.id);
       return channels.get(c.id)!;
@@ -95,7 +98,7 @@ export const channels = {
       'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir',
       'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'avatar_bg', 'avatar_bg_manual', 'design_system', 'design_system_name', 'archived',
       'default_harness', 'default_model', 'default_effort', 'worktree_include', 'worktree_shared',
-      'prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks',
+      'prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks', 'scan_opt_out',
     ] as const;
     const keys = allowed.filter((k) => k in patch);
     if (keys.length) {

@@ -201,6 +201,7 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         )}
         <SwitchRow title="Worktree per thread" detail="Each thread gets its own branch (omni/…), so parallel work never collides. Off runs in the repo itself." value={form.use_worktree} disabled={!hasRepo} onValueChange={(v) => set('use_worktree', v)} />
         <SwitchRow title="Show the browser window" detail="Off runs the channel browser headless. On, to watch it or log in by hand. Logins stay per channel." value={form.showBrowser} onValueChange={(v) => set('showBrowser', v)} />
+        <SwitchRow title="Leave out of usage scans" detail="Scan my usage skips this channel’s threads, so none of their text reaches a model." value={form.scanOptOut} onValueChange={(v) => set('scanOptOut', v)} />
       </Group>
 
       {hasRepo && form.use_worktree ? (

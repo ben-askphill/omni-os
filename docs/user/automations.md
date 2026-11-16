@@ -31,6 +31,29 @@ prompt: |
 
 `timezone` defaults to your timezone from the config (`OMNI_TZ` wins, else the system's). Omni watches both folders, so edits apply without a restart. The Mac has to be awake at the scheduled time, unless the automation sets `catchup: true`. Then a missed slot runs once Omni is back.
 
+## Scan my usage
+
+Scan my usage on the Automations page suggests automations from your own history. Desktop web, phone web and the desktop app all have it; the Conductor starts one with `scan_usage` when you ask.
+
+1. Omni reads the first message you typed in each thread you started in the last 90 days, plus the slash commands you used. It leaves out threads an automation started and every thread below one or continued from one, threads the Conductor, a team lead or another agent started and every thread below or continued from those (their first message is a brief an agent wrote), earlier scans, forks of the same ask, and channels set to **Leave out of usage scans** (Channel settings, Advanced; iOS Channel Settings too). Pick one channel in the dialog to scan only that.
+2. It groups asks that share a slash command, a linked site (GitHub PRs, Shopify admin, claude.ai pages) or a phrase: 6 or more asks over 3 or more weeks. No model runs for this.
+3. Secrets are masked before any text goes further or is grouped: token patterns in any case, and the values in Omni's secret store in any case, URL-encoded, form-encoded, in base64 and JSON-escaped. A slash command that holds a secret is dropped. A value only part of which appears (cut off, or quoted in a thread title a model wrote) is not caught. Haiku labels each group on this machine through your Claude Code login, as it does thread titles.
+4. A thread in #Inbox with the usage-scan role (`crew/usage-scan.md`) gets the groups, a few masked examples each, when they usually come in and the automations you already have. It replies with the patterns and up to 3 suggestions, each split 10/90: the small safe part a run does on its own, and the rest, where the run stops and explains the problem for you. It does not read transcripts.
+5. Nothing is created until you answer in that thread. It then saves only the ones you picked, with `save_automation`, and every one starts off. Turn each on here when you are happy with it.
+
+Omni holds the lead to this: until you have replied in the thread, or answered a question it asked, a save from it is refused, and whatever it saves is written with `enabled: false`. It cannot change, turn on, run or delete an existing automation. A scan that finds nothing repeating says so and starts no thread.
+
+To see the groups without any model, run the same query read-only against a database:
+
+```sh
+npm run repeated-asks --workspace @omni/server -- --db data/omni.db [--channel <id>] [--samples] [--json]
+```
+
+## Safety
+
+- **Turned off after 3 failed runs in a row.** When a run thread of an automation fails for the third time in a row, Omni turns the automation off in its YAML, like the toggle (so it syncs), and adds a Turned off row to its run history with the reason. Its card says Turned off after 3 failed runs. A finished run breaks the streak; skipped and stopped runs neither count nor break it. Turning it back on starts the count again. Any number of skipped runs between two failures does not hide the earlier one. Only the machine that runs the automation turns it off, and it also counts runs another machine started once their history syncs over.
+- **Automation threads cannot make automations.** A thread an automation started, and every thread below it at any depth (a crewmate it delegated to, a team, a thread continued from one of them), cannot create, change, turn on or run automations, retry a delivery, or start a usage scan. It can still turn one off or delete one. Omni's MCP servers name the calling thread on every request (`x-omni-thread`), and the API refuses with 403. A command a thread runs itself against the API names no thread and is not checked.
+
 ## Skipping runs with nothing to do
 
 Two optional fields keep a scheduled automation from spending plan usage on a run it does not need:
