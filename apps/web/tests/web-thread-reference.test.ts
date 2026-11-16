@@ -4,7 +4,7 @@ import { act, createElement, Fragment } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { readContexts } from '@omni/shared/message-context-kinds.ts';
 import type { Thread } from '../src/api.ts';
-import { attachReference, type ReferenceCandidate } from '../src/message-context/thread-picker.ts';
+import { attachReference, threadTarget, type ReferenceCandidate } from '../src/message-context/thread-picker.ts';
 
 vi.mock('../src/store.tsx', () => ({ useApp: () => ({ channels: [], crew: [], status: null }), useFeed: () => {} }));
 
@@ -76,8 +76,8 @@ const mount = async (phone: boolean) => {
   await act(async () =>
     root.render(
       phone
-        ? createElement(Fragment, null, createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onSwitched: () => {}, onFork: () => {} }), createElement(ThreadReferencePanel, { thread, touch: true, onPicked: () => {} }))
-        : createElement(Fragment, null, createElement(ReplyComposer, { thread }), createElement(ThreadReferencePanel, { thread, onPicked: () => {} })),
+        ? createElement(Fragment, null, createElement(MoComposer, { thread, chips: [], placeholder: 'Follow up', onSent: () => {}, onSwitched: () => {}, onFork: () => {} }), createElement(ThreadReferencePanel, { to: threadTarget(thread), touch: true, onPicked: () => {} }))
+        : createElement(Fragment, null, createElement(ReplyComposer, { thread }), createElement(ThreadReferencePanel, { to: threadTarget(thread), onPicked: () => {} })),
     ),
   );
 };
@@ -131,13 +131,13 @@ describe.each([false, true])('the picker, phone=%s', (phone) => {
 
   it('does not add the same thread twice, and says so', async () => {
     addDraftContext(thread.id, (() => {
-      expect(attachReference(thread.id, 'shop', same)).toBeNull();
+      expect(attachReference(threadTarget(thread), same)).toBeNull();
       return draftContext(thread.id)[0];
     })());
     await open(phone);
     const first = rows()[0] as HTMLButtonElement;
     expect(first.disabled).toBe(true);
-    expect(attachReference(thread.id, 'shop', same)).toBe('That thread is already attached.');
+    expect(attachReference(threadTarget(thread), same)).toBe('That thread is already attached.');
     expect(draftContext(thread.id)).toHaveLength(1);
   });
 
@@ -155,7 +155,7 @@ describe.each([false, true])('the picker, phone=%s', (phone) => {
 
 describe('a sent reference', () => {
   it('shows the captured title and channel and links to the thread', async () => {
-    attachReference(thread.id, 'shop', other);
+    attachReference(threadTarget(thread), other);
     const [r] = readContexts(draftContext(thread.id));
     await act(async () => root.render(createElement(ContextInspector, { reading: r })));
     expect(host.textContent).toContain('Nails page');
@@ -165,7 +165,7 @@ describe('a sent reference', () => {
   });
 
   it('keeps the title it was sent with when the record is read again', async () => {
-    attachReference(thread.id, 'shop', same);
+    attachReference(threadTarget(thread), same);
     const [r] = readContexts(draftContext(thread.id));
     expect(r.as === 'known' && r.kind === 'thread_reference' && r.body.title).toBe('Fix the cart total');
   });

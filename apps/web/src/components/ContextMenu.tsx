@@ -8,6 +8,7 @@ import { useApp } from '../store.tsx';
 import { openContinue } from './ContinueSheet.tsx';
 import { useThreadMenuActions } from './useThreadMenuActions.ts';
 import { ThreadReferencePanel } from './ThreadReference.tsx';
+import { threadTarget } from '../message-context/thread-picker.ts';
 import { FolderChoices, MenuCaption, MenuGroups, containerItems, focusFirstItem, itemForKey, moveFocus, useMenuDismiss, useMenuPlacement, useThreadRow, type MenuItem } from './ContextMenuParts.tsx';
 import { KbdFooter, MENU_SURFACE, MOD_KEY } from './ui/overlay.tsx';
 
@@ -154,7 +155,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
       <div className={referencing ? '' : 'p-1.5'}>
         {title && <MenuCaption>{title}</MenuCaption>}
         {referencing && row ? (
-          <ThreadReferencePanel thread={row} onPicked={onClose} />
+          <ThreadReferencePanel to={threadTarget(row)} onPicked={onClose} />
         ) : moving && row ? (
           <FolderChoices current={row.folder_id ?? null} choices={choices} onPick={moveTo} />
         ) : draft !== null ? (

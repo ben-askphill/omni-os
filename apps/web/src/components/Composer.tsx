@@ -27,6 +27,8 @@ import { requestIdFor, type PendingRequest } from '@omni/shared/request-id.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { ForkThreadButton } from './ContinueSheet.tsx';
 import { removeDraftContext, settleDraftContext, useDraftContext } from '../message-context/draft.ts';
+import { referencesFor } from '../message-context/thread-picker.ts';
+import { ReferenceThreadButton } from './ThreadReference.tsx';
 
 import { AttachButton, AttachmentStrip, useAttachments } from './composer/attachments.tsx';
 import { DropHint, enterKey, SendButton, shell, StopButton, useAutosize, useFocusRequests, withKeys } from './composer/controls.tsx';
@@ -78,6 +80,8 @@ export function NewThreadComposer({
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const att = useAttachments();
+  // Threads Ben referenced for the first message: chips over the box, kept like its text until Start.
+  const refs = useDraftContext(key);
   useAutosize(ref, text, big ? 360 : 260);
   useFocusRequests(ref, true);
 
@@ -86,7 +90,7 @@ export function NewThreadComposer({
   const toast = useToast();
   // Grok Bot in the Machine chip: the text goes to its webhook and no thread starts, so the run's own pickers step aside.
   const toGrok = runOn.grokBot;
-  const grokBlock = toGrok ? grokBotBlock(att.files.length) : null;
+  const grokBlock = toGrok ? grokBotBlock(att.files.length + refs.length) : null;
   const { choice, effort } = draftRun(picked, crew.find((r) => r.id === role), channels.find((c) => c.id === channel), harnesses ?? []);
   // Who the picked harness runs as on the machine the thread will run on: in the model list, the machine rows, and a
   // notice when it switched since anyone last looked. Auto picks the harness later, so it shows none.
@@ -168,11 +172,13 @@ export function NewThreadComposer({
           ...baseRequest(base, choice.harness),
           ...runOn.request,
           folder: folder && channel === preset?.channel ? folder.id : undefined,
+          ...(refs.length && { context: referencesFor(refs, channel) }),
         },
         att.files,
       );
       keepLocalFiles(t.id, att.files);
       drafts.delete(key);
+      settleDraftContext(key, refs.map((r) => r.id));
       setText('');
       att.clear();
       navigate(`/t/${t.id}`);
@@ -190,6 +196,7 @@ export function NewThreadComposer({
       {/* Near the top of the page, so it opens downward. */}
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
       {fileMenu.menu && <FileMenu {...fileMenu.menu} below />}
+      <ContextChips records={refs} onRemove={(id) => removeDraftContext(key, id)} className="px-3 pt-3 pb-0.5" />
       <AttachmentStrip files={att.files} onRemove={att.remove} />
       <textarea
         ref={ref}
@@ -226,6 +233,7 @@ export function NewThreadComposer({
         {!toGrok && <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />}
         <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} />
         <AttachButton onPick={att.add} disabled={busy} />
+        {!toGrok && <ReferenceThreadButton to={{ draft: key, channel }} disabled={busy} />}
         {folder && channel === preset?.channel && !toGrok && (
           <button
             type="button"

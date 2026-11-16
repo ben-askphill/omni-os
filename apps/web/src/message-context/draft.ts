@@ -1,5 +1,6 @@
 // The context Ben has added to a thread's next message and not sent yet (packages/shared/message-context.ts). One
-// list per thread, shared by the desktop reply box and the phone composer. Kept in memory across navigation and in
+// list per thread, shared by the desktop reply box and the phone composer, and one per new-thread composer under a
+// `new:` key (a thread id is a uuid, so the two never meet). Kept in memory across navigation and in
 // this browser's localStorage across a reload: a browser_annotation's screenshot is a file
 // on the server, so a reload that dropped the record would leave the file behind and cost Ben the capture.
 import { useSyncExternalStore } from 'react';
@@ -87,6 +88,11 @@ export function addDraftContext(threadId: string, record: MessageContext): strin
 export function removeDraftContext(threadId: string, id: string) {
   const list = draftContext(threadId);
   if (list.some((r) => r.id === id)) put(threadId, list.filter((r) => r.id !== id));
+}
+
+/** Drops the whole draft: the phone's new-thread sheet, whose text goes when it closes, lets its chips go with it. */
+export function clearDraftContext(threadId: string) {
+  if (drafts.has(threadId)) put(threadId, NONE);
 }
 
 /** Drops what a send carried. A record added while it was in flight stays for the next message. */

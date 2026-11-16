@@ -1,6 +1,8 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { fixture } from '@omni/test-fixtures';
 import { newContext, type MessageContext } from '@omni/shared/message-context.ts';
 import { referenceBody, threadReference } from '@omni/shared/message-context-thread.ts';
 import { startRunner } from './runner-boot.ts';
@@ -346,5 +348,104 @@ describe('reading a referenced thread', () => {
 
   it('answers the same through readReferenced, which the route calls', () => {
     expect(readReferenced(from.id, long.id, { limit: 3 })).toMatchObject({ state: 'ok', rows: [{ text: `message ${total - 3}` }, { text: `message ${total - 2}` }, { text: `message ${total - 1}` }] });
+  });
+});
+
+describe('starting a new thread with a thread reference', () => {
+  // POST /api/threads as the new-thread composer sends it: the first message carries the chips Ben picked.
+  const create = (body: Record<string, unknown>) =>
+    app.request('/api/threads', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ channel: 'shop', prompt: 'CMD hi', ...body }) });
+  const threadCount = () => (db.db.prepare('SELECT count(*) AS n FROM threads').get() as { n: number }).n;
+  /** A thread made through the route, once its first turn has ended. */
+  const started = async (body: Record<string, unknown>) => {
+    const res = await create(body);
+    expect(res.status, await res.clone().text()).toBe(200);
+    const t = (await res.json()) as { id: string; channel_id: string };
+    await H.untilResults(t.id, 1);
+    return t;
+  };
+
+  it('stamps the reference on the first message, tells the agent, and leaves the referenced thread alone', async () => {
+    const to = make('shop', 'Fix the cart total');
+    say(to.id, 'user', 'SECRET-TRANSCRIPT-LINE');
+    db.threads.update(to.id, { title: 'Renamed before start' });
+    const before = snapshot(to.id);
+    const t = await started({ context: [ref(to, 'shop')] });
+    const first = H.byKind(t.id, 'user')[0]!;
+    expect(first.p.text).toBe('CMD hi');
+    expect(first.p.context).toHaveLength(1);
+    expect((first.p.context as MessageContext[])[0].body).toMatchObject({ thread: to.id, title: 'Renamed before start', channel: 'shop', channel_name: 'Shop', cross_channel: false });
+    const told = H.claudeTexts(t.id).at(0)!;
+    expect(told).toContain(`Reference to another Omni thread, "Renamed before start" (thread id ${to.id})`);
+    expect(told).toContain(`with the Omni tool ${HISTORY_TOOL} (thread_id ${to.id})`);
+    expect(told).not.toContain('SECRET-TRANSCRIPT-LINE');
+    // The new thread's agent may read it now: the reference is on a user event of its own.
+    expect(readReferenced(t.id, to.id)).toMatchObject({ state: 'ok', rows: [{ text: 'SECRET-TRANSCRIPT-LINE' }] });
+    expect(snapshot(to.id)).toEqual(before);
+  });
+
+  it('starts as before with no context, and with an empty list', async () => {
+    for (const body of [{}, { context: [] }]) {
+      const t = await started(body);
+      expect(H.byKind(t.id, 'user')[0]!.p.context).toBeUndefined();
+    }
+  });
+
+  it('attaches a thread of another channel only when Ben picked it from All channels', async () => {
+    const other = make('pink', 'Nails page');
+    const n = threadCount();
+    const quiet = await create({ context: [ref(other, 'pink')] });
+    expect(quiet.status).toBe(400);
+    expect((await quiet.json()).error).toBe(`${ref(other, 'pink').label}: that thread is in another channel (#Pink Gellac). Pick it from All channels to attach it.`);
+    expect(threadCount()).toBe(n);
+    const t = await started({ context: [ref(other, 'shop')] });
+    expect(H.byKind(t.id, 'user')[0]!.p.context[0].body).toMatchObject({ cross_channel: true, channel: 'pink' });
+  });
+
+  it('checks the channel the thread is made in, not the one the record says', async () => {
+    const same = make('shop', 'Same channel');
+    const t = await started({ context: [ref(same, 'pink')] });
+    expect(H.byKind(t.id, 'user')[0]!.p.context[0].body).toMatchObject({ cross_channel: false });
+  });
+
+  it('refuses a thread that is gone, and any other kind of context, making no thread', async () => {
+    const gone = make('shop', 'Soon gone');
+    const picked = ref(gone, 'shop');
+    db.db.prepare('DELETE FROM threads WHERE id = ?').run(gone.id);
+    const n = threadCount();
+    const res = await create({ context: [picked] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(`${picked.label}: that thread no longer exists. Remove it from the message.`);
+    const diff = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')).records[0].raw as MessageContext;
+    const other = await create({ context: [diff] });
+    expect(other.status).toBe(400);
+    expect((await other.json()).error).toBe(`${diff.label}: a new thread's first message can carry thread references only. Add it in a reply once the thread has started.`);
+    expect((await create({ context: [{ kind: 'nope' }] })).status).toBe(400);
+    expect(threadCount()).toBe(n);
+  });
+
+  it('answers a retry with the thread it made even after the referenced thread was deleted', async () => {
+    const to = make('shop', 'Retried');
+    const body = { id: randomUUID(), context: [ref(to, 'shop')] };
+    const t = await started(body);
+    db.db.prepare('DELETE FROM threads WHERE id = ?').run(to.id);
+    const again = await create(body);
+    expect(again.status).toBe(200);
+    expect(((await again.json()) as { id: string }).id).toBe(t.id);
+  });
+
+  it('searches from the channel when there is no thread yet', async () => {
+    const mine = make('find', 'Composer search target');
+    const theirs = make('find-other', 'Composer search elsewhere');
+    const search = (q: string, query: string) => getJson(`/api/thread-references?${query}&q=${encodeURIComponent(q)}`);
+    const here = await search('composer search', 'channel=find');
+    expect(here.status).toBe(200);
+    expect(here.body.map((c: any) => c.id)).toEqual([mine.id]);
+    expect(here.body[0].same_channel).toBe(true);
+    const all = await search('composer search', 'channel=find&scope=all');
+    expect(all.body.map((c: any) => c.id).sort()).toEqual([mine.id, theirs.id].sort());
+    expect(all.body.find((c: any) => c.id === theirs.id).same_channel).toBe(false);
+    expect((await search('x', 'channel=nope')).status).toBe(404);
+    expect((await search('x', '')).status).toBe(404);
   });
 });
