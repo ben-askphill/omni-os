@@ -106,6 +106,15 @@ describe('the bundled server', () => {
     const automations = (await (await fetch(`http://127.0.0.1:${port}/api/automations`, { headers: auth })).json()) as { id: string; error?: string }[];
     expect(automations.find((a) => a.id === 'docs-daily')?.error).toMatch(/needs an Omni checkout/);
     expect(automations.find((a) => a.id === 'morning-coffee')?.error).toBeUndefined();
+
+    // Onboarding knows it is the desktop app: no `npm run setup`, and the welcome names the data folder's crew.
+    const setup = (await (await fetch(`http://127.0.0.1:${port}/api/setup`, { headers: auth })).json()) as { install: string };
+    expect(setup.install).toBe('app');
+    const done = (await (await fetch(`http://127.0.0.1:${port}/api/setup/complete`, { method: 'POST', headers: auth, body: '{}' })).json()) as { threadId: string };
+    const welcome = (await (await fetch(`http://127.0.0.1:${port}/api/threads/${done.threadId}`, { headers: auth })).json()) as { events: { kind: string; payload: string }[] };
+    const text = (JSON.parse(welcome.events.find((e) => e.kind === 'assistant_text')?.payload ?? '{}') as { text?: string }).text ?? '';
+    expect(text).toContain('Crew charters (the roles I hand work to) ship with the app.');
+    expect(text).toContain(`in \`${join(data, 'crew')}/\`. Settings > About shows where Omni keeps its files.`);
   }, 60_000);
 
   it("reads an adopted checkout's .env below its data dir's", async () => {

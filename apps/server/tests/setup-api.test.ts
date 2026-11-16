@@ -27,6 +27,8 @@ describe('onboarding', () => {
     expect(existsSync(configPath())).toBe(false);
     const s = await json(await send('GET', '/api/setup'));
     expect(s.onboarded).toBe(false);
+    // Tests run the TypeScript, as a checkout does; the desktop app's bundle says 'app' (bundle-boot.test.ts).
+    expect(s.install).toBe('checkout');
     expect(s.config.user.name).toBe('');
     expect(s.fallbacks.workspaceRoot).toBe('~/Omni');
     // No threads yet, so the legacy migration leaves it to onboarding.
@@ -74,9 +76,42 @@ describe('onboarding', () => {
     const evs = r.events(done.threadId);
     expect(evs.map((e) => e.kind)).toEqual(['assistant_text']);
     expect(evs[0].p.text).toContain('Welcome to Omni, Ada');
+    // This checkout's own crew folders, not the desktop app's wording.
+    expect(evs[0].p.text).toContain(`- Crew charters live in \`${paths.crew}/\`. To change one just for you, copy it into \`${paths.personalCrew}/\``);
     expect((await json(await send('GET', '/api/status'))).profile.onboarded).toBe(true);
     // Running setup again from Settings: no second welcome.
     expect((await json(await send('POST', '/api/setup/complete', {}))).threadId).toBeNull();
+  });
+});
+
+describe('the welcome message', () => {
+  const lines = (text: string) => text.split('\n');
+
+  it('in a checkout, names the repo crew folder and the data/crew copy', async () => {
+    const { welcomeText } = await import('../setup-api.ts');
+    const text = welcomeText('Ada', { install: 'checkout', crew: '~/omni-os/crew', personalCrew: '~/omni-os/data/crew' });
+    expect(lines(text)).toContain('- Crew charters live in `~/omni-os/crew/`. To change one just for you, copy it into `~/omni-os/data/crew/` and edit that copy.');
+  });
+
+  it('in the desktop app, names the data folder the app reads and Settings > About, never a crew/ folder to edit', async () => {
+    const { welcomeText } = await import('../setup-api.ts');
+    const personal = '~/Library/Application Support/Omni/data/crew';
+    const text = welcomeText('Ada', { install: 'app', crew: '/Applications/Omni.app/Contents/Resources/app/crew', personalCrew: personal });
+    const crew = lines(text).find((l) => l.startsWith('- Crew charters'))!;
+    expect(crew).toBe(
+      `- Crew charters (the roles I hand work to) ship with the app. To change one just for you, save a copy with the same name, like \`builder.md\`, in \`${personal}/\`. Settings > About shows where Omni keeps its files.`,
+    );
+    expect(text).not.toContain('Resources/app/crew');
+    expect(text).not.toMatch(/`crew\/`|`data\/crew\/`/);
+  });
+
+  it('says where to add a channel on the rail and on a phone, not "the sidebar"', async () => {
+    const { welcomeText } = await import('../setup-api.ts');
+    for (const install of ['app', 'checkout'] as const) {
+      const text = welcomeText('', { install, crew: '~/c', personalCrew: '~/d' });
+      expect(text).toContain('Add channel (+) at the foot of the channel rail, or Settings > Channels on a phone.');
+      expect(text).not.toContain('sidebar');
+    }
   });
 });
 

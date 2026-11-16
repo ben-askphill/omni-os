@@ -5,6 +5,7 @@ import { configDirty, configPatch, configProblem, configRows, configValues } fro
 
 const state = (over: Partial<SetupState['config']> = {}, env: Record<string, string> = {}): SetupState => ({
   onboarded: true,
+  install: 'checkout',
   path: '~/omni/data/omni.config.json',
   config: {
     version: 1,

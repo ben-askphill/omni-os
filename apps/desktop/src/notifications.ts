@@ -6,6 +6,7 @@
 import { BrowserWindow, Notification } from 'electron';
 import { allows, createTracker, type AlertPrefs, type AttentionAlert, type AttentionItem, type FeedAlert } from '@omni/shared/attention.ts';
 import type { AppContext } from './context.ts';
+import { handle } from './handle.ts';
 import { omniWindows } from './windows.ts';
 
 /** A notification on screen, as far as this module cares. */
@@ -205,8 +206,28 @@ export async function followFeed(deps: FeedDeps, signal: AbortSignal): Promise<v
 
 // ---------- Electron ----------
 
+/** What onboarding's Notifications step posts, so the OS asks for permission then (bridge `testNotification`). */
+export const TEST_NOTIFICATION = { title: 'Omni', body: 'Notifications are on. Omni tells you here when a thread needs you.' };
+
+/** Posts the sample notification. False when this system cannot show one. */
+export function postTestNotification(ctx: Pick<AppContext, 'paths' | 'showMain'>, notify: { isSupported(): boolean; show(options: Electron.NotificationConstructorOptions, onClick: () => void): void }): boolean {
+  if (!notify.isSupported()) return false;
+  notify.show({ ...TEST_NOTIFICATION, ...(ctx.paths.icon && process.platform !== 'darwin' ? { icon: ctx.paths.icon } : {}) }, () => ctx.showMain());
+  return true;
+}
+
+const electronNotify = {
+  isSupported: () => Notification.isSupported(),
+  show(options: Electron.NotificationConstructorOptions, onClick: () => void) {
+    const n = new Notification(options);
+    n.on('click', onClick);
+    n.show();
+  },
+};
+
 /** Follows the server while it is up, and posts what the tracker says is news. */
 export function installNotifications(ctx: AppContext): void {
+  handle('omni:notifications:test', () => postTestNotification(ctx, electronNotify));
   if (!Notification.isSupported()) return;
   const { backend, settings } = ctx;
   const notifier = createDesktopNotifier({

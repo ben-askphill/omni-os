@@ -13,7 +13,7 @@ import { webhookSecretName } from './github-webhook.ts';
 import { listCrew } from './crew.ts';
 import { channelCatalog, freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
-import { HARNESS_INSTALL } from './harness/types.ts';
+import { HARNESS_INSTALL, type HarnessInfo } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
 import { getProfile, profileInput, setProfile } from './profile.ts';
 import { deleteSecret, hasSecret, listSecrets, setSecret } from './secrets.ts';
@@ -32,14 +32,21 @@ metaApi.get('/crew', (c) => {
   );
 });
 
-// The harnesses with their availability, fix command, models, efforts, cap and running count.
+// The harnesses with their availability, fix command, models, efforts, cap and running count, and the install
+// command for a CLI Omni found no binary for (a signed-out one gets only its sign-in `fix`).
 // A harness that is down is probed again first, so a login shows up when the picker opens.
 // With ?channel=, as that channel sees them: Cursor Cloud needs its GitHub repo and can use its own key.
 metaApi.get('/harnesses', async (c) => {
   const cat = channelCatalog(await freshCatalog(), c.req.query('channel'));
   const running = runningByHarness();
-  return c.json(cat.harnesses.map((h) => ({ ...h, running: running[h.id] ?? 0, ...(!h.available && HARNESS_INSTALL[h.id] && { install: HARNESS_INSTALL[h.id] }) })));
+  return c.json(cat.harnesses.map((h) => harnessRow(h, running[h.id] ?? 0)));
 });
+
+/** One row of GET /api/harnesses. */
+export function harnessRow(h: HarnessInfo, running: number) {
+  const install = !h.available && h.missing ? HARNESS_INSTALL[h.id] : undefined;
+  return { ...h, running, ...(install && { install }) };
+}
 
 /** The other synced Macs a thread can be handed to, with whether Tailscale sees each up. Empty while sync is off. */
 metaApi.get('/devices', async (c) => c.json(await listDevices()));

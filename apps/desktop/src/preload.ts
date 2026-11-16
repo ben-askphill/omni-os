@@ -28,6 +28,7 @@ const bridge: DesktopBridge = {
   focus: () => send('omni:focus'),
   pairAgain: (route) => send('omni:pair-again', route),
   nativeNotifications: true,
+  testNotification: () => invoke('omni:notifications:test'),
   setAppearance: (mode) => send('omni:appearance', mode),
   setLayout: (layout) => send('omni:layout', layout),
   routeLinks(decide) {

@@ -104,8 +104,7 @@
     "available": false,
     "fix": "codex login",
     "models": [],
-    "running": 0,
-    "install": "npm install -g @openai/codex"
+    "running": 0
   },
   {
     "id": "cursor",
@@ -121,6 +120,7 @@
     "cap": 4,
     "available": false,
     "fix": "cursor-agent login",
+    "missing": true,
     "models": [],
     "running": 0,
     "install": "curl https://cursor.com/install -fsS | bash"

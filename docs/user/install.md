@@ -42,7 +42,7 @@ The desktop app replaced both, and the repo no longer has them.
 
 Signing Claude Code in over ssh works too. The login keychain is locked there, so `claude` saves the login to `~/.claude/.credentials.json`. Before each Claude Code thread starts, Omni copies that login into the Keychain when it is newer than the one there, because the desktop session reads the Keychain first and would otherwise fail with "OAuth session expired". `OMNI_CLAUDE_LOGIN_SYNC=0` in `.env` turns this off.
 
-Secrets go in the Keychain on a Mac and in `data/secrets.json` on Linux ([Configuration](configuration.md#secrets)). Codex and Cursor Agent are optional (see [Harnesses](harnesses.md)).
+Secrets go in the Keychain on a Mac and in `data/secrets.json` on Linux ([Configuration](configuration.md#secrets)). Cursor Agent is optional. Codex is too, but the Conductor has it review every pull request Claude wrote, and asks you each time when it is missing ([Crew](crew.md)). See [Harnesses](harnesses.md).
 
 ## Agent instructions
 
@@ -101,15 +101,17 @@ npm install --include=dev
 npm run setup
 ```
 
-`npm run setup` asks the same five things the Web UI's first-run screens ask:
+`npm run setup` asks what the first-run screens in the Web UI and the desktop app ask, except notifications:
 
 1. **You**: your name (what Omni and its agents call you), email, timezone (prefilled from the system) and pronouns (default they/them)
 2. **Workspace**: the workspace folder (default `~/Omni`; threads without a repo run there and its CLAUDE.md and skills load in every Claude thread), your repos folder (default `~/code`) and your GitHub owner
-3. **Harnesses**: which of Claude Code, Codex and Cursor Agent are installed and signed in, with the command to fix each one
+3. **Harnesses**: whether Claude Code, Codex and Cursor Agent are ready, not installed, signed out or failing, with the install command for a missing one, the sign-in command for a signed-out one, and the reason for any other
 4. **First channel**: a client or project with an optional repo and Shopify store, or skip
 5. **Done**: saves `data/omni.config.json` and, in the Web UI, opens #conductor with a welcome message
 
-Running it again is safe, because every answer defaults to what is saved. `npm run setup -- --yes --name Ada --email ada@example.com` answers it without prompts (`--help` lists the flags). Skip it and the Web UI asks on first open instead. `npm run setup` writes the checkout's `data/`, which the packaged desktop app does not use unless you keep it there, so set up the desktop app in its own first-run screens. Change anything later in **Settings > General** and **Workspace** on any surface; General has **Run setup again**, which walks the screens once more. [Configuration](configuration.md) describes what the file holds.
+The first-run screens add **Notifications** before Done: in a browser, a switch that turns on browser notifications and asks the browser for permission; in the desktop app, a test notification, so macOS asks for permission during setup rather than at the first alert ([Notifications](notifications.md)).
+
+Running it again is safe, because every answer defaults to what is saved. `npm run setup -- --yes --name Ada --email ada@example.com` answers it without prompts (`--help` lists the flags). Skip it and the Web UI asks on first open instead. `npm run setup` writes the checkout's `data/`, which the packaged desktop app does not use unless you keep it there, so set up the desktop app in its own first-run screens. When the desktop app's server holds the port (`:4747`), it refuses the checkout's token, and `npm run setup` stops and says so instead of writing a config the app never reads. Change anything later in **Settings > General** and **Workspace** on any surface; General has **Run setup again**, which walks the screens once more. [Configuration](configuration.md) describes what the file holds.
 
 ## Start it
 

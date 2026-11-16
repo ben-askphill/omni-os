@@ -188,6 +188,11 @@ export interface DesktopBridge {
    * own. Older app builds lack it, and the page's browser notifications stay on there.
    */
   readonly nativeNotifications?: boolean;
+  /**
+   * Posts a sample native notification now, so the OS asks for permission during setup, not at the first real alert
+   * (macOS asks once). False when this system cannot show notifications. Older app builds lack it.
+   */
+  testNotification?(): Promise<boolean>;
   /** Keeps the native window chrome and menus on the theme the Web UI picked. */
   setAppearance(mode: 'system' | 'light' | 'dark'): void;
   /**

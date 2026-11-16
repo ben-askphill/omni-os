@@ -64,12 +64,16 @@ const caps = (): Record<HarnessId, number> => ({
   'cursor-cloud': config.maxConcurrentCursorCloud,
 });
 
-/** Probe `cursor-agent --list-models` for the model list. Success means installed and logged in. */
+/**
+ * Probe `cursor-agent --list-models` for the model list. Success means installed and logged in. No binary on PATH, or
+ * an OMNI_CURSOR_BIN that is not there, is `missing`; any other failure reads as signed out.
+ */
 export async function probeCursor(bin = cursorBin()): Promise<CursorProbe> {
   const unavailable: CursorProbe = { available: false, models: [] };
-  if (!bin) return unavailable;
+  if (!bin) return { ...unavailable, missing: true };
   return await new Promise<CursorProbe>((resolve) => {
     execFile(bin, ['--list-models'], { env: harnessEnv('cursor', {}), timeout: 5000 }, (err, stdout) => {
+      if ((err as NodeJS.ErrnoException | null)?.code === 'ENOENT') return resolve({ ...unavailable, missing: true });
       if (err || !stdout?.trim()) return resolve(unavailable);
       rememberCursorWindows(stdout);
       const models = parseCursorModels(stdout);
@@ -128,7 +132,7 @@ export async function probeCodex(
   { startMs = CODEX_START_MS, silenceMs = CODEX_SILENCE_MS }: { startMs?: number; silenceMs?: number } = {},
 ): Promise<Probe> {
   const down = (fix: string): Probe => ({ available: false, models: [], fix });
-  if (!bin) return down(CODEX_NOT_FOUND);
+  if (!bin) return { ...down(CODEX_NOT_FOUND), missing: true };
   return await new Promise<Probe>((resolve) => {
     let settled = false;
     let stderr = '';

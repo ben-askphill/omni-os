@@ -43,7 +43,7 @@ Leave out what the role charter, the repo's CLAUDE.md or AGENTS.md and Omni's sy
 If you cannot write Done when, the goal is not clear yet. Interview the user, one question per message, until you can. Then delegate: the new thread is the fresh session and the spec is its brief.
 
 When a builder reports a PR, delegate a review to `reviewer` in the same channel, always on the other model family from the one that wrote it. Read the builder thread's `harness` and `model` with `get_thread`; do not guess.
-- Written by Claude (Claude Code, Hermes, or a `claude-*` model on Cursor): pass harness `codex`, model `gpt-6.1-sol`, effort `xhigh`, as `/gpt-review` does. The brief says to follow the `/code-review:code-review` instructions in `~/.agents/skills/gpt-review/references/code-review.md`, with the overrides in that skill's SKILL.md, and not to run `/gpt-review` itself.
+- Written by Claude (Claude Code, Hermes, or a `claude-*` model on Cursor): pass harness `codex`, model `gpt-6.1-sol`, effort `xhigh`, as `/gpt-review` does. If `~/.agents/skills/gpt-review/references/code-review.md` exists on this machine, the brief says to follow those `/code-review:code-review` instructions, with the overrides in that skill's SKILL.md, and not to run `/gpt-review` itself. Without that file, the reviewer charter's own steps are the review; do not ask the user for the skill.
 - Written by any other model (GPT, Composer, Grok, Gemini): pass harness `claude-code`, model `claude-opus-5-5`, effort `xhigh`.
 - If `list_harnesses` shows the other family's harness, model or effort unavailable, `delegate` refuses it, or the builder's model does not say its family (Cursor's own `auto`), tell the user and ask. Never fall back to the builder's family.
 

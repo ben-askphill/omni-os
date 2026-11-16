@@ -32,7 +32,7 @@ The iPhone app has the same kinds, Pull requests included, as switches under its
 
 The desktop app posts native notifications from its main process, so they arrive even with every Omni window closed (on a Mac the app stays in the Dock). They are on by default. Turn them off with **Notify from the desktop app**.
 
-- On a Mac, macOS asks once whether Omni may send notifications. If none arrive, allow Omni in System Settings > Notifications. Focus modes can hold them back too.
+- On a Mac, macOS asks once whether Omni may send notifications. First-run setup's Notifications screen has **Send a test notification**, so it asks then rather than at the first alert. If none arrive, allow Omni in System Settings > Notifications. Focus modes can hold them back too.
 - The app shows one notification per thread: a newer one for the same thread replaces the older one.
 - These choices belong to the app on this machine. They do not sync, and the browser's choices do not apply to it.
 - Before this, the app's page posted browser notifications with the page's own channel switches. The first time the updated app opens, channels you had turned off there are turned off in the app's setting too, once.
@@ -40,7 +40,7 @@ The desktop app posts native notifications from its main process, so they arrive
 
 ## Browser and phone browser
 
-Browser notifications start off. Turn on **Notify in this browser**; the browser asks for permission the first time. They only arrive while an Omni tab is open. The choices stay in that browser.
+Browser notifications start off. Turn on **Notify in this browser**, here or on the Notifications screen of first-run setup; the browser asks for permission the first time. They only arrive while an Omni tab is open. The choices stay in that browser.
 
 ## Where the events come from
 

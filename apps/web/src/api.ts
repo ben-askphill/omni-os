@@ -23,7 +23,7 @@ import type { FeedAlert } from '@omni/shared/attention.ts';
 export type { EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
 
 /** A harness in the catalog, plus how many of its threads are running now. */
-export type HarnessWithRunning = HarnessInfo & { running: number; /** How to install it, when it is not available and has a local CLI. */ install?: string };
+export type HarnessWithRunning = HarnessInfo & { running: number; /** How to install it, when it is `missing`. */ install?: string };
 
 /** A thread's `/` menu: its harness's commands, and the names Ben used last on that harness, newest first. */
 export type CommandList = HarnessCommands & { recent?: string[] };
