@@ -44,10 +44,17 @@ function accountTitle(a: NonNullable<UsageRow['account']>): string {
   return `${[a.label, a.plan, a.org && !a.org.toLowerCase().includes(a.label.toLowerCase()) ? a.org : null].filter(Boolean).join(' · ')}${machines}`;
 }
 
+/** Why an account row has no numbers yet, and what fills it in. */
+function waitingTitle(harness: string, name: string, a: NonNullable<UsageRow['account']>): string {
+  const on = a.machines.length ? ` on ${a.machines.join(' or ')}` : '';
+  const what = harness === 'claude-code' ? 'Claude Code turn' : `${name} run`;
+  return `No reading for ${a.label} yet. It fills in after the next ${what} signed in as this account${on}.`;
+}
+
 /**
- * One account's row: the 5-hour and weekly windows, a monthly cycle (Cursor), or "no data" when that account has no
- * reading of its own. A harness with several accounts names each under its row; one with a single account keeps the
- * plain row, with the account on hover.
+ * One account's row: the 5-hour and weekly windows, a monthly cycle (Cursor), "no reading yet" when that account has
+ * none of its own yet, or "no data" when its reading went stale. A harness with several accounts names each under its
+ * row; one with a single account keeps the plain row, with the account on hover.
  */
 function UsageRowView({ row }: { row: UsageRow }) {
   useNow(60_000);
@@ -65,7 +72,11 @@ function UsageRowView({ row }: { row: UsageRow }) {
           <span className="text-fg"><HarnessLogo harness={row.harness} size={12} /></span>
           {name}
         </span>
-        {noData ? (
+        {noData && row.waiting && row.account ? (
+          <span className="flex-1 truncate text-[10.5px] text-fg-3" title={waitingTitle(row.harness, name, row.account)} data-testid="usage-waiting">
+            no reading yet
+          </span>
+        ) : noData ? (
           <span className="flex-1 text-[10.5px] text-fg-3">no data</span>
         ) : !windows ? (
           <MonthCell m={usage!.monthly! as MonthlyUsage} name={label} />

@@ -65,7 +65,11 @@ describe('usageRows', () => {
     expect(claude.every((r) => r.several)).toBe(true);
     expect(claude[0]).toMatchObject({ account: { label: 'ben@askphill.com', plan: 'Max', machines: ['omarchy', 'mbp'] }, usage: week(0.6) });
     // The personal account has no reading of its own: "no data", not the work account's or the per-harness one.
-    expect(claude[1]).toMatchObject({ account: { label: 'ben.rosenberg.personal.long.address@example-domain.com', plan: 'Pro' }, usage: null });
+    expect(claude[1]).toMatchObject({ account: { label: 'ben.rosenberg.personal.long.address@example-domain.com', plan: 'Pro' }, usage: null, waiting: true });
+    expect(claude[0]!.waiting).toBe(false);
+    // A reading of its own that went stale is "no data", not waiting for a first one.
+    const stale = usageRows(H, v, [...records, rec('claude-code', 'ben.rosenberg.personal.long.address@example-domain.com', null)]);
+    expect(stale.filter((r) => r.harness === 'claude-code')[1]).toMatchObject({ usage: null, waiting: false });
     expect(new Set(claude.map((r) => r.key)).size).toBe(2);
   });
 
@@ -73,7 +77,7 @@ describe('usageRows', () => {
     const v = view(machine('omarchy', [acct('claude-code', 'a@x.com')], true), machine('air', [acct('claude-code', null)]));
     const rows = usageRows(['claude-code'], v, [rec('claude-code', 'old@x.com', week(0.1))], { 'claude-code': week(0.9) });
     // One account signed in, the other signed out. A record exists for an account that is gone: a@x.com still has none.
-    expect(rows).toEqual([{ key: expect.any(String), harness: 'claude-code', account: { label: 'a@x.com', org: null, plan: 'Max', machines: ['omarchy'] }, usage: null, several: false }]);
+    expect(rows).toEqual([{ key: expect.any(String), harness: 'claude-code', account: { label: 'a@x.com', org: null, plan: 'Max', machines: ['omarchy'] }, usage: null, several: false, waiting: true }]);
   });
 
   it("never puts a reading from another login (Cursor's IDE session) on an account's row", () => {
@@ -86,7 +90,7 @@ describe('usageRows', () => {
 
   it('shows a failed check as a plain row with no data, and every harness as today before the accounts load', () => {
     const v = view(machine('omarchy', [acct('codex', null, { state: 'unknown' })], true));
-    expect(usageRows(['codex'], v, [], { codex: week(0.4) })).toEqual([{ key: 'codex', harness: 'codex', account: null, usage: null, several: false }]);
+    expect(usageRows(['codex'], v, [], { codex: week(0.4) })).toEqual([{ key: 'codex', harness: 'codex', account: null, usage: null, several: false, waiting: false }]);
     expect(usageRows(['claude-code', 'codex'], undefined, [], { codex: week(0.4) }).map((r) => [r.harness, r.usage])).toEqual([
       ['claude-code', null],
       ['codex', week(0.4)],

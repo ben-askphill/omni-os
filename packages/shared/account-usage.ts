@@ -59,6 +59,11 @@ export interface UsageRow {
   usage: PlanUsage | null;
   /** The harness has more than one account, so this row names its account. */
   several: boolean;
+  /**
+   * The account has no reading of its own yet, from any machine: readings are filed per account only since PR #750, and
+   * Claude Code's come in only with a turn. The row says so instead of a bare "no data".
+   */
+  waiting: boolean;
 }
 
 /** The latest record per account, by when it was read. */
@@ -91,7 +96,7 @@ export function usageRows(
 ): UsageRow[] {
   const latest = latestUsage(records);
   return harnesses.flatMap((h): UsageRow[] => {
-    const plain = (usage: PlanUsage | null): UsageRow[] => [{ key: h, harness: h, account: null, usage, several: false }];
+    const plain = (usage: PlanUsage | null): UsageRow[] => [{ key: h, harness: h, account: null, usage, several: false, waiting: false }];
     const listed = (view?.machines ?? []).flatMap((m) => m.accounts.filter((a) => a.harness === h).map((a) => ({ machine: m.name, a })));
     if (!view || !listed.length) return plain(legacy[h] ?? null);
 
@@ -119,7 +124,7 @@ export function usageRows(
       // read through another login.
       const stand = legacy[h] && !legacy[h]!.unattributed ? legacy[h]! : null;
       const usage = own ? own.usage : !several && !anyRecord ? stand : null;
-      return { key: k, harness: h, account, usage, several };
+      return { key: k, harness: h, account, usage, several, waiting: !own && !usage };
     });
   });
 }
