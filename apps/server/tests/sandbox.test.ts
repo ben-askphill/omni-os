@@ -17,6 +17,8 @@ const DATA_DIR = vi.hoisted(() => {
   const dir = mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'omni-sandbox-data-'));
   process.env.OMNI_DATA_DIR = dir;
   delete process.env.OMNI_CONFIG;
+  // These tests are of a checkout's default, the TypeScript servers. native-mcp.test.ts has the Rust build's.
+  delete process.env.OMNI_NATIVE_MCP;
   return dir;
 });
 

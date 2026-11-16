@@ -87,7 +87,7 @@ Per slice:
 
 | Module | Status | Reason or next step |
 | --- | --- | --- |
-| `apps/mcp` `ask.ts`, `render.ts`, `threads.ts`, `referenced-thread.ts`, `api.ts` | in progress | Slice 1. Step 1 is done: `crates/omni-mcp` passes the record. Nothing starts the binary yet (step 2), and the TypeScript stays until step 3 |
+| `apps/mcp` `ask.ts`, `render.ts`, `threads.ts`, `referenced-thread.ts`, `api.ts` | in progress | Slice 1. Steps 1 and 2 are done: `crates/omni-mcp` passes the record, the desktop build ships it and the server starts it when it is there. The TypeScript stays as the fallback until step 3, after a release has carried the binary |
 | `apps/cli` | planned | Slice 2. Keeps its six commands ([ADR 0014](../adr/0014-omni-command-line.md)) |
 | `apps/mcp` `omni.ts`, `pull-requests.ts` | planned | Slice 3 |
 | `apps/mcp` `external/` | kept | The HTTP transport runs inside the server and shares `tools.ts` with the stdio one. Porting only stdio would leave two copies of 20 tools. Moves with the server or not at all |
@@ -126,6 +126,14 @@ Per slice:
 - **`crates/omni-mcp/tests/goldens.rs`** replays them against the Rust binary, each stdout line and request body byte for byte.
 - **`packages/test-fixtures/native/js-corpus.json`** holds 248 JSON texts with what Node made of each: whether it parses, how it prints, and `String()`, `Number()`, truthiness, `trim()`, code point count and `encodeURIComponent()`. `apps/mcp/tests/js-corpus.test.ts` checks the file against Node and `crates/omni-core/tests/node_parity.rs` holds the Rust code to it.
 
+### How it ships and runs
+
+- **The build.** `apps/desktop/scripts/stage.ts` calls `native.ts`, which compiles `omni-mcp` for the app's target and puts it at `bin/omni-mcp` in the app root. Linux gets a static musl build, so it needs no glibc at all. A universal Mac build compiles both arches and joins them with `lipo`. `--native auto` (the default) leaves the binary out when the machine has no `cargo`, `--native required` fails instead, and the release workflow passes `required`.
+- **The server.** `apps/server/native-mcp.ts` decides once per server start. It runs `bin/omni-mcp --version`, and when that prints a version, `buildMcpConfig` names the binary for `omni-ask`, `omni-render` and `omni-threads`. Otherwise it names the TypeScript servers as before. The server log says which: `[mcp] ask, render and threads run on the Rust build: <path> (<version>)`, or a warning with the reason the binary did not start. A desktop build without the binary logs nothing and runs the TypeScript.
+- **Harnesses.** Claude Code, Codex and Cursor Agent threads get these servers from `buildMcpConfig`, so all three get the same choice. Hermes and Cursor Cloud threads get no per-thread servers.
+- **`OMNI_NATIVE_MCP`.** `0` keeps a machine on the TypeScript servers. A path names a binary to use, which is how a checkout tries one (`OMNI_NATIVE_MCP=target/release/omni-mcp`, relative to the repo root). Unset, the desktop app uses its own and a checkout uses none, because a `target/` build can be older than the TypeScript beside it. The desktop app reads it from the `.env` in its data folder.
+- The conductor's `omni` server is slice 3 and still runs on TypeScript.
+
 The tool descriptions and limits in `ask.rs` and `render.rs` are copies of `packages/shared/question.ts` and `html-render.ts`. The `tools/list` scenarios compare them byte for byte, so a change to the TypeScript text fails the Rust test until the copy follows.
 
 ## Known differences
@@ -145,4 +153,4 @@ What the Rust build does differently on purpose. None of these has been seen fro
 - **The server.** It stays in TypeScript under this plan. A full port is possible, and the wire fixtures in `packages/test-fixtures/wire/` would be its parity record, but it is 47,766 lines with 49,785 lines of tests, and until the last route moved there would be two implementations of the schema side by side. It buys lower idle memory and one binary to ship. It does not make threads faster. Say so if you want it anyway and it becomes slice 4, route group by route group behind the same port.
 - **The desktop shell.** Tauri would replace Electron's Chromium with the system web view and make the download much smaller. It cannot run the bundled Node server, so it needs either a separate Node in the app or the server port above. It also trades one Chromium for WebKit on macOS and WebKitGTK on Linux, which the Web UI has never been tested on. Kept on Electron until the server decision is made.
 - **The iOS app.** No Rust planned. Say so if you want a shared native core for a later Android app.
-- **Rust as a build requirement.** Slice 1 step 2 makes the desktop release need a Rust toolchain on the build machines. Development from a checkout keeps working without one.
+- **Rust as a build requirement.** The release workflow now needs a Rust toolchain, which GitHub's runners have. A local desktop build without `cargo` still works and ships the TypeScript servers only. Development from a checkout needs no Rust. Say so if you would rather the release also fell back without Rust.
