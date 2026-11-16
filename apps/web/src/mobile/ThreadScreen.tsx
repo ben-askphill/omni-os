@@ -34,7 +34,6 @@ import { threadView } from '@omni/shared/thread-view.ts';
 import { crewLine, prLine, prOffered, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
-import { runningSubagents } from '../subagents.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { STATUS, asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
@@ -43,8 +42,8 @@ import { threadPill } from '../components/thread/thread-state.ts';
 export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
-  const { thread, parent, children, events, history, revealTarget, clearReveal, files, shots, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover, init, warm, crew: crewArtifacts, jumpTo } = s;
-  const { needsYou, channel, tasks } = useApp();
+  const { thread, parent, children, events, history, revealTarget, clearReveal, files, shots, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover, init, warm, crew: crewArtifacts } = s;
+  const { needsYou, channel } = useApp();
   const hereName = useHereName();
   // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
   const [quick, setQuick] = useState(false);
@@ -58,7 +57,6 @@ export function ThreadScreen() {
   const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
   const changes = useBranchChanges(thread, slotBusy);
   const [pr] = useThreadPR(thread, slotBusy, true);
-  const agents = useMemo(() => runningSubagents(tasks, thread?.id ?? ''), [tasks, thread?.id]);
   // The channel's own step prompts (Channel Settings), else the built-in ones.
   const ownChannel = thread ? channel(thread.channel_id) : undefined;
   const prompts = useMemo(() => stepPrompts(ownChannel), [ownChannel]);
@@ -173,9 +171,6 @@ export function ThreadScreen() {
                 init={init}
                 warm={warm}
                 slotBusy={slotBusy}
-                agents={agents}
-                parent={parent}
-                children={children}
                 prs={pr}
                 step={step}
                 artifactCount={artifactCount}
@@ -185,13 +180,9 @@ export function ThreadScreen() {
                 turn={turn}
                 reconnecting={reconnecting}
                 onOpen={openFromCard}
-                onOpenThread={(id) => {
+                onOpenPR={(c, n) => {
                   setQuick(false);
-                  shell.open(href.thread(id));
-                }}
-                onJump={(at) => {
-                  setQuick(false);
-                  jumpTo(at);
+                  shell.open(href.pr(c, n));
                 }}
               />
             </div>

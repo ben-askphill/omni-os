@@ -35,6 +35,10 @@ import {
   getHarness,
   CURSOR_CLOUD_REJECTED,
   CURSOR_CLOUD_UNREACHABLE,
+  CODEX_API_KEY,
+  CODEX_LOGIN,
+  CODEX_NOT_FOUND,
+  codexFix,
   type Catalog,
   type CodexProbe,
   type CursorProbe,
@@ -74,43 +78,99 @@ export async function probeCursor(bin = cursorBin()): Promise<CursorProbe> {
   });
 }
 
-/** Probe `codex app-server` for the account, config defaults, the model list and rate limits. */
-export async function probeCodex(bin = codexBin()): Promise<Probe> {
-  const unavailable: Probe = { available: false, models: [] };
-  if (!bin) return unavailable;
+/** How long the probe waits for Codex to start and answer. The `codex` on PATH can be a wrapper that installs a release first. */
+export const CODEX_START_MS = 15_000;
+/** How long Codex may then leave a probe request unanswered. */
+export const CODEX_SILENCE_MS = 5_000;
+/** The most a probe waits in all, however long Codex keeps talking without answering. */
+const CODEX_PROBE_CAP_MS = 60_000;
+
+/**
+ * Calls `onSilent` when `stream` sends nothing for `ms` after `expect`, counting only time the server could hear it.
+ * On a busy machine synchronous disk writes hold the server's thread for seconds, and a timer that comes due meanwhile
+ * runs before the poll reads what Codex sent. So the timer looks again after the next poll (setImmediate) and waits
+ * another `ms` if anything came in.
+ */
+function silenceWatch(stream: NodeJS.ReadableStream, onSilent: (method: string, ms: number) => void) {
+  const started = Date.now();
+  let heard = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let next: ReturnType<typeof setImmediate> | undefined;
+  const onData = () => void heard++;
+  stream.on('data', onData);
+  const clear = () => {
+    clearTimeout(timer);
+    clearImmediate(next);
+  };
+  const stop = () => {
+    clear();
+    stream.off('data', onData);
+  };
+  const expect = (method: string, ms: number) => {
+    clear();
+    const seen = heard;
+    timer = setTimeout(() => {
+      next = setImmediate(() => (heard === seen || Date.now() - started > CODEX_PROBE_CAP_MS ? onSilent(method, ms) : expect(method, ms)));
+    }, ms);
+  };
+  return { expect, stop };
+}
+
+/** The last line Codex wrote to stderr, short enough for a fix hint. */
+const lastLine = (text: string) => (text.trim().split('\n').pop() ?? '').trim().slice(0, 200);
+
+/**
+ * Probe `codex app-server` for the account, config defaults, the model list and rate limits. When Codex can't be
+ * used, `fix` says why: signed out, an API key login, no binary, a binary that won't run or exits, or no answer.
+ */
+export async function probeCodex(
+  bin = codexBin(),
+  { startMs = CODEX_START_MS, silenceMs = CODEX_SILENCE_MS }: { startMs?: number; silenceMs?: number } = {},
+): Promise<Probe> {
+  const down = (fix: string): Probe => ({ available: false, models: [], fix });
+  if (!bin) return down(CODEX_NOT_FOUND);
   return await new Promise<Probe>((resolve) => {
     let settled = false;
+    let stderr = '';
     const client = new CodexClient({
       bin,
       env: harnessEnv('codex', {}),
-      onExit: () => finish(unavailable),
+      onExit: (code, signal) => finish(down(codexFix.exited(code, signal, lastLine(stderr)))),
+      onStderr: (chunk) => void (stderr = (stderr + chunk).slice(-2000)),
     });
     // A binary that can't be run (a stale OMNI_CODEX_BIN) is an error event, not an exit.
-    client.child.on('error', () => finish(unavailable));
+    client.child.on('error', (e: NodeJS.ErrnoException) => finish(down(codexFix.wontRun(bin, e.code ?? e.message))));
+    const watch = silenceWatch(client.child.stdout!, (method, ms) => finish(down(codexFix.silent(method, ms))));
     const finish = (r: Probe) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeout);
+      watch.stop();
       client.kill();
       resolve(r);
     };
-    const timeout = setTimeout(() => finish(unavailable), 5000);
+    let method = 'initialize';
+    const ask = <T>(m: string, params: unknown, ms = silenceMs) => {
+      method = m;
+      watch.expect(m, ms);
+      return client.request<T>(m, params);
+    };
     (async () => {
       try {
-        await client.request('initialize', { clientInfo: { name: 'omni-os', version: '0.1.0' } });
+        await ask('initialize', { clientInfo: { name: 'omni-os', version: '0.1.0' } }, startMs);
         client.notify('initialized', {});
         // Omni runs Codex on the ChatGPT plan only, so an API key login counts as logged out.
-        const { account } = await client.request<GetAccountResponse>('account/read', {});
-        if (account?.type !== 'chatgpt') return finish(unavailable);
-        const cfg = (await client.request<ConfigReadResponse>('config/read', {}).catch(() => null))?.config;
+        const { account } = await ask<GetAccountResponse>('account/read', {});
+        if (!account) return finish(down(CODEX_LOGIN));
+        if (account.type !== 'chatgpt') return finish(down(CODEX_API_KEY));
+        const cfg = (await ask<ConfigReadResponse>('config/read', {}).catch(() => null))?.config;
         const listed: CodexModel[] = [];
         let cursor: string | null = null;
         do {
-          const page: ModelListResponse = await client.request<ModelListResponse>('model/list', { cursor, includeHidden: true });
+          const page: ModelListResponse = await ask<ModelListResponse>('model/list', { cursor, includeHidden: true });
           listed.push(...page.data);
           cursor = page.nextCursor;
         } while (cursor);
-        const rl = await client.request<GetAccountRateLimitsResponse>('account/rateLimits/read', {}).catch(() => null);
+        const rl = await ask<GetAccountRateLimitsResponse>('account/rateLimits/read', {}).catch(() => null);
         // Codex's own picker hides some models; so does Omni's, unless config.toml picks one.
         const models = listed
           .filter((m) => !m.hidden || m.id === cfg?.model)
@@ -129,15 +189,15 @@ export async function probeCodex(bin = codexBin()): Promise<Probe> {
           models,
           rateLimits: rl?.rateLimitsByLimitId?.[PLAN_LIMIT_ID] ?? rl?.rateLimits,
         });
-      } catch {
-        finish(unavailable);
+      } catch (e) {
+        finish(down(codexFix.failed(method, e instanceof Error ? e.message : String(e))));
       }
     })();
   });
 }
 
 async function probeCodexHarness(cap: number): Promise<HarnessInfo> {
-  const probe = await probeCodex().catch((): Probe => ({ available: false, models: [] }));
+  const probe = await probeCodex().catch((e): Probe => ({ available: false, models: [], fix: codexFix.failed('the probe', String(e)) }));
   // Read Codex plan usage at startup and on every refresh; live turns keep it current.
   if (probe.available && probe.rateLimits) recordUsage('codex', normalizeRateLimits(probe.rateLimits));
   return codexHarness(probe, cap);

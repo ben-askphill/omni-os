@@ -309,17 +309,13 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 init={init}
                 warm={warm}
                 slotBusy={slotBusy}
-                agents={agents}
-                parent={parent}
-                children={children}
                 prs={prs}
                 step={step}
                 artifactCount={artifactCount}
                 machineName={hereName}
                 cwd={workCwd}
                 onOpen={openFromCard}
-                onOpenThread={(t) => navigate(href.thread(t))}
-                onJump={jumpTo}
+                onOpenPR={(c, n) => navigate(href.pr(c, n))}
                 asking={asking}
                 turn={turn}
                 reconnecting={reconnecting}

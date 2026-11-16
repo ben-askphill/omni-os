@@ -55,9 +55,28 @@ export function claudeHarness(cap: number, defaultModelId?: string): HarnessInfo
 
 // ---------- Codex ----------
 
+/** Signed out. Three words or fewer, so the clients show it as a command to run. */
+export const CODEX_LOGIN = 'codex login';
+export const CODEX_API_KEY = 'Signed in with an API key, not a ChatGPT plan. Run codex login';
+export const CODEX_NOT_FOUND = 'Omni found no codex on its PATH. Install Codex or set OMNI_CODEX_BIN to its path';
+
+/** Why a probe could not get an answer from Codex, as the fix the picker and `delegate` show. */
+export const codexFix = {
+  wontRun: (bin: string, why: string) => `Omni could not run ${bin} (${why}). Set OMNI_CODEX_BIN to a codex that runs`,
+  exited: (code: number | null, signal: string | null, stderr: string) =>
+    `codex app-server exited (${signal ?? `code ${code}`}) before it answered${stderr ? `: ${stderr}` : ''}. Run codex app-server in a terminal to see why`,
+  silent: (method: string, ms: number) =>
+    method === 'initialize'
+      ? `codex app-server did not start within ${ms / 1000} s. Run codex app-server in a terminal to see why`
+      : `Codex did not answer ${method} within ${ms / 1000} s. Omni asks again when the model picker opens`,
+  failed: (method: string, message: string) => `Codex answered ${method} with an error: ${message}`,
+};
+
 /** The raw shape a Codex `model/list` + `config/read` probe yields, harness-agnostic. */
 export interface CodexProbe {
   available: boolean;
+  /** Why not, when unavailable. Signed out (CODEX_LOGIN) unless set. */
+  fix?: string;
   /** e.g. "plus" from account/read; shown as the plan when present. */
   planType?: string;
   /** From config/read: Ben's default model and effort, when set. */
@@ -75,7 +94,7 @@ export function codexHarness(probe: CodexProbe, cap: number): HarnessInfo {
     cap,
   };
   if (!probe.available) {
-    return { ...base, available: false, fix: 'codex login', models: [] };
+    return { ...base, available: false, fix: probe.fix ?? CODEX_LOGIN, models: [] };
   }
   const models: ModelEntry[] = probe.models.map((m) => ({
     id: m.id,
@@ -194,7 +213,7 @@ export function catalogForChannel(cat: Catalog, channel: { github_repo: string |
 }
 
 const UNAVAILABLE_FIX: Partial<Record<HarnessId, string>> = {
-  codex: 'codex login',
+  codex: CODEX_LOGIN,
   cursor: 'cursor-agent login',
   hermes: HERMES_FIX,
   'cursor-cloud': CURSOR_CLOUD_FIX,
