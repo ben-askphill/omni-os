@@ -9,6 +9,7 @@ import type { HarnessInfo, ModelEntry, HarnessId } from '@omni/server/harness/ty
 import type { CommandList as HarnessCommands } from '@omni/server/commands.ts';
 import type { ContextView } from '@omni/server/context.ts';
 import type { ContextUsage } from '@omni/shared/context-meter.ts';
+import type { AccountUsage } from '@omni/shared/account-usage.ts';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import type { RanOnFields } from '@omni/shared/ran-on.ts';
 import type { Opening } from '@omni/shared/opening.ts';
@@ -455,6 +456,8 @@ export type FeedEvent =
   | { type: 'disk'; level: DiskLevel }
   /** A harness account changed, here or on another machine, or a switch was acknowledged: refetch GET /api/accounts. */
   | { type: 'accounts' }
+  /** One account's plan usage was read, here or on another machine: the Usage card updates that account's row. */
+  | { type: 'account_usage'; usage: AccountUsage }
   /** A thread's review notes changed, here or on another Mac: refetch GET /api/threads/:id/review-notes. */
   | { type: 'review_notes'; thread_id: string }
   /** A machine's CPU and memory sample, while the machine tiles are watched (apps/server/machine-stats.ts). Id null is this machine with sync off. */

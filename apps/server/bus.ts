@@ -28,6 +28,8 @@ export type FeedEvent =
   | { type: 'disk'; level: string }
   /** A harness account changed on this machine, or another machine's record or an acknowledged switch synced in (harness-accounts.ts). Clients refetch GET /api/accounts. */
   | { type: 'accounts' }
+  /** One account's plan usage was read here, or synced in from another machine (harness-accounts.ts). The Usage card updates that account's row. */
+  | { type: 'account_usage'; usage: unknown }
   /** A thread's review notes changed, here or on another Mac (db/repos/review-notes.ts). Its open Changes panels refetch them. */
   | { type: 'review_notes'; thread_id: string }
   /** A machine's CPU and memory sample: this one's while a client watches, another's as sync brings it (machine-stats.ts). Id null is this machine with sync off. */

@@ -29,6 +29,8 @@ export interface CursorPlanUsage {
   /** Epoch seconds. */
   cycleStart: number | null;
   cycleEnd: number;
+  /** The IDE's session answered, not cursor-agent's login, so the reading may be another account than cursor-agent's. */
+  fallback?: boolean;
 }
 
 /** One billed model call (or turn) from the usage events. */
@@ -108,7 +110,10 @@ export function mapUsageEvents(body: unknown): { events: CursorUsageEvent[]; tot
 // ---------- tokens ----------
 
 /** Where a token comes from. Each is read fresh on every call: cursor-agent and the IDE keep theirs refreshed. */
-export type TokenSource = () => Promise<string | null>;
+export type TokenSource = (() => Promise<string | null>) & {
+  /** The IDE's session: signed in to Cursor in the app, which may be another account than cursor-agent's. */
+  ide?: boolean;
+};
 
 /** cursor-agent's login, in the Keychain. Read with `security`, the way Omni reads its own secrets. Mac only. */
 export const keychainToken: TokenSource = () =>
@@ -124,7 +129,7 @@ export const IDE_STATE_DB = join(homedir(), 'Library', 'Application Support', 'C
 
 /** The Cursor IDE's session, read-only from its state database. */
 export function ideToken(file = IDE_STATE_DB): TokenSource {
-  return async () => {
+  return Object.assign(async () => {
     if (!existsSync(file)) return null;
     let db: DatabaseSync | null = null;
     try {
@@ -139,7 +144,7 @@ export function ideToken(file = IDE_STATE_DB): TokenSource {
         db?.close();
       } catch {}
     }
-  };
+  }, { ide: true });
 }
 
 // ---------- the client ----------
@@ -156,9 +161,9 @@ export interface CursorDashboard {
   usageEvents(since: number): Promise<CursorUsageEvent[] | null>;
 }
 
-/** The parsed body of one call, trying each token source until one is accepted. Null on any failure. */
-async function rpc(deps: Required<DashboardDeps>, method: string, body: unknown): Promise<unknown | null> {
-  for (const source of deps.tokens) {
+/** The parsed body of one call, trying each token source until one is accepted, and which one it was. Null on any failure. */
+async function rpcFrom(deps: Required<DashboardDeps>, method: string, body: unknown): Promise<{ body: unknown; source: number } | null> {
+  for (const [i, source] of deps.tokens.entries()) {
     const token = await source().catch(() => null);
     if (!token) continue;
     let res: Response;
@@ -176,7 +181,7 @@ async function rpc(deps: Required<DashboardDeps>, method: string, body: unknown)
     if (res.status === 401 || res.status === 403) continue;
     if (!res.ok) return null;
     try {
-      return await res.json();
+      return { body: await res.json(), source: i };
     } catch {
       return null;
     }
@@ -184,11 +189,15 @@ async function rpc(deps: Required<DashboardDeps>, method: string, body: unknown)
   return null;
 }
 
+const rpc = async (deps: Required<DashboardDeps>, method: string, body: unknown) => (await rpcFrom(deps, method, body))?.body ?? null;
+
 export function cursorDashboard(deps: DashboardDeps = {}): CursorDashboard {
   const d: Required<DashboardDeps> = { fetch: deps.fetch ?? fetch, tokens: deps.tokens ?? [keychainToken, ideToken()] };
   return {
     async planUsage() {
-      return mapPlanUsage(await rpc(d, 'GetCurrentPeriodUsage', {}));
+      const res = await rpcFrom(d, 'GetCurrentPeriodUsage', {});
+      const plan = mapPlanUsage(res?.body ?? null);
+      return plan && d.tokens[res!.source]?.ide ? { ...plan, fallback: true } : plan;
     },
     async usageEvents(since) {
       const events: CursorUsageEvent[] = [];

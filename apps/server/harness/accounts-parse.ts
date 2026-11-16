@@ -2,6 +2,7 @@
 // filter every field goes through before it leaves (harness-accounts.ts does the I/O). Only the fields picked here
 // survive, and `clean` drops any string shaped like a credential.
 import type { AccountIdentity, AccountState, HarnessAccount, RecordedAccount } from '@omni/shared/harness-accounts.ts';
+import { parsePlanUsage, type AccountUsage } from '@omni/shared/account-usage.ts';
 import type { GetAccountResponse } from './codex/protocol.ts';
 
 // ---------- what a reader may return ----------
@@ -120,3 +121,19 @@ export function sanitize(v: unknown, harness: string): RecordedAccount {
   };
 }
 
+/** A usage record as stored or synced in, each field checked. Null when it is not one. */
+export function parseAccountUsage(v: unknown): AccountUsage | null {
+  const r = v as Partial<AccountUsage> | null;
+  const label = clean(r?.label);
+  if (!r || !label || typeof r.harness !== 'string' || typeof r.machine !== 'string' || typeof r.at !== 'string') return null;
+  return {
+    harness: r.harness,
+    label,
+    org: clean(r.org),
+    plan: clean(r.plan, 40),
+    machine: r.machine,
+    machineName: clean(r.machineName, 80) ?? r.machine,
+    at: r.at,
+    usage: parsePlanUsage(r.usage),
+  };
+}

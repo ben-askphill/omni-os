@@ -17,10 +17,17 @@
 // otherwise, since the relay keeps every write. Each machine writes only its own key. A switch (a reading signed in as
 // someone else than the last signed-in account) stays on the record with the account before it until the next one;
 // `accounts-seen.<machine>.<harness>` holds the account it was acknowledged as, written from any machine.
+//
+// Plan usage belongs to an account, not a harness: each reading (usage.ts) also goes to the synced kv
+// `usage-account.<harness>.<hash of the account>`, under the account this machine's harness runs as when it comes in.
+// Two machines on one account share that key (the newer reading wins); two accounts never do.
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { ACCOUNT_USAGE_PREFIX, type AccountUsage, type PlanUsage } from '@omni/shared/account-usage.ts';
 import {
   ACCOUNTS_PREFIX,
   identityKey,
+  identityOf,
   nextAccount,
   RAN_PREFIX,
   seenKey,
@@ -40,7 +47,7 @@ import type { GetAccountResponse } from './harness/codex/protocol.ts';
 import { cursorBin } from './harness/cursor/bin.ts';
 import { CursorCloudClient } from './harness/cursor-cloud/client.ts';
 import { probeHermes } from './harness/hermes/client.ts';
-import { account, clean, parseClaudeStatus, parseCodexAccount, parseCursorAbout, parseCursorMe, sanitize } from './harness/accounts-parse.ts';
+import { account, clean, parseAccountUsage, parseClaudeStatus, parseCodexAccount, parseCursorAbout, parseCursorMe, sanitize } from './harness/accounts-parse.ts';
 import { harnessEnv } from './harness/env-guard.ts';
 import { HARNESS_IDS, type HarnessId } from './harness/types.ts';
 import { globalSecret } from './secrets.ts';
@@ -261,7 +268,41 @@ export async function accountsView({ refresh = false }: { refresh?: boolean } = 
   const mine = await ownAccounts({ force: refresh });
   const self = outbox.machineId();
   const synced = !!self && !!activeWorker();
-  return { machines: [viewOf(mine, true), ...(synced ? otherRecords(self).map((r) => viewOf(r, false)) : [])], synced };
+  return { machines: [viewOf(mine, true), ...(synced ? otherRecords(self).map((r) => viewOf(r, false)) : [])], synced, usage: accountUsages() };
+}
+
+// ---------- plan usage per account ----------
+
+/** The kv key of an account's usage: the account hashed, so the key carries no email. */
+export const accountUsageKey = (harness: string, identity: string) =>
+  `${ACCOUNT_USAGE_PREFIX}${harness}.${createHash('sha256').update(identity).digest('hex').slice(0, 16)}`;
+
+/** Every account's last usage reading, from any machine. */
+export const accountUsages = (): AccountUsage[] => kv.list<unknown>(ACCOUNT_USAGE_PREFIX).flatMap(([, v]) => parseAccountUsage(v) ?? []);
+
+/**
+ * File a plan reading under the account the harness runs as here. Uses the last reading of the accounts as it is
+ * (a thread's start reads them again when stale, before any of its usage comes in), so a usage update never runs the
+ * account checks itself; only with no reading at all does it read one. Nothing is filed when the harness is not
+ * signed in: the reading belongs to no account.
+ */
+export function attributeUsage(harness: string, usage: PlanUsage | null): Promise<AccountUsage | null> {
+  const last = own?.record ?? storedOwn();
+  return (last ? Promise.resolve(last) : ownAccounts())
+    .then((r) => {
+      const a = r.accounts.find((x) => x.harness === harness);
+      const who = a && identityOf(a);
+      const key = who && identityKey(who);
+      if (!who || !key) return null;
+      const record: AccountUsage = { harness, label: who.label, org: who.org, plan: who.plan, machine: r.id, machineName: r.name, at: new Date().toISOString(), usage };
+      kv.set(accountUsageKey(harness, key), record);
+      publishFeed({ type: 'account_usage', usage: record });
+      return record;
+    })
+    .catch((err) => {
+      console.error('[accounts] could not file the usage reading:', (err as Error).message);
+      return null;
+    });
 }
 
 const refused = (message: string, status: number) => Object.assign(new Error(message), { status });

@@ -3,6 +3,7 @@
 // name), its organization and its plan ever travel: never a token, a key or a file the harness keeps them in.
 // Each machine reads its own harnesses and writes them to the synced kv `accounts.<machine id>`, so every machine
 // lists the others as they last reported.
+import type { AccountUsage } from './account-usage.ts';
 
 /**
  * - `signed-in`: the harness says who it runs as.
@@ -68,6 +69,8 @@ export interface MachineAccounts {
 export interface AccountsView {
   machines: MachineAccounts[];
   synced: boolean;
+  /** Each account's last plan reading, from any machine (@omni/shared/account-usage.ts). Older servers leave it out. */
+  usage?: AccountUsage[];
 }
 
 /** POST /api/accounts/seen: acknowledge the switch shown for that harness on that machine. */

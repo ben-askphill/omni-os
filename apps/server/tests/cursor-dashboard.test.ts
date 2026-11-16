@@ -98,6 +98,14 @@ describe('cursorDashboard', () => {
     expect(calls.map((c) => c.auth)).toEqual(['Bearer tok-cli', 'Bearer tok-ide']);
   });
 
+  it("marks a cycle read through the IDE's session, which may be another account than cursor-agent's", async () => {
+    const ide = Object.assign(token('tok-ide'), { ide: true });
+    const refused = fakeFetch((c) => (c.auth === 'Bearer tok-ide' ? json(PERIOD) : json({}, 401)));
+    expect((await cursorDashboard({ fetch: refused.f, tokens: [token('tok-cli'), ide] }).planUsage())?.fallback).toBe(true);
+    const agent = fakeFetch(() => json(PERIOD));
+    expect((await cursorDashboard({ fetch: agent.f, tokens: [token('tok-cli'), ide] }).planUsage())?.fallback).toBeUndefined();
+  });
+
   it('is null when every token is refused, or there is none', async () => {
     const { f } = fakeFetch(() => json({}, 401));
     expect(await cursorDashboard({ fetch: f, tokens: [token('a'), token('b')] }).planUsage()).toBeNull();

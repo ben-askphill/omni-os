@@ -1,9 +1,14 @@
-import { useState } from 'react';
-import { type HarnessId, type MonthlyUsage, type Usage, type UsageWindow } from '../../api.ts';
+import { useMemo, useState } from 'react';
+import { accountUsageKey, usageRows, type AccountUsage, type UsageRow } from '@omni/shared/account-usage.ts';
+import { type MonthlyUsage, type UsageWindow } from '../../api.ts';
+import { useAccounts } from '../../accounts.ts';
 import { monthlyTitle, untilLabel, windowPct } from '../../format.ts';
-import { readPref, useApp, useNow, writePref } from '../../store.tsx';
+import { readPref, useApp, useFeed, useNow, writePref } from '../../store.tsx';
 import { HARNESS_ROWS, HarnessLogo, SLOT_ROWS } from '../brand.tsx';
 import { Icon, Ticks } from '../ui.tsx';
+
+const HARNESS_IDS = HARNESS_ROWS.map((r) => r.id);
+const NAMES: Record<string, string> = Object.fromEntries(HARNESS_ROWS.map((r) => [r.id, r.name]));
 
 /** One window's tick bar and percentage, with the reset time on hover. */
 function WindowCell({ w, label }: { w?: UsageWindow; label: string }) {
@@ -33,40 +38,79 @@ function MonthCell({ m, name }: { m: MonthlyUsage; name: string }) {
   );
 }
 
-/** One plan's row: the 5-hour and weekly windows, a monthly cycle (Cursor), or "no data" for a harness that reports none. */
-function HarnessUsageRow({ id, name, usage }: { id: HarnessId; name: string; usage?: Usage | null }) {
+/** Who a row's account is, in full: "ben@askphill.com · Max · Acme, on omarchy and Ben's MacBook Air". */
+function accountTitle(a: NonNullable<UsageRow['account']>): string {
+  const machines = a.machines.length ? `, on ${a.machines.join(' and ')}` : '';
+  return `${[a.label, a.plan, a.org && !a.org.toLowerCase().includes(a.label.toLowerCase()) ? a.org : null].filter(Boolean).join(' · ')}${machines}`;
+}
+
+/**
+ * One account's row: the 5-hour and weekly windows, a monthly cycle (Cursor), or "no data" when that account has no
+ * reading of its own. A harness with several accounts names each under its row; one with a single account keeps the
+ * plain row, with the account on hover.
+ */
+function UsageRowView({ row }: { row: UsageRow }) {
   useNow(60_000);
+  const name = NAMES[row.harness] ?? row.harness;
+  const usage = row.usage;
   const windows = !!usage && (!!usage.five_hour || !!usage.seven_day);
   const noData = !windows && !usage?.monthly;
+  const who = row.account && accountTitle(row.account);
+  // Several accounts on one harness: each bar's tooltip names the account it belongs to.
+  const label = row.several && row.account ? `${name} (${row.account.label})` : name;
   return (
-    <div className="flex items-center gap-2">
-      <span className="caption inline-flex w-[66px] shrink-0 items-center gap-1.5 text-fg-2">
-        <span className="text-fg"><HarnessLogo harness={id} size={12} /></span>
-        {name}
-      </span>
-      {noData ? (
-        <span className="flex-1 text-[10.5px] text-fg-3">no data</span>
-      ) : !windows ? (
-        <MonthCell m={usage!.monthly!} name={name} />
-      ) : (
-        <>
-          <WindowCell w={usage!.five_hour} label={`${name} 5h`} />
-          <WindowCell w={usage!.seven_day} label={`${name} week`} />
-        </>
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="caption inline-flex w-[66px] shrink-0 items-center gap-1.5 text-fg-2" title={who ?? undefined}>
+          <span className="text-fg"><HarnessLogo harness={row.harness} size={12} /></span>
+          {name}
+        </span>
+        {noData ? (
+          <span className="flex-1 text-[10.5px] text-fg-3">no data</span>
+        ) : !windows ? (
+          <MonthCell m={usage!.monthly! as MonthlyUsage} name={label} />
+        ) : (
+          <>
+            <WindowCell w={usage!.five_hour} label={`${label} 5h`} />
+            <WindowCell w={usage!.seven_day} label={`${label} week`} />
+          </>
+        )}
+      </div>
+      {row.several && row.account && (
+        <div className="flex min-w-0 items-center gap-1 pl-[18px] pt-0.5 text-[10px] leading-tight text-fg-3" title={who ?? undefined} data-testid="usage-account">
+          <span className="min-w-0 truncate">{row.account.label}</span>
+          {row.account.plan && <span className="shrink-0">· {row.account.plan}</span>}
+        </div>
       )}
     </div>
   );
 }
 
+/**
+ * The card's rows: one per signed-in account (GET /api/accounts), each with its own reading. Readings that come in on
+ * the feed replace the listed one for that account until the list loads again.
+ */
+function useUsageRows(): UsageRow[] {
+  const { usage } = useApp();
+  const accounts = useAccounts();
+  const [live, setLive] = useState<Record<string, AccountUsage>>({});
+  useFeed((e) => {
+    if (e.type === 'account_usage') setLive((prev) => ({ ...prev, [accountUsageKey(e.usage)]: e.usage }));
+  });
+  const view = accounts.data;
+  return useMemo(() => usageRows(HARNESS_IDS, view, [...(view?.usage ?? []), ...Object.values(live)], usage), [view, live, usage]);
+}
+
 /** Plan usage per harness. Collapsed by default to one row with the live dot and the busiest window; click to open. */
 export function UsageCard() {
-  const { usage, status, feedLive } = useApp();
+  const { status, feedLive } = useApp();
+  const rows = useUsageRows();
   const [open, setOpen] = useState(() => readPref('usage.open', false));
   const toggle = () => setOpen((o) => { writePref('usage.open', !o); return !o; });
   const slots = status?.slots ?? {};
   const footer = SLOT_ROWS.filter((r) => slots[r.id]).map((r) => `${r.name} ${slots[r.id]!.running}/${slots[r.id]!.cap}`).join(' · ');
-  const peak = HARNESS_ROWS.reduce<number | null>((max, r) => {
-    const u = usage[r.id];
+  const peak = rows.reduce<number | null>((max, r) => {
+    const u = r.usage;
     for (const p of [windowPct(u?.five_hour), windowPct(u?.seven_day), windowPct(u?.monthly)]) if (p !== null && (max === null || p > max)) max = p;
     return max;
   }, null);
@@ -100,8 +144,8 @@ export function UsageCard() {
             <span className="flex-1">5h</span>
             <span className="flex-1">Week</span>
           </div>
-          {HARNESS_ROWS.map((r) => (
-            <HarnessUsageRow key={r.id} id={r.id} name={r.name} usage={usage[r.id]} />
+          {rows.map((r) => (
+            <UsageRowView key={r.key} row={r} />
           ))}
           <div className="flex items-center gap-2 border-t border-line pt-2.5 text-[11px] text-fg-3">
             {footer ? (
