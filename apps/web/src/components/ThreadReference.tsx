@@ -1,27 +1,30 @@
-// Attach another thread to a reply as a reference (the thread_reference kind of message context): a search over thread
+// Attach another thread to a message as a reference (the thread_reference kind of message context): a search over thread
 // titles and channels, scoped to this channel unless Ben switches it to All channels. A pick adds a chip to the draft;
-// nothing is sent to, started in or changed on the picked thread. The `@` menu for files is untouched.
+// nothing is sent to, started in or changed on the picked thread. The `@` menu for files is untouched. The thread menu
+// opens it for a reply; the new-thread composer opens it for the first message of a thread it is about to start.
 import { useEffect, useId, useRef, useState } from 'react';
 import { relTime } from '@omni/shared/format.ts';
-import { api, errorText, type Thread } from '../api.ts';
-import { attachReference, isAttached, searchPath, type ReferenceCandidate, type ReferenceScope } from '../message-context/thread-picker.ts';
+import { api, errorText } from '../api.ts';
+import { attachReference, isAttached, searchPath, type ReferenceCandidate, type ReferenceScope, type ReferenceTarget } from '../message-context/thread-picker.ts';
 import { useDraftContext } from '../message-context/draft.ts';
-import { Icon, StatusDot } from './ui.tsx';
+import { Icon, IconButton, MENU_SURFACE, StatusDot } from './ui.tsx';
+import { useDismissable } from './ui/use-dismissable.ts';
 
 const SCOPES: { value: ReferenceScope; label: string }[] = [
   { value: 'channel', label: 'This channel' },
   { value: 'all', label: 'All channels' },
 ];
 
-/** The thread's search answers for `query`, after a short pause, never showing an older search's answer. */
-function useCandidates(threadId: string, query: string, scope: ReferenceScope) {
+/** The search's answers for `query`, after a short pause, never showing an older search's answer. */
+function useCandidates(to: ReferenceTarget, query: string, scope: ReferenceScope) {
   const [got, setGot] = useState<{ key: string; rows: ReferenceCandidate[] | null; error: string | null }>({ key: '', rows: null, error: null });
-  const key = `${threadId}\0${scope}\0${query.trim()}`;
+  // The path names the target, the scope and the words, so it keys the answer too.
+  const key = searchPath(to, query, scope);
   useEffect(() => {
     let stale = false;
     const t = setTimeout(() => {
       api
-        .get<ReferenceCandidate[]>(searchPath(threadId, query, scope))
+        .get<ReferenceCandidate[]>(key)
         .then((rows) => !stale && setGot({ key, rows, error: null }))
         .catch((e) => !stale && setGot({ key, rows: null, error: errorText(e) }));
     }, got.key ? 120 : 0);
@@ -35,15 +38,15 @@ function useCandidates(threadId: string, query: string, scope: ReferenceScope) {
 }
 
 /**
- * The picker's body, in the desktop popover and the phone sheet. `onPicked` runs after a thread is attached.
- * `touch` makes the rows the phone's size.
+ * The picker's body, in the desktop popovers and the phone sheets. `to` says whose draft a pick joins (threadTarget
+ * for a reply). `onPicked` runs after a thread is attached. `touch` makes the rows the phone's size.
  */
-export function ThreadReferencePanel({ thread, onPicked, touch }: { thread: Thread; onPicked: () => void; touch?: boolean }) {
+export function ThreadReferencePanel({ to, onPicked, touch }: { to: ReferenceTarget; onPicked: () => void; touch?: boolean }) {
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<ReferenceScope>('channel');
   const [problem, setProblem] = useState<string | null>(null);
-  const { rows, error, settled } = useCandidates(thread.id, query, scope);
-  const attached = useDraftContext(thread.id);
+  const { rows, error, settled } = useCandidates(to, query, scope);
+  const attached = useDraftContext(to.draft);
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -52,7 +55,7 @@ export function ThreadReferencePanel({ thread, onPicked, touch }: { thread: Thre
   }, [touch]);
 
   const pick = (c: ReferenceCandidate) => {
-    const why = attachReference(thread.id, thread.channel_id, c);
+    const why = attachReference(to, c);
     if (why) return setProblem(why);
     onPicked();
   };
@@ -96,9 +99,9 @@ export function ThreadReferencePanel({ thread, onPicked, touch }: { thread: Thre
       {scope === 'all' && <p className="m-0 px-4 pt-2 text-[11.5px] leading-snug text-fg-3">Picking a thread from another channel attaches it on purpose. Nothing else of that channel is shared.</p>}
       <div id={listId} role="list" aria-label="Threads" className="scroll-thin mt-2 max-h-[min(20rem,45vh)] overflow-y-auto px-1.5 pb-1.5">
         {error && <p className="m-0 px-3 py-3 text-[12.5px] text-fg-3">Could not search: {error}</p>}
-        {!error && rows?.length === 0 && settled && <p className="m-0 px-3 py-3 text-[12.5px] text-fg-3">{query.trim() ? 'No thread matches.' : 'No other threads in this channel yet.'}</p>}
+        {!error && rows?.length === 0 && settled && <p className="m-0 px-3 py-3 text-[12.5px] text-fg-3">{query.trim() ? 'No thread matches.' : to.thread ? 'No other threads in this channel yet.' : 'No threads in this channel yet.'}</p>}
         {rows?.map((c) => {
-          const on = attached.length > 0 && isAttached(thread.id, c.id);
+          const on = attached.length > 0 && isAttached(to.draft, c.id);
           return (
             <button
               key={c.id}
@@ -130,6 +133,26 @@ export function ThreadReferencePanel({ thread, onPicked, touch }: { thread: Thre
       <p className="m-0 border-t border-line px-4 py-2.5 text-[11.5px] leading-snug text-fg-3">
         Attaches a reference, not the thread's messages. The agent reads it only when it needs to, and the thread itself is not touched.
       </p>
+    </div>
+  );
+}
+
+/**
+ * The new-thread composer's Reference a thread: an icon beside Attach files that opens the picker under it. A pick
+ * adds a chip to the composer's draft and closes the picker; the chip goes with the first message on Start.
+ */
+export function ReferenceThreadButton({ to, disabled }: { to: ReferenceTarget; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useDismissable(open, () => setOpen(false), { root: wrap });
+  return (
+    <div ref={wrap} className="relative">
+      <IconButton icon="message" label="Reference a thread" size={15} disabled={disabled} active={open} onClick={() => setOpen((o) => !o)} />
+      {open && (
+        <div role="dialog" aria-label="Reference a thread" className={`pop-in absolute top-[calc(100%+8px)] left-0 z-30 w-[min(23rem,calc(100vw-2rem))] ${MENU_SURFACE}`}>
+          <ThreadReferencePanel to={to} onPicked={() => setOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }

@@ -10,14 +10,31 @@ import { defang } from './defang.ts';
 import type { Projector } from './project.ts';
 
 /**
- * Why a message cannot carry these records, or the records stamped with what their threads are now. A record is
+ * Why a message to `threadId` cannot carry these records, or the records stamped with what their threads are now. A record is
  * refused when its thread is gone, is the thread being written to, or is in another channel than the thread without
  * Ben having picked it from All channels (`cross_channel`): the flag is the client saying he did, and it is checked
  * against the real channels, so a record cannot claim to be the same channel when it is not. The title, the channel's
  * name and the time are written from the threads as they are now, never trusted from the client.
  */
-export function stampThreadReferences(threadId: string, records: readonly MessageContext[], at: Date = new Date()): { ok: true; value: MessageContext[] } | { ok: false; error: string } {
-  const here = threads.get(threadId);
+export function stampThreadReferences(threadId: string, records: readonly MessageContext[], at: Date = new Date()): Stamped {
+  return stamp(threadId, threads.get(threadId)?.channel_id ?? null, records, at);
+}
+
+/**
+ * The same for the first message of a thread not made yet, which will be made in `channel`: the new-thread composer's
+ * references. Only thread references may go there (every other kind points into the thread it is written in), so a
+ * record of another kind is refused rather than passed on.
+ */
+export function stampNewThreadReferences(channel: string, records: readonly MessageContext[], at: Date = new Date()): Stamped {
+  const other = records.find((r) => r.kind !== 'thread_reference');
+  if (other) return { ok: false, error: `${other.label}: a new thread's first message can carry thread references only. Add it in a reply once the thread has started.` };
+  return stamp(null, channels.get(channel) ? channel : null, records, at);
+}
+
+type Stamped = { ok: true; value: MessageContext[] } | { ok: false; error: string };
+
+/** `threadId` is the thread written to, null for one not made yet. `here` is its channel, null when unknown. */
+function stamp(threadId: string | null, here: string | null, records: readonly MessageContext[], at: Date): Stamped {
   const out: MessageContext[] = [];
   for (const r of readContexts(records)) {
     if (r.as !== 'known' || r.kind !== 'thread_reference') {
@@ -30,9 +47,9 @@ export function stampThreadReferences(threadId: string, records: readonly Messag
     const ref = threads.get(b.thread);
     if (!ref) return { ok: false, error: `${name}: that thread no longer exists. Remove it from the message.` };
     const channel = channels.get(ref.channel_id);
-    const cross = !!here && ref.channel_id !== here.channel_id;
+    const cross = !!here && ref.channel_id !== here;
     if (cross && !b.cross_channel) return { ok: false, error: `${name}: that thread is in another channel (#${channel?.name ?? ref.channel_id}). Pick it from All channels to attach it.` };
-    const body = referenceBody({ id: ref.id, title: ref.title, channel: ref.channel_id, channel_name: channel?.name ?? ref.channel_id }, here?.channel_id ?? ref.channel_id, at);
+    const body = referenceBody({ id: ref.id, title: ref.title, channel: ref.channel_id, channel_name: channel?.name ?? ref.channel_id }, here ?? ref.channel_id, at);
     out.push({ ...r.record, label: cutLabel(threadReference.label(body)), body });
   }
   return { ok: true, value: out };

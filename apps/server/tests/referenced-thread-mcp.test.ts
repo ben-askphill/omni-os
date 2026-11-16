@@ -115,6 +115,20 @@ describe('read_referenced_thread', () => {
     expect(await callTool(client, { thread_id: gone.id })).toMatchObject({ isError: true, body: { state: 'unavailable', reason: 'missing' } });
   });
 
+  it('reads a thread referenced on a new thread\'s first message, as the new-thread composer sends it', T, async () => {
+    const body = { channel: 'scratch', prompt: 'CMD hi', context: [newContext(threadReference, referenceBody({ id: to.id, title: to.title, channel: 'scratch', channel_name: 'Scratch' }, 'scratch', new Date()), '')] };
+    const res = await app.request('/api/threads', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect(res.status, await res.clone().text()).toBe(200);
+    const made = (await res.json()) as { id: string };
+    await h.untilResults(made.id, 1);
+    const before = { thread: JSON.stringify(h.db.threads.get(to.id)), events: h.db.events.since(to.id).length };
+    const read = await callTool(await connect(made.id), { thread_id: to.id, limit: 2 });
+    expect(read.isError).toBe(false);
+    expect(read.body.rows.map((r: any) => r.text)).toEqual(['message 118', 'message 119']);
+    // Reading it changed nothing in it.
+    expect({ thread: JSON.stringify(h.db.threads.get(to.id)), events: h.db.events.since(to.id).length }).toEqual(before);
+  });
+
   it('explains a bad call and an unknown asking thread instead of throwing', T, async () => {
     const client = await connect(from.id);
     const both = await callTool(client, { thread_id: to.id, before: 5, after: 3 });

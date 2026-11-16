@@ -9,7 +9,8 @@ import { z } from 'zod';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { readOpenItems } from '@omni/shared/open-items.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
-import { stampThreadReferences } from './message-context/thread-reference.ts';
+import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
+import { getCrew } from './crew.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
 import { bus } from './bus.ts';
@@ -86,6 +87,11 @@ const createSchema = z.object({
   /** Where a new worktree thread's branch starts (worktree-base.ts). Left out: the repo's HEAD, as before. */
   base: basePick.nullish(),
   device: z.string().max(100).nullish(),
+  /**
+   * Thread references on the first message (the new-thread composer's chips), checked by parseContexts and stamped by
+   * stampNewThreadReferences. No other kind: the rest point into the thread they are written in.
+   */
+  context: z.unknown().optional(),
 });
 
 threadRoutesApi.get('/', (c) =>
@@ -106,14 +112,21 @@ const creating = new Map<string, Promise<Thread>>();
 threadRoutesApi.post('/', async (c) => {
   const { data, files } = await readBody(c);
   // run-on.ts: a synced machine's id, "here", or left out for Settings' default.
-  const body = createSchema.parse(data);
+  const { context: raw, ...body } = createSchema.parse(data);
   checkUploads(files);
+  const parsed = parseContexts(raw);
+  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
   const { id } = body;
-  if (!id) return c.json(await createThread({ ...body, files }));
   // A retry of a create whose answer was lost: the thread it made, not a second one with the same first message.
-  const made = threads.get(id);
+  const made = id ? threads.get(id) : undefined;
   if (made) return made.channel_id === body.channel ? c.json(made) : c.json({ error: `Thread id ${id} was already used in another channel.` }, 409);
-  const first = creating.get(id) ?? createThread({ ...body, files });
+  // After the retry check, as on a reply, so a retry after a referenced thread was deleted still gets its thread. The
+  // channel is the one openThread will make the thread in.
+  const stamped = stampNewThreadReferences(body.channel || getCrew(body.role)?.channel || 'inbox', parsed.value);
+  if (!stamped.ok) return c.json({ error: stamped.error }, 400);
+  const input = { ...body, files, ...(stamped.value.length && { context: stamped.value }) };
+  if (!id) return c.json(await createThread(input));
+  const first = creating.get(id) ?? createThread(input);
   creating.set(id, first);
   try {
     return c.json(await first);

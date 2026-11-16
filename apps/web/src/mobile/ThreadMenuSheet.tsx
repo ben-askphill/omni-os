@@ -12,6 +12,7 @@ import { useFolders } from '../folders.tsx';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
+import { threadTarget } from '../message-context/thread-picker.ts';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 
@@ -198,7 +199,7 @@ export function MenuSheet({ thread, pr, changes, onClose }: { thread: Thread; pr
   if (mode === 'reference') {
     return (
       <MoSheet onClose={onClose} label="Reference a thread" full>
-        <ThreadReferencePanel thread={thread} touch onPicked={onClose} />
+        <ThreadReferencePanel to={threadTarget(thread)} touch onPicked={onClose} />
       </MoSheet>
     );
   }

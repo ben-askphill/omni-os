@@ -7,6 +7,10 @@ import { ComposerAccountNotice } from '../components/AccountNotice.tsx';
 import { pickerAccounts, useAccounts } from '../accounts.ts';
 import { accountLine } from '@omni/shared/harness-accounts.ts';
 import { AttachmentStrip, useAttachments } from '../components/Composer.tsx';
+import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
+import { ContextChips } from '../message-context/ContextChips.tsx';
+import { clearDraftContext, removeDraftContext, useDraftContext } from '../message-context/draft.ts';
+import { referencesFor } from '../message-context/thread-picker.ts';
 import { keepLocalFiles } from '../sending.ts';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
 import { Avatar, ErrorNote } from '../components/ui.tsx';
@@ -24,6 +28,9 @@ import { ModelSheet, runLabel } from './ModelSheet.tsx';
 import { RunOnChip, RunOnSheet } from './RunOnSheet.tsx';
 import { MoRound, MoSheet } from './parts.tsx';
 import { useShell } from './shell.tsx';
+
+/** The sheet's draft-context list: its reference chips, gone with its text when the sheet closes. */
+export const NEW_SHEET_DRAFT = 'new:sheet';
 
 const pill = (on: boolean) =>
   `mo-press inline-flex h-9 shrink-0 items-center gap-[7px] rounded-full pr-3 pl-1.5 text-[13.5px] leading-none font-medium ${on ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg'}`;
@@ -48,6 +55,13 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const [picking, setPicking] = useState(false);
   const [pickingBase, setPickingBase] = useState(false);
   const [pickingMachine, setPickingMachine] = useState(false);
+  const [referencing, setReferencing] = useState(false);
+  const refs = useDraftContext(NEW_SHEET_DRAFT);
+  // Fresh on open, as its text is, even after a reload that left chips in this browser's storage; dropped on close.
+  useEffect(() => {
+    clearDraftContext(NEW_SHEET_DRAFT);
+    return () => clearDraftContext(NEW_SHEET_DRAFT);
+  }, []);
   const runOn = useRunOn();
   const [base, setBase] = useBasePick(target);
   const [busy, setBusy] = useState(false);
@@ -84,7 +98,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const close = () => shell.sheet(null);
   // Grok Bot takes the text alone: the model and the base do not apply, and attachments stop the send.
   const toGrok = runOn.grokBot;
-  const grokBlock = toGrok ? grokBotBlock(att.files.length) : null;
+  const grokBlock = toGrok ? grokBotBlock(att.files.length + refs.length) : null;
 
   const sendToGrok = async (prompt: string) => {
     if (grokBlock) return;
@@ -113,10 +127,12 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
           ...draftRunRequest(picked?.target === target ? run : null),
           ...baseRequest(base, run?.choice.harness),
           ...runOn.request,
+          ...(refs.length && { context: referencesFor(refs, target) }),
         },
         att.files,
       );
       keepLocalFiles(t.id, att.files);
+      clearDraftContext(NEW_SHEET_DRAFT);
       shell.open(href.thread(t.id));
     } catch (e) {
       setError(errorText(e));
@@ -152,6 +168,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
           ))}
         </div>
         <div className="mx-3 flex flex-col gap-2.5 rounded-[26px] bg-surface px-2 pt-3.5 pb-2">
+          <ContextChips records={refs} onRemove={(id) => removeDraftContext(NEW_SHEET_DRAFT, id)} className="px-1" />
           <AttachmentStrip files={att.files} onRemove={att.remove} />
           <textarea
             autoFocus
@@ -199,6 +216,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
               }}
             />
             <MoRound icon="plus" label="Attach files" onClick={() => file.current?.click()} disabled={busy} />
+            {!toGrok && <MoRound icon="message" label="Reference a thread" onClick={() => setReferencing(true)} disabled={busy} />}
             {!toGrok && (
               <button
                 type="button"
@@ -238,6 +256,11 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
         </p>
       </MoSheet>
       {pickingBase && baseRows && <BaseSheet rows={baseRows} value={base} onChange={setBase} onClose={() => setPickingBase(false)} />}
+      {referencing && (
+        <MoSheet onClose={() => setReferencing(false)} label="Reference a thread" full>
+          <ThreadReferencePanel to={{ draft: NEW_SHEET_DRAFT, channel: target }} touch onPicked={() => setReferencing(false)} />
+        </MoSheet>
+      )}
       {pickingMachine && runOn.rows && <RunOnSheet rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} onClose={() => setPickingMachine(false)} />}
       {picking && harnesses && run && (
         <ModelSheet
