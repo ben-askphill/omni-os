@@ -34,6 +34,27 @@ describe('currentRecords', () => {
     expect(currentRecords([live, old], null)).toEqual([merged]);
   });
 
+  it('keeps a Mac and a Linux box that share a name, whichever changed its record last', () => {
+    const mac = { ...rec('mac', '2026-11-10T09:00:00.000Z', 'n1', 'MacBook Pro'), signKey: 'mac-key' };
+    const linux = { ...rec('linux-box', '2026-11-16T06:55:00.000Z', null, 'macbook pro'), signKey: 'linux-key' };
+    expect(currentRecords([mac, linux], null)).toEqual([mac, linux]);
+    const macLater = { ...mac, at: '2026-11-17T00:00:00.000Z' };
+    expect(currentRecords([macLater, linux], null)).toEqual([macLater, linux]);
+    expect(currentRecords([mac, linux], 'third')).toEqual([mac, linux]);
+  });
+
+  it('merges a reset machine whose old and new records share a signing key', () => {
+    const old = { ...rec('old', '2026-11-10T09:00:00.000Z', 'n1'), signKey: 'omarchy-key' };
+    const live = { ...rec('live', '2026-11-16T06:55:00.000Z', null), signKey: 'omarchy-key' };
+    expect(currentRecords([old, live], null)).toEqual([{ ...live, tailscale: old.tailscale, carriedNode: true }]);
+  });
+
+  it('merges when the stale record predates signing keys', () => {
+    const old = rec('old', '2026-11-10T09:00:00.000Z', 'n1');
+    const live = { ...rec('live', '2026-11-16T06:55:00.000Z', null), signKey: 'omarchy-key' };
+    expect(currentRecords([old, live], null)).toEqual([{ ...live, tailscale: old.tailscale, carriedNode: true }]);
+  });
+
   it('keeps two same-named machines that both run without Tailscale', () => {
     const old = rec('old', '2026-11-10T09:00:00.000Z', null);
     const live = rec('live', '2026-11-16T06:55:00.000Z', null);
