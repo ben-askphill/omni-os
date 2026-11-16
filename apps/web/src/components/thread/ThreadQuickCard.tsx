@@ -1,20 +1,16 @@
 import { useState, type ReactNode } from 'react';
-import type { BackgroundTask, Thread } from '../../api.ts';
+import type { Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
-import { HarnessMark, harnessLabel, Loader } from '../brand.tsx';
+import { HarnessMark, harnessLabel } from '../brand.tsx';
 import { useThreadAccount } from '../../accounts.ts';
 import { threadAccountLine } from '@omni/shared/harness-accounts.ts';
-import { Chip, copyText, Icon, IconButton, StatusDot, type Glyph, type IconName } from '../ui.tsx';
+import { Chip, copyText, Icon, IconButton, IconLink, StatusDot, type ChipTone, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
-import { isWorking } from '@omni/shared/delegate-count.ts';
 import { threadPill } from './thread-state.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
-import { toDate } from '@omni/shared/format.ts';
-import { duration } from '../../format.ts';
 import { useHereName, useNow } from '../../store.tsx';
-import { subagentKind, subagentTip } from '../../subagents.ts';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
 import type { ThreadPRs } from './panel/PRsTab.tsx';
@@ -29,7 +25,8 @@ function QuickRow({
   disabled,
   trailing,
 }: {
-  icon: IconName;
+  /** The leading glyph. A row without one starts its content in the icon column. */
+  icon?: IconName;
   children: ReactNode;
   onClick?: () => void;
   label?: string;
@@ -38,7 +35,7 @@ function QuickRow({
 }) {
   const body = (
     <>
-      <Icon name={icon} size={15} className={`shrink-0 ${disabled ? 'text-fg-disabled' : 'text-fg-3'}`} />
+      {icon && <Icon name={icon} size={15} className={`shrink-0 ${disabled ? 'text-fg-disabled' : 'text-fg-3'}`} />}
       <span className={`flex min-w-0 flex-1 items-center gap-[var(--sp-4)] ${disabled ? 'text-fg-disabled' : 'text-fg'}`}>{children}</span>
       {onClick && !disabled && !trailing && <Icon name="chevronRight" size={13} className="shrink-0 text-fg-3" />}
     </>
@@ -64,25 +61,22 @@ function QuickRow({
 }
 
 /**
- * A compact glance at the thread beside the transcript: machine, checkout, harness, run state, branch work, and a door
- * into the full inspector. Desktop gives it a narrow column right of the transcript; the phone opens it from the header.
+ * A compact glance at the thread beside the transcript: machine, checkout, harness, run state, branch, a door into the
+ * full inspector, and the PRs the thread and its crew opened. Desktop gives it a narrow column right of the transcript;
+ * the phone opens it from the header.
  */
 export function ThreadQuickCard({
   thread,
   init,
   warm,
   slotBusy,
-  agents,
-  parent,
-  children,
   prs,
   step,
   artifactCount,
   machineName,
   cwd,
   onOpen,
-  onOpenThread,
-  onJump,
+  onOpenPR,
   asking = false,
   reconnecting = false,
   className = '',
@@ -91,11 +85,7 @@ export function ThreadQuickCard({
   init: InitP | null;
   warm: boolean | undefined;
   slotBusy: boolean;
-  agents: BackgroundTask[];
-  /** The thread that delegated this one, for the lineage. */
-  parent: Thread | null;
-  /** Threads this one delegated; the working ones join the lineage. */
-  children: Thread[];
+  /** The thread's own PRs and its crew's, from GET /threads/:id/pr (useThreadPR). */
   prs: ThreadPRs;
   step: PRStep | null;
   artifactCount: number;
@@ -103,9 +93,8 @@ export function ThreadQuickCard({
   cwd: string;
   /** Opens the full inspector on `tab`; the phone opens the matching thread screen. */
   onOpen: (tab: PanelTab) => void;
-  onOpenThread: (id: string) => void;
-  /** Scrolls the transcript to the call that started a sub-agent. */
-  onJump: (eventId: number) => void;
+  /** Opens Omni's page for a PR. */
+  onOpenPR: (channelId: string, n: number) => void;
   /** The agent waits on a question card: the turn is open, but on Ben. */
   asking?: boolean;
   reconnecting?: boolean;
@@ -114,9 +103,6 @@ export function ThreadQuickCard({
   const cloud = thread.harness === 'cursor-cloud';
   const remote = thread.harness === 'hermes' || cloud;
   const cloudUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
-  const pr = prs?.pr ?? null;
-  const badge = pr ? prBadge(pr) : null;
-  const line = pr ? prLine(pr) : null;
   const model = thread.model || init?.model;
   const now = useNow(60_000);
   // The run row says what the header pill says, except that a turn in progress reads as one.
@@ -179,26 +165,9 @@ export function ThreadQuickCard({
           <span className="text-fg-3">No branch</span>
         </QuickRow>
       ) : (
-        <>
-          <QuickRow icon="branch" onClick={() => onOpen('details')} label="Branch details">
-            <span className="min-w-0 truncate font-mono text-[11.5px]">{thread.branch}</span>
-          </QuickRow>
-          <QuickRow icon="pr" onClick={() => onOpen('prs')} label="Pull requests">
-            {prs === undefined ? (
-              <span className="text-fg-3">Checking PR…</span>
-            ) : pr && badge && line ? (
-              <>
-                <span className="shrink-0 font-num tabular-nums">#{pr.number}</span>
-                <Chip tone={line.tone === 'needs' ? 'needs' : badge.tone}>{line.tone === 'needs' && badge.label === 'open' ? 'blocked' : badge.label}</Chip>
-                <span className="min-w-0 truncate text-fg-3">{line.text}</span>
-              </>
-            ) : step === 'open' ? (
-              <span className="text-fg-3">{STEP_WORKING.open}…</span>
-            ) : (
-              <span className="text-fg-3">No PR yet</span>
-            )}
-          </QuickRow>
-        </>
+        <QuickRow icon="branch" onClick={() => onOpen('details')} label="Branch details">
+          <span className="min-w-0 truncate font-mono text-[11.5px]">{thread.branch}</span>
+        </QuickRow>
       )}
       {artifactCount > 0 && (
         <QuickRow icon="layers" onClick={() => onOpen('artifacts')} label="Artifacts">
@@ -210,7 +179,7 @@ export function ThreadQuickCard({
           <span className="font-medium">All details</span>
         </QuickRow>
       </div>
-      <Lineage thread={thread} glyph={run.glyph} parent={parent} delegated={children.filter(isWorking)} agents={agents} onOpenThread={onOpenThread} onJump={onJump} />
+      <PullRequests thread={thread} prs={prs} step={step} onOpen={onOpen} onOpenPR={onOpenPR} />
     </section>
   );
 }
@@ -233,104 +202,85 @@ function CopyPath({ path }: { path: string }) {
   );
 }
 
-/** The elbow that hangs a row off the one above it; `last` ends the trunk there. */
-function Branch({ last }: { last: boolean }) {
-  return (
-    <span aria-hidden className="relative w-3 shrink-0 self-stretch">
-      <span className="absolute top-0 left-0 h-1/2 w-2.5 rounded-bl-[6px] border-b border-l border-line-strong" />
-      {!last && <span className="absolute top-1/2 bottom-0 left-0 border-l border-line-strong" />}
-    </span>
-  );
-}
+/** One PR in the card: the thread's own, with what blocks it, or one its crew opened. */
+type CardPR = { key: string; channelId: string; number: number; title: string; url: string; state: { label: string; tone: ChipTone }; open: boolean };
 
-const treeRow = `flex w-full min-w-0 items-center gap-[var(--sp-4)] ${ROW} text-left text-[12px]`;
-const treeButton = `hov ${treeRow} [--hov:var(--bg)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-line-strong`;
+/** How many PRs the card lists before it hands the rest to the PRs tab. */
+const SHOWN = 5;
 
-function SubagentLeaf({ t, last, indent, onJump }: { t: BackgroundTask; last: boolean; indent: string; onJump: (eventId: number) => void }) {
-  const now = useNow(1000);
-  const kind = subagentKind(t);
-  const tip = kind ? `${kind}: ${subagentTip(t)}` : subagentTip(t);
-  const body = (
-    <>
-      <Branch last={last} />
-      <Loader size={10} className="shrink-0 text-live-text" />
-      <span className="min-w-0 flex-1 truncate">{t.description}</span>
-      <span className="shrink-0 font-num text-[10.5px] text-fg-3 tabular-nums">{duration(Math.max(0, now - toDate(t.started_at).getTime()))}</span>
-    </>
-  );
-  const id = t.event_id;
-  return id ? (
-    <button type="button" title={tip} onClick={() => onJump(id)} className={`${treeButton} ${indent}`}>
-      {body}
-    </button>
-  ) : (
-    <div title={tip} className={`${treeRow} ${indent}`}>
-      {body}
-    </div>
-  );
+/** The thread's PRs, then the ones its crew opened: open before merged, newest first, nothing listed twice. */
+export function cardPRs(thread: Pick<Thread, 'channel_id'>, prs: NonNullable<ThreadPRs>): CardPR[] {
+  const own: CardPR[] = prs.prs.map((p) => {
+    const badge = prBadge(p);
+    const line = prLine(p);
+    const blocked = line.tone === 'needs' && badge.label === 'open';
+    return {
+      key: p.url || `own-${p.number}`,
+      channelId: thread.channel_id,
+      number: p.number,
+      title: p.title,
+      url: p.url,
+      state: blocked ? { label: 'blocked', tone: 'needs' } : badge,
+      open: (p.state ?? 'OPEN') === 'OPEN',
+    };
+  });
+  const seen = new Set(own.map((p) => p.url));
+  const crew: CardPR[] = [...prs.crew]
+    .reverse()
+    .filter((p) => !seen.has(p.url))
+    .map((p) => ({ key: p.url, channelId: p.channel_id, number: p.number, title: p.title, url: p.url, state: prBadge(p), open: p.state === 'OPEN' }));
+  const all = [...own, ...crew];
+  return [...all.filter((p) => p.open), ...all.filter((p) => !p.open)];
 }
 
 /**
- * Where the thread sits: the thread that delegated it, the thread itself, and what runs inside it now (delegated
- * threads, then its own sub-agents), drawn as a tree. A delegated thread always shows its parent, so one click goes back
- * up a level. Nothing for a top-level thread with nothing running.
+ * The PRs this thread and the threads it delegated opened, each with its number, title and state. A row opens Omni's
+ * page for the PR and the arrow beside it opens it on GitHub. The heading opens the PRs tab, where the rest of a long
+ * list and the merge steps live.
  */
-function Lineage({
-  thread,
-  glyph,
-  parent,
-  delegated,
-  agents,
-  onOpenThread,
-  onJump,
-}: {
-  thread: Thread;
-  /** The thread's own state, as the run row shows it. */
-  glyph: Glyph;
-  parent: Thread | null;
-  delegated: Thread[];
-  agents: BackgroundTask[];
-  onOpenThread: (id: string) => void;
-  onJump: (eventId: number) => void;
-}) {
-  const total = delegated.length + agents.length;
-  if (!total && !parent) return null;
-  // What runs hangs from the thread's own dot, one step further in when the thread hangs from its parent. The offsets
-  // past the row's own padding are the elbow (w-3) and gap before that dot, so the trunk lines up under it.
-  const indent = parent ? 'pl-[calc(var(--sp-6)+22px)]' : 'pl-[calc(var(--sp-6)+3px)]';
+function PullRequests({ thread, prs, step, onOpen, onOpenPR }: { thread: Thread; prs: ThreadPRs; step: PRStep | null; onOpen: (tab: PanelTab) => void; onOpenPR: (channelId: string, n: number) => void }) {
+  const list = prs ? cardPRs(thread, prs) : [];
+  const shown = list.slice(0, SHOWN);
+  const more = list.length - shown.length;
   return (
-    <section aria-label="Lineage" className={DIVIDER}>
-      <div className={`flex items-center ${CAPTION} text-[11px] text-fg-3`}>
-        Lineage
-        {total > 0 && (
-          <span className="ml-auto font-num tabular-nums" title={`${plural(total, 'agent')} running`}>
-            {total} running
+    <section aria-label="Pull requests" className={DIVIDER}>
+      <button type="button" onClick={() => onOpen('prs')} className={`hov flex w-full items-center rounded-[var(--r-sm)] ${CAPTION} text-left text-[11px] text-fg-3 [--hov:var(--bg)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-line-strong`}>
+        Pull requests
+        {list.length > 0 && (
+          <span className="ml-auto font-num tabular-nums" title={`${list.filter((p) => p.open).length} open`}>
+            {list.length}
           </span>
         )}
-      </div>
-      {parent && (
-        <button type="button" title={`Back to the thread that delegated this one: ${parent.title}`} onClick={() => onOpenThread(parent.id)} className={treeButton}>
-          <Icon name="arrowUpRight" size={13} className="shrink-0 text-fg-3" />
-          <span className="min-w-0 flex-1 truncate text-fg-2">{parent.title || 'Untitled'}</span>
-          <StatusDot status={parent.status} size={6} />
-        </button>
+      </button>
+      {prs === undefined ? (
+        <QuickRow icon="pr" disabled>
+          <span className="text-fg-3">Checking PRs…</span>
+        </QuickRow>
+      ) : shown.length === 0 ? (
+        <QuickRow icon="pr" disabled>
+          <span className="text-fg-3">{step === 'open' ? `${STEP_WORKING.open}…` : 'No PRs yet'}</span>
+        </QuickRow>
+      ) : (
+        shown.map((p) => (
+          <QuickRow
+            key={p.key}
+            label={`Open PR #${p.number}: ${p.title}`}
+            onClick={() => onOpenPR(p.channelId, p.number)}
+            trailing={p.url ? <IconLink href={p.url} icon="external" label={`Open #${p.number} on GitHub`} size={13} external newTab className="mr-[var(--sp-2)] h-7 w-7" /> : undefined}
+          >
+            <span className="shrink-0 font-num text-fg-3 tabular-nums">#{p.number}</span>
+            <span className="min-w-0 flex-1 truncate" title={p.title}>
+              {p.title}
+            </span>
+            <Chip tone={p.state.tone}>{p.state.label}</Chip>
+          </QuickRow>
+        ))
       )}
-      <div className={`${treeRow} font-medium`}>
-        {parent && <Branch last />}
-        <StatusDot status={glyph} size={7} />
-        <span className="min-w-0 flex-1 truncate">{thread.title || 'This thread'}</span>
-      </div>
-      {delegated.map((c, i) => (
-        <button key={c.id} type="button" title={c.title} onClick={() => onOpenThread(c.id)} className={`${treeButton} ${indent}`}>
-          <Branch last={i === total - 1} />
-          <StatusDot status={c.status} size={6} />
-          <span className="min-w-0 flex-1 truncate">{c.title || 'Untitled'}</span>
-          <Icon name="chevronRight" size={12} className="shrink-0 text-fg-3" />
-        </button>
-      ))}
-      {agents.map((t, i) => (
-        <SubagentLeaf key={t.task_id} t={t} last={delegated.length + i === total - 1} indent={indent} onJump={onJump} />
-      ))}
+      {more > 0 && (
+        <QuickRow icon="more" label="All pull requests" onClick={() => onOpen('prs')}>
+          <span className="text-fg-3">{more} more</span>
+        </QuickRow>
+      )}
     </section>
   );
 }
