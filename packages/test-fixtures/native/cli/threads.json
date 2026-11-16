@@ -1,0 +1,2375 @@
+{
+  "scenarios": [
+    {
+      "name": "the latest threads as a table",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "channel_id": "acme",
+                  "title": "Fix the cart total",
+                  "status": "running",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-10s}}"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "channel_id": "inbox",
+                  "title": "  A title   with\n\tloose   space  ",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-300s}}"
+                },
+                {
+                  "id": "33333333-3333-4333-8333-333333333333",
+                  "channel_id": "acme",
+                  "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀 and more",
+                  "status": "failed",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-29m}}"
+                },
+                {
+                  "id": "44444444-4444-4444-8444-444444444444",
+                  "channel_id": "acme",
+                  "title": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+                  "status": "queued",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": "preparing",
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2020-01-01T10:30:00.000Z"
+                },
+                {
+                  "id": "55555555-5555-4555-8555-555555555555",
+                  "channel_id": "acme",
+                  "title": "üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü",
+                  "status": "stopped",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": "scheduled",
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2019-12-31T23:59:59.999Z"
+                },
+                {
+                  "id": "66666666-6666-4666-8666-666666666666",
+                  "channel_id": "acme",
+                  "title": "Daily digest · 5 Jan",
+                  "status": "stopped",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": "waiting",
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2021-06-15 08:05:09"
+                },
+                {
+                  "id": "77777777-7777-4777-8777-777777777777",
+                  "channel_id": "a-long-channel-name",
+                  "title": "",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "not a date"
+                },
+                {
+                  "id": "8888",
+                  "channel_id": "acme",
+                  "title": "a short id, a null time",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ID        STATUS                CHANNEL               UPDATED      TITLE\n11111111  running               #acme                 just now     Fix the cart total\n22222222  done                  #inbox                5m ago       A title with loose space\n33333333  failed                #acme                 29m ago      xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…\n44444444  preparing             #acme                 1 Jan 2020   éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n55555555  limit, resumes later  #acme                 31 Dec 2019  üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü…\n66666666  usage limit           #acme                 15 Jun 2021  Daily digest · 5 Jan\n77777777  done                  #a-long-channel-name\n8888      done                  #acme                              a short id, a null time\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the same table west of UTC",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "America/Los_Angeles"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "channel_id": "acme",
+                  "title": "Fix the cart total",
+                  "status": "running",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-10s}}"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "channel_id": "inbox",
+                  "title": "  A title   with\n\tloose   space  ",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-300s}}"
+                },
+                {
+                  "id": "33333333-3333-4333-8333-333333333333",
+                  "channel_id": "acme",
+                  "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀 and more",
+                  "status": "failed",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-29m}}"
+                },
+                {
+                  "id": "44444444-4444-4444-8444-444444444444",
+                  "channel_id": "acme",
+                  "title": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+                  "status": "queued",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": "preparing",
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2020-01-01T10:30:00.000Z"
+                },
+                {
+                  "id": "55555555-5555-4555-8555-555555555555",
+                  "channel_id": "acme",
+                  "title": "üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü",
+                  "status": "stopped",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": "scheduled",
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2019-12-31T23:59:59.999Z"
+                },
+                {
+                  "id": "66666666-6666-4666-8666-666666666666",
+                  "channel_id": "acme",
+                  "title": "Daily digest · 5 Jan",
+                  "status": "stopped",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": "waiting",
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2021-06-15 08:05:09"
+                },
+                {
+                  "id": "77777777-7777-4777-8777-777777777777",
+                  "channel_id": "a-long-channel-name",
+                  "title": "",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "not a date"
+                },
+                {
+                  "id": "8888",
+                  "channel_id": "acme",
+                  "title": "a short id, a null time",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ID        STATUS                CHANNEL               UPDATED      TITLE\n11111111  running               #acme                 just now     Fix the cart total\n22222222  done                  #inbox                5m ago       A title with loose space\n33333333  failed                #acme                 29m ago      xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…\n44444444  preparing             #acme                 1 Jan 2020   éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n55555555  limit, resumes later  #acme                 31 Dec 2019  üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü…\n66666666  usage limit           #acme                 15 Jun 2021  Daily digest · 5 Jan\n77777777  done                  #a-long-channel-name\n8888      done                  #acme                              a short id, a null time\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the same table far east of UTC",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "Pacific/Kiritimati"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "channel_id": "acme",
+                  "title": "Fix the cart total",
+                  "status": "running",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-10s}}"
+                },
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "channel_id": "inbox",
+                  "title": "  A title   with\n\tloose   space  ",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-300s}}"
+                },
+                {
+                  "id": "33333333-3333-4333-8333-333333333333",
+                  "channel_id": "acme",
+                  "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀 and more",
+                  "status": "failed",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-29m}}"
+                },
+                {
+                  "id": "44444444-4444-4444-8444-444444444444",
+                  "channel_id": "acme",
+                  "title": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+                  "status": "queued",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": "preparing",
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2020-01-01T10:30:00.000Z"
+                },
+                {
+                  "id": "55555555-5555-4555-8555-555555555555",
+                  "channel_id": "acme",
+                  "title": "üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü",
+                  "status": "stopped",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": "scheduled",
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2019-12-31T23:59:59.999Z"
+                },
+                {
+                  "id": "66666666-6666-4666-8666-666666666666",
+                  "channel_id": "acme",
+                  "title": "Daily digest · 5 Jan",
+                  "status": "stopped",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": "waiting",
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2021-06-15 08:05:09"
+                },
+                {
+                  "id": "77777777-7777-4777-8777-777777777777",
+                  "channel_id": "a-long-channel-name",
+                  "title": "",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "not a date"
+                },
+                {
+                  "id": "8888",
+                  "channel_id": "acme",
+                  "title": "a short id, a null time",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ID        STATUS                CHANNEL               UPDATED      TITLE\n11111111  running               #acme                 just now     Fix the cart total\n22222222  done                  #inbox                5m ago       A title with loose space\n33333333  failed                #acme                 29m ago      xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…\n44444444  preparing             #acme                 2 Jan 2020   éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n55555555  limit, resumes later  #acme                 1 Jan 2020   üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü…\n66666666  usage limit           #acme                 15 Jun 2021  Daily digest · 5 Jan\n77777777  done                  #a-long-channel-name\n8888      done                  #acme                              a short id, a null time\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "no threads",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "nothing running",
+      "args": [
+        "threads",
+        "--running"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?status=running&limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Nothing is running.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?status=running&limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "one channel, running, five",
+      "args": [
+        "threads",
+        "-c",
+        "acme",
+        "--running",
+        "-n",
+        "5"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?channel=acme&status=running&limit=5",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "channel_id": "acme",
+                  "title": "Fix the cart total",
+                  "status": "running",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-10s}}"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ID        STATUS   CHANNEL  UPDATED   TITLE\n11111111  running  #acme    just now  Fix the cart total\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?channel=acme&status=running&limit=5",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the long options",
+      "args": [
+        "threads",
+        "--channel=acme",
+        "--limit",
+        "500"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?channel=acme&limit=500",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "channel_id": "inbox",
+                  "title": "  A title   with\n\tloose   space  ",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "{{now-300s}}"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ID        STATUS  CHANNEL  UPDATED  TITLE\n22222222  done    #inbox   5m ago   A title with loose space\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?channel=acme&limit=500",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the last value of a repeated option wins",
+      "args": [
+        "threads",
+        "-n",
+        "3",
+        "-n",
+        "4",
+        "-c",
+        "a",
+        "-c",
+        "b"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?channel=b&limit=4",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?channel=b&limit=4",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "threads as JSON, as the server sent them",
+      "args": [
+        "threads",
+        "--json"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "wire": "threads.json"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "[\n  {\n    \"id\": \"00000000-0000-4000-8000-000000000001\",\n    \"channel_id\": \"acme\",\n    \"title\": \"Fix the cart and the tests\",\n    \"status\": \"done\",\n    \"role\": null,\n    \"model\": \"claude-haiku-4-5\",\n    \"harness\": \"claude-code\",\n    \"effort\": \"low\",\n    \"auto_reason\": \"Light quick task: Haiku 4.5, low effort\",\n    \"queued_harness\": null,\n    \"queued_model\": null,\n    \"queued_effort\": null,\n    \"session_id\": \"00000000-0000-4000-8000-000000000001\",\n    \"has_run\": 1,\n    \"cwd\": \"/tmp/omni-fixtures/acme\",\n    \"branch\": null,\n    \"parent_id\": null,\n    \"task_id\": null,\n    \"source\": \"manual\",\n    \"automation\": null,\n    \"last_text\": \"ack: then tidy up\",\n    \"suggestion\": null,\n    \"next_title\": null,\n    \"next_prompt\": null,\n    \"open_items\": null,\n    \"archived\": 0,\n    \"folder_id\": null,\n    \"pinned_at\": null,\n    \"done_at\": null,\n    \"setup\": null,\n    \"setup_error\": null,\n    \"resume_blocked\": null,\n    \"limit_state\": null,\n    \"limit_resets_at\": null,\n    \"limit_elsewhere\": 0,\n    \"goal_objective\": null,\n    \"goal_status\": null,\n    \"goal_checks\": 0,\n    \"continued_from\": null,\n    \"created_at\": \"2026-01-05T09:00:00.000Z\",\n    \"updated_at\": \"2026-01-05T09:00:00.000Z\",\n    \"delegating\": false,\n    \"ran_on\": null,\n    \"run_started_at\": null\n  }\n]\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "JSON keeps numbers, escapes and key order",
+      "args": [
+        "threads",
+        "--json"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "text": "[{\"b\":1,\"a\":2,\"10\":\"x\",\"2\":\"y\",\"n\":[0.1,1e21,1E-7,-0,123456789012345680000,1.5e300,0.000001,5e-324,9007199254740993],\"s\":\"q\\\"\\\\\\/\\b\\f\\n\\r\\t\\u0001\\u007f\\u2028\\ud83d\\ude00\\ud800 é\",\"e\":{},\"l\":[],\"nested\":{\"l\":[[]],\"e\":[{}]},\"t\":true,\"f\":false,\"z\":null,\"a\":3}]",
+              "contentType": "application/json"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "[\n  {\n    \"2\": \"y\",\n    \"10\": \"x\",\n    \"b\": 1,\n    \"a\": 3,\n    \"n\": [\n      0.1,\n      1e+21,\n      1e-7,\n      0,\n      123456789012345680000,\n      1.5e+300,\n      0.000001,\n      5e-324,\n      9007199254740992\n    ],\n    \"s\": \"q\\\"\\\\/\\b\\f\\n\\r\\t\\u0001 😀\\ud800 é\",\n    \"e\": {},\n    \"l\": [],\n    \"nested\": {\n      \"l\": [\n        []\n      ],\n      \"e\": [\n        {}\n      ]\n    },\n    \"t\": true,\n    \"f\": false,\n    \"z\": null\n  }\n]\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "what needs you as a table",
+      "args": [
+        "threads",
+        "--needs-you"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [
+                  {
+                    "thread": {
+                      "id": "11111111-1111-4111-8111-111111111111",
+                      "channel_id": "acme",
+                      "title": "Which store first?",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": null,
+                    "blockers": [
+                      {
+                        "kind": "question",
+                        "detail": "Which store should the digest cover first?",
+                        "count": 1,
+                        "at": "2020-01-01T10:30:00.000Z"
+                      }
+                    ],
+                    "at": "{{now-20s}}"
+                  },
+                  {
+                    "thread": {
+                      "id": "22222222-2222-4222-8222-222222222222",
+                      "channel_id": "inbox",
+                      "title": "Hit the limit",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": null,
+                    "blockers": [
+                      {
+                        "kind": "limited",
+                        "detail": null,
+                        "count": 0,
+                        "resets_at": "2020-01-01T10:30:00.000Z",
+                        "scheduled": true,
+                        "elsewhere": false
+                      }
+                    ],
+                    "at": "{{now-120s}}"
+                  },
+                  {
+                    "thread": {
+                      "id": "33333333-3333-4333-8333-333333333333",
+                      "channel_id": "acme",
+                      "title": "Setup broke",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": null,
+                    "blockers": [
+                      {
+                        "kind": "setup",
+                        "detail": "git worktree add failed",
+                        "count": 0
+                      },
+                      {
+                        "kind": "recovered",
+                        "detail": null,
+                        "count": 1
+                      },
+                      {
+                        "kind": "uncertain",
+                        "detail": null,
+                        "count": 2
+                      },
+                      {
+                        "kind": "child_failed",
+                        "detail": "x",
+                        "count": 1
+                      },
+                      {
+                        "kind": "something_new",
+                        "detail": null,
+                        "count": 1
+                      }
+                    ],
+                    "at": "2020-01-01T10:30:00.000Z"
+                  },
+                  {
+                    "thread": {
+                      "id": "44444444-4444-4444-8444-444444444444",
+                      "channel_id": "acme",
+                      "title": "An unread result",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": {
+                      "uid": "u1",
+                      "status": "done",
+                      "event_uid": "e1",
+                      "at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "blockers": [],
+                    "at": "2020-01-01T10:30:00.000Z"
+                  },
+                  {
+                    "thread": {
+                      "id": "55555555-5555-4555-8555-555555555555",
+                      "channel_id": "acme",
+                      "title": "A failed result",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": {
+                      "uid": "u2",
+                      "status": "failed",
+                      "event_uid": null,
+                      "at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "blockers": [],
+                    "at": "2020-01-01T10:30:00.000Z"
+                  },
+                  {
+                    "thread": {
+                      "id": "66666666-6666-4666-8666-666666666666",
+                      "channel_id": "acme",
+                      "title": "Neither",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": null,
+                    "blockers": [],
+                    "at": "2020-01-01T10:30:00.000Z"
+                  }
+                ],
+                "unread": 2,
+                "blocked": 3
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ID        WHY                                                                                                     CHANNEL  WHEN        TITLE\n11111111  question                                                                                                #acme    just now    Which store first?\n22222222  usage limit                                                                                             #inbox   2m ago      Hit the limit\n33333333  setup failed, messages to resume, message may not have arrived, delegated thread failed, something_new  #acme    1 Jan 2020  Setup broke\n44444444  done, unread                                                                                            #acme    1 Jan 2020  An unread result\n55555555  failed, unread                                                                                          #acme    1 Jan 2020  A failed result\n66666666                                                                                                          #acme    1 Jan 2020  Neither\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "what needs you in one channel, the first two",
+      "args": [
+        "threads",
+        "--needs-you",
+        "-c",
+        "acme",
+        "-n",
+        "2"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/needs-you?channel=acme",
+          "replies": [
+            {
+              "json": {
+                "items": [
+                  {
+                    "thread": {
+                      "id": "11111111-1111-4111-8111-111111111111",
+                      "channel_id": "acme",
+                      "title": "Which store first?",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": null,
+                    "blockers": [
+                      {
+                        "kind": "question",
+                        "detail": "Which store should the digest cover first?",
+                        "count": 1,
+                        "at": "2020-01-01T10:30:00.000Z"
+                      }
+                    ],
+                    "at": "{{now-20s}}"
+                  },
+                  {
+                    "thread": {
+                      "id": "22222222-2222-4222-8222-222222222222",
+                      "channel_id": "inbox",
+                      "title": "Hit the limit",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": null,
+                    "blockers": [
+                      {
+                        "kind": "limited",
+                        "detail": null,
+                        "count": 0,
+                        "resets_at": "2020-01-01T10:30:00.000Z",
+                        "scheduled": true,
+                        "elsewhere": false
+                      }
+                    ],
+                    "at": "{{now-120s}}"
+                  },
+                  {
+                    "thread": {
+                      "id": "33333333-3333-4333-8333-333333333333",
+                      "channel_id": "acme",
+                      "title": "Setup broke",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": null,
+                    "blockers": [
+                      {
+                        "kind": "setup",
+                        "detail": "git worktree add failed",
+                        "count": 0
+                      },
+                      {
+                        "kind": "recovered",
+                        "detail": null,
+                        "count": 1
+                      },
+                      {
+                        "kind": "uncertain",
+                        "detail": null,
+                        "count": 2
+                      },
+                      {
+                        "kind": "child_failed",
+                        "detail": "x",
+                        "count": 1
+                      },
+                      {
+                        "kind": "something_new",
+                        "detail": null,
+                        "count": 1
+                      }
+                    ],
+                    "at": "2020-01-01T10:30:00.000Z"
+                  },
+                  {
+                    "thread": {
+                      "id": "44444444-4444-4444-8444-444444444444",
+                      "channel_id": "acme",
+                      "title": "An unread result",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": {
+                      "uid": "u1",
+                      "status": "done",
+                      "event_uid": "e1",
+                      "at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "blockers": [],
+                    "at": "2020-01-01T10:30:00.000Z"
+                  },
+                  {
+                    "thread": {
+                      "id": "55555555-5555-4555-8555-555555555555",
+                      "channel_id": "acme",
+                      "title": "A failed result",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": {
+                      "uid": "u2",
+                      "status": "failed",
+                      "event_uid": null,
+                      "at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "blockers": [],
+                    "at": "2020-01-01T10:30:00.000Z"
+                  },
+                  {
+                    "thread": {
+                      "id": "66666666-6666-4666-8666-666666666666",
+                      "channel_id": "acme",
+                      "title": "Neither",
+                      "status": "done",
+                      "role": null,
+                      "model": "claude-haiku-4-5",
+                      "harness": "claude-code",
+                      "effort": "low",
+                      "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                      "queued_harness": null,
+                      "queued_model": null,
+                      "queued_effort": null,
+                      "session_id": "11111111-1111-4111-8111-111111111111",
+                      "has_run": 1,
+                      "cwd": "/tmp/omni-fixtures/acme",
+                      "branch": null,
+                      "parent_id": null,
+                      "task_id": null,
+                      "source": "manual",
+                      "automation": null,
+                      "last_text": "ack: fix the cart",
+                      "suggestion": null,
+                      "next_title": null,
+                      "next_prompt": null,
+                      "open_items": null,
+                      "archived": 0,
+                      "folder_id": null,
+                      "pinned_at": null,
+                      "done_at": null,
+                      "setup": null,
+                      "setup_error": null,
+                      "resume_blocked": null,
+                      "limit_state": null,
+                      "limit_resets_at": null,
+                      "limit_elsewhere": 0,
+                      "goal_objective": null,
+                      "goal_status": null,
+                      "goal_checks": 0,
+                      "continued_from": null,
+                      "created_at": "2020-01-01T10:30:00.000Z",
+                      "updated_at": "2020-01-01T10:30:00.000Z"
+                    },
+                    "result": null,
+                    "blockers": [],
+                    "at": "2020-01-01T10:30:00.000Z"
+                  }
+                ],
+                "unread": 2,
+                "blocked": 3
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ID        WHY          CHANNEL  WHEN      TITLE\n11111111  question     #acme    just now  Which store first?\n22222222  usage limit  #inbox   2m ago    Hit the limit\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/needs-you?channel=acme",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "nothing needs you",
+      "args": [
+        "threads",
+        "--needs-you"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Nothing needs you.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "what needs you as JSON, as the server sent it",
+      "args": [
+        "threads",
+        "--needs-you",
+        "--json",
+        "-n",
+        "3"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "wire": "needs-you.json"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "{\n  \"unread\": 7,\n  \"blocked\": 4,\n  \"items\": [\n    {\n      \"thread\": {\n        \"id\": \"00000000-0000-4000-8000-000000000008\",\n        \"channel_id\": \"acme\",\n        \"title\": \"Daily digest · 5 Jan\",\n        \"status\": \"done\",\n        \"role\": \"researcher\",\n        \"model\": \"claude-opus-5-5\",\n        \"harness\": \"claude-code\",\n        \"effort\": \"\",\n        \"auto_reason\": null,\n        \"queued_harness\": null,\n        \"queued_model\": null,\n        \"queued_effort\": null,\n        \"session_id\": \"00000000-0000-4000-8000-000000000008\",\n        \"has_run\": 1,\n        \"cwd\": \"/tmp/omni-fixtures/acme\",\n        \"branch\": null,\n        \"parent_id\": null,\n        \"task_id\": null,\n        \"source\": \"automation\",\n        \"automation\": \"daily-digest\",\n        \"last_text\": \"ack: Summarize what changed in the cart since yesterday.\",\n        \"suggestion\": \"Yes, open a PR\",\n        \"next_title\": null,\n        \"next_prompt\": null,\n        \"open_items\": null,\n        \"archived\": 0,\n        \"folder_id\": null,\n        \"pinned_at\": null,\n        \"done_at\": null,\n        \"setup\": null,\n        \"setup_error\": null,\n        \"resume_blocked\": null,\n        \"limit_state\": null,\n        \"limit_resets_at\": null,\n        \"limit_elsewhere\": 0,\n        \"goal_objective\": null,\n        \"goal_status\": null,\n        \"goal_checks\": 0,\n        \"continued_from\": null,\n        \"created_at\": \"2026-01-05T09:00:00.000Z\",\n        \"updated_at\": \"2026-01-05T09:00:00.000Z\"\n      },\n      \"result\": {\n        \"uid\": \"00000000-0000-4000-8000-000000000017\",\n        \"status\": \"done\",\n        \"event_uid\": \"00000000-0000-4000-8000-000000000018\",\n        \"at\": \"2026-01-05T09:00:00.000Z\"\n      },\n      \"blockers\": [\n        {\n          \"kind\": \"question\",\n          \"detail\": \"Which store should the digest cover first?\",\n          \"count\": 1,\n          \"at\": \"2026-01-05T09:00:00.000Z\"\n        }\n      ],\n      \"at\": \"2026-01-05T09:00:00.000Z\"\n    },\n    {\n      \"thread\": {\n        \"id\": \"00000000-0000-4000-8000-000000000019\",\n        \"channel_id\": \"acme\",\n        \"title\": \"Tidy the copy\",\n        \"status\": \"failed\",\n        \"role\": null,\n        \"model\": \"claude-haiku-4-5\",\n        \"harness\": \"claude-code\",\n        \"effort\": \"low\",\n        \"auto_reason\": \"Light writing task: Haiku 4.5, low effort\",\n        \"queued_harness\": null,\n        \"queued_model\": null,\n        \"queued_effort\": null,\n        \"session_id\": \"00000000-0000-4000-8000-000000000019\",\n        \"has_run\": 1,\n        \"cwd\": \"/tmp/omni-fixtures/acme\",\n        \"branch\": null,\n        \"parent_id\": null,\n        \"task_id\": null,\n        \"source\": \"manual\",\n        \"automation\": null,\n        \"last_text\": \"You've hit your limit · resets 5pm (Europe/Amsterdam)\",\n        \"suggestion\": null,\n        \"next_title\": null,\n        \"next_prompt\": null,\n        \"open_items\": null,\n        \"archived\": 0,\n        \"folder_id\": null,\n        \"pinned_at\": null,\n        \"done_at\": null,\n        \"setup\": null,\n        \"setup_error\": null,\n        \"resume_blocked\": null,\n        \"limit_state\": \"scheduled\",\n        \"limit_resets_at\": \"2026-01-05T09:00:00.000Z\",\n        \"limit_elsewhere\": 0,\n        \"goal_objective\": null,\n        \"goal_status\": null,\n        \"goal_checks\": 0,\n        \"continued_from\": null,\n        \"created_at\": \"2026-01-05T09:00:00.000Z\",\n        \"updated_at\": \"2026-01-05T09:00:00.000Z\"\n      },\n      \"result\": {\n        \"uid\": \"00000000-0000-4000-8000-000000000020\",\n        \"status\": \"failed\",\n        \"event_uid\": \"00000000-0000-4000-8000-000000000021\",\n        \"at\": \"2026-01-05T09:00:00.000Z\"\n      },\n      \"blockers\": [\n        {\n          \"kind\": \"limited\",\n          \"detail\": null,\n          \"count\": 0,\n          \"resets_at\": \"2026-01-05T09:00:00.000Z\",\n          \"scheduled\": true,\n          \"elsewhere\": false\n        }\n      ],\n      \"at\": \"2026-01-05T09:00:00.000Z\"\n    },\n    {\n      \"thread\": {\n        \"id\": \"00000000-0000-4000-8000-000000000015\",\n        \"channel_id\": \"widgets\",\n        \"title\": \"Fix the widget\",\n        \"status\": \"failed\",\n        \"role\": null,\n        \"model\": \"claude-haiku-4-5\",\n        \"harness\": \"claude-code\",\n        \"effort\": \"low\",\n        \"auto_reason\": \"Light quick task: Haiku 4.5, low effort\",\n        \"queued_harness\": null,\n        \"queued_model\": null,\n        \"queued_effort\": null,\n        \"session_id\": \"00000000-0000-4000-8000-000000000015\",\n        \"has_run\": 0,\n        \"cwd\": \"/tmp/omni-fixtures/data/worktrees/00000000-0000-4000-8000-000000000015\",\n        \"branch\": \"omni/00000000\",\n        \"parent_id\": null,\n        \"task_id\": null,\n        \"source\": \"manual\",\n        \"automation\": null,\n        \"last_text\": null,\n        \"suggestion\": null,\n        \"next_title\": null,\n        \"next_prompt\": null,\n        \"open_items\": null,\n        \"archived\": 0,\n        \"folder_id\": null,\n        \"pinned_at\": null,\n        \"done_at\": null,\n        \"setup\": \"failed\",\n        \"setup_error\": \"git worktree add failed: fatal: invalid reference: HEAD\",\n        \"resume_blocked\": null,\n        \"limit_state\": null,\n        \"limit_resets_at\": null,\n        \"limit_elsewhere\": 0,\n        \"goal_objective\": null,\n        \"goal_status\": null,\n        \"goal_checks\": 0,\n        \"continued_from\": null,\n        \"created_at\": \"2026-01-05T09:00:00.000Z\",\n        \"updated_at\": \"2026-01-05T09:00:00.000Z\"\n      },\n      \"result\": {\n        \"uid\": \"00000000-0000-4000-8000-000000000022\",\n        \"status\": \"failed\",\n        \"event_uid\": null,\n        \"at\": \"2026-01-05T09:00:00.000Z\"\n      },\n      \"blockers\": [\n        {\n          \"kind\": \"setup\",\n          \"detail\": \"git worktree add failed: fatal: invalid reference: HEAD\",\n          \"count\": 0\n        },\n        {\n          \"kind\": \"recovered\",\n          \"detail\": null,\n          \"count\": 1\n        }\n      ],\n      \"at\": \"2026-01-05T09:00:00.000Z\"\n    }\n  ]\n}\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    }
+  ]
+}

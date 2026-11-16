@@ -1,0 +1,1285 @@
+{
+  "scenarios": [
+    {
+      "name": "no target opens Omni itself",
+      "args": [
+        "open"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "expected": {
+        "stdout": "Opened {url}/#/ in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {
+          "browser": [
+            "{url}/#/"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a thread id opens without asking the server",
+      "args": [
+        "open",
+        "11111111-1111-4111-8111-111111111111"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "expected": {
+        "stdout": "Opened {url}/#/t/11111111-1111-4111-8111-111111111111 in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {
+          "browser": [
+            "{url}/#/t/11111111-1111-4111-8111-111111111111"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a short id is looked up",
+      "args": [
+        "open",
+        "1111"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=500",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "11111111-1111-4111-8111-111111111111",
+                  "channel_id": "acme",
+                  "title": "Fix the cart",
+                  "status": "done",
+                  "role": null,
+                  "model": "claude-haiku-4-5",
+                  "harness": "claude-code",
+                  "effort": "low",
+                  "auto_reason": "Light quick task: Haiku 4.5, low effort",
+                  "queued_harness": null,
+                  "queued_model": null,
+                  "queued_effort": null,
+                  "session_id": "11111111-1111-4111-8111-111111111111",
+                  "has_run": 1,
+                  "cwd": "/tmp/omni-fixtures/acme",
+                  "branch": null,
+                  "parent_id": null,
+                  "task_id": null,
+                  "source": "manual",
+                  "automation": null,
+                  "last_text": "ack: fix the cart",
+                  "suggestion": null,
+                  "next_title": null,
+                  "next_prompt": null,
+                  "open_items": null,
+                  "archived": 0,
+                  "folder_id": null,
+                  "pinned_at": null,
+                  "done_at": null,
+                  "setup": null,
+                  "setup_error": null,
+                  "resume_blocked": null,
+                  "limit_state": null,
+                  "limit_resets_at": null,
+                  "limit_elsewhere": 0,
+                  "goal_objective": null,
+                  "goal_status": null,
+                  "goal_checks": 0,
+                  "continued_from": null,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "updated_at": "2020-01-01T10:30:00.000Z"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Opened {url}/#/t/11111111-1111-4111-8111-111111111111 in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=500",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {
+          "browser": [
+            "{url}/#/t/11111111-1111-4111-8111-111111111111"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a link opens the thread it names",
+      "args": [
+        "open",
+        "https://omni.example.test/#/t/11111111-1111-4111-8111-111111111111"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "expected": {
+        "stdout": "Opened {url}/#/t/11111111-1111-4111-8111-111111111111 in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {
+          "browser": [
+            "{url}/#/t/11111111-1111-4111-8111-111111111111"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a channel id",
+      "args": [
+        "open",
+        "acme"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/channels/acme",
+          "replies": [
+            {
+              "json": {
+                "id": "acme",
+                "name": "Acme",
+                "kind": "client",
+                "repo_path": null,
+                "github_repo": null,
+                "use_worktree": 0,
+                "base_dir": "/tmp/omni-fixtures/acme",
+                "store_domain": null,
+                "portal_slug": null,
+                "browser_headless": 1,
+                "notes": "Fixture",
+                "icon": null,
+                "design_system_name": null,
+                "archived": 0,
+                "created_at": "2020-01-01T10:30:00.000Z",
+                "avatar_bg": null,
+                "avatar_bg_manual": 0,
+                "default_harness": null,
+                "default_model": null,
+                "default_effort": null,
+                "worktree_include": null,
+                "worktree_shared": null,
+                "prompt_open_pr": null,
+                "prompt_fix_conflicts": null,
+                "prompt_fix_checks": null,
+                "scan_opt_out": 0,
+                "design_system_size": 0,
+                "running": 0,
+                "active": [],
+                "recent": [],
+                "folders": []
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Opened {url}/#/c/acme in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/channels/acme",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {
+          "browser": [
+            "{url}/#/c/acme"
+          ]
+        }
+      }
+    },
+    {
+      "name": "no such channel",
+      "args": [
+        "open",
+        "acme-shop"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/channels/acme-shop",
+          "replies": [
+            {
+              "status": 404,
+              "json": {
+                "error": "not found"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni open: No channel or thread named acme-shop.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/channels/acme-shop",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a channel the server fails on",
+      "args": [
+        "open",
+        "acme-shop"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/channels/acme-shop",
+          "replies": [
+            {
+              "status": 500,
+              "json": {
+                "error": "The database is locked"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni open: The database is locked\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/channels/acme-shop",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the app opens a channel",
+      "args": [
+        "open",
+        "acme"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_APP": "{dir}/bin/omni-app"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        },
+        "omni-app": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/channels/acme",
+          "replies": [
+            {
+              "json": {
+                "id": "acme",
+                "name": "Acme",
+                "kind": "client",
+                "repo_path": null,
+                "github_repo": null,
+                "use_worktree": 0,
+                "base_dir": "/tmp/omni-fixtures/acme",
+                "store_domain": null,
+                "portal_slug": null,
+                "browser_headless": 1,
+                "notes": "Fixture",
+                "icon": null,
+                "design_system_name": null,
+                "archived": 0,
+                "created_at": "2020-01-01T10:30:00.000Z",
+                "avatar_bg": null,
+                "avatar_bg_manual": 0,
+                "default_harness": null,
+                "default_model": null,
+                "default_effort": null,
+                "worktree_include": null,
+                "worktree_shared": null,
+                "prompt_open_pr": null,
+                "prompt_fix_conflicts": null,
+                "prompt_fix_checks": null,
+                "scan_opt_out": 0,
+                "design_system_size": 0,
+                "running": 0,
+                "active": [],
+                "recent": [],
+                "folders": []
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Opened #/c/acme in the Omni app.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/channels/acme",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {
+          "omni-app": [
+            "--route=#/c/acme"
+          ]
+        }
+      }
+    },
+    {
+      "name": "an app that will not start falls back to the browser",
+      "args": [
+        "open"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_APP": "{dir}/not-a-program"
+      },
+      "files": {
+        "not-a-program": {
+          "text": "plain text",
+          "mode": "644"
+        }
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "expected": {
+        "stdout": "Opened {url}/#/ in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {
+          "browser": [
+            "{url}/#/"
+          ]
+        }
+      }
+    },
+    {
+      "name": "no browser and no app",
+      "args": [
+        "open",
+        "11111111-1111-4111-8111-111111111111"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni open: Could not start a browser. Open {url}/#/t/11111111-1111-4111-8111-111111111111\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": ". inside a worktree is its thread",
+      "args": [
+        "open",
+        "."
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_DATA_DIR": "{dir}/data"
+      },
+      "dirs": [
+        "data/worktrees/11111111-1111-4111-8111-111111111111/apps/web"
+      ],
+      "cwd": "data/worktrees/11111111-1111-4111-8111-111111111111/apps/web",
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "expected": {
+        "stdout": "Opened {url}/#/t/11111111-1111-4111-8111-111111111111 in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {
+          "browser": [
+            "{url}/#/t/11111111-1111-4111-8111-111111111111"
+          ]
+        }
+      }
+    },
+    {
+      "name": ". at the top of a worktree with no data folder known",
+      "args": [
+        "open",
+        "."
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "dirs": [
+        "elsewhere/worktrees/11111111-1111-4111-8111-111111111111"
+      ],
+      "cwd": "elsewhere/worktrees/11111111-1111-4111-8111-111111111111",
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "expected": {
+        "stdout": "Opened {url}/#/t/11111111-1111-4111-8111-111111111111 in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {
+          "browser": [
+            "{url}/#/t/11111111-1111-4111-8111-111111111111"
+          ]
+        }
+      }
+    },
+    {
+      "name": ". in a worktree of another install falls to the thread it runs in",
+      "args": [
+        "open",
+        "."
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_DATA_DIR": "{dir}/data",
+        "OMNI_THREAD_ID": "22222222-2222-4222-8222-222222222222"
+      },
+      "dirs": [
+        "other/worktrees/11111111-1111-4111-8111-111111111111",
+        "data"
+      ],
+      "cwd": "other/worktrees/11111111-1111-4111-8111-111111111111",
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "expected": {
+        "stdout": "Opened {url}/#/t/22222222-2222-4222-8222-222222222222 in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {
+          "browser": [
+            "{url}/#/t/22222222-2222-4222-8222-222222222222"
+          ]
+        }
+      }
+    },
+    {
+      "name": ". in a channel folder is the channel with the deepest folder",
+      "args": [
+        "open",
+        "."
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "dirs": [
+        "work/shop/src"
+      ],
+      "cwd": "work/shop/src",
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/channels",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "conductor",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": null,
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "acme",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/work",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "acme shop/eu",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": "{dir}/work/shop//",
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/other",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "near",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/work/shop-two",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Opened {url}/#/c/acme%20shop%2Feu in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/channels",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {
+          "browser": [
+            "{url}/#/c/acme%20shop%2Feu"
+          ]
+        }
+      }
+    },
+    {
+      "name": ". in a folder that only starts like a channel folder",
+      "args": [
+        "open",
+        "."
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "dirs": [
+        "work/shop-twofold"
+      ],
+      "cwd": "work/shop-twofold",
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/channels",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "conductor",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": null,
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "acme",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/work",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "acme shop/eu",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": "{dir}/work/shop//",
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/other",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "near",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/work/shop-two",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Opened {url}/#/c/acme in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/channels",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {
+          "browser": [
+            "{url}/#/c/acme"
+          ]
+        }
+      }
+    },
+    {
+      "name": ". in a folder no channel has",
+      "args": [
+        "open",
+        "."
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "dirs": [
+        "nowhere"
+      ],
+      "cwd": "nowhere",
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/channels",
+          "replies": [
+            {
+              "json": [
+                {
+                  "id": "conductor",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": null,
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "acme",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/work",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "acme shop/eu",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": "{dir}/work/shop//",
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/other",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                },
+                {
+                  "id": "near",
+                  "name": "Acme",
+                  "kind": "client",
+                  "repo_path": null,
+                  "github_repo": null,
+                  "use_worktree": 0,
+                  "base_dir": "{dir}/work/shop-two",
+                  "store_domain": null,
+                  "portal_slug": null,
+                  "browser_headless": 1,
+                  "notes": "Fixture",
+                  "icon": null,
+                  "design_system_name": null,
+                  "archived": 0,
+                  "created_at": "2020-01-01T10:30:00.000Z",
+                  "avatar_bg": null,
+                  "avatar_bg_manual": 0,
+                  "default_harness": null,
+                  "default_model": null,
+                  "default_effort": null,
+                  "worktree_include": null,
+                  "worktree_shared": null,
+                  "prompt_open_pr": null,
+                  "prompt_fix_conflicts": null,
+                  "prompt_fix_checks": null,
+                  "scan_opt_out": 0,
+                  "design_system_size": 0,
+                  "running": 0,
+                  "active": [],
+                  "recent": [],
+                  "folders": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni open: No channel has {dir}/nowhere as its folder. Name a thread or channel instead.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/channels",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "--pair prints a link with the token",
+      "args": [
+        "open",
+        "--pair"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "expected": {
+        "stdout": "{url}/#/?pair=test-token\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "--pair encodes the token",
+      "args": [
+        "open",
+        "11111111-1111-4111-8111-111111111111",
+        "--pair"
+      ],
+      "env": {
+        "OMNI_TOKEN": "a+b/c=d&e f'g(h)*~é"
+      },
+      "expected": {
+        "stdout": "{url}/#/t/11111111-1111-4111-8111-111111111111?pair=a%2Bb%2Fc%3Dd%26e%20f'g(h)*~%C3%A9\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "--pair with no token",
+      "args": [
+        "open",
+        "--pair"
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni open: No API token to pair with. Set OMNI_TOKEN, or run this on the machine Omni runs on.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "--pair on the install port proves the server first",
+      "args": [
+        "open",
+        "--pair"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "expected": {
+        "stdout": "{url}/#/?pair=test-token\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "--pair on the install port does not print for another server",
+      "args": [
+        "open",
+        "--pair"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "wrong",
+      "expected": {
+        "stdout": "",
+        "stderr": "omni open: {url} answers as Omni, but not as this install's: another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "--pair on the install port with nothing listening",
+      "args": [
+        "open",
+        "--pair"
+      ],
+      "address": "closed-port",
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni open: cannot reach Omni at {url} (connection refused). Is it running? omni doctor says why not.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    }
+  ]
+}

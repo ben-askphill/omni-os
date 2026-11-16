@@ -9,9 +9,13 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# The local API client. A binary that brings its own HTTP client (omni-cli) leaves it out.
+api = ["dep:reqwest"]
+
 [dependencies]
 # Plain HTTP only: the binaries that use this talk to the server on 127.0.0.1.
-reqwest = { version = "0.13.5", default-features = false }
+reqwest = { version = "0.13.5", default-features = false, optional = true }
 ryu-js = "1.0.3"
 
 [dev-dependencies]

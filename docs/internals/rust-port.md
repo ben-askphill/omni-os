@@ -63,7 +63,7 @@ Lines are source lines, then test lines, counted on `main` at a336f918 (2026-11-
 Omni's server spends its time waiting on a harness process, on SQLite or on GitHub, and Rust does not make waiting faster. Two parts of Omni pay for a whole runtime they barely use:
 
 - **Helper processes.** Every thread starts three MCP servers, and each is a whole Node runtime (Electron's, in the desktop app) holding a few dozen lines of logic. A machine with four live threads had 12 of them at 22 to 28 MB of private memory each. The Rust build of the same server holds about 1 MB and answers `initialize` in 1 ms, against roughly 170 to 200 ms for the TypeScript one from a checkout.
-- **The `omni` command.** Agents and people run it from a shell, often many times in one turn. `omni --version` took about 190 ms through the desktop app's shim, nearly all of it runtime start.
+- **The `omni` command.** Agents and people run it from a shell, often many times in one turn. `omni --version` took about 190 ms through the desktop app's shim, nearly all of it runtime start. The Rust build prints it in under 1 ms.
 
 ## Plan
 
@@ -88,7 +88,7 @@ Per slice:
 | Module | Status | Reason or next step |
 | --- | --- | --- |
 | `apps/mcp` `ask.ts`, `render.ts`, `threads.ts`, `referenced-thread.ts`, `api.ts` | in progress | Slice 1. Steps 1 and 2 are done: `crates/omni-mcp` passes the record, the desktop build ships it and the server starts it when it is there. The TypeScript stays as the fallback until step 3, after a release has carried the binary |
-| `apps/cli` | planned | Slice 2. Keeps its six commands ([ADR 0014](../adr/0014-omni-command-line.md)) |
+| `apps/cli` | in progress | Slice 2. Step 1 is done: `crates/omni-cli` passes the record of all six commands ([ADR 0014](../adr/0014-omni-command-line.md)). Nothing runs it yet. Step 2 makes the desktop app's shim start it |
 | `apps/mcp` `omni.ts`, `pull-requests.ts` | planned | Slice 3 |
 | `apps/mcp` `external/` | kept | The HTTP transport runs inside the server and shares `tools.ts` with the stdio one. Porting only stdio would leave two copies of 20 tools. Moves with the server or not at all |
 | `apps/server` `runner/`, `harness/` | kept | They start a CLI and wait on its stream. The adapters change with every harness release, and 50,000 lines of tests hold them in TypeScript. No runtime cost to win back |
@@ -108,13 +108,14 @@ Per slice:
 
 - **The record.** `packages/test-fixtures/native/` holds what the TypeScript module did: each scenario's input and the exact output. A TypeScript test replays every scenario against the TypeScript module on each `npm test`, so the record cannot drift from the code it describes. `OMNI_RECORD_NATIVE_FIXTURES=1` on that test rewrites the record.
 - **The Rust side.** A Rust integration test replays the same files against the Rust binary and compares byte for byte.
-- **Both ways.** The TypeScript test also runs the Rust binary when `OMNI_NATIVE_MCP=<path to the binary>` is set, so one runner has judged both implementations.
+- **Both ways.** The TypeScript test also runs the Rust binary when `OMNI_NATIVE_MCP=<path to the binary>` is set (`OMNI_NATIVE_CLI` for the `omni` command), so one runner has judged both implementations.
 
 ## Working on the Rust code
 
 - Toolchain: `rust-toolchain.toml` pins it. `rustup` or `mise` installs it on first use.
 - `npm run test:rust` (or `cargo test --workspace --locked`), `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo fmt --all --check`.
 - The workspace is `Cargo.toml` at the repo root, the crates are in `crates/`. `unsafe` is forbidden in the workspace lints.
+- `omni-cli` needs a C compiler: its TLS library (`ring`) compiles C and assembly. `omni-mcp` and `omni-core` need none.
 - Run the tests with Omni's own variables unset (`env -i PATH="$PATH" HOME="$HOME" cargo test ...`) when your shell is an Omni thread: `OMNI_URL` there points at the live server.
 
 ## Slice 1: the per-thread MCP servers
@@ -136,9 +137,29 @@ Per slice:
 
 The tool descriptions and limits in `ask.rs` and `render.rs` are copies of `packages/shared/question.ts` and `html-render.ts`. The `tools/list` scenarios compare them byte for byte, so a change to the TypeScript text fails the Rust test until the copy follows.
 
+## Slice 2: the `omni` command
+
+`crates/omni-cli` builds one binary, `omni`, with the six commands of `apps/cli`: `new`, `send`, `threads` and `show`, `status`, `doctor`, `open`. It prints the same text, sends the same requests and exits with the same codes. Nothing runs it yet: the desktop app's shim still starts the TypeScript command.
+
+- **How it is built.** It is synchronous and has no async runtime. HTTP is `ureq` with `rustls` and the Mozilla root certificates, because `OMNI_URL` can be an `https` address on another machine. API answers stay the JSON values of `omni-core`, so a field the command does not know prints as the TypeScript one prints it. Column widths and cut-off points count UTF-16 units, as JavaScript strings do.
+- **The token.** On the install port the command first asks the server to prove it holds the token (an HMAC over a nonce) and sends the token only after that, as the TypeScript command does. With no token it sends nothing.
+- **The record** is `packages/test-fixtures/native/cli/*.json`: 275 scenarios in ten files (`basics` 47, `connection` 42, `doctor` 26, `http` 26, `new` 25, `open` 22, `send` 18, `show` 23, `status` 32, `threads` 14). A scenario is the arguments, the environment, stdin, a scripted stand-in for Omni's API and the programs on `PATH`. It records stdout, stderr, the exit code, each request with its headers and body, and each program the command started with its arguments.
+- **`apps/cli/tests/native-fixtures.test.ts`** replays them against the TypeScript command, and against the Rust binary with `OMNI_NATIVE_CLI=<path>`. `apps/cli/tests/scenarios.ts` is the runner both use.
+- **`crates/omni-cli/tests/goldens.rs`** replays them against the Rust binary with a runner written in Rust, so `cargo test` needs no Node. It compares requests in the order they were sent.
+- **`packages/test-fixtures/native/cli-corpus.json`** holds 2,728 inputs to the command's pure functions with what Node made of each: "5m ago" and "Yesterday 14:05" at 44 offsets from six moments in eight time zones (2,112 cases), date texts, `toFixed` and rounding, sizes and durations, cutting and lining up text with wide characters, thread arguments, server addresses, the app launch line and the proof. `apps/cli/tests/native-corpus.test.ts` checks the file against Node and `crates/omni-cli/src/corpus.rs` holds the Rust code to it.
+- **Against a real server.** Both commands ran against one throwaway Omni server (`scripts/qa-stack.sh`): 23 read commands in each of the two ways to find the server, and seven `new` and `send` runs with and without `--wait` and `--json`. The output and exit code were the same in all of them. `status --json` differed only in the server's own `since` time, which changed between the two requests.
+
+### What step 2 needs
+
+- **A C compiler for the static Linux build.** `native.ts` builds `omni-mcp` for `x86_64-unknown-linux-musl`. `ring` needs `musl-gcc` for that target, so the release job installs `musl-tools` first. A Mac needs nothing more than Xcode's command line tools.
+- **A path outside the AppImage.** The shim in `~/.local/bin/omni` starts the app's own Node today. A binary inside a mounted AppImage has no path a shim can name, so the Linux app copies `omni` into its `bin` folder at start. The Mac app's shim can name the binary inside `Omni.app`.
+- **The fallback.** The shim starts the binary when it is there and the TypeScript command when it is not, as the server does for the MCP servers.
+
 ## Known differences
 
 What the Rust build does differently on purpose. None of these has been seen from a harness or from Omni's API.
+
+### The per-thread MCP servers
 
 - **A question poll that answers without `text`.** The TypeScript server answers with the SDK's validation dump, about 3,300 characters. Rust answers the same error code (-32602) with `MCP error -32602: Invalid tools/call result: the tool answered without text`. The API never sends that answer. Covered by a test in `goldens.rs`.
 - **`initialize` with rare capabilities.** The SDK checks the shape of `experimental`, `elicitation`, `tasks`, `extensions` and `clientInfo.icons`. Rust checks `sampling`, `roots`, and the name, title, version, website and description of `clientInfo`, and accepts the rest unchecked.
@@ -147,6 +168,18 @@ What the Rust build does differently on purpose. None of these has been seen fro
 - **A cancel notice in the same write as a `ping` or `tools/list`.** The SDK can drop the answer to a request that is cancelled before its handler's first tick. Rust answers `ping`, `initialize` and `tools/list` at once and honours a cancel only for tool calls.
 - **JSON nested deeper than 1,000 levels** is refused as invalid, where Node's limit is its stack.
 - **`Number()` of a hex string above 2^53** may round to a neighbouring value. It can only reach the same kind of error message.
+
+### The `omni` command
+
+- **A server answer in a shape the command does not expect.** The TypeScript command can stop with a JavaScript stack trace, for example when a list of threads arrives as text. Rust prints one line and exits 3. A list that is not a list reads as empty.
+- **A link with a malformed id.** `omni show '#/t/%zz'` ends in a `URIError` stack in TypeScript. Rust says `#/t/%zz is not a link this command can read` and exits 3. Covered by a test in `goldens.rs`.
+- **A switch named after a JavaScript object method.** The TypeScript parser looks a switch up in a plain object, so `omni threads --constructor` passes as a known switch and `--toString=1` answers "--toString takes no value". Rust says `unknown option --constructor` and exits 64. Covered by a test in `goldens.rs`.
+- **Dates.** Rust reads ISO 8601 dates, which is all the API sends. Texts only V8's older parser reads ("16 Nov 2026", "2026-1-6", a lower-case `z`) and years past 262,142 read as no date, so the line shows no time where TypeScript shows one.
+- **The words for a failure below HTTP.** An answer that is not JSON, a dropped connection or a failed TLS handshake give the same line and exit code, but the detail in brackets comes from each HTTP client (`Unexpected token ...` against `... at byte 12`).
+- **Requests go out one after another.** Where TypeScript sends two or three requests at once (`status`, `show`, each poll of `--wait`), Rust sends them in the order the code lists them. After a dropped connection on the install port it asks for a fresh proof before it sends the token again.
+- **`OMNI_URL` forms.** A port that is not a number or is out of range gives `OMNI_URL is not an http(s) address` where Node says `Invalid URL`. Numeric loopback forms such as `http://2130706433`, host names outside ASCII and unusual characters in the path are not rewritten as Node's URL parser rewrites them.
+- **`NODE_EXTRA_CA_CERTS`** is not read. An `https` server with a private certificate authority is refused.
+- **`omni open`** starts the app in its own process group. TypeScript gives it its own session. Both let the command exit while the app stays open.
 
 ## Decisions for Ben
 

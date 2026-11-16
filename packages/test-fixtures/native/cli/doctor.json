@@ -1,0 +1,1359 @@
+{
+  "scenarios": [
+    {
+      "name": "everything is well",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_DATA_DIR": "{dir}/data",
+        "OMNI_INSTALL_LOG": "{dir}/logs/server.log",
+        "OMNI_APP": "{dir}/bin/omni-app",
+        "TZ": "UTC"
+      },
+      "proof": "test-token",
+      "files": {
+        "data/omni.db": {
+          "text": ""
+        },
+        "logs/server.log": {
+          "text": "[server] listening on :4747\n\n[sync] pulled 3 changes\n",
+          "agoMs": 130000
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        },
+        "omni-app": {}
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, runs on {dir}/bin/omni-app\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, and the server takes it\nok    data    {dir}/data\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nok    log     {dir}/logs/server.log, last written 2m ago\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "everything is well, as JSON",
+      "args": [
+        "doctor",
+        "--json"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_DATA_DIR": "{dir}/data",
+        "OMNI_INSTALL_LOG": "{dir}/logs/server.log",
+        "TZ": "UTC"
+      },
+      "proof": "test-token",
+      "files": {
+        "data/omni.db": {
+          "text": ""
+        },
+        "logs/server.log": {
+          "text": "[server] listening on :4747\n",
+          "agoMs": 130000
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "{\n  \"ok\": true,\n  \"checks\": [\n    {\n      \"name\": \"omni\",\n      \"level\": \"ok\",\n      \"detail\": \"dev, not run through the desktop app's command\"\n    },\n    {\n      \"name\": \"server\",\n      \"level\": \"ok\",\n      \"detail\": \"Omni answers on {url}\"\n    },\n    {\n      \"name\": \"token\",\n      \"level\": \"ok\",\n      \"detail\": \"OMNI_TOKEN, and the server takes it\"\n    },\n    {\n      \"name\": \"data\",\n      \"level\": \"ok\",\n      \"detail\": \"{dir}/data\"\n    },\n    {\n      \"name\": \"claude\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in (claude.ai, max)\"\n    },\n    {\n      \"name\": \"codex\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in (ChatGPT)\"\n    },\n    {\n      \"name\": \"gh\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in to github.com as ben-askphill\"\n    },\n    {\n      \"name\": \"log\",\n      \"level\": \"ok\",\n      \"detail\": \"{dir}/logs/server.log, last written 2m ago\"\n    }\n  ]\n}\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a bare terminal: nothing installed, nothing known",
+      "args": [
+        "doctor"
+      ],
+      "address": "closed-port",
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nFAIL  server  nothing answers on {url}: Omni is not running. Open the Omni app.\nFAIL  token   none found. nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR.\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nwarn  claude  not installed (no claude on PATH)\nwarn  codex   not installed (no codex on PATH)\nwarn  gh      not installed (no gh on PATH): PR features need it\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a bare terminal, as JSON",
+      "args": [
+        "doctor",
+        "--json"
+      ],
+      "address": "closed-port",
+      "expected": {
+        "stdout": "{\n  \"ok\": false,\n  \"checks\": [\n    {\n      \"name\": \"omni\",\n      \"level\": \"ok\",\n      \"detail\": \"dev, not run through the desktop app's command\"\n    },\n    {\n      \"name\": \"server\",\n      \"level\": \"fail\",\n      \"detail\": \"nothing answers on {url}: Omni is not running. Open the Omni app.\"\n    },\n    {\n      \"name\": \"token\",\n      \"level\": \"fail\",\n      \"detail\": \"none found. nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR.\"\n    },\n    {\n      \"name\": \"data\",\n      \"level\": \"warn\",\n      \"detail\": \"unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\"\n    },\n    {\n      \"name\": \"claude\",\n      \"level\": \"warn\",\n      \"detail\": \"not installed (no claude on PATH)\"\n    },\n    {\n      \"name\": \"codex\",\n      \"level\": \"warn\",\n      \"detail\": \"not installed (no codex on PATH)\"\n    },\n    {\n      \"name\": \"gh\",\n      \"level\": \"warn\",\n      \"detail\": \"not installed (no gh on PATH): PR features need it\"\n    },\n    {\n      \"name\": \"log\",\n      \"level\": \"warn\",\n      \"detail\": \"unknown. The desktop app's omni command knows where the server log is.\"\n    }\n  ]\n}\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the install port with its token file",
+      "args": [
+        "doctor"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "proof": "install-token",
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nok    token   {dir}/data/api-token (the install), and the server takes it\nwarn  data    {dir}/data has no omni.db yet: the server has not started with it.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer install-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a token file others can read",
+      "args": [
+        "doctor"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "proof": "install-token",
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "644"
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nwarn  token   {dir}/data/api-token (the install) can be read by other users (mode 644). It should be 600.\nwarn  data    {dir}/data has no omni.db yet: the server has not started with it.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a token file the group can write",
+      "args": [
+        "doctor"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN_FILE": "{dir}/tok"
+      },
+      "proof": "install-token",
+      "files": {
+        "tok": {
+          "text": "install-token\n",
+          "mode": "620"
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nwarn  token   {dir}/tok (OMNI_TOKEN_FILE) can be read by other users (mode 620). It should be 600.\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a token file that is not there, and a data folder that is not there",
+      "args": [
+        "doctor"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "proof": "install-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nFAIL  token   {dir}/data/api-token (the install) does not exist. The server writes it on its first start.\nFAIL  data    {dir}/data does not exist.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an empty token file",
+      "args": [
+        "doctor"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_DATA_DIR": "{dir}/data"
+      },
+      "proof": "install-token",
+      "files": {
+        "data/api-token": {
+          "text": "\n",
+          "mode": "600"
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nFAIL  token   {dir}/data/api-token (OMNI_DATA_DIR) is empty or unreadable.\nwarn  data    {dir}/data has no omni.db yet: the server has not started with it.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another install holds the port",
+      "args": [
+        "doctor"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_DATA_DIR": "{dir}/data"
+      },
+      "dirs": [
+        "data"
+      ],
+      "proof": "another-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nFAIL  server  {url} answers as Omni, but not with this token: another install, or the token changed.\nok    token   OMNI_TOKEN (not sent: the server on that port is not this install)\nwarn  data    {dir}/data has no omni.db yet: the server has not started with it.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program holds the port",
+      "args": [
+        "doctor"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "status": 404,
+              "text": "Not Found"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nFAIL  server  {url} answers, but not as Omni (it answered 404, not an Omni proof). Another program holds the port.\nok    token   OMNI_TOKEN (not checked: the server is not answering)\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "doctor on a port that is taken but silent",
+      "args": [
+        "doctor"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_INSTALL_LOG": "{dir}/server.log",
+        "TZ": "UTC"
+      },
+      "files": {
+        "server.log": {
+          "text": "line 1  www\nline 2  www\nline 3  www\nline 4  www\nline 5  www\nline 6  www\nline 7  www\nline 8  www\nline 9  www\nline 10  www\nline 11  wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\nline 12  www\n",
+          "agoMs": 20000
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "hang": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nFAIL  server  {url} is taken but did not answer within 2s. If it is Omni, it is stuck or starting: see the log below.\nok    token   OMNI_TOKEN (not checked: the server is not answering)\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nok    log     {dir}/server.log, last written just now\n              | line 5 www\n              | line 6 www\n              | line 7 www\n              | line 8 www\n              | line 9 www\n              | line 10 www\n              | line 11 wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww…\n              | line 12 www\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the server refuses the token",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "status": 401,
+              "json": {
+                "error": "unauthorized"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nFAIL  token   OMNI_TOKEN: the server refused it. It was rotated or belongs to another install.\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the server does not say whether it takes the token",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "status": 500,
+              "json": {
+                "error": "The database is locked and the server cannot say more than this about it right now, sorry"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nwarn  token   OMNI_TOKEN: the server did not say (The database is locked and the server cannot say more than this about it right …)\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the server hangs up on the token",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "drop": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nwarn  token   OMNI_TOKEN: the server did not say (Cannot reach the Omni server. Is it running?)\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "no token at all against a server that answers",
+      "args": [
+        "doctor"
+      ],
+      "proof": "whatever",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nFAIL  token   none found. nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR.\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the log reports trouble",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_INSTALL_LOG": "{dir}/server.log",
+        "TZ": "UTC"
+      },
+      "proof": "test-token",
+      "files": {
+        "server.log": {
+          "text": "starting\n[server] Uncaught   exception\n    at boot (server.ts:1)\n",
+          "agoMs": 400000
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, and the server takes it\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     {dir}/server.log, last written 7m ago. Its last lines report trouble:\n              | starting\n              | [server] Uncaught exception\n              | at boot (server.ts:1)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the log is not written yet, the server is up",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_INSTALL_LOG": "{dir}/server.log"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, and the server takes it\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nok    log     {dir}/server.log does not exist yet\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the log is not written yet, the server is down",
+      "args": [
+        "doctor",
+        "--json"
+      ],
+      "address": "closed-url",
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_INSTALL_LOG": "{dir}/server.log",
+        "OMNI_DATA_DIR": "{dir}/data"
+      },
+      "dirs": [
+        "data"
+      ],
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "expected": {
+        "stdout": "{\n  \"ok\": false,\n  \"checks\": [\n    {\n      \"name\": \"omni\",\n      \"level\": \"ok\",\n      \"detail\": \"dev, not run through the desktop app's command\"\n    },\n    {\n      \"name\": \"server\",\n      \"level\": \"fail\",\n      \"detail\": \"nothing answers on {url}: Omni is not running. Open the Omni app.\"\n    },\n    {\n      \"name\": \"token\",\n      \"level\": \"ok\",\n      \"detail\": \"OMNI_TOKEN (not checked: the server is not answering)\"\n    },\n    {\n      \"name\": \"data\",\n      \"level\": \"warn\",\n      \"detail\": \"{dir}/data has no omni.db yet: the server has not started with it.\"\n    },\n    {\n      \"name\": \"claude\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in (claude.ai, max)\"\n    },\n    {\n      \"name\": \"codex\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in (ChatGPT)\"\n    },\n    {\n      \"name\": \"gh\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in to github.com as ben-askphill\"\n    },\n    {\n      \"name\": \"log\",\n      \"level\": \"warn\",\n      \"detail\": \"{dir}/server.log does not exist yet\"\n    }\n  ]\n}\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an empty log with the server down",
+      "args": [
+        "doctor"
+      ],
+      "address": "closed-url",
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_INSTALL_LOG": "{dir}/server.log",
+        "TZ": "UTC"
+      },
+      "files": {
+        "server.log": {
+          "text": "",
+          "agoMs": 10000
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nFAIL  server  nothing answers on {url}: Omni is not running. Open the Omni app.\nok    token   OMNI_TOKEN (not checked: the server is not answering)\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nok    log     {dir}/server.log, last written just now\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the app the command runs on is gone",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_APP": "{dir}/Omni.AppImage"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "FAIL  omni    {dir}/Omni.AppImage is gone. Open the Omni app once and it points this command at itself again.\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, and the server takes it\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "signed out everywhere",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":false}\n"
+        },
+        "codex": {
+          "stderr": "Not logged in\n",
+          "exit": 1
+        },
+        "gh": {
+          "stderr": "You are not logged into any GitHub hosts.\n",
+          "exit": 1
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, and the server takes it\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nFAIL  claude  signed out: run claude and sign in\nFAIL  codex   signed out: run codex login\nFAIL  gh      signed out of github.com: run gh auth login\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "logins that answer oddly",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "Welcome to Claude\n",
+          "exit": 0
+        },
+        "codex": {
+          "stdout": "Logged in using an API key - sk-***abc\n"
+        },
+        "gh": {
+          "stderr": "github.com\n  ✓ Logged in to github.com as ben-askphill (oauth_token)\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, and the server takes it\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nwarn  claude  claude auth status did not answer\nwarn  codex   signed in (an API key, not the ChatGPT plan Omni runs on)\nok    gh      signed in to github.com as ben-askphill\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "logins with less to say",
+      "args": [
+        "doctor",
+        "--json"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"\",\"subscriptionType\":5}\n"
+        },
+        "codex": {
+          "stdout": "ok\n"
+        },
+        "gh": {
+          "stdout": "fine\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "{\n  \"ok\": true,\n  \"checks\": [\n    {\n      \"name\": \"omni\",\n      \"level\": \"ok\",\n      \"detail\": \"dev, not run through the desktop app's command\"\n    },\n    {\n      \"name\": \"server\",\n      \"level\": \"ok\",\n      \"detail\": \"Omni answers on {url}\"\n    },\n    {\n      \"name\": \"token\",\n      \"level\": \"ok\",\n      \"detail\": \"OMNI_TOKEN, and the server takes it\"\n    },\n    {\n      \"name\": \"data\",\n      \"level\": \"warn\",\n      \"detail\": \"unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\"\n    },\n    {\n      \"name\": \"claude\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in\"\n    },\n    {\n      \"name\": \"codex\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in\"\n    },\n    {\n      \"name\": \"gh\",\n      \"level\": \"ok\",\n      \"detail\": \"signed in to github.com\"\n    },\n    {\n      \"name\": \"log\",\n      \"level\": \"warn\",\n      \"detail\": \"unknown. The desktop app's omni command knows where the server log is.\"\n    }\n  ]\n}\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "claude answers with an error and JSON",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"api_key\"}",
+          "exit": 3
+        },
+        "codex": {
+          "stdout": "api key and ChatGPT\n",
+          "exit": 2
+        },
+        "gh": {
+          "stdout": "Logged in to github.com account someone-else\nLogged in to github.com account second\n",
+          "exit": 1
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, and the server takes it\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nok    claude  signed in (api_key)\nFAIL  codex   signed out: run codex login\nFAIL  gh      signed out of github.com: run gh auth login\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 1,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a program that is there but cannot run",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "files": {
+        "bin/claude": {
+          "text": "not a program",
+          "mode": "644"
+        }
+      },
+      "programs": {
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, not run through the desktop app's command\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, and the server takes it\nwarn  data    unknown. The desktop app's omni command knows it; elsewhere set OMNI_DATA_DIR.\nwarn  claude  not installed (no claude on PATH)\nok    codex   signed in (ChatGPT)\nwarn  gh      not installed (no gh on PATH): PR features need it\nwarn  log     unknown. The desktop app's omni command knows where the server log is.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    }
+  ]
+}

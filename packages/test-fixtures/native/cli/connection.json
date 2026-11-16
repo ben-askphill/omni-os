@@ -1,0 +1,1334 @@
+{
+  "scenarios": [
+    {
+      "name": "OMNI_URL that is not http",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_URL": "ftp://example.test",
+        "OMNI_TOKEN": "test-token"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: OMNI_URL is not an http(s) address: ftp://example.test\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_URL with a user in it",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_URL": "http://ben@127.0.0.1:1",
+        "OMNI_TOKEN": "test-token"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: OMNI_URL is not an http(s) address: http://ben@127.0.0.1:1\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_URL with a query",
+      "args": [
+        "show",
+        "11111111-1111-4111-8111-111111111111"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_URL": " http://127.0.0.1:1/?x=1 "
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni show: OMNI_URL is not an http(s) address: http://127.0.0.1:1/?x=1\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_URL with a path prefix and trailing slashes",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_URL": " HTTP://127.0.0.1:{port}/base/omni/// ",
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/base/omni/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/base/omni/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_URL through localhost",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_URL": "http://localhost:{port}",
+        "OMNI_TOKEN": "  spaced-token\n"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer spaced-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "no token on OMNI_URL still asks, and the server refuses",
+      "args": [
+        "threads"
+      ],
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 401,
+              "json": {
+                "error": "unauthorized"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Omni at {url} refused the token from nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a blank OMNI_TOKEN is no token",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "   "
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 401,
+              "json": {
+                "error": "unauthorized"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Omni at {url} refused the token from nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the token file is read and trimmed",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN_FILE": "{dir}/tok"
+      },
+      "files": {
+        "tok": {
+          "text": "\n  file-token  \n\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer file-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_TOKEN wins over the token file",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "OMNI_TOKEN_FILE": "{dir}/tok",
+        "OMNI_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "tok": {
+          "text": "file-token"
+        },
+        "data/api-token": {
+          "text": "data-token"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_TOKEN_FILE wins over the data folder",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN_FILE": "{dir}/tok",
+        "OMNI_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "tok": {
+          "text": "file-token"
+        },
+        "data/api-token": {
+          "text": "data-token"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer file-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_DATA_DIR wins over the install data folder",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_DATA_DIR": "{dir}/data",
+        "OMNI_INSTALL_DATA_DIR": "{dir}/install"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "data-token\n"
+        },
+        "install/api-token": {
+          "text": "install-token\n"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer data-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refused token names the file it came from",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN_FILE": "{dir}/tok"
+      },
+      "files": {
+        "tok": {
+          "text": "old"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 401,
+              "json": {
+                "error": "unauthorized"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Omni at {url} refused the token from {dir}/tok (OMNI_TOKEN_FILE). omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer old"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refused token from the environment",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 401,
+              "text": "nope"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Omni at {url} refused the token from OMNI_TOKEN. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "nothing listens on OMNI_URL",
+      "args": [
+        "threads"
+      ],
+      "address": "closed-url",
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: cannot reach Omni at {url} (fetch failed). Is it running? omni doctor says why not.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the install port with no token sends nothing",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for {url}: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the install port with a missing token file sends nothing",
+      "args": [
+        "new",
+        "hello"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni new: No API token for {url}: {dir}/data/api-token (the install). Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the install port with an empty token file sends nothing",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": " \n"
+        }
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for {url}: {dir}/data/api-token (OMNI_DATA_DIR). Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the install port with a missing OMNI_TOKEN_FILE sends nothing",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN_FILE": "{dir}/nope"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for {url}: {dir}/nope (OMNI_TOKEN_FILE). Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_PORT is read when the install port is not set",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_PORT": " {port} "
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for {url}: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the install port wins over OMNI_PORT",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_PORT": "1"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for {url}: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a port of abc falls back to the default",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_INSTALL_PORT": "abc"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for http://127.0.0.1:4747: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a port of 0 falls back to the default",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_INSTALL_PORT": "0"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for http://127.0.0.1:4747: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a port of 65536 falls back to the default",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_INSTALL_PORT": "65536"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for http://127.0.0.1:4747: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a port of 80.5 falls back to the default",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_INSTALL_PORT": "80.5"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for http://127.0.0.1:4747: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a port of -1 falls back to the default",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_INSTALL_PORT": "-1"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for http://127.0.0.1:4747: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a bad install port falls back to OMNI_PORT",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_INSTALL_PORT": "abc",
+        "OMNI_PORT": "{port}"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for {url}: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a port in hex is a port",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_INSTALL_PORT": "0x1F90"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for http://127.0.0.1:8080: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a port with an exponent is a port",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_INSTALL_PORT": "8.08e3"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for http://127.0.0.1:8080: nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR. Nothing was sent. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the install port proves itself, then gets the token",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "proof": "install-token",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer install-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the install port with OMNI_TOKEN proves itself",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "proof": "test-token",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a server with another token gets nothing",
+      "args": [
+        "new",
+        "a secret prompt"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "proof": "another-token",
+      "expected": {
+        "stdout": "",
+        "stderr": "omni new: {url} answers as Omni, but not as this install's: another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a server with a wrong proof gets nothing",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "proof": "wrong",
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers as Omni, but not as this install's: another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program on the port: 404",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "status": 404,
+              "text": "Not Found"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers, but not as Omni (it answered 404, not an Omni proof): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program on the port: a web page",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "status": 200,
+              "text": "<html></html>",
+              "contentType": "text/html"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers, but not as Omni (it answered 200, not an Omni proof): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program on the port: JSON without a proof",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "json": {
+                "ok": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers, but not as Omni (it answered 200, not an Omni proof): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program on the port: a proof that is not text",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "json": {
+                "proof": 12
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers, but not as Omni (it answered 200, not an Omni proof): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program on the port: JSON null",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "text": "null",
+              "contentType": "application/json"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers, but not as Omni (it answered 200, not an Omni proof): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program on the port: a redirect",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "status": 302,
+              "json": {
+                "proof": "x"
+              },
+              "headers": {
+                "location": "http://127.0.0.1:1/"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers, but not as Omni (it answered 302, not an Omni proof): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program on the port: not HTTP",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "raw": "SSH-2.0-OpenSSH_9.9\r\n"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers, but not as Omni (nothing answered as HTTP): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another program on the port: it hangs up",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "drop": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answers, but not as Omni (nothing answered as HTTP): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the port is taken but silent",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "hang": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: cannot reach Omni at {url} (no answer within 2s). Is it running? omni doctor says why not.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "nothing listens on the install port",
+      "args": [
+        "threads"
+      ],
+      "address": "closed-port",
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: cannot reach Omni at {url} (connection refused). Is it running? omni doctor says why not.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    }
+  ]
+}
