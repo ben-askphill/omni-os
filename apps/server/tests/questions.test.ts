@@ -83,7 +83,6 @@ describe('asking', () => {
     };
     expect(await refused({})).toBe('questions must be a list of 1 to 4 questions');
     expect(await refused({ questions: [Q4, MAIL, Q4, MAIL, Q4] })).toBe('questions must be a list of 1 to 4 questions');
-    expect(await refused({ questions: [{ ...Q4, header: 'Quarter focus' }] })).toBe('questions[0].header is longer than 12 characters');
     expect(await refused({ questions: [{ ...Q4, options: [...Q4.options, { label: 'Other', description: '' }] }] })).toBe(
       'questions[0].options[2] is "Other": leave it out, the card always offers it',
     );
@@ -99,6 +98,11 @@ describe('asking', () => {
     expect(await blockers(id)).toEqual([{ kind: 'question', detail: Q4.question, count: 2, at: expect.any(String) }]);
     expect(await poll(id, qid)).toEqual({ state: 'pending', text: 'The user has not answered yet.' });
     expect((await call('GET', `/threads/${id}/questions/nope`)).status).toBe(404);
+  });
+  it('shortens a header over 12 characters instead of refusing the call', T, async () => {
+    const id = await idle();
+    await ask(id, [{ ...Q4, header: 'Quarter focus' }]);
+    expect(h.byKind(id, 'question')[0].p.questions[0].header).toBe('Quarter foc…');
   });
 });
 

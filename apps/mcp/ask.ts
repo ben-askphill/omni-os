@@ -21,7 +21,8 @@ const option = z.object({
 
 const question = z.object({
   question: z.string().describe('The full question, ending with a question mark.'),
-  header: z.string().max(HEADER_MAX).optional().describe(`A short tag shown with the question, at most ${HEADER_MAX} characters, like "Q4 focus".`),
+  // No .max(): a schema limit makes the harness refuse the whole call over one extra character. Omni shortens it instead.
+  header: z.string().optional().describe(`A short tag shown with the question, at most ${HEADER_MAX} characters, like "Q4 focus". A longer one is cut short.`),
   options: z
     .array(option)
     .min(OPTIONS_MIN)
