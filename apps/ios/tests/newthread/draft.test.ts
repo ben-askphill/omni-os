@@ -48,6 +48,11 @@ describe('where a thread can start', () => {
     ]);
   });
 
+  it("draws the Conductor with the icon and background saved for it", () => {
+    const channels = [channel({ id: 'conductor', name: 'Conductor', icon: 'icon:target', avatar_bg: '#ffffff' })];
+    expect(targetsOf(channels)).toEqual([{ id: 'conductor', name: 'Conductor', icon: 'icon:target', avatar_bg: '#ffffff' }]);
+  });
+
   it('still offers the Conductor before the channels have loaded', () => {
     expect(targetsOf(null)).toEqual([{ id: 'conductor', name: 'Conductor', icon: null }]);
   });

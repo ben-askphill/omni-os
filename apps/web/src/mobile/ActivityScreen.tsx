@@ -7,7 +7,9 @@ import { AccountNotice } from '../components/AccountNotice.tsx';
 import { MachineTile } from '../components/dashboard/MachineTiles.tsx';
 import { useMachines } from '../app/useMachines.ts';
 import { href } from '../router.ts';
-import { useNow } from '../store.tsx';
+import { useApp, useNow } from '../store.tsx';
+import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
+import { Avatar } from '../components/ui.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
 import { MoDoneRow, MoInboxRow, MoShelf, MoShowMore } from './InboxRows.tsx';
 import { MoEmpty, MoHeader, MoScroll, MoTitle } from './parts.tsx';
@@ -22,6 +24,7 @@ export function ActivityScreen() {
   const now = useNow(60_000);
   const { pinned, inbox, working, done, loaded, status } = useInbox();
   const machines = useMachines().data;
+  const conductor = useApp().channel(CONDUCTOR_CHANNEL);
   const waiting = [...pinned, ...inbox];
   const mark = waiting.some((t) => asksForYou(status(t)?.glyph ?? 'idle')) ? 'attention' : working.count ? 'delegating' : 'idle';
   const date = new Date(now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -31,7 +34,7 @@ export function ActivityScreen() {
       <MoHeader
         left={
           <button type="button" onClick={() => shell.open(href.channel('conductor'))} aria-label="Open the Conductor" className="mo-press flex h-10 items-center gap-2 px-1.5">
-            <OmniMark size={30} state={mark} />
+            {conductor && hasOwnLook(conductor) ? <Avatar name={conductor.name} omni channelIcon={conductor.icon} avatarBg={conductor.avatar_bg} size={30} /> : <OmniMark size={30} state={mark} />}
             <span className="text-[14px] leading-none font-medium">Conductor</span>
           </button>
         }

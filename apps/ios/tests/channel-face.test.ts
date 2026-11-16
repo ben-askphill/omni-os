@@ -36,8 +36,11 @@ describe('what a channel avatar draws', () => {
     expect(channelFace('#!', null)).toEqual({ kind: 'letters', letters: '?' });
   });
 
-  it('draws the Omni mark for the Conductor whatever its icon', () => {
-    expect(channelFace('Conductor', '🚀', true)).toEqual({ kind: 'conductor' });
+  it('draws the Omni mark for the Conductor until it has an icon of its own', () => {
+    expect(channelFace('Conductor', null, true)).toEqual({ kind: 'omni' });
+    expect(channelFace('Conductor', 'icon:not-a-glyph', true)).toEqual({ kind: 'omni' });
+    expect(channelFace('Conductor', '🚀', true)).toEqual({ kind: 'emoji', text: '🚀' });
+    expect(channelFace('Conductor', glyphIcon('target'), true)).toEqual({ kind: 'glyph', name: 'target' });
   });
 });
 

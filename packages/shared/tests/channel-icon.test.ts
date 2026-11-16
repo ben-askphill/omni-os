@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHANNEL_GLYPHS, parseChannelIcon, readSvgIcon, SVG_MAX } from '../channel-icon.ts';
+import { CHANNEL_GLYPHS, channelFace, hasOwnLook, parseChannelIcon, readSvgIcon, SVG_MAX } from '../channel-icon.ts';
 
 import { ICON_PATHS, type IconName } from '../icons.ts';
 
@@ -47,5 +47,28 @@ describe('channel icons', () => {
 
   it('offers only icons the Web UI draws', () => {
     for (const name of CHANNEL_GLYPHS) expect(ICON_PATHS[name]).toEqual(expect.any(String));
+  });
+});
+
+describe('channel faces', () => {
+  it('draws the Omni mark for the Conductor only while it has no icon of its own', () => {
+    expect(channelFace(null, true)).toEqual({ kind: 'omni' });
+    expect(channelFace('', true)).toEqual({ kind: 'omni' });
+    expect(channelFace('icon:nope', true)).toEqual({ kind: 'omni' });
+    expect(channelFace('icon:target', true)).toEqual({ kind: 'glyph', name: 'target' });
+    expect(channelFace('🎼', true)).toEqual({ kind: 'emoji', text: '🎼' });
+  });
+
+  it('draws any other channel its icon or its monogram', () => {
+    expect(channelFace('icon:terminal')).toEqual({ kind: 'glyph', name: 'terminal' });
+    expect(channelFace(null)).toEqual({ kind: 'letters' });
+  });
+
+  it('tells a saved look from the defaults', () => {
+    expect(hasOwnLook({ icon: null, avatar_bg: null })).toBe(false);
+    expect(hasOwnLook({})).toBe(false);
+    expect(hasOwnLook({ icon: 'icon:target', avatar_bg: null })).toBe(true);
+    expect(hasOwnLook({ icon: null, avatar_bg: '#283c62' })).toBe(true);
+    expect(hasOwnLook({ icon: 'icon:nope', avatar_bg: '' })).toBe(false);
   });
 });

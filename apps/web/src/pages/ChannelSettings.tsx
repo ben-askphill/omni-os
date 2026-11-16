@@ -5,7 +5,7 @@ import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRu
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { AUTO, AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
 import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
-import { CHANNEL_GLYPHS, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
+import { CHANNEL_GLYPHS, CONDUCTOR_CHANNEL, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
 import { lastGrapheme } from '../format.ts';
@@ -50,7 +50,7 @@ function AutoValue({ label, value, note, onEdit }: { label: string; value: strin
 /** Bigger than any SVG that could be kept once cleaned, so it is refused before being read. */
 const SVG_FILE_MAX = 512 * 1024;
 
-function IconPicker({ value, name, avatarBg, onChange }: { avatarBg?: string; value: string; name: string; onChange: (v: string) => void }) {
+function IconPicker({ value, name, avatarBg, omni, onChange }: { avatarBg?: string; value: string; name: string; omni?: boolean; onChange: (v: string) => void }) {
   const mark = parseChannelIcon(value);
   const fileRef = useRef<HTMLInputElement>(null);
   const [svgError, setSvgError] = useState<string | null>(null);
@@ -72,7 +72,7 @@ function IconPicker({ value, name, avatarBg, onChange }: { avatarBg?: string; va
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Avatar name={name} channelIcon={value} avatarBg={avatarBg} size={36} />
+        <Avatar name={name} omni={omni} channelIcon={value} avatarBg={avatarBg} size={36} />
         <input
           id="ch-icon"
           className="field w-24 text-center !text-[18px] placeholder:!text-[13px]"
@@ -221,6 +221,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const isNew = !existing;
   const isSystem = existing?.kind === 'system';
+  const isConductor = existing?.id === CONDUCTOR_CHANNEL;
 
   const set = <K extends keyof ChannelForm>(k: K, v: ChannelForm[K]) => {
     setSaved(false);
@@ -291,11 +292,11 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Field label="Name" htmlFor="ch-name">
           <input id="ch-name" className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
         </Field>
-        <Field label="Icon" htmlFor="ch-icon" hint="Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses the first letter.">
-          <IconPicker avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
+        <Field label="Icon" htmlFor="ch-icon" hint={`Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses ${isConductor ? 'the Omni mark' : 'the first letter'}.`}>
+          <IconPicker avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} omni={isConductor} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
         </Field>
         <Field label="Avatar background" hint="Automatic follows the avatar. A custom color stays when you change the icon.">
-          <AvatarColorPicker icon={f.icon} name={f.name || f.id} value={f.avatar_bg} manual={!!f.avatar_bg_manual}
+          <AvatarColorPicker icon={f.icon} name={f.name || f.id} omni={isConductor} value={f.avatar_bg} manual={!!f.avatar_bg_manual}
             onChange={(color) => { setSaved(false); setF((prev) => ({ ...prev, avatar_bg: color, avatar_bg_manual: 1 })); }}
             onAuto={() => { setSaved(false); setF((prev) => ({ ...prev, avatar_bg: autoAvatarColor(prev.icon) ?? '', avatar_bg_manual: 0 })); }} />
         </Field>

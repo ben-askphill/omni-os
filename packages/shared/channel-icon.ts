@@ -77,3 +77,22 @@ export function parseChannelIcon(value: string | null | undefined): ChannelIcon 
 }
 
 export const glyphIcon = (name: ChannelGlyph) => `${GLYPH_PREFIX}${name}`;
+
+/** The Conductor's channel, a system channel every install has (apps/server/db/repos/channels.ts). */
+export const CONDUCTOR_CHANNEL = 'conductor';
+
+/**
+ * What a channel's avatar draws: its own icon when it has one, the Omni mark for the Conductor, else its monogram.
+ * The Omni mark is only the Conductor's default: an icon picked in its settings wins on every client.
+ */
+export type ChannelFace = ChannelIcon | { kind: 'omni' } | { kind: 'letters' };
+
+export function channelFace(icon: string | null | undefined, conductor = false): ChannelFace {
+  return parseChannelIcon(icon) ?? (conductor ? { kind: 'omni' } : { kind: 'letters' });
+}
+
+/**
+ * Whether the channel has a look of its own: an icon or a background. Without one, the Conductor shows its bare Omni
+ * mark where other channels show a #, which in places moves with what it is doing.
+ */
+export const hasOwnLook = (c: { icon?: string | null; avatar_bg?: string | null }) => !!c.avatar_bg || !!parseChannelIcon(c.icon);

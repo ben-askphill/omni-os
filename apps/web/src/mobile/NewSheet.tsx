@@ -13,6 +13,7 @@ import { Avatar, ErrorNote } from '../components/ui.tsx';
 import { draftRun, draftRunRequest } from '@omni/shared/draft-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
+import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { GROK_BOT_NOTE, GROK_BOT_PLACEHOLDER, GROK_BOT_SENT, grokBotBlock } from '@omni/shared/thread-machine.ts';
 import { sendMessageToGrokBot } from '../grokbot.ts';
 import { href } from '../router.ts';
@@ -36,6 +37,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const shell = useShell();
   const { channels, crew } = useApp();
   const listed = channels.filter((c) => !c.archived && c.id !== 'conductor');
+  const conductorChannel = channels.find((c) => c.id === CONDUCTOR_CHANNEL);
   const [target, setTarget] = useState(initial ?? 'conductor');
   // An open item's New thread starts with its prompt (components/thread/OpenItemsCard.tsx).
   const [text, setText] = useState(first ?? '');
@@ -134,9 +136,13 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
         </div>
         <div ref={strip} className="mo-scroll flex shrink-0 gap-2 overflow-x-auto px-4 pb-3">
           <button type="button" onClick={() => onTarget('conductor')} className={pill(conductor)} aria-pressed={conductor}>
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg">
-              <OmniMark size={18} />
-            </span>
+            {conductorChannel && hasOwnLook(conductorChannel) ? (
+              <Avatar name={conductorChannel.name} omni channelIcon={conductorChannel.icon} avatarBg={conductorChannel.avatar_bg} size={24} />
+            ) : (
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-bg text-fg">
+                <OmniMark size={18} />
+              </span>
+            )}
             Conductor
           </button>
           {listed.map((c) => (

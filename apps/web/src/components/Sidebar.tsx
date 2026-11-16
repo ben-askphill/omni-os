@@ -6,7 +6,7 @@ import { opensOnVisit } from '../sidebar-fold.ts';
 import { rowsElsewhere, runningThreadGroups } from '../sidebar-lists.ts';
 import { href, useRoute } from '../router.ts';
 import { useApp } from '../store.tsx';
-import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
+import { CONDUCTOR_CHANNEL, parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { useJobTree } from '../thread-tree.ts';
 import { OmniMark } from './brand.tsx';
 import { Avatar, ChannelMark, ErrorNote } from './ui.tsx';
@@ -184,19 +184,30 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
     />
   );
 
+  // A channel row's lead: its avatar when it has a background, else its bare icon, else # (the Conductor: the Omni mark).
+  const channelLead = (c: ChannelWithRunning) => {
+    const tone = activeChannel === c.id ? 'text-fg-2' : 'text-fg-3';
+    if (c.id === CONDUCTOR_CHANNEL) {
+      return (
+        <span className="grid min-w-[15px] place-items-center">
+          {c.avatar_bg ? <Avatar name={c.name} omni channelIcon={c.icon} avatarBg={c.avatar_bg} size={22} /> : parseChannelIcon(c.icon) ? <span className={`grid ${tone}`}><ChannelMark icon={c.icon} size={14} /></span> : <OmniMark size={17} />}
+        </span>
+      );
+    }
+    if (c.avatar_bg) return <Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} size={20} />;
+    if (parseChannelIcon(c.icon)) {
+      return (
+        <span className={`grid w-[15px] place-items-center ${tone}`}>
+          <ChannelMark icon={c.icon} size={14} />
+        </span>
+      );
+    }
+    return <span className={`w-[15px] text-center font-num text-[12px] ${tone}`}>#</span>;
+  };
+
   const channelLink = (c: ChannelWithRunning) => (
     <Fragment key={c.id}>
-      {channelRow(
-        c,
-        c.name,
-        c.avatar_bg ? <Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} size={20} /> : parseChannelIcon(c.icon) ? (
-          <span className={`grid w-[15px] place-items-center ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-3'}`}>
-            <ChannelMark icon={c.icon} avatarBg={c.avatar_bg} size={14} />
-          </span>
-        ) : (
-          <span className={`w-[15px] text-center font-num text-[12px] ${activeChannel === c.id ? 'text-fg-2' : 'text-fg-3'}`}>#</span>
-        ),
-      )}
+      {channelRow(c, c.name, channelLead(c))}
       {threadLinks(c)}
     </Fragment>
   );
@@ -217,7 +228,7 @@ export function Sidebar({ onNavigate, onSearch, onClose }: { onNavigate?: () => 
               </NavLink>
               {conductor && (
                 <>
-                  {channelRow(conductor, 'Conductor', <span className="grid min-w-[15px] place-items-center">{conductor.avatar_bg ? <Avatar name="Conductor" omni avatarBg={conductor.avatar_bg} size={22} /> : <OmniMark size={17} />}</span>)}
+                  {channelRow(conductor, 'Conductor', channelLead(conductor))}
                   {threadLinks(conductor)}
                 </>
               )}

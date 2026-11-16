@@ -1,7 +1,7 @@
 import { avatarInk } from '@omni/shared/avatar-color.ts';
 import { createContext, useContext, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { monogram } from '@omni/shared/monogram.ts';
-import { CHANNEL_GLYPHS, parseChannelIcon, svgDataUrl } from '@omni/shared/channel-icon.ts';
+import { CHANNEL_GLYPHS, channelFace, parseChannelIcon, svgDataUrl } from '@omni/shared/channel-icon.ts';
 import { Loader, StaticMark } from '../brand.tsx';
 import { Icon, type IconName } from './icons.tsx';
 
@@ -149,10 +149,13 @@ export function useMonogram(name: string): string {
   return useContext(Monograms).get(name) ?? monogram(name);
 }
 
-/** Monogram avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces the letters. */
-/** `omni` draws the Conductor's mark, the same one the sidebar shows. */
+/**
+ * Monogram avatar for channels and roles: neutral surface, SF Rounded. No per-name hue. A channel's own icon replaces
+ * the letters. `omni` marks the Conductor: it draws the Omni mark until the Conductor gets an icon of its own
+ * (channelFace in packages/shared/channel-icon.ts).
+ */
 export function Avatar({ name, size = 28, icon, omni, channelIcon, avatarBg, ink, className = '' }: { name: string; size?: number; icon?: IconName; omni?: boolean; channelIcon?: string | null; avatarBg?: string | null; ink?: boolean; className?: string }) {
-  const mark = parseChannelIcon(channelIcon);
+  const face = channelFace(channelIcon, omni);
   const letters = useMonogram(name);
   return (
     <span
@@ -160,14 +163,14 @@ export function Avatar({ name, size = 28, icon, omni, channelIcon, avatarBg, ink
       className={`inline-grid shrink-0 place-items-center rounded-full font-rounded font-medium leading-none ${ink ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg-2'} ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.42, ...(avatarBg ? { backgroundColor: avatarBg, color: avatarInk(avatarBg) } : {}) }}
     >
-      {omni ? (
-        <StaticMark size={size * 0.56} title="" />
-      ) : icon ? (
+      {icon ? (
         <Icon name={icon} size={size * 0.5} />
-      ) : mark ? (
-        <ChannelMark icon={channelIcon} size={size * { glyph: 0.5, emoji: 0.52, svg: 0.58 }[mark.kind]} />
-      ) : (
+      ) : face.kind === 'omni' ? (
+        <StaticMark size={size * 0.56} title="" />
+      ) : face.kind === 'letters' ? (
         letters
+      ) : (
+        <ChannelMark icon={channelIcon} size={size * { glyph: 0.5, emoji: 0.52, svg: 0.58 }[face.kind]} />
       )}
     </span>
   );

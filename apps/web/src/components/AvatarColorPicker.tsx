@@ -17,7 +17,7 @@ const SWATCH_NAMES: Record<string, string> = {
 };
 
 /** Uses the same field and button primitives as channel settings. Sample coordinates use the image's actual contain box. */
-export function AvatarColorPicker({ icon, name, value, manual, onChange, onAuto }: { icon: string; name: string; value: string; manual: boolean; onChange: (color: string) => void; onAuto: () => void }) {
+export function AvatarColorPicker({ icon, name, omni, value, manual, onChange, onAuto }: { icon: string; name: string; omni?: boolean; value: string; manual: boolean; onChange: (color: string) => void; onAuto: () => void }) {
   const mark = parseChannelIcon(icon);
   const [error, setError] = useState('');
   const current = value.toLowerCase();
@@ -48,7 +48,7 @@ export function AvatarColorPicker({ icon, name, value, manual, onChange, onAuto 
   const swatches = [...new Set([...AVATAR_SWATCHES, ...(mark?.kind === 'svg' ? svgColors(mark.markup).palette : [])].map((c) => c.toLowerCase()))];
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center gap-3">
-      <Avatar name={name} channelIcon={icon} avatarBg={value} size={56} />
+      <Avatar name={name} omni={omni} channelIcon={icon} avatarBg={value} size={56} />
       <input type="color" aria-label="Avatar background color" value={current || '#e8d9f5'} onChange={(e) => onChange(e.target.value)} className="h-9 w-10 cursor-pointer rounded-lg" />
       <input aria-label="Avatar background hex" className="field !w-28 font-mono" placeholder="#e8d9f5" value={hex} maxLength={7} onChange={(e) => { setHex(e.target.value); if (/^#[\da-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} aria-invalid={!!hex && !/^#[\da-f]{6}$/i.test(hex)} />
       <Button type="button" onClick={onAuto} disabled={!manual} title={manual ? undefined : 'Already automatic'}>Reset to auto</Button>

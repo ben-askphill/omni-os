@@ -178,7 +178,7 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         <InputRow first label="Hex color" value={form.avatar_bg} placeholder="#e8d9f5" autoCapitalize="none" onChangeText={(v) => { set('avatar_bg', v); set('avatar_bg_manual', 1); }} />
         <ListRow title="Reset to auto" onPress={() => { set('avatar_bg', autoAvatarColor(form.icon) ?? ''); set('avatar_bg_manual', 0); }} />
       </Group>
-      <IconPicker icon={form.icon} onChange={(v) => { set('icon', v); if (!form.avatar_bg_manual) set('avatar_bg', autoAvatarColor(v) ?? ''); }} />
+      <IconPicker icon={form.icon} conductor={channel?.id === 'conductor'} onChange={(v) => { set('icon', v); if (!form.avatar_bg_manual) set('avatar_bg', autoAvatarColor(v) ?? ''); }} />
 
       <Group footer="Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.">
         <InputRow first label="Notes" value={form.notes} multiline autoCapitalize="sentences" onChangeText={(t) => set('notes', t)} />
@@ -252,12 +252,12 @@ function RunPicker({ run, harnesses, onChange }: { run: ChannelForm['run']; harn
   );
 }
 
-/** Emoji, one of the design system's icons, or the first letter. An uploaded SVG comes from the computer and shows here with Clear. */
-function IconPicker({ icon, onChange }: { icon: string; onChange: (value: string) => void }) {
+/** Emoji, one of the design system's icons, or the first letter (the Conductor: the Omni mark). An uploaded SVG comes from the computer and shows here with Clear. */
+function IconPicker({ icon, conductor, onChange }: { icon: string; conductor: boolean; onChange: (value: string) => void }) {
   const { colors } = useOmniTheme();
   const parts = iconParts(icon);
   return (
-    <Group title="Icon" footer="Shown in Channels and on the channel. Empty uses the first letter.">
+    <Group title="Icon" footer={`Shown in Channels and on the channel. Empty uses ${conductor ? 'the Omni mark' : 'the first letter'}.`}>
       <InputRow first label="Emoji" value={parts.kind === 'emoji' ? parts.text : ''} placeholder="Type one emoji" onChangeText={(t) => onChange(lastEmoji(t))} />
       {parts.kind === 'svg' ? <ListRow title="Custom SVG" detail="Uploaded on the computer" /> : null}
       <View style={[styles.glyphs, { borderTopColor: colors.line }]} accessibilityRole="radiogroup" accessibilityLabel="Icon">

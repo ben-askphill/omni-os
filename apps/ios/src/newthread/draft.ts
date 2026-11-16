@@ -19,7 +19,8 @@ export interface Target {
 
 export function targetsOf(channels: readonly ChannelWithRunning[] | null): Target[] {
   const live = (channels ?? []).filter((c) => !c.archived && c.id !== CONDUCTOR);
-  return [{ id: CONDUCTOR, name: 'Conductor', icon: null, avatar_bg: channels?.find((c) => c.id === CONDUCTOR)?.avatar_bg }, ...live.map((c) => ({ id: c.id, name: c.name, icon: c.icon ?? null, avatar_bg: c.avatar_bg }))];
+  const conductor = channels?.find((c) => c.id === CONDUCTOR);
+  return [{ id: CONDUCTOR, name: 'Conductor', icon: conductor?.icon ?? null, avatar_bg: conductor?.avatar_bg }, ...live.map((c) => ({ id: c.id, name: c.name, icon: c.icon ?? null, avatar_bg: c.avatar_bg }))];
 }
 
 /** The Conductor's threads run as its crew role. Another channel's start with none. */

@@ -59,7 +59,7 @@ export function ChannelRail({ selection }: { selection: RailSelection }) {
         {conductor && (
           <RailItem to={href.channel('conductor')} label="Conductor" selected={isChannel('conductor')} badge={badgeOf(conductor)}>
             <Disc selected={isChannel('conductor')} fill={conductor.avatar_bg}>
-              <StaticMark size={20} title="" />
+              {parseChannelIcon(conductor.icon) ? <ChannelMark icon={conductor.icon} size={22} /> : <StaticMark size={20} title="" />}
             </Disc>
           </RailItem>
         )}

@@ -13,7 +13,7 @@ import { type Glyph, StatusDot } from './StatusDot';
 
 /**
  * A channel as the Web UI's Avatar draws it, everywhere a channel shows: its own icon (an emoji, a design system icon
- * or an uploaded SVG) or its monogram (packages/shared/monogram.ts) in a soft circle, the Omni mark for the Conductor, and a thread's status glyph
+ * or an uploaded SVG) or its monogram (packages/shared/monogram.ts) in a soft circle, the Omni mark for the Conductor until it has an icon of its own, and a thread's status glyph
  * on the corner when given.
  */
 export function ChannelAvatar({
@@ -51,7 +51,7 @@ export function ChannelAvatar({
 
 function Face({ face, name, size, color }: { face: ChannelFace; name: string; size: number; color: string }) {
   switch (face.kind) {
-    case 'conductor':
+    case 'omni':
       return <OmniMark size={size * 0.56} color={color} />;
     case 'glyph':
       return <Icon name={face.name} size={Math.round(size * 0.46)} color={color} />;

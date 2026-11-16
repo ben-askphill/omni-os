@@ -9,6 +9,7 @@ import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { useFolders } from '../folders.tsx';
 import { delegatesByParent } from '@omni/shared/delegate-count.ts';
+import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { bottomInset, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoScroll, MoSection, MoTitle } from './parts.tsx';
 import { MoDelegatedRow } from './DelegatedRow.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
@@ -66,7 +67,7 @@ export function ChannelsScreen() {
         <div className="px-4">
           <MoGroup>
             <MoListRow
-              icon={<OmniMark size={22} state={conductor?.running ? 'delegating' : 'idle'} />}
+              icon={conductor && hasOwnLook(conductor) ? <Avatar name={conductor.name} omni channelIcon={conductor.icon} avatarBg={conductor.avatar_bg} size={30} /> : <OmniMark size={22} state={conductor?.running ? 'delegating' : 'idle'} />}
               label="Conductor"
               sub={conductor?.notes || 'Delegates to crew threads in every channel'}
               right={<Counts needs={needsIn('conductor')} running={conductor?.running ?? 0} />}

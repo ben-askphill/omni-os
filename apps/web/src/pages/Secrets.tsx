@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SecretRow } from '../api.ts';
 import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
-import { StaticMark } from '../components/brand.tsx';
+import { channelAvatar } from '../components/composer/pickerOptions.tsx';
 import { href } from '../router.ts';
 import { useApp, useSecretStoreLabel } from '../store.tsx';
 import { Card, FootNote } from './settings-parts.tsx';
@@ -93,7 +93,7 @@ export function SecretsSection() {
 
   const scopeOptions: PickerOption<string>[] = [
     { value: 'global', label: 'Global', sub: 'All channels', icon: 'globe' },
-    ...channels.map((c) => ({ value: `channel:${c.id}`, label: `#${c.name}`, sub: c.kind, avatar: c.name, avatarBg: c.avatar_bg, channelIcon: c.icon, lead: c.id === 'conductor' ? <StaticMark size={13} title="" /> : undefined })),
+    ...channels.map((c) => ({ value: `channel:${c.id}`, label: `#${c.name}`, sub: c.kind, ...channelAvatar(c) })),
   ];
 
   return (

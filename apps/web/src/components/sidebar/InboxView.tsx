@@ -131,8 +131,8 @@ function Shelf({ label, count, open, onToggle }: { label: string; count: number;
 
 function ChannelLead({ channel }: { channel: ReturnType<typeof useApp>['channels'][number] | undefined }) {
   if (channel?.avatar_bg) return <Avatar name={channel.name} channelIcon={channel.icon} avatarBg={channel.avatar_bg} omni={channel.id === 'conductor'} size={18} />;
-  if (channel?.id === 'conductor') return <OmniMark size={13} />;
   if (channel && parseChannelIcon(channel.icon)) return <ChannelMark icon={channel.icon} avatarBg={channel.avatar_bg} size={12} />;
+  if (channel?.id === 'conductor') return <OmniMark size={13} />;
   return <span className="font-num text-[11px] leading-none text-fg-3">#</span>;
 }
 
