@@ -206,7 +206,8 @@ export const codexAdapter: HarnessAdapter = {
         case 'account/rateLimits/updated': {
           const rl = p.rateLimits;
           // Only the plan's bucket; a reserve model's has its own.
-          if (rl && (rl.limitId ?? PLAN_LIMIT_ID) === PLAN_LIMIT_ID) cb.usage(normalizeRateLimits(rl, usageFor('codex')));
+          // It leaves out windows that did not change: recordUsage fills them per account, never from another account's reading.
+          if (rl && (rl.limitId ?? PLAN_LIMIT_ID) === PLAN_LIMIT_ID) cb.usage(normalizeRateLimits(rl), { partial: true });
           break;
         }
         case 'thread/tokenUsage/updated': {

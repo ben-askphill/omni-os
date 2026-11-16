@@ -28,6 +28,7 @@
 //   LIMITRESET:<epoch>  the same, with the reset time in the body (resets_at, epoch seconds)
 //   CRASH     exit(1) mid-turn, like the process dying
 //   SKILLS_EDITED  send skills/changed, as Codex does when a personal skill file changes
+//   FIVEONLY:<pct>  send account/rateLimits/updated for the plan with the 5-hour window only (no weekly one)
 // and in a review's custom instructions:
 //   HANG      never finish on its own; only turn/interrupt ends the review
 // Env:
@@ -284,6 +285,8 @@ async function runTurn(turn, input) {
     notify('account/rateLimits/updated', { rateLimits: planLimits(12, 3) });
     notify('account/rateLimits/updated', { rateLimits: RESERVE_LIMITS });
   }
+  const fiveOnly = Number(said.match(/FIVEONLY:(\d+)/)?.[1]);
+  if (Number.isFinite(fiveOnly)) notify('account/rateLimits/updated', { rateLimits: bucket('codex', win(fiveOnly, 300, 1790328600), null) });
   if (said.includes('BADTURN') || said.includes('LIMITRESET')) {
     // LIMITRESET:<epoch> carries the reset time in the body, as the API does; BADTURN says it only in words.
     const at = Number(said.match(/LIMITRESET:(\d+)/)?.[1]);

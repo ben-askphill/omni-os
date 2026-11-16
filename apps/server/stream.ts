@@ -185,6 +185,8 @@ export interface Usage {
   monthly?: MonthlyUsage;
   status?: string;
   updated_at: string;
+  /** Read through a login that may not be the harness's account (Cursor's IDE session): no account's row falls back to it. */
+  unattributed?: boolean;
 }
 
 /** What an event says about the thread's context window. */

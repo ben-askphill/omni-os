@@ -175,7 +175,7 @@ async function spawnLive(live: Live, thread: Thread) {
         if (thread.harness === 'claude-code' && rec.kind === 'replay') sessionStarted(live);
         onRecord(live, rec);
       },
-      usage: (u) => recordUsage(thread.harness as HarnessId, u),
+      usage: (u, opts) => recordUsage(thread.harness as HarnessId, u, { partial: opts?.partial }),
       session: (sid) => {
         live.sessionIs(sid);
         const t = threads.get(thread.id);

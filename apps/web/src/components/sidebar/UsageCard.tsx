@@ -79,7 +79,8 @@ function UsageRowView({ row }: { row: UsageRow }) {
       {row.several && row.account && (
         <div className="flex min-w-0 items-center gap-1 pl-[18px] pt-0.5 text-[10px] leading-tight text-fg-3" title={who ?? undefined} data-testid="usage-account">
           <span className="min-w-0 truncate">{row.account.label}</span>
-          {row.account.plan && <span className="shrink-0">· {row.account.plan}</span>}
+          {/* The plan gives way too, at most half the line, so a narrow sidebar keeps room for the email. */}
+          {row.account.plan && <span className="min-w-0 max-w-[45%] shrink-0 truncate">· {row.account.plan}</span>}
         </div>
       )}
     </div>

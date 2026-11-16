@@ -66,8 +66,8 @@ export type EndMode = 'close' | 'stop' | 'terminate' | 'kill';
 export interface AdapterCallbacks {
   /** One Omni record produced by the harness. */
   record: (rec: StreamRecord) => void;
-  /** A usage snapshot for the meter. */
-  usage: (u: Usage) => void;
+  /** A usage snapshot for the meter. `partial`: windows it leaves out did not change (recordUsage fills them). */
+  usage: (u: Usage, opts?: { partial?: boolean }) => void;
   /** The harness's own session id, learned once the session starts (Codex thread id, Cursor chat id). */
   session: (id: string) => void;
   /** The harness says its commands changed, so a cached command list is out of date. */

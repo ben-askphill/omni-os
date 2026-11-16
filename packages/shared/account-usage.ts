@@ -26,6 +26,8 @@ export interface PlanUsage {
   monthly?: MonthlyPlanUsage;
   status?: string;
   updated_at?: string;
+  /** The per-harness reading came through a login that may not be the harness's account (Cursor's IDE session). */
+  unattributed?: boolean;
 }
 
 /** One account's last plan reading, as the machine that read it wrote it to the synced kv. */
@@ -78,7 +80,8 @@ export function latestUsage(records: readonly AccountUsage[]): Map<string, Accou
  * `legacy`, the reading kept per harness.
  *
  * `legacy` also fills a lone account's row until any account of that harness has its own record, so the card does
- * not go blank on the first start after an update. Once one does, it is never used for that harness again.
+ * not go blank on the first start after an update, unless it was read through another login (`unattributed`). Once
+ * an account has a record, it is never used for that harness again.
  */
 export function usageRows(
   harnesses: readonly string[],
@@ -112,7 +115,10 @@ export function usageRows(
     return [...accounts.values()].map((account) => {
       const k = accountUsageKey({ harness: h, label: account.label, org: account.org });
       const own = latest.get(k);
-      const usage = own ? own.usage : !several && !anyRecord ? (legacy[h] ?? null) : null;
+      // The per-harness reading stands in only when it can be no other account's: one account, none filed yet, and not
+      // read through another login.
+      const stand = legacy[h] && !legacy[h]!.unattributed ? legacy[h]! : null;
+      const usage = own ? own.usage : !several && !anyRecord ? stand : null;
       return { key: k, harness: h, account, usage, several };
     });
   });

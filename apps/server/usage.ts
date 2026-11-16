@@ -7,27 +7,32 @@
 // account it was read as (harness-accounts.ts attributeUsage), which is what the Usage card shows per account.
 import { kv } from './db.ts';
 import { publishFeed } from './bus.ts';
-import { attributeUsage } from './harness-accounts.ts';
+import { attributeUsage, fillWindows } from './harness-accounts.ts';
 import type { Usage } from './stream.ts';
 import { HARNESS_IDS, type HarnessId } from './harness/types.ts';
 
 const key = (harness: string) => `usage:${harness}`;
 
 /**
- * A plan reading for the account the harness runs as on this machine. `account: false` keeps it off every account,
- * for a reading that may have come from another login (Cursor's dashboard through the IDE's session).
+ * A plan reading for the account the harness runs as on this machine.
+ * - `account: false` keeps it off every account, for a reading that may have come from another login (Cursor's
+ *   dashboard through the IDE's session). The per-harness copy is marked, so no account row ever falls back to it.
+ * - `partial`: the reading leaves out windows that did not change (Codex's rate-limit updates). The per-harness copy
+ *   takes them from the last per-harness reading, as before; the account's copy only from that account's own.
  */
-export function recordUsage(harness: HarnessId, usage: Usage, { account = true }: { account?: boolean } = {}) {
-  kv.set(key(harness), usage);
-  publishFeed({ type: 'usage', harness, usage });
-  if (account) void attributeUsage(harness, usage);
+export function recordUsage(harness: HarnessId, usage: Usage, { account = true, partial = false }: { account?: boolean; partial?: boolean } = {}) {
+  const shared = partial ? fillWindows(usage, usageFor(harness)) : usage;
+  const value: Usage = account ? shared : { ...shared, unattributed: true };
+  kv.set(key(harness), value);
+  publishFeed({ type: 'usage', harness, usage: value });
+  if (account) attributeUsage(harness, usage, { partial });
 }
 
 /** The harness has no reading any more: the card shows "no data". */
 export function clearUsage(harness: HarnessId) {
   kv.set(key(harness), null);
   publishFeed({ type: 'usage', harness, usage: null });
-  void attributeUsage(harness, null);
+  attributeUsage(harness, null);
 }
 
 export function usageFor(harness: HarnessId): Usage | null {

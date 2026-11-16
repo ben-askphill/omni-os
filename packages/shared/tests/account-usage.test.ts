@@ -76,6 +76,14 @@ describe('usageRows', () => {
     expect(rows).toEqual([{ key: expect.any(String), harness: 'claude-code', account: { label: 'a@x.com', org: null, plan: 'Max', machines: ['omarchy'] }, usage: null, several: false }]);
   });
 
+  it("never puts a reading from another login (Cursor's IDE session) on an account's row", () => {
+    const v = view(machine('omarchy', [acct('cursor', 'ben@askphill.com', { plan: 'Pro' })], true));
+    const ide: PlanUsage = { monthly: { utilization: 0.79, resetsAt: 2_000_000_000 }, unattributed: true };
+    expect(usageRows(['cursor'], v, [], { cursor: ide })[0]).toMatchObject({ account: { label: 'ben@askphill.com' }, usage: null });
+    // Read through cursor-agent's own login, the lone account's row still falls back to it until it has a record.
+    expect(usageRows(['cursor'], v, [], { cursor: { ...ide, unattributed: undefined } })[0]!.usage).toMatchObject({ monthly: { utilization: 0.79 } });
+  });
+
   it('shows a failed check as a plain row with no data, and every harness as today before the accounts load', () => {
     const v = view(machine('omarchy', [acct('codex', null, { state: 'unknown' })], true));
     expect(usageRows(['codex'], v, [], { codex: week(0.4) })).toEqual([{ key: 'codex', harness: 'codex', account: null, usage: null, several: false }]);
