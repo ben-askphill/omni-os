@@ -95,7 +95,10 @@ it('keeps method, delete branch and auto-merge on the merge card, with the slide
   expect(card.querySelector('button[aria-label^="Merge method"]')).not.toBeNull();
   expect(card.querySelector('[role="switch"]')?.getAttribute('aria-label')).toBe('Delete branch after merge');
   expect(card.querySelector('[aria-label="Auto-merge"]')?.textContent).toContain('Turn on auto-merge');
-  expect(card.querySelector('button[aria-label="Slide to squash and merge"]')).not.toBeNull();
+  const slide = card.querySelector('button[aria-label="Slide to squash and merge"]');
+  expect(slide).not.toBeNull();
+  // A control's width, not the card's, and it shrinks on a phone.
+  expect(slide!.closest('.sld')?.className).toMatch(/\bw-full\b.*\bmax-w-\[20rem\]/);
   expect(card.querySelector('p')?.textContent).toBe('Runs gh pr merge, then deletes the branch. Can’t be undone from here.');
   expect(card.textContent).not.toContain('Rerun failed checks');
 });

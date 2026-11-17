@@ -91,8 +91,9 @@ export function PRMergePanel({
             </div>
           )}
           <RerunNote outcome={rerun.outcome} className="mt-3" />
+          {/* A control's width, not the card's: it shrinks on a phone and still holds the longest label. */}
           <SlideToConfirm
-            className="mt-3"
+            className="mt-3 w-full max-w-[20rem]"
             label={conflicting ? 'Resolve conflicts first' : `Slide to ${MERGE_METHODS.find((m) => m.value === method)?.label.toLowerCase()}`}
             busyLabel="Merging"
             doneLabel="Merged"
