@@ -223,7 +223,8 @@ describe('crew/tools/notion.mjs', () => {
     // A 503 that names what it committed.
     const committed = sequence([
       [404, { object: 'error', code: 'object_not_found', message: 'not a database' }],
-      [503, { object: 'error', code: 'service_unavailable', message: 'Do not repeat the write', committed_resource_id: 'p-9' }],
+      // The shape Notion documents for a write that landed despite the 503.
+      [503, { object: 'error', status: 503, code: 'service_unavailable', message: 'Do not repeat the write', additional_data: { committed_resource_id: 'p-9' } }],
     ]);
     let err = await helper.run(['create', PAGE, 'Notes', 'hello'], env, committed.fetchImpl).catch((e: unknown) => e);
     expect(committed.calls.map((c) => c.method)).toEqual(['GET', 'POST']);
@@ -238,7 +239,7 @@ describe('crew/tools/notion.mjs', () => {
     err = await helper.run(['append', PAGE, md], env, half.fetchImpl).catch((e: unknown) => e);
     expect(half.calls.map((c) => c.body.children.length)).toEqual([100, 50]);
     expect((err as any).unknown).toBe(true);
-    expect(helper.explain(err)).toMatch(/may or may not have landed, so it was not retried.*100 of 150 top-level blocks were appended/);
+    expect(helper.explain(err)).toMatch(/may or may not have landed, so it was not retried.*Appending to .*: 100 of 150 top-level blocks written before this failed/);
 
     // No answer at all on a write is unknown too, and not retried.
     const silent = sequence([[0, null]]);
@@ -253,6 +254,53 @@ describe('crew/tools/notion.mjs', () => {
     ]);
     expect(await helper.run(['append', PAGE, 'x'], env, limited.fetchImpl)).toBe(`Appended 1 block to ${PAGE}`);
     expect(limited.calls.map((c) => c.method)).toEqual(['PATCH', 'PATCH']);
+  });
+
+  it('keeps what a create or append wrote in every failure message', async () => {
+    const md = Array.from({ length: 150 }, (_, i) => `- item ${i}`).join('\n');
+    const first = [200, { results: Array.from({ length: 100 }, (_, i) => ({ id: `n${i}` })) }] as [number, unknown];
+
+    // The second request goes out, then its answer breaks off: unknown, with what was written before it.
+    let sent = 0;
+    const cutOff = (async (_url: string, init: any) => {
+      sent++;
+      if (sent === 1) return new Response(JSON.stringify(first[1]), { status: 200 });
+      expect(init.method).toBe('PATCH');
+      return { status: 200, ok: true, type: 'basic', headers: new Headers(), text: async () => { throw new TypeError('terminated'); } };
+    }) as unknown as typeof fetch;
+    let err: any = await helper.run(['append', PAGE, md], env, cutOff).catch((e: unknown) => e);
+    expect(sent).toBe(2);
+    expect(err.unknown).toBe(true);
+    expect(helper.explain(err)).toMatch(/\(answer_cut_off\): this write may or may not have landed.*100 of 150 top-level blocks written/);
+
+    // A permission or sharing error halfway keeps the count next to its hint.
+    for (const [status, code, hint] of [[404, 'object_not_found', 'not shared'], [403, 'restricted_resource', 'lacks the capability'], [401, 'unauthorized', 'refused the token']] as const) {
+      const half = sequence([first, [status, { object: 'error', code, message: 'no' }]]);
+      err = await helper.run(['append', PAGE, md], env, half.fetchImpl).catch((e: unknown) => e);
+      expect(helper.explain(err)).toContain(hint);
+      expect(helper.explain(err)).toContain('100 of 150 top-level blocks written before this failed');
+    }
+
+    // A create whose page and 100 blocks went out, then the lookup for the long table failed: they count as written.
+    const table = ['| h |', '|---|', ...Array.from({ length: 120 }, (_, i) => `| r${i} |`)].join('\n');
+    const lookupFails = sequence([
+      [404, { object: 'error', code: 'object_not_found', message: 'not a database' }],
+      [200, { object: 'page', id: PAGE, url: 'https://www.notion.so/new' }],
+      [403, { object: 'error', code: 'restricted_resource', message: 'no read' }],
+    ]);
+    err = await helper.run(['create', PAGE, 'Big table', table], env, lookupFails.fetchImpl).catch((e: unknown) => e);
+    expect(lookupFails.calls.map((c) => c.method)).toEqual(['GET', 'POST', 'GET']);
+    expect(helper.explain(err)).toContain(`Created https://www.notion.so/new (id ${PAGE}), with 1 of 1 top-level block written, but the rest of the rows or nested items of one of them were not all added before this failed.`);
+
+    // A lookup that finds no block is not a bare TypeError: it carries the same count.
+    const empty = sequence([
+      [404, { object: 'error', code: 'object_not_found', message: 'not a database' }],
+      [200, { object: 'page', id: PAGE, url: 'https://www.notion.so/new' }],
+      [200, { results: [], has_more: false }],
+    ]);
+    err = await helper.run(['create', PAGE, 'Big table', table], env, empty.fetchImpl).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(helper.NotionError);
+    expect(helper.explain(err)).toMatch(/could not find a block just written.*1 of 1 top-level block written, but the rest/);
   });
 
   it('cuts any children array at 100 and appends the rest to the block it belongs to', async () => {
