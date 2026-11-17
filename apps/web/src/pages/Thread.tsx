@@ -201,6 +201,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
           parent={parent}
           links={links}
           modLines={modLines}
+          delegated={known}
           actions={{
             thread,
             meter: (

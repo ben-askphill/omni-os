@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import type { Channel, ModStatus, Thread } from '../../api.ts';
+import { ChannelStack } from '../ChannelStack.tsx';
 import { ContinueCrumbs } from '../ContinueLinks.tsx';
 import { Avatar, Icon } from '../ui.tsx';
 import { href } from '../../router.ts';
@@ -20,13 +21,17 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
   );
 }
 
-/** The thread page's header: the channel and parent crumbs, the title, mod status lines and the header actions. */
+/**
+ * The thread page's header: the channel and parent crumbs, the title, mod status lines, the channels its delegated
+ * threads work in and the header actions. `delegated`: those threads, finished ones and team members included.
+ */
 export function ThreadHeader({
   thread,
   channel,
   parent,
   links,
   modLines,
+  delegated,
   actions,
 }: {
   thread: Thread;
@@ -34,6 +39,7 @@ export function ThreadHeader({
   parent: Pick<Thread, 'id' | 'title'> | null;
   links: ComponentProps<typeof ContinueCrumbs>['links'];
   modLines: ModStatus[];
+  delegated: readonly Thread[];
   actions: ComponentProps<typeof HeaderActions>;
 }) {
   return (
@@ -62,6 +68,7 @@ export function ThreadHeader({
         </h1>
         {modLines.length > 0 && <ModStatusLines lines={modLines} />}
       </div>
+      <ChannelStack threads={delegated} own={thread.channel_id} to={href.threadView(thread.id, 'details')} className="mr-1" />
       <HeaderActions {...actions} />
     </div>
   );

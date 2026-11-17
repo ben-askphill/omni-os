@@ -14,6 +14,7 @@ import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.ts
 import { TakeoverConfirm } from '../components/thread/Takeover.tsx';
 import { useThreadMachine } from '../components/composer/MachineChip.tsx';
 import { HERE } from '@omni/shared/thread-machine.ts';
+import { ChannelStack } from '../components/ChannelStack.tsx';
 import { MoContinueLinks } from '../components/ContinueLinks.tsx';
 import { ErrorNote, StatusPill } from '../components/ui.tsx';
 import { plural } from '../format.ts';
@@ -52,6 +53,8 @@ export function ThreadScreen() {
   const [machineSheet, setMachineSheet] = useState(false);
   const spans = history.history.spans;
   const view = useMemo(() => (thread ? threadView({ events, spans, thread, artifacts: files, children }) : null), [events, spans, thread, files, children]);
+  // Every thread it delegated, team members too, for the channels in the header.
+  const delegated = useMemo(() => [...children, ...s.team], [children, s.team]);
   const edges = useMemo(() => historyEdges({ spans }, view?.turns.map((t) => t.key) ?? []), [spans, view]);
   const status = useMemo(() => (thread?.status === 'running' ? statusLabel(events) : null), [events, thread?.status]);
   const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
@@ -152,7 +155,22 @@ export function ThreadScreen() {
       <MoHeader
         onBack={shell.back}
         title={thread.title || 'Untitled'}
-        sub={parent ? <span>{sub} · <a href={href.thread(parent.id)} className="text-fg-2 hover:text-fg" title={`Delegated from ${parent.title}`}>Parent: {parent.title}</a></span> : sub}
+        sub={
+          <span className="flex min-w-0 items-center gap-1">
+            <ChannelStack threads={delegated} own={thread.channel_id} to={href.threadView(thread.id, 'details')} size={18} className="-ml-0.5" />
+            <span className="min-w-0 truncate">
+              {sub}
+              {parent && (
+                <>
+                  {' · '}
+                  <a href={href.thread(parent.id)} className="text-fg-2 hover:text-fg" title={`Delegated from ${parent.title}`}>
+                    Parent: {parent.title}
+                  </a>
+                </>
+              )}
+            </span>
+          </span>
+        }
         right={
           <>
             <StatusPill mark={pill.mark} label={pill.label} />
