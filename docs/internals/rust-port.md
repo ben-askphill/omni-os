@@ -152,7 +152,7 @@ Per slice:
 | `apps/mcp` `ask.ts`, `render.ts`, `threads.ts` | ported | Slice 1, all three steps. `crates/omni-mcp` is the only build: 0.1.30 shipped it and the TypeScript is deleted. `referenced-thread.ts` and `api.ts` stay, because the conductor's `omni.ts` uses them |
 | `apps/cli` | ported | Slice 2, all three steps. `crates/omni-cli` is the only build of the six commands ([ADR 0014](../adr/0014-omni-command-line.md)): 0.1.30 shipped it, and `apps/cli` and its bundle are deleted. `scripts/omni.sh` builds and runs it from a checkout |
 | `apps/mcp` `omni.ts`, `pull-requests.ts` | kept | 28 MB and 63 ms per conductor thread to win, in a file that changes every day. Not scheduled: see the decision below |
-| The browser server (`@playwright/mcp`) | planned | Slice 3. Not Omni's code, so it is not ported: a Rust process in front of it starts it late |
+| The browser server (`@playwright/mcp`) | in progress | Slice 3, step 1: `omni-mcp lazy` and its tests are in `crates/omni-mcp`. Nothing starts it yet. Not Omni's code, so it is not ported: the Rust process in front of it starts it late |
 | `apps/mcp` `external/` | kept | The HTTP transport runs inside the server and shares `tools.ts` with the stdio one. Porting only stdio would leave two copies of 20 tools. Moves with the server or not at all |
 | `apps/server` `runner/`, `harness/` | kept | They start a CLI and wait on its stream. The adapters change with every harness release, and 50,000 lines of tests hold them in TypeScript. No runtime cost to win back |
 | `apps/server` `db/` | kept | `node:sqlite` is SQLite's own C code already. The migrations and repos are the on-disk contract, and two implementations of a schema is the regression this port must not cause |
@@ -220,6 +220,25 @@ Per slice:
 - **From a checkout.** `scripts/omni.sh` builds the command into `target/debug` with `cargo` (a no-op when it is current) and runs it. Without `cargo` it says to install Rust and exits 3.
 - **Start time.** Through the shim of a packaged AppImage, `omni --version` took 1 ms on the Rust build and 190 ms on the bundled TypeScript command it replaced. `omni threads` against a local server took 2 ms and 245 ms.
 
+## Slice 3: the browser server starts late
+
+`omni-mcp lazy <answers.json> <command> [args...]` (`crates/omni-mcp/src/lazy.rs`) stands in front of a stdio MCP server. It answers the start of a session from a record of that server's own answers, and starts the server at the first message the record does not cover. From then on it copies bytes both ways, so the client talks to the server itself. It is made for the browser server, `@playwright/mcp`, which is not Omni's code. Nothing is ported: the server runs unchanged, later, or never in a thread that does not call it.
+
+This slice has two steps. There is no TypeScript twin to delete: starting the server directly stays as the fallback.
+
+- **What it answers itself.** `initialize` in a protocol version the record has, `ping`, `tools/list` without a cursor, and a method the record says the server does not have, with the server's own error. It keeps the client's `notifications/initialized` for the server and drops other notices, because nothing runs yet to hear them.
+- **What starts the server.** Any other request, such as `tools/call` or `resources/list`. So does a handshake the record cannot answer: a protocol version it does not hold, an `initialize` slice 1's checks refuse, or a request that asks for a task.
+- **Starting.** The server gets the client's own `initialize` line, then its `notifications/initialized`, then a `tools/list` from the front. Both answers stay with the front, because the client has them already. Then the message that needed the server goes in, and the front is a pipe. When the server's tools are not the recorded ones, the front sends the client `notifications/tools/list_changed`, so it asks again, and this time the server answers.
+- **Ending.** It exits with the server's exit code, or 128 plus the signal that ended it. A client that closes stdin before any call gets exit code 0, and no server ran. A server that does not start fails the request that needed it (-32603, `The server did not start: ...`) and the front exits 1. A record it cannot read, or no command, is exit code 2 before it reads a line.
+- **The record** is one JSON file: `initialize` (the server's result per protocol version), `tools` (its `tools/list` result) and `refused` (its error per method it does not have). The front only reads it. Step 2 makes it from the server itself.
+- **Why `refused`.** Claude Code asks a server `server/discover` before `initialize` (seen in 2.1.316). `@playwright/mcp` answers "method not found" and Claude Code goes on to `initialize`. A front that could not give that answer would start the server in every Claude Code thread at once.
+- **How it is built.** Two threads from the standard library, no async runtime and no new crate. It reads lines only until the server starts. After that it copies bytes and reads nothing.
+
+### How it is tested
+
+- **`crates/omni-mcp/tests/lazy.rs`** runs the front before a shell script that notes when it started, what it read and when it ended. Ten tests: the handshake from the record with no server started, a method the record does not refuse going to the server, the handshake said again to the server at the first call, messages that arrive in one write, a server with other tools, the exit code, a killed front closing the server's input, a server that does not start, and a record that is not one.
+- **`goldens.rs`** replays slice 1's record with each server behind the front: 60 of the 61 scenarios, byte for byte as without it. A client cannot tell `omni-mcp lazy ... omni-mcp ask` from `omni-mcp ask`. The scenario left out swaps the token file between two lines, which a server that starts later reads differently ([Known differences](#known-differences)).
+
 ## Without cargo
 
 The binaries have no TypeScript fallback any more, so each place that needs one says what happens without `cargo`:
@@ -237,7 +256,7 @@ The binaries have no TypeScript fallback any more, so each place that needs one 
 
 What the Rust build does differently on purpose. None of these has been seen from a harness or from Omni's API.
 
-These were measured against the TypeScript builds before they were deleted.
+The first two lists were measured against the TypeScript builds before they were deleted.
 
 ### The per-thread MCP servers
 
@@ -248,6 +267,14 @@ These were measured against the TypeScript builds before they were deleted.
 - **A cancel notice in the same write as a `ping` or `tools/list`.** The SDK can drop the answer to a request that is cancelled before its handler's first tick. Rust answers `ping`, `initialize` and `tools/list` at once and honours a cancel only for tool calls.
 - **JSON nested deeper than 1,000 levels** is refused as invalid, where Node's limit is its stack.
 - **`Number()` of a hex string above 2^53** may round to a neighbouring value. It can only reach the same kind of error message.
+
+### The front of the browser server
+
+What a client sees differently with `omni-mcp lazy` in front of a server.
+
+- **What a server reads when it starts, it reads at the first call.** A token file or a setting that changes between the start of a thread and its first call is read as it is at the call. This is the one scenario of slice 1's record the front does not replay.
+- **Notices before the first call are dropped**, all but `notifications/initialized`. A server that acts on a notice it got before any request would miss it. The browser server asks the client for what it needs, its roots, when it starts.
+- **The front writes to stderr** when the server does not start, or does not answer as the record says, each line starting `omni-mcp lazy:`.
 
 ### The `omni` command
 
