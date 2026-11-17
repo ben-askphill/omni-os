@@ -14,6 +14,7 @@ import {
   treePrefKey,
   treeRows,
   treeTally,
+  treeThreads,
   unfinishedLabel,
   type SavedOpen,
   type TreeThread,
@@ -61,6 +62,12 @@ describe('the tree under a job', () => {
   it('reads a thread marked done as done, whatever it waits on', () => {
     const nodes = buildTree('x', treeIndex([{ parent: { id: 'x' }, children: [{ ...asks, done_at: '2026-11-15T21:00:00Z' }] }]), flags);
     expect(nodes[0]).toMatchObject({ state: 'done', flagged: false });
+  });
+
+  it('lists every thread under it at any depth in the order they were handed out, for the channel stack', () => {
+    const nodes = buildTree('job', index, flags);
+    expect(treeThreads(nodes).map((x) => x.id)).toEqual(['asks', 'broke', 'works', 'done', 'lead', 'm1', 'm2', 'm3', 'm4', 'm5']);
+    expect(treeThreads([])).toEqual([]);
   });
 
   it('stops at a thread it already passed', () => {

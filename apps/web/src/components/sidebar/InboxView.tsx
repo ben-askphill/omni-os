@@ -16,6 +16,7 @@ import { useMarkDone } from '../../done-confirm.tsx';
 import { useJobTree, useTreesFold, type TreesFold } from '../../thread-tree.ts';
 import { AgentRows, FoldTrees, TreeRows, TreeToggle, TreeToggleSpace } from '../ThreadTree.tsx';
 import { RunElapsed } from '../RunElapsed.tsx';
+import { ChannelRollup } from '../ChannelStack.tsx';
 import { WorkspaceLinks } from './SidebarLinks.tsx';
 
 /**
@@ -136,6 +137,9 @@ function Shelf({ label, count, open, onToggle, fold }: { label: string; count: n
   );
 }
 
+/** A card with nothing under it: its channel stack falls back to the channel's avatar. */
+const NONE: readonly Thread[] = [];
+
 function ChannelLead({ channel }: { channel: ReturnType<typeof useApp>['channels'][number] | undefined }) {
   if (channel?.avatar_bg) return <Avatar name={channel.name} channelIcon={channel.icon} avatarBg={channel.avatar_bg} omni={channel.id === 'conductor'} size={18} />;
   if (channel && parseChannelIcon(channel.icon)) return <ChannelMark icon={channel.icon} avatarBg={channel.avatar_bg} size={12} />;
@@ -146,7 +150,8 @@ function ChannelLead({ channel }: { channel: ReturnType<typeof useApp>['channels
 /**
  * T3's card: the channel on top with the status or the time on its right, the title, then the machine it runs or ran
  * on with the run's time, and the harness. The branch and the machines before are in that line's tooltip. A job's
- * card has its tally there instead of the harness, and its tree under it. `agents`: the live tasks, on the Working
+ * card has its tally there instead of the harness, and its tree under it. A job that works outside its channel shows
+ * every channel it touches in place of the channel's avatar, its own first. `agents`: the live tasks, on the Working
  * shelf only, so a card there lists what runs under it.
  */
 function InboxCard({
@@ -201,7 +206,7 @@ function InboxCard({
       >
         <span className="flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3">
           <span className="grid min-w-3 shrink-0 place-items-center">
-            <ChannelLead channel={channel} />
+            <ChannelRollup threads={tree?.threads ?? NONE} own={t.channel_id} lead size={18} fallback={<ChannelLead channel={channel} />} />
           </span>
           {pinned && <Icon name="pin" size={11} className="shrink-0 text-fg-3" />}
           <span className="min-w-0 flex-1 truncate">{channelName}</span>
