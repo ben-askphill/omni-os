@@ -25,16 +25,12 @@ const notarize = Boolean(
 // Keychain auto-discovery finds only a "Developer ID Application" identity. scripts/build-desktop.sh names an
 // "Apple Development" one here instead, so a local build keeps one signature from build to build, and macOS keeps
 // its permissions. electron-builder still lays out every file's entitlements; only the identity changes.
+// Both sign through scripts/mac-sign.cjs, which waits out Apple's timestamp server when it stops answering.
 const localIdentity = env.OMNI_MAC_IDENTITY || null;
-const localSigning = localIdentity
-  ? {
-      identity: '-',
-      sign: async (opts) => {
-        const { signApp } = require('@electron/osx-sign');
-        await signApp({ ...opts, identity: localIdentity });
-      },
-    }
-  : {};
+const { signMac } = require('./scripts/mac-sign.cjs');
+const signing = localIdentity
+  ? { identity: '-', sign: (opts) => signMac(opts, { identity: localIdentity }) }
+  : { sign: (opts) => signMac(opts) };
 
 const repo = githubRepo();
 
@@ -70,7 +66,7 @@ module.exports = {
     // A universal build stages both arches' prebuilds into both apps, so each one is the same file on both sides.
     // The merge keeps them as they are, and node-pty picks prebuilds/darwin-<arch> at run time.
     x64ArchFiles: 'Contents/Resources/omni/node_modules/**',
-    ...localSigning,
+    ...signing,
   },
   dmg: {
     contents: [
