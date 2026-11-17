@@ -177,22 +177,28 @@ describe('the Details tab of a thread that delegated work', () => {
         }),
       ),
     );
-  const mergeButtons = () => [...host.querySelectorAll('button')].filter((b) => b.textContent?.startsWith('Merge'));
-  const merges = () => mergeButtons().map((b) => b.textContent);
+  // Each row's own Merge, named for its PR (its text is just "Merge").
+  const mergeButtons = () => [...host.querySelectorAll<HTMLButtonElement>('button[aria-label^="Merge #"]')];
+  const merges = () => mergeButtons().map((b) => b.getAttribute('aria-label'));
+  const button = (text: string) => [...host.querySelectorAll('button')].find((b) => b.textContent === text)!;
 
   it('offers Merge for each open crew PR, with or without a branch', () => {
     render([crewPR(), crewPR({ number: 13, url: 'https://github.com/o/r/pull/13', channel_id: 'shop' }), merged]);
     expect(merges()).toEqual(['Merge #12', 'Merge #13']);
+    expect(mergeButtons().map((b) => b.textContent)).toEqual(['Merge', 'Merge']);
     expect(host.textContent).not.toContain('Show PRs in Thread options');
 
     render([crewPR()], { branch: 'omni/own' });
     expect(merges()).toEqual(['Merge #12']);
   });
 
-  it("squash-merges the PR in its own channel on click, then reads the PRs again", async () => {
+  it('squash-merges the PR in its own channel once confirmed, then reads the PRs again', async () => {
     reloads = 0;
     render([crewPR(), crewPR({ number: 13, url: 'https://github.com/o/r/pull/13', channel_id: 'shop' })]);
     await act(async () => mergeButtons()[1].click());
+    // Merge only asks; nothing runs until Squash and merge.
+    expect(posted).toEqual([]);
+    await act(async () => button('Squash and merge').click());
     expect(posted).toEqual([['/api/channels/shop/prs/13/merge', { method: 'squash', delete_branch: true, confirm: true }]]);
     expect(reloads).toBe(1);
   });

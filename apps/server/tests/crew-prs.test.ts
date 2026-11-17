@@ -12,7 +12,7 @@ let H: Awaited<ReturnType<typeof startRunner>>;
 let githubApi: (typeof import('../github-api.ts'))['githubApi'];
 const T = { timeout: 20_000 };
 
-type FakePR = { number: number; branch: string; state?: 'OPEN' | 'MERGED' | 'CLOSED'; title?: string };
+type FakePR = { number: number; branch: string; state?: 'OPEN' | 'MERGED' | 'CLOSED'; title?: string; mergeable?: string; checks?: string[] };
 let prsFile: string;
 /** What the fake gh answers, per repo. */
 const github = (byRepo: Record<string, FakePR[]>) => writeFileSync(prsFile, JSON.stringify(byRepo));
@@ -33,7 +33,7 @@ const head = a.includes('--head') ? arg('--head') : null;
 const out = all.filter((p) => !head || p.branch === head).map((p) => ({
   number: p.number, title: p.title ?? 'PR ' + p.number, author: null, headRefName: p.branch, baseRefName: 'main', state: p.state ?? 'OPEN',
   isDraft: false, updatedAt: '2026-11-01T00:00:00Z', reviewDecision: null, url: 'https://github.com/' + arg('--repo') + '/pull/' + p.number,
-  additions: 1, deletions: 0, mergeable: 'MERGEABLE', statusCheckRollup: [],
+  additions: 1, deletions: 0, mergeable: p.mergeable ?? 'MERGEABLE', statusCheckRollup: (p.checks ?? []).map((c) => ({ conclusion: c })),
 }));
 console.log(JSON.stringify(out));
 `;
@@ -77,7 +77,21 @@ describe('crew PRs', () => {
     expect(top.pr).toBeNull();
     expect(top.prs).toEqual([]);
     expect(top.crew).toEqual([
-      { number: 4, title: 'Child work', state: 'OPEN', isDraft: false, url: url('acme/shop', 4), repo: 'acme/shop', thread_id: child.id, thread_title: child.title, channel_id: 'shop', task_id: child.task_id },
+      {
+        number: 4,
+        title: 'Child work',
+        state: 'OPEN',
+        isDraft: false,
+        url: url('acme/shop', 4),
+        repo: 'acme/shop',
+        thread_id: child.id,
+        thread_title: child.title,
+        channel_id: 'shop',
+        task_id: child.task_id,
+        mergeable: 'MERGEABLE',
+        reviewDecision: null,
+        checks: { passed: 0, failed: 0, pending: 0 },
+      },
       expect.objectContaining({ number: 9, url: url('acme/app', 9), thread_id: grandchild.id, channel_id: 'app' }),
     ]);
 
@@ -114,6 +128,28 @@ describe('crew PRs', () => {
     expect(res.status).toBe(200);
     // The clock has not moved and gh's list still says open: the merge itself marks it.
     expect((await prsOf(conductor.id)).crew.map((p) => [p.number, p.state])).toEqual([[61, 'MERGED']]);
+  });
+
+  it('says what stands in the way of merging an open crew PR, and leaves it out of a merged one', T, async () => {
+    const conductor = await H.start('be the conductor');
+    await H.untilResults(conductor.id, 1);
+    await delegate(conductor.id, 'shop', 'omni/blocked-a');
+    await delegate(conductor.id, 'shop', 'omni/blocked-b');
+    await delegate(conductor.id, 'shop', 'omni/blocked-c');
+    github({
+      'acme/shop': [
+        { number: 71, branch: 'omni/blocked-a', mergeable: 'CONFLICTING', checks: ['SUCCESS', 'FAILURE', 'FAILURE'] },
+        { number: 72, branch: 'omni/blocked-b', checks: ['SUCCESS', 'IN_PROGRESS'] },
+        { number: 73, branch: 'omni/blocked-c', state: 'MERGED', checks: ['FAILURE'] },
+      ],
+    });
+    later();
+    const crew = (await prsOf(conductor.id)).crew;
+    expect(crew.map((p) => [p.number, p.mergeable, p.checks])).toEqual([
+      [71, 'CONFLICTING', { passed: 1, failed: 2, pending: 0 }],
+      [72, 'MERGEABLE', { passed: 1, failed: 0, pending: 1 }],
+      [73, undefined, undefined],
+    ]);
   });
 
   it('lists a PR two delegated threads share once, and leaves out threads without a branch or a repo', T, async () => {

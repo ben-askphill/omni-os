@@ -237,3 +237,26 @@ export async function threadPRMarks(repo: string) {
   markCache.set(repo, { at: Date.now(), marks });
   return marks;
 }
+
+/** What decides whether an open PR can merge now: conflicts, checks and review. */
+export interface PRMergeState {
+  mergeable: string;
+  reviewDecision: string | null;
+  checks: { passed: number; failed: number; pending: number };
+}
+
+const stateCache = new Map<string, { at: number; states: Record<number, PRMergeState> }>();
+
+/**
+ * Each open PR's merge state in a repo, by number, in one gh call, so a crew card can say why a PR cannot merge without
+ * asking per PR. Cached for 30s, like the marks.
+ */
+export async function openPRStates(repo: string) {
+  const hit = stateCache.get(repo);
+  if (hit && Date.now() - hit.at < 30_000) return hit.states;
+  const raw = JSON.parse(await gh(['pr', 'list', '--repo', repo, '--state', 'open', '--limit', '100', '--json', 'number,mergeable,reviewDecision,statusCheckRollup'], undefined, CHECK_TIMEOUT));
+  const states: Record<number, PRMergeState> = {};
+  for (const p of raw as any[]) states[p.number] = { mergeable: p.mergeable, reviewDecision: p.reviewDecision ?? null, checks: summarizeChecks(p.statusCheckRollup) };
+  stateCache.set(repo, { at: Date.now(), states });
+  return states;
+}

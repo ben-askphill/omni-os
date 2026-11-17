@@ -256,7 +256,8 @@ export interface BranchPRMark {
 }
 /**
  * A PR a delegated thread opened, from GET /threads/:id/pr `crew`: one per thread under this one in the delegation
- * tree, at any depth, oldest delegation first. Open or merged only.
+ * tree, at any depth, oldest delegation first. Open or merged only. An open one carries what decides whether it can
+ * merge, left out when gh could not say (and by a server older than the fields).
  */
 export interface CrewPR extends BranchPRMark {
   repo: string;
@@ -264,6 +265,9 @@ export interface CrewPR extends BranchPRMark {
   thread_title: string;
   channel_id: string;
   task_id: string | null;
+  mergeable?: string;
+  reviewDecision?: string | null;
+  checks?: Checks;
 }
 export interface PRDetail extends PRSummary {
   body: string;

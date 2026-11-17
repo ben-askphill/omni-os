@@ -1,10 +1,10 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { PRSummary, Thread } from '../src/api.ts';
+import type { CrewPR, PRSummary, Thread } from '../src/api.ts';
 import { AgentsSection } from '../src/components/thread/panel/AgentsSection.tsx';
 import { DetailsTab } from '../src/components/thread/panel/DetailsTab.tsx';
-import { FIX_CHECKS_PROMPT, FIX_CONFLICTS_PROMPT, OPEN_PR_PROMPT, prLine, prNext, stepParked, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { FIX_CHECKS_PROMPT, FIX_CONFLICTS_PROMPT, mergeBlock, OPEN_PR_PROMPT, prLine, prNext, stepParked, stepUnderway } from '@omni/shared/thread-glance.ts';
 
 // The thread panel's Details tab: the branch card on top (thread-glance.ts, GlanceCard.tsx), the agents card and the
 // session rows with MCP folded to one line.
@@ -83,6 +83,18 @@ describe('the step a branch PR calls for', () => {
     expect(prLine(pr({ checks: { passed: 2, failed: 0, pending: 1 } }))).toEqual({ text: '1 of 3 checks running', tone: 'live' });
     expect(prLine(pr({ state: 'MERGED' }))).toEqual({ text: 'Merged', tone: 'done' });
   });
+
+  it("says why a PR's row has no Merge, in the PR page's words, in prNext's order", () => {
+    expect(mergeBlock(pr())).toBeNull();
+    expect(mergeBlock(pr({ reviewDecision: 'CHANGES_REQUESTED' }))).toBeNull();
+    expect(mergeBlock(pr({ mergeable: 'CONFLICTING', checks: { passed: 0, failed: 2, pending: 0 }, isDraft: true }))).toEqual({ label: 'Has conflicts', dot: 'needs' });
+    expect(mergeBlock(pr({ checks: { passed: 1, failed: 1, pending: 1 } }))).toEqual({ label: '1 check failing', dot: 'needs' });
+    expect(mergeBlock(pr({ checks: { passed: 1, failed: 2, pending: 0 } }))?.label).toBe('2 checks failing');
+    expect(mergeBlock(pr({ isDraft: true, checks: { passed: 0, failed: 0, pending: 1 } }))).toEqual({ label: 'Draft', dot: 'idle' });
+    expect(mergeBlock(pr({ checks: { passed: 2, failed: 0, pending: 1 } }))).toEqual({ label: 'Checks running', dot: 'running' });
+    // A crew PR from a server older than the merge fields, or one gh could not read: nothing holds it back.
+    expect(mergeBlock({ isDraft: false })).toBeNull();
+  });
 });
 
 describe('the agents card', () => {
@@ -132,9 +144,64 @@ describe('the Details tab', () => {
     expect(card).toBeGreaterThan(-1);
     expect(card).toBeLessThan(html.indexOf('Harness'));
     expect(html).toContain('#481');
-    expect(html).toContain('Conflicts with the base branch');
+    // The reason in a few words on the row, the whole line as its tooltip and in the row's name.
+    expect(html).toContain('Has conflicts');
+    expect(html).toContain('title="Conflicts with the base branch"');
+    expect(html).toContain('aria-label="Show PRs: #481, Conflicts with the base branch"');
     expect(html).toContain('2 files changed');
-    expect(html).toContain('Fix conflicts');
+    // The step sits at the end of the PR's row, after the row's own button, not in a full-width bar under the card.
+    expect(html).toMatch(/aria-label="Show PRs: #481[^"]*"[^>]*>.*?<\/button><\/div><div[^>]*><button[^>]*>.*?Fix conflicts<\/button>/);
+    expect(html.indexOf('Fix conflicts')).toBeLessThan(html.indexOf('2 files changed'));
+  });
+
+  it('puts Merge on the PR row of a branch that can merge, and asks before it runs', () => {
+    const ready = pr({ reviewDecision: 'APPROVED' });
+    const html = renderToStaticMarkup(
+      createElement(DetailsTab, { ...details, thread: thread({ branch: 't3/x' }), init: null, prs: { pr: ready, prs: [ready], crew: [] }, changes: { files: [{}], add: 1, del: 0 }, next: prNext(ready, true) }),
+    );
+    expect(html).toContain('3 checks passed · approved');
+    expect(html).toMatch(/<button[^>]*aria-label="Merge #481"[^>]*aria-expanded="false"[^>]*>.*?Merge<\/button>/);
+    // The confirm is not there until Merge is pressed.
+    expect(html).not.toContain('role="group"');
+    expect(html).not.toContain('>Squash and merge<');
+  });
+
+  const crewPR = (over: Partial<CrewPR> = {}): CrewPR => ({
+    number: 771,
+    title: 'Remove the TypeScript twins',
+    state: 'OPEN',
+    isDraft: false,
+    url: 'https://github.com/o/r/pull/771',
+    repo: 'o/r',
+    thread_id: 'c1',
+    thread_title: 'Twins',
+    channel_id: 'omni',
+    task_id: null,
+    mergeable: 'MERGEABLE',
+    reviewDecision: null,
+    checks: { passed: 12, failed: 0, pending: 0 },
+    ...over,
+  });
+
+  it("gives each delegated PR its own Merge, or says on its row why it can't merge", () => {
+    const crew = [
+      crewPR(),
+      crewPR({ number: 772, url: 'u772', title: 'Deferred sync', checks: { passed: 10, failed: 2, pending: 0 } }),
+      crewPR({ number: 773, url: 'u773', title: 'PR page', mergeable: 'CONFLICTING' }),
+      crewPR({ number: 774, url: 'u774', title: 'Draft work', isDraft: true }),
+      // A server older than the merge fields: the row keeps its Merge, as before.
+      crewPR({ number: 775, url: 'u775', title: 'Old server', mergeable: undefined, checks: undefined, reviewDecision: undefined }),
+      crewPR({ number: 700, url: 'u700', title: 'Already in', state: 'MERGED' }),
+    ];
+    const html = renderToStaticMarkup(createElement(DetailsTab, { ...details, thread: thread(), init: null, prs: { pr: null, prs: [], crew } }));
+    const merges = [...html.matchAll(/aria-label="Merge #(\d+)"/g)].map((m) => Number(m[1]));
+    expect(merges).toEqual([771, 775]);
+    expect(html).toContain('aria-label="Show PRs: #772 Deferred sync. 2 checks failing"');
+    expect(html).toContain('Has conflicts');
+    expect(html).toContain('>Draft<');
+    expect(html).not.toContain('Already in');
+    // No full-width "Merge #N" bars under the list.
+    expect(html).not.toMatch(/>Merge #\d+</);
   });
 
   it('shows the step the agent is on, spinning, until the PR opens', () => {
