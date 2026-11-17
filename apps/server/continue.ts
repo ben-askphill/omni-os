@@ -18,6 +18,7 @@ import { changesCheckout, defaultBranch, git, gitOr, parseNameStatus, real, thre
 import { threadDir, uploadsDir } from './config.ts';
 import { asksAuto } from './harness/auto.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
+import { reviewerEffort } from './harness/resolve.ts';
 import { isHarnessId, isProviderHarness, providerWhere } from './harness/types.ts';
 import { userName } from './profile.ts';
 import { resumeRequests } from './runner/api.ts';
@@ -82,10 +83,14 @@ export function sourceBlock(t: Thread): ContinueBlock | null {
   return null;
 }
 
-/** The run Ben picked, checked: a local harness the catalog offers, on a model he chose. Cursor's own `auto` is one. */
-async function targetRun(run: Run): Promise<RunName> {
-  if (asksAuto(run)) throw refusal('Pick a model: a continued thread runs on the one you choose, not Auto.', 400);
-  if (!isHarnessId(run.harness)) throw refusal(`Unknown harness "${run.harness}".`, 400);
+/**
+ * The run Ben picked, checked: a local harness the catalog offers, on a model he chose. Cursor's own `auto` is one. The
+ * continued thread keeps the source's role, so a GPT reviewer's runs at high effort (resolve.ts reviewerEffort).
+ */
+async function targetRun(picked: Run, role: string | null): Promise<RunName> {
+  if (asksAuto(picked)) throw refusal('Pick a model: a continued thread runs on the one you choose, not Auto.', 400);
+  if (!isHarnessId(picked.harness)) throw refusal(`Unknown harness "${picked.harness}".`, 400);
+  const run = { ...picked, harness: picked.harness, effort: reviewerEffort(picked, role, getCatalog()) };
   const remote = continueRefusal(run.harness);
   if (remote) throw refusal(remote, 400);
   const to = { ...run, harness: run.harness };
@@ -284,8 +289,9 @@ async function machineFor(device: string | undefined): Promise<{ route: Route | 
 
 /** POST /api/threads/:id/continue/preview: the Carryover for this run, whether the thread can be continued now, and where. */
 export async function previewContinue(sourceId: string, run: Run, attachments: readonly string[] = [], device?: string): Promise<ContinuePreview> {
-  if (!threads.get(sourceId)) throw refusal('thread not found', 404);
-  const to = await targetRun(run);
+  const source = threads.get(sourceId);
+  if (!source) throw refusal('thread not found', 404);
+  const to = await targetRun(run, source.role);
   // The Carryover says which machine it runs on, so the machine is known before the capture.
   const machine = await machineFor(device);
   const { preview } = await capture(sourceId, to, attachments, machine.route, !!machine.block);
@@ -321,7 +327,7 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
   const fingerprint = fingerprintOf(body);
   const again = startedBefore(sourceId, body.request_id, fingerprint);
   if (again) return again;
-  const to = await targetRun(body);
+  const to = await targetRun(body, first.role);
   const { route, block } = await machineFor(body.device);
   if (block) throw busy(block);
   const idle = sourceBlock(threads.get(sourceId) ?? first);

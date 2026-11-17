@@ -18,7 +18,7 @@ import { previewContinue, startContinue } from './continue.ts';
 import { cancelHandoff, handOff, handOffCheck, requestTakeover, takeoverCheck, takeoverOf, type HandoffResult } from './handoff.ts';
 import { handoffView, offerOf, replyOf, requestOf } from './handoff/records.ts';
 import { refusal } from './runner/state.ts';
-import { cancelQueued, previewSwitch, queuedRun, runName, switchRun } from './runner/switch.ts';
+import { cancelQueued, previewSwitch, queuedRun, runForRole, runName, switchRun } from './runner/switch.ts';
 import { deviceRecord, ownName } from './sync/devices.ts';
 
 export type ThreadTransition = Transition<Thread>;
@@ -82,13 +82,15 @@ async function previewRelocate(threadId: string, to: string): Promise<Transition
  * the catalog does not offer.
  */
 export async function createTransition(threadId: string, req: TransitionRequest): Promise<ThreadTransition> {
-  mustExist(threadId);
+  const source = mustExist(threadId);
   switch (req.kind) {
     case 'reconfigure': {
-      const thread = await switchRun(threadId, req.run);
+      // The run the thread gets, which for a GPT reviewer is not always the one asked for.
+      const run = runForRole(source, req.run);
+      const thread = await switchRun(threadId, run);
       const q = queuedRun(thread);
-      const state: TransitionState = q && sameRun(q, req.run) ? 'queued' : 'applied';
-      const row = transitions.add({ id: randomUUID(), thread_id: threadId, kind: 'reconfigure', state, request: { run: req.run } });
+      const state: TransitionState = q && sameRun(q, run) ? 'queued' : 'applied';
+      const row = transitions.add({ id: randomUUID(), thread_id: threadId, kind: 'reconfigure', state, request: { run } });
       return view(row, thread);
     }
     case 'relocate':

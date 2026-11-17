@@ -16,7 +16,7 @@ Each lane is a reason to leave Claude Code's tier model. Auto skips a lane whose
 
 1. **Image generation: Codex**, busy or not, since nothing else here makes images. Codex's `imageGeneration` item carries the PNG as base64; `codex/images.ts` writes it to the thread's artifacts and the transcript row keeps only the file name.
 2. **Connectors: Claude Code**, busy or not. Gmail, Calendar, Notion, Slack, Productive and the Portal are claude.ai connectors, which only Claude Code loads. Omni's own MCP servers reach Claude Code, Codex and Cursor Agent. Hermes and Cursor Cloud have no Omni MCP servers.
-3. **Review: Codex.** A second model family catches what the first misses in its own work.
+3. **Review: Codex**, at `high` effort whatever the tier (`GPT_REVIEW_EFFORT`). A second model family catches what the first misses in its own work. A `reviewer` thread on any GPT model is held at `high` too, however it was picked (`reviewerEffort` in `harness/resolve.ts`).
 4. **Claude plan busy: Codex.**
 5. **Both plans busy, code: Composer.**
 6. **Quick or bulk code: Composer**, below the max tier, and never with images in the first message (Cursor Agent only gets their paths). Composer 2.5 ranks third on Artificial Analysis's Coding Agent Index at a few cents a task and is among the fastest agents it times, and a mechanical change across files gains little from a frontier model.

@@ -195,6 +195,9 @@ export const TIERS: Record<Tier, { claudeModel: string; effort: string }> = {
   max: { claudeModel: 'claude-opus-5-5', effort: 'xhigh' },
 };
 
+/** A review on a GPT model runs at this effort whatever its tier: high, never xhigh (Ben's rule; see reviewerEffort in resolve.ts). */
+export const GPT_REVIEW_EFFORT = 'high';
+
 /** At or above this share of a plan window, Auto moves work to another plan when it can. */
 export const HEADROOM_LIMIT = 0.9;
 
@@ -272,7 +275,7 @@ const coding = (p: TaskProfile) => p.kind === 'code';
 const LANES: { why: string; run: (p: TaskProfile, ctx: RouteContext, effort: string) => Run | null }[] = [
   { why: 'Codex is the harness here that generates images', run: (p, ctx, e) => (p.needs.includes('image-generation') ? codexRun(ctx, e, false) : null) },
   { why: 'your mail, calendar, Notion and Slack connectors are in Claude Code', run: (p, ctx, e) => (p.needs.includes('connectors') ? claudeRun(p, ctx, e) : null) },
-  { why: 'a second model family reviews it', run: (p, ctx, e) => (p.needs.includes('review') ? codexRun(ctx, e) : null) },
+  { why: 'a second model family reviews it', run: (p, ctx) => (p.needs.includes('review') ? codexRun(ctx, GPT_REVIEW_EFFORT) : null) },
   { why: 'the Claude plan is near its limit', run: (_, ctx, e) => (busy(ctx.usage?.['claude-code']) ? codexRun(ctx, e) : null) },
   {
     why: 'the Claude and ChatGPT plans are near their limits',
