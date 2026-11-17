@@ -1,7 +1,7 @@
 // Questions an agent asks the user with ask_user_question (crates/omni-mcp): asked, waited on, answered or dismissed.
 // The thread's events hold them (packages/shared/question.ts), so they persist, stream and sync like any event. Only
-// which questions a tool call still polls for lives here, in memory: after a restart none does, and an answer goes to
-// the thread as a message instead.
+// which questions a tool call still polls for lives in memory (question-waits.ts): after a restart none does, and an
+// answer goes to the thread as a message instead.
 import { randomUUID } from 'node:crypto';
 import {
   ANSWER_EVENT,
@@ -17,22 +17,21 @@ import {
   type QuestionState,
   type ThreadQuestion,
 } from '@omni/shared/question.ts';
-import { bus, publishFeed } from '../bus.ts';
+import { bus } from '../bus.ts';
 import { events, threads } from '../db.ts';
 import { notifyNeedsInput } from '../push-sender.ts';
 import { remoteHolder } from '../ownership.ts';
 import { runningElsewhere, turnBlocked } from '../sync/guard.ts';
 import { runnerPorts } from './ports.ts';
-import { saveOwn, wake } from './queue.ts';
+import { wakePrepared } from './api.ts';
+import { polled, settled } from './question-waits.ts';
+import { saveOwn } from './queue.ts';
 import { addEvent, lives, refusal, runsHere } from './state.ts';
 
 /** The longest one poll waits for an answer, in seconds. */
 export const WAIT_MAX_SEC = 30;
 /** A call that polled this recently still waits. Longer than one poll, so a poll in flight always counts. */
 const WAITER_FRESH_MS = 35_000;
-
-/** When a tool call last polled each question, by question id. */
-const polled = new Map<string, number>();
 
 function find(threadId: string, id: string): ThreadQuestion {
   if (!threads.get(threadId)) throw refusal('thread not found', 404);
@@ -43,8 +42,6 @@ function find(threadId: string, id: string): ThreadQuestion {
 
 /** What the waiting call returns to the agent. */
 const reply = (q: ThreadQuestion) => ({ state: q.state, text: resultText(q.questions, q.state, q.answers) });
-
-const settled = (threadId: string) => publishFeed({ type: 'needs_you', thread_id: threadId });
 
 /**
  * The agent asks: a card in the thread, and a blocker in Needs you until Ben acts. A delegated thread's card also shows
@@ -122,9 +119,10 @@ export type Answered = { state: QuestionState; via: AnswerPayload['via'] } | { c
 /**
  * Ben's answers. The first answer wins: a later one is a conflict, with the state the first left. The waiting call
  * returns them; when no call waits any more (a restart, Stop, the harness's own timeout) they reach the thread as a
- * message instead, saved before it is woken, once. A thread that runs on another machine (run-on.ts) has its call
- * there: while a turn runs there, the answer event syncs to it and that call returns; between turns, the answer goes
- * to it as a forwarded message.
+ * message instead, saved before it is woken, once. A thread whose turn runs on another machine has its call there,
+ * however it got there (sent there, delegated, a reply or Take over there): the answer event syncs to it and that call
+ * returns. Between turns, the answer goes as a forwarded message to a machine that keeps the thread (remoteHolder), and
+ * otherwise runs the thread here, as Ben's reply would.
  */
 export async function answerQuestion(threadId: string, id: string, raw: unknown): Promise<Answered> {
   const q = find(threadId, id);
@@ -133,7 +131,7 @@ export async function answerQuestion(threadId: string, id: string, raw: unknown)
   if (q.state !== 'pending') return { conflict: q.state };
   const thread = threads.get(threadId)!;
   const holder = remoteHolder(thread);
-  const via = waitedOn(threadId, id) || (holder && runningElsewhere(thread)) ? 'tool' : 'message';
+  const via = waitedOn(threadId, id) || runningElsewhere(thread) ? 'tool' : 'message';
   const answers = parsed.value;
   const state = stateOf(answers) as AnswerPayload['state'];
   if (via === 'message' && holder) {
@@ -145,19 +143,11 @@ export async function answerQuestion(threadId: string, id: string, raw: unknown)
   addEvent(threadId, ANSWER_EVENT, { id, state, answers, via } satisfies AnswerPayload);
   polled.delete(id);
   if (via === 'message' && !holder) {
+    // Ben's reply, delivered as one (run-on.ts does the same with a forwarded one): it runs the thread here even when
+    // another machine ran it last, which a wake of Omni's own never does.
     const row = saveOwn(threadId, `question:${id}`, { prompt: resultText(q.questions, state, answers), kind: 'user', source: 'ben', payload: null });
-    if (row) wake(row);
+    if (row) void wakePrepared(row).catch((err) => console.error(`[questions] ${id}:`, (err as Error).message));
   }
   settled(threadId);
   return { state, via };
-}
-
-/** Ben wrote in the thread instead of answering: each waiting question is dismissed, so its call returns and the agent reads the message. */
-export function dismissQuestions(threadId: string) {
-  const open = questionsIn(events.questions(threadId)).filter((q) => q.state === 'pending');
-  for (const q of open) {
-    addEvent(threadId, ANSWER_EVENT, { id: q.id, state: 'dismissed', answers: null, via: 'tool' } satisfies AnswerPayload);
-    polled.delete(q.id);
-  }
-  if (open.length) settled(threadId);
 }

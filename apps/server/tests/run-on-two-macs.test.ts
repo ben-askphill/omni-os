@@ -403,6 +403,61 @@ describe('a question from a thread delegated on the other machine', () => {
   }, T.timeout);
 });
 
+describe('a question from a thread that runs on the other machine without being sent there', () => {
+  // Ben started it on B (or a reply or Take over moved it there), as with a Conductor thread: not routed, no parent and
+  // no branch, so A keeps none of its messages for B. Its call still waits on B, and Ben answers on A's card.
+  const asking = async (question: string) => {
+    const t = await b.runner.createThread({ channel: 'shop', prompt: `TOOL:60000 ${question}`, device: 'here' });
+    await b.untilTool(t.id);
+    const asked = await b.json(`/threads/${t.id}/questions`, { body: { questions: [{ question, options: [{ label: 'Yes', description: 'Go' }, { label: 'No', description: 'Wait' }] }] } });
+    expect(asked.status, JSON.stringify(asked.body)).toBe(200);
+    const shown = () => a.byKind(t.id, 'question').some((e) => e.p.id === asked.body.id) && a.thread(t.id)?.status === 'running';
+    for (let n = 0; n < 5 && !shown(); n++) await both();
+    expect(a.thread(t.id)).toMatchObject({ status: 'running', parent_id: null, branch: null });
+    expect(a.db.assignments.get(t.id)).toMatchObject({ machine: 'box-b', routed: false });
+    return { id: t.id, qid: asked.body.id as string };
+  };
+
+  it("takes Send on the hub's card to the call waiting on that machine", async () => {
+    const { id, qid } = await asking('Port the Conductor MCP?');
+    const poll = b.json(`/threads/${id}/questions/${qid}?wait=25`);
+    const res = await a.json(`/threads/${id}/questions/${qid}/answer`, { body: { answers: [{ selected: ['Yes'], other: null }] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toEqual({ state: 'answered', via: 'tool' });
+    await both();
+    expect((await poll).body).toEqual({ state: 'answered', text: expect.stringContaining('"Port the Conductor MCP?"="Yes"') });
+    // Nothing ran on the hub: the turn stays on B.
+    expect(a.runner.isLive(id)).toBe(false);
+  }, T.timeout);
+
+  it("takes Skip on the hub's card to the call waiting on that machine", async () => {
+    const { id, qid } = await asking('Port the server routes?');
+    const poll = b.json(`/threads/${id}/questions/${qid}?wait=25`);
+    const res = await a.json(`/threads/${id}/questions/${qid}/answer`, { body: { answers: [null] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toEqual({ state: 'skipped', via: 'tool' });
+    await both();
+    expect((await poll).body).toEqual({ state: 'skipped', text: expect.stringContaining('skipped these questions') });
+    expect(a.runner.isLive(id)).toBe(false);
+  }, T.timeout);
+
+  it('runs the thread here on an answer given after its turn there ended, as a reply would', async () => {
+    const { id, qid } = await asking('Port the relay?');
+    expect((await b.json(`/threads/${id}/stop`, { body: {} })).status).toBe(200);
+    await waitFor(() => !b.runner.isLive(id), 'the turn on B to stop');
+    await b.files.turnFinished(id);
+    for (let n = 0; n < 5 && ['running', 'queued'].includes(a.thread(id).status); n++) await both();
+    const res = await a.json(`/threads/${id}/questions/${qid}/answer`, { body: { answers: [{ selected: ['No'], other: null }] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toEqual({ state: 'answered', via: 'message' });
+    // Not parked for Resume, as a wake of Omni's own would be on a thread B ran last: it runs here, and A holds it now.
+    const answer = () => a.db.messageRequests.byRequestId(id, `question:${qid}`);
+    await waitFor(() => answer()?.state === 'delivered', () => `the answer to run on A, not ${answer()?.state}`);
+    expect(a.byKind(id, 'user').at(-1)?.p.text).toContain('"Port the relay?"="No"');
+    expect(a.db.assignments.holder(id)).toBe('mac-a');
+  }, T.timeout);
+});
+
 describe('remote preparation and takeover', () => {
   it('resolves skills and mentions for fresh prompts and replies, and carries context', async () => {
     writeFileSync(join(shared, 'remote-notes.txt'), 'REMOTE FILE CONTENT');
