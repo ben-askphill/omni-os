@@ -22,7 +22,7 @@ import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
 import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
-import { dismissQuestions } from './questions.ts';
+import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
 import { parseGoalCommand } from '@omni/shared/goal.ts';

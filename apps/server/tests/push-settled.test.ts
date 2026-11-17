@@ -7,7 +7,8 @@ import { startRunner } from './runner-boot.ts';
 
 const H = await startRunner();
 const { app } = await import('../app.ts');
-const { askQuestion, dismissQuestions } = await import('../runner/questions.ts');
+const { askQuestion } = await import('../runner/questions.ts');
+const { dismissQuestions } = await import('../runner/question-waits.ts');
 const { settledAlerts } = await import('../push-settled.ts');
 const { pushSenderId } = await import('../push-sender.ts');
 type Ref = import('@omni/shared/app-pairing.ts').AppPushAlertRef;
