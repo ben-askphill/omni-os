@@ -16,7 +16,7 @@ import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
 import { usageByHarness } from '../usage.ts';
 import { channelCatalog, freshCatalog, getCatalog } from '../harness/catalog-service.ts';
-import { resolveRun, setsRun } from '../harness/resolve.ts';
+import { resolveRun, reviewerEffort, setsRun } from '../harness/resolve.ts';
 import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
@@ -142,7 +142,9 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   if (!run.ok) throw new Error(run.error);
   const images = (input.files ?? []).some((f) => f.type.startsWith('image/'));
   const auto = 'auto' in run ? routeTask(profileTask(input.prompt), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
-  const { harness, model, effort } = auto ?? (run as Resolved);
+  const picked = auto ?? (run as Resolved);
+  const { harness, model } = picked;
+  const effort = reviewerEffort(picked, role?.id, channelCatalog(getCatalog(), channel.id));
   if (role?.delegateOnly && isProviderHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
@@ -161,7 +163,8 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     model: model || null,
     harness,
     effort,
-    auto_reason: auto?.reason ?? null,
+    // Auto's line names the effort it picked; a reviewer's is the one it runs at.
+    auto_reason: auto ? auto.reason.replace(`, ${auto.effort} effort`, `, ${effort} effort`) : null,
     session_id: id,
     cwd: wd.cwd,
     branch: wd.branch,

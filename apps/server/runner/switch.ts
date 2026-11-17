@@ -9,6 +9,7 @@ import { userName } from '../profile.ts';
 import { getHarness, resolveModel, unavailableError, validateRun, type Catalog } from '../harness/catalog.ts';
 import { freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { HARNESS_META, isHarnessId, type HarnessId } from '../harness/types.ts';
+import { reviewerEffort } from '../harness/resolve.ts';
 import { turnBlocked } from '../sync/guard.ts';
 import { buildHandover } from './handover.ts';
 import { closeLive } from './session.ts';
@@ -29,6 +30,9 @@ export function runName(run: Run, cat: Catalog = getCatalog()): RunName {
 }
 
 const runOf = (t: Thread): Run => ({ harness: t.harness, model: t.model ?? '', effort: t.effort });
+
+/** The run a switch asks for, at the effort the thread's role allows: a GPT reviewer stays at high (resolve.ts reviewerEffort). */
+export const runForRole = (t: Thread, to: Run): Run => ({ ...to, effort: reviewerEffort(to, t.role, getCatalog()) });
 
 /** The run Ben picked while a turn ran, or null. */
 export const queuedRun = (t: Thread | undefined): Run | null =>
@@ -57,6 +61,7 @@ const plan = (t: Thread, to: Run, cat: Catalog) =>
 export async function previewSwitch(threadId: string, to: Run): Promise<{ run: RunName; blocked: string | null; mode: SwitchMode | 'none'; waits: boolean }> {
   const t = threads.get(threadId);
   if (!t) throw refusal('thread not found', 404);
+  to = runForRole(t, to);
   const run = runName(to);
   if (sameRun(runOf(t), to)) return { run, blocked: null, mode: 'none', waits: false };
   if (!isHarnessId(to.harness)) return { run, blocked: `Unknown harness "${to.harness}".`, mode: 'none', waits: false };
@@ -87,6 +92,7 @@ export function cancelQueued(threadId: string): boolean {
 export async function switchRun(threadId: string, to: Run): Promise<Thread> {
   const t = threads.get(threadId);
   if (!t) throw refusal('thread not found', 404);
+  to = runForRole(t, to);
   if (sameRun(runOf(t), to)) {
     if (!queuedRun(t)) return t;
     threads.update(threadId, NO_QUEUED);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveRun, validateDefaults } from '../harness/resolve.ts';
+import { resolveRun, reviewerEffort, validateDefaults } from '../harness/resolve.ts';
 import { claudeHarness, codexHarness, cursorHarness, hermesHarness, HERMES_FIX, type Catalog } from '../harness/catalog.ts';
 
 const cat: Catalog = {
@@ -162,5 +162,41 @@ describe('channel defaults', () => {
   it('can set only an effort, on the default model', () => {
     expect(ok(resolveRun({}, undefined, cat, { effort: 'max' }))).toMatchObject({ harness: 'claude-code', model: '', effort: 'max' });
     expect(ok(resolveRun({ model: 'claude-haiku-4-5' }, undefined, cat, { effort: 'max' }))).toMatchObject({ model: 'claude-haiku-4-5', effort: '' });
+  });
+});
+
+describe('a GPT reviewer runs at high effort', () => {
+  const withCursor: Catalog = {
+    harnesses: cat.harnesses.map((h) =>
+      h.id === 'cursor'
+        ? {
+            ...h,
+            models: [
+              ...h.models,
+              { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' },
+              { id: 'composer-2.5', label: 'Composer 2.5', efforts: [], defaultEffort: '' },
+            ],
+          }
+        : h,
+    ),
+  };
+
+  it('clamps xhigh, and anything else, to high on Codex', () => {
+    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'xhigh' }, 'reviewer', cat)).toBe('high');
+    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'medium' }, 'reviewer', cat)).toBe('high');
+    // No model named: the harness default, at high rather than its own default effort.
+    expect(reviewerEffort({ harness: 'codex', model: '', effort: '' }, 'reviewer', cat)).toBe('high');
+  });
+
+  it('clamps a gpt-* model on another harness too', () => {
+    expect(reviewerEffort({ harness: 'cursor', model: 'gpt-5.6-sol', effort: 'xhigh' }, 'reviewer', withCursor)).toBe('high');
+    // Not GPT: Cursor's own models keep what they asked.
+    expect(reviewerEffort({ harness: 'cursor', model: 'composer-2.5', effort: '' }, 'reviewer', withCursor)).toBe('');
+  });
+
+  it('leaves Claude reviewers and every other role alone', () => {
+    expect(reviewerEffort({ harness: 'claude-code', model: 'claude-opus-5-5', effort: 'xhigh' }, 'reviewer', cat)).toBe('xhigh');
+    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'xhigh' }, 'builder', cat)).toBe('xhigh');
+    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'xhigh' }, null, cat)).toBe('xhigh');
   });
 });

@@ -135,6 +135,20 @@ describe('routeTask', () => {
     expect(routeTask({ ...hard, needs: ['review'] }, { catalog: cat, usage: { codex: full } }).harness).toBe('claude-code');
   });
 
+  it('runs a GPT review at high effort whatever its tier, never xhigh', () => {
+    const xhighCodex: Catalog = {
+      harnesses: cat.harnesses.map((h) =>
+        h.id === 'codex' ? { ...h, models: h.models.map((m) => ({ ...m, efforts: ['low', 'medium', 'high', 'xhigh'] })) } : h,
+      ),
+    };
+    for (const tier of ['light', 'heavy', 'max'] as const) {
+      const pick = routeTask({ ...hard, tier, needs: ['review'] }, { catalog: xhighCodex });
+      expect(pick).toMatchObject({ harness: 'codex', effort: 'high' });
+      expect(pick.reason).toMatch(/high effort on Codex/);
+    }
+    expect(routeTask({ ...hard, tier: 'max', needs: ['review', 'speed'] }, { catalog: xhighCodex }).effort).toBe('high');
+  });
+
   it('runs a quick or bulk code change on Composer', () => {
     for (const need of ['speed', 'bulk'] as const) {
       const pick = routeTask({ ...hard, tier: 'standard', needs: [need] }, { catalog: cat });

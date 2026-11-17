@@ -14,7 +14,9 @@ Each role is a file in `crew/*.md` with frontmatter and a charter. Edit them fre
 
 The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Overview and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
 
-The conductor reviews every PR a builder reports on the other model family from the one that wrote it, read from the builder thread's harness and model (`get_thread`): Codex `gpt-6.1-sol` at `xhigh` for a PR Claude wrote, following `/code-review:code-review` from the `gpt-review` skill where the machine has it in `~/.agents/skills`, else the reviewer charter's own steps; Claude Code `claude-opus-5-5` at `xhigh` for any other. When that harness or model is unavailable, or the builder's model does not say its family, it asks you instead of reviewing on the same family.
+The conductor reviews every PR a builder reports on the other model family from the one that wrote it, read from the builder thread's harness and model (`get_thread`): Codex `gpt-6.1-sol` at `high` for a PR Claude wrote, following `/code-review:code-review` from the `gpt-review` skill where the machine has it in `~/.agents/skills`, else the reviewer charter's own steps; Claude Code `claude-opus-5-5` at `xhigh` for any other. When that harness or model is unavailable, or the builder's model does not say its family, it asks you instead of reviewing on the same family.
+
+A `reviewer` thread on a GPT model (Codex, or a `gpt-*` model on Cursor) always runs at `high` effort. Omni sets it when the thread is made, switched to another run or continued, even when `xhigh` or no effort was asked for. Claude reviewers keep the effort they were given.
 
 `delegate_only: true` in a role's frontmatter makes it a router that runs without the tools that do work. The conductor sets it, and so does usage-scan, which only reads its first message and saves what you pick.
 
