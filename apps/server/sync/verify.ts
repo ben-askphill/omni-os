@@ -25,7 +25,14 @@ import type { Change, RemoteChange } from './transport.ts';
 
 export type SignatureMode = 'actions' | 'strict' | 'log';
 
-export type Gate = { kind: 'apply'; change: RemoteChange } | { kind: 'refuse'; reason: string; change: RemoteChange } | { kind: 'defer'; reason: string };
+/**
+ * `unverified`: why the signature did not check out on a change that applies anyway. The caller logs it with the write
+ * (sync/apply.ts), so a change that fails and waits in sync_deferred is logged once it lands, not on every retry.
+ */
+export type Gate =
+  | { kind: 'apply'; change: RemoteChange; unverified?: string }
+  | { kind: 'refuse'; reason: string; change: RemoteChange }
+  | { kind: 'defer'; reason: string };
 
 const DEVICE = 'devices.';
 const SECRET_DROP = 'secretdrop.';
@@ -143,10 +150,7 @@ export function gateChange(raw: RemoteChange, mode: SignatureMode = resolved.syn
   }
   const reason = REASONS[verdict];
   const strict = action || mode === 'strict';
-  if (!strict || (action && mode === 'log' && verdict === 'unsigned')) {
-    logRefused(change, reason, true);
-    return { kind: 'apply', change };
-  }
+  if (!strict || (action && mode === 'log' && verdict === 'unsigned')) return { kind: 'apply', change, unverified: reason };
   if (verdict === 'unknown-signer') return { kind: 'defer', reason: `${reason} yet (${change.machine_id})` };
   return { kind: 'refuse', reason, change };
 }

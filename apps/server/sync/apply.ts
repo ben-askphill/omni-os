@@ -72,15 +72,32 @@ function defer(change: RemoteChange, err: unknown) {
   ).run(change.seq, JSON.stringify(change), (err as Error)?.message ?? String(err));
 }
 
+// A change its handler could not apply (most often its thread is not on this machine) is tried on every sync for its
+// first ten minutes, then at most once every tenth of the time it has waited, and at least once an hour. A thread that
+// never comes (deleted here, or never synced) stops costing a pass on every sync, and one that comes late brings its
+// changes within a tenth of their wait. Kept in memory, so a restart tries them all again. A change the gate holds (no
+// handler, a key or Trust to wait for) is tried on every sync as before. Keyed by seq, which only one relay's history
+// keeps unique, so a pulled change always starts over (applyBatch).
+const EVERY_SYNC_MS = 10 * 60_000;
+const MAX_WAIT_MS = 60 * 60_000;
+const stuck = new Map<number, { since: number; next: number }>();
+
+function backOff(seq: number, now: number) {
+  const since = stuck.get(seq)?.since ?? now;
+  const age = now - since;
+  stuck.set(seq, { since, next: age < EVERY_SYNC_MS ? now : now + Math.min(MAX_WAIT_MS, age / 10) });
+}
+
 /**
  * Apply one remote change. A change that fails is kept in sync_deferred and retried, never lost or fatal. Its
  * signature is checked first (sync/verify.ts): a refused one is logged and skipped, and the handler sees the change
  * without its signature.
  */
-export function applyChange(signed: RemoteChange, ctx: ApplyContext): ApplyOutcome {
+export function applyChange(signed: RemoteChange, ctx: ApplyContext, now = Date.now()): ApplyOutcome {
   const handler = handlers.get(signed.entity);
   let applied: boolean;
   let change = signed;
+  let handled = false;
   try {
     if (!handler) throw new Error(`no handler for ${signed.entity}`);
     const gate = gateChange(signed, undefined, ctx.pairedMachines);
@@ -90,18 +107,25 @@ export function applyChange(signed: RemoteChange, ctx: ApplyContext): ApplyOutco
         logRefused(gate.change, gate.reason, false);
         db.prepare('DELETE FROM sync_deferred WHERE seq = ?').run(signed.seq);
       });
+      stuck.delete(signed.seq);
       return 'skipped';
     }
     change = gate.change;
+    handled = true;
     applied = tx(() => {
       const ok = handler.apply(change, ctx);
+      // In the same commit as the write, so a change that fails is not logged on each retry.
+      if (gate.unverified) logRefused(change, gate.unverified, true);
       db.prepare('DELETE FROM sync_deferred WHERE seq = ?').run(change.seq);
       return ok;
     });
   } catch (err) {
     defer(signed, err);
+    if (handled) backOff(signed.seq, now);
+    else stuck.delete(signed.seq);
     return 'deferred';
   }
+  stuck.delete(signed.seq);
   if (applied) {
     try {
       handler.notify?.(change);
@@ -118,6 +142,9 @@ export function applyBatch(changes: RemoteChange[], ctx: ApplyContext): ApplySta
   applying++;
   try {
     for (const c of changes) {
+      // New here, even with a seq a waiting change had: moving to another relay (sync/setup.ts) or copying the data
+      // folder to another machine (db/sync.ts arm) pulls from seq 1 again.
+      stuck.delete(c.seq);
       const outcome = applyChange(c, ctx);
       stats[outcome]++;
       if (outcome === 'applied') applied.push(c);
@@ -148,18 +175,27 @@ export function deferredChanges(): RemoteChange[] {
   return (db.prepare('SELECT change FROM sync_deferred ORDER BY seq').all() as { change: string }[]).map((r) => JSON.parse(r.change) as RemoteChange);
 }
 
-/** Try the deferred changes again, oldest first, until a pass applies nothing more. */
-export function retryDeferred(ctx: ApplyContext): ApplyStats {
+/**
+ * Try the deferred changes that are due again, oldest first, until a pass applies nothing more. A pass after one that
+ * applied something tries every change, waiting or not: what landed may be what they wait for.
+ */
+export function retryDeferred(ctx: ApplyContext, now = Date.now()): ApplyStats {
   const stats: ApplyStats = { applied: 0, skipped: 0, deferred: 0 };
   const applied: RemoteChange[] = [];
   applying++;
   try {
-    for (;;) {
+    for (let all = false; ; all = true) {
       const rows = deferredChanges();
+      const here = new Set(rows.map((r) => r.seq));
+      for (const seq of stuck.keys()) if (!here.has(seq)) stuck.delete(seq);
       let progress = 0;
       stats.deferred = 0;
       for (const r of rows) {
-        const outcome = applyChange(r, ctx);
+        if (!all && (stuck.get(r.seq)?.next ?? now) > now) {
+          stats.deferred++;
+          continue;
+        }
+        const outcome = applyChange(r, ctx, now);
         if (outcome === 'deferred') stats.deferred++;
         else (stats[outcome]++, progress++);
         if (outcome === 'applied') applied.push(r);
