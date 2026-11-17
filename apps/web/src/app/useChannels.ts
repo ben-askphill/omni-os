@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type SetStateAction } from 'react';
 import { latestOnly } from '@omni/shared/latest.ts';
-import { api, errorText, type ChannelWithRunning, type Thread, type ThreadStub } from '../api.ts';
+import { api, errorText, listGet, type ChannelWithRunning, type Thread, type ThreadStub } from '../api.ts';
 import { withPin, type PinnedThread } from '../pins.ts';
 
 /**
@@ -27,8 +27,7 @@ export function useChannels() {
 
   const reloadPinned = useCallback(() => {
     const token = pinReads.begin();
-    return api
-      .get<PinnedThread[]>('/pinned')
+    return listGet<PinnedThread[]>('/pinned')
       .then((list) => void (pinReads.holds(token) && setPinnedList(list)))
       .catch(() => {});
   }, [pinReads]);
@@ -47,7 +46,7 @@ export function useChannels() {
         const pins = reloadPinned();
         const token = channelReads.begin();
         try {
-          const list = await api.get<ChannelWithRunning[]>('/channels');
+          const list = await listGet<ChannelWithRunning[]>('/channels');
           if (channelReads.holds(token)) {
             setChannelsState(list);
             setChannelsError(null);

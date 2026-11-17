@@ -29,6 +29,7 @@ import type { ClaudeArtifactsSchedule } from '@omni/shared/claude-artifacts.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
 import { earlierCursor, type HistoryPage } from '@omni/shared/history.ts';
 import { latestOnly } from '@omni/shared/latest.ts';
+import { createYieldGate } from '@omni/shared/yield-gate.ts';
 import type { Answer } from '@omni/shared/question.ts';
 import type { OutputChunk } from '@omni/shared/tool-output.ts';
 
@@ -47,6 +48,7 @@ import { createClaudeArtifactsLive, type ClaudeArtifactsLiveState } from './clau
 import { createLibraryLive, type LibraryState } from './library';
 import type { OmniSession } from './session';
 import { createStore, type Store } from './store';
+import { gatedFetch } from './yield-gate';
 import { emptyThreadView, reduceThread, withChanges, withDetail, type ThreadChanges, type ThreadDetail, type ThreadView } from './thread-reducer';
 
 /** Feed messages that change the channel list's counts and rows. Usage and mod lines do not, and `tasks` only sometimes (`taskHostsOf`). */
@@ -168,6 +170,11 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   const paired = baseUrl !== null;
   const http: HttpClient | null = baseUrl ? createHttpClient({ baseUrl, token: () => session.token(), fetch: options.fetch, upload: options.upload }) : null;
   const api: OmniApi | null = http ? createOmniApi(http) : null;
+  // The reads the hub sends by itself go through the gate, so they give way to the thread Ben opens (yield-gate.ts).
+  const gate = createYieldGate();
+  const background: OmniApi | null = baseUrl
+    ? createOmniApi(createHttpClient({ baseUrl, token: () => session.token(), fetch: gatedFetch(gate, options.fetch ?? (globalThis.fetch as unknown as Fetch)) }))
+    : null;
 
   const channels = createStore<ChannelsState>({ channels: null, loading: false, error: null, loadedAt: null });
   const link = createStore<Link>(linkOf({ paired, foreground: true, feed: null, thread: null }));
@@ -198,16 +205,21 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     }
   }
 
-  const activity = createActivityLive({ api, withAuth, now });
-  const library = createLibraryLive({ api, withAuth, now });
-  const claudeArtifacts = createClaudeArtifactsLive({ api, withAuth });
+  const activity = createActivityLive({ api: background, withAuth, now });
+  const library = createLibraryLive({ api: background, withAuth, now });
+  const claudeArtifacts = createClaudeArtifactsLive({ api: background, withAuth });
 
   function requireApi(): OmniApi {
     if (!api) throw new Error('Not paired');
     return api;
   }
 
-  const catalog = createCatalog(() => withAuth(() => requireApi().harnesses()));
+  function requireBackground(): OmniApi {
+    if (!background) throw new Error('Not paired');
+    return background;
+  }
+
+  const catalog = createCatalog(() => withAuth(() => requireBackground().harnesses()));
   const senders = createSenders({
     api: requireApi,
     run: withAuth,
@@ -266,7 +278,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         refreshAgain = false;
         try {
           const token = channelReads.begin();
-          const list = await withAuth(() => requireApi().channels());
+          const list = await withAuth(() => requireBackground().channels());
           if (!channelReads.holds(token)) {
             refreshAgain = true;
             continue;
@@ -288,7 +300,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     if (!api) return;
     const readsAtStart = readsMarked;
     try {
-      const data = await withAuth(() => requireApi().needsYou());
+      const data = await withAuth(() => requireBackground().needsYou());
       // Most loads answer what is on screen already: setting it again would redraw every screen that reads it.
       if (readsAtStart === readsMarked && !(needsYou.get().error === null && sameJson(needsYou.get().data, data))) needsYou.set({ data, error: null });
     } catch (e) {
@@ -317,7 +329,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   const refreshTasks = coalesced(async () => {
     if (!api) return;
     try {
-      setTasks(await withAuth(() => requireApi().tasks()));
+      setTasks(await withAuth(() => requireBackground().tasks()));
     } catch {
       // The feed sends `tasks` only when the list changes, so while nothing starts or stops it would never bring the
       // list. Ask again after a backoff, in the foreground only: coming back to the foreground asks anyway.
@@ -411,6 +423,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     private stream: SSEClient | null = null;
     private following = true;
     private opening: Promise<void> | null = null;
+    /** Ends the hold on the hub's own reads while this thread's first page loads. */
+    private release: (() => void) | null = null;
     private closed = false;
     private readonly unwatch: () => void;
 
@@ -455,7 +469,11 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       }
       this.patch({ error: null, status: this.view.get().thread ? 'ready' : 'loading' });
       void catalog.ensure();
+      const release = gate.hold();
+      this.release = release;
       this.opening = this.open().finally(() => {
+        release();
+        this.release = null;
         this.opening = null;
       });
       return this.opening;
@@ -578,6 +596,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     close() {
       if (this.closed) return;
       this.closed = true;
+      this.release?.();
       this.unwatch();
       this.stream?.close();
       this.stream = null;
@@ -656,6 +675,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
       return thread;
     },
     setForeground(active) {
+      if (active === foreground) return;
       foreground = active;
       if (!active) {
         cancelTasksRetry();

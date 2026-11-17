@@ -332,6 +332,21 @@ describe('link and background', () => {
     hub.close();
   });
 
+  it('refetches nothing when told it is in the foreground while it already is', async () => {
+    const t = fakeTransport();
+    const { fetch, calls } = fakeFetch(() => ({ body: [] }));
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    t.feeds()[0]?.sink.open();
+    const before = calls.length;
+    hub.setForeground(true);
+    await settle(REFRESH_DEBOUNCE_MS);
+    expect(calls.length).toBe(before);
+    expect(t.feeds()).toHaveLength(1);
+    expect(hub.link.get()).toEqual({ kind: 'live' });
+    hub.close();
+  });
+
   it('shows Offline, retrying after the second failed attempt', async () => {
     const t = fakeTransport();
     const hub = createLiveHub({ session: session(), transport: t.transport, fetch: fakeFetch(() => ({ body: [] })).fetch });
@@ -416,6 +431,77 @@ describe('open thread', () => {
     await settle();
     expect(live.view.get().rows.map((r) => [r.id, r.kind])).toEqual([[0, 'user']]);
     expect(live.view.get().pending).toEqual([]);
+    live.close();
+    hub.close();
+  });
+
+  it('holds the list refetches a thread change starts until the opening thread has its first page', async () => {
+    const t = fakeTransport();
+    const sends: string[] = [];
+    let landDetail = () => {};
+    const fetch: Fetch = (url, init) => {
+      const path = new URL(url).pathname;
+      sends.push(path);
+      const body = path === '/api/threads/t1' ? threadDetail() : [];
+      const reply = { status: 200, headers: { get: () => 'application/json' }, text: async () => JSON.stringify(body) };
+      if (path !== '/api/threads/t1') return Promise.resolve(reply);
+      return new Promise((resolve, reject) => {
+        landDetail = () => resolve(reply);
+        init.signal?.addEventListener('abort', () => reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })));
+      });
+    };
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    t.feeds()[0]?.sink.open();
+    const live = hub.openThread('t1');
+    await settle();
+    sends.length = 0;
+
+    t.feeds()[0]?.sink.message(frame({ type: 'thread', thread: { id: 'other', channel_id: 'c', title: 'x', status: 'running' } }));
+    await settle(REFRESH_DEBOUNCE_MS);
+    expect(sends).toEqual([]);
+    expect(live.view.get().status).toBe('loading');
+
+    landDetail();
+    await settle();
+    expect(live.view.get().status).toBe('ready');
+    expect(sends).toEqual(expect.arrayContaining(['/api/channels', '/api/needs-you', '/api/pinned']));
+    live.close();
+    hub.close();
+  });
+
+  it('cuts off a channel list already on its way when a thread opens, and loads it again after the first page', async () => {
+    const t = fakeTransport();
+    const sends: { path: string; aborted: boolean }[] = [];
+    let channelsAnswered = 0;
+    const fetch: Fetch = (url, init) => {
+      const path = new URL(url).pathname;
+      const send = { path, aborted: false };
+      sends.push(send);
+      const reply = (body: unknown) => ({ status: 200, headers: { get: () => 'application/json' }, text: async () => JSON.stringify(body) });
+      if (path === '/api/threads/t1') return Promise.resolve(reply(threadDetail()));
+      if (path !== '/api/channels') return Promise.resolve(reply([]));
+      // The first list never answers on its own: only a cut-off ends it.
+      if (channelsAnswered++ > 0) return Promise.resolve(reply([channel('second')]));
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          send.aborted = true;
+          reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+        });
+      });
+    };
+    const hub = createLiveHub({ session: session(), transport: t.transport, fetch });
+    await settle();
+    expect(sends.filter((s) => s.path === '/api/channels')).toEqual([{ path: '/api/channels', aborted: false }]);
+
+    const live = hub.openThread('t1');
+    await settle();
+    expect(live.view.get().status).toBe('ready');
+    expect(sends.filter((s) => s.path === '/api/channels')).toEqual([
+      { path: '/api/channels', aborted: true },
+      { path: '/api/channels', aborted: false },
+    ]);
+    expect(hub.channels.get()).toMatchObject({ error: null, channels: [{ id: 'second' }] });
     live.close();
     hub.close();
   });

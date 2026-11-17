@@ -9,6 +9,7 @@ import EventSource from 'react-native-sse';
 import { clearArtifactCache } from '../artifacts/files';
 import { shownResult } from '../needs/inbox';
 import type { ActionsLive, ActionsView } from './actions';
+import { foregroundOf } from './app-state';
 import { afterFirstPage, afterNextPage, type ChannelPages } from './channel-pages';
 import { createHandoffPrefs, type HandoffPrefs } from './handoff-prefs';
 import { createTreePrefs, type TreePrefs } from './tree-prefs';
@@ -30,7 +31,10 @@ export function LiveProvider({ session, children }: { session: OmniSession; chil
     clearArtifactCache();
     const next = createLiveHub({ session, transport: eventSourceTransport(EventSource), upload: xhrUploadTransport() });
     setHub(next);
-    const appState = AppState.addEventListener('change', (state) => next.setForeground(state === 'active'));
+    const appState = AppState.addEventListener('change', (state) => {
+      const foreground = foregroundOf(state);
+      if (foreground !== null) next.setForeground(foreground);
+    });
     const network = addNetworkStateListener((state) => {
       if (state.isInternetReachable) next.kick();
     });
