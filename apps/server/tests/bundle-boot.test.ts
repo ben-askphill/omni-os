@@ -138,8 +138,8 @@ describe('the bundled server', () => {
     expect(docs?.prompt).toContain(`${checkout}/scripts/docs-daily.sh`);
   }, 60_000);
 
-  it('runs a bundled MCP script on its own, with no tsx', async () => {
-    const child = spawn(process.execPath, [join(app, 'apps', 'mcp', 'ask.mjs')], {
+  it('runs the bundled conductor MCP server on its own, with no tsx', async () => {
+    const child = spawn(process.execPath, [join(app, 'apps', 'mcp', 'omni.mjs')], {
       cwd: tmp,
       env: { PATH: process.env.PATH, HOME: process.env.HOME, OMNI_URL: 'http://127.0.0.1:9', OMNI_THREAD_ID: 'thread-1' },
       stdio: ['pipe', 'pipe', 'pipe'],

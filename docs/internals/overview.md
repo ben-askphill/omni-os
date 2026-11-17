@@ -15,7 +15,7 @@ Each Claude Code thread gets one long-lived `claude -p --input-format stream-jso
 | cwd | worktree `data/worktrees/<thread>` on branch `omni/<id>` (repo channels), else the channel base dir, else your workspace folder |
 | context | your workspace folder added with `--add-dir`, its CLAUDE.md loaded, all your user skills and MCP servers |
 | system prompt | channel facts (store, Portal slug, repo, notes), artifacts and browser rules, the channel's design system file, the crew role charter |
-| MCP | `omni-browser` (`@playwright/mcp` at the exact version in `apps/server/package.json`, run by `node` from Omni's install, never `npx`; attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); `omni-ask` (`apps/mcp/ask.ts`, the `ask_user_question` tool) and `omni-threads` (`apps/mcp/threads.ts`, `read_referenced_thread`), which Claude Code, Codex and Cursor threads all get, from the Rust `omni-mcp` binary when the install carries one ([rust-port.md](rust-port.md)); conductor also gets `omni`, which has `read_referenced_thread` itself |
+| MCP | `omni-browser` (`@playwright/mcp` at the exact version in `apps/server/package.json`, run by `node` from Omni's install, never `npx`; attached over CDP to the channel's Chrome that Omni runs, profile in `data/browsers/<channel>`); `omni-ask` (the `ask_user_question` tool), `omni-render` (`html_render`) and `omni-threads` (`read_referenced_thread`), which Claude Code, Codex and Cursor threads all get from the Rust `omni-mcp` binary (`crates/omni-mcp`, [rust-port.md](rust-port.md)); conductor also gets `omni` (`apps/mcp/omni.ts`), which has `read_referenced_thread` itself |
 | env | `OMNI_THREAD_ID`, `OMNI_ARTIFACTS_DIR`, `OMNI_URL`, `OMNI_TOKEN` (the API token), plus global and channel secrets, after that harness's strip list (`apps/server/harness/env-guard.ts`). Claude Code never sees `ANTHROPIC_BASE_URL` or `CLAUDE_CONFIG_DIR`, so it keeps the plan login and writes transcripts under `~/.claude` |
 | session | `--session-id` on the first run, `--resume` after, so every follow-up keeps full context. A switch to another harness and back resumes it with a handover of what it missed (`apps/server/runner/switch.ts`) |
 
@@ -60,7 +60,7 @@ An npm workspaces monorepo run with Turborepo (`turbo.json`). Each app and packa
 apps/server/                @omni/server: Hono API (*-api.ts), runner/, harness/ (claude, codex, cursor,
                             hermes, cursor-cloud adapters), db/, sync/, sandbox, secrets, terminal, browser, artifacts,
                             GitHub, scheduler; scripts/ for history import and sync backfill
-apps/mcp/                   @omni/mcp: omni.ts, the conductor tools; ask.ts, ask_user_question for every thread; threads.ts, read_referenced_thread for every thread but the conductor's
+apps/mcp/                   @omni/mcp: omni.ts, the conductor tools; external/, Omni as an MCP server for other clients
 apps/web/                   @omni/web: Web UI (React, Vite)
 apps/desktop/               @omni/desktop: Electron app for macOS and Linux. Shows the Web UI and runs the bundled server
 apps/ios/                   @omni/ios: Expo React Native app (pairing, live threads, Activity as Inbox, Settings, shared icons)
@@ -68,7 +68,7 @@ packages/shared/            @omni/shared: pure TypeScript the web, desktop and i
 packages/client-core/       @omni/client-core: typed HTTP and thread stream for the iOS app
 packages/test-fixtures/     @omni/test-fixtures: fake CLIs, corpora and wire fixtures the tests share
 packages/typescript-config/ @omni/typescript-config: the tsconfig bases every package extends
-crates/                     Rust (Cargo workspace at the root): omni-mcp, the per-thread MCP servers, and omni-core. See rust-port.md
+crates/                     Rust (Cargo workspace at the root): omni-mcp, the per-thread MCP servers, omni-cli, the omni command, and omni-core. See rust-port.md
 crew/                       shared role charters (yours override them from data/crew/)
 automations/                shared automation YAML, cron or events (yours go in data/automations/)
 prototypes/                 standalone experiments (not npm workspaces; see prototypes/README.md)

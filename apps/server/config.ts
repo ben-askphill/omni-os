@@ -105,10 +105,6 @@ export const config = {
   teardownTimeoutMs: Number(env.OMNI_TEARDOWN_TIMEOUT_MS ?? TEARDOWN_LIMIT_MINUTES * 60_000),
 };
 
-function mcpScript(name: 'omni' | 'ask' | 'render' | 'threads'): string {
-  return join(ROOT, 'apps', 'mcp', BUNDLED ? `${name}.mjs` : `${name}.ts`);
-}
-
 // OMNI_DATA_DIR moves all runtime state, so tests can run against a temp dir.
 const DATA = env.OMNI_DATA_DIR ? resolve(ROOT, env.OMNI_DATA_DIR) : join(ROOT, 'data');
 
@@ -132,17 +128,12 @@ export const paths = {
     return configPath();
   },
   webDist: env.OMNI_WEB_DIST ? resolve(ROOT, env.OMNI_WEB_DIST) : join(ROOT, 'apps', 'web', 'dist'),
-  mcpOmni: mcpScript('omni'),
-  /** ask_user_question, which every local thread gets. */
-  mcpAsk: mcpScript('ask'),
-  /** html_render, which every local thread gets. */
-  mcpRender: mcpScript('render'),
-  /** read_referenced_thread alone, which every local thread without `omni` gets. */
-  mcpThreads: mcpScript('threads'),
+  /** The conductor's MCP server. ask, render and threads run on omni-mcp instead (native-mcp.ts). */
+  mcpOmni: join(ROOT, 'apps', 'mcp', BUNDLED ? 'omni.mjs' : 'omni.ts'),
   /** Claude Code mods (plugins of function hooks) Omni loads when config.mods is on. */
   mods: join(ROOT, 'mods'),
   modProgress: join(ROOT, 'mods', 'omni-progress'),
-  /** Runs the mcp scripts: tsx on the TypeScript in a checkout, this runtime on the built files in the desktop app. */
+  /** Runs mcpOmni: tsx on the TypeScript in a checkout, this runtime on the built file in the desktop app. */
   mcpRunner: BUNDLED ? process.execPath : join(ROOT, 'node_modules', '.bin', 'tsx'),
 };
 

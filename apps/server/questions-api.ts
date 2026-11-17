@@ -1,4 +1,4 @@
-// /api/threads/:id/questions: what ask_user_question (apps/mcp/ask.ts) asks and polls, and what the question card
+// /api/threads/:id/questions: what ask_user_question (crates/omni-mcp) asks and polls, and what the question card
 // sends. apps/server/runner/questions.ts decides; the shared parsers' messages come back as 400s.
 import { Hono, type Context } from 'hono';
 import { answerQuestion, askQuestion, awaitAnswer, crewQuestions, WAIT_MAX_SEC } from './runner.ts';

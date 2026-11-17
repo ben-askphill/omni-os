@@ -1,5 +1,4 @@
-//! `omni new` and `omni send`: start a thread, message one, and with `--wait` report how its turn ended
-//! (`apps/cli/src/commands/write.ts`).
+//! `omni new` and `omni send`: start a thread, message one, and with `--wait` report how its turn ended.
 
 use omni_core::js::{self, JsValue};
 

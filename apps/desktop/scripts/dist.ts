@@ -1,14 +1,14 @@
 // Builds the desktop app for one platform and arch: dist/ (build.ts), build/omni (stage.ts), then electron-builder
 // with electron-builder.config.cjs. Artifacts land in release/.
 //
-//   tsx scripts/dist.ts [--platform mac|linux] [--arch arm64|x64|universal] [--dir] [--publish] [--skip-web] [--host-glibc] [--native auto|required|off] [-- builder args]
+//   tsx scripts/dist.ts [--platform mac|linux] [--arch arm64|x64|universal] [--dir] [--publish] [--skip-web] [--host-glibc] [--native required|off] [-- builder args]
 //
 //   --dir         the unpacked app only (release/mac-<arch>/Omni.app, release/linux-unpacked), no DMG or AppImage
 //   --publish     upload the artifacts and the update feed to the draft GitHub release v<version> (needs GH_TOKEN).
 //                 Only the release workflow passes it (.github/workflows/desktop-release.yml)
 //   --skip-web    use apps/web/dist as it is
 //   --host-glibc  a Linux build that only has to run on this machine (stage.ts)
-//   --native      whether the Rust binaries go in (stage.ts). The release workflow passes required
+//   --native      required (the default) or off: whether the Rust binaries go in (stage.ts)
 //   --          the rest goes to electron-builder, like: -- -c.extraMetadata.version=0.1.1
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';

@@ -1,6 +1,6 @@
 //! Whether the server on the install's port is this install's Omni, asked without the token: GET /api/auth/proof
 //! answers an HMAC of its port and a nonce under its token. `doctor` reports it; every other command needs it
-//! before it sends the token (`apps/cli/src/proof.ts`).
+//! before it sends the token.
 
 use std::time::Duration;
 

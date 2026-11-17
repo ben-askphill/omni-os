@@ -4,7 +4,7 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { CrewQuestion } from '@omni/shared/question.ts';
 import { startRunner } from './runner-boot.ts';
-import { sleep } from './support.ts';
+import { hasMcpBuild, sleep } from './support.ts';
 
 // A delegated thread's ask_user_question (apps/server/runner/questions.ts): its card shows on every thread above it
 // (GET /threads/:id/crew-questions), its Needs you blocker sits on the thread Ben delegated from, and an answer given
@@ -208,11 +208,11 @@ describe('a delegated thread asks', () => {
   });
 });
 
-describe('ask_user_question from a delegated agent', () => {
+describe.skipIf(!hasMcpBuild)('ask_user_question from a delegated agent', () => {
   it('waits until Ben answers on the delegating thread, then the agent goes on with the answer', { timeout: 60_000 }, async () => {
     const conductor = await idle('be the conductor');
     const child = await h.start('ASK_ONE plan the quarter', { parent_id: conductor.id });
-    // The card waits on the omni-ask server starting (tsx compiles it), which a loaded machine can take a while over.
+    // The card waits on the omni-ask server starting, which a loaded machine can take a while over.
     await h.until('the question card', () => h.byKind(child.id, 'question')[0], 25_000);
     const [shown] = await crew(conductor.id);
     expect(shown.thread_id).toBe(child.id);

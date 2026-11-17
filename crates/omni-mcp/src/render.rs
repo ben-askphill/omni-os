@@ -7,11 +7,13 @@ use omni_core::js::{self, JsString, JsValue};
 use crate::server::{Outcome, Tool, user};
 use crate::zod::{Field, Schema};
 
-// RENDER_MAX_TITLE and RENDER_MAX_BYTES of packages/shared/html-render.ts.
+// RENDER_MAX_TITLE and RENDER_MAX_BYTES of packages/shared/html-render.ts, which the server holds a call to.
+// packages/shared/tests/html-render.test.ts checks that the two files agree.
 const MAX_TITLE: u32 = 200;
 const MAX_HTML: u32 = 512_000;
 
-/// RENDER_GUIDE of packages/shared/html-render.ts: what a page must do to look like part of the thread.
+/// What a page must do to look like part of the thread. It names every theme variable the frame sets
+/// (RENDER_COLORS and RENDER_OTHER of packages/shared/html-render.ts).
 const GUIDE: &str = "Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark: \
     --background, --foreground, --muted, --muted-foreground, --card, --card-foreground, --border, --primary, --primary-foreground, \
     --accent, --accent-foreground, --destructive, --warning, --success, --code-background, \

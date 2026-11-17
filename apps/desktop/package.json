@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
-    "dev": "tsx scripts/build.ts && node scripts/ensure-electron.mjs && electron . --dev",
+    "dev": "tsx scripts/build.ts && tsx ../server/scripts/native.ts && node scripts/ensure-electron.mjs && electron . --dev",
     "start": "tsx scripts/build.ts && node scripts/ensure-electron.mjs && electron .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

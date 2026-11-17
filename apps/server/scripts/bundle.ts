@@ -1,5 +1,5 @@
-// Builds the server and its stdio MCP scripts into single ESM files, for the desktop app to run on Electron's Node:
-// <out>/apps/server/index.mjs and <out>/apps/mcp/<name>.mjs, the repo's own layout, so config.ts's ROOT holds there.
+// Builds the server and the conductor's stdio MCP server into single ESM files, for the desktop app to run on Electron's Node:
+// <out>/apps/server/index.mjs and <out>/apps/mcp/omni.mjs, the repo's own layout, so config.ts's ROOT holds there.
 // Packages that must stay files on disk are left external, and the caller installs them under <out>/node_modules.
 import { build } from 'esbuild';
 import { join, resolve } from 'node:path';
@@ -9,11 +9,11 @@ const REPO = resolve(import.meta.dirname, '../../..');
 /**
  * Left out of the bundle. node-pty loads a native addon and finds its spawn helper beside its package.json.
  * @playwright/mcp is started as a CLI from its package path (sandbox.ts). Nothing bundled loads tsx: when BUNDLED,
- * the MCP scripts run as .mjs on process.execPath (config.ts).
+ * the MCP script runs as .mjs on process.execPath (config.ts). The other MCP servers are a Rust binary (native-mcp.ts).
  */
 export const EXTERNAL = ['node-pty', '@playwright/mcp'] as const;
 
-export const MCP_SCRIPTS = ['omni', 'ask', 'render', 'threads'] as const;
+export const MCP_SCRIPTS = ['omni'] as const;
 
 // CJS dependencies call require(); an ESM bundle has none of its own.
 const banner = { js: "import { createRequire as __omniRequire } from 'node:module'; const require = __omniRequire(import.meta.url);" };

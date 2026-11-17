@@ -7,8 +7,8 @@
     "./*": "./*"
   },
   "scripts": {
-    "dev": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx watch --clear-screen=false --exclude '../../data/**' index.ts",
-    "start": "NODE_ENV=production NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx index.ts",
+    "dev": "tsx scripts/native.ts && NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx watch --clear-screen=false --exclude '../../data/**' index.ts",
+    "start": "tsx scripts/native.ts && NODE_ENV=production NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "import-history": "tsx scripts/import-history.ts",

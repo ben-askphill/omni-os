@@ -1,8 +1,7 @@
 //! Holds the command's own formatting to what the TypeScript command made of the same inputs
-//! (`packages/test-fixtures/native/cli-corpus.json`, recorded and re-checked by
-//! `apps/cli/tests/native-corpus.test.ts`): times in several time zones, numbers, sizes, tables, thread arguments
-//! and server addresses. `tests/goldens.rs` runs the whole command; this covers what depends on the clock, the time
-//! zone or JavaScript's rounding.
+//! (`packages/test-fixtures/native/cli-corpus.json`, recorded from it before it was removed): times in several time
+//! zones, numbers, sizes, tables, thread arguments and server addresses. `tests/goldens.rs` runs the whole command;
+//! this covers what depends on the clock, the time zone or JavaScript's rounding.
 
 use std::path::Path;
 

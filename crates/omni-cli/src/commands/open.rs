@@ -1,6 +1,5 @@
 //! `omni open`: a thread or channel in the desktop app, else in the browser. The app takes the page as `--route`,
-//! also on a second launch while it runs (`apps/desktop/src/main.ts`), and as an omni:// link
-//! (`apps/cli/src/commands/open.ts`).
+//! also on a second launch while it runs (`apps/desktop/src/main.ts`), and as an omni:// link.
 
 use crate::api;
 use crate::args::{self, switch};

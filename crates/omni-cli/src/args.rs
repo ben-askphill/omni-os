@@ -1,5 +1,4 @@
-//! A small option parser: `--name value`, `--name=value`, `-n value`, switches, `--` and `-` for stdin
-//! (`apps/cli/src/args.ts`).
+//! A small option parser: `--name value`, `--name=value`, `-n value`, switches, `--` and `-` for stdin.
 
 use crate::error::{Error, Result};
 

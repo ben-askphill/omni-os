@@ -1,5 +1,7 @@
 # The omni command is a thin client the desktop app puts on PATH
 
+> From the release after 0.1.30, the command is the Rust binary `crates/omni-cli` and the shim starts it ([rust-port.md](../internals/rust-port.md)). The TypeScript CLI in `apps/cli`, its bundle and the shim's `ELECTRON_RUN_AS_NODE` boot below were removed once 0.1.30 had shipped the binary, and `scripts/omni.sh` builds and runs the binary with `cargo`. The rest of this record stands.
+
 Agents in Codex and Cursor threads, and crew roles without the Conductor's MCP tools, reach Omni by hand-writing `curl -H "Authorization: Bearer $OMNI_TOKEN" $OMNI_URL/api/...`. Nothing tells Ben why Omni will not start when the server is down, because the agents that could tell him live inside it. `scripts/omni.sh` started threads, but only from a checkout, with no wait or read-back. On omarchy `~/.local/bin/omni` was a different script for the old Linux service, dead since #528. The research for T-OMNICLI compared the CLIs of Orca, cloudroom, T3 Code, Claude Code, Codex, Cursor, Conductor, Zed and VS Code. The agent workspaces closest to Omni ship their CLI inside the desktop app and put it on PATH from there.
 
 ## Decision

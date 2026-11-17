@@ -2,8 +2,8 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { chmodSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Which program a thread's ask, render and threads servers start from (native-mcp.ts): the Rust build when the
-// install has one that runs, the TypeScript otherwise. The stand-ins here are shell scripts that answer --version.
+// Which program a thread's ask, render and threads servers start from (native-mcp.ts): omni-mcp, when the install
+// has one that runs, and none of the three when it does not. The stand-ins here are shell scripts that answer --version.
 
 vi.mock('../db.ts', () => {
   throw new Error('db.ts must not be imported by sandbox tests');
@@ -14,11 +14,11 @@ const DIR = vi.hoisted(() => {
   const dir = mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'omni-native-mcp-'));
   process.env.OMNI_DATA_DIR = require('node:path').join(dir, 'data');
   delete process.env.OMNI_CONFIG;
-  delete process.env.OMNI_NATIVE_MCP;
   return dir;
 });
 
 import { nativeMcp, nativeMcpCandidate, nativeMcpCommand, probeNativeMcp } from '../native-mcp.ts';
+import { buildCheckoutMcp } from '../scripts/native.ts';
 import { buildMcpConfig } from '../sandbox.ts';
 import { config, paths } from '../config.ts';
 import type { Channel } from '../db.ts';
@@ -34,12 +34,15 @@ const GOOD = script('good', 'echo "omni-mcp 9.9.9"');
 const channel = { id: 'c', name: 'C', browser_headless: 1 } as Channel;
 const conductor: CrewRole = { id: 'r', name: 'R', description: '', mcp: ['omni'], delegateOnly: false, charter: 'x' };
 const URL = 'http://127.0.0.1:4747';
-const servers = (omniUrl = URL, role?: CrewRole) => buildMcpConfig({ threadId: 't', channel, role, browserBusy: false, omniUrl }).mcpServers;
+const servers = (role?: CrewRole) => buildMcpConfig({ threadId: 't', channel, role, browserBusy: false, omniUrl: URL }).mcpServers;
 
 const originalBrowser = config.browser;
 config.browser = false;
+// The run's own setting (global-native.ts), put back after each test that names another binary.
+const runs = process.env.OMNI_NATIVE_MCP;
 afterEach(() => {
-  delete process.env.OMNI_NATIVE_MCP;
+  if (runs === undefined) delete process.env.OMNI_NATIVE_MCP;
+  else process.env.OMNI_NATIVE_MCP = runs;
   vi.restoreAllMocks();
 });
 afterAll(() => {
@@ -47,17 +50,13 @@ afterAll(() => {
   rmSync(DIR, { recursive: true, force: true });
 });
 
-describe('where the Rust build is looked for', () => {
-  it('is the app root in the desktop app, and nowhere in a checkout unless it is named', () => {
+describe('where the binary is looked for', () => {
+  it('is the app root in the desktop app, target/debug in a checkout, or the path OMNI_NATIVE_MCP names', () => {
     expect(nativeMcpCandidate({}, true, '/app')).toBe('/app/bin/omni-mcp');
-    expect(nativeMcpCandidate({}, false, '/repo')).toBeNull();
+    expect(nativeMcpCandidate({}, false, '/repo')).toBe('/repo/target/debug/omni-mcp');
     expect(nativeMcpCandidate({ OMNI_NATIVE_MCP: 'target/release/omni-mcp' }, false, '/repo')).toBe('/repo/target/release/omni-mcp');
     expect(nativeMcpCandidate({ OMNI_NATIVE_MCP: '/opt/omni-mcp' }, true, '/app')).toBe('/opt/omni-mcp');
-  });
-
-  it('is turned off with OMNI_NATIVE_MCP=0, in the desktop app too', () => {
-    expect(nativeMcpCandidate({ OMNI_NATIVE_MCP: '0' }, true, '/app')).toBeNull();
-    expect(nativeMcpCandidate({ OMNI_NATIVE_MCP: ' 0 ' }, true, '/app')).toBeNull();
+    expect(nativeMcpCandidate({ OMNI_NATIVE_MCP: '  ' }, true, '/app')).toBe('/app/bin/omni-mcp');
   });
 });
 
@@ -75,53 +74,52 @@ describe('whether a binary starts', () => {
 });
 
 describe('what a thread gets', () => {
-  it('starts ask, render and threads from the Rust build, with the same environment, and says so once', () => {
+  it('starts ask, render and threads from the binary, with the API environment, and says so once', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     process.env.OMNI_NATIVE_MCP = GOOD;
-    const typescript = (() => {
-      delete process.env.OMNI_NATIVE_MCP;
-      const got = servers();
-      process.env.OMNI_NATIVE_MCP = GOOD;
-      return got;
-    })();
-    const native = servers();
-    expect(Object.keys(native)).toEqual(['omni-ask', 'omni-render', 'omni-threads']);
+    const got = servers();
+    expect(Object.keys(got)).toEqual(['omni-ask', 'omni-render', 'omni-threads']);
     for (const [name, arg] of [['omni-ask', 'ask'], ['omni-render', 'render'], ['omni-threads', 'threads']] as const) {
-      expect(native[name]).toEqual({ command: GOOD, args: [arg], env: typescript[name].env });
-      expect(typescript[name].command).toBe(paths.mcpRunner);
+      expect(got[name]).toMatchObject({ command: GOOD, args: [arg], env: { OMNI_URL: URL, OMNI_THREAD_ID: 't', OMNI_TOKEN_FILE: expect.any(String) } });
     }
     servers();
-    expect(log.mock.calls.filter(([line]) => String(line).includes('Rust build'))).toEqual([[`[mcp] ask, render and threads run on the Rust build: ${GOOD} (9.9.9)`]]);
+    expect(log.mock.calls.filter(([line]) => String(line).startsWith('[mcp]'))).toEqual([[`[mcp] ask, render and threads run on ${GOOD} (9.9.9)`]]);
   });
 
-  it('keeps the conductor on its TypeScript server, which has no Rust build', () => {
+  it('keeps the conductor on its TypeScript server, which has no Rust build yet', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     process.env.OMNI_NATIVE_MCP = GOOD;
-    const got = servers(URL, conductor);
+    const got = servers(conductor);
     expect(got['omni']).toMatchObject({ command: paths.mcpRunner, args: [paths.mcpOmni] });
     expect(got['omni-ask'].command).toBe(GOOD);
     expect(got['omni-threads']).toBeUndefined();
   });
 
-  it('falls back to the TypeScript servers, with a warning, when the named binary does not start', () => {
+  it('leaves the three out, with one warning that says how to build it, when the binary does not start', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     process.env.OMNI_NATIVE_MCP = script('broken', 'exit 1');
-    expect(servers()['omni-ask']).toMatchObject({ command: paths.mcpRunner, args: [paths.mcpAsk] });
+    expect(servers()).toEqual({});
+    expect(servers(conductor)).toEqual({ omni: expect.objectContaining({ args: [paths.mcpOmni] }) });
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain('run on the TypeScript servers');
+    expect(String(warn.mock.calls[0][0])).toContain('Threads get no ask_user_question, html_render or read_referenced_thread. Build it with npm run dev');
+    expect(nativeMcpCommand('ask')).toBeNull();
   });
 
-  it('says nothing when a desktop build simply has no binary', () => {
+  it('warns about a missing binary too, which a checkout that never built it has', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(nativeMcp(join(DIR, 'app', 'bin', 'omni-mcp'))).toBeNull();
-    expect(warn).not.toHaveBeenCalled();
+    expect(nativeMcp(join(DIR, 'app', 'target', 'debug', 'omni-mcp'))).toBeNull();
+    expect(String(warn.mock.calls[0][0])).toContain('did not start (no such file)');
   });
+});
 
-  it('leaves an API that is not plain HTTP to the TypeScript servers', () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    process.env.OMNI_NATIVE_MCP = GOOD;
-    expect(nativeMcpCommand('ask', 'https://omni.example')).toBeNull();
-    expect(nativeMcpCommand('ask', URL)).toEqual({ command: GOOD, args: ['ask'] });
-    expect(servers('https://omni.example')['omni-ask'].command).toBe(paths.mcpRunner);
+describe("a checkout's build", () => {
+  it('says cargo is missing instead of failing, so the server still starts', () => {
+    const path = process.env.PATH;
+    process.env.PATH = join(DIR, 'no-bin');
+    try {
+      expect(buildCheckoutMcp(DIR)).toEqual({ ok: false, reason: 'cargo is not installed (https://rustup.rs)' });
+    } finally {
+      process.env.PATH = path;
+    }
   });
 });

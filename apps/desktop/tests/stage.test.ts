@@ -222,19 +222,20 @@ describe("copying a package from the repo's node_modules", () => {
 
 describe('the command lines', () => {
   it('parses a target, defaulting to this machine', () => {
-    expect(parseStageArgs([], { platform: 'linux', arch: 'x64' })).toEqual({ target: linux, skipWeb: false, hostGlibc: false, native: 'auto' });
+    expect(parseStageArgs([], { platform: 'linux', arch: 'x64' })).toEqual({ target: linux, skipWeb: false, hostGlibc: false, native: 'required' });
     expect(parseStageArgs(['--platform', 'mac', '--arch', 'universal', '--skip-web'], { platform: 'linux', arch: 'x64' })).toEqual({
       target: universal,
       skipWeb: true,
       hostGlibc: false,
-      native: 'auto',
+      native: 'required',
     });
     expect(parseStageArgs(['--host-glibc'], { platform: 'linux', arch: 'x64' })).toMatchObject({ hostGlibc: true });
     expect(parseStageArgs(['--platform', 'linux', '--arch', 'universal'], { platform: 'linux', arch: 'x64' })).toEqual({ error: 'universal is a Mac build' });
     expect(parseStageArgs(['--platform', 'win'], { platform: 'linux', arch: 'x64' })).toHaveProperty('error');
     expect(parseStageArgs(['--native', 'required'], { platform: 'linux', arch: 'x64' })).toMatchObject({ native: 'required' });
     expect(parseStageArgs(['--native', 'off'], { platform: 'linux', arch: 'x64' })).toMatchObject({ native: 'off' });
-    expect(parseStageArgs(['--native', 'yes'], { platform: 'linux', arch: 'x64' })).toEqual({ error: '--native needs auto, required or off' });
+    expect(parseStageArgs(['--native', 'auto'], { platform: 'linux', arch: 'x64' })).toHaveProperty('error');
+    expect(parseStageArgs(['--native', 'yes'], { platform: 'linux', arch: 'x64' })).toEqual({ error: '--native needs required or off' });
     expect(parseStageArgs(['--native'], { platform: 'linux', arch: 'x64' })).toHaveProperty('error');
   });
 
@@ -296,6 +297,19 @@ describe('the Rust binaries', () => {
       expect(stagedNativeProblems(path, universal, () => ['arm64'])).toEqual([expect.stringMatching(/no x86_64 slice \(it has arm64\)/)]);
       expect(stagedNativeProblems(path, macArm, () => [])).toEqual([expect.stringMatching(/no arm64 slice \(it has none\)/)]);
     } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails the build, saying what to install, on a machine without cargo', () => {
+    const dir = scratch();
+    const path = process.env.PATH;
+    process.env.PATH = join(dir, 'no-bin');
+    try {
+      expect(() => stageNative(linux, dir, 'required')).toThrow('cargo did not run. Install Rust from https://rustup.rs.');
+      expect(existsSync(join(dir, NATIVE_DIR))).toBe(false);
+    } finally {
+      process.env.PATH = path;
       rmSync(dir, { recursive: true, force: true });
     }
   });

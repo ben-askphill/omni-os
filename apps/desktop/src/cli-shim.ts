@@ -1,9 +1,9 @@
-// The `omni` command (apps/cli, docs/user/cli.md, ADR 0014): a shell script this app writes each time it starts. It
-// starts the Rust build of the command (crates/omni-cli) when this app carries one that runs. Otherwise, and
-// whenever that binary is gone, it runs the CLI bundled under the app's resources on the app's own binary, acting
-// as Node. Either way the command updates with the app and needs no Node on the machine. One copy goes in the app's
-// bin folder, which the server puts on its threads' PATH (backend/index.ts), so agents in every local harness have
-// it. The other goes in ~/.local/bin for terminals, unless something there that is not Omni's already has the name.
+// The `omni` command (crates/omni-cli, docs/user/cli.md, ADR 0014): a shell script this app writes each time it
+// starts, which starts the Rust binary the app carries (bin/omni) with the facts of this install. The command
+// updates with the app and needs no Node on the machine. One copy goes in the app's bin folder, which the server
+// puts on its threads' PATH (backend/index.ts), so agents in every local harness have it. The other goes in
+// ~/.local/bin for terminals, unless something there that is not Omni's already has the name. An app built without
+// the binary (--native off) writes no shim and removes the ones it wrote before.
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -11,10 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 /** On every shim, so a later launch knows the file is Omni's to replace. */
 export const SHIM_MARK = '# omni-cli-shim';
 
-/** Where the bundled CLI sits under the app's resources: apps/cli/scripts/bundle.ts writes it, scripts/stage.ts stages it. */
-export const CLI_SCRIPT = ['omni', 'apps', 'cli', 'omni.mjs'] as const;
-
-/** Where the Rust build of the command sits under the app root, when the build carries it: scripts/native.ts stages it. */
+/** Where the command sits under the app root: scripts/native.ts stages it. */
 export const NATIVE_CLI = ['bin', 'omni'] as const;
 
 export interface ShimFacts {
@@ -23,43 +20,33 @@ export interface ShimFacts {
   dataDir: string;
   logFile: string;
   port: number;
-  /** The Rust build of the command, when this app has one that runs (`nativeCommand`). */
-  native?: string | null;
+  /** The command's binary (`nativeCommand`). */
+  binary: string;
 }
 
 const quote = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`;
 
-/**
- * Node's `-e`, so the script's path comes from the app's own resources at run time: an AppImage mounts somewhere new
- * each time. The bundle exports `run(argv)` (apps/cli/src/main.ts) and answers the exit code.
- */
-export const BOOT =
-  `import(require("node:url").pathToFileURL(require("node:path").join(process.resourcesPath,${CLI_SCRIPT.map((p) => JSON.stringify(p)).join(',')})).href)` +
-  '.then((m)=>m.run(process.argv.slice(1))).then((code)=>{process.exitCode=code})';
-
 export function shimText(f: ShimFacts): string {
-  // The binary first. When it is gone, or OMNI_NATIVE_CLI=0 is set for the call, the bundled CLI below runs.
-  const native = f.native ? [`omni_native=${quote(f.native)}`, 'if [ "${OMNI_NATIVE_CLI:-}" != 0 ] && [ -x "$omni_native" ]; then', '  exec "$omni_native" "$@"', 'fi'] : [];
   return [
     '#!/bin/sh',
     "# omni: Omni's command line (docs/user/cli.md). The Omni desktop app writes this file each time it starts.",
-    `${SHIM_MARK} 2`,
+    `${SHIM_MARK} 3`,
     `export OMNI_APP=${quote(f.app)}`,
     `export OMNI_INSTALL_DATA_DIR=${quote(f.dataDir)}`,
     `export OMNI_INSTALL_LOG=${quote(f.logFile)}`,
     `export OMNI_INSTALL_PORT=${f.port}`,
-    ...native,
-    'if [ ! -x "$OMNI_APP" ]; then',
-    '  echo "omni: $OMNI_APP is gone. Open the Omni app once and it points this command at itself again." >&2',
+    `omni_bin=${quote(f.binary)}`,
+    'if [ ! -x "$omni_bin" ]; then',
+    '  echo "omni: $omni_bin is gone. Open the Omni app once and it points this command at itself again." >&2',
     '  exit 3',
     'fi',
-    `ELECTRON_RUN_AS_NODE=1 exec "$OMNI_APP" -e ${quote(BOOT)} -- "$@"`,
+    'exec "$omni_bin" "$@"',
     '',
   ].join('\n');
 }
 
-/** The Rust build for the shim to start, or why the command stays on the bundled CLI (`reason` null: this app carries no binary). */
-export type NativeCommand = { path: string; version: string } | { path: null; reason: string | null };
+/** The binary for the shim to start, or why this app has no command. */
+export type NativeCommand = { path: string; version: string } | { path: null; reason: string };
 
 export interface NativeCommandInput {
   /** The app root: `<resources>/omni` in a packaged app. */
@@ -80,12 +67,12 @@ function versionOf(file: string): { ok: boolean; out: string } {
 }
 
 /**
- * Decides once per launch whether the shim starts the Rust build. It has to print its version here first: a binary
- * that cannot start would leave every thread without the command, where the bundled CLI always runs.
+ * Decides once per launch which binary the shim starts. It has to print its version here first, so a binary that
+ * cannot start leaves no shim that fails on every call.
  */
 export function nativeCommand(input: NativeCommandInput): NativeCommand {
   const shipped = join(input.appRoot, ...NATIVE_CLI);
-  if (!existsSync(shipped)) return { path: null, reason: null };
+  if (!existsSync(shipped)) return { path: null, reason: `${shipped} is not there: this app was built without it (--native off)` };
   try {
     let path = shipped;
     if (input.copyTo) {
@@ -173,7 +160,7 @@ function writeAtomic(path: string, text: string | Buffer): void {
   }
 }
 
-export type InstallResult = { path: string; result: 'written' | 'kept' } | { path: string; result: 'skipped'; reason: string };
+export type InstallResult = { path: string; result: 'written' | 'kept' | 'removed' } | { path: string; result: 'skipped'; reason: string };
 
 export function installShim(path: string, text: string): InstallResult {
   const plan = planShim(readExisting(path), text);
@@ -194,21 +181,35 @@ export function ownsUserCommand(input: { packaged: boolean; dev: boolean; custom
 }
 
 export interface CommandLineInput {
-  facts: ShimFacts;
+  /** The shim's facts, with the binary `nativeCommand` found, or null when it found none. */
+  facts: Omit<ShimFacts, 'binary'> & { binary: string | null };
   /** The app's bin folder, on the server's PATH. */
   binDir: string;
   /** ~/.local/bin/omni, or null when this launch must not claim it. */
   userPath: string | null;
 }
 
-/** Writes both shims. Never throws: the app runs without the command. */
+/** Removes a shim this app wrote, and leaves anything else at the path alone. */
+function removeShim(path: string): InstallResult | null {
+  const existing = readExisting(path);
+  if (existing.kind !== 'file' || !existing.text.includes(SHIM_MARK)) return null;
+  rmSync(path, { force: true });
+  return { path, result: 'removed' };
+}
+
+/**
+ * Writes both shims, or, with no binary, removes the ones an earlier launch wrote: a shim that fails on every call
+ * would also tell threads they have the command (apps/server/runner/prompts.ts). Never throws: the app runs without it.
+ */
 export function installCommandLine(input: CommandLineInput): InstallResult[] {
-  const text = shimText(input.facts);
+  const { binary } = input.facts;
+  const text = binary ? shimText({ ...input.facts, binary }) : null;
   const out: InstallResult[] = [];
   for (const path of [join(input.binDir, 'omni'), input.userPath]) {
     if (!path) continue;
     try {
-      out.push(installShim(path, text));
+      const result = text ? installShim(path, text) : removeShim(path);
+      if (result) out.push(result);
     } catch (err) {
       out.push({ path, result: 'skipped', reason: err instanceof Error ? err.message : String(err) });
     }

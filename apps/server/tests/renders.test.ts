@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { renderedFrom, renderedText } from '@omni/shared/html-render.ts';
 import { startRunner } from './runner-boot.ts';
 
-// html_render (apps/mcp/render.ts) posts a page here. It is saved under artifacts/renders/ and recorded at once; the
+// html_render (crates/omni-mcp) posts a page here. It is saved under artifacts/renders/ and recorded at once; the
 // transcript's frame loads it with `?frame=1`, which adds the script that reports its height and takes Omni's theme.
 
 const r = await startRunner({});

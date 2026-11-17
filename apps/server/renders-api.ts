@@ -1,4 +1,4 @@
-// /api/threads/:id/renders: what html_render (apps/mcp/render.ts) calls. The page is saved under the thread's
+// /api/threads/:id/renders: what html_render (crates/omni-mcp) calls. The page is saved under the thread's
 // artifacts/renders/ and recorded at once, so the artifact row reaches the clients before the call's result does.
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';

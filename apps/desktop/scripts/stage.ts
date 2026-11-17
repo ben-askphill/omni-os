@@ -1,12 +1,12 @@
 // Writes build/omni: the app root the packaged server runs from, the repo's layout in small.
-// The server and MCP bundles, the built Web UI, the shipped defaults, a version-stamped package.json, and a
+// The server and conductor MCP bundles, the Rust binaries, the built Web UI, the shipped defaults, a version-stamped package.json, and a
 // node_modules with only the bundle's external packages and their dependencies for one target.
 //
-//   tsx scripts/stage.ts [--platform mac|linux] [--arch arm64|x64|universal] [--skip-web] [--host-glibc] [--native auto|required|off]
+//   tsx scripts/stage.ts [--platform mac|linux] [--arch arm64|x64|universal] [--skip-web] [--host-glibc] [--native required|off]
 //
 //   --host-glibc  ship this machine's node-pty build on Linux even when it needs a newer glibc than the floor
-//   --native      the Rust binaries (native.ts). auto, the default, builds them when cargo is here and goes on
-//                 without them when it is not. required fails instead, which a release build passes. off skips them
+//   --native      the Rust binaries (native.ts). required, the default, fails when one does not build. off leaves
+//                 them out, for an app whose threads go without ask, render and threads and that has no omni command
 //
 // Packages come from the repo's node_modules along package-lock.json's graph, at their locked versions.
 import { spawnSync } from 'node:child_process';
@@ -47,7 +47,7 @@ export function parseStageArgs(argv: readonly string[], host: { platform: string
   let arch: string = host.arch;
   let skipWeb = false;
   let hostGlibc = false;
-  let native: string = 'auto';
+  let native: string = 'required';
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--platform') platform = argv[++i] ?? '';
@@ -61,7 +61,7 @@ export function parseStageArgs(argv: readonly string[], host: { platform: string
   if (arch !== 'x64' && arch !== 'arm64' && arch !== 'universal') return { error: '--arch needs arm64, x64 or universal' };
   if (arch === 'universal' && platform !== 'mac') return { error: 'universal is a Mac build' };
   const nativeMode = NATIVE_MODES.find((mode) => mode === native);
-  if (!nativeMode) return { error: '--native needs auto, required or off' };
+  if (!nativeMode) return { error: '--native needs required or off' };
   const arches: Arch[] = arch === 'universal' ? ['arm64', 'x64'] : [arch];
   return { target: { platform: platform === 'mac' ? 'darwin' : 'linux', arches }, skipWeb, hostGlibc, native: nativeMode };
 }
@@ -396,11 +396,8 @@ export async function stage(args: StageArgs, out = STAGE_DIR): Promise<void> {
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
 
-  say(`Bundling the server and MCP scripts (${label})`);
+  say(`Bundling the server and the conductor's MCP server (${label})`);
   run('npx', ['--no-install', 'tsx', join(REPO, 'apps/server/scripts/bundle.ts'), out], REPO);
-  // The omni command, which the app's shim runs from <resources>/omni/apps/cli/omni.mjs (src/cli-shim.ts).
-  say('Bundling the omni command');
-  run('npx', ['--no-install', 'tsx', join(REPO, 'apps/cli/scripts/bundle.ts'), out], REPO);
 
   const webDist = join(REPO, 'apps/web/dist');
   if (!args.skipWeb) {

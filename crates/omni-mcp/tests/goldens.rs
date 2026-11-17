@@ -1,8 +1,8 @@
 //! Runs the scenarios recorded from the Node servers (`packages/test-fixtures/native/mcp`) against this binary: a
 //! scripted stand-in for Omni's API on a local port, the server as a child process, the scenario's lines on its
-//! stdin, and what came back. `apps/mcp/tests/scenarios.ts` is the same runner in TypeScript and the one that
-//! recorded the files, so both implementations are held to one record. Here the answers are compared as the bytes
-//! the server wrote, key order and number format included.
+//! stdin, and what came back. The Node servers and their runner were removed once a release had carried this
+//! binary, so the files are the contract now: a change in behaviour edits them by hand, here. The answers are
+//! compared as the bytes the server wrote, key order and number format included.
 
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read, Write};

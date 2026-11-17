@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fixture } from '@omni/test-fixtures';
 import { describe, expect, it } from 'vitest';
-import { INLINE_MAX_HEIGHT, isRenderPath, readFrameHeight, renderedFrom, renderedText, withFrameScript } from '../html-render.ts';
+import { join } from 'node:path';
+import { INLINE_MAX_HEIGHT, isRenderPath, readFrameHeight, RENDER_COLORS, RENDER_MAX_BYTES, RENDER_MAX_TITLE, RENDER_OTHER, renderedFrom, renderedText, withFrameScript } from '../html-render.ts';
 
 const cases = JSON.parse(readFileSync(fixture('html-render.json'), 'utf8')) as {
   case: string;
@@ -70,5 +71,22 @@ describe('readFrameHeight', () => {
     for (const d of [null, 'omni:render-height', { type: 'other', height: 10 }, { type: 'omni:render-height', height: -5 }, { type: 'omni:render-height', height: Infinity }, { type: 'omni:render-height', height: '300' }]) {
       expect(readFrameHeight(d)).toBeUndefined();
     }
+  });
+});
+
+// The tool itself is Rust (crates/omni-mcp/src/render.rs). Its limits and the theme variables its description names
+// are copies of the ones here, which the server and the frame use.
+describe('the html_render tool in crates/omni-mcp', () => {
+  const rust = readFileSync(join(import.meta.dirname, '../../../crates/omni-mcp/src/render.rs'), 'utf8');
+  const constant = (name: string) => Number(new RegExp(`const ${name}: u32 = ([\\d_]+);`).exec(rust)?.[1].replaceAll('_', ''));
+
+  it('has the same limits', () => {
+    expect([constant('MAX_TITLE'), constant('MAX_HTML')]).toEqual([RENDER_MAX_TITLE, RENDER_MAX_BYTES]);
+  });
+
+  it('names every theme variable the frame sets, in order', () => {
+    // A backslash at a line's end continues a Rust string past the newline and the next line's indent.
+    const guide = (/const GUIDE: &str = "([^"]*)"/.exec(rust)?.[1] ?? '').replace(/\\\n\s*/g, '');
+    expect(guide).toContain([...Object.keys(RENDER_COLORS), ...Object.keys(RENDER_OTHER)].join(', '));
   });
 });

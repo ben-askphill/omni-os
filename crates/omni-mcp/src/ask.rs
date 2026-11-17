@@ -14,7 +14,8 @@ const WAIT: u32 = 25;
 /// Between polls that could not reach Omni.
 const RETRY: Duration = Duration::from_millis(2000);
 
-// The limits of packages/shared/question.ts.
+// The limits of packages/shared/question.ts, which the server parses a call with.
+// packages/shared/tests/question.test.ts checks that the two files agree.
 const QUESTIONS_MAX: u32 = 4;
 const OPTIONS_MIN: u32 = 2;
 const OPTIONS_MAX: u32 = 4;

@@ -659,7 +659,7 @@ async function scenario() {
   const scheduled = keep('limit-scheduled.json', await call('POST', `/threads/${capped.id}/limit/schedule`, {})) as { thread: { limit_state: string } };
   expect(scheduled.thread.limit_state).toBe('scheduled');
 
-  // An agent's question that waits for Ben (apps/mcp/ask.ts), asked after its call ended.
+  // An agent's question that waits for Ben (crates/omni-mcp), asked after its call ended.
   const digestQuestion = {
     question: 'Which store should the digest cover first?',
     header: 'Digest',

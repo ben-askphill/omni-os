@@ -1,4 +1,4 @@
-// Questions an agent asks the user with ask_user_question (apps/mcp/ask.ts): asked, waited on, answered or dismissed.
+// Questions an agent asks the user with ask_user_question (crates/omni-mcp): asked, waited on, answered or dismissed.
 // The thread's events hold them (packages/shared/question.ts), so they persist, stream and sync like any event. Only
 // which questions a tool call still polls for lives here, in memory: after a restart none does, and an answer goes to
 // the thread as a message instead.

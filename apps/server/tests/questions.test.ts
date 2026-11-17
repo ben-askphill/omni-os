@@ -3,9 +3,9 @@ import { once } from 'node:events';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { startRunner } from './runner-boot.ts';
-import { sleep } from './support.ts';
+import { hasMcpBuild, sleep } from './support.ts';
 
-// ask_user_question (apps/mcp/ask.ts, apps/server/runner/questions.ts) through the real runner and the fake claude CLI.
+// ask_user_question (crates/omni-mcp, apps/server/runner/questions.ts) through the real runner and the fake claude CLI.
 // The server listens on a real port, so the fake's ASK directive starts the omni-ask MCP server from the thread's
 // mcp.json and that server polls the API exactly as it does under Claude Code.
 
@@ -186,9 +186,9 @@ describe('answering', () => {
   });
 });
 
-describe('ask_user_question from the agent', () => {
+describe.skipIf(!hasMcpBuild)('ask_user_question from the agent', () => {
   const tool = (id: string) => h.byKind(id, 'tool_use').find((e) => e.p.name === 'mcp__omni-ask__ask_user_question');
-  // The card waits on the omni-ask server starting (tsx compiles it), which a loaded machine can take a while over.
+  // The card waits on the omni-ask server starting, which a loaded machine can take a while over.
   const asked = (id: string) => h.until('the question card', () => h.byKind(id, 'question')[0], 25_000);
   const E2E = { timeout: 60_000 };
 

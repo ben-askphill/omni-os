@@ -4,9 +4,9 @@
 //
 // A Linux binary is linked statically against musl, so it runs on any distro whatever its glibc. A universal Mac
 // build compiles both arches and joins them with lipo, and the app merge then leaves the file as it is.
-// Without cargo the app still builds: the server starts the TypeScript servers and the omni command runs on the
-// app's Node when a binary is not there. The omni command's TLS library compiles C, so its Linux build also needs
-// musl-gcc (musl-tools on Debian and Ubuntu). A machine without it ships the MCP servers alone.
+// The app has no other build of either, so a build that cannot make one fails and says what to install: Rust from
+// rustup.rs, and for the omni command's TLS library a C compiler (Xcode's command line tools on a Mac, musl-gcc
+// from musl-tools on Debian and Ubuntu). `--native off` makes an app without them, for a quick local check.
 import { spawnSync } from 'node:child_process';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -19,18 +19,22 @@ const TARGET_DIR = join(DESKTOP, 'build', 'cache', 'cargo-target');
 
 /**
  * The binaries: the crate, the file it builds (staged as bin/<file> under the app root, and the first word of its
- * `--version`), and what the app does without it.
+ * `--version`), and what an app without it lacks.
  */
 export const NATIVE_BINARIES = [
-  { crate: 'omni-mcp', file: 'omni-mcp', without: 'Threads get the TypeScript MCP servers instead' },
-  { crate: 'omni-cli', file: 'omni', without: "The omni command runs on the app's Node instead" },
+  { crate: 'omni-mcp', file: 'omni-mcp', without: 'its threads get no ask_user_question, html_render or read_referenced_thread' },
+  { crate: 'omni-cli', file: 'omni', without: 'it writes no omni command' },
 ] as const;
 export type NativeBinary = (typeof NATIVE_BINARIES)[number];
 export const NATIVE_DIR = 'bin';
 
-/** `auto` builds when cargo is here and goes on without the binaries when it is not. `required` fails instead. */
-export type NativeMode = 'auto' | 'required' | 'off';
-export const NATIVE_MODES: readonly NativeMode[] = ['auto', 'required', 'off'];
+/** `required`, the default, fails the build when a binary does not build. `off` leaves both out. */
+export type NativeMode = 'required' | 'off';
+export const NATIVE_MODES: readonly NativeMode[] = ['required', 'off'];
+
+/** What a failed build says to do about it. */
+export const NATIVE_HINT =
+  "Install Rust from https://rustup.rs. The omni command also needs a C compiler: Xcode's command line tools on a Mac, musl-gcc (musl-tools) on Linux. --native off builds an app without them";
 
 /** The Rust target for one platform and arch. */
 export function rustTriple(platform: Target['platform'], arch: Arch): string {
@@ -69,37 +73,31 @@ function machoArchs(file: string): string[] {
 }
 
 /**
- * Builds every binary for `target` into <out>/bin and returns the files the staged app carries. In `auto` mode a
- * machine without cargo, or a binary that does not build, leaves it out with a line saying so. `version` is the
- * app's, which the omni command reports as its own.
+ * Builds every binary for `target` into <out>/bin and returns the files the staged app carries. Throws, with what to
+ * install, when one does not build. `version` is the app's, which the omni command reports as its own.
  */
 export function stageNative(target: Target, out: string, mode: NativeMode, version = 'dev'): string[] {
   if (mode === 'off') {
-    say('Leaving the Rust binaries out (--native off)');
+    say(`Leaving the Rust binaries out (--native off): ${NATIVE_BINARIES.map((binary) => `without ${binary.file}, ${binary.without}`).join('; ')}`);
     return [];
   }
-  const missing = (what: string, err: unknown, without: string): void => {
-    if (mode === 'required') throw err;
-    say(`No ${what} in this build: ${err instanceof Error ? err.message : String(err)}`);
-    say(`${without}. Pass --native required to fail here`);
+  const fail = (err: unknown): never => {
+    throw new Error(`${err instanceof Error ? err.message : String(err)}. ${NATIVE_HINT}`);
   };
-  let triples: string[];
+  let triples: string[] = [];
   try {
     triples = toolchain(target);
   } catch (err) {
-    missing('Rust binaries', err, NATIVE_BINARIES.map((binary) => binary.without).join('. '));
-    return [];
+    fail(err);
   }
-  const staged: string[] = [];
   for (const binary of NATIVE_BINARIES) {
     try {
       build(binary, target, triples, out, version);
-      staged.push(binary.file);
     } catch (err) {
-      missing(binary.file, err, binary.without);
+      fail(err);
     }
   }
-  return staged;
+  return NATIVE_BINARIES.map((binary) => binary.file);
 }
 
 /** Checks that cargo runs and has every target of the build. Returns the Rust targets. */
@@ -109,7 +107,7 @@ function toolchain(target: Target): string[] {
   // and fails, and cargo then says below whether there is a toolchain.
   const rustup = ran('rustup', ['--version']).ok;
   if (rustup) ran('rustup', ['toolchain', 'install'], true);
-  if (!ran('cargo', ['--version']).ok) throw new Error('cargo did not run. Install Rust from https://rustup.rs');
+  if (!ran('cargo', ['--version']).ok) throw new Error('cargo did not run');
   const triples = target.arches.map((arch) => rustTriple(target.platform, arch));
   for (const triple of triples) {
     if (rustup && !ran('rustup', ['target', 'add', triple], true).ok) throw new Error(`rustup could not add the target ${triple}`);

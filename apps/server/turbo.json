@@ -8,7 +8,9 @@
         "$TURBO_ROOT$/packages/test-fixtures/wire/**",
         "$TURBO_ROOT$/crew/**",
         "$TURBO_ROOT$/automations/**",
-        "$TURBO_ROOT$/mods/**"
+        "$TURBO_ROOT$/mods/**",
+        "$TURBO_ROOT$/crates/**",
+        "$TURBO_ROOT$/Cargo.lock"
       ]
     }
   }

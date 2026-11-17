@@ -1,4 +1,4 @@
-//! The usage text, one block per command (`apps/cli/src/help.ts`). `docs/user/cli.md` says the same at more length.
+//! The usage text, one block per command. `docs/user/cli.md` says the same at more length.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
