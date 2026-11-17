@@ -143,6 +143,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --include=dev
+      # The omni command's TLS library (ring) compiles C, and the static build needs musl's own compiler wrapper.
+      - name: Install musl-gcc
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
       # stage.ts compiles node-pty for glibc 2.28 in docker, which the runner has, and the Rust binaries with the
       # runner's rustup, which installs the toolchain rust-toolchain.toml pins.
       - name: Build and upload

@@ -419,7 +419,7 @@ export async function stage(args: StageArgs, out = STAGE_DIR): Promise<void> {
   installClosure(lock, paths, target, out, args.hostGlibc);
   say(`${paths.length} packages copied`);
 
-  stageNative(target, out, args.native);
+  stageNative(target, out, args.native, version);
 
   if (target.platform === process.platform && target.arches.includes(process.arch as Arch)) {
     say('Checking the staged tree on Electron');

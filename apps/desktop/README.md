@@ -12,7 +12,7 @@ The desktop app is an Electron window on the Web UI that runs the Omni server it
 | `src/ipc.ts`, `src/handle.ts`, `src/preload.ts` | The bridge: channel table, typed `ipcMain` handlers with an origin check, and `window.omniDesktop` |
 | `src/notifications.ts` | Native notifications: follows the server's feed and Needs you with the install's token, asks the shared tracker (`packages/shared/attention.ts`) what is news, posts it, and opens the thread on click. The bridge's `nativeNotifications` tells the page to post none of its own. See [docs/user/notifications.md](../../docs/user/notifications.md) |
 | `src/options.ts`, `src/paths.ts`, `src/settings.ts` | Command line (with `--route` and `omni://` links, from this launch or a second one while it runs), per-OS default paths, the app's own settings file |
-| `src/cli-shim.ts` | The `omni` command: the shim the app writes on each launch, which runs the bundled `apps/cli` on this binary as Node ([ADR 0014](../../docs/adr/0014-omni-command-line.md), [docs/user/cli.md](../../docs/user/cli.md)) |
+| `src/cli-shim.ts` | The `omni` command: the shim the app writes on each launch. It starts the Rust build of the command (`bin/omni`, [docs/internals/rust-port.md](../../docs/internals/rust-port.md)) when the app carries one that runs, and otherwise runs the bundled `apps/cli` on this binary as Node ([ADR 0014](../../docs/adr/0014-omni-command-line.md), [docs/user/cli.md](../../docs/user/cli.md)) |
 | `scripts/build.ts` | Builds `dist/main.cjs`, `dist/preload.cjs` and `dist/pick-preload.cjs` |
 | `scripts/stage.ts`, `scripts/dist.ts`, `electron-builder.config.cjs` | Stage the server and `omni` command bundles and package the app |
 | `scripts/qa.ts` | The QA harness |
@@ -126,7 +126,7 @@ npx tsx scripts/dist.ts --platform mac --arch arm64      # or x64, universal; --
 npx tsx scripts/dist.ts --platform linux --arch x64      # the AppImage
 ```
 
-`dist.ts` builds `dist/`, stages `build/omni` with `stage.ts` (the server and MCP bundles, the Rust `omni-mcp` binary, `apps/web/dist`, `crew/`, `automations/`, `mods/`, `prototypes/activity-monitor/`, a `package.json` and a `node_modules` with only the bundle's external packages for that target), then runs electron-builder with `electron-builder.config.cjs`. Artifacts land in `release/` as `Omni-<version>-<os>-<arch>.<ext>`. It uploads them only with `--publish`, which only the release workflow passes ([RELEASE.md](RELEASE.md)). A Mac build signs with the keychain's Developer ID identity when there is one, and notarizes only when Apple's credentials are in the environment.
+`dist.ts` builds `dist/`, stages `build/omni` with `stage.ts` (the server and MCP bundles, the Rust `omni-mcp` and `omni` binaries, `apps/web/dist`, `crew/`, `automations/`, `mods/`, `prototypes/activity-monitor/`, a `package.json` and a `node_modules` with only the bundle's external packages for that target), then runs electron-builder with `electron-builder.config.cjs`. Artifacts land in `release/` as `Omni-<version>-<os>-<arch>.<ext>`. It uploads them only with `--publish`, which only the release workflow passes ([RELEASE.md](RELEASE.md)). A Mac build signs with the keychain's Developer ID identity when there is one, and notarizes only when Apple's credentials are in the environment.
 
 A Linux build ships `node-pty`'s compiled addon, which must load on glibc 2.28. When the checkout's own build needs a newer glibc (most current distros), `stage.ts` compiles it again in docker's `node:24-bullseye` image, so it needs a working docker, and stops with an error without one. `--host-glibc` skips that and ships this machine's build, which only runs on a glibc as new as this one. That is fine for a local test, not for a release.
 
@@ -169,5 +169,6 @@ npx tsx scripts/update-check.ts
 | Server log | `~/Library/Logs/Omni/server.log` | `$XDG_STATE_HOME/omni-os/server.log` (`~/.local/state/omni-os/server.log`) |
 | App settings (`settings.json`), the data-dir choice (`data-dir.json`) | `~/Library/Application Support/Omni` | `~/.config/Omni` |
 | The `omni` command (`src/cli-shim.ts`): the agents' copy, and yours | `~/Library/Application Support/Omni/bin/omni`, `~/.local/bin/omni` | `~/.config/Omni/bin/omni`, `~/.local/bin/omni` |
+| The Rust build of the command that those start | `bin/omni` inside `Omni.app` | `~/.config/Omni/native/omni`, copied out of the AppImage at each launch |
 
 On first launch, when the SwiftUI app (its `repoPath`, or `~/omni-os`) or the Linux launcher (the checkout in its `omni-os.desktop` entry) left an `omni.db` in a checkout's `data/`, the app asks once whether to use that folder in place or start fresh. It only reads the old folder to decide, and never copies or moves it. `--data-dir` and `--dev` skip the question. In development the default is the checkout's own `data/`. Server, Show Server Log opens the log.

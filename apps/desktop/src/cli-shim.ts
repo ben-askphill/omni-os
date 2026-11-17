@@ -1,9 +1,11 @@
 // The `omni` command (apps/cli, docs/user/cli.md, ADR 0014): a shell script this app writes each time it starts. It
-// runs the CLI bundled under the app's resources on the app's own binary, acting as Node, so the command updates
-// with the app and needs no Node on the machine. One copy goes in the app's bin folder, which the server puts on its
-// threads' PATH (backend/index.ts), so agents in every local harness have it. The other goes in ~/.local/bin for
-// terminals, unless something there that is not Omni's already has the name.
-import { lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+// starts the Rust build of the command (crates/omni-cli) when this app carries one that runs. Otherwise, and
+// whenever that binary is gone, it runs the CLI bundled under the app's resources on the app's own binary, acting
+// as Node. Either way the command updates with the app and needs no Node on the machine. One copy goes in the app's
+// bin folder, which the server puts on its threads' PATH (backend/index.ts), so agents in every local harness have
+// it. The other goes in ~/.local/bin for terminals, unless something there that is not Omni's already has the name.
+import { spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 /** On every shim, so a later launch knows the file is Omni's to replace. */
@@ -12,12 +14,17 @@ export const SHIM_MARK = '# omni-cli-shim';
 /** Where the bundled CLI sits under the app's resources: apps/cli/scripts/bundle.ts writes it, scripts/stage.ts stages it. */
 export const CLI_SCRIPT = ['omni', 'apps', 'cli', 'omni.mjs'] as const;
 
+/** Where the Rust build of the command sits under the app root, when the build carries it: scripts/native.ts stages it. */
+export const NATIVE_CLI = ['bin', 'omni'] as const;
+
 export interface ShimFacts {
   /** What runs: the AppImage file on Linux (the binary inside lives in a mount that goes away), else this binary. */
   app: string;
   dataDir: string;
   logFile: string;
   port: number;
+  /** The Rust build of the command, when this app has one that runs (`nativeCommand`). */
+  native?: string | null;
 }
 
 const quote = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`;
@@ -31,14 +38,17 @@ export const BOOT =
   '.then((m)=>m.run(process.argv.slice(1))).then((code)=>{process.exitCode=code})';
 
 export function shimText(f: ShimFacts): string {
+  // The binary first. When it is gone, or OMNI_NATIVE_CLI=0 is set for the call, the bundled CLI below runs.
+  const native = f.native ? [`omni_native=${quote(f.native)}`, 'if [ "${OMNI_NATIVE_CLI:-}" != 0 ] && [ -x "$omni_native" ]; then', '  exec "$omni_native" "$@"', 'fi'] : [];
   return [
     '#!/bin/sh',
     "# omni: Omni's command line (docs/user/cli.md). The Omni desktop app writes this file each time it starts.",
-    `${SHIM_MARK} 1`,
+    `${SHIM_MARK} 2`,
     `export OMNI_APP=${quote(f.app)}`,
     `export OMNI_INSTALL_DATA_DIR=${quote(f.dataDir)}`,
     `export OMNI_INSTALL_LOG=${quote(f.logFile)}`,
     `export OMNI_INSTALL_PORT=${f.port}`,
+    ...native,
     'if [ ! -x "$OMNI_APP" ]; then',
     '  echo "omni: $OMNI_APP is gone. Open the Omni app once and it points this command at itself again." >&2',
     '  exit 3',
@@ -46,6 +56,53 @@ export function shimText(f: ShimFacts): string {
     `ELECTRON_RUN_AS_NODE=1 exec "$OMNI_APP" -e ${quote(BOOT)} -- "$@"`,
     '',
   ].join('\n');
+}
+
+/** The Rust build for the shim to start, or why the command stays on the bundled CLI (`reason` null: this app carries no binary). */
+export type NativeCommand = { path: string; version: string } | { path: null; reason: string | null };
+
+export interface NativeCommandInput {
+  /** The app root: `<resources>/omni` in a packaged app. */
+  appRoot: string;
+  /**
+   * Where the binary is copied before the shim names it, or null to name it where it is. An AppImage's files sit in
+   * a mount that goes away when the app quits, and the command has to work then too.
+   */
+  copyTo: string | null;
+  /** Runs `<file> --version`. Replaced in tests. */
+  versionOf?: (file: string) => { ok: boolean; out: string };
+}
+
+function versionOf(file: string): { ok: boolean; out: string } {
+  const r = spawnSync(file, ['--version'], { encoding: 'utf8', timeout: 5_000, stdio: ['ignore', 'pipe', 'pipe'] });
+  if (r.error) return { ok: false, out: r.error.message };
+  return { ok: r.status === 0, out: r.status === 0 ? r.stdout.trim() : `--version exited with ${r.status ?? r.signal}` };
+}
+
+/**
+ * Decides once per launch whether the shim starts the Rust build. It has to print its version here first: a binary
+ * that cannot start would leave every thread without the command, where the bundled CLI always runs.
+ */
+export function nativeCommand(input: NativeCommandInput): NativeCommand {
+  const shipped = join(input.appRoot, ...NATIVE_CLI);
+  if (!existsSync(shipped)) return { path: null, reason: null };
+  try {
+    let path = shipped;
+    if (input.copyTo) {
+      const bytes = readFileSync(shipped);
+      // The copy is replaced only when the app brought another build, so a running `omni` keeps its file.
+      const same = existsSync(input.copyTo) && readFileSync(input.copyTo).equals(bytes);
+      if (!same) writeAtomic(input.copyTo, bytes);
+      chmodSync(input.copyTo, 0o755);
+      path = input.copyTo;
+    }
+    const said = (input.versionOf ?? versionOf)(path);
+    const version = /^omni (\S+)$/.exec(said.out)?.[1];
+    if (!said.ok || !version) return { path: null, reason: `${path} did not start (${said.out || 'it printed nothing'})` };
+    return { path, version };
+  } catch (err) {
+    return { path: null, reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /** What is at the path the shim goes to. */
@@ -105,7 +162,7 @@ export function readExisting(path: string): Existing {
 }
 
 /** Writes beside it and renames over it, so a running `omni` never reads half a file and a link is replaced, not followed. */
-function writeAtomic(path: string, text: string): void {
+function writeAtomic(path: string, text: string | Buffer): void {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.tmp`;
   try {
