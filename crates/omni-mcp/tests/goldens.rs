@@ -5,6 +5,7 @@
 //! compared as the bytes the server wrote, key order and number format included.
 
 use std::collections::VecDeque;
+use std::ffi::OsString;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -143,6 +144,42 @@ fn id_of(line: &str) -> String {
 
 static RUNS: AtomicUsize = AtomicUsize::new(0);
 
+const BIN: &str = env!("CARGO_BIN_EXE_omni-mcp");
+
+/// What a server answers to `initialize` in each protocol version and to `tools/list`, as the file `omni-mcp lazy`
+/// reads. `apps/server/lazy-mcp.ts` asks the browser server the same way.
+fn handshake(server: &str, env: &[(String, OsString)]) -> Result<String, String> {
+    let mut initialize = Vec::new();
+    let mut tools = JsValue::Null;
+    for version in ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"] {
+        let mut child = Command::new(BIN)
+            .arg(server)
+            .env_clear()
+            .envs(env.iter().cloned())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let ask = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"{version}","capabilities":{{}},"clientInfo":{{"name":"test","version":"0"}}}}}}
+{{"jsonrpc":"2.0","id":2,"method":"tools/list"}}
+"#
+        );
+        child.stdin.take().ok_or("no stdin")?.write_all(ask.as_bytes()).map_err(|e| e.to_string())?;
+        let out = child.wait_with_output().map_err(|e| e.to_string())?;
+        let mut results = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter_map(|line| js::parse(line).ok()?.get("result").cloned())
+            .collect::<Vec<_>>();
+        if results.len() != 2 {
+            return Err(format!("{server} answered the handshake with {:?}", String::from_utf8_lossy(&out.stdout)));
+        }
+        tools = results.pop().unwrap_or(JsValue::Null);
+        initialize.push((version, results.pop().unwrap_or(JsValue::Null)));
+    }
+    Ok(js::stringify(&JsValue::object([("initialize", JsValue::object(initialize)), ("tools", tools)])))
+}
+
 fn run(scenario: &JsValue) -> Result<Ran, String> {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
         "scenario-{}-{}",
@@ -161,22 +198,29 @@ fn run_in(scenario: &JsValue, dir: &Path) -> Result<Ran, String> {
     let (api, port) = serve(script);
 
     // Nothing of the machine's own Omni reaches the server under test.
-    let mut command = Command::new(env!("CARGO_BIN_EXE_omni-mcp"));
-    command.arg(text(field(scenario, "server")).ok_or("a scenario names its server")?);
-    command
-        .env_clear()
-        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-        .env("HOME", dir)
-        .env("OMNI_URL", format!("http://127.0.0.1:{port}"));
+    let server = text(field(scenario, "server")).ok_or("a scenario names its server")?;
+    let mut env: Vec<(String, OsString)> = vec![
+        ("PATH".to_owned(), std::env::var_os("PATH").unwrap_or_default()),
+        ("HOME".to_owned(), dir.into()),
+        ("OMNI_URL".to_owned(), format!("http://127.0.0.1:{port}").into()),
+    ];
     if let Some(token) = text(field(scenario, "tokenFile")) {
         std::fs::write(&token_file, token).map_err(|e| e.to_string())?;
-        command.env("OMNI_TOKEN_FILE", &token_file);
+        env.push(("OMNI_TOKEN_FILE".to_owned(), token_file.clone().into()));
     }
-    if let Some(env) = field(scenario, "env").and_then(JsValue::as_object) {
-        for (name, value) in env.iter() {
-            command.env(name.to_string_lossy(), text(Some(value)).unwrap_or_default());
+    if let Some(set) = field(scenario, "env").and_then(JsValue::as_object) {
+        for (name, value) in set.iter() {
+            env.push((name.to_string_lossy(), text(Some(value)).unwrap_or_default().into()));
         }
     }
+    let mut command = Command::new(BIN);
+    if field(scenario, "lazy").is_some_and(JsValue::is_truthy) {
+        // The same server behind `omni-mcp lazy`, with a record of what it answers in this scenario's environment.
+        let answers = dir.join("answers.json");
+        std::fs::write(&answers, handshake(&server, &env)?).map_err(|e| e.to_string())?;
+        command.arg("lazy").arg(answers).arg(BIN);
+    }
+    command.arg(&server).env_clear().envs(env);
     let mut child = command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn().map_err(|e| e.to_string())?;
     let mut stdin = child.stdin.take().ok_or("no stdin")?;
     let stdout = child.stdout.take().ok_or("no stdout")?;
@@ -361,6 +405,36 @@ fn threads_matches_the_record_of_the_node_server() {
     check(&scenarios);
 }
 
+/// The front may change nothing a client sees: every recorded scenario again, with the server behind `omni-mcp lazy`.
+/// One thing does change, and one scenario turns on it: the server starts at the first call, so what it reads once
+/// at its start (the token file here) it reads then, not when the thread started. That scenario swaps the file in
+/// between and counts on the old token, so it is left out.
+#[test]
+fn every_server_behind_the_lazy_front_still_matches_the_record() {
+    let swaps_the_token = |scenario: &JsValue| {
+        field(scenario, "steps").and_then(JsValue::as_array).unwrap_or_default().iter().any(|step| field(step, "writeTokenFile").is_some())
+    };
+    let mut left_out = 0;
+    for server in ["ask", "render", "threads"] {
+        let all = fixture(server);
+        let count = all.len();
+        let behind: Vec<JsValue> = all
+            .into_iter()
+            .filter(|scenario| !swaps_the_token(scenario))
+            .map(|scenario| match scenario {
+                JsValue::Object(mut scenario) => {
+                    scenario.set("lazy", JsValue::Bool(true));
+                    JsValue::Object(scenario)
+                }
+                other => other,
+            })
+            .collect();
+        left_out += count - behind.len();
+        check(&behind);
+    }
+    assert_eq!(left_out, 1, "only the rotated token scenario depends on when the server starts");
+}
+
 /// Where this binary knowingly differs from the Node servers (docs/internals/rust-port.md), so no shared record can hold it.
 #[test]
 fn an_answer_with_no_text_is_an_error_with_a_short_message() {
@@ -410,7 +484,7 @@ fn a_call_that_reuses_a_running_id_does_not_stop_the_first() {
 
 #[test]
 fn without_a_server_name_it_says_how_to_run_it() {
-    let out = Command::new(env!("CARGO_BIN_EXE_omni-mcp")).output().unwrap();
+    let out = Command::new(BIN).output().unwrap();
     assert_eq!(out.status.code(), Some(2));
-    assert_eq!(String::from_utf8_lossy(&out.stderr), "usage: omni-mcp <ask|render|threads>\n");
+    assert_eq!(String::from_utf8_lossy(&out.stderr), "usage: omni-mcp <ask|render|threads|lazy <answers.json> <command> [args...]>\n");
 }

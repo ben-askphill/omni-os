@@ -1,8 +1,10 @@
 //! The stdio MCP servers every local thread gets (`apps/server/sandbox.ts`), as one binary: `omni-mcp ask`,
 //! `omni-mcp render` and `omni-mcp threads`. Each is a port of the Node script of that name in `apps/mcp`, held to
-//! the same recorded scenarios (`packages/test-fixtures/native/mcp`, docs/internals/rust-port.md).
+//! the same recorded scenarios (`packages/test-fixtures/native/mcp`, docs/internals/rust-port.md). `omni-mcp lazy`
+//! is no server of its own: it starts another one when a thread first needs it (`lazy.rs`).
 
 mod ask;
+mod lazy;
 mod protocol;
 mod render;
 mod server;
@@ -12,7 +14,10 @@ mod zod;
 use server::Kind;
 
 fn main() {
-    let kind = match std::env::args().nth(1).as_deref() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let kind = match args.first().map(String::as_str) {
+        // No runtime: it reads lines and copies bytes on two threads.
+        Some("lazy") => lazy::run(&args[1..]),
         Some("ask") => Kind::Ask,
         Some("render") => Kind::Render,
         Some("threads") => Kind::Threads,
@@ -21,7 +26,7 @@ fn main() {
             return;
         }
         _ => {
-            eprintln!("usage: omni-mcp <ask|render|threads>");
+            eprintln!("usage: omni-mcp <ask|render|threads|lazy <answers.json> <command> [args...]>");
             std::process::exit(2);
         }
     };
