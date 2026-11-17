@@ -1,5 +1,5 @@
 // The command line the app takes. A packaged app usually gets none; development and the QA harness
-// (scripts/qa.ts) name the port and data dir of a server to start or attach to. `omni open` (apps/cli) passes
+// (scripts/qa.ts) name the port and data dir of a server to start or attach to. `omni open` (crates/omni-cli) passes
 // `--route`, and the OS passes an omni:// link, to this launch or, through the single-instance lock, to the one running.
 
 export interface LaunchOptions {

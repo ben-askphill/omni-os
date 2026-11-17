@@ -9,19 +9,18 @@ The desktop app installs it each time it starts:
 - **In your terminal:** `~/.local/bin/omni`. Claude Code's native installer uses the same folder, so it is often on your PATH already. If `omni` is not found, add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile.
 - **For agents:** a second copy in the app's own `bin` folder, which comes last on every thread's PATH, so Claude Code, Codex and Cursor Agent threads have it even when your PATH lacks `~/.local/bin`. Threads without the Conductor's MCP tools are told about it in their system prompt, unless another program named `omni` comes first on PATH.
 
-The command is a small shell script. It starts the native build of the CLI that the app carries, so a call starts in a few milliseconds. When that binary is missing, or with `OMNI_NATIVE_CLI=0` set for a call, it runs the same CLI bundled in the app, on the app itself. Either way it updates when the app does and needs no Node.
+The command is a small shell script that starts the `omni` binary the app carries, so a call starts in a few milliseconds. It updates when the app does and needs no Node. An app built without the binary (`--native off`) writes no command and removes the one it wrote before.
 
 | | Mac | Linux (AppImage) |
 | --- | --- | --- |
 | Your command | `~/.local/bin/omni` | `~/.local/bin/omni` |
 | The agents' copy | `~/Library/Application Support/Omni/bin/omni` | `~/.config/Omni/bin/omni` |
 | What it runs | `bin/omni` inside `Omni.app` | `~/.config/Omni/native/omni`, a copy the app refreshes at each launch |
-| What it falls back to | `/Applications/Omni.app/Contents/MacOS/Omni` | the `.AppImage` file itself |
 
 - **A file already called `omni` there:** the app replaces its own older copies and Omni's old launchers (the Linux service control script, a link to `scripts/omni.sh`). Anything else it leaves alone and notes in the server log. Use the agents' copy by its full path, or move the other program.
 - **Moved or updated the app:** the next launch rewrites the command. Until then it says the app is gone.
 - **Only the installed app claims it:** a dev run, the QA harness, a `--data-dir` or `--port` launch, or a Mac app run from the disk image never writes `~/.local/bin/omni`.
-- **From a checkout without the app** (a server or VPS, or `npm run dev`): `scripts/omni.sh` runs the same CLI from the checkout. It uses the checkout's `data/api-token`.
+- **From a checkout without the app** (a server or VPS, or `npm run dev`): `scripts/omni.sh` builds the command with `cargo` into `target/debug` and runs it. It uses the checkout's `data/api-token`. Without `cargo` it says to install Rust from https://rustup.rs and exits 3.
 
 ## Commands
 

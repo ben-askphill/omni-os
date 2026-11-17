@@ -1,5 +1,4 @@
-//! What a thread argument names: a full id, the first characters of one, a link to it, or `parent`
-//! (`apps/cli/src/resolve.ts`).
+//! What a thread argument names: a full id, the first characters of one, a link to it, or `parent`.
 
 use crate::connection::Client;
 use crate::error::{Error, Result};

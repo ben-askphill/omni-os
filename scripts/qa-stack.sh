@@ -73,6 +73,8 @@ SH
     sleep 0.25
   done
   [ -n "$cursor_api" ] || die "fake Cursor API did not start"
+  # omni-mcp, which a thread's ask, render and threads servers run on. Without cargo it warns and the stack goes on.
+  npx tsx apps/server/scripts/native.ts || die "omni-mcp did not build"
   # OMNI_TOKEN cleared: an agent's shell carries the live server's, and this stack makes its own.
   OMNI_TOKEN= OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="${QA_CLAUDE_BIN:-$fx/fake-claude.mjs}" OMNI_CODEX_BIN="${QA_CODEX_BIN:-$fx/fake-codex.mjs}" OMNI_CURSOR_BIN="${QA_CURSOR_BIN:-$fx/fake-cursor.mjs}" \

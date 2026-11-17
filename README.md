@@ -35,7 +35,7 @@ Nothing extra. Omni runs each thread through the official CLI of the harness you
 
 ## Quick start
 
-The desktop app needs no checkout: install the DMG or AppImage ([Install](docs/user/install.md#the-desktop-app)). Running from a checkout or building the app needs Node 24+. Either way, sign in to `gh`. Secrets go to the Keychain on a Mac and a 0600 file on Linux.
+The desktop app needs no checkout: install the DMG or AppImage ([Install](docs/user/install.md#the-desktop-app)). Running from a checkout or building the app needs Node 24+ and Rust ([What you need](docs/user/install.md#what-you-need)). Either way, sign in to `gh`. Secrets go to the Keychain on a Mac and a 0600 file on Linux.
 
 **Let an agent do it.** Open Claude Code, Codex or Cursor in an empty terminal and paste this. Swap `<you>` for your GitHub owner, or point it at an existing clone.
 

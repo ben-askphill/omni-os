@@ -1,5 +1,5 @@
 //! How the command prints threads and what waits on Ben: plain lines, nothing that needs a terminal, since agents
-//! read this output too (`apps/cli/src/format.ts`).
+//! read this output too.
 
 use omni_core::js::{self, JsValue};
 

@@ -217,9 +217,9 @@ export function playwrightMcpBin() {
   return playwrightMcp;
 }
 
-/** The server with ask_user_question (apps/mcp/ask.ts). Harnesses name its tool `mcp__omni-ask__ask_user_question`. */
+/** The server with ask_user_question (crates/omni-mcp). Harnesses name its tool `mcp__omni-ask__ask_user_question`. */
 export const ASK_SERVER = 'omni-ask';
-/** The server with read_referenced_thread alone (apps/mcp/threads.ts), for threads that do not get `omni`, which has it too. */
+/** The server with read_referenced_thread alone (crates/omni-mcp), for threads that do not get `omni`, which has it too. */
 export const THREADS_SERVER = 'omni-threads';
 /** How long a harness lets an ask_user_question call wait for the user: a day. */
 export const ASK_TIMEOUT_SEC = 86_400;
@@ -237,11 +237,14 @@ export function buildMcpConfig(input: McpInput) {
   const servers: Record<string, McpServer> = {};
   const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
 
-  // The Rust build of a server when this install has one (native-mcp.ts), else its TypeScript on a Node runtime.
-  const helper = (name: NativeMcpServer, script: string): McpServer => ({ ...(nativeMcpCommand(name, input.omniUrl) ?? { command: paths.mcpRunner, args: [script] }), env: api });
+  // ask, render and threads run on omni-mcp (native-mcp.ts). An install without a binary that starts leaves them out.
+  const helper = (key: string, name: NativeMcpServer): void => {
+    const command = nativeMcpCommand(name);
+    if (command) servers[key] = { ...command, env: api };
+  };
 
-  servers[ASK_SERVER] = helper('ask', paths.mcpAsk);
-  servers[RENDER_SERVER] = helper('render', paths.mcpRender);
+  helper(ASK_SERVER, 'ask');
+  helper(RENDER_SERVER, 'render');
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
   if (config.browser && !input.role?.delegateOnly) {
@@ -263,7 +266,7 @@ export function buildMcpConfig(input: McpInput) {
   if (input.role?.mcp.includes('omni')) {
     servers['omni'] = { command: paths.mcpRunner, args: [paths.mcpOmni], env: api };
   } else {
-    servers[THREADS_SERVER] = helper('threads', paths.mcpThreads);
+    helper(THREADS_SERVER, 'threads');
   }
   return { mcpServers: servers };
 }
@@ -274,7 +277,8 @@ export function buildMcpConfig(input: McpInput) {
  */
 export function writeMcpConfig(input: McpInput): string {
   const cfg = buildMcpConfig(input);
-  cfg.mcpServers[ASK_SERVER] = { ...cfg.mcpServers[ASK_SERVER], timeout: ASK_TIMEOUT_SEC * 1000 };
+  const ask = cfg.mcpServers[ASK_SERVER];
+  if (ask) cfg.mcpServers[ASK_SERVER] = { ...ask, timeout: ASK_TIMEOUT_SEC * 1000 };
   mkdirSync(threadDir(input.threadId), { recursive: true });
   const file = join(threadDir(input.threadId), 'mcp.json');
   writeFileSync(file, JSON.stringify(cfg, null, 2));

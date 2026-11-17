@@ -42,9 +42,6 @@
     "apps/mcp": {
       "entry": [
         "omni.ts",
-        "ask.ts",
-        "threads.ts",
-        "render.ts",
         "external/stdio.ts",
         "tests/**/*.test.ts"
       ]
@@ -61,13 +58,6 @@
     },
     "apps/web": {
       "entry": [
-        "tests/**/*.test.ts"
-      ]
-    },
-    "apps/cli": {
-      "entry": [
-        "src/main.ts",
-        "scripts/*.ts",
         "tests/**/*.test.ts"
       ]
     },

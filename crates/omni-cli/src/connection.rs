@@ -1,5 +1,5 @@
 //! Which Omni the command talks to and with what token, from the environment alone, and the client that sends its
-//! requests (`apps/cli/src/connection.ts` and client-core's `http.ts`).
+//! requests.
 //!
 //! Inside an Omni thread the server sets OMNI_URL, OMNI_TOKEN or OMNI_TOKEN_FILE, OMNI_DATA_DIR and OMNI_THREAD_ID.
 //! In a terminal the desktop app's shim sets the install's facts instead: OMNI_APP, OMNI_INSTALL_DATA_DIR,

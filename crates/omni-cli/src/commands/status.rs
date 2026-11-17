@@ -1,6 +1,5 @@
 //! `omni status`: this Omni's version, running turns, Needs you, sync and update state. `--machine` reads another
-//! synced machine as this Omni sees it (GET /machines and the update fleet), so it needs no route to that machine
-//! (`apps/cli/src/commands/status.ts`).
+//! synced machine as this Omni sees it (GET /machines and the update fleet), so it needs no route to that machine.
 
 use omni_core::js::{self, JsValue};
 

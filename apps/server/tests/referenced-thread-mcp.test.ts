@@ -8,6 +8,7 @@ import { createInterface } from 'node:readline';
 import { newContext } from '@omni/shared/message-context.ts';
 import { referenceBody, threadReference } from '@omni/shared/message-context-thread.ts';
 import { startRunner } from './runner-boot.ts';
+import { hasMcpBuild } from './support.ts';
 
 // read_referenced_thread as an agent calls it: the omni-threads server, started from the config Omni writes for a
 // thread, talking to the real API over HTTP. The same tool is registered by the conductor's server (apps/mcp/omni.ts).
@@ -74,7 +75,7 @@ const callTool = async (client: McpClient, args: Record<string, unknown>) => {
   return { isError: !!r.isError, body: JSON.parse(r.content[0].text) as any };
 };
 
-describe('read_referenced_thread', () => {
+describe.skipIf(!hasMcpBuild)('read_referenced_thread', () => {
   const from = make('Asking');
   const to = make('A long one');
   for (let i = 0; i < 120; i++) h.db.events.add(to.id, i % 2 ? 'assistant_text' : 'user', { text: `message ${i}` });

@@ -1,6 +1,6 @@
-//! The omni command (`docs/user/cli.md`, ADR 0014) in Rust: the same six commands over Omni's HTTP API as
-//! `apps/cli`, held to a record of what that one prints, sends and starts (`packages/test-fixtures/native/cli`,
-//! `tests/goldens.rs`). `docs/internals/rust-port.md` says where the two differ on purpose.
+//! The omni command (`docs/user/cli.md`, ADR 0014): six commands over Omni's HTTP API. It replaced a TypeScript
+//! command and is held to a record of what that one printed, sent and started (`packages/test-fixtures/native/cli`,
+//! `tests/goldens.rs`). `docs/internals/rust-port.md` says where the two differed on purpose.
 
 mod api;
 mod args;

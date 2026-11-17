@@ -236,18 +236,19 @@ function installCommand(options: LaunchOptions, dirs: PlatformDirs, dataDir: str
     customUserData: app.commandLine.hasSwitch('user-data-dir'),
     app: runs,
   });
-  // The Rust build of the command, when this app carries one. An AppImage's copy goes beside the data, out of the mount.
+  // The command's binary. An AppImage's copy goes beside the data, out of the mount.
   const native = nativeCommand({ appRoot: join(process.resourcesPath, 'omni'), copyTo: process.env.APPIMAGE ? join(dirs.userData, 'native', 'omni') : null });
-  if (native.path !== null) console.log(`[omni] the omni command runs on the Rust build: ${native.path} (${native.version})`);
-  else if (native.reason) console.error(`[omni] the omni command stays on the bundled CLI: ${native.reason}`);
+  if (native.path !== null) console.log(`[omni] the omni command runs ${native.path} (${native.version})`);
+  else console.error(`[omni] no omni command: ${native.reason}`);
   const results = installCommandLine({
-    facts: { app: runs, dataDir, logFile: serverLogFile(dirs), port: options.port, native: native.path },
+    facts: { app: runs, dataDir, logFile: serverLogFile(dirs), port: options.port, binary: native.path },
     binDir: join(dirs.userData, 'bin'),
     userPath: owner ? join(dirs.home, '.local', 'bin', 'omni') : null,
   });
   for (const r of results) {
     if (r.result === 'skipped') console.error(`[omni] left ${r.path} as it is: ${r.reason}. docs/user/cli.md says how to use the command anyway.`);
     else if (r.result === 'written') console.log(`[omni] wrote the omni command to ${r.path}`);
+    else if (r.result === 'removed') console.log(`[omni] removed the omni command from ${r.path}`);
   }
   // macOS reads the scheme from Info.plist (electron-builder's protocols); Linux needs the desktop entry to say so.
   if (owner && !app.isDefaultProtocolClient(URL_SCHEME)) app.setAsDefaultProtocolClient(URL_SCHEME);

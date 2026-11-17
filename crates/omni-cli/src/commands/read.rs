@@ -1,4 +1,4 @@
-//! `omni threads` and `omni show`: what is there, and one thread in detail (`apps/cli/src/commands/read.ts`).
+//! `omni threads` and `omni show`: what is there, and one thread in detail.
 
 use omni_core::js::{self, JsValue};
 

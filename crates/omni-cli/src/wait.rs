@@ -1,5 +1,5 @@
 //! `--wait`: poll a thread until its turn is over, then say how it ended. Exit 0 done, 1 failed or stopped, 2 needs
-//! you (`apps/cli/src/wait.ts`).
+//! you.
 
 use omni_core::js::{self, JsValue};
 

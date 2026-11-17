@@ -7,6 +7,9 @@ export const FAKE_CODEX = fixture('fake-codex.mjs');
 export const FAKE_CURSOR = fixture('fake-cursor.mjs');
 export const FAKE_TAILSCALE = fixture('fake-tailscale.mjs');
 
+/** Whether this run built omni-mcp (global-native.ts). A test that starts a thread's ask, render or threads server skips without it. */
+export const hasMcpBuild = process.env.OMNI_TEST_MCP_BUILD === '1';
+
 /**
  * What `tailscale status --json` prints, cut to the fields Omni reads, in the real layout: peers keyed by node key,
  * each with its own HostName, which two Macs can share.

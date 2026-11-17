@@ -1,8 +1,8 @@
 //! Runs the scenarios recorded from the TypeScript command (`packages/test-fixtures/native/cli`) against this binary:
 //! a temp folder with the files and stand-in programs the scenario names, a scripted stand-in for Omni's API on a
-//! local port, the command as a child process, and what it printed, asked the API and started.
-//! `apps/cli/tests/scenarios.ts` is the same runner in TypeScript and the one that recorded the files, so both
-//! implementations are held to one record. Here the requests are compared in the order they arrived.
+//! local port, the command as a child process, and what it printed, asked the API and started. The TypeScript
+//! command and its runner were removed once a release had carried this one, so the files are the contract now: a
+//! change in behaviour edits them by hand, here. The requests are compared in the order they arrived.
 #![cfg(unix)]
 
 use std::collections::BTreeMap;

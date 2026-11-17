@@ -1,4 +1,4 @@
-//! How a command fails, and the exit code each failure gets (`apps/cli/src/io.ts`, `docs/user/cli.md`).
+//! How a command fails, and the exit code each failure gets (`docs/user/cli.md`).
 
 /// What a command answers.
 pub mod exit {

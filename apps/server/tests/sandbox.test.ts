@@ -17,13 +17,12 @@ const DATA_DIR = vi.hoisted(() => {
   const dir = mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'omni-sandbox-data-'));
   process.env.OMNI_DATA_DIR = dir;
   delete process.env.OMNI_CONFIG;
-  // These tests are of a checkout's default, the TypeScript servers. native-mcp.test.ts has the Rust build's.
-  delete process.env.OMNI_NATIVE_MCP;
   return dir;
 });
 
 import { buildMcpConfig, needsWorktree, playwrightMcpBin, plannedWorktree, prepareWorkdir, writeCursorDenyConfig, writeMcpConfig } from '../sandbox.ts';
 import { config, paths, browserOutDir, threadDir } from '../config.ts';
+import { nativeMcpCandidate } from '../native-mcp.ts';
 import type { Channel } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 
@@ -60,6 +59,8 @@ const role = (mcp: string[], delegateOnly = false): CrewRole => ({ id: 'r', name
 
 const THREAD = 'thread-123';
 const OMNI_URL = 'http://127.0.0.1:4747';
+/** omni-mcp, which this run built or stood in for (global-native.ts). native-mcp.test.ts has how it is chosen. */
+const MCP = nativeMcpCandidate();
 const originalBrowser = config.browser;
 
 beforeEach(() => {
@@ -159,12 +160,11 @@ describe('buildMcpConfig: omni-ask', () => {
     for (const r of [undefined, role([]), role(['github']), role(['omni'])]) {
       const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL });
       expect(cfg.mcpServers['omni-ask']).toEqual({
-        command: paths.mcpRunner,
-        args: [paths.mcpAsk],
+        command: MCP,
+        args: ['ask'],
         env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
     }
-    expect(existsSync(paths.mcpAsk)).toBe(true);
   });
 });
 
@@ -173,7 +173,7 @@ describe('writeMcpConfig', () => {
     const file = writeMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, omniUrl: OMNI_URL });
     const { mcpServers } = JSON.parse(readFileSync(file, 'utf8'));
     expect(mcpServers['omni-ask'].timeout).toBe(86_400_000);
-    expect(mcpServers['omni-ask'].args).toEqual([paths.mcpAsk]);
+    expect(mcpServers['omni-ask'].args).toEqual(['ask']);
     for (const [name, server] of Object.entries<{ timeout?: number }>(mcpServers)) if (name !== 'omni-ask') expect(server.timeout, name).toBeUndefined();
   });
 });
@@ -183,12 +183,11 @@ describe('buildMcpConfig: omni-render', () => {
     for (const r of [undefined, role([]), role(['github']), role(['omni'])]) {
       const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL });
       expect(cfg.mcpServers['omni-render']).toEqual({
-        command: paths.mcpRunner,
-        args: [paths.mcpRender],
+        command: MCP,
+        args: ['render'],
         env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
     }
-    expect(existsSync(paths.mcpRender)).toBe(true);
   });
 });
 
@@ -197,13 +196,12 @@ describe('buildMcpConfig: omni-threads', () => {
     for (const r of [undefined, role([]), role(['github'])]) {
       const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL });
       expect(cfg.mcpServers['omni-threads']).toEqual({
-        command: paths.mcpRunner,
-        args: [paths.mcpThreads],
+        command: MCP,
+        args: ['threads'],
         env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
     }
     expect(buildMcpConfig({ threadId: THREAD, channel: channel(), role: role(['omni']), browserBusy: false, omniUrl: OMNI_URL }).mcpServers['omni-threads']).toBeUndefined();
-    expect(existsSync(paths.mcpThreads)).toBe(true);
   });
 });
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { answerOf, answersOf, canAdvance, choose, newDraft, parseAnswers, parseQuestions, questionsIn, resultText, shortHeader, stateOf, type Question } from '../question.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { answerOf, answersOf, canAdvance, choose, HEADER_MAX, newDraft, OPTIONS_MAX, OPTIONS_MIN, parseAnswers, parseQuestions, QUESTIONS_MAX, questionsIn, resultText, shortHeader, stateOf, type Question } from '../question.ts';
 
 const opt = (label: string) => ({ label, description: `${label} description` });
 const q = (over: Partial<Question> = {}) => ({ question: 'Which goal first?', options: [opt('Acne'), opt('Volero')], multiSelect: false, ...over });
@@ -125,5 +127,14 @@ describe('the card draft', () => {
     const d = newDraft([single, multi]);
     expect(answersOf({ ...d, skipped: [true, false] })).toEqual([null, null]);
     expect(parseAnswers([single, multi], answersOf(d)).ok).toBe(true);
+  });
+});
+
+// The tool itself is Rust (crates/omni-mcp/src/ask.rs), and refuses a call over these limits before the server sees it.
+describe('the ask_user_question tool in crates/omni-mcp', () => {
+  it('has the limits the server parses with', () => {
+    const rust = readFileSync(join(import.meta.dirname, '../../../crates/omni-mcp/src/ask.rs'), 'utf8');
+    const constant = (name: string) => Number(new RegExp(`const ${name}: u32 = (\\d+);`).exec(rust)?.[1]);
+    expect(['QUESTIONS_MAX', 'OPTIONS_MIN', 'OPTIONS_MAX', 'HEADER_MAX'].map(constant)).toEqual([QUESTIONS_MAX, OPTIONS_MIN, OPTIONS_MAX, HEADER_MAX]);
   });
 });

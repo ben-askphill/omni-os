@@ -57,7 +57,7 @@ function resolveOmni(path: string): string | null {
 let omniCommand: { path: string; found: boolean } | null = null;
 
 /**
- * Whether threads have the `omni` command (apps/cli): the desktop app writes it into its bin folder, which is on
+ * Whether threads have the `omni` command (crates/omni-cli): the desktop app writes it into its bin folder, which is on
  * this server's PATH and so on the harnesses' (ADR 0014). It counts only when it is the `omni` PATH resolves to: the
  * app appends its folder last (apps/desktop/src/backend/index.ts), so another program named omni earlier wins.
  */

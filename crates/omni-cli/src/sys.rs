@@ -1,5 +1,4 @@
 //! Everything the command touches outside itself: the environment, the clocks, files, disks and other programs.
-//! `apps/cli/src/node-io.ts` is the same layer over Node.
 
 use std::io::{IsTerminal, Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::MetadataExt;
@@ -10,8 +9,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use omni_core::js;
 
-/// The desktop app's shim runs the TypeScript command on the app's own binary with this set. A program this command
-/// starts must not inherit it, or an Electron app would act as Node.
+/// Set when an Electron app's binary runs as Node, as the desktop app's shim once ran the TypeScript command. A
+/// program this command starts must not inherit it, or an Electron app would act as Node.
 const SHIM_ONLY: &str = "ELECTRON_RUN_AS_NODE";
 
 /// An environment variable with something in it, trimmed. Blank counts as not set.

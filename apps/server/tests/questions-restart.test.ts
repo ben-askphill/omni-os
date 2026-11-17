@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { FAKE_CLAUDE, fakeAlive, sleep, waitFor } from './support.ts';
+import { FAKE_CLAUDE, fakeAlive, hasMcpBuild, sleep, waitFor } from './support.ts';
 
 // ask_user_question across a forced restart: apps/server/index.ts as a process of its own on a throwaway data dir, the
 // fake claude CLI asking through the real omni-ask MCP server, and only HTTP. The call dies with the server; the
@@ -108,7 +108,7 @@ async function until<T>(fn: () => Promise<T | null | undefined | false>, label: 
   }
 }
 
-describe('a question across a forced restart', () => {
+describe.skipIf(!hasMcpBuild)('a question across a forced restart', () => {
   it('stays in Needs you, and the answer reaches the thread as a message', { timeout: 90_000 }, async () => {
     const first = boot();
     const api = client(await first.port());

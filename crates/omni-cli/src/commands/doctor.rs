@@ -1,5 +1,5 @@
 //! `omni doctor`: why Omni is not working, without needing the server. Every check reads this machine; the server is
-//! asked only whether it answers, and whether it takes the token (`apps/cli/src/commands/doctor.ts`).
+//! asked only whether it answers, and whether it takes the token.
 
 use std::time::Duration;
 

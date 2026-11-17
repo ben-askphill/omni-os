@@ -1,4 +1,13 @@
 {
   "extends": ["//"],
-  "tags": ["lib"]
+  "tags": ["lib"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/crates/omni-mcp/src/ask.rs",
+        "$TURBO_ROOT$/crates/omni-mcp/src/render.rs"
+      ]
+    }
+  }
 }

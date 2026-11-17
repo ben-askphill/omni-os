@@ -1,10 +1,9 @@
-// Pages an agent shows inline in its thread with Omni's html_render tool (apps/mcp/render.ts): a chart, diagram,
+// Pages an agent shows inline in its thread with Omni's html_render tool (crates/omni-mcp): a chart, diagram,
 // table or mockup that sits in the transcript above the reply. The server saves each one as an artifact under
 // artifacts/renders/, so it syncs and stays in the Library like any file, and serves it with `?frame=1` to the frame.
 // packages/test-fixtures/html-render.json holds the call parsing's cases.
 
 export const RENDER_SERVER = 'omni-render';
-export const RENDER_TOOL = 'html_render';
 export const RENDER_MAX_BYTES = 512_000;
 export const RENDER_MAX_TITLE = 200;
 
@@ -64,16 +63,6 @@ export const RENDER_COLORS = {
 } as const;
 
 export const RENDER_OTHER = { '--radius': '--r-md', '--font-sans': '--font-sans', '--font-mono': '--font-mono' } as const;
-
-export const RENDER_GUIDE = [
-  'Use the theme variables on :root, never fixed colours, so the page matches Omni in light and dark:',
-  `${Object.keys(RENDER_COLORS).join(', ')}, ${Object.keys(RENDER_OTHER).join(', ')}.`,
-  'The frame is the reply column (about 680px on desktop, 360px on a phone) on the thread background.',
-  'Leave html and body with no background, outer card, border, page title banner or side padding: the base sheet sets text colour and font.',
-  'A box that needs its own background gets var(--card), 16px padding and var(--radius) corners. Give charts a fixed pixel height and fluid width.',
-  'Use --chart-1 to --chart-6 in that order for series, and label them or add a legend: never colour alone.',
-  'Let the content set the height: no vh units and no height:100% on html or body.',
-].join(' ');
 
 export type Scheme = 'light' | 'dark';
 
