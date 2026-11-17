@@ -9,7 +9,7 @@ import { href, navigate } from '../router.ts';
 import { DiffStat, PRDetailTabBody, type DetailTab } from './PRDetailTabs.tsx';
 import { PRMergePanel } from './PRMergePanel.tsx';
 import { LinkChannel } from '../link-previews.ts';
-import { RerunNote, useRerunFailedChecks } from '../components/RerunChecks.tsx';
+import { useRerunFailedChecks } from '../components/RerunChecks.tsx';
 
 function NoRepo({ channel }: { channel: Channel }) {
   return (
@@ -105,6 +105,38 @@ export function PRList({ channel }: { channel: Channel }) {
   );
 }
 
+/**
+ * Files the PR changes: the larger of the diff's count and gh's file list. The list stops at 100 files; the diff stops at
+ * 400,000 characters, so either can come up short.
+ */
+const changedFiles = (p: PRDetailT) => Math.max(p.diff?.match(/^diff --git /gm)?.length ?? 0, p.files?.length ?? 0);
+
+/** Where the PR came from: the thread that delegated the work, then the thread that opened the PR. */
+function PRThreadLinks({ thread }: { thread: NonNullable<PRDetailT['thread']> }) {
+  const link = 'inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-[var(--r-xs)] py-1 text-fg-2 underline decoration-[var(--line-strong)] underline-offset-[3px] transition-colors hover:text-fg hover:decoration-current';
+  return (
+    <nav aria-label="Threads" className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[length:var(--fs-small)] text-fg-3">
+      <span>From</span>
+      {thread.parent && (
+        <>
+          <a href={href.thread(thread.parent.id)} className={link} title={`The thread that delegated this work: ${thread.parent.title}`}>
+            <Icon name="arrowUpRight" size={12} className="shrink-0 text-fg-3" />
+            <span className="truncate">{thread.parent.title || 'Parent thread'}</span>
+          </a>
+        </>
+      )}
+      {/* The separator wraps with the link after it, so a wrapped line never ends on it. */}
+      <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+        {thread.parent && <Icon name="chevronRight" size={11} className="shrink-0 text-fg-3" />}
+        <a href={href.thread(thread.id)} className={link} title={`The thread that opened this PR: ${thread.title}`}>
+          <Icon name="message" size={12} className="shrink-0 text-fg-3" />
+          <span className="truncate">{thread.title || (thread.parent ? 'Delegated thread' : 'Open thread')}</span>
+        </a>
+      </span>
+    </nav>
+  );
+}
+
 export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
   const q = useApi<PRDetailT>(channel.github_repo ? `/channels/${encodeURIComponent(channel.id)}/prs/${n}` : null);
   const [tab, setTab] = useState<DetailTab>('conversation');
@@ -155,60 +187,39 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
 
   return (
     <div className={`${pageColumn('page')} pt-6 pb-16`}>
-      {back}
-      {/* The actions sit beside the title when the page is wide enough, else after the related threads, review first. */}
-      <div className="@container mt-3">
-        <header className="grid grid-cols-1 gap-y-2.5 @3xl:grid-cols-[minmax(0,1fr)_auto] @3xl:gap-x-6">
-          <h2 className="font-display text-[length:var(--fs-title)] leading-[1.15] text-balance @3xl:col-start-1 @3xl:row-start-1">
-            {p.title} <span className="font-num whitespace-nowrap text-fg-3">#{p.number}</span>
-          </h2>
-          <div className="order-last flex flex-row-reverse items-center justify-end gap-1.5 @3xl:order-none @3xl:col-start-2 @3xl:row-start-1 @3xl:flex-row @3xl:self-start">
-            <LinkButton size="sm" variant="ghost" icon="external" href={p.url} target="_blank" external>
-              GitHub
-            </LinkButton>
-            {rerun.can && (
-              <Button size="sm" icon="refresh" onClick={() => void rerun.run()} busy={rerun.busy} title="Runs gh run rerun --failed for each failing workflow run. No agent turn.">
-                Rerun failed checks
-              </Button>
-            )}
-            <Button size="sm" icon="delegate" onClick={askReview} busy={reviewBusy}>
-              Ask builder to review
-            </Button>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--fs-small)] text-fg-3 @3xl:col-span-2">
-            <span className="inline-flex items-center gap-1.5">
-              <Chip tone={badge.tone}>{badge.label}</Chip>
-              <ReviewChip d={p.reviewDecision} />
-            </span>
-            {p.author?.login && <span>{p.author.login}</span>}
-            <span className="min-w-0 truncate font-mono text-[length:var(--fs-code)]" title={`${p.headRefName} into ${p.baseRefName}`}>
-              {p.headRefName} <span className="text-fg-3">→</span> {p.baseRefName}
-            </span>
-            {hasChecks(p.checks) && <ChecksSummary c={p.checks} />}
-            <DiffStat additions={p.additions} deletions={p.deletions} />
-          </div>
-          {p.thread && (
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5 @3xl:col-span-2">
-              {p.thread.parent && (
-                <LinkButton size="sm" href={href.thread(p.thread.parent.id)} icon="arrowUpRight" className="max-w-full min-w-0">
-                  <span className="truncate" title={`The thread that delegated this work: ${p.thread.parent.title}`}>
-                    {p.thread.parent.title || 'Parent thread'}
-                  </span>
-                </LinkButton>
-              )}
-              <LinkButton size="sm" href={href.thread(p.thread.id)} icon="message" className="max-w-full min-w-0">
-                <span className="truncate" title={`The thread that opened this PR: ${p.thread.title}`}>
-                  {p.thread.parent ? 'Delegated thread' : p.thread.title || 'Open thread'}
-                </span>
-              </LinkButton>
-            </div>
-          )}
-        </header>
+      {/* The page's actions ride on the back link's row, so the title gets the full width. */}
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        {back}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <LinkButton size="sm" variant="ghost" icon="external" href={p.url} target="_blank" external>
+            <span className="max-sm:sr-only">GitHub</span>
+          </LinkButton>
+          <Button size="sm" icon="delegate" onClick={askReview} busy={reviewBusy}>
+            Ask builder to review
+          </Button>
+        </div>
       </div>
-      {reviewError && <ErrorNote className="mt-2">{reviewError}</ErrorNote>}
-      <RerunNote outcome={rerun.outcome} className="mt-3" />
+      <header className="mt-3">
+        <h2 className="font-display text-[length:var(--fs-title)] leading-[1.15] text-balance">
+          {p.title} <span className="font-num whitespace-nowrap text-fg-3">#{p.number}</span>
+        </h2>
+        <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--fs-small)] text-fg-3">
+          <span className="inline-flex items-center gap-1.5">
+            <Chip tone={badge.tone}>{badge.label}</Chip>
+            <ReviewChip d={p.reviewDecision} />
+          </span>
+          {p.author?.login && <span>{p.author.login}</span>}
+          <span className="min-w-0 truncate font-mono text-[length:var(--fs-code)]" title={`${p.headRefName} into ${p.baseRefName}`}>
+            {p.headRefName} <span className="text-fg-3">→</span> {p.baseRefName}
+          </span>
+          {hasChecks(p.checks) && <ChecksSummary c={p.checks} />}
+          <DiffStat additions={p.additions} deletions={p.deletions} />
+        </div>
+        {p.thread && <PRThreadLinks thread={p.thread} />}
+      </header>
+      {reviewError && <ErrorNote className="mt-3">{reviewError}</ErrorNote>}
 
-      <PRMergePanel channel={channel} p={p} n={n} onMerged={q.reload} />
+      <PRMergePanel channel={channel} p={p} n={n} onMerged={q.reload} rerun={rerun} />
       <Tabs
         className="mt-6"
         size="sm"
@@ -217,14 +228,13 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
         tabs={[
           { id: 'conversation', label: 'Conversation' },
           { id: 'checks', label: 'Checks', badge: <span className="font-num text-[10.5px] text-fg-3">{p.checkRuns.length}</span> },
-          { id: 'files', label: 'Files', badge: <span className="font-num text-[10.5px] text-fg-3">{p.files?.length ?? 0}</span> },
-          { id: 'diff', label: 'Diff', badge: <span className="font-num text-[10.5px] text-fg-3">+{p.additions} −{p.deletions}</span> },
+          { id: 'changes', label: 'Changes', badge: <span className="font-num text-[10.5px] text-fg-3">{changedFiles(p)}</span> },
         ]}
       />
 
       <LinkChannel.Provider value={channel.id}>
         <div className="mt-4">
-          <PRDetailTabBody tab={tab} p={p} onFiles={() => setTab('diff')} />
+          <PRDetailTabBody tab={tab} p={p} />
         </div>
       </LinkChannel.Provider>
     </div>

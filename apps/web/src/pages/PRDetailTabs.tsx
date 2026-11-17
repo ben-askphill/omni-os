@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { parseDiff } from '@omni/shared/diff.ts';
 import { Markdown } from '../components/Markdown.tsx';
 import { DiffViewer } from '../components/DiffViewer.tsx';
 import { Avatar, Chip, Icon, IconLink } from '../components/ui.tsx';
@@ -22,10 +24,10 @@ export function DiffStat({ additions, deletions }: { additions: number; deletion
   );
 }
 
-export type DetailTab = 'conversation' | 'checks' | 'files' | 'diff';
+export type DetailTab = 'conversation' | 'checks' | 'changes';
 
-/** The body under the tabs of a pull request: description and comments, check runs, changed files or the diff. */
-export function PRDetailTabBody({ tab, p, onFiles }: { tab: DetailTab; p: PRDetailT; onFiles: () => void }) {
+/** The body under the tabs of a pull request: description and comments, check runs, or the changes. */
+export function PRDetailTabBody({ tab, p }: { tab: DetailTab; p: PRDetailT }) {
   return (
     <>
           {tab === 'conversation' && (
@@ -70,24 +72,48 @@ export function PRDetailTabBody({ tab, p, onFiles }: { tab: DetailTab; p: PRDeta
             ) : (
               <div className="text-[13px] text-fg-3">No checks on this PR.</div>
             ))}
-          {tab === 'files' && (
-            <div className="overflow-hidden rounded-[var(--r-xl)] bg-surface p-1.5">
-              {(p.files ?? []).map((f) => (
-                <button
-                  type="button"
-                  key={f.path}
-                  onClick={() => onFiles()}
-                  className="hov flex h-9 w-full min-w-0 items-center gap-2 rounded-[var(--r-md)] px-3 text-left text-[12.5px] [--hov:var(--surface-2)]"
-                >
-                  <Icon name="file" size={13} className="text-fg-3" />
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
-                  <DiffStat additions={f.additions} deletions={f.deletions} />
-                </button>
-              ))}
-              {!p.files?.length && <div className="px-3.5 py-2 text-[13px] text-fg-3">No files.</div>}
-            </div>
-          )}
-          {tab === 'diff' && <DiffViewer diff={p.diff ?? ''} />}
+          {tab === 'changes' && <PRChanges p={p} />}
     </>
+  );
+}
+
+/** The server cuts a diff past 400,000 characters and ends it with this line (github.ts getPR). */
+const TRUNCATED = /\n\.\.\. diff truncated \.\.\.\s*$/;
+
+/**
+ * The diff, file by file: each file's header already carries its path and counts, so it doubles as the file list. When
+ * the diff was cut short or holds fewer files than gh's file list, the files it lacks follow it with their counts. When
+ * gh could not hand over a diff at all, the whole list stands in, under what gh said.
+ */
+function PRChanges({ p }: { p: PRDetailT }) {
+  const diff = p.diff ?? '';
+  const files = p.files ?? [];
+  const real = /^diff --git /m.test(diff);
+  const truncated = real && TRUNCATED.test(diff);
+  const shown = useMemo(() => (real ? parseDiff(diff).map((f) => f.path) : []), [diff, real]);
+  // Paths are compared only when the diff is short of the list, so an odd path git quotes never shows twice.
+  const missing = !real ? files : truncated || shown.length < files.length ? files.filter((f) => !shown.includes(f.path)) : [];
+  if (!missing.length) return <DiffViewer diff={diff} />;
+  return (
+    <div className="space-y-3">
+      {real ? <DiffViewer diff={diff} /> : diff.trim() && <div className="text-[length:var(--fs-small)] text-fg-3">{diff.trim()}</div>}
+      <div className="overflow-hidden rounded-[var(--r-xl)] bg-surface p-1.5">
+        {real && (
+          <div role="note" className="px-3 pt-1.5 pb-1 text-[length:var(--fs-small)] text-fg-3">
+            {truncated
+              ? `Diff truncated: it stops at 400,000 characters, so ${missing.length === 1 ? 'this file is' : `these ${missing.length} files are`} not in it.`
+              : `Not in the loaded diff: ${missing.length === 1 ? '1 file' : `${missing.length} files`}.`}{' '}
+            Open the PR on GitHub for the rest.
+          </div>
+        )}
+        {missing.map((f) => (
+          <div key={f.path} className="flex h-9 min-w-0 items-center gap-2 rounded-[var(--r-md)] px-3 text-[12.5px]">
+            <Icon name="file" size={13} className="text-fg-3" />
+            <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
+            <DiffStat additions={f.additions} deletions={f.deletions} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
