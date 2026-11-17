@@ -25,12 +25,16 @@ const notarize = Boolean(
 // Keychain auto-discovery finds only a "Developer ID Application" identity. scripts/build-desktop.sh names an
 // "Apple Development" one here instead, so a local build keeps one signature from build to build, and macOS keeps
 // its permissions. electron-builder still lays out every file's entitlements; only the identity changes.
-// Both sign through scripts/mac-sign.cjs, which waits out Apple's timestamp server when it stops answering.
+// That build and the release workflow's (CSC_LINK) sign through scripts/mac-sign.cjs, which waits out Apple's
+// timestamp server when it stops answering. Any other build keeps electron-builder's own signing: with a `sign`
+// hook set, electron-builder no longer reports a missing identity and builds unsigned without a word.
 const localIdentity = env.OMNI_MAC_IDENTITY || null;
 const { signMac } = require('./scripts/mac-sign.cjs');
 const signing = localIdentity
   ? { identity: '-', sign: (opts) => signMac(opts, { identity: localIdentity }) }
-  : { sign: (opts) => signMac(opts) };
+  : env.CSC_LINK
+    ? { sign: (opts) => signMac(opts) }
+    : {};
 
 const repo = githubRepo();
 
