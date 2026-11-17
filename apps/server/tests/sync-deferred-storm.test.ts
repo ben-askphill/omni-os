@@ -228,4 +228,32 @@ describe('a change whose thread is not here', () => {
     await syncOk();
     expect(db.kv.get('note.held')).toBe('held');
   });
+
+  // Last in the file: it leaves this machine on another relay.
+  it('a change from a new relay starts over, even with the seq a backed-off change had on the old one', async () => {
+    /** Move to another relay, as sync/setup.ts finishRelaySignIn does: the old sync ends, the cursor goes back and the parked changes go. */
+    const moveTo = async (next: MemoryTransport) => {
+      await sync.setActiveWorker(null);
+      db.kv.set('sync.cursor', 0);
+      db.db.exec('DELETE FROM sync_deferred');
+      worker = sync.createSyncWorker({ transport: next, machineId: 'mac-a' });
+      await sync.setActiveWorker(worker);
+    };
+    // Each relay numbers its changes from 1. Pushed before this machine's first sync with it, the orphan is seq 1.
+    const relayA = new MemoryTransport();
+    await relayA.push([remoteEvent('switch-a', 'switch-t')]);
+    await moveTo(relayA);
+    expect(await triesAt(t0, 'switch-a')).toBe(2);
+    expect(await triesAt(t0 + 100 * min, 'switch-a')).toBe(1);
+    expect(await triesAt(t0 + 100 * min + 1_000, 'switch-a')).toBe(0);
+
+    const relayB = new MemoryTransport();
+    await relayB.push([remoteEvent('switch-b', 'switch-t')]);
+    await moveTo(relayB);
+    await triesAt(t0 + 101 * min, 'switch-b');
+    expect(apply.deferredChanges()).toEqual([expect.objectContaining({ entity_id: 'switch-b', seq: 1 })]);
+    // A minute old: tried on every sync, not left waiting on the old change's backoff.
+    expect(await triesAt(t0 + 101 * min + 1_000, 'switch-b')).toBe(1);
+    expect(await triesAt(t0 + 102 * min, 'switch-b')).toBe(1);
+  });
 });

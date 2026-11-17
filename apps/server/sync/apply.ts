@@ -76,7 +76,8 @@ function defer(change: RemoteChange, err: unknown) {
 // first ten minutes, then at most once every tenth of the time it has waited, and at least once an hour. A thread that
 // never comes (deleted here, or never synced) stops costing a pass on every sync, and one that comes late brings its
 // changes within a tenth of their wait. Kept in memory, so a restart tries them all again. A change the gate holds (no
-// handler, a key or Trust to wait for) is tried on every sync as before.
+// handler, a key or Trust to wait for) is tried on every sync as before. Keyed by seq, which only one relay's history
+// keeps unique, so a pulled change always starts over (applyBatch).
 const EVERY_SYNC_MS = 10 * 60_000;
 const MAX_WAIT_MS = 60 * 60_000;
 const stuck = new Map<number, { since: number; next: number }>();
@@ -141,6 +142,9 @@ export function applyBatch(changes: RemoteChange[], ctx: ApplyContext): ApplySta
   applying++;
   try {
     for (const c of changes) {
+      // New here, even with a seq a waiting change had: moving to another relay (sync/setup.ts) or copying the data
+      // folder to another machine (db/sync.ts arm) pulls from seq 1 again.
+      stuck.delete(c.seq);
       const outcome = applyChange(c, ctx);
       stats[outcome]++;
       if (outcome === 'applied') applied.push(c);
