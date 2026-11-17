@@ -152,7 +152,7 @@ Per slice:
 | `apps/mcp` `ask.ts`, `render.ts`, `threads.ts` | ported | Slice 1, all three steps. `crates/omni-mcp` is the only build: 0.1.30 shipped it and the TypeScript is deleted. `referenced-thread.ts` and `api.ts` stay, because the conductor's `omni.ts` uses them |
 | `apps/cli` | ported | Slice 2, all three steps. `crates/omni-cli` is the only build of the six commands ([ADR 0014](../adr/0014-omni-command-line.md)): 0.1.30 shipped it, and `apps/cli` and its bundle are deleted. `scripts/omni.sh` builds and runs it from a checkout |
 | `apps/mcp` `omni.ts`, `pull-requests.ts` | kept | 28 MB and 63 ms per conductor thread to win, in a file that changes every day. Not scheduled: see the decision below |
-| The browser server (`@playwright/mcp`) | in progress | Slice 3, step 1: `omni-mcp lazy` and its tests are in `crates/omni-mcp`. Nothing starts it yet. Not Omni's code, so it is not ported: the Rust process in front of it starts it late |
+| The browser server (`@playwright/mcp`) | ported | Slice 3, both steps. Not Omni's code, so the server itself is not ported: `omni-mcp lazy` in front of it starts it at a thread's first browser call. `OMNI_BROWSER_LAZY=0` turns that off |
 | `apps/mcp` `external/` | kept | The HTTP transport runs inside the server and shares `tools.ts` with the stdio one. Porting only stdio would leave two copies of 20 tools. Moves with the server or not at all |
 | `apps/server` `runner/`, `harness/` | kept | They start a CLI and wait on its stream. The adapters change with every harness release, and 50,000 lines of tests hold them in TypeScript. No runtime cost to win back |
 | `apps/server` `db/` | kept | `node:sqlite` is SQLite's own C code already. The migrations and repos are the on-disk contract, and two implementations of a schema is the regression this port must not cause |
@@ -224,13 +224,13 @@ Per slice:
 
 `omni-mcp lazy <answers.json> <command> [args...]` (`crates/omni-mcp/src/lazy.rs`) stands in front of a stdio MCP server. It answers the start of a session from a record of that server's own answers, and starts the server at the first message the record does not cover. From then on it copies bytes both ways, so the client talks to the server itself. It is made for the browser server, `@playwright/mcp`, which is not Omni's code. Nothing is ported: the server runs unchanged, later, or never in a thread that does not call it.
 
-This slice has two steps. There is no TypeScript twin to delete: starting the server directly stays as the fallback.
+This slice has two steps and both are done. There is no TypeScript twin to delete: starting the server directly stays as the fallback.
 
 - **What it answers itself.** `initialize` in a protocol version the record has, `ping`, `tools/list` without a cursor, and a method the record says the server does not have, with the server's own error. It keeps the client's `notifications/initialized` for the server and drops other notices, because nothing runs yet to hear them.
 - **What starts the server.** Any other request, such as `tools/call` or `resources/list`. So does a handshake the record cannot answer: a protocol version it does not hold, an `initialize` slice 1's checks refuse, or a request that asks for a task.
 - **Starting.** The server gets the client's own `initialize` line, then its `notifications/initialized`, then a `tools/list` from the front. Both answers stay with the front, because the client has them already. Then the message that needed the server goes in, and the front is a pipe. When the server's tools are not the recorded ones, the front sends the client `notifications/tools/list_changed`, so it asks again, and this time the server answers.
 - **Ending.** It exits with the server's exit code, or 128 plus the signal that ended it. A client that closes stdin before any call gets exit code 0, and no server ran. A server that does not start fails the request that needed it (-32603, `The server did not start: ...`) and the front exits 1. A record it cannot read, or no command, is exit code 2 before it reads a line.
-- **The record** is one JSON file: `initialize` (the server's result per protocol version), `tools` (its `tools/list` result) and `refused` (its error per method it does not have). The front only reads it. Step 2 makes it from the server itself.
+- **The record** is one JSON file: `initialize` (the server's result per protocol version), `tools` (its `tools/list` result) and `refused` (its error per method it does not have). The front only reads it. Omni's server makes it from the browser server itself ([How it ships and runs](#how-it-ships-and-runs-2)).
 - **Why `refused`.** Claude Code asks a server `server/discover` before `initialize` (seen in 2.1.316). `@playwright/mcp` answers "method not found" and Claude Code goes on to `initialize`. A front that could not give that answer would start the server in every Claude Code thread at once.
 - **How it is built.** Two threads from the standard library, no async runtime and no new crate. It reads lines only until the server starts. After that it copies bytes and reads nothing.
 
@@ -238,6 +238,40 @@ This slice has two steps. There is no TypeScript twin to delete: starting the se
 
 - **`crates/omni-mcp/tests/lazy.rs`** runs the front before a shell script that notes when it started, what it read and when it ended. Ten tests: the handshake from the record with no server started, a method the record does not refuse going to the server, the handshake said again to the server at the first call, messages that arrive in one write, a server with other tools, the exit code, a killed front closing the server's input, a server that does not start, and a record that is not one.
 - **`goldens.rs`** replays slice 1's record with each server behind the front: 60 of the 61 scenarios, byte for byte as without it. A client cannot tell `omni-mcp lazy ... omni-mcp ask` from `omni-mcp ask`. The scenario left out swaps the token file between two lines, which a server that starts later reads differently ([Known differences](#known-differences)).
+
+### How it ships and runs
+
+- **The record.** `apps/server/lazy-mcp.ts` makes it once the server listens (`prepareBrowserMcp` in `sandbox.ts`). It starts the browser server six times, headless and isolated so no browser opens: once to ask `server/discover`, then one handshake in each of the five protocol versions MCP has had. That takes about 0.9 s in the background, once per `@playwright/mcp` version. The flags a thread adds (`--cdp-endpoint`, `--user-data-dir`, `--output-dir`) change none of the answers.
+- **Where it is kept.** `<data>/mcp-answers/playwright-mcp/<version>-<hash>.json`. The hash covers how the server was started to ask and the `PLAYWRIGHT_MCP_*` settings in the server's environment (hashed, never stored). A new version or setting makes a new record and removes the old one. So does each launch of an AppImage, whose files sit at a new path every time.
+- **The proof.** Before any thread gets the front, the server runs `omni-mcp lazy` on the record and compares what it says to one handshake and to `server/discover` with the record. Only then does `buildMcpConfig` name `omni-mcp lazy <record> <node> <cli.js> ...` for `omni-browser`. The log says `[mcp] playwright-mcp <version> starts on a thread's first call to it, behind <path> lazy`.
+- **The fallback** is the direct start, as before this slice, and the log says why: `[mcp] playwright-mcp starts with every thread, as before: <reason>`. It applies when the server does not answer, when its tools differ between two starts, when the front does not repeat the record, to a thread that starts before the record is ready, and when the record file is gone later. An install without `omni-mcp` gets the direct start and no new log line.
+- **The switch.** `OMNI_BROWSER_LAZY=0` keeps the direct start for every thread.
+- **Harnesses.** Claude Code, Codex and Cursor Agent get the front from `buildMcpConfig`. Checked on 2026-11-17 with the real CLIs (Claude Code 2.1.316, Codex 0.166.0, Cursor Agent): none started the server when the thread started, each started it once at its first browser call and got the tool's answer, and nothing stayed running after the turn. Hermes and Cursor Cloud threads get no per-thread servers.
+- **What each harness opens with** is in `apps/server/tests/lazy-browser.test.ts`, as the lines each sent that day. Claude Code asks `server/discover` first. Codex sends `tools/list` with a progress token. Cursor Agent sends it with empty params. A harness that starts opening with a request the record does not cover starts the server with the thread: nothing breaks, and the saving is gone until the record learns that request (`OPENERS` in `lazy-mcp.ts`).
+- **Clients.** No change to the Web UI, the phone layout or the desktop app's shell. The desktop app gets it through its bundled server and `bin/omni-mcp`.
+
+### The server's tests
+
+- **`apps/server/tests/lazy-mcp.test.ts`** (20 tests) runs the recording and the proof against a scripted stdio server: an error, a line that is not JSON, silence, an early exit, tools that change between starts, a front that says something else, and each fallback with its log line. It also checks the file name, that a new version removes the old record, and what `buildMcpConfig` writes with and without a proven front.
+- **`apps/server/tests/lazy-browser.test.ts`** (8 tests) runs the real `@playwright/mcp` both ways and compares every answer of a scripted session: two protocol versions the record holds and one it does not. Then the three harness openings: no server process before the first call, one after.
+- Both skip what needs the binary on a machine without `cargo` ([Without cargo](#without-cargo)).
+
+### Before and after
+
+The same benchmark, runtime and machine as [Measured candidates](#measured-candidates), five runs each, medians. The direct start measured 151 ms here and 241 ms in the ranking run, when the machine was busy writing to disk. The memory was the same both times.
+
+`node scripts/bench-stdio-server.mjs --runs 5 --env ELECTRON_RUN_AS_NODE=1 [--then resources/list] -- [target/release/omni-mcp lazy <record>] <app>/omni-os <app>/resources/omni/node_modules/@playwright/mcp/cli.js --output-dir <dir> --headless --isolated --executable-path /opt/google/chrome/chrome`
+
+| | Before: direct | After: behind the front |
+| --- | --- | --- |
+| `initialize` answered after | 150.8 ms | 1.4 ms |
+| `tools/list` (25 tools) answered after | 153.8 ms | 1.7 ms |
+| Private memory while it waits | 61.77 MB | 1.17 MB |
+| `resources/list`, the first request only the server answers | 2.3 ms | 149.7 ms |
+| Private memory after that request | 62.52 MB | 63.4 MB |
+
+- A thread that never calls a browser tool holds 1.2 MB for the browser server where it held 62 MB, and its harness has the tool list 150 ms sooner.
+- A thread that does call one pays the server's start at that call: 150 ms once, before a call that opens a browser. From then on it holds the server and the front, 0.9 MB more than before.
 
 ## Without cargo
 
@@ -247,8 +281,8 @@ The binaries have no TypeScript fallback any more, so each place that needs one 
 | --- | --- |
 | Desktop build (`scripts/dist.ts`, `stage.ts`) | Fails at the native step: `cargo did not run`, then what to install (Rust from rustup.rs, and a C compiler for the `omni` command). `--native off` builds an app without the binaries: its threads get no `ask_user_question`, `html_render` or `read_referenced_thread`, and it writes no `omni` command. A Linux machine without `musl-gcc` fails the same way at the `omni` step |
 | Release workflow | Passes `--native required`, which is the default now, and installs `musl-tools` |
-| `npm run dev`, `npm start`, `scripts/qa-stack.sh` | `[mcp] cargo does not run ...`, then the server starts. Its threads get no `ask_user_question`, `html_render` or `read_referenced_thread`, and the server log says so once. A machine with `cargo` whose build fails (the crate, the lockfile) stops there instead, so no server starts on an old binary |
-| `npm test` | Passes. `[tests] no omni-mcp build` at the top of the server run, and the tests that start a thread's MCP servers skip: the agent's `ask_user_question` round trips, the restart with a waiting question, and `read_referenced_thread` over stdio. A stand-in answers `--version`, so the config each harness gets is still checked. "Without cargo" means `cargo --version` does not run, which includes a version manager's shim with no Rust set. With `cargo`, a build that fails fails the run |
+| `npm run dev`, `npm start`, `scripts/qa-stack.sh` | `[mcp] cargo does not run ...`, then the server starts. Its threads get no `ask_user_question`, `html_render` or `read_referenced_thread`, and the server log says so once. Each thread starts its browser server at once, as before slice 3. A machine with `cargo` whose build fails (the crate, the lockfile) stops there instead, so no server starts on an old binary |
+| `npm test` | Passes. `[tests] no omni-mcp build` at the top of the server run, and the tests that start a thread's MCP servers skip: the agent's `ask_user_question` round trips, the restart with a waiting question, `read_referenced_thread` over stdio, and the browser server behind `omni-mcp lazy`. A stand-in answers `--version`, so the config each harness gets is still checked. "Without cargo" means `cargo --version` does not run, which includes a version manager's shim with no Rust set. With `cargo`, a build that fails fails the run |
 | `scripts/omni.sh` | `omni: running it from a checkout needs cargo`, exit 3 |
 | `npm run test:rust`, clippy, fmt | Need `cargo`, as before |
 
@@ -275,6 +309,8 @@ What a client sees differently with `omni-mcp lazy` in front of a server.
 - **What a server reads when it starts, it reads at the first call.** A token file or a setting that changes between the start of a thread and its first call is read as it is at the call. This is the one scenario of slice 1's record the front does not replay.
 - **Notices before the first call are dropped**, all but `notifications/initialized`. A server that acts on a notice it got before any request would miss it. The browser server asks the client for what it needs, its roots, when it starts.
 - **The front writes to stderr** when the server does not start, or does not answer as the record says, each line starting `omni-mcp lazy:`.
+- **A setting only one thread has.** The record is made in the server's environment. A thread whose own environment changes the browser server's tools, such as a channel secret named `PLAYWRIGHT_MCP_CAPS`, gets the recorded list until its first call. The front then sees the server's list differ and sends `notifications/tools/list_changed`.
+- **The first browser call waits for the server to start**, about 150 ms on the machine measured, which the thread's start no longer pays.
 
 ### The `omni` command
 
