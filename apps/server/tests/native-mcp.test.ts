@@ -19,6 +19,7 @@ const DIR = vi.hoisted(() => {
 
 import { nativeMcp, nativeMcpCandidate, nativeMcpCommand, probeNativeMcp } from '../native-mcp.ts';
 import { buildCheckoutMcp } from '../scripts/native.ts';
+import { prepareMcp } from './global-native.ts';
 import { buildMcpConfig } from '../sandbox.ts';
 import { config, paths } from '../config.ts';
 import type { Channel } from '../db.ts';
@@ -113,13 +114,51 @@ describe('what a thread gets', () => {
 });
 
 describe("a checkout's build", () => {
-  it('says cargo is missing instead of failing, so the server still starts', () => {
+  /** Runs `fn` with only a fake `cargo` on PATH, which answers --version and the build as told. */
+  const withCargo = <T>(version: string, build: string, fn: () => T): T => {
+    const bin = join(DIR, `cargo-${version}-${build}`.replace(/\W+/g, '-'));
+    require('node:fs').mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'cargo'), `#!/bin/sh\nif [ "$1" = --version ]; then ${version}; fi\n${build}\n`);
+    chmodSync(join(bin, 'cargo'), 0o755);
+    const path = process.env.PATH;
+    process.env.PATH = `${bin}:/usr/bin:/bin`;
+    try {
+      return fn();
+    } finally {
+      process.env.PATH = path;
+    }
+  };
+
+  it('says cargo is missing when there is none, or when it does not run, as a version manager shim with no Rust set', () => {
     const path = process.env.PATH;
     process.env.PATH = join(DIR, 'no-bin');
     try {
-      expect(buildCheckoutMcp(DIR)).toEqual({ ok: false, reason: 'cargo is not installed (https://rustup.rs)' });
+      expect(buildCheckoutMcp(DIR)).toEqual({ ok: false, missing: true, reason: 'cargo does not run (ENOENT). Install Rust from https://rustup.rs' });
     } finally {
       process.env.PATH = path;
+    }
+    const shim = withCargo('echo "No version is set for shim: cargo" >&2; exit 1', 'exit 0', () => buildCheckoutMcp(DIR));
+    expect(shim).toEqual({ ok: false, missing: true, reason: 'cargo does not run (No version is set for shim: cargo). Install Rust from https://rustup.rs' });
+  });
+
+  it('tells a build that fails apart from a missing cargo', () => {
+    expect(withCargo('echo "cargo 1.100.0"; exit 0', 'exit 101', () => buildCheckoutMcp(DIR))).toEqual({ ok: false, missing: false, reason: 'cargo build -p omni-mcp exited with 101' });
+    expect(withCargo('echo "cargo 1.100.0"; exit 0', 'exit 0', () => buildCheckoutMcp(DIR))).toEqual({ ok: true });
+  });
+
+  it("fails the test run on a build that fails, and skips only without cargo", () => {
+    const saved = { build: process.env.OMNI_TEST_MCP_BUILD, mcp: process.env.OMNI_NATIVE_MCP };
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(() => prepareMcp({ ok: false, missing: false, reason: 'cargo build -p omni-mcp exited with 101' })).toThrow('omni-mcp did not build: cargo build -p omni-mcp exited with 101');
+      prepareMcp({ ok: false, missing: true, reason: 'cargo does not run (ENOENT)' });
+      expect(process.env.OMNI_TEST_MCP_BUILD).toBe('0');
+      expect(probeNativeMcp(process.env.OMNI_NATIVE_MCP!)).toEqual({ ok: true, version: '0.0.0-stub' });
+    } finally {
+      if (saved.build === undefined) delete process.env.OMNI_TEST_MCP_BUILD;
+      else process.env.OMNI_TEST_MCP_BUILD = saved.build;
+      if (saved.mcp === undefined) delete process.env.OMNI_NATIVE_MCP;
+      else process.env.OMNI_NATIVE_MCP = saved.mcp;
     }
   });
 });
