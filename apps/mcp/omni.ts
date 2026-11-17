@@ -10,6 +10,7 @@ import { awaitingStats, statsReport, type MachinesView } from '@omni/shared/mach
 import { ApiError, call, SELF, text } from './api.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
+import { threadId } from './thread-id.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
@@ -186,6 +187,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, folder, create }) => {
+    thread_id = await threadId(thread_id);
     const { thread } = await call(`/threads/${thread_id}`);
     let folder_id: string | null = null;
     if (folder.trim()) {
@@ -209,6 +211,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, done }) => {
+    thread_id = await threadId(thread_id);
     const t = await call(`/threads/${thread_id}`, { method: 'PATCH', body: JSON.stringify({ done: done ?? true }) });
     return text({ thread_id: t.id, channel: t.channel_id, status: t.status, done_at: t.done_at });
   },
@@ -286,6 +289,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, message, mode, wake_cold }) => {
+    thread_id = await threadId(thread_id);
     const t = await call(`/threads/${thread_id}/messages`, {
       method: 'POST',
       body: JSON.stringify({ prompt: message, from: 'conductor', mode: mode ?? 'steer', ...(wake_cold && { wake_cold }) }),
@@ -308,6 +312,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, action }) => {
+    thread_id = await threadId(thread_id);
     const res = await call(`/threads/${thread_id}/session/${action}`, { method: 'POST', body: '{}' });
     return text({ thread_id, status: res.thread?.status, resume_blocked: res.thread?.resume_blocked ?? null, waiting: res.pending?.length ?? 0 });
   },
@@ -329,6 +334,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, harness, model, effort }) => {
+    thread_id = await threadId(thread_id);
     const t = await call(`/threads/${thread_id}/run`, { method: 'POST', body: JSON.stringify({ harness, model: model ?? '', effort: effort ?? '' }) });
     const queued = t.queued_harness ? { harness: t.queued_harness, model: t.queued_model, effort: t.queued_effort } : null;
     return text({ thread_id: t.id, harness: t.harness, model: t.model, effort: t.effort, queued });
@@ -356,7 +362,7 @@ server.registerTool(
       if (action !== 'status') throw new Error('start and stop need a thread_id.');
       return text(await call('/pr-watches'));
     }
-    const path = `/threads/${encodeURIComponent(thread_id)}/pr-watch`;
+    const path = `/threads/${encodeURIComponent(await threadId(thread_id))}/pr-watch`;
     if (action === 'start') return text(await call(path, { method: 'PUT', body: JSON.stringify(number ? { number } : {}) }));
     if (action === 'stop') return text(await call(path, { method: 'DELETE' }));
     return text(await call(path));
@@ -374,7 +380,7 @@ server.registerTool(
     inputSchema: { thread_id: z.string().optional() },
   },
   async ({ thread_id }) => {
-    const id = thread_id ?? SELF;
+    const id = thread_id ? await threadId(thread_id) : SELF;
     if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
     return text((await call(`/threads/${encodeURIComponent(id)}/pr`)).crew ?? []);
   },
@@ -418,7 +424,7 @@ server.registerTool(
     inputSchema: { thread_id: z.string().optional() },
   },
   async ({ thread_id }) => {
-    const id = thread_id ?? SELF;
+    const id = thread_id ? await threadId(thread_id) : SELF;
     if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
     const { items } = await call(`/threads/${encodeURIComponent(id)}/crew-questions`);
     return text(
@@ -437,7 +443,7 @@ server.registerTool(
     inputSchema: { thread_id: z.string().optional() },
   },
   async ({ thread_id }) => {
-    const id = thread_id ?? SELF;
+    const id = thread_id ? await threadId(thread_id) : SELF;
     if (!id) throw new Error('Pass a thread_id: this session is not a thread.');
     const { notes } = await call(`/threads/${encodeURIComponent(id)}/review-notes`);
     return text(openNotesView(notes));
@@ -468,6 +474,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, harness, model, effort, message, attachments, device }) => {
+    thread_id = await threadId(thread_id);
     const machine = await deviceId(device);
     const run = { harness, model: model ?? '', effort: effort ?? '', ...(machine && { device: machine }) };
     const previewOf = (picked?: string[]) => call(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify({ ...run, attachments: picked }) });
@@ -510,7 +517,7 @@ server.registerTool(
       '(questions, decisions with options, blockers). Reading it never wakes the thread.',
     inputSchema: { thread_id: z.string() },
   },
-  async ({ thread_id }) => text(await call(`/threads/${thread_id}/summary`)),
+  async ({ thread_id }) => text(await call(`/threads/${await threadId(thread_id)}/summary`)),
 );
 
 server.registerTool(
@@ -743,6 +750,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, to }) => {
+    thread_id = await threadId(thread_id);
     if (to.trim().toLowerCase() === 'here') {
       const res = await call(`/threads/${thread_id}/takeover`, { method: 'POST', body: '{}' });
       return text({ thread_id, to: 'here', handoff: res.handoff?.state ?? null });
@@ -783,6 +791,7 @@ server.registerTool(
     inputSchema: { thread_id: z.string(), url: z.string().describe('The page url from list_published_artifacts.') },
   },
   async ({ thread_id, url }) => {
+    thread_id = await threadId(thread_id);
     const t = await call(`/threads/${thread_id}/published/comments`, { method: 'POST', body: JSON.stringify({ url }) });
     return text({ thread_id: t.id, status: t.status });
   },
@@ -1023,7 +1032,7 @@ server.registerTool(
   async ({ channel, thread_id, include_output }) => {
     if (!channel === !thread_id) throw new Error('Pass channel or thread_id, not both.');
     if (channel) return text((await call(`/channels/${encodeURIComponent(channel)}/actions`)).map(actionSummary));
-    const res = await call(`/threads/${encodeURIComponent(thread_id!)}/actions`);
+    const res = await call(`/threads/${encodeURIComponent(await threadId(thread_id!))}/actions`);
     return text({ actions: res.actions.map(actionSummary), runs: res.runs.map((r: any) => runSummary(r, include_output === true)), blocked: res.blocked });
   },
 );
@@ -1041,6 +1050,7 @@ server.registerTool(
     },
   },
   async ({ thread_id, action }) => {
+    thread_id = await threadId(thread_id);
     const { actions } = await call(`/threads/${encodeURIComponent(thread_id)}/actions`);
     const want = action.trim().toLowerCase();
     const hit = actions.find((a: any) => a.id === action) ?? actions.find((a: any) => a.name.toLowerCase() === want);
