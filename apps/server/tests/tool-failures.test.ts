@@ -111,6 +111,16 @@ describe('tool failure capture and triage', () => {
     }
   });
 
+  it('tells agents not to self-report their own shell commands or expected misses', async () => {
+    // Codex reviewers once posted 41 reports in a day, one per failed sub-command of their own exec calls.
+    const t = await h.start('hello');
+    await h.untilResults(t.id, 1);
+    const prompt = buildSystemPrompt({ ...h.thread(t.id), harness: 'codex', source: 'crew' } as any, h.db.channels.get('scratch')!);
+    expect(prompt).toContain('Never report your own calls or the commands inside one of them');
+    expect(prompt).toContain('a search with no match');
+    expect(prompt).toContain('Report only failures Omni cannot see');
+  });
+
   it('heads off the recurring zsh, file: URL, preview-server, browser_find, browser_click and member-thread slips', async () => {
     const t = await h.start('hello');
     await h.untilResults(t.id, 1);

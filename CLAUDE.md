@@ -39,6 +39,7 @@ Local agent workspace. See README.md for what it does.
 - `npm run dev` (server :4747 + vite :4748), `npm test`, `npm run typecheck`, all through turbo. One package: `npx turbo run test --filter=@omni/server`; one file: `cd apps/server && npx vitest run tests/<file>.test.ts`.
 - Secret values go in the secret store (Keychain on a Mac, `data/secrets.json` on Linux, or libsecret via `OMNI_SECRET_STORE`). The `secrets` table holds names only.
 - `data/` is runtime state (db, thread dirs, worktrees, browser profiles). Never commit it.
+- Repo skills live in `.agents/skills/`; each `.claude/skills/<name>` is a symlink to one. Edit and `git add` the `.agents/skills/` path: git refuses a path through the symlink.
 - A feature or fix with a visible change to the Web UI or the desktop app ships with screenshots in the PR description (before/after, of desktop web, phone web and the desktop app). Take them against a throwaway server, never :4747, and upload with `scripts/pr-screenshots.sh`. See `docs/pr-screenshots.md`.
 
 ## Don't hurt the live install
