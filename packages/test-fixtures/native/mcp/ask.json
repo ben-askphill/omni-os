@@ -1,0 +1,6712 @@
+{
+  "scenarios": [
+    {
+      "name": "protocol: initialize, list the tools, ping, and what the server does not have",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "ping"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "resources/list"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "prompts/list"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": "six",
+            "method": "ping"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/roots/list_changed"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/made_up"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tools/list",
+            "params": {
+              "cursor": "x"
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "logging/setLevel",
+            "params": {
+              "level": "debug"
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "completion/complete",
+            "params": {}
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "method": "made/up",
+            "params": {
+              "a": 1
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": "six"
+          },
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "error": {
+              "code": -32601,
+              "message": "Method not found"
+            }
+          },
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "ask_user_question",
+                  "description": "Ask Ben 1 to 4 multiple-choice questions and wait for the answers. Use it at a real fork only Ben can settle: an ambiguous requirement, a choice between approaches with different tradeoffs, a preference, a go-ahead. Not for what you can find out by reading or running things, and not to ask permission for routine steps. The questions show as a card in the thread and in Needs you, where Ben can always type an answer of their own, so never offer \"Other\". Your turn waits on this call until Ben answers or skips, which can take hours. If they send a message instead, it tells you to read that message.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "questions": {
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "question": {
+                              "type": "string",
+                              "description": "The full question, ending with a question mark."
+                            },
+                            "header": {
+                              "description": "A short tag shown with the question, at most 12 characters, like \"Q4 focus\". A longer one is cut short.",
+                              "type": "string"
+                            },
+                            "options": {
+                              "minItems": 2,
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "description": "1 to 5 words, shown bold."
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "description": "One line under the label: what this choice means or what follows from it."
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "description"
+                                ]
+                              },
+                              "description": "2 to 4 distinct choices, the one you recommend first. Never add \"Other\": the card always offers it."
+                            },
+                            "multiSelect": {
+                              "description": "true when more than one option can apply. Default false.",
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "question",
+                            "options"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "questions"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "error": {
+              "code": -32601,
+              "message": "Method not found"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32601,
+              "message": "Method not found"
+            }
+          },
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "ask_user_question",
+                  "description": "Ask Ben 1 to 4 multiple-choice questions and wait for the answers. Use it at a real fork only Ben can settle: an ambiguous requirement, a choice between approaches with different tradeoffs, a preference, a go-ahead. Not for what you can find out by reading or running things, and not to ask permission for routine steps. The questions show as a card in the thread and in Needs you, where Ben can always type an answer of their own, so never offer \"Other\". Your turn waits on this call until Ben answers or skips, which can take hours. If they send a message instead, it tells you to read that message.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "questions": {
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "question": {
+                              "type": "string",
+                              "description": "The full question, ending with a question mark."
+                            },
+                            "header": {
+                              "description": "A short tag shown with the question, at most 12 characters, like \"Q4 focus\". A longer one is cut short.",
+                              "type": "string"
+                            },
+                            "options": {
+                              "minItems": 2,
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "description": "1 to 5 words, shown bold."
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "description": "One line under the label: what this choice means or what follows from it."
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "description"
+                                ]
+                              },
+                              "description": "2 to 4 distinct choices, the one you recommend first. Never add \"Other\": the card always offers it."
+                            },
+                            "multiSelect": {
+                              "description": "true when more than one option can apply. Default false.",
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "question",
+                            "options"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "questions"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 7
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "error": {
+              "code": -32601,
+              "message": "Method not found"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "error": {
+              "code": -32601,
+              "message": "Method not found"
+            }
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "protocol: the version asked for, when the server knows it, else its newest",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2024-11-05",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-03-26",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-11-25",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "1999-01-01",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2024-10-07",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2024-11-05",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "protocolVersion": "2025-03-26",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "protocolVersion": "2025-11-25",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "result": {
+              "protocolVersion": "2025-11-25",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          },
+          {
+            "result": {
+              "protocolVersion": "2024-10-07",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 5
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "protocol: lines that are not requests get no answer",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "raw": "not json"
+        },
+        {
+          "raw": ""
+        },
+        {
+          "raw": "{\"id\":1,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1.5,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "[{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}]"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"1.0\",\"id\":3,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":4,\"result\":{}}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":7}"
+        },
+        {
+          "raw": "  {\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"ping\"}  \r"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":true,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "\"ping\""
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"ping\",\"params\":[1]}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"ping\",\"params\":null}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"ping\",\"extra\":1}"
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 99,
+            "method": "ping"
+          }
+        }
+      ],
+      "settleMs": 300,
+      "expected": {
+        "responses": [
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 6
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 99
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "protocol: a tools/call the server cannot read",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {}
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": 7
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+              "name": "nope"
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "nope",
+              "arguments": "x"
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "initialize",
+            "params": {}
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "initialize"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "tools/list",
+            "params": {
+              "cursor": 5
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "tools/list",
+            "params": {
+              "cursor": "next",
+              "more": 1
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "method": "tools/call",
+            "params": {
+              "name": "nope",
+              "task": 5
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 11,
+            "method": "tools/call",
+            "params": {
+              "name": "nope",
+              "task": {}
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "tools/call",
+            "params": {
+              "name": "nope",
+              "task": {
+                "ttl": "x"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 13,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": 5,
+              "capabilities": [],
+              "clientInfo": {
+                "name": 1
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 14,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "roots": {
+                  "listChanged": "yes"
+                },
+                "sampling": 4
+              },
+              "clientInfo": {
+                "name": "n",
+                "version": "v",
+                "title": 3,
+                "websiteUrl": null,
+                "description": []
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 15,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "roots": {},
+                "sampling": {},
+                "more": 1
+              },
+              "clientInfo": {
+                "name": "n",
+                "version": "v",
+                "title": "t",
+                "extra": true
+              },
+              "extra": 1
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 16,
+            "method": "tools/call",
+            "params": {
+              "name": "nope",
+              "arguments": {},
+              "extra": 1
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 17,
+            "method": "tools/call",
+            "params": {
+              "arguments": 5,
+              "name": null
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 18,
+            "method": "ping",
+            "params": {
+              "task": {}
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 19,
+            "method": "tools/list",
+            "params": {
+              "task": {
+                "ttl": 5,
+                "more": 1
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 20,
+            "method": "made/up",
+            "params": {
+              "task": {}
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 21,
+            "method": "tools/call",
+            "params": {
+              "task": {
+                "ttl": 1.5
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 22,
+            "method": "ping",
+            "params": {
+              "task": {
+                "ttl": null
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 23,
+            "method": "initialize",
+            "params": {
+              "task": {}
+            }
+          }
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":24,\"method\":\"tools/call\",\"params\":{\"name\":\"nope\",\"task\":{\"ttl\":1e400}}}"
+        },
+        {
+          "waitResponse": 24
+        }
+      ],
+      "settleMs": 200,
+      "expected": {
+        "responses": [
+          {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\"\n    ],\n    \"message\": \"Invalid input: expected object, received undefined\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"task\"\n    ],\n    \"message\": \"Invalid input: expected object, received number\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 11,
+            "error": {
+              "code": -32603,
+              "message": "Server does not support task creation (required for tools/call)"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 12,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"number\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"task\",\n      \"ttl\"\n    ],\n    \"message\": \"Invalid input: expected number, received string\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 13,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"protocolVersion\"\n    ],\n    \"message\": \"Invalid input: expected string, received number\"\n  },\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"capabilities\"\n    ],\n    \"message\": \"Invalid input: expected object, received array\"\n  },\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"clientInfo\",\n      \"name\"\n    ],\n    \"message\": \"Invalid input: expected string, received number\"\n  },\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"clientInfo\",\n      \"version\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 14,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"capabilities\",\n      \"sampling\"\n    ],\n    \"message\": \"Invalid input: expected object, received number\"\n  },\n  {\n    \"expected\": \"boolean\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"capabilities\",\n      \"roots\",\n      \"listChanged\"\n    ],\n    \"message\": \"Invalid input: expected boolean, received string\"\n  },\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"clientInfo\",\n      \"title\"\n    ],\n    \"message\": \"Invalid input: expected string, received number\"\n  },\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"clientInfo\",\n      \"websiteUrl\"\n    ],\n    \"message\": \"Invalid input: expected string, received null\"\n  },\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"clientInfo\",\n      \"description\"\n    ],\n    \"message\": \"Invalid input: expected string, received array\"\n  }\n]"
+            }
+          },
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 15
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Tool nope not found"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 16
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 17,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"name\"\n    ],\n    \"message\": \"Invalid input: expected string, received null\"\n  },\n  {\n    \"expected\": \"record\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"arguments\"\n    ],\n    \"message\": \"Invalid input: expected record, received number\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 18,
+            "error": {
+              "code": -32603,
+              "message": "Server does not support task creation (required for ping)"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 19,
+            "error": {
+              "code": -32603,
+              "message": "Server does not support task creation (required for tools/list)"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"name\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 20,
+            "error": {
+              "code": -32601,
+              "message": "Method not found"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 21,
+            "error": {
+              "code": -32603,
+              "message": "Server does not support task creation (required for tools/call)"
+            }
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 22
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 23,
+            "error": {
+              "code": -32603,
+              "message": "Server does not support task creation (required for initialize)"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 24,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"number\",\n    \"code\": \"invalid_type\",\n    \"received\": \"Infinity\",\n    \"path\": [\n      \"params\",\n      \"task\",\n      \"ttl\"\n    ],\n    \"message\": \"Invalid input: expected number, received Infinity\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"name\"\n    ],\n    \"message\": \"Invalid input: expected string, received number\"\n  }\n]"
+            }
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Tool nope not found"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"record\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"arguments\"\n    ],\n    \"message\": \"Invalid input: expected record, received string\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"protocolVersion\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  },\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"capabilities\"\n    ],\n    \"message\": \"Invalid input: expected object, received undefined\"\n  },\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"clientInfo\"\n    ],\n    \"message\": \"Invalid input: expected object, received undefined\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\"\n    ],\n    \"message\": \"Invalid input: expected object, received undefined\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"cursor\"\n    ],\n    \"message\": \"Invalid input: expected string, received number\"\n  }\n]"
+            }
+          },
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "ask_user_question",
+                  "description": "Ask Ben 1 to 4 multiple-choice questions and wait for the answers. Use it at a real fork only Ben can settle: an ambiguous requirement, a choice between approaches with different tradeoffs, a preference, a go-ahead. Not for what you can find out by reading or running things, and not to ask permission for routine steps. The questions show as a card in the thread and in Needs you, where Ben can always type an answer of their own, so never offer \"Other\". Your turn waits on this call until Ben answers or skips, which can take hours. If they send a message instead, it tells you to read that message.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "questions": {
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "question": {
+                              "type": "string",
+                              "description": "The full question, ending with a question mark."
+                            },
+                            "header": {
+                              "description": "A short tag shown with the question, at most 12 characters, like \"Q4 focus\". A longer one is cut short.",
+                              "type": "string"
+                            },
+                            "options": {
+                              "minItems": 2,
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "description": "1 to 5 words, shown bold."
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "description": "One line under the label: what this choice means or what follows from it."
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "description"
+                                ]
+                              },
+                              "description": "2 to 4 distinct choices, the one you recommend first. Never add \"Other\": the card always offers it."
+                            },
+                            "multiSelect": {
+                              "description": "true when more than one option can apply. Default false.",
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "question",
+                            "options"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "questions"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 9
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "protocol: params that break the envelope get no answer",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "ping",
+            "params": {
+              "_meta": 5
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "ping",
+            "params": {
+              "_meta": {
+                "progressToken": 1.5
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/list",
+            "params": {
+              "_meta": {
+                "progressToken": null
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "ping",
+            "params": {
+              "_meta": {
+                "io.modelcontextprotocol/related-task": {
+                  "taskId": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "ping",
+            "params": {
+              "_meta": {
+                "progressToken": "p",
+                "more": [
+                  1
+                ]
+              },
+              "other": 2
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "ping",
+            "params": {
+              "_meta": {
+                "progressToken": 7,
+                "io.modelcontextprotocol/related-task": {
+                  "taskId": "t",
+                  "x": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "ping",
+            "params": {
+              "_meta": null
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "ping",
+            "params": {
+              "_meta": []
+            }
+          }
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":9007199254740993,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":-5,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1e2,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"\",\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":-0,\"method\":\"ping\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":2.0,\"method\":\"ping\",\"method\":\"nope\"}"
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":\"half \\ud83d\"}"
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 99,
+            "method": "ping"
+          }
+        }
+      ],
+      "silent": [
+        1,
+        2,
+        3,
+        4,
+        7,
+        8
+      ],
+      "settleMs": 300,
+      "expected": {
+        "responses": [
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": ""
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": "half \ud83d"
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": -5
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 0
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 0
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 100
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32601,
+              "message": "Method not found"
+            }
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 5
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 6
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 99
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "arguments the schema refuses",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question"
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {}
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": []
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  },
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  },
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  },
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  },
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": "x"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  7
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": 5,
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ],
+                    "header": 5
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "x"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 11,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A"
+                      },
+                      {
+                        "description": "x"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 13,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ],
+                    "multiSelect": "yes"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 14,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": null,
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  },
+                  {
+                    "question": "Which one?",
+                    "options": null
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 15,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": 1,
+                        "description": 2
+                      },
+                      null
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 16,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": {
+                  "0": {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 17,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": null
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 18,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": []
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 19,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": null
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 20,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ],
+                    "header": null,
+                    "multiSelect": null
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 21,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  []
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected object, received undefined"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Too small: expected array to have >=2 items at questions[0].options"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 10
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected object, received number at questions[0].options[0]\nInvalid input: expected object, received number at questions[0].options[1]\nInvalid input: expected object, received number at questions[0].options[2]\nInvalid input: expected object, received number at questions[0].options[3]\nInvalid input: expected object, received number at questions[0].options[4]\nToo big: expected array to have <=4 items at questions[0].options"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 11
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected string, received undefined at questions[0].options[0].description\nInvalid input: expected string, received undefined at questions[0].options[1].label"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 12
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected boolean, received string at questions[0].multiSelect"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 13
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected string, received null at questions[0].question\nInvalid input: expected array, received null at questions[1].options"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 14
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected string, received number at questions[0].options[0].label\nInvalid input: expected string, received number at questions[0].options[0].description\nInvalid input: expected object, received null at questions[0].options[1]"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 15
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected array, received object at questions"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 16
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected array, received null at questions"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 17
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 18,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"record\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"arguments\"\n    ],\n    \"message\": \"Invalid input: expected record, received array\"\n  }\n]"
+            }
+          },
+          {
+            "jsonrpc": "2.0",
+            "id": 19,
+            "error": {
+              "code": -32603,
+              "message": "[\n  {\n    \"expected\": \"record\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"params\",\n      \"arguments\"\n    ],\n    \"message\": \"Invalid input: expected record, received null\"\n  }\n]"
+            }
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected array, received undefined at questions"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected string, received null at questions[0].header\nInvalid input: expected boolean, received null at questions[0].multiSelect"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 20
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected object, received array at questions[0]"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 21
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Too small: expected array to have >=1 items at questions"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Too big: expected array to have <=4 items at questions"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected array, received string at questions"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 5
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected object, received number at questions[0]"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 6
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected string, received undefined at questions[0].question"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 7
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected string, received number at questions[0].question"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 8
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool ask_user_question: Invalid input: expected string, received number at questions[0].header"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 9
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "no thread id: refused without a request",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "settleMs": 100,
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Omni did not say which thread this is (OMNI_THREAD_ID is not set), so the questions have nowhere to go."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "an empty thread id is no thread id",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "settleMs": 100,
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Omni did not say which thread this is (OMNI_THREAD_ID is not set), so the questions have nowhere to go."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "without OMNI_USER the tool speaks of the user",
+      "server": "ask",
+      "env": {
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list"
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "ask_user_question",
+                  "description": "Ask the user 1 to 4 multiple-choice questions and wait for the answers. Use it at a real fork only the user can settle: an ambiguous requirement, a choice between approaches with different tradeoffs, a preference, a go-ahead. Not for what you can find out by reading or running things, and not to ask permission for routine steps. The questions show as a card in the thread and in Needs you, where the user can always type an answer of their own, so never offer \"Other\". Your turn waits on this call until the user answers or skips, which can take hours. If they send a message instead, it tells you to read that message.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "questions": {
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "question": {
+                              "type": "string",
+                              "description": "The full question, ending with a question mark."
+                            },
+                            "header": {
+                              "description": "A short tag shown with the question, at most 12 characters, like \"Q4 focus\". A longer one is cut short.",
+                              "type": "string"
+                            },
+                            "options": {
+                              "minItems": 2,
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "description": "1 to 5 words, shown bold."
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "description": "One line under the label: what this choice means or what follows from it."
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "description"
+                                ]
+                              },
+                              "description": "2 to 4 distinct choices, the one you recommend first. Never add \"Other\": the card always offers it."
+                            },
+                            "multiSelect": {
+                              "description": "true when more than one option can apply. Default false.",
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "question",
+                            "options"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "questions"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "an empty OMNI_USER is the user too",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list"
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "ask_user_question",
+                  "description": "Ask the user 1 to 4 multiple-choice questions and wait for the answers. Use it at a real fork only the user can settle: an ambiguous requirement, a choice between approaches with different tradeoffs, a preference, a go-ahead. Not for what you can find out by reading or running things, and not to ask permission for routine steps. The questions show as a card in the thread and in Needs you, where the user can always type an answer of their own, so never offer \"Other\". Your turn waits on this call until the user answers or skips, which can take hours. If they send a message instead, it tells you to read that message.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "questions": {
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "question": {
+                              "type": "string",
+                              "description": "The full question, ending with a question mark."
+                            },
+                            "header": {
+                              "description": "A short tag shown with the question, at most 12 characters, like \"Q4 focus\". A longer one is cut short.",
+                              "type": "string"
+                            },
+                            "options": {
+                              "minItems": 2,
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "description": "1 to 5 words, shown bold."
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "description": "One line under the label: what this choice means or what follows from it."
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "description"
+                                ]
+                              },
+                              "description": "2 to 4 distinct choices, the one you recommend first. Never add \"Other\": the card always offers it."
+                            },
+                            "multiSelect": {
+                              "description": "true when more than one option can apply. Default false.",
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "question",
+                            "options"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "questions"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "answered on the first poll",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": "Which one?\n- A"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Which one?\n- A"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "pending twice, then skipped",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q 2/x"
+          }
+        },
+        {
+          "json": {
+            "state": "pending"
+          }
+        },
+        {
+          "json": {
+            "state": "pending",
+            "text": "not yet"
+          }
+        },
+        {
+          "json": {
+            "state": "skipped",
+            "text": "Ben skipped the questions."
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ben skipped the questions."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q%202/x?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q%202/x?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q%202/x?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "what the schema does not name is left out of the request, and the rest goes as given",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "json": {
+            "state": "dismissed",
+            "text": "Ben sent a message instead. Read it."
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "extra": true,
+                "questions": [
+                  {
+                    "multiSelect": true,
+                    "zzz": 1,
+                    "options": [
+                      {
+                        "description": " d ",
+                        "label": " L ",
+                        "more": []
+                      },
+                      {
+                        "label": "Other",
+                        "description": ""
+                      }
+                    ],
+                    "header": "  a header far longer than twelve  ",
+                    "question": "  Spaces stay?  "
+                  },
+                  {
+                    "question": "Second?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ],
+                    "multiSelect": false
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ben sent a message instead. Read it."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "  Spaces stay?  ",
+                  "header": "  a header far longer than twelve  ",
+                  "options": [
+                    {
+                      "label": " L ",
+                      "description": " d "
+                    },
+                    {
+                      "label": "Other",
+                      "description": ""
+                    }
+                  ],
+                  "multiSelect": true
+                },
+                {
+                  "question": "Second?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ],
+                  "multiSelect": false
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "text beyond ASCII, a split emoji included, goes through whole",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "text": "{\"state\":\"answered\",\"text\":\"caf\\u00e9 \\ud83d\\ude00 half \\ud83d and \\u2028 \\u0007 \\\"q\\\" \\\\\"}"
+        }
+      ],
+      "steps": [
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"ask_user_question\",\"arguments\":{\"questions\":[{\"question\":\"Na\\u00efve \\ud83d\\ude00 \\ud83d ?\",\"options\":[{\"label\":\"é\",\"description\":\"\\u0000\\u001f\"},{\"label\":\"😀\",\"description\":\"\\/\"}]}]}}}"
+        },
+        {
+          "waitResponse": 1
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "café 😀 half \ud83d and   \u0007 \"q\" \\"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Naïve 😀 \ud83d ?",
+                  "options": [
+                    {
+                      "label": "é",
+                      "description": "\u0000\u001f"
+                    },
+                    {
+                      "label": "😀",
+                      "description": "/"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "the API refuses the questions: the agent reads why",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "status": 400,
+          "json": {
+            "error": "questions[0].question repeats an earlier question"
+          }
+        },
+        {
+          "status": 409,
+          "json": {
+            "error": "The thread is archived.",
+            "detail": "Unarchive it first."
+          }
+        },
+        {
+          "status": 404,
+          "json": {
+            "error": ""
+          }
+        },
+        {
+          "status": 422,
+          "json": {
+            "error": 0,
+            "detail": "x"
+          }
+        },
+        {
+          "status": 400,
+          "json": {
+            "error": [
+              "a",
+              null,
+              2
+            ],
+            "detail": {
+              "b": 1
+            }
+          }
+        },
+        {
+          "status": 400,
+          "json": {
+            "error": "only error",
+            "detail": ""
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 1
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 3
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 4
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 5
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "questions[0].question repeats an earlier question"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The thread is archived. Unarchive it first."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "HTTP 404"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "HTTP 422"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "a,,2 [object Object]"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 5
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "only error"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 6
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "the API fails or is not there when asked",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "status": 500,
+          "text": "Internal Server Error"
+        },
+        {
+          "status": 503,
+          "json": {
+            "error": "Omni is restarting."
+          }
+        },
+        {
+          "drop": true
+        },
+        {
+          "status": 500,
+          "json": [
+            1
+          ]
+        },
+        {
+          "status": 500,
+          "json": "text"
+        },
+        {
+          "status": 302,
+          "json": {
+            "error": "moved"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 1
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 3
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 4
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 5
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "HTTP 500"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Omni is restarting."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "fetch failed"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "HTTP 500"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "HTTP 500"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 5
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "moved"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 6
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a poll that fails on the server is tried again; one the API refuses ends the call",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "status": 500,
+          "json": {
+            "error": "busy"
+          }
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": "A"
+          }
+        },
+        {
+          "json": {
+            "id": "q2"
+          }
+        },
+        {
+          "status": 404,
+          "json": {
+            "error": "No such question."
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 1
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "No such question."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q2?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a poll with no answer at all is tried again",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "drop": true
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": "A"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a cancelled call stops polling and answers nothing",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "hang": true
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitRequests": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": 2,
+              "reason": "user"
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": 77
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "ping"
+          }
+        }
+      ],
+      "silent": [
+        2
+      ],
+      "settleMs": 400,
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null,
+            "closedByClient": true
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a call cancelled while its retry waits answers nothing and asks no more",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "status": 502,
+          "json": {}
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitRequests": 2
+        },
+        {
+          "sleepMs": 200
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": 2
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "ping"
+          }
+        }
+      ],
+      "silent": [
+        2
+      ],
+      "settleMs": 2400,
+      "expected": {
+        "responses": [
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "stdin closing ends a call that is still waiting",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "hang": true
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitRequests": 2
+        }
+      ],
+      "silent": [
+        1
+      ],
+      "expected": {
+        "responses": [],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null,
+            "closedByClient": false
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a rotated token: a 401 reads the file again and retries once",
+      "server": "ask",
+      "tokenFile": " tok-old\n",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1"
+      },
+      "api": [
+        {
+          "status": 401,
+          "json": {
+            "error": "Unauthorized"
+          }
+        },
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": "A"
+          }
+        },
+        {
+          "status": 401,
+          "json": {
+            "error": "Unauthorized"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 1
+        },
+        {
+          "writeTokenFile": "tok-new\n"
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-ask",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Unauthorized"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-old",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-new",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-new",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-new",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "OMNI_TOKEN wins over the file until a 401, and an empty one falls back to the file",
+      "server": "ask",
+      "tokenFile": "tok-file",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "status": 401,
+          "json": {
+            "error": "Unauthorized"
+          }
+        },
+        {
+          "status": 400,
+          "json": {
+            "error": "x"
+          }
+        },
+        {
+          "status": 400,
+          "json": {
+            "error": "y"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 1
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "x"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "y"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-file",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-file",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "an empty OMNI_TOKEN falls back to the file",
+      "server": "ask",
+      "tokenFile": "tok-file",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": ""
+      },
+      "api": [
+        {
+          "status": 400,
+          "json": {
+            "error": "x"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "x"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-file",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "no token anywhere still asks",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1"
+      },
+      "api": [
+        {
+          "status": 401,
+          "json": {
+            "error": "Unauthorized"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Unauthorized"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "an answer that is not text is shown as JSON",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "text": "{\"state\":\"answered\",\"text\":{\"b\":1,\"10\":[1.0,1e21,{}],\"2\":null,\"a\":\"x\"}}"
+        },
+        {
+          "json": {
+            "id": 7
+          }
+        },
+        {
+          "json": {
+            "text": "no state"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 1
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\n  \"2\": null,\n  \"10\": [\n    1,\n    1e+21,\n    {}\n  ],\n  \"b\": 1,\n  \"a\": \"x\"\n}"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "no state"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/7?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "an answer whose text is not text, or with no body at all",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q2"
+          }
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": null
+          }
+        },
+        {
+          "text": "null"
+        },
+        {
+          "status": 500,
+          "text": "null"
+        },
+        {
+          "json": {}
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": false
+          }
+        },
+        {
+          "json": {
+            "id": null
+          }
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": ""
+          }
+        },
+        {
+          "json": []
+        },
+        {
+          "json": {
+            "text": [
+              1,
+              "a"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 3
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 4
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 5
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 6
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "null"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Cannot destructure property 'id' of '(intermediate value)' as it is null."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Cannot read properties of null (reading 'error')"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "false"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 5
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 6
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[\n  1,\n  \"a\"\n]"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 7
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q2?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/undefined?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/null?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/undefined?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a poll with an empty body is tried again",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "text": "null"
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": "A"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a cancel notice that names no running call changes nothing",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "delayMs": 300,
+          "json": {
+            "state": "answered",
+            "text": "A"
+          }
+        },
+        {
+          "json": {
+            "id": "q2"
+          }
+        },
+        {
+          "delayMs": 300,
+          "json": {
+            "state": "answered",
+            "text": "B"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitRequests": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": 0
+            }
+          }
+        },
+        {
+          "waitResponse": 0
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitRequests": 4
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": 5,
+              "reason": 7
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": "5"
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": 5.5
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {}
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": null
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": 5,
+              "_meta": 1
+            }
+          }
+        },
+        {
+          "raw": "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":5},\"extra\":1}"
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 0
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "B"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 5
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q2?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a cancel notice with a reason and more stops the call",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "hang": true
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": "call-1",
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitRequests": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+              "requestId": "call-1",
+              "reason": "gone",
+              "extra": 1,
+              "_meta": {
+                "progressToken": 1
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "ping"
+          }
+        }
+      ],
+      "silent": [
+        "call-1"
+      ],
+      "settleMs": 400,
+      "expected": {
+        "responses": [
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null,
+            "closedByClient": true
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "two calls at once each get their own answer",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "json": {
+            "id": "q1"
+          }
+        },
+        {
+          "delayMs": 400,
+          "json": {
+            "state": "answered",
+            "text": "first"
+          }
+        },
+        {
+          "json": {
+            "id": "q2"
+          }
+        },
+        {
+          "json": {
+            "state": "answered",
+            "text": "second"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitRequests": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Other?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "ping"
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "first"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "second"
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q1?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          },
+          {
+            "method": "POST",
+            "url": "/api/threads/thread-1/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Other?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads/thread-1/questions/q2?wait=25",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": null
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a thread id that needs no escaping here is sent as it is",
+      "server": "ask",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "a b/c?d",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "api": [
+        {
+          "status": 400,
+          "json": {
+            "error": "x"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+              "name": "ask_user_question",
+              "arguments": {
+                "questions": [
+                  {
+                    "question": "Which one?",
+                    "options": [
+                      {
+                        "label": "A",
+                        "description": "First"
+                      },
+                      {
+                        "label": "B",
+                        "description": "Second"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "x"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/threads/a%20b/c?d/questions",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "a b/c?d"
+            },
+            "body": {
+              "questions": [
+                {
+                  "question": "Which one?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "description": "First"
+                    },
+                    {
+                      "label": "B",
+                      "description": "Second"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "exit": 0
+      }
+    }
+  ]
+}

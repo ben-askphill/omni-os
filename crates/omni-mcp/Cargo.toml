@@ -1,0 +1,14 @@
+[package]
+name = "omni-mcp"
+version = "0.1.0"
+description = "The stdio MCP servers every local thread gets: ask_user_question, html_render and read_referenced_thread."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+tokio = { version = "1.54", features = ["rt", "io-std", "io-util", "time", "sync", "macros"] }

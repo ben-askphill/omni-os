@@ -87,7 +87,7 @@ Per slice:
 
 | Module | Status | Reason or next step |
 | --- | --- | --- |
-| `apps/mcp` `ask.ts`, `render.ts`, `threads.ts`, `referenced-thread.ts`, `api.ts` | planned | Slice 1 |
+| `apps/mcp` `ask.ts`, `render.ts`, `threads.ts`, `referenced-thread.ts`, `api.ts` | in progress | Slice 1. Step 1 is done: `crates/omni-mcp` passes the record. Nothing starts the binary yet (step 2), and the TypeScript stays until step 3 |
 | `apps/cli` | planned | Slice 2. Keeps its six commands ([ADR 0014](../adr/0014-omni-command-line.md)) |
 | `apps/mcp` `omni.ts`, `pull-requests.ts` | planned | Slice 3 |
 | `apps/mcp` `external/` | kept | The HTTP transport runs inside the server and shares `tools.ts` with the stdio one. Porting only stdio would leave two copies of 20 tools. Moves with the server or not at all |
@@ -106,12 +106,39 @@ Per slice:
 
 ## How parity is checked
 
-- **The record.** `packages/test-fixtures/native/` holds what the TypeScript module did: each scenario's input and the exact output. A TypeScript test replays every scenario against the TypeScript module on each `npm test`, so the record cannot drift from the code it describes.
+- **The record.** `packages/test-fixtures/native/` holds what the TypeScript module did: each scenario's input and the exact output. A TypeScript test replays every scenario against the TypeScript module on each `npm test`, so the record cannot drift from the code it describes. `OMNI_RECORD_NATIVE_FIXTURES=1` on that test rewrites the record.
 - **The Rust side.** A Rust integration test replays the same files against the Rust binary and compares byte for byte.
+- **Both ways.** The TypeScript test also runs the Rust binary when `OMNI_NATIVE_MCP=<path to the binary>` is set, so one runner has judged both implementations.
+
+## Working on the Rust code
+
+- Toolchain: `rust-toolchain.toml` pins it. `rustup` or `mise` installs it on first use.
+- `npm run test:rust` (or `cargo test --workspace --locked`), `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo fmt --all --check`.
+- The workspace is `Cargo.toml` at the repo root, the crates are in `crates/`. `unsafe` is forbidden in the workspace lints.
+- Run the tests with Omni's own variables unset (`env -i PATH="$PATH" HOME="$HOME" cargo test ...`) when your shell is an Omni thread: `OMNI_URL` there points at the live server.
+
+## Slice 1: the per-thread MCP servers
+
+`omni-mcp ask`, `omni-mcp render` and `omni-mcp threads` are one binary (`crates/omni-mcp`) that speaks MCP over stdio the way the TypeScript servers do through the MCP SDK. It uses no MCP crate and no JSON crate. `crates/omni-core` has its own JSON reader and printer that match `JSON.parse` and `JSON.stringify`, because the record compares bytes.
+
+- **The record** is `packages/test-fixtures/native/mcp/{ask,render,threads}.json`: 61 scenarios (32, 15 and 14). A scenario is a scripted stand-in for Omni's API, the lines sent to the server's stdin, and what must come back: each answer, each API request with its headers and body, and the exit code. They cover the handshake in every protocol version, malformed lines, argument validation, cancelling a call, the token file changing, and every way the API can fail.
+- **`apps/mcp/tests/native-fixtures.test.ts`** replays them against the TypeScript servers.
+- **`crates/omni-mcp/tests/goldens.rs`** replays them against the Rust binary, each stdout line and request body byte for byte.
+- **`packages/test-fixtures/native/js-corpus.json`** holds 248 JSON texts with what Node made of each: whether it parses, how it prints, and `String()`, `Number()`, truthiness, `trim()`, code point count and `encodeURIComponent()`. `apps/mcp/tests/js-corpus.test.ts` checks the file against Node and `crates/omni-core/tests/node_parity.rs` holds the Rust code to it.
+
+The tool descriptions and limits in `ask.rs` and `render.rs` are copies of `packages/shared/question.ts` and `html-render.ts`. The `tools/list` scenarios compare them byte for byte, so a change to the TypeScript text fails the Rust test until the copy follows.
 
 ## Known differences
 
-None yet. A slice lists here what its Rust build does differently on purpose.
+What the Rust build does differently on purpose. None of these has been seen from a harness or from Omni's API.
+
+- **A question poll that answers without `text`.** The TypeScript server answers with the SDK's validation dump, about 3,300 characters. Rust answers the same error code (-32602) with `MCP error -32602: Invalid tools/call result: the tool answered without text`. The API never sends that answer. Covered by a test in `goldens.rs`.
+- **`initialize` with rare capabilities.** The SDK checks the shape of `experimental`, `elicitation`, `tasks`, `extensions` and `clientInfo.icons`. Rust checks `sampling`, `roots`, and the name, title, version, website and description of `clientInfo`, and accepts the rest unchecked.
+- **A thread id or `OMNI_URL` that cannot be sent.** For a thread id with characters outside Latin-1, or an `OMNI_URL` that is not a URL, both servers answer the tool call with an error. The wording differs, because it comes from each HTTP client.
+- **An object that hides `toString`.** `String({"toString": 1})` throws in JavaScript. Rust prints `[object Object]`. It can only reach an error message built from an API answer with that shape.
+- **A cancel notice in the same write as a `ping` or `tools/list`.** The SDK can drop the answer to a request that is cancelled before its handler's first tick. Rust answers `ping`, `initialize` and `tools/list` at once and honours a cancel only for tool calls.
+- **JSON nested deeper than 1,000 levels** is refused as invalid, where Node's limit is its stack.
+- **`Number()` of a hex string above 2^53** may round to a neighbouring value. It can only reach the same kind of error message.
 
 ## Decisions for Ben
 

@@ -45,7 +45,8 @@
         "ask.ts",
         "threads.ts",
         "render.ts",
-        "external/stdio.ts"
+        "external/stdio.ts",
+        "tests/**/*.test.ts"
       ]
     },
     "apps/ios": {

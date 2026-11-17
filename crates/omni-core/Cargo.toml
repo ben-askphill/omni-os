@@ -1,0 +1,18 @@
+[package]
+name = "omni-core"
+version = "0.1.0"
+description = "What Omni's native binaries share: JSON as JavaScript reads and writes it, and the local API client."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# Plain HTTP only: the binaries that use this talk to the server on 127.0.0.1.
+reqwest = { version = "0.13.5", default-features = false }
+ryu-js = "1.0.3"
+
+[dev-dependencies]
+tokio = { version = "1.54", features = ["macros", "rt", "net", "io-util", "time"] }

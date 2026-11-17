@@ -1,0 +1,2255 @@
+{
+  "cases": [
+    {
+      "text": "0",
+      "ok": true,
+      "compact": "0",
+      "pretty": "0",
+      "string": "0",
+      "number": "0",
+      "truthy": false
+    },
+    {
+      "text": "-0",
+      "ok": true,
+      "compact": "0",
+      "pretty": "0",
+      "string": "0",
+      "number": "0",
+      "truthy": false
+    },
+    {
+      "text": "-0.0",
+      "ok": true,
+      "compact": "0",
+      "pretty": "0",
+      "string": "0",
+      "number": "0",
+      "truthy": false
+    },
+    {
+      "text": "0e0",
+      "ok": true,
+      "compact": "0",
+      "pretty": "0",
+      "string": "0",
+      "number": "0",
+      "truthy": false
+    },
+    {
+      "text": "1",
+      "ok": true,
+      "compact": "1",
+      "pretty": "1",
+      "string": "1",
+      "number": "1",
+      "truthy": true
+    },
+    {
+      "text": "-1",
+      "ok": true,
+      "compact": "-1",
+      "pretty": "-1",
+      "string": "-1",
+      "number": "-1",
+      "truthy": true
+    },
+    {
+      "text": "1.0",
+      "ok": true,
+      "compact": "1",
+      "pretty": "1",
+      "string": "1",
+      "number": "1",
+      "truthy": true
+    },
+    {
+      "text": "1.5",
+      "ok": true,
+      "compact": "1.5",
+      "pretty": "1.5",
+      "string": "1.5",
+      "number": "1.5",
+      "truthy": true
+    },
+    {
+      "text": "-1.5",
+      "ok": true,
+      "compact": "-1.5",
+      "pretty": "-1.5",
+      "string": "-1.5",
+      "number": "-1.5",
+      "truthy": true
+    },
+    {
+      "text": "1e2",
+      "ok": true,
+      "compact": "100",
+      "pretty": "100",
+      "string": "100",
+      "number": "100",
+      "truthy": true
+    },
+    {
+      "text": "1E2",
+      "ok": true,
+      "compact": "100",
+      "pretty": "100",
+      "string": "100",
+      "number": "100",
+      "truthy": true
+    },
+    {
+      "text": "1e+2",
+      "ok": true,
+      "compact": "100",
+      "pretty": "100",
+      "string": "100",
+      "number": "100",
+      "truthy": true
+    },
+    {
+      "text": "1e-2",
+      "ok": true,
+      "compact": "0.01",
+      "pretty": "0.01",
+      "string": "0.01",
+      "number": "0.01",
+      "truthy": true
+    },
+    {
+      "text": "0.1",
+      "ok": true,
+      "compact": "0.1",
+      "pretty": "0.1",
+      "string": "0.1",
+      "number": "0.1",
+      "truthy": true
+    },
+    {
+      "text": "0.2",
+      "ok": true,
+      "compact": "0.2",
+      "pretty": "0.2",
+      "string": "0.2",
+      "number": "0.2",
+      "truthy": true
+    },
+    {
+      "text": "0.30000000000000004",
+      "ok": true,
+      "compact": "0.30000000000000004",
+      "pretty": "0.30000000000000004",
+      "string": "0.30000000000000004",
+      "number": "0.30000000000000004",
+      "truthy": true
+    },
+    {
+      "text": "4.35",
+      "ok": true,
+      "compact": "4.35",
+      "pretty": "4.35",
+      "string": "4.35",
+      "number": "4.35",
+      "truthy": true
+    },
+    {
+      "text": "0.000001",
+      "ok": true,
+      "compact": "0.000001",
+      "pretty": "0.000001",
+      "string": "0.000001",
+      "number": "0.000001",
+      "truthy": true
+    },
+    {
+      "text": "1e-7",
+      "ok": true,
+      "compact": "1e-7",
+      "pretty": "1e-7",
+      "string": "1e-7",
+      "number": "1e-7",
+      "truthy": true
+    },
+    {
+      "text": "1.5e-7",
+      "ok": true,
+      "compact": "1.5e-7",
+      "pretty": "1.5e-7",
+      "string": "1.5e-7",
+      "number": "1.5e-7",
+      "truthy": true
+    },
+    {
+      "text": "123456789012345680000",
+      "ok": true,
+      "compact": "123456789012345680000",
+      "pretty": "123456789012345680000",
+      "string": "123456789012345680000",
+      "number": "123456789012345680000",
+      "truthy": true
+    },
+    {
+      "text": "1e21",
+      "ok": true,
+      "compact": "1e+21",
+      "pretty": "1e+21",
+      "string": "1e+21",
+      "number": "1e+21",
+      "truthy": true
+    },
+    {
+      "text": "1.5e21",
+      "ok": true,
+      "compact": "1.5e+21",
+      "pretty": "1.5e+21",
+      "string": "1.5e+21",
+      "number": "1.5e+21",
+      "truthy": true
+    },
+    {
+      "text": "1e300",
+      "ok": true,
+      "compact": "1e+300",
+      "pretty": "1e+300",
+      "string": "1e+300",
+      "number": "1e+300",
+      "truthy": true
+    },
+    {
+      "text": "-1e300",
+      "ok": true,
+      "compact": "-1e+300",
+      "pretty": "-1e+300",
+      "string": "-1e+300",
+      "number": "-1e+300",
+      "truthy": true
+    },
+    {
+      "text": "1e400",
+      "ok": true,
+      "compact": "null",
+      "pretty": "null",
+      "string": "Infinity",
+      "number": "Infinity",
+      "truthy": true
+    },
+    {
+      "text": "-1e400",
+      "ok": true,
+      "compact": "null",
+      "pretty": "null",
+      "string": "-Infinity",
+      "number": "-Infinity",
+      "truthy": true
+    },
+    {
+      "text": "1e-400",
+      "ok": true,
+      "compact": "0",
+      "pretty": "0",
+      "string": "0",
+      "number": "0",
+      "truthy": false
+    },
+    {
+      "text": "5e-324",
+      "ok": true,
+      "compact": "5e-324",
+      "pretty": "5e-324",
+      "string": "5e-324",
+      "number": "5e-324",
+      "truthy": true
+    },
+    {
+      "text": "2.5e-324",
+      "ok": true,
+      "compact": "5e-324",
+      "pretty": "5e-324",
+      "string": "5e-324",
+      "number": "5e-324",
+      "truthy": true
+    },
+    {
+      "text": "1.7976931348623157e308",
+      "ok": true,
+      "compact": "1.7976931348623157e+308",
+      "pretty": "1.7976931348623157e+308",
+      "string": "1.7976931348623157e+308",
+      "number": "1.7976931348623157e+308",
+      "truthy": true
+    },
+    {
+      "text": "1.7976931348623159e308",
+      "ok": true,
+      "compact": "null",
+      "pretty": "null",
+      "string": "Infinity",
+      "number": "Infinity",
+      "truthy": true
+    },
+    {
+      "text": "9007199254740991",
+      "ok": true,
+      "compact": "9007199254740991",
+      "pretty": "9007199254740991",
+      "string": "9007199254740991",
+      "number": "9007199254740991",
+      "truthy": true
+    },
+    {
+      "text": "9007199254740992",
+      "ok": true,
+      "compact": "9007199254740992",
+      "pretty": "9007199254740992",
+      "string": "9007199254740992",
+      "number": "9007199254740992",
+      "truthy": true
+    },
+    {
+      "text": "9007199254740993",
+      "ok": true,
+      "compact": "9007199254740992",
+      "pretty": "9007199254740992",
+      "string": "9007199254740992",
+      "number": "9007199254740992",
+      "truthy": true
+    },
+    {
+      "text": "-9007199254740993",
+      "ok": true,
+      "compact": "-9007199254740992",
+      "pretty": "-9007199254740992",
+      "string": "-9007199254740992",
+      "number": "-9007199254740992",
+      "truthy": true
+    },
+    {
+      "text": "12345678901234567890",
+      "ok": true,
+      "compact": "12345678901234567000",
+      "pretty": "12345678901234567000",
+      "string": "12345678901234567000",
+      "number": "12345678901234567000",
+      "truthy": true
+    },
+    {
+      "text": "123456789012345678901234567890",
+      "ok": true,
+      "compact": "1.2345678901234568e+29",
+      "pretty": "1.2345678901234568e+29",
+      "string": "1.2345678901234568e+29",
+      "number": "1.2345678901234568e+29",
+      "truthy": true
+    },
+    {
+      "text": "0.1e1",
+      "ok": true,
+      "compact": "1",
+      "pretty": "1",
+      "string": "1",
+      "number": "1",
+      "truthy": true
+    },
+    {
+      "text": "100e-2",
+      "ok": true,
+      "compact": "1",
+      "pretty": "1",
+      "string": "1",
+      "number": "1",
+      "truthy": true
+    },
+    {
+      "text": "1.2345678901234567890123",
+      "ok": true,
+      "compact": "1.2345678901234567",
+      "pretty": "1.2345678901234567",
+      "string": "1.2345678901234567",
+      "number": "1.2345678901234567",
+      "truthy": true
+    },
+    {
+      "text": "3.141592653589793",
+      "ok": true,
+      "compact": "3.141592653589793",
+      "pretty": "3.141592653589793",
+      "string": "3.141592653589793",
+      "number": "3.141592653589793",
+      "truthy": true
+    },
+    {
+      "text": "2.718281828459045e0",
+      "ok": true,
+      "compact": "2.718281828459045",
+      "pretty": "2.718281828459045",
+      "string": "2.718281828459045",
+      "number": "2.718281828459045",
+      "truthy": true
+    },
+    {
+      "text": "1e22",
+      "ok": true,
+      "compact": "1e+22",
+      "pretty": "1e+22",
+      "string": "1e+22",
+      "number": "1e+22",
+      "truthy": true
+    },
+    {
+      "text": "1e23",
+      "ok": true,
+      "compact": "1e+23",
+      "pretty": "1e+23",
+      "string": "1e+23",
+      "number": "1e+23",
+      "truthy": true
+    },
+    {
+      "text": "4.4501477170144023e-308",
+      "ok": true,
+      "compact": "4.4501477170144023e-308",
+      "pretty": "4.4501477170144023e-308",
+      "string": "4.4501477170144023e-308",
+      "number": "4.4501477170144023e-308",
+      "truthy": true
+    },
+    {
+      "text": "0.000000000000000000000000000001",
+      "ok": true,
+      "compact": "1e-30",
+      "pretty": "1e-30",
+      "string": "1e-30",
+      "number": "1e-30",
+      "truthy": true
+    },
+    {
+      "text": "25e-1",
+      "ok": true,
+      "compact": "2.5",
+      "pretty": "2.5",
+      "string": "2.5",
+      "number": "2.5",
+      "truthy": true
+    },
+    {
+      "text": "",
+      "ok": false
+    },
+    {
+      "text": "   ",
+      "ok": false
+    },
+    {
+      "text": "01",
+      "ok": false
+    },
+    {
+      "text": "-01",
+      "ok": false
+    },
+    {
+      "text": "+1",
+      "ok": false
+    },
+    {
+      "text": "1.",
+      "ok": false
+    },
+    {
+      "text": ".5",
+      "ok": false
+    },
+    {
+      "text": "-.5",
+      "ok": false
+    },
+    {
+      "text": "1e",
+      "ok": false
+    },
+    {
+      "text": "1e+",
+      "ok": false
+    },
+    {
+      "text": "0x10",
+      "ok": false
+    },
+    {
+      "text": "NaN",
+      "ok": false
+    },
+    {
+      "text": "Infinity",
+      "ok": false
+    },
+    {
+      "text": "-Infinity",
+      "ok": false
+    },
+    {
+      "text": "undefined",
+      "ok": false
+    },
+    {
+      "text": "True",
+      "ok": false
+    },
+    {
+      "text": "nul",
+      "ok": false
+    },
+    {
+      "text": "tru",
+      "ok": false
+    },
+    {
+      "text": "[1,]",
+      "ok": false
+    },
+    {
+      "text": "[,1]",
+      "ok": false
+    },
+    {
+      "text": "{\"a\":1,}",
+      "ok": false
+    },
+    {
+      "text": "{a:1}",
+      "ok": false
+    },
+    {
+      "text": "{'a':1}",
+      "ok": false
+    },
+    {
+      "text": "'a'",
+      "ok": false
+    },
+    {
+      "text": "[1 2]",
+      "ok": false
+    },
+    {
+      "text": "{\"a\" 1}",
+      "ok": false
+    },
+    {
+      "text": "{\"a\":}",
+      "ok": false
+    },
+    {
+      "text": "[",
+      "ok": false
+    },
+    {
+      "text": "]",
+      "ok": false
+    },
+    {
+      "text": "{",
+      "ok": false
+    },
+    {
+      "text": "}",
+      "ok": false
+    },
+    {
+      "text": "[1",
+      "ok": false
+    },
+    {
+      "text": "{\"a\":1",
+      "ok": false
+    },
+    {
+      "text": "\"abc",
+      "ok": false
+    },
+    {
+      "text": "\"a\nb\"",
+      "ok": false
+    },
+    {
+      "text": "\"a\tb\"",
+      "ok": false
+    },
+    {
+      "text": "\"\\x41\"",
+      "ok": false
+    },
+    {
+      "text": "\"\\u12\"",
+      "ok": false
+    },
+    {
+      "text": "\"\\u12G4\"",
+      "ok": false
+    },
+    {
+      "text": "\"\\\"",
+      "ok": false
+    },
+    {
+      "text": "1 2",
+      "ok": false
+    },
+    {
+      "text": "{} {}",
+      "ok": false
+    },
+    {
+      "text": "[] x",
+      "ok": false
+    },
+    {
+      "text": "// c\n1",
+      "ok": false
+    },
+    {
+      "text": "/* c */ 1",
+      "ok": false
+    },
+    {
+      "text": "﻿1",
+      "ok": false
+    },
+    {
+      "text": "1 ",
+      "ok": false
+    },
+    {
+      "text": " 1",
+      "ok": false
+    },
+    {
+      "text": "\u000b1",
+      "ok": false
+    },
+    {
+      "text": "\f1",
+      "ok": false
+    },
+    {
+      "text": "- 1",
+      "ok": false
+    },
+    {
+      "text": "--1",
+      "ok": false
+    },
+    {
+      "text": "1e1.5",
+      "ok": false
+    },
+    {
+      "text": "{\"a\":1,\"a\"}",
+      "ok": false
+    },
+    {
+      "text": "[1,,2]",
+      "ok": false
+    },
+    {
+      "text": "\"\\a\"",
+      "ok": false
+    },
+    {
+      "text": "nulll",
+      "ok": false
+    },
+    {
+      "text": "{\"a\":undefined}",
+      "ok": false
+    },
+    {
+      "text": " 1 ",
+      "ok": true,
+      "compact": "1",
+      "pretty": "1",
+      "string": "1",
+      "number": "1",
+      "truthy": true
+    },
+    {
+      "text": "\t\n\r 1 \t\n\r",
+      "ok": true,
+      "compact": "1",
+      "pretty": "1",
+      "string": "1",
+      "number": "1",
+      "truthy": true
+    },
+    {
+      "text": "[ 1 , 2 ]",
+      "ok": true,
+      "compact": "[1,2]",
+      "pretty": "[\n  1,\n  2\n]",
+      "string": "1,2",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{ \"a\" : 1 , \"b\" : [ ] }",
+      "ok": true,
+      "compact": "{\"a\":1,\"b\":[]}",
+      "pretty": "{\n  \"a\": 1,\n  \"b\": []\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "null",
+      "ok": true,
+      "compact": "null",
+      "pretty": "null",
+      "string": "null",
+      "number": "0",
+      "truthy": false
+    },
+    {
+      "text": "true",
+      "ok": true,
+      "compact": "true",
+      "pretty": "true",
+      "string": "true",
+      "number": "1",
+      "truthy": true
+    },
+    {
+      "text": "false",
+      "ok": true,
+      "compact": "false",
+      "pretty": "false",
+      "string": "false",
+      "number": "0",
+      "truthy": false
+    },
+    {
+      "text": "[]",
+      "ok": true,
+      "compact": "[]",
+      "pretty": "[]",
+      "string": "",
+      "number": "0",
+      "truthy": true
+    },
+    {
+      "text": "{}",
+      "ok": true,
+      "compact": "{}",
+      "pretty": "{}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "[[]]",
+      "ok": true,
+      "compact": "[[]]",
+      "pretty": "[\n  []\n]",
+      "string": "",
+      "number": "0",
+      "truthy": true
+    },
+    {
+      "text": "[{}]",
+      "ok": true,
+      "compact": "[{}]",
+      "pretty": "[\n  {}\n]",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"a\":{}}",
+      "ok": true,
+      "compact": "{\"a\":{}}",
+      "pretty": "{\n  \"a\": {}\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "[[],[[]],{}]",
+      "ok": true,
+      "compact": "[[],[[]],{}]",
+      "pretty": "[\n  [],\n  [\n    []\n  ],\n  {}\n]",
+      "string": ",,[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "[null]",
+      "ok": true,
+      "compact": "[null]",
+      "pretty": "[\n  null\n]",
+      "string": "",
+      "number": "0",
+      "truthy": true
+    },
+    {
+      "text": "[null,null]",
+      "ok": true,
+      "compact": "[null,null]",
+      "pretty": "[\n  null,\n  null\n]",
+      "string": ",",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "[1,null,[2,3],\"a\",{}]",
+      "ok": true,
+      "compact": "[1,null,[2,3],\"a\",{}]",
+      "pretty": "[\n  1,\n  null,\n  [\n    2,\n    3\n  ],\n  \"a\",\n  {}\n]",
+      "string": "1,,2,3,a,[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "[[1,[2,[3,[4]]]]]",
+      "ok": true,
+      "compact": "[[1,[2,[3,[4]]]]]",
+      "pretty": "[\n  [\n    1,\n    [\n      2,\n      [\n        3,\n        [\n          4\n        ]\n      ]\n    ]\n  ]\n]",
+      "string": "1,2,3,4",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "[true,false]",
+      "ok": true,
+      "compact": "[true,false]",
+      "pretty": "[\n  true,\n  false\n]",
+      "string": "true,false",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "[\"\"]",
+      "ok": true,
+      "compact": "[\"\"]",
+      "pretty": "[\n  \"\"\n]",
+      "string": "",
+      "number": "0",
+      "truthy": true
+    },
+    {
+      "text": "[\"0x10\"]",
+      "ok": true,
+      "compact": "[\"0x10\"]",
+      "pretty": "[\n  \"0x10\"\n]",
+      "string": "0x10",
+      "number": "16",
+      "truthy": true
+    },
+    {
+      "text": "[5]",
+      "ok": true,
+      "compact": "[5]",
+      "pretty": "[\n  5\n]",
+      "string": "5",
+      "number": "5",
+      "truthy": true
+    },
+    {
+      "text": "[\" 12 \"]",
+      "ok": true,
+      "compact": "[\" 12 \"]",
+      "pretty": "[\n  \" 12 \"\n]",
+      "string": " 12 ",
+      "number": "12",
+      "truthy": true
+    },
+    {
+      "text": "[1,2]",
+      "ok": true,
+      "compact": "[1,2]",
+      "pretty": "[\n  1,\n  2\n]",
+      "string": "1,2",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "[[5]]",
+      "ok": true,
+      "compact": "[[5]]",
+      "pretty": "[\n  [\n    5\n  ]\n]",
+      "string": "5",
+      "number": "5",
+      "truthy": true
+    },
+    {
+      "text": "[null,1]",
+      "ok": true,
+      "compact": "[null,1]",
+      "pretty": "[\n  null,\n  1\n]",
+      "string": ",1",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"a\":null,\"b\":true,\"c\":[1,2,{\"d\":\"e\"}]}",
+      "ok": true,
+      "compact": "{\"a\":null,\"b\":true,\"c\":[1,2,{\"d\":\"e\"}]}",
+      "pretty": "{\n  \"a\": null,\n  \"b\": true,\n  \"c\": [\n    1,\n    2,\n    {\n      \"d\": \"e\"\n    }\n  ]\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"b\":1,\"a\":2}",
+      "ok": true,
+      "compact": "{\"b\":1,\"a\":2}",
+      "pretty": "{\n  \"b\": 1,\n  \"a\": 2\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"2\":1,\"1\":2,\"b\":3,\"a\":4,\"0\":5}",
+      "ok": true,
+      "compact": "{\"0\":5,\"1\":2,\"2\":1,\"b\":3,\"a\":4}",
+      "pretty": "{\n  \"0\": 5,\n  \"1\": 2,\n  \"2\": 1,\n  \"b\": 3,\n  \"a\": 4\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"10\":1,\"9\":2,\"01\":3,\"1.5\":4,\"-1\":5,\"4294967294\":6,\"4294967295\":7,\"4294967296\":8}",
+      "ok": true,
+      "compact": "{\"9\":2,\"10\":1,\"4294967294\":6,\"01\":3,\"1.5\":4,\"-1\":5,\"4294967295\":7,\"4294967296\":8}",
+      "pretty": "{\n  \"9\": 2,\n  \"10\": 1,\n  \"4294967294\": 6,\n  \"01\": 3,\n  \"1.5\": 4,\n  \"-1\": 5,\n  \"4294967295\": 7,\n  \"4294967296\": 8\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"a\":1,\"a\":2}",
+      "ok": true,
+      "compact": "{\"a\":2}",
+      "pretty": "{\n  \"a\": 2\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"a\":1,\"b\":2,\"a\":3}",
+      "ok": true,
+      "compact": "{\"a\":3,\"b\":2}",
+      "pretty": "{\n  \"a\": 3,\n  \"b\": 2\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"1\":1,\"a\":1,\"1\":2}",
+      "ok": true,
+      "compact": "{\"1\":2,\"a\":1}",
+      "pretty": "{\n  \"1\": 2,\n  \"a\": 1\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"\":1}",
+      "ok": true,
+      "compact": "{\"\":1}",
+      "pretty": "{\n  \"\": 1\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"__proto__\":1}",
+      "ok": true,
+      "compact": "{\"__proto__\":1}",
+      "pretty": "{\n  \"__proto__\": 1\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"__proto__\":{\"a\":1},\"b\":2}",
+      "ok": true,
+      "compact": "{\"__proto__\":{\"a\":1},\"b\":2}",
+      "pretty": "{\n  \"__proto__\": {\n    \"a\": 1\n  },\n  \"b\": 2\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"constructor\":1,\"toString\":2,\"length\":3}",
+      "ok": true,
+      "compact": "{\"constructor\":1,\"toString\":2,\"length\":3}",
+      "pretty": "{\n  \"constructor\": 1,\n  \"toString\": 2,\n  \"length\": 3\n}",
+      "string": null,
+      "number": null,
+      "truthy": true
+    },
+    {
+      "text": "{\"a b\":1,\"\\u00e9\":2,\"\\ud83d\\ude00\":3,\"\\ud83d\":4}",
+      "ok": true,
+      "compact": "{\"a b\":1,\"é\":2,\"😀\":3,\"\\ud83d\":4}",
+      "pretty": "{\n  \"a b\": 1,\n  \"é\": 2,\n  \"😀\": 3,\n  \"\\ud83d\": 4\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"1e2\":1,\"100\":2}",
+      "ok": true,
+      "compact": "{\"100\":2,\"1e2\":1}",
+      "pretty": "{\n  \"100\": 2,\n  \"1e2\": 1\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "{\"00\":1,\"0\":2}",
+      "ok": true,
+      "compact": "{\"0\":2,\"00\":1}",
+      "pretty": "{\n  \"0\": 2,\n  \"00\": 1\n}",
+      "string": "[object Object]",
+      "number": "NaN",
+      "truthy": true
+    },
+    {
+      "text": "\"\"",
+      "ok": true,
+      "compact": "\"\"",
+      "pretty": "\"\"",
+      "string": "",
+      "number": "0",
+      "truthy": false,
+      "trimmed": "",
+      "codePoints": 0,
+      "uri": ""
+    },
+    {
+      "text": "\"a\"",
+      "ok": true,
+      "compact": "\"a\"",
+      "pretty": "\"a\"",
+      "string": "a",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "a",
+      "codePoints": 1,
+      "uri": "a"
+    },
+    {
+      "text": "\"\\\"\"",
+      "ok": true,
+      "compact": "\"\\\"\"",
+      "pretty": "\"\\\"\"",
+      "string": "\"",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\"",
+      "codePoints": 1,
+      "uri": "%22"
+    },
+    {
+      "text": "\"\\\\\"",
+      "ok": true,
+      "compact": "\"\\\\\"",
+      "pretty": "\"\\\\\"",
+      "string": "\\",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\\",
+      "codePoints": 1,
+      "uri": "%5C"
+    },
+    {
+      "text": "\"\\/\"",
+      "ok": true,
+      "compact": "\"/\"",
+      "pretty": "\"/\"",
+      "string": "/",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "/",
+      "codePoints": 1,
+      "uri": "%2F"
+    },
+    {
+      "text": "\"/\"",
+      "ok": true,
+      "compact": "\"/\"",
+      "pretty": "\"/\"",
+      "string": "/",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "/",
+      "codePoints": 1,
+      "uri": "%2F"
+    },
+    {
+      "text": "\"\\b\\f\\n\\r\\t\"",
+      "ok": true,
+      "compact": "\"\\b\\f\\n\\r\\t\"",
+      "pretty": "\"\\b\\f\\n\\r\\t\"",
+      "string": "\b\f\n\r\t",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\b",
+      "codePoints": 5,
+      "uri": "%08%0C%0A%0D%09"
+    },
+    {
+      "text": "\"\\u0000\"",
+      "ok": true,
+      "compact": "\"\\u0000\"",
+      "pretty": "\"\\u0000\"",
+      "string": "\u0000",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\u0000",
+      "codePoints": 1,
+      "uri": "%00"
+    },
+    {
+      "text": "\"\\u001f\"",
+      "ok": true,
+      "compact": "\"\\u001f\"",
+      "pretty": "\"\\u001f\"",
+      "string": "\u001f",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\u001f",
+      "codePoints": 1,
+      "uri": "%1F"
+    },
+    {
+      "text": "\"\\u0020\"",
+      "ok": true,
+      "compact": "\" \"",
+      "pretty": "\" \"",
+      "string": " ",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "",
+      "codePoints": 1,
+      "uri": "%20"
+    },
+    {
+      "text": "\"\\u007f\"",
+      "ok": true,
+      "compact": "\"\"",
+      "pretty": "\"\"",
+      "string": "",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "",
+      "codePoints": 1,
+      "uri": "%7F"
+    },
+    {
+      "text": "\"\\u0080\"",
+      "ok": true,
+      "compact": "\"\"",
+      "pretty": "\"\"",
+      "string": "",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "",
+      "codePoints": 1,
+      "uri": "%C2%80"
+    },
+    {
+      "text": "\"\\u00e9\"",
+      "ok": true,
+      "compact": "\"é\"",
+      "pretty": "\"é\"",
+      "string": "é",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "é",
+      "codePoints": 1,
+      "uri": "%C3%A9"
+    },
+    {
+      "text": "\"é\"",
+      "ok": true,
+      "compact": "\"é\"",
+      "pretty": "\"é\"",
+      "string": "é",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "é",
+      "codePoints": 1,
+      "uri": "%C3%A9"
+    },
+    {
+      "text": "\"\\u2028\\u2029\"",
+      "ok": true,
+      "compact": "\"  \"",
+      "pretty": "\"  \"",
+      "string": "  ",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "",
+      "codePoints": 2,
+      "uri": "%E2%80%A8%E2%80%A9"
+    },
+    {
+      "text": "\" \"",
+      "ok": true,
+      "compact": "\" \"",
+      "pretty": "\" \"",
+      "string": " ",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "",
+      "codePoints": 1,
+      "uri": "%E2%80%A8"
+    },
+    {
+      "text": "\"\\ud83d\\ude00\"",
+      "ok": true,
+      "compact": "\"😀\"",
+      "pretty": "\"😀\"",
+      "string": "😀",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "😀",
+      "codePoints": 1,
+      "uri": "%F0%9F%98%80"
+    },
+    {
+      "text": "\"😀\"",
+      "ok": true,
+      "compact": "\"😀\"",
+      "pretty": "\"😀\"",
+      "string": "😀",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "😀",
+      "codePoints": 1,
+      "uri": "%F0%9F%98%80"
+    },
+    {
+      "text": "\"\\ud83d\"",
+      "ok": true,
+      "compact": "\"\\ud83d\"",
+      "pretty": "\"\\ud83d\"",
+      "string": "\ud83d",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\ud83d",
+      "codePoints": 1,
+      "uri": null
+    },
+    {
+      "text": "\"\\ude00\"",
+      "ok": true,
+      "compact": "\"\\ude00\"",
+      "pretty": "\"\\ude00\"",
+      "string": "\ude00",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\ude00",
+      "codePoints": 1,
+      "uri": null
+    },
+    {
+      "text": "\"a\\ud83db\"",
+      "ok": true,
+      "compact": "\"a\\ud83db\"",
+      "pretty": "\"a\\ud83db\"",
+      "string": "a\ud83db",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "a\ud83db",
+      "codePoints": 3,
+      "uri": null
+    },
+    {
+      "text": "\"\\ude00\\ud83d\"",
+      "ok": true,
+      "compact": "\"\\ude00\\ud83d\"",
+      "pretty": "\"\\ude00\\ud83d\"",
+      "string": "\ude00\ud83d",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\ude00\ud83d",
+      "codePoints": 2,
+      "uri": null
+    },
+    {
+      "text": "\"\\ud83d\\ud83d\\ude00\"",
+      "ok": true,
+      "compact": "\"\\ud83d😀\"",
+      "pretty": "\"\\ud83d😀\"",
+      "string": "\ud83d😀",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\ud83d😀",
+      "codePoints": 2,
+      "uri": null
+    },
+    {
+      "text": "\"\\uD83D\\uDE00\"",
+      "ok": true,
+      "compact": "\"😀\"",
+      "pretty": "\"😀\"",
+      "string": "😀",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "😀",
+      "codePoints": 1,
+      "uri": "%F0%9F%98%80"
+    },
+    {
+      "text": "\"\\u00E9\\u00e9\"",
+      "ok": true,
+      "compact": "\"éé\"",
+      "pretty": "\"éé\"",
+      "string": "éé",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "éé",
+      "codePoints": 2,
+      "uri": "%C3%A9%C3%A9"
+    },
+    {
+      "text": "\"\\uffff\"",
+      "ok": true,
+      "compact": "\"￿\"",
+      "pretty": "\"￿\"",
+      "string": "￿",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "￿",
+      "codePoints": 1,
+      "uri": "%EF%BF%BF"
+    },
+    {
+      "text": "\"\\ufffe\"",
+      "ok": true,
+      "compact": "\"￾\"",
+      "pretty": "\"￾\"",
+      "string": "￾",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "￾",
+      "codePoints": 1,
+      "uri": "%EF%BF%BE"
+    },
+    {
+      "text": "\"\\ufeff\"",
+      "ok": true,
+      "compact": "\"﻿\"",
+      "pretty": "\"﻿\"",
+      "string": "﻿",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "",
+      "codePoints": 1,
+      "uri": "%EF%BB%BF"
+    },
+    {
+      "text": "\"<script>&amp;</script>\"",
+      "ok": true,
+      "compact": "\"<script>&amp;</script>\"",
+      "pretty": "\"<script>&amp;</script>\"",
+      "string": "<script>&amp;</script>",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "<script>&amp;</script>",
+      "codePoints": 22,
+      "uri": "%3Cscript%3E%26amp%3B%3C%2Fscript%3E"
+    },
+    {
+      "text": "\"\\u003c\"",
+      "ok": true,
+      "compact": "\"<\"",
+      "pretty": "\"<\"",
+      "string": "<",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "<",
+      "codePoints": 1,
+      "uri": "%3C"
+    },
+    {
+      "text": "\"\"",
+      "ok": true,
+      "compact": "\"\"",
+      "pretty": "\"\"",
+      "string": "",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "",
+      "codePoints": 1,
+      "uri": "%7F"
+    },
+    {
+      "text": "\"日本語\"",
+      "ok": true,
+      "compact": "\"日本語\"",
+      "pretty": "\"日本語\"",
+      "string": "日本語",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "日本語",
+      "codePoints": 3,
+      "uri": "%E6%97%A5%E6%9C%AC%E8%AA%9E"
+    },
+    {
+      "text": "\"𝒳\"",
+      "ok": true,
+      "compact": "\"𝒳\"",
+      "pretty": "\"𝒳\"",
+      "string": "𝒳",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "𝒳",
+      "codePoints": 1,
+      "uri": "%F0%9D%92%B3"
+    },
+    {
+      "text": "\" a \"",
+      "ok": true,
+      "compact": "\" a \"",
+      "pretty": "\" a \"",
+      "string": " a ",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "a",
+      "codePoints": 3,
+      "uri": "%20a%20"
+    },
+    {
+      "text": "\"\\t\\n\\u000b\\u000c\\r a\"",
+      "ok": true,
+      "compact": "\"\\t\\n\\u000b\\f\\r a\"",
+      "pretty": "\"\\t\\n\\u000b\\f\\r a\"",
+      "string": "\t\n\u000b\f\r a",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "a",
+      "codePoints": 7,
+      "uri": "%09%0A%0B%0C%0D%20a"
+    },
+    {
+      "text": "\"\\u00a0\\ufeff x \\u2028\\u2029\"",
+      "ok": true,
+      "compact": "\" ﻿ x   \"",
+      "pretty": "\" ﻿ x   \"",
+      "string": " ﻿ x   ",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "x",
+      "codePoints": 7,
+      "uri": "%C2%A0%EF%BB%BF%20x%20%E2%80%A8%E2%80%A9"
+    },
+    {
+      "text": "\"\\u1680\\u2000\\u200a\\u202f\\u205f\\u3000x\"",
+      "ok": true,
+      "compact": "\"     　x\"",
+      "pretty": "\"     　x\"",
+      "string": "     　x",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "x",
+      "codePoints": 7,
+      "uri": "%E1%9A%80%E2%80%80%E2%80%8A%E2%80%AF%E2%81%9F%E3%80%80x"
+    },
+    {
+      "text": "\"\\u180ex\"",
+      "ok": true,
+      "compact": "\"᠎x\"",
+      "pretty": "\"᠎x\"",
+      "string": "᠎x",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "᠎x",
+      "codePoints": 2,
+      "uri": "%E1%A0%8Ex"
+    },
+    {
+      "text": "\"\\u0085x\"",
+      "ok": true,
+      "compact": "\"x\"",
+      "pretty": "\"x\"",
+      "string": "x",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "x",
+      "codePoints": 2,
+      "uri": "%C2%85x"
+    },
+    {
+      "text": "\"\\u200bx\"",
+      "ok": true,
+      "compact": "\"​x\"",
+      "pretty": "\"​x\"",
+      "string": "​x",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "​x",
+      "codePoints": 2,
+      "uri": "%E2%80%8Bx"
+    },
+    {
+      "text": "\"  \"",
+      "ok": true,
+      "compact": "\"  \"",
+      "pretty": "\"  \"",
+      "string": "  ",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "",
+      "codePoints": 2,
+      "uri": "%20%20"
+    },
+    {
+      "text": "\"0\"",
+      "ok": true,
+      "compact": "\"0\"",
+      "pretty": "\"0\"",
+      "string": "0",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "0",
+      "codePoints": 1,
+      "uri": "0"
+    },
+    {
+      "text": "\"-0\"",
+      "ok": true,
+      "compact": "\"-0\"",
+      "pretty": "\"-0\"",
+      "string": "-0",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "-0",
+      "codePoints": 2,
+      "uri": "-0"
+    },
+    {
+      "text": "\"12\"",
+      "ok": true,
+      "compact": "\"12\"",
+      "pretty": "\"12\"",
+      "string": "12",
+      "number": "12",
+      "truthy": true,
+      "trimmed": "12",
+      "codePoints": 2,
+      "uri": "12"
+    },
+    {
+      "text": "\" 12 \"",
+      "ok": true,
+      "compact": "\" 12 \"",
+      "pretty": "\" 12 \"",
+      "string": " 12 ",
+      "number": "12",
+      "truthy": true,
+      "trimmed": "12",
+      "codePoints": 4,
+      "uri": "%2012%20"
+    },
+    {
+      "text": "\"1e3\"",
+      "ok": true,
+      "compact": "\"1e3\"",
+      "pretty": "\"1e3\"",
+      "string": "1e3",
+      "number": "1000",
+      "truthy": true,
+      "trimmed": "1e3",
+      "codePoints": 3,
+      "uri": "1e3"
+    },
+    {
+      "text": "\"1E3\"",
+      "ok": true,
+      "compact": "\"1E3\"",
+      "pretty": "\"1E3\"",
+      "string": "1E3",
+      "number": "1000",
+      "truthy": true,
+      "trimmed": "1E3",
+      "codePoints": 3,
+      "uri": "1E3"
+    },
+    {
+      "text": "\"1e\"",
+      "ok": true,
+      "compact": "\"1e\"",
+      "pretty": "\"1e\"",
+      "string": "1e",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "1e",
+      "codePoints": 2,
+      "uri": "1e"
+    },
+    {
+      "text": "\".5\"",
+      "ok": true,
+      "compact": "\".5\"",
+      "pretty": "\".5\"",
+      "string": ".5",
+      "number": "0.5",
+      "truthy": true,
+      "trimmed": ".5",
+      "codePoints": 2,
+      "uri": ".5"
+    },
+    {
+      "text": "\"5.\"",
+      "ok": true,
+      "compact": "\"5.\"",
+      "pretty": "\"5.\"",
+      "string": "5.",
+      "number": "5",
+      "truthy": true,
+      "trimmed": "5.",
+      "codePoints": 2,
+      "uri": "5."
+    },
+    {
+      "text": "\"+.5e1\"",
+      "ok": true,
+      "compact": "\"+.5e1\"",
+      "pretty": "\"+.5e1\"",
+      "string": "+.5e1",
+      "number": "5",
+      "truthy": true,
+      "trimmed": "+.5e1",
+      "codePoints": 5,
+      "uri": "%2B.5e1"
+    },
+    {
+      "text": "\".\"",
+      "ok": true,
+      "compact": "\".\"",
+      "pretty": "\".\"",
+      "string": ".",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": ".",
+      "codePoints": 1,
+      "uri": "."
+    },
+    {
+      "text": "\"+\"",
+      "ok": true,
+      "compact": "\"+\"",
+      "pretty": "\"+\"",
+      "string": "+",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "+",
+      "codePoints": 1,
+      "uri": "%2B"
+    },
+    {
+      "text": "\"-\"",
+      "ok": true,
+      "compact": "\"-\"",
+      "pretty": "\"-\"",
+      "string": "-",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "-",
+      "codePoints": 1,
+      "uri": "-"
+    },
+    {
+      "text": "\"0x1F\"",
+      "ok": true,
+      "compact": "\"0x1F\"",
+      "pretty": "\"0x1F\"",
+      "string": "0x1F",
+      "number": "31",
+      "truthy": true,
+      "trimmed": "0x1F",
+      "codePoints": 4,
+      "uri": "0x1F"
+    },
+    {
+      "text": "\"0X1f\"",
+      "ok": true,
+      "compact": "\"0X1f\"",
+      "pretty": "\"0X1f\"",
+      "string": "0X1f",
+      "number": "31",
+      "truthy": true,
+      "trimmed": "0X1f",
+      "codePoints": 4,
+      "uri": "0X1f"
+    },
+    {
+      "text": "\"0x\"",
+      "ok": true,
+      "compact": "\"0x\"",
+      "pretty": "\"0x\"",
+      "string": "0x",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "0x",
+      "codePoints": 2,
+      "uri": "0x"
+    },
+    {
+      "text": "\"-0x10\"",
+      "ok": true,
+      "compact": "\"-0x10\"",
+      "pretty": "\"-0x10\"",
+      "string": "-0x10",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "-0x10",
+      "codePoints": 5,
+      "uri": "-0x10"
+    },
+    {
+      "text": "\"+0x10\"",
+      "ok": true,
+      "compact": "\"+0x10\"",
+      "pretty": "\"+0x10\"",
+      "string": "+0x10",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "+0x10",
+      "codePoints": 5,
+      "uri": "%2B0x10"
+    },
+    {
+      "text": "\"0b101\"",
+      "ok": true,
+      "compact": "\"0b101\"",
+      "pretty": "\"0b101\"",
+      "string": "0b101",
+      "number": "5",
+      "truthy": true,
+      "trimmed": "0b101",
+      "codePoints": 5,
+      "uri": "0b101"
+    },
+    {
+      "text": "\"0B11\"",
+      "ok": true,
+      "compact": "\"0B11\"",
+      "pretty": "\"0B11\"",
+      "string": "0B11",
+      "number": "3",
+      "truthy": true,
+      "trimmed": "0B11",
+      "codePoints": 4,
+      "uri": "0B11"
+    },
+    {
+      "text": "\"0b12\"",
+      "ok": true,
+      "compact": "\"0b12\"",
+      "pretty": "\"0b12\"",
+      "string": "0b12",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "0b12",
+      "codePoints": 4,
+      "uri": "0b12"
+    },
+    {
+      "text": "\"0o17\"",
+      "ok": true,
+      "compact": "\"0o17\"",
+      "pretty": "\"0o17\"",
+      "string": "0o17",
+      "number": "15",
+      "truthy": true,
+      "trimmed": "0o17",
+      "codePoints": 4,
+      "uri": "0o17"
+    },
+    {
+      "text": "\"0O7\"",
+      "ok": true,
+      "compact": "\"0O7\"",
+      "pretty": "\"0O7\"",
+      "string": "0O7",
+      "number": "7",
+      "truthy": true,
+      "trimmed": "0O7",
+      "codePoints": 3,
+      "uri": "0O7"
+    },
+    {
+      "text": "\"0o8\"",
+      "ok": true,
+      "compact": "\"0o8\"",
+      "pretty": "\"0o8\"",
+      "string": "0o8",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "0o8",
+      "codePoints": 3,
+      "uri": "0o8"
+    },
+    {
+      "text": "\"Infinity\"",
+      "ok": true,
+      "compact": "\"Infinity\"",
+      "pretty": "\"Infinity\"",
+      "string": "Infinity",
+      "number": "Infinity",
+      "truthy": true,
+      "trimmed": "Infinity",
+      "codePoints": 8,
+      "uri": "Infinity"
+    },
+    {
+      "text": "\"-Infinity\"",
+      "ok": true,
+      "compact": "\"-Infinity\"",
+      "pretty": "\"-Infinity\"",
+      "string": "-Infinity",
+      "number": "-Infinity",
+      "truthy": true,
+      "trimmed": "-Infinity",
+      "codePoints": 9,
+      "uri": "-Infinity"
+    },
+    {
+      "text": "\"+Infinity\"",
+      "ok": true,
+      "compact": "\"+Infinity\"",
+      "pretty": "\"+Infinity\"",
+      "string": "+Infinity",
+      "number": "Infinity",
+      "truthy": true,
+      "trimmed": "+Infinity",
+      "codePoints": 9,
+      "uri": "%2BInfinity"
+    },
+    {
+      "text": "\"infinity\"",
+      "ok": true,
+      "compact": "\"infinity\"",
+      "pretty": "\"infinity\"",
+      "string": "infinity",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "infinity",
+      "codePoints": 8,
+      "uri": "infinity"
+    },
+    {
+      "text": "\"Infinityx\"",
+      "ok": true,
+      "compact": "\"Infinityx\"",
+      "pretty": "\"Infinityx\"",
+      "string": "Infinityx",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "Infinityx",
+      "codePoints": 9,
+      "uri": "Infinityx"
+    },
+    {
+      "text": "\"inf\"",
+      "ok": true,
+      "compact": "\"inf\"",
+      "pretty": "\"inf\"",
+      "string": "inf",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "inf",
+      "codePoints": 3,
+      "uri": "inf"
+    },
+    {
+      "text": "\"nan\"",
+      "ok": true,
+      "compact": "\"nan\"",
+      "pretty": "\"nan\"",
+      "string": "nan",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "nan",
+      "codePoints": 3,
+      "uri": "nan"
+    },
+    {
+      "text": "\"NaN\"",
+      "ok": true,
+      "compact": "\"NaN\"",
+      "pretty": "\"NaN\"",
+      "string": "NaN",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "NaN",
+      "codePoints": 3,
+      "uri": "NaN"
+    },
+    {
+      "text": "\"1_000\"",
+      "ok": true,
+      "compact": "\"1_000\"",
+      "pretty": "\"1_000\"",
+      "string": "1_000",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "1_000",
+      "codePoints": 5,
+      "uri": "1_000"
+    },
+    {
+      "text": "\"1,000\"",
+      "ok": true,
+      "compact": "\"1,000\"",
+      "pretty": "\"1,000\"",
+      "string": "1,000",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "1,000",
+      "codePoints": 5,
+      "uri": "1%2C000"
+    },
+    {
+      "text": "\"12px\"",
+      "ok": true,
+      "compact": "\"12px\"",
+      "pretty": "\"12px\"",
+      "string": "12px",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "12px",
+      "codePoints": 4,
+      "uri": "12px"
+    },
+    {
+      "text": "\"1 2\"",
+      "ok": true,
+      "compact": "\"1 2\"",
+      "pretty": "\"1 2\"",
+      "string": "1 2",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "1 2",
+      "codePoints": 3,
+      "uri": "1%202"
+    },
+    {
+      "text": "\"1e1000\"",
+      "ok": true,
+      "compact": "\"1e1000\"",
+      "pretty": "\"1e1000\"",
+      "string": "1e1000",
+      "number": "Infinity",
+      "truthy": true,
+      "trimmed": "1e1000",
+      "codePoints": 6,
+      "uri": "1e1000"
+    },
+    {
+      "text": "\"-1e1000\"",
+      "ok": true,
+      "compact": "\"-1e1000\"",
+      "pretty": "\"-1e1000\"",
+      "string": "-1e1000",
+      "number": "-Infinity",
+      "truthy": true,
+      "trimmed": "-1e1000",
+      "codePoints": 7,
+      "uri": "-1e1000"
+    },
+    {
+      "text": "\"1e-1000\"",
+      "ok": true,
+      "compact": "\"1e-1000\"",
+      "pretty": "\"1e-1000\"",
+      "string": "1e-1000",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "1e-1000",
+      "codePoints": 7,
+      "uri": "1e-1000"
+    },
+    {
+      "text": "\"00012\"",
+      "ok": true,
+      "compact": "\"00012\"",
+      "pretty": "\"00012\"",
+      "string": "00012",
+      "number": "12",
+      "truthy": true,
+      "trimmed": "00012",
+      "codePoints": 5,
+      "uri": "00012"
+    },
+    {
+      "text": "\"0.0000001\"",
+      "ok": true,
+      "compact": "\"0.0000001\"",
+      "pretty": "\"0.0000001\"",
+      "string": "0.0000001",
+      "number": "1e-7",
+      "truthy": true,
+      "trimmed": "0.0000001",
+      "codePoints": 9,
+      "uri": "0.0000001"
+    },
+    {
+      "text": "\"123456789012345678901234567890\"",
+      "ok": true,
+      "compact": "\"123456789012345678901234567890\"",
+      "pretty": "\"123456789012345678901234567890\"",
+      "string": "123456789012345678901234567890",
+      "number": "1.2345678901234568e+29",
+      "truthy": true,
+      "trimmed": "123456789012345678901234567890",
+      "codePoints": 30,
+      "uri": "123456789012345678901234567890"
+    },
+    {
+      "text": "\"١\"",
+      "ok": true,
+      "compact": "\"١\"",
+      "pretty": "\"١\"",
+      "string": "١",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "١",
+      "codePoints": 1,
+      "uri": "%D9%A1"
+    },
+    {
+      "text": "\"true\"",
+      "ok": true,
+      "compact": "\"true\"",
+      "pretty": "\"true\"",
+      "string": "true",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "true",
+      "codePoints": 4,
+      "uri": "true"
+    },
+    {
+      "text": "\"null\"",
+      "ok": true,
+      "compact": "\"null\"",
+      "pretty": "\"null\"",
+      "string": "null",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "null",
+      "codePoints": 4,
+      "uri": "null"
+    },
+    {
+      "text": "\"\\u00a012\\u00a0\"",
+      "ok": true,
+      "compact": "\" 12 \"",
+      "pretty": "\" 12 \"",
+      "string": " 12 ",
+      "number": "12",
+      "truthy": true,
+      "trimmed": "12",
+      "codePoints": 4,
+      "uri": "%C2%A012%C2%A0"
+    },
+    {
+      "text": "\"1e+2\"",
+      "ok": true,
+      "compact": "\"1e+2\"",
+      "pretty": "\"1e+2\"",
+      "string": "1e+2",
+      "number": "100",
+      "truthy": true,
+      "trimmed": "1e+2",
+      "codePoints": 4,
+      "uri": "1e%2B2"
+    },
+    {
+      "text": "\"1e-2\"",
+      "ok": true,
+      "compact": "\"1e-2\"",
+      "pretty": "\"1e-2\"",
+      "string": "1e-2",
+      "number": "0.01",
+      "truthy": true,
+      "trimmed": "1e-2",
+      "codePoints": 4,
+      "uri": "1e-2"
+    },
+    {
+      "text": "\"e5\"",
+      "ok": true,
+      "compact": "\"e5\"",
+      "pretty": "\"e5\"",
+      "string": "e5",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "e5",
+      "codePoints": 2,
+      "uri": "e5"
+    },
+    {
+      "text": "\"5e\"",
+      "ok": true,
+      "compact": "\"5e\"",
+      "pretty": "\"5e\"",
+      "string": "5e",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "5e",
+      "codePoints": 2,
+      "uri": "5e"
+    },
+    {
+      "text": "\"++5\"",
+      "ok": true,
+      "compact": "\"++5\"",
+      "pretty": "\"++5\"",
+      "string": "++5",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "++5",
+      "codePoints": 3,
+      "uri": "%2B%2B5"
+    },
+    {
+      "text": "\"5-\"",
+      "ok": true,
+      "compact": "\"5-\"",
+      "pretty": "\"5-\"",
+      "string": "5-",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "5-",
+      "codePoints": 2,
+      "uri": "5-"
+    },
+    {
+      "text": "\"0x1g\"",
+      "ok": true,
+      "compact": "\"0x1g\"",
+      "pretty": "\"0x1g\"",
+      "string": "0x1g",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "0x1g",
+      "codePoints": 4,
+      "uri": "0x1g"
+    },
+    {
+      "text": "\"0e0\"",
+      "ok": true,
+      "compact": "\"0e0\"",
+      "pretty": "\"0e0\"",
+      "string": "0e0",
+      "number": "0",
+      "truthy": true,
+      "trimmed": "0e0",
+      "codePoints": 3,
+      "uri": "0e0"
+    },
+    {
+      "text": "\"a/b c?&=#%+\"",
+      "ok": true,
+      "compact": "\"a/b c?&=#%+\"",
+      "pretty": "\"a/b c?&=#%+\"",
+      "string": "a/b c?&=#%+",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "a/b c?&=#%+",
+      "codePoints": 11,
+      "uri": "a%2Fb%20c%3F%26%3D%23%25%2B"
+    },
+    {
+      "text": "\"!~*'()-_.\"",
+      "ok": true,
+      "compact": "\"!~*'()-_.\"",
+      "pretty": "\"!~*'()-_.\"",
+      "string": "!~*'()-_.",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "!~*'()-_.",
+      "codePoints": 9,
+      "uri": "!~*'()-_."
+    },
+    {
+      "text": "\"\\u0000\\u007f\\u0080\\u07ff\\u0800\\uffff\"",
+      "ok": true,
+      "compact": "\"\\u0000߿ࠀ￿\"",
+      "pretty": "\"\\u0000߿ࠀ￿\"",
+      "string": "\u0000߿ࠀ￿",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\u0000߿ࠀ￿",
+      "codePoints": 6,
+      "uri": "%00%7F%C2%80%DF%BF%E0%A0%80%EF%BF%BF"
+    },
+    {
+      "text": "\"\\\"<>[]{}|^`\\\\\"",
+      "ok": true,
+      "compact": "\"\\\"<>[]{}|^`\\\\\"",
+      "pretty": "\"\\\"<>[]{}|^`\\\\\"",
+      "string": "\"<>[]{}|^`\\",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\"<>[]{}|^`\\",
+      "codePoints": 11,
+      "uri": "%22%3C%3E%5B%5D%7B%7D%7C%5E%60%5C"
+    },
+    {
+      "text": "\"a\\ud83d\"",
+      "ok": true,
+      "compact": "\"a\\ud83d\"",
+      "pretty": "\"a\\ud83d\"",
+      "string": "a\ud83d",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "a\ud83d",
+      "codePoints": 2,
+      "uri": null
+    },
+    {
+      "text": "\"\\ude00a\"",
+      "ok": true,
+      "compact": "\"\\ude00a\"",
+      "pretty": "\"\\ude00a\"",
+      "string": "\ude00a",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "\ude00a",
+      "codePoints": 2,
+      "uri": null
+    },
+    {
+      "text": "\"é😀\"",
+      "ok": true,
+      "compact": "\"é😀\"",
+      "pretty": "\"é😀\"",
+      "string": "é😀",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "é😀",
+      "codePoints": 2,
+      "uri": "%C3%A9%F0%9F%98%80"
+    },
+    {
+      "text": "\"@:$,;\"",
+      "ok": true,
+      "compact": "\"@:$,;\"",
+      "pretty": "\"@:$,;\"",
+      "string": "@:$,;",
+      "number": "NaN",
+      "truthy": true,
+      "trimmed": "@:$,;",
+      "codePoints": 5,
+      "uri": "%40%3A%24%2C%3B"
+    }
+  ]
+}
