@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { api, errorText, type Channel, type PRDetail as PRDetailT } from '../api.ts';
-import { Chip, ErrorNote, Picker, SlideToConfirm, StatusDot, Toggle, type PickerOption } from '../components/ui.tsx';
+import { Button, Chip, ErrorNote, Picker, SlideToConfirm, StatusDot, Toggle, type PickerOption } from '../components/ui.tsx';
 import { checkTone } from '@omni/shared/thread-glance.ts';
+import { autoMergeView } from '@omni/shared/pr-auto-merge.ts';
 import { PRAutoMerge } from './PRAutoMerge.tsx';
+import { RerunNote, type useRerunFailedChecks } from '../components/RerunChecks.tsx';
 
 type MergeMethod = 'squash' | 'merge' | 'rebase';
 
@@ -13,10 +15,23 @@ const MERGE_METHODS: PickerOption<MergeMethod>[] = [
 ];
 
 /**
- * The merge card on an open pull request: method, delete-branch, warnings and the slide to confirm. After a merge it shows
- * gh's output in place of the card; `onMerged` reloads the pull request.
+ * The merge card on an open pull request, kept to one block above the tabs: method, delete-branch and auto-merge on one
+ * row, then what stands in the way (with Rerun failed checks beside the failing count), the slide and a one-line note.
+ * After a merge it shows gh's output in place of the card; `onMerged` reloads the pull request.
  */
-export function PRMergePanel({ channel, p, n, onMerged }: { channel: Channel; p: PRDetailT; n: number; onMerged: () => void }) {
+export function PRMergePanel({
+  channel,
+  p,
+  n,
+  onMerged,
+  rerun,
+}: {
+  channel: Channel;
+  p: PRDetailT;
+  n: number;
+  onMerged: () => void;
+  rerun: ReturnType<typeof useRerunFailedChecks>;
+}) {
   const [method, setMethod] = useState<MergeMethod>('squash');
   const [deleteBranch, setDeleteBranch] = useState(true);
   const [mergeError, setMergeError] = useState<string | null>(null);
@@ -41,50 +56,59 @@ export function PRMergePanel({ channel, p, n, onMerged }: { channel: Channel; p:
   };
 
   const failed = p.checkRuns.filter((c) => checkTone(c.state) === 'needs').length;
-  const warnings = [failed > 0 && `${failed} checks failing`, p.isDraft && 'Still a draft', p.reviewDecision === 'CHANGES_REQUESTED' && 'Changes requested'].filter(Boolean) as string[];
+  const warnings = [p.isDraft && 'Still a draft', p.reviewDecision === 'CHANGES_REQUESTED' && 'Changes requested'].filter(Boolean) as string[];
   const conflicting = p.mergeable === 'CONFLICTING';
+  const blocked = conflicting || failed > 0 || warnings.length > 0 || rerun.can;
+  const code = 'font-mono text-[length:var(--fs-code)] text-fg-2';
+  const auto = autoMergeView(p.autoMergeRequest);
 
   return (
     <>
       {open && !merged && (
-        <section aria-label="Merge" className="mt-6 rounded-[var(--r-xl)] bg-surface px-5 pt-4 pb-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-[length:var(--fs-heading)]">Merge</h3>
-            <Picker label="Merge method" value={method} onChange={setMethod} options={MERGE_METHODS} className="ml-1" />
-            <label className="flex items-center gap-2 pl-1 text-[13px] text-fg-2">
+        <section aria-label="Merge" className="mt-5 rounded-[var(--r-xl)] bg-surface px-4 pt-3.5 pb-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Picker label="Merge method" value={method} onChange={setMethod} options={MERGE_METHODS} />
+            <label className="flex items-center gap-2 text-[length:var(--fs-ui)] text-fg-2">
               <Toggle checked={deleteBranch} onChange={setDeleteBranch} label="Delete branch after merge" />
               Delete branch
             </label>
+            <PRAutoMerge channelId={channel.id} n={n} p={p} method={method} onChanged={onMerged} className="ml-auto" />
           </div>
-          <p className="mt-2 text-[length:var(--fs-small)] leading-[1.5] text-fg-3">
-            Merges <span className="font-mono text-[length:var(--fs-code)] text-fg-2">{p.headRefName}</span> into <span className="font-mono text-[length:var(--fs-code)] text-fg-2">{p.baseRefName}</span> on{' '}
-            <span className="font-mono text-[length:var(--fs-code)] text-fg-2">{channel.github_repo}</span>
-            {deleteBranch ? ', then deletes the branch.' : '.'} This runs <span className="font-mono text-[length:var(--fs-code)] text-fg-2">gh pr merge</span> and can’t be undone from here.
-          </p>
-          {(warnings.length > 0 || conflicting) && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
+          {blocked && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
               {conflicting && <Chip tone="needs">Has conflicts</Chip>}
+              {failed > 0 && <Chip tone="needs">{failed === 1 ? '1 check failing' : `${failed} checks failing`}</Chip>}
               {warnings.map((w) => (
                 <Chip key={w} tone="needs">
                   {w}
                 </Chip>
               ))}
+              {rerun.can && (
+                <Button size="sm" variant="ghost" icon="refresh" onClick={() => void rerun.run()} busy={rerun.busy} title="Runs gh run rerun --failed for each failing workflow run. No agent turn.">
+                  Rerun failed checks
+                </Button>
+              )}
             </div>
           )}
+          <RerunNote outcome={rerun.outcome} className="mt-3" />
           <SlideToConfirm
-            className="mt-4"
+            className="mt-3"
             label={conflicting ? 'Resolve conflicts first' : `Slide to ${MERGE_METHODS.find((m) => m.value === method)?.label.toLowerCase()}`}
             busyLabel="Merging"
             doneLabel="Merged"
             disabled={conflicting}
             onConfirm={doMerge}
           />
+          <p className="mt-2 px-1 text-[length:var(--fs-12)] leading-[1.45] text-fg-3" title={`${p.headRefName} into ${p.baseRefName} on ${channel.github_repo}`}>
+            Runs <span className={code}>gh pr merge</span>
+            {deleteBranch ? ', then deletes the branch' : ''}. Can’t be undone from here.
+            {auto.on && ` Auto-merge: ${auto.detail.charAt(0).toLowerCase()}${auto.detail.slice(1)}${auto.by ? `. ${auto.by}` : ''}.`}
+          </p>
           {mergeError && <ErrorNote className="mt-3">{mergeError}</ErrorNote>}
-          <PRAutoMerge channelId={channel.id} n={n} p={p} method={method} onChanged={onMerged} />
         </section>
       )}
       {merged && (
-        <div className="pop-in mt-6 flex items-start gap-2.5 rounded-[var(--r-xl)] bg-surface px-4 py-3 text-[length:var(--fs-ui)] text-fg">
+        <div className="pop-in mt-5 flex items-start gap-2.5 rounded-[var(--r-xl)] bg-surface px-4 py-3 text-[length:var(--fs-ui)] text-fg">
           <StatusDot status="done" size={9} className="mt-1 shrink-0" />
           <span className="whitespace-pre-wrap">{merged}</span>
         </div>

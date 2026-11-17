@@ -29,23 +29,27 @@ export function useAutoMerge(channelId: string | undefined, n: number | undefine
   return { view: autoMergeView(p.autoMergeRequest), busy, error, set };
 }
 
-/** The auto-merge row under the desktop merge card: on with its method, or a button that turns it on with `method`. */
-export function PRAutoMerge({ channelId, n, p, method, onChanged }: { channelId: string; n: number; p: PRDetail; method: MergeMethod; onChanged: () => void }) {
+/**
+ * Auto-merge on the desktop merge card's control row: a button that turns it on with `method`, or, while it is on, a
+ * live mark and a button that turns it off. The card's note says what it does and who turned it on. gh's refusal shows
+ * under the row.
+ */
+export function PRAutoMerge({ channelId, n, p, method, onChanged, className = '' }: { channelId: string; n: number; p: PRDetail; method: MergeMethod; onChanged: () => void; className?: string }) {
   const a = useAutoMerge(channelId, n, p, onChanged);
   const { on, title, detail, by } = a.view;
+  const says = by ? `${detail}. ${by}.` : `${detail}.`;
   return (
-    <div aria-label="Auto-merge" role="group" className="mt-4 border-t border-line pt-4">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Icon name="zap" size={16} className={`shrink-0 ${on ? 'text-live-text' : 'text-fg-3'}`} />
-        <div className="min-w-0 flex-1">
-          <div className="text-[length:var(--fs-ui)] font-medium text-fg">{title}</div>
-          <div className="text-[length:var(--fs-small)] leading-[1.5] text-fg-3">{by ? `${detail}. ${by}.` : `${detail}.`}</div>
-        </div>
-        <Button size="sm" busy={a.busy} disabled={p.isDraft && !on} onClick={() => void a.set(!on, method).catch(() => {})}>
-          {on ? AUTO_MERGE_COPY.disarm : AUTO_MERGE_COPY.arm}
-        </Button>
-      </div>
-      {a.error && <ErrorNote className="mt-3">{a.error}</ErrorNote>}
+    <div aria-label="Auto-merge" role="group" className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 ${className}`}>
+      {on && (
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[length:var(--fs-ui)] font-medium text-live-text" title={says}>
+          <Icon name="zap" size={14} className="shrink-0" />
+          {title}
+        </span>
+      )}
+      <Button size="sm" variant={on ? 'ghost' : 'secondary'} icon={on ? undefined : 'zap'} busy={a.busy} disabled={p.isDraft && !on} title={says} onClick={() => void a.set(!on, method).catch(() => {})}>
+        {on ? AUTO_MERGE_COPY.disarm : AUTO_MERGE_COPY.arm}
+      </Button>
+      {a.error && <ErrorNote className="basis-full">{a.error}</ErrorNote>}
     </div>
   );
 }

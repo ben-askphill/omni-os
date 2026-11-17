@@ -118,7 +118,7 @@ The inspector's tabs are Details, PRs, Artifacts, Changes, Browser, Terminal and
 
 - **Open PR** while there is none.
 - **Fix conflicts** or **Fix checks**, each of which asks the agent and queues mid-turn. After the prompt, Fix checks also sends up to five failing checks with their links and log tails, or the prompt alone when gh cannot read them.
-- **Merge**, which squash-merges in place and deletes the branch, with the same settings as the phone's merge slider. The PR page still has the full merge card for other merge methods, with an **Auto-merge** row under it ([Auto-merge](#auto-merge)).
+- **Merge**, which squash-merges in place and deletes the branch, with the same settings as the phone's merge slider. The PR page still has the full merge card for other merge methods, with **Auto-merge** on the same row ([Auto-merge](#auto-merge)).
 
 Each channel sets what Open PR, Fix conflicts and Fix checks ask the agent, under **Branch steps** in its settings (desktop web, phone web and the iOS app). For example, "use the pr-writer skill and the repo template". An empty field sends the built-in prompt, which it shows greyed out. The prompts sync to your other machine with the rest of the channel.
 
@@ -130,9 +130,9 @@ A thread that delegated work, such as a Conductor thread, gets a second card wit
 
 On a phone (phone web and the iOS app), Thread options lists Details first and the PR screen second. A thread with delegated PRs gets that PR entry without a branch. Without a PR of its own, its PR screen shows the first open delegated PR with the merge slide and a row that opens the delegated thread. Tap a delegated PR in the list below to show that one instead.
 
-A PR page opened from the PRs tab has buttons back to the thread that opened the PR and, for delegated work, to the thread that delegated it. **Ask builder to review** (and Fix conflicts when it asks for a review) opens that work under the nearest Conductor ancestor of the thread that owns the PR's branch, or under that builder when there is no Conductor. That keeps the review and its report with the original job. A PR with no clear Omni origin, or a fork PR, gets a new standalone builder instead.
+A PR page opened from the PRs tab keeps its header short: the back link with **GitHub** and **Ask builder to review** beside it, the title, one line of state, author, branch, checks and line counts, and a **From** line that links the thread that delegated the work and the thread that opened the PR. Under the header sits the merge card: merge method, Delete branch and Auto-merge on one row, then what stands in the way (conflicts, failing checks, draft, changes requested), the slide and a one-line note on what the merge runs. The tabs are **Conversation**, **Checks** and **Changes** (the diff, file by file, with each file's counts in its header). **Ask builder to review** (and Fix conflicts when it asks for a review) opens that work under the nearest Conductor ancestor of the thread that owns the PR's branch, or under that builder when there is no Conductor. That keeps the review and its report with the original job. A PR with no clear Omni origin, or a fork PR, gets a new standalone builder instead.
 
-**Rerun failed checks** shows on an open PR's page (desktop), the phone web PR view and the iOS PR screen while a failing check is a GitHub Actions job. It runs `gh run rerun --failed` for each failing workflow run, with no agent turn, and says in place how many runs started again or why none did. Omni leaves alone a failing check from outside GitHub Actions, such as a commit status or another app. The Conductor does the same with `rerun_failed_checks`.
+**Rerun failed checks** shows on an open PR's page (desktop, on the merge card beside the failing count), the phone web PR view and the iOS PR screen while a failing check is a GitHub Actions job. It runs `gh run rerun --failed` for each failing workflow run, with no agent turn, and says in place how many runs started again or why none did. Omni leaves alone a failing check from outside GitHub Actions, such as a commit status or another app. The Conductor does the same with `rerun_failed_checks`.
 
 ## Running subagents
 
@@ -258,7 +258,7 @@ A thread with an open PR can watch its checks and its reviews. Start it with **W
 
 ## Auto-merge
 
-An open PR can merge by itself once its required checks and reviews pass (`gh pr merge --auto`), so you can turn it on from the phone and walk away. The **Auto-merge** row shows whether it is on, with which method and who turned it on, and turns it on or off. It is on the desktop PR page under the merge card, where it uses the merge method picked there. It is also on the phone web PR screen and in the iOS app, where a tap shows the same confirm slide as a merge.
+An open PR can merge by itself once its required checks and reviews pass (`gh pr merge --auto`), so you can turn it on from the phone and walk away. The **Auto-merge** row shows whether it is on, with which method and who turned it on, and turns it on or off. It is on the desktop PR page's merge card, beside the merge method it uses, and the card's note says what it does and who turned it on while it is on. It is also on the phone web PR screen and in the iOS app, where a tap shows the same confirm slide as a merge.
 
 - Only a paired device can turn it on. The server refuses a request from the install token, which agents hold, so the Conductor's `set_auto_merge` tool can only read it or turn it off.
 - It uses the repo's merge method: the one asked for when the repo allows it, otherwise the first of squash, merge and rebase that the repo allows.
