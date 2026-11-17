@@ -76,6 +76,8 @@ export const config = {
   /** How long after a usage limit's reported reset a scheduled continuation runs, so the reset has landed. */
   limitGraceMs: Number(env.OMNI_LIMIT_GRACE_MS ?? 60_000),
   browser: (env.OMNI_BROWSER ?? '1') !== '0',
+  /** The browser MCP starts when a thread first calls it, not with the thread (lazy-mcp.ts). Off, every thread starts its own at once. */
+  browserLazy: (env.OMNI_BROWSER_LAZY ?? '1') !== '0',
   /** Omni runs the channel's Chrome itself, so the thread panel can show it live. Off, Playwright MCP launches its own. */
   browserLive: (env.OMNI_BROWSER_LIVE ?? '1') !== '0',
   /** After a finished turn, ask Haiku for the user's likely next reply: the reply box's placeholder, Tab fills it in. */

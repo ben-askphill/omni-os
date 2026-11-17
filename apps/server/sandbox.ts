@@ -10,6 +10,7 @@ import { fillWorktree, type WorktreeExtras } from './worktree-include.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
+import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
 import type { Channel } from './db.ts';
 import type { CrewRole } from './crew.ts';
 
@@ -202,19 +203,37 @@ export interface McpInput {
   omniUrl: string;
 }
 
-let playwrightMcp: string | undefined;
+let playwrightMcp: { bin: string; version: string } | undefined;
+
+function playwrightMcpPackage() {
+  if (!playwrightMcp) {
+    const pkg = createRequire(import.meta.url).resolve('@playwright/mcp/package.json');
+    const { bin, version } = JSON.parse(readFileSync(pkg, 'utf8')) as { bin: string | Record<string, string>; version: string };
+    playwrightMcp = { bin: join(dirname(pkg), typeof bin === 'string' ? bin : bin['playwright-mcp']), version };
+  }
+  return playwrightMcp;
+}
 
 /**
  * The browser MCP's entry script, from the exact @playwright/mcp version pinned in apps/server/package.json.
  * Run from Omni's own install so no registry, `latest` tag or repo .npmrc decides what code gets the browser profile.
  */
 export function playwrightMcpBin() {
-  if (!playwrightMcp) {
-    const pkg = createRequire(import.meta.url).resolve('@playwright/mcp/package.json');
-    const { bin } = JSON.parse(readFileSync(pkg, 'utf8')) as { bin: string | Record<string, string> };
-    playwrightMcp = join(dirname(pkg), typeof bin === 'string' ? bin : bin['playwright-mcp']);
-  }
-  return playwrightMcp;
+  return playwrightMcpPackage().bin;
+}
+
+/** The name the browser MCP's record is kept under (lazy-mcp.ts). */
+const BROWSER_MCP = 'playwright-mcp';
+
+/**
+ * Lets the browser MCP start at a thread's first browser call (lazy-mcp.ts). Run once at server start. The flags it
+ * is asked with open no browser and change none of its answers: the handshake is the same with every set
+ * buildMcpConfig passes.
+ */
+export async function prepareBrowserMcp(): Promise<void> {
+  if (!config.browser || !config.browserLazy) return;
+  const { bin, version } = playwrightMcpPackage();
+  await prepareLazy({ name: BROWSER_MCP, version, probe: { command: process.execPath, args: [bin, '--headless', '--isolated'], env: nodeChildEnv } });
 }
 
 /** The server with ask_user_question (crates/omni-mcp). Harnesses name its tool `mcp__omni-ask__ask_user_question`. */
@@ -260,7 +279,9 @@ export function buildMcpConfig(input: McpInput) {
       const bin = chromeBinary();
       if (bin) args.push('--executable-path', bin);
     }
-    servers['omni-browser'] = { command: process.execPath, args, env: { ...nodeChildEnv } };
+    // Behind the front where this install has proven it, so a thread that never browses never starts it.
+    const direct = { command: process.execPath, args };
+    servers['omni-browser'] = { ...(lazyCommand(BROWSER_MCP, direct) ?? direct), env: { ...nodeChildEnv } };
   }
 
   if (input.role?.mcp.includes('omni')) {

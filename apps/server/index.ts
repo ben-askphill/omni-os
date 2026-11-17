@@ -26,6 +26,7 @@ const { app } = await import('./app.ts');
 const { messageRequests, outbox, threads, turnSnapshots } = await import('./db.ts');
 const { shutdownAll, startLimits } = await import('./runner.ts');
 const { closeAllBrowsers } = await import('./browser.ts');
+const { prepareBrowserMcp } = await import('./sandbox.ts');
 const { closeAllTerminals } = await import('./terminal.ts');
 const { stopAllRuns } = await import('./actions.ts');
 const { startArtifactWatcher } = await import('./artifacts.ts');
@@ -95,6 +96,8 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startWorktreeRetention();
   // Warns in the log, the sidebar and on the phone before the data disk or the temp folder's quota fills (disk-space.ts).
   startDiskWatch();
+  // From here on a thread's browser MCP starts at its first browser call, where this install can do that (lazy-mcp.ts).
+  void prepareBrowserMcp();
   // Alerts go out only when the APNs key is set (push-sender.ts); otherwise this logs why and nothing is sent.
   void startPush();
   // The Mac stays awake while the server runs, as the old LaunchAgent's caffeinate kept it: phones reach it over the
