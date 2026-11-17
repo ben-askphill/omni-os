@@ -36,8 +36,8 @@ Or open the Actions tab, choose **Desktop release** and **Run workflow**. A run 
 | Job | Does |
 | --- | --- |
 | Version and draft release | Sets `apps/desktop/package.json` to the new version (`scripts/version.ts`), commits it to `main`, tags `v<version>` and drafts the release with notes generated from the merged PRs |
-| Mac | Builds the universal app on a macOS runner, signs it with the Developer ID, notarizes and staples it, uploads the DMG, the zip and `latest-mac.yml`, then checks the signature, Gatekeeper's verdict and the staple |
-| Linux | Builds the x64 AppImage, with node-pty compiled for glibc 2.28 in docker, and uploads it with `latest-linux.yml` |
+| Mac | Builds the universal app on a macOS runner with the Rust `omni-mcp` binary for both arches, signs it with the Developer ID, notarizes and staples it, uploads the DMG, the zip and `latest-mac.yml`, then checks the signature, Gatekeeper's verdict and the staple |
+| Linux | Builds the x64 AppImage, with node-pty compiled for glibc 2.28 in docker and the Rust `omni-mcp` binary linked statically, and uploads it with `latest-linux.yml` |
 | Publish | Checks that both feeds and all three downloads are attached, that every file a feed names is there and that the Mac feed points at the zip, then publishes the release as the latest |
 
 Installed apps see a release only once it is published, so a failed run never offers a half-built update. When a build job fails for a cause outside the code, such as a secret or the runner, fix it and choose **Re-run failed jobs** on the same run. The version, tag and draft stay, and the uploads replace what the failed attempt left. The build jobs check out the tag, so a fix merged to `main` never reaches a re-run. For a cause in the code, and to abandon a release, delete the draft and its tag (`gh release delete v<version> --cleanup-tag`) and run the workflow again with the next version.

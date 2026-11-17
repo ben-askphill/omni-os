@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { builderArgs } from '../scripts/dist.ts';
+import { NATIVE_BINARIES, NATIVE_DIR, rustTriple, stagedNativeProblems, stageNative } from '../scripts/native.ts';
 import {
   compareVersions,
   copyProblem,
@@ -220,15 +221,20 @@ describe("copying a package from the repo's node_modules", () => {
 
 describe('the command lines', () => {
   it('parses a target, defaulting to this machine', () => {
-    expect(parseStageArgs([], { platform: 'linux', arch: 'x64' })).toEqual({ target: linux, skipWeb: false, hostGlibc: false });
+    expect(parseStageArgs([], { platform: 'linux', arch: 'x64' })).toEqual({ target: linux, skipWeb: false, hostGlibc: false, native: 'auto' });
     expect(parseStageArgs(['--platform', 'mac', '--arch', 'universal', '--skip-web'], { platform: 'linux', arch: 'x64' })).toEqual({
       target: universal,
       skipWeb: true,
       hostGlibc: false,
+      native: 'auto',
     });
     expect(parseStageArgs(['--host-glibc'], { platform: 'linux', arch: 'x64' })).toMatchObject({ hostGlibc: true });
     expect(parseStageArgs(['--platform', 'linux', '--arch', 'universal'], { platform: 'linux', arch: 'x64' })).toEqual({ error: 'universal is a Mac build' });
     expect(parseStageArgs(['--platform', 'win'], { platform: 'linux', arch: 'x64' })).toHaveProperty('error');
+    expect(parseStageArgs(['--native', 'required'], { platform: 'linux', arch: 'x64' })).toMatchObject({ native: 'required' });
+    expect(parseStageArgs(['--native', 'off'], { platform: 'linux', arch: 'x64' })).toMatchObject({ native: 'off' });
+    expect(parseStageArgs(['--native', 'yes'], { platform: 'linux', arch: 'x64' })).toEqual({ error: '--native needs auto, required or off' });
+    expect(parseStageArgs(['--native'], { platform: 'linux', arch: 'x64' })).toHaveProperty('error');
   });
 
   it('hands electron-builder the same arch, and publishes only when asked', () => {
@@ -237,5 +243,64 @@ describe('the command lines', () => {
     expect(args.slice(-2)).toEqual(['--publish', 'never']);
     expect(builderArgs({ platform: 'linux', arch: 'x64', dir: false })).not.toContain('--dir');
     expect(builderArgs({ platform: 'linux', arch: 'x64', dir: false, publish: true }).slice(-2)).toEqual(['--publish', 'always']);
+  });
+});
+
+describe('the Rust binaries', () => {
+  const scratch = () => mkdtempSync(join(tmpdir(), 'omni-native-'));
+  const file = (dir: string, bytes: string, mode = 0o755) => {
+    const path = join(dir, 'omni-mcp');
+    writeFileSync(path, bytes);
+    chmodSync(path, mode);
+    return path;
+  };
+
+  it('builds a static musl binary for Linux and a darwin one per arch for a Mac', () => {
+    expect(rustTriple('linux', 'x64')).toBe('x86_64-unknown-linux-musl');
+    expect(rustTriple('linux', 'arm64')).toBe('aarch64-unknown-linux-musl');
+    expect(rustTriple('darwin', 'arm64')).toBe('aarch64-apple-darwin');
+    expect(rustTriple('darwin', 'x64')).toBe('x86_64-apple-darwin');
+  });
+
+  it('stages them where the server looks', () => {
+    // apps/desktop never imports apps/server, so the server's path is read from its source.
+    const server = readFileSync(join(import.meta.dirname, '../../server/native-mcp.ts'), 'utf8');
+    const parts = server.match(/NATIVE_MCP_PATH = join\(([^)]+)\)/)?.[1] ?? '';
+    expect([...parts.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([NATIVE_DIR, NATIVE_BINARIES[0]]);
+  });
+
+  it('refuses a Linux binary that needs glibc, or one that cannot be run', () => {
+    const dir = scratch();
+    try {
+      expect(stagedNativeProblems(join(dir, 'omni-mcp'), linux)).toEqual([expect.stringMatching(/is missing$/)]);
+      expect(stagedNativeProblems(file(dir, 'ELF static'), linux)).toEqual([]);
+      expect(stagedNativeProblems(file(dir, 'ELF GLIBC_2.34'), linux)).toEqual([expect.stringMatching(/static musl build/)]);
+      expect(stagedNativeProblems(file(dir, 'ELF static', 0o644), linux)).toEqual([expect.stringMatching(/not executable/)]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a Mac binary without a slice for each arch of the build', () => {
+    const dir = scratch();
+    try {
+      const path = file(dir, 'Mach-O');
+      expect(stagedNativeProblems(path, universal, () => ['x86_64', 'arm64'])).toEqual([]);
+      expect(stagedNativeProblems(path, macArm, () => ['arm64'])).toEqual([]);
+      expect(stagedNativeProblems(path, universal, () => ['arm64'])).toEqual([expect.stringMatching(/no x86_64 slice \(it has arm64\)/)]);
+      expect(stagedNativeProblems(path, macArm, () => [])).toEqual([expect.stringMatching(/no arm64 slice \(it has none\)/)]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves them out when told to, without running cargo', () => {
+    const dir = scratch();
+    try {
+      expect(stageNative(linux, dir, 'off')).toBe(false);
+      expect(existsSync(join(dir, NATIVE_DIR))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

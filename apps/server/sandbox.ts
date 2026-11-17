@@ -9,6 +9,7 @@ import { userName } from './user-config.ts';
 import { fillWorktree, type WorktreeExtras } from './worktree-include.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
+import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import type { Channel } from './db.ts';
 import type { CrewRole } from './crew.ts';
 
@@ -236,8 +237,11 @@ export function buildMcpConfig(input: McpInput) {
   const servers: Record<string, McpServer> = {};
   const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
 
-  servers[ASK_SERVER] = { command: paths.mcpRunner, args: [paths.mcpAsk], env: api };
-  servers[RENDER_SERVER] = { command: paths.mcpRunner, args: [paths.mcpRender], env: api };
+  // The Rust build of a server when this install has one (native-mcp.ts), else its TypeScript on a Node runtime.
+  const helper = (name: NativeMcpServer, script: string): McpServer => ({ ...(nativeMcpCommand(name, input.omniUrl) ?? { command: paths.mcpRunner, args: [script] }), env: api });
+
+  servers[ASK_SERVER] = helper('ask', paths.mcpAsk);
+  servers[RENDER_SERVER] = helper('render', paths.mcpRender);
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
   if (config.browser && !input.role?.delegateOnly) {
@@ -259,7 +263,7 @@ export function buildMcpConfig(input: McpInput) {
   if (input.role?.mcp.includes('omni')) {
     servers['omni'] = { command: paths.mcpRunner, args: [paths.mcpOmni], env: api };
   } else {
-    servers[THREADS_SERVER] = { command: paths.mcpRunner, args: [paths.mcpThreads], env: api };
+    servers[THREADS_SERVER] = helper('threads', paths.mcpThreads);
   }
   return { mcpServers: servers };
 }

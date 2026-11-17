@@ -2,15 +2,18 @@
 // The server and MCP bundles, the built Web UI, the shipped defaults, a version-stamped package.json, and a
 // node_modules with only the bundle's external packages and their dependencies for one target.
 //
-//   tsx scripts/stage.ts [--platform mac|linux] [--arch arm64|x64|universal] [--skip-web] [--host-glibc]
+//   tsx scripts/stage.ts [--platform mac|linux] [--arch arm64|x64|universal] [--skip-web] [--host-glibc] [--native auto|required|off]
 //
 //   --host-glibc  ship this machine's node-pty build on Linux even when it needs a newer glibc than the floor
+//   --native      the Rust binaries (native.ts). auto, the default, builds them when cargo is here and goes on
+//                 without them when it is not. required fails instead, which a release build passes. off skips them
 //
 // Packages come from the repo's node_modules along package-lock.json's graph, at their locked versions.
 import { spawnSync } from 'node:child_process';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
+import { NATIVE_MODES, type NativeMode, stageNative } from './native.ts';
 
 const DESKTOP = resolve(import.meta.dirname, '..');
 const REPO = resolve(DESKTOP, '../..');
@@ -35,6 +38,8 @@ export interface StageArgs {
   skipWeb: boolean;
   /** Ship a Linux node-pty that only runs on a glibc as new as this machine's. For local test builds. */
   hostGlibc: boolean;
+  /** Whether the Rust binaries go in: built when cargo is here, always, or never. */
+  native: NativeMode;
 }
 
 export function parseStageArgs(argv: readonly string[], host: { platform: string; arch: string }): StageArgs | { error: string } {
@@ -42,19 +47,23 @@ export function parseStageArgs(argv: readonly string[], host: { platform: string
   let arch: string = host.arch;
   let skipWeb = false;
   let hostGlibc = false;
+  let native: string = 'auto';
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--platform') platform = argv[++i] ?? '';
     else if (arg === '--arch') arch = argv[++i] ?? '';
     else if (arg === '--skip-web') skipWeb = true;
     else if (arg === '--host-glibc') hostGlibc = true;
+    else if (arg === '--native') native = argv[++i] ?? '';
     else return { error: `unknown option ${arg}` };
   }
   if (platform !== 'mac' && platform !== 'linux') return { error: '--platform needs mac or linux' };
   if (arch !== 'x64' && arch !== 'arm64' && arch !== 'universal') return { error: '--arch needs arm64, x64 or universal' };
   if (arch === 'universal' && platform !== 'mac') return { error: 'universal is a Mac build' };
+  const nativeMode = NATIVE_MODES.find((mode) => mode === native);
+  if (!nativeMode) return { error: '--native needs auto, required or off' };
   const arches: Arch[] = arch === 'universal' ? ['arm64', 'x64'] : [arch];
-  return { target: { platform: platform === 'mac' ? 'darwin' : 'linux', arches }, skipWeb, hostGlibc };
+  return { target: { platform: platform === 'mac' ? 'darwin' : 'linux', arches }, skipWeb, hostGlibc, native: nativeMode };
 }
 
 /** One package in package-lock.json's `packages` map (lockfileVersion 3). */
@@ -409,6 +418,8 @@ export async function stage(args: StageArgs, out = STAGE_DIR): Promise<void> {
   const paths = dependencyClosure(lock, EXTERNALS, target, 'apps/server');
   installClosure(lock, paths, target, out, args.hostGlibc);
   say(`${paths.length} packages copied`);
+
+  stageNative(target, out, args.native);
 
   if (target.platform === process.platform && target.arches.includes(process.arch as Arch)) {
     say('Checking the staged tree on Electron');
