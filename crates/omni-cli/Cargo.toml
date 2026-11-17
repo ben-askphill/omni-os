@@ -1,0 +1,31 @@
+[package]
+name = "omni-cli"
+version = "0.1.0"
+description = "The omni command: six commands over Omni's HTTP API, as apps/cli makes them."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "omni"
+path = "src/main.rs"
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+# Blocking HTTP with rustls and the Mozilla roots, as Node's fetch carries its own. No gzip: the API sends none unasked.
+ureq = { version = "3.5.2", default-features = false, features = ["rustls"] }
+# HMAC-SHA256 for the server's proof and random bytes for ids. rustls already brings it in.
+ring = "0.17"
+# The local time zone (TZ, /etc/localtime) for "Yesterday 14:05".
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# statfs without unsafe code, for doctor's disk checks.
+rustix = { version = "1", features = ["fs"] }
+
+[dev-dependencies]
+# Named zones for the date corpus recorded from Node.
+chrono-tz = "0.10"
+# A bound socket that never listens, for the scenarios where nothing answers on the port.
+rustix = { version = "1", features = ["net"] }

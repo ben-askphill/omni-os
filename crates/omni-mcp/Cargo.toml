@@ -10,5 +10,5 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-omni-core = { path = "../omni-core" }
+omni-core = { path = "../omni-core", features = ["api"] }
 tokio = { version = "1.54", features = ["rt", "io-std", "io-util", "time", "sync", "macros"] }

@@ -1,0 +1,1066 @@
+{
+  "scenarios": [
+    {
+      "name": "a refusal with an error",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 400,
+              "json": {
+                "error": "No such channel"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No such channel\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal with an error and a detail",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 409,
+              "json": {
+                "error": "The worktree is dirty",
+                "detail": "M apps/web/src/App.tsx\n?? notes.txt"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: The worktree is dirty\nM apps/web/src/App.tsx\n?? notes.txt\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal with an empty detail",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 409,
+              "json": {
+                "error": "Refused",
+                "detail": ""
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Refused\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal with an empty error",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 400,
+              "json": {
+                "error": ""
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Request failed (400)\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal whose error is not text",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 400,
+              "json": {
+                "error": {
+                  "code": 7
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Request failed (400)\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal in plain text",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 502,
+              "text": "Bad Gateway from the proxy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Bad Gateway from the proxy\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal in long plain text",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 502,
+              "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx → éééééééééééééééééééééééééééééééééééééééé"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx → ééééééééééééééééé\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal as a web page",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 503,
+              "text": "<html><body>Down</body></html>",
+              "contentType": "Text/HTML; charset=utf-8"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Request failed (503)\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal with no body",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 500,
+              "text": ""
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Request failed (500)\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal that is a JSON string",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 500,
+              "text": "\"just text\"",
+              "contentType": "application/json"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: just text\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a refusal that is a JSON array",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 500,
+              "json": [
+                "a"
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: Request failed (500)\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a 404 names the id",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 404,
+              "wire": "error-not-found.json"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: not found: Omni at {url} has nothing by that id. Check it, or update Omni if it is older than this command.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a web page where the API should be",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 200,
+              "text": "<!doctype html><title>Omni</title>",
+              "contentType": "text/html; charset=utf-8"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answered, but not as Omni's API (200 text/html; charset=utf-8). Is OMNI_URL right?\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "plain text where the API should be",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 200,
+              "text": "[]"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: {url} answered, but not as Omni's API (200 text/plain). Is OMNI_URL right?\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a redirect is refused",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 302,
+              "json": [],
+              "headers": {
+                "location": "http://127.0.0.1:1/api/threads"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: The server redirected the request to another address. The app refuses to follow it.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a 304 is a redirect too",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 304,
+              "text": ""
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: The server redirected the request to another address. The app refuses to follow it.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "JSON under another +json type",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 200,
+              "text": "[]",
+              "contentType": "application/vnd.omni+json; charset=utf-8"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "JSON under an upper case type",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "status": 201,
+              "text": " [ ] ",
+              "contentType": "Application/JSON;charset=UTF-8"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the server hangs up",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "drop": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: cannot reach Omni at {url} (fetch failed). Is it running? omni doctor says why not.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the server answers something that is not HTTP",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "raw": "hello\r\n"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: cannot reach Omni at {url} (fetch failed). Is it running? omni doctor says why not.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the answer stops halfway",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "raw": "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 100\r\nconnection: close\r\n\r\n[{\"id\":"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: cannot reach Omni at {url} (terminated). Is it running? omni doctor says why not.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an id is one path segment whatever is in it",
+      "args": [
+        "open",
+        "a b/c?d#e%f'g(h)*i!~é"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "programs": {
+        "open": {
+          "record": true
+        },
+        "xdg-open": {
+          "record": true
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/channels/",
+          "prefix": true,
+          "replies": [
+            {
+              "json": {
+                "id": "a b/c?d#e%f'g(h)*i!~é",
+                "name": "Acme",
+                "kind": "client",
+                "repo_path": null,
+                "github_repo": null,
+                "use_worktree": 0,
+                "base_dir": "/tmp/omni-fixtures/acme",
+                "store_domain": null,
+                "portal_slug": null,
+                "browser_headless": 1,
+                "notes": "Fixture",
+                "icon": null,
+                "design_system_name": null,
+                "archived": 0,
+                "created_at": "2020-01-01T10:30:00.000Z",
+                "avatar_bg": null,
+                "avatar_bg_manual": 0,
+                "default_harness": null,
+                "default_model": null,
+                "default_effort": null,
+                "worktree_include": null,
+                "worktree_shared": null,
+                "prompt_open_pr": null,
+                "prompt_fix_conflicts": null,
+                "prompt_fix_checks": null,
+                "scan_opt_out": 0,
+                "design_system_size": 0,
+                "running": 0,
+                "active": [],
+                "recent": [],
+                "folders": []
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Opened {url}/#/c/a%20b%2Fc%3Fd%23e%25f'g(h)*i!~%C3%A9 in your browser.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/channels/a%20b%2Fc%3Fd%23e%25f'g(h)*i!~%C3%A9",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {
+          "browser": [
+            "{url}/#/c/a%20b%2Fc%3Fd%23e%25f'g(h)*i!~%C3%A9"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a query value is encoded",
+      "args": [
+        "threads",
+        "-c",
+        "a b&c=d/e?f#g'h(i)*j!~é+%",
+        "--running",
+        "-n",
+        "7"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?",
+          "prefix": true,
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Nothing is running.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?channel=a%20b%26c%3Dd%2Fe%3Ff%23g%27h(i)*j!~%C3%A9%2B%25&status=running&limit=7",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a limit Number() reads is a limit",
+      "args": [
+        "threads",
+        "-n",
+        " 0x10 "
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=16",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=16",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a limit with an exponent",
+      "args": [
+        "threads",
+        "-n",
+        "1e2"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=100",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=100",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a limit with a trailing dot",
+      "args": [
+        "threads",
+        "-n",
+        "5.0"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=5",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=5",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    }
+  ]
+}

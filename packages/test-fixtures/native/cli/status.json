@@ -1,0 +1,3932 @@
+{
+  "scenarios": [
+    {
+      "name": "this Omni, all well",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 1,
+                "blocked": 1
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "up-to-date"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  1 unread result, 1 blocked thread\nsync       on, last synced just now\nupdate     up to date (runs 0.9.4)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "this Omni with work waiting",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 0,
+                "queued": 0,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 2,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": null,
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 3
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": false,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "available"
+                  },
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "available"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      0 running, 0 queued\nneeds you  2 unread results, 0 blocked threads\nsync       on, not synced yet, 3 to push\nupdate     0.9.5 available (runs 0.9.4)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "sync is off and the server says little",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "device": {}
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": false,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni on this machine ({url})\nneeds you  0 unread results, 0 blocked threads\nsync       off\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "sync is signed out",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "",
+                  "startedAt": "2020-01-01T10:30:00.000Z",
+                  "pid": 0,
+                  "gitHead": ""
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": true,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": 45.5,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "downloading"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni on omarchy ({url})\nserver     up since 1 Jan 2020\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       signed out: sign in again in Settings > Sync\nupdate     downloading 0.9.5 (46%)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "sync is paused",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": false,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "downloading"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       paused\nupdate     downloading 0.9.5\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "sync fails once",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": "The relay answered 500",
+                "signedOut": false,
+                "failures": 1,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "ready"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       failing: The relay answered 500\nupdate     0.9.5 downloaded, applies on restart (runs 0.9.4)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "sync fails again and again",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": "fetch failed: zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+                "signedOut": false,
+                "failures": 4,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 1,
+                      "error": null
+                    },
+                    "state": "waiting"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       failing (4 in a row): fetch failed: zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz…\nupdate     restarting for 0.9.5 once 1 running turn end\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update waits for turns",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 3,
+                      "error": null
+                    },
+                    "state": "waiting"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     restarting for 0.9.5 once 3 running turns end\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update failed",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": null,
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": "The download stopped\nhalfway."
+                    },
+                    "state": "failed"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     update failed: The download stopped halfway.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update failed without a reason",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": null,
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "failed"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     update failed (runs 0.9.4)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update state from a newer server",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "checking"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     checking (runs 0.9.4)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update with no status",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": null,
+                    "state": "available"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     an update available\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update that is offline",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "offline"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     offline\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update that is sent",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "sent"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     asked to update, not taken yet\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update that is expired",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "expired"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     asked to update, never took it\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an update that is not-reporting",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "not-reporting"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     runs an Omni from before Update all machines\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a download at half a percent rounds as JavaScript does",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": 2.5,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "downloading"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\nupdate     downloading 0.9.5 (3%)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an older server lacks the other routes",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "status": 404,
+              "json": {
+                "error": "not found"
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "status": 500,
+              "text": "boom"
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "status": 200,
+              "text": "<html>",
+              "contentType": "text/html"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver  up since 25m ago, pid 4242, commit 01234567\nturns   2 running, 1 queued\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "this Omni as JSON, as the server sent it",
+      "args": [
+        "status",
+        "--json"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "wire": "status.json"
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "wire": "needs-you.json"
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "wire": "sync-status.json"
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "wire": "update-fleet.json"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "{\n  \"url\": \"{url}\",\n  \"machine\": \"Omni's Mac\",\n  \"server\": {\n    \"version\": \"0.1.0\",\n    \"pid\": 4242,\n    \"root\": \"/Users/omni/omni-os\",\n    \"dataDir\": \"/tmp/omni-fixtures/data\",\n    \"gitHead\": \"0000000000000000000000000000000000000000\",\n    \"startedAt\": \"2026-01-05T09:00:00.000Z\",\n    \"port\": 4799,\n    \"name\": \"Omni's Mac\",\n    \"secretStore\": \"keychain\"\n  },\n  \"running\": 1,\n  \"queued\": 0,\n  \"needs_you\": {\n    \"unread\": 7,\n    \"blocked\": 4\n  },\n  \"sync\": {\n    \"configured\": true,\n    \"enabled\": true,\n    \"running\": false,\n    \"machineId\": \"3f9c2a1e7b4d\",\n    \"lastSyncAt\": \"2026-09-28T09:15:02.123Z\",\n    \"lastError\": null,\n    \"signedOut\": false,\n    \"failures\": 0,\n    \"nextSyncAt\": \"2026-09-28T09:16:02.123Z\",\n    \"pending\": 2,\n    \"held\": 0,\n    \"legacyRelay\": false,\n    \"deferred\": 1,\n    \"cursor\": 418,\n    \"automations\": {\n      \"owner\": \"3f9c2a1e7b4d\",\n      \"isThisMac\": true\n    }\n  },\n  \"update\": {\n    \"id\": \"mac-a\",\n    \"name\": \"Mac A\",\n    \"current\": true,\n    \"reach\": \"online\",\n    \"status\": {\n      \"id\": \"mac-a\",\n      \"name\": \"Mac A\",\n      \"track\": \"manual\",\n      \"version\": \"d6e2a30d\",\n      \"available\": \"07e9dbef\",\n      \"behind\": 2,\n      \"progress\": null,\n      \"waitingFor\": 0,\n      \"error\": null,\n      \"phase\": \"checking\",\n      \"taken\": {\n        \"mac-a\": \"00000000-0000-4000-8000-000000000001\"\n      },\n      \"since\": \"2026-01-05T09:00:00.000Z\"\n    },\n    \"ask\": {\n      \"id\": \"00000000-0000-4000-8000-000000000001\",\n      \"sender\": \"mac-a\",\n      \"target\": \"mac-a\",\n      \"action\": \"check\",\n      \"at\": \"2026-01-05T09:00:00.000Z\",\n      \"expiresAt\": \"2026-01-05T09:00:00.000Z\"\n    },\n    \"state\": \"checking\"\n  }\n}\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "this Omni as JSON when the other routes fail",
+      "args": [
+        "status",
+        "--json"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {}
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "drop": true
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "status": 401,
+              "json": {
+                "error": "unauthorized"
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "status": 302,
+              "text": ""
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "{\n  \"url\": \"{url}\",\n  \"machine\": null,\n  \"server\": null,\n  \"running\": null,\n  \"queued\": null,\n  \"needs_you\": null,\n  \"sync\": null,\n  \"update\": null\n}\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "status needs the server to answer",
+      "args": [
+        "status"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "status": 401,
+              "json": {
+                "error": "unauthorized"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni status: Omni at {url} refused the token from OMNI_TOKEN. omni doctor checks it.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "status on the install port",
+      "args": [
+        "status"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "proof": "test-token",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "running": 2,
+                "queued": 1,
+                "server": {
+                  "version": "0.9.4",
+                  "pid": 4242,
+                  "root": "/x",
+                  "dataDir": "/d",
+                  "gitHead": "0123456789abcdef0123",
+                  "startedAt": "{{now-1500s}}",
+                  "port": 4799,
+                  "name": "omarchy"
+                },
+                "device": {
+                  "name": "omarchy",
+                  "here": true
+                }
+              },
+              "delayMs": 400
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/needs-you",
+          "replies": [
+            {
+              "json": {
+                "items": [],
+                "unread": 0,
+                "blocked": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/sync/status",
+          "replies": [
+            {
+              "json": {
+                "configured": true,
+                "enabled": true,
+                "running": false,
+                "machineId": "box",
+                "lastSyncAt": "{{now-30s}}",
+                "lastError": null,
+                "signedOut": false,
+                "failures": 0,
+                "pending": 0
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Omni 0.9.4 on omarchy ({url})\nserver     up since 25m ago, pid 4242, commit 01234567\nturns      2 running, 1 queued\nneeds you  0 unread results, 0 blocked threads\nsync       on, last synced just now\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/needs-you",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/sync/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "this machine by here",
+      "args": [
+        "status",
+        "--machine",
+        " HERE "
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "json": {
+                "syncLive": true,
+                "lastSyncAt": "{{now-20s}}",
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "here": true,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 1,
+                    "stats": {
+                      "sampledAt": "{{now-5s}}",
+                      "cpu": 0.4,
+                      "cores": 0,
+                      "load": [],
+                      "memory": {
+                        "used": 536870912,
+                        "total": 68719476736
+                      }
+                    }
+                  },
+                  {
+                    "id": "AIR-1",
+                    "name": "MacBook Air",
+                    "here": false,
+                    "reachability": "offline",
+                    "lastSeen": "{{now-900s}}",
+                    "lastChangeAt": "{{now-1200s}}",
+                    "running": 3,
+                    "queued": 2,
+                    "delegated": 1,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 4,
+                    "needsYou": 0,
+                    "stats": {
+                      "sampledAt": "{{now-65s}}",
+                      "cpu": 37.5,
+                      "cores": 8,
+                      "load": [
+                        1.005,
+                        0.125,
+                        12
+                      ],
+                      "memory": {
+                        "used": 10200547328,
+                        "total": 17179869184
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "up-to-date"
+                  },
+                  {
+                    "id": "AIR-1",
+                    "name": "omarchy",
+                    "current": false,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "available"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "omarchy (this machine)\nturns      1 running, 0 queued\nneeds you  1 thread asking for you\ncpu        0%, load \nmemory     512 MB of 64 GB in use\nsampled    just now\nupdate     up to date (runs 0.9.4)\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another machine by its name in any case",
+      "args": [
+        "status",
+        "--machine",
+        "macbook AIR"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "json": {
+                "syncLive": true,
+                "lastSyncAt": "{{now-20s}}",
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "here": true,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 1,
+                    "stats": null
+                  },
+                  {
+                    "id": "AIR-1",
+                    "name": "MacBook Air",
+                    "here": false,
+                    "reachability": "offline",
+                    "lastSeen": "{{now-900s}}",
+                    "lastChangeAt": "{{now-1200s}}",
+                    "running": 3,
+                    "queued": 2,
+                    "delegated": 1,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 4,
+                    "needsYou": 0,
+                    "stats": {
+                      "sampledAt": "{{now-65s}}",
+                      "cpu": 37.5,
+                      "cores": 8,
+                      "load": [
+                        1.005,
+                        0.125,
+                        12
+                      ],
+                      "memory": {
+                        "used": 10200547328,
+                        "total": 17179869184
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "up-to-date"
+                  },
+                  {
+                    "id": "AIR-1",
+                    "name": "omarchy",
+                    "current": false,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "ready"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "MacBook Air (offline, last seen 15m ago)\nturns        3 running, 2 queued, 1 delegated\nsub-agents   4\nneeds you    0 threads asking for you\ncpu          38% of 8 cores, load 1.00 0.13 12.00\nmemory       9.5 GB of 16 GB in use\nsampled      1m ago\nlast change  20m ago\nupdate       0.9.5 downloaded, applies on restart (runs 0.9.4)\nsync         live, last synced just now\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "another machine by its id",
+      "args": [
+        "status",
+        "--machine",
+        "air-1"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "json": {
+                "syncLive": false,
+                "lastSyncAt": "{{now-20s}}",
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "here": true,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 1,
+                    "stats": null
+                  },
+                  {
+                    "id": "AIR-1",
+                    "name": "MacBook Air",
+                    "here": false,
+                    "reachability": "offline",
+                    "lastSeen": "{{now-900s}}",
+                    "lastChangeAt": "{{now-1200s}}",
+                    "running": 3,
+                    "queued": 2,
+                    "delegated": 1,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 4,
+                    "needsYou": 0,
+                    "stats": {
+                      "sampledAt": "{{now-65s}}",
+                      "cpu": 37.5,
+                      "cores": 8,
+                      "load": [
+                        1.005,
+                        0.125,
+                        12
+                      ],
+                      "memory": {
+                        "used": 10200547328,
+                        "total": 17179869184
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "status": 500,
+              "json": {
+                "error": "x"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "MacBook Air (offline, last seen 15m ago)\nturns        3 running, 2 queued, 1 delegated\nsub-agents   4\nneeds you    0 threads asking for you\ncpu          38% of 8 cores, load 1.00 0.13 12.00\nmemory       9.5 GB of 16 GB in use\nsampled      1m ago\nlast change  20m ago\nsync         not live: these numbers may be old\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a machine with no id and thin stats",
+      "args": [
+        "status",
+        "--machine",
+        "mac mini"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "json": {
+                "syncLive": true,
+                "lastSyncAt": null,
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "here": true,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 1,
+                    "stats": null
+                  },
+                  {
+                    "id": null,
+                    "name": "Mac mini",
+                    "here": false,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 2,
+                    "stats": {
+                      "sampledAt": "2020-01-01T10:30:00.000Z",
+                      "cpu": null,
+                      "cores": null,
+                      "load": null,
+                      "memory": null
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "current": true,
+                    "reach": "online",
+                    "status": {
+                      "id": "box",
+                      "version": "0.9.4",
+                      "available": "0.9.5",
+                      "progress": null,
+                      "waitingFor": 0,
+                      "error": null
+                    },
+                    "state": "up-to-date"
+                  }
+                ],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "Mac mini (online)\nturns        1 running, 0 queued\nneeds you    2 threads asking for you\nsampled      1 Jan 2020\nlast change  none synced yet\nupdate       up to date (runs 0.9.4)\nsync         live, last synced never\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "an online machine that never synced a change",
+      "args": [
+        "status",
+        "--machine",
+        "MacBook Air"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "json": {
+                "syncLive": true,
+                "lastSyncAt": "{{now-20s}}",
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "here": true,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 1,
+                    "stats": null
+                  },
+                  {
+                    "id": "AIR-1",
+                    "name": "MacBook Air",
+                    "here": false,
+                    "reachability": "online",
+                    "lastSeen": "{{now-900s}}",
+                    "lastChangeAt": null,
+                    "running": 3,
+                    "queued": 2,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 1,
+                    "stats": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "MacBook Air (online)\nturns        3 running, 2 queued\nneeds you    1 thread asking for you\nlast change  none synced yet\nsync         live, last synced just now\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "no such machine, sync off",
+      "args": [
+        "status",
+        "--machine",
+        "laptop"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "json": {
+                "syncLive": true,
+                "lastSyncAt": "{{now-20s}}",
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "here": true,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 1,
+                    "stats": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni status: No machine named laptop. Machines: omarchy. Sync is off, so this Omni knows only itself.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "no such machine among several",
+      "args": [
+        "status",
+        "--machine",
+        "laptop"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "json": {
+                "syncLive": true,
+                "lastSyncAt": "{{now-20s}}",
+                "machines": [
+                  {
+                    "id": "box",
+                    "name": "omarchy",
+                    "here": true,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 1,
+                    "stats": null
+                  },
+                  {
+                    "id": "AIR-1",
+                    "name": "MacBook Air",
+                    "here": false,
+                    "reachability": "offline",
+                    "lastSeen": "{{now-900s}}",
+                    "lastChangeAt": "{{now-1200s}}",
+                    "running": 3,
+                    "queued": 2,
+                    "delegated": 1,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 4,
+                    "needsYou": 0,
+                    "stats": {
+                      "sampledAt": "{{now-65s}}",
+                      "cpu": 37.5,
+                      "cores": 8,
+                      "load": [
+                        1.005,
+                        0.125,
+                        12
+                      ],
+                      "memory": {
+                        "used": 10200547328,
+                        "total": 17179869184
+                      }
+                    }
+                  },
+                  {
+                    "id": null,
+                    "name": "Mac mini",
+                    "here": false,
+                    "reachability": "online",
+                    "lastSeen": null,
+                    "lastChangeAt": null,
+                    "running": 1,
+                    "queued": 0,
+                    "delegated": 0,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 0,
+                    "needsYou": 2,
+                    "stats": {
+                      "sampledAt": "2020-01-01T10:30:00.000Z",
+                      "cpu": null,
+                      "cores": null,
+                      "load": null,
+                      "memory": null
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni status: No machine named laptop. Machines: omarchy, MacBook Air, Mac mini.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "here when no machine is here",
+      "args": [
+        "status",
+        "--machine",
+        "here"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "json": {
+                "syncLive": true,
+                "lastSyncAt": "{{now-20s}}",
+                "machines": [
+                  {
+                    "id": "AIR-1",
+                    "name": "MacBook Air",
+                    "here": false,
+                    "reachability": "offline",
+                    "lastSeen": "{{now-900s}}",
+                    "lastChangeAt": "{{now-1200s}}",
+                    "running": 3,
+                    "queued": 2,
+                    "delegated": 1,
+                    "harnesses": [],
+                    "threadIds": [],
+                    "agents": 4,
+                    "needsYou": 0,
+                    "stats": {
+                      "sampledAt": "{{now-65s}}",
+                      "cpu": 37.5,
+                      "cores": 8,
+                      "load": [
+                        1.005,
+                        0.125,
+                        12
+                      ],
+                      "memory": {
+                        "used": 10200547328,
+                        "total": 17179869184
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni status: No machine named here. Machines: MacBook Air. Sync is off, so this Omni knows only itself.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a machine as JSON",
+      "args": [
+        "status",
+        "--machine",
+        "here",
+        "--json"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token",
+        "TZ": "UTC"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "wire": "machines.json"
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "wire": "update-fleet.json"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "{\n  \"machine\": {\n    \"id\": null,\n    \"name\": \"Omni's Mac\",\n    \"here\": true,\n    \"reachability\": \"online\",\n    \"lastSeen\": null,\n    \"lastChangeAt\": null,\n    \"running\": 1,\n    \"queued\": 0,\n    \"delegated\": 0,\n    \"harnesses\": [\n      {\n        \"id\": \"claude-code\",\n        \"running\": 1,\n        \"queued\": 0,\n        \"cap\": 12\n      },\n      {\n        \"id\": \"codex\",\n        \"running\": 0,\n        \"queued\": 0,\n        \"cap\": 12\n      },\n      {\n        \"id\": \"cursor\",\n        \"running\": 0,\n        \"queued\": 0,\n        \"cap\": 12\n      },\n      {\n        \"id\": \"hermes\",\n        \"running\": 0,\n        \"queued\": 0,\n        \"cap\": 12\n      },\n      {\n        \"id\": \"cursor-cloud\",\n        \"running\": 0,\n        \"queued\": 0,\n        \"cap\": 12\n      }\n    ],\n    \"threadIds\": [\n      \"00000000-0000-4000-8000-000000000001\"\n    ],\n    \"agents\": 0,\n    \"needsYou\": 0,\n    \"stats\": null\n  },\n  \"update\": {\n    \"id\": \"mac-a\",\n    \"name\": \"Mac A\",\n    \"current\": true,\n    \"reach\": \"online\",\n    \"status\": {\n      \"id\": \"mac-a\",\n      \"name\": \"Mac A\",\n      \"track\": \"manual\",\n      \"version\": \"d6e2a30d\",\n      \"available\": \"07e9dbef\",\n      \"behind\": 2,\n      \"progress\": null,\n      \"waitingFor\": 0,\n      \"error\": null,\n      \"phase\": \"checking\",\n      \"taken\": {\n        \"mac-a\": \"00000000-0000-4000-8000-000000000001\"\n      },\n      \"since\": \"2026-01-05T09:00:00.000Z\"\n    },\n    \"ask\": {\n      \"id\": \"00000000-0000-4000-8000-000000000001\",\n      \"sender\": \"mac-a\",\n      \"target\": \"mac-a\",\n      \"action\": \"check\",\n      \"at\": \"2026-01-05T09:00:00.000Z\",\n      \"expiresAt\": \"2026-01-05T09:00:00.000Z\"\n    },\n    \"state\": \"checking\"\n  },\n  \"sync_live\": false,\n  \"last_sync_at\": null\n}\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "the machines route must answer",
+      "args": [
+        "status",
+        "--machine=here"
+      ],
+      "env": {
+        "OMNI_TOKEN": "test-token"
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/machines?stats=1",
+          "replies": [
+            {
+              "status": 404,
+              "json": {
+                "error": "not found"
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/update/fleet",
+          "replies": [
+            {
+              "json": {
+                "machines": [],
+                "synced": true
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni status: not found: Omni at {url} has nothing by that id. Check it, or update Omni if it is older than this command.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/machines?stats=1",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/update/fleet",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer test-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    }
+  ]
+}

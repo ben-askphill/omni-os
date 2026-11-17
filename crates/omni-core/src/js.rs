@@ -44,8 +44,8 @@ impl JsString {
 
     /// `String.prototype.trim`.
     pub fn trim(&self) -> JsString {
-        let start = self.0.iter().position(|&u| !is_js_space(u)).unwrap_or(self.0.len());
-        let end = self.0.iter().rposition(|&u| !is_js_space(u)).map_or(start, |i| i + 1);
+        let start = self.0.iter().position(|&u| !is_space(u)).unwrap_or(self.0.len());
+        let end = self.0.iter().rposition(|&u| !is_space(u)).map_or(start, |i| i + 1);
         JsString(self.0[start..end].to_vec())
     }
 
@@ -86,8 +86,9 @@ pub fn encode_uri_component(text: &JsString) -> Option<String> {
     Some(out)
 }
 
-/// WhiteSpace and LineTerminator of the ECMAScript grammar, which is what `trim` removes. All of them are one unit.
-fn is_js_space(unit: u16) -> bool {
+/// WhiteSpace and LineTerminator of the ECMAScript grammar, which is what `trim` removes and `\s` matches. All of
+/// them are one unit.
+pub fn is_space(unit: u16) -> bool {
     matches!(
         unit,
         0x0009..=0x000D | 0x0020 | 0x00A0 | 0x1680 | 0x2000..=0x200A | 0x2028 | 0x2029 | 0x202F | 0x205F | 0x3000 | 0xFEFF
@@ -96,7 +97,7 @@ fn is_js_space(unit: u16) -> bool {
 
 /// `String.prototype.trim` on text that is already a Rust string.
 pub fn trim_str(text: &str) -> &str {
-    text.trim_matches(|c: char| u16::try_from(c as u32).is_ok_and(is_js_space))
+    text.trim_matches(|c: char| u16::try_from(c as u32).is_ok_and(is_space))
 }
 
 impl From<&str> for JsString {
