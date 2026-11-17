@@ -116,6 +116,16 @@ export function everyNode<T extends TreeThread>(nodes: readonly TreeNode<T>[]): 
   return nodes.flatMap((n) => [n, ...everyNode(n.children)]);
 }
 
+/**
+ * Every thread under a job at any depth, oldest first: the order the job handed them out, whatever order the tree ranks
+ * its rows in. The channel stack on its card and row reads them this way (channel-stack.ts).
+ */
+export function treeThreads<T extends TreeThread>(nodes: readonly TreeNode<T>[]): T[] {
+  return everyNode(nodes)
+    .map((n) => n.thread)
+    .sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+}
+
 /** Running while the job's own turn or anything under it still works, finished once all of it ended. */
 export type TreePhase = 'running' | 'finished';
 

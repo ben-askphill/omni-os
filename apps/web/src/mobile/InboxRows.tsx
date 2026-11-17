@@ -8,6 +8,7 @@ import { useMarkDone } from '../done-confirm.tsx';
 import { useJobTree, type TreesFold } from '../thread-tree.ts';
 import { DoneMark, Icon, type IconName } from '../components/ui.tsx';
 import { RunElapsed } from '../components/RunElapsed.tsx';
+import { ChannelRollup } from '../components/ChannelStack.tsx';
 import { ranOnLine } from '@omni/shared/ran-on.ts';
 import { blockerMark, threadPhase, type RowStatus } from '@omni/shared/status.ts';
 import type { InboxThread } from '../inbox.ts';
@@ -59,7 +60,8 @@ function RowActions({ actions }: { actions: RowAction[] }) {
 
 /**
  * A thread as the sidebar's Inbox card: its status on the avatar and on the right, the title, the channel and the
- * machine. A job has its tally at the end of the second line and its tree under it. `working`: the row is on the
+ * machine. A job has its tally at the end of the second line and its tree under it, and the other channels it works
+ * in before its channel's name. `working`: the row is on the
  * Working shelf, so what runs under it shows too.
  */
 export function MoInboxRow({
@@ -106,6 +108,7 @@ export function MoInboxRow({
           </span>
           <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
             {pinned && <Icon name="pin" size={12} className="shrink-0" />}
+            {tree && <ChannelRollup threads={tree.threads} own={t.channel_id} size={16} className="-mr-0.5" />}
             <span className={`min-w-0 truncate ${label ? 'max-w-[45%] shrink-0' : 'flex-1'}`}>#{ch?.name ?? t.channel_id}</span>
             {label && (
               <span className="-ml-1 flex min-w-0 flex-1 items-center gap-1" title={where.title || undefined} data-ran-on={where.machine ?? undefined}>

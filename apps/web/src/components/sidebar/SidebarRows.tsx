@@ -11,6 +11,7 @@ import { showsRunning } from '@omni/shared/delegate-count.ts';
 import { showsAgents } from '@omni/shared/thread-tree.ts';
 import { useJobTree, treeLabel, type JobTree } from '../../thread-tree.ts';
 import { TreeRows, TreeToggle } from '../ThreadTree.tsx';
+import { ChannelRollup } from '../ChannelStack.tsx';
 
 export function NavLink({ to, icon, lead, active, children, right, onNavigate, channelId, expanded }: { channelId?: string; to: string; icon?: IconName; lead?: ReactNode; active?: boolean; children: ReactNode; right?: ReactNode; onNavigate?: (e: MouseEvent) => void; expanded?: boolean }) {
   return (
@@ -48,14 +49,16 @@ export function RunningBadge({ n }: { n: number }) {
 const TREE_AT = { true: { line: 'ml-[43px]', meta: 'ml-[57px]' }, flush: { line: 'ml-[22px]', meta: 'ml-[36px]' }, false: { line: 'ml-[18px]', meta: 'ml-[32px]' } } as const;
 
 /**
- * A job's second line (its branch, or what sits under it, with the tally that opens and closes the tree) and its tree.
- * Each thread in it nests its own running sub-agents, from the store's live tasks, while the job is at work.
+ * A job's second line (the other channels it works in, its branch or what sits under it, and the tally that opens and
+ * closes the tree) and its tree. Each thread in it nests its own running sub-agents, from the store's live tasks,
+ * while the job is at work.
  */
 function TreeUnder({ t, tree, at, onNavigate }: { t: ThreadStub; tree: JobTree; at: { line: string; meta: string }; onNavigate?: () => void }) {
   const { tasks } = useApp();
   return (
     <>
       <div className={`-mt-1 flex h-5 min-w-0 items-center pr-3 ${at.meta}`}>
+        <ChannelRollup threads={tree.threads} own={t.channel_id} size={14} className="mr-1.5" />
         <TreeToggle tree={tree} title={t.title || 'Untitled'} label={treeLabel(t, tree)} className="max-w-full" />
       </div>
       <TreeRows tree={tree} variant="sidebar" agents={showsAgents(t, tree.phase) ? tasks : undefined} onNavigate={onNavigate} className={at.line} />

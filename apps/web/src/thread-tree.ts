@@ -12,6 +12,7 @@ import {
   treePhase,
   treePrefKey,
   treeTally,
+  treeThreads,
   type SavedOpen,
   type Tally,
   type TreeNode,
@@ -44,6 +45,8 @@ export interface JobTree {
   spans: boolean;
   /** Every thread under it is a member of its team, so its line reads "Team of n". */
   team: boolean;
+  /** Every thread under it at any depth, oldest first, for the channel stack on its card and row. */
+  threads: ThreadStub[];
 }
 
 /** Every parent's threads, and what Needs you flags among them, from the store. */
@@ -63,6 +66,7 @@ export function useTreeSource() {
 export function useJobTree(parent: ThreadStub, view: TreeView): JobTree | null {
   const { index, flags } = useTreeSource();
   const nodes = useMemo(() => buildTree(parent.id, index, flags), [parent.id, index, flags]);
+  const threads = useMemo(() => treeThreads(nodes), [nodes]);
   const key = treePrefKey(view, parent.id);
   const [saved, setSaved] = useState<SavedOpen | null>(() => readPref<SavedOpen | null>(key, null));
   useSavedChanged(() => setSaved(readPref<SavedOpen | null>(key, null)), [key]);
@@ -91,6 +95,7 @@ export function useJobTree(parent: ThreadStub, view: TreeView): JobTree | null {
     tally: treeTally(nodes),
     spans: spansChannels(nodes),
     team: nodes.every((n) => n.thread.source === 'team'),
+    threads,
   };
 }
 
