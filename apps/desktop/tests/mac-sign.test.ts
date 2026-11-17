@@ -49,6 +49,13 @@ describe('signMac', () => {
     expect(waits.reduce((a, b) => a + b, 0)).toBeGreaterThan(9 * 60);
   });
 
+  it('treats a refused timestamp server the same way', async () => {
+    const refused = new Error('Command failed: codesign\nOmni.app: The timestamp service is not available.');
+    const { done, waits } = run([refused, timestampError]);
+    await done;
+    expect(waits).toEqual(TIMESTAMP_RETRY_WAITS.slice(0, 2));
+  });
+
   it('gives up with the timestamp error once the waits run out', async () => {
     const errors = Array.from({ length: TIMESTAMP_RETRY_WAITS.length + 1 }, () => timestampError);
     const { done, waits } = run(errors);

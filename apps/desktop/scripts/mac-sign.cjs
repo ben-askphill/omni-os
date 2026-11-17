@@ -1,17 +1,19 @@
 // The Mac signing step electron-builder runs (electron-builder.config.cjs `mac.sign`). codesign --timestamp asks
-// Apple's timestamp server for every file, and that server drops out for minutes at a time. electron-builder's own
-// signing tries four times in under a minute, so 0.1.33's release failed twice on its first file (playwright-core's
-// codicon font, the deepest path) with "A timestamp was expected but was not found". This keeps electron-builder's
-// short retries for any signing error and waits much longer when the timestamp is what is missing.
+// Apple's timestamp server for every file, and that server sometimes stops answering for minutes. codesign gives up
+// on a silent server after 15 seconds ("A timestamp was expected but was not found"; "The timestamp service is not
+// available" when it refuses or answers badly). electron-builder's own signing tries four times in about a minute,
+// so 0.1.33's release failed twice on the first file it signs, playwright-core's codicon font (the deepest path).
+// This keeps electron-builder's short retries for any signing error and waits much longer for the timestamp server.
 
-/** Seconds before each new try after a missing timestamp: about 18 minutes in all. */
+/** Seconds before each new try after a timestamp error: about 18 minutes in all. */
 const TIMESTAMP_RETRY_WAITS = [30, 60, 120, 240, 300, 300];
 /** Seconds before each new try after any other error, as electron-builder's own sign waits. */
 const OTHER_RETRY_WAITS = [5, 10, 15];
 
-/** True for codesign's missing-timestamp error. Node's execFile error message carries codesign's stderr. */
+/** True for codesign's timestamp-server errors. Node's execFile error message carries codesign's stderr. */
 function isTimestampError(error) {
-  return /A timestamp was expected but was not found/.test(String(error && error.message ? error.message : error));
+  const message = String(error && error.message ? error.message : error);
+  return /A timestamp was expected but was not found|The timestamp service is not available/.test(message);
 }
 
 /**
@@ -34,7 +36,7 @@ async function signMac(opts, { identity, signApp, wait, log } = {}) {
       if (seconds === undefined) throw error;
       log(
         timestamp
-          ? `  • Apple's timestamp server did not answer; signing again in ${seconds}s`
+          ? `  • the timestamp server did not answer; signing again in ${seconds}s`
           : `  • signing failed (${String(error && error.message ? error.message : error).split('\n').pop()}); signing again in ${seconds}s`,
       );
       await wait(seconds);
