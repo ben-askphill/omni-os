@@ -105,8 +105,11 @@ export function PRList({ channel }: { channel: Channel }) {
   );
 }
 
-/** Files the PR changes: counted in the diff, since gh's file list stops at 100; the list when the diff did not load. */
-const changedFiles = (p: PRDetailT) => (p.diff?.match(/^diff --git /gm)?.length ?? 0) || (p.files?.length ?? 0);
+/**
+ * Files the PR changes: the larger of the diff's count and gh's file list. The list stops at 100 files; the diff stops at
+ * 400,000 characters, so either can come up short.
+ */
+const changedFiles = (p: PRDetailT) => Math.max(p.diff?.match(/^diff --git /gm)?.length ?? 0, p.files?.length ?? 0);
 
 /** Where the PR came from: the thread that delegated the work, then the thread that opened the PR. */
 function PRThreadLinks({ thread }: { thread: NonNullable<PRDetailT['thread']> }) {

@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { parseDiff } from '@omni/shared/diff.ts';
 import { Markdown } from '../components/Markdown.tsx';
 import { DiffViewer } from '../components/DiffViewer.tsx';
 import { Avatar, Chip, Icon, IconLink } from '../components/ui.tsx';
@@ -75,18 +77,36 @@ export function PRDetailTabBody({ tab, p }: { tab: DetailTab; p: PRDetailT }) {
   );
 }
 
+/** The server cuts a diff past 400,000 characters and ends it with this line (github.ts getPR). */
+const TRUNCATED = /\n\.\.\. diff truncated \.\.\.\s*$/;
+
 /**
  * The diff, file by file: each file's header already carries its path and counts, so it doubles as the file list. When
- * gh could not hand over a diff it can read, the changed files stand in, under what gh said.
+ * the diff was cut short or holds fewer files than gh's file list, the files it lacks follow it with their counts. When
+ * gh could not hand over a diff at all, the whole list stands in, under what gh said.
  */
 function PRChanges({ p }: { p: PRDetailT }) {
   const diff = p.diff ?? '';
-  if (/^diff --git /m.test(diff) || !p.files?.length) return <DiffViewer diff={diff} />;
+  const files = p.files ?? [];
+  const real = /^diff --git /m.test(diff);
+  const truncated = real && TRUNCATED.test(diff);
+  const shown = useMemo(() => (real ? parseDiff(diff).map((f) => f.path) : []), [diff, real]);
+  // Paths are compared only when the diff is short of the list, so an odd path git quotes never shows twice.
+  const missing = !real ? files : truncated || shown.length < files.length ? files.filter((f) => !shown.includes(f.path)) : [];
+  if (!missing.length) return <DiffViewer diff={diff} />;
   return (
     <div className="space-y-3">
-      {diff.trim() && <div className="text-[length:var(--fs-small)] text-fg-3">{diff.trim()}</div>}
+      {real ? <DiffViewer diff={diff} /> : diff.trim() && <div className="text-[length:var(--fs-small)] text-fg-3">{diff.trim()}</div>}
       <div className="overflow-hidden rounded-[var(--r-xl)] bg-surface p-1.5">
-        {p.files.map((f) => (
+        {real && (
+          <div role="note" className="px-3 pt-1.5 pb-1 text-[length:var(--fs-small)] text-fg-3">
+            {truncated
+              ? `Diff truncated: it stops at 400,000 characters, so ${missing.length === 1 ? 'this file is' : `these ${missing.length} files are`} not in it.`
+              : `Not in the loaded diff: ${missing.length === 1 ? '1 file' : `${missing.length} files`}.`}{' '}
+            Open the PR on GitHub for the rest.
+          </div>
+        )}
+        {missing.map((f) => (
           <div key={f.path} className="flex h-9 min-w-0 items-center gap-2 rounded-[var(--r-md)] px-3 text-[12.5px]">
             <Icon name="file" size={13} className="text-fg-3" />
             <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>

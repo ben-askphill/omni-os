@@ -132,3 +132,36 @@ it('lists the changed files when gh could not load the diff', async () => {
   expect(host.textContent).toContain('Could not load diff: HTTP 406');
   expect(host.textContent).toContain('a.ts');
 });
+
+it('lists the files a truncated diff left out, and counts them in the badge', async () => {
+  // The server cuts a diff at 400,000 characters (github.ts getPR); a big first file can push later ones out.
+  const cut = `diff --git a/big.ts b/big.ts\n--- a/big.ts\n+++ b/big.ts\n@@ -1,1 +1,1 @@\n-old\n+new\n... diff truncated ...`;
+  const files = [
+    { path: 'big.ts', additions: 1, deletions: 1 },
+    { path: 'later.ts', additions: 4, deletions: 2 },
+  ];
+  await show({ ...base, diff: cut, files } as PRDetailT);
+  expect(tab('Changes')?.textContent).toBe('Changes2');
+  await act(async () => tab('Changes')!.click());
+  expect(host.querySelector('button[aria-expanded]:not([aria-label])')?.textContent).toContain('big.ts');
+  expect(host.querySelector('[role="note"]')?.textContent).toContain('Diff truncated');
+  const rest = host.querySelector('[role="note"]')!.parentElement!.textContent;
+  expect(rest).toContain('later.ts');
+  expect(rest).toContain('+4');
+  expect(rest).not.toContain('big.ts');
+});
+
+it('lists files missing from a diff that holds fewer files than the list', async () => {
+  const files = ['a.ts', 'b.ts', 'c.ts', 'd.ts'].map((path) => ({ path, additions: 1, deletions: 1 }));
+  await show({ ...base, files } as PRDetailT);
+  expect(tab('Changes')?.textContent).toBe('Changes4');
+  await act(async () => tab('Changes')!.click());
+  expect(host.querySelector('[role="note"]')?.textContent).toContain('Not in the loaded diff: 1 file.');
+  expect(host.querySelector('[role="note"]')!.parentElement!.textContent).toContain('d.ts');
+});
+
+it('adds no list when the diff holds every file', async () => {
+  await show(base);
+  await act(async () => tab('Changes')!.click());
+  expect(host.querySelector('[role="note"]')).toBeNull();
+});
