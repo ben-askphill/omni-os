@@ -694,4 +694,12 @@ export function migrate() {
   // ones, and each one's start.
   db.exec(`CREATE INDEX IF NOT EXISTS events_task_at ON events(created_at) WHERE kind = 'task';
     CREATE INDEX IF NOT EXISTS events_task ON events(thread_id, json_extract(payload, '$.task_id')) WHERE kind = 'task';`);
+  // Older builds counted every sync's retry of an unsigned change waiting in sync_deferred as one more change applied
+  // without a valid signature (sync/apply.ts): two rows on one Mac passed 12 million. The real number is lost, so those
+  // counts start over at one; each row keeps its machine, entity, reason and time. Refusals and held actions
+  // (applied = 0) were never counted that way and stay as they are. Once per machine.
+  if (!db.prepare(`SELECT 1 FROM kv WHERE key = 'sync.migrated.refused_retry_counts'`).get()) {
+    db.exec(`UPDATE sync_refused SET count = 1 WHERE applied = 1 AND count > 1;
+      INSERT INTO kv (key, value) VALUES ('sync.migrated.refused_retry_counts', json_quote(strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));`);
+  }
 }
