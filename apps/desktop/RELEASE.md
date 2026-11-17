@@ -42,6 +42,8 @@ Or open the Actions tab, choose **Desktop release** and **Run workflow**. A run 
 
 Installed apps see a release only once it is published, so a failed run never offers a half-built update. When a build job fails for a cause outside the code, such as a secret or the runner, fix it and choose **Re-run failed jobs** on the same run. The version, tag and draft stay, and the uploads replace what the failed attempt left. The build jobs check out the tag, so a fix merged to `main` never reaches a re-run. For a cause in the code, and to abandon a release, delete the draft and its tag (`gh release delete v<version> --cleanup-tag`) and run the workflow again with the next version.
 
+Signing asks Apple's timestamp server about every file, and that server sometimes stops answering for minutes. codesign then fails with "A timestamp was expected but was not found" (or "The timestamp service is not available"), on whatever file comes first. The Mac job waits it out for about 18 minutes before it fails (`scripts/mac-sign.cjs`). If it still fails on that error, it is Apple's side: choose **Re-run failed jobs** later.
+
 Any agent with `gh` can start a release the same way. Starting one is a deploy to every installed copy, so an agent asks first.
 
 ## Versions
