@@ -209,6 +209,20 @@ export function prLine(pr: PRSummary): { text: string; tone: PRTone } {
   return { text: pr.reviewDecision === 'APPROVED' ? `${checks} · approved` : checks, tone: 'outline' };
 }
 
+/**
+ * Why an open PR cannot merge from its row yet, in the PR page's words, with the dot to show beside it; null when nothing
+ * stands in the way. The same order as `prNext`: conflicts, failing checks, then a draft or running checks. A PR whose
+ * merge state is unknown (gh could not say) is not held back: gh refuses a merge GitHub would block.
+ */
+export function mergeBlock(p: { isDraft: boolean; mergeable?: string; checks?: { failed: number; pending: number } }): { label: string; dot: 'needs' | 'running' | 'idle' } | null {
+  if (p.mergeable === 'CONFLICTING') return { label: 'Has conflicts', dot: 'needs' };
+  const failed = p.checks?.failed ?? 0;
+  if (failed) return { label: `${failed} ${failed === 1 ? 'check' : 'checks'} failing`, dot: 'needs' };
+  if (p.isDraft) return { label: 'Draft', dot: 'idle' };
+  if (p.checks?.pending) return { label: 'Checks running', dot: 'running' };
+  return null;
+}
+
 /** A check run's state as a glyph tone: done, needs (failed) or running. */
 export function checkTone(state: string): 'done' | 'needs' | 'running' {
   if (['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(state)) return 'done';

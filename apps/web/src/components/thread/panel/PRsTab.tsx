@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, type CrewPR, type PRSummary, type Thread } from '../../../api.ts';
 import { plural } from '../../../format.ts';
@@ -15,19 +15,24 @@ export type ThreadPRs = ThreadPRData | undefined;
 const TONE_DOT: Record<PRTone, string> = { live: 'running', done: 'done', needs: 'needs', outline: 'idle' };
 
 /**
- * Squash-merges the PR and deletes its branch, the phone PR screen's defaults, then reads the PRs again. The PR page
- * keeps the other merge methods. A refusal from gh shows under the button.
+ * One PR's merge from the panel: squash, then delete the branch (the phone PR screen's defaults), then read the PRs again.
+ * The PR page keeps the other merge methods. Merge only opens the confirm (`asking`); Squash and merge in it runs gh. A
+ * refusal from gh stays in the confirm so it can be read and tried again.
  */
-export function MergeButton({ channelId, number, onMerged, size = 'sm' }: { channelId: string; number: number; onMerged: () => void; size?: 'sm' | 'md' }) {
+export function useMerge(channelId: string, number: number, onMerged: () => void) {
   const toast = useToast();
+  const id = useId();
+  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ids = { trigger: `${id}merge`, confirm: `${id}confirm`, note: `${id}note`, cancel: `${id}cancel` };
   const merge = async () => {
     setBusy(true);
     setError(null);
     try {
       await api.post(`/channels/${encodeURIComponent(channelId)}/prs/${number}/merge`, { method: 'squash', delete_branch: true, confirm: true });
       toast({ title: `Merged #${number}`, icon: 'pr' });
+      setAsking(false);
       onMerged();
     } catch (e) {
       setError(errorText(e));
@@ -35,29 +40,131 @@ export function MergeButton({ channelId, number, onMerged, size = 'sm' }: { chan
       setBusy(false);
     }
   };
+  const close = () => {
+    setAsking(false);
+    setError(null);
+  };
+  return { number, ids, asking, busy, error, merge, close, toggle: () => (asking ? close() : setAsking(true)) };
+}
+
+export type MergeState = ReturnType<typeof useMerge>;
+
+/**
+ * Merge on a PR's row: small, and the one filled button only on a PR that can merge. It opens the confirm under the row
+ * rather than merging, and turns quiet while that is open so the confirm holds the one filled button.
+ */
+export function MergeTrigger({ m, label = 'Merge' }: { m: MergeState; label?: string }) {
+  return (
+    <Button
+      size="sm"
+      id={m.ids.trigger}
+      variant={m.asking ? 'secondary' : 'primary'}
+      icon="pr"
+      aria-label={label === 'Merge' ? `Merge #${m.number}` : undefined}
+      aria-expanded={m.asking}
+      aria-controls={m.ids.confirm}
+      disabled={m.busy}
+      title="Squash and merge, then delete the branch"
+      onClick={m.toggle}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && m.asking) {
+          e.stopPropagation();
+          m.close();
+        }
+      }}
+    >
+      {label}
+    </Button>
+  );
+}
+
+/**
+ * The confirm under a PR's row: what the merge does, Cancel (focused, so a second Enter does not merge) and Squash and
+ * merge. It opens below the row, so a double click on Merge cannot land on it. Escape closes it.
+ */
+export function MergeConfirm({ m, base, onPanel = false, className = '' }: { m: MergeState; base?: string | null; /** On the panel's own background, not in a card: it takes the card fill. */ onPanel?: boolean; className?: string }) {
+  useEffect(() => {
+    if (m.asking) document.getElementById(m.ids.cancel)?.focus();
+  }, [m.asking, m.ids.cancel]);
+  if (!m.asking) return null;
+  const close = () => {
+    m.close();
+    document.getElementById(m.ids.trigger)?.focus();
+  };
+  return (
+    <div
+      id={m.ids.confirm}
+      role="group"
+      aria-label={`Merge #${m.number}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && !m.busy) {
+          e.stopPropagation();
+          close();
+        }
+      }}
+      className={`pop-in rounded-[var(--r-lg)] ${onPanel ? 'bg-bg' : 'bg-surface'} px-[var(--sp-6)] py-[var(--sp-5)] ${className}`}
+    >
+      <p id={m.ids.note} className="text-[12px] leading-[1.45] text-fg-2">
+        Squash-merges #{m.number}
+        {base ? (
+          <>
+            {' '}
+            into <span className="font-mono text-[11.5px]">{base}</span>
+          </>
+        ) : null}
+        , then deletes its branch. Can’t be undone from here.
+      </p>
+      {m.error && (
+        <p role="alert" className="mt-[var(--sp-4)] flex items-start gap-[var(--sp-4)] text-[12px] leading-[1.45] break-words text-fg">
+          <StatusDot status="needs" size={7} className="mt-[5px] shrink-0" />
+          <span className="min-w-0">{m.error}</span>
+        </p>
+      )}
+      <div className="mt-[var(--sp-5)] flex flex-wrap justify-end gap-[var(--sp-3)]">
+        <Button size="sm" variant="ghost" id={m.ids.cancel} disabled={m.busy} onClick={close}>
+          Cancel
+        </Button>
+        <Button size="sm" variant="primary" icon="pr" busy={m.busy} aria-describedby={m.ids.note} onClick={() => void m.merge()}>
+          {m.busy ? 'Merging…' : 'Squash and merge'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Merge with its confirm under it, for a wrapping row of buttons (the PRs tab): the confirm takes a line of its own. */
+function MergeAction({ channelId, number, base, onMerged }: { channelId: string; number: number; base?: string | null; onMerged: () => void }) {
+  const m = useMerge(channelId, number, onMerged);
   return (
     <>
-      <Button size={size} variant="primary" icon="pr" busy={busy} title="Squash and merge, then delete the branch" onClick={() => void merge()}>
-        {busy ? 'Merging…' : `Merge #${number}`}
-      </Button>
-      {error && <ErrorNote className="w-full">{error}</ErrorNote>}
+      <MergeTrigger m={m} label={`Merge #${number}`} />
+      <MergeConfirm m={m} base={base} onPanel className="w-full" />
     </>
   );
 }
 
 /**
- * The step the branch's PR calls for, as one button: a prompt to the agent, or a merge. While the agent works on a step
- * the button spins and says so, and every step button waits for it. A step whose message was parked (`parked`) says
- * why it did not start under the button.
+ * A step that asks the agent (Open PR, Fix conflicts, Fix checks). While the agent works on a step the button spins and
+ * says so, and every step button waits for it.
  */
-export function PRNextButton({ next, thread, pr, step, parked = null, onAsk, onMerged, size = 'sm' }: { next: PRNext; thread: Thread; pr: PRSummary | null; step: PRStep | null; parked?: PRStep | null; onAsk: (prompt: string) => void; onMerged: () => void; size?: 'sm' | 'md' }) {
+export function StepButton({ next, step, onAsk }: { next: Exclude<PRNext, null | { kind: 'merge' }>; step: PRStep | null; onAsk: (prompt: string) => void }) {
+  return (
+    <Button size="sm" variant={next.kind === 'open' ? 'primary' : 'secondary'} icon={next.kind === 'open' ? 'pr' : 'zap'} busy={step === next.kind} disabled={step !== null} onClick={() => onAsk(next.prompt)}>
+      {step === next.kind ? `${STEP_WORKING[step]}…` : next.label}
+    </Button>
+  );
+}
+
+/**
+ * The step the branch's PR calls for, as one button: a prompt to the agent, or a merge behind its confirm. A step whose
+ * message was parked (`parked`) says why it did not start under the button.
+ */
+function PRNextButton({ next, thread, pr, step, parked = null, onAsk, onMerged }: { next: PRNext; thread: Thread; pr: PRSummary | null; step: PRStep | null; parked?: PRStep | null; onAsk: (prompt: string) => void; onMerged: () => void }) {
   if (!next) return null;
-  if (next.kind === 'merge') return pr ? <MergeButton channelId={thread.channel_id} number={pr.number} onMerged={onMerged} size={size} /> : null;
+  if (next.kind === 'merge') return pr ? <MergeAction channelId={thread.channel_id} number={pr.number} base={pr.baseRefName} onMerged={onMerged} /> : null;
   return (
     <>
-      <Button size={size} variant={next.kind === 'open' ? 'primary' : 'secondary'} icon={next.kind === 'open' ? 'pr' : 'zap'} busy={step === next.kind} disabled={step !== null} onClick={() => onAsk(next.prompt)}>
-        {step === next.kind ? `${STEP_WORKING[step]}…` : next.label}
-      </Button>
+      <StepButton next={next} step={step} onAsk={onAsk} />
       {step === null && parked === next.kind && <ErrorNote className="w-full">{stepParkedText(parked, thread)}</ErrorNote>}
     </>
   );

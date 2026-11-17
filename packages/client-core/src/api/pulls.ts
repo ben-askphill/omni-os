@@ -57,6 +57,10 @@ export interface CrewPR {
   thread_title: string;
   channel_id: string;
   task_id: string | null;
+  /** An open one's merge state. Left out when gh could not say, and by a server older than the fields. */
+  mergeable?: string;
+  reviewDecision?: string | null;
+  checks?: PRChecks;
 }
 
 /**

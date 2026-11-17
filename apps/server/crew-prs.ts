@@ -2,9 +2,10 @@
 // to, at any depth (a team's members under their lead), gives the PR from its branch. Asked of GitHub on every read
 // and never stored, so a merge or a close shows on the parent as soon as it shows on the child.
 import { channels, threads } from './db.ts';
-import { threadPRMarks, type BranchPRMark } from './github.ts';
+import { openPRStates, threadPRMarks, type BranchPRMark, type PRMergeState } from './github.ts';
 
-export interface CrewPR extends BranchPRMark {
+/** An open one also carries its merge state (`mergeable`, `checks`, `reviewDecision`), left out when gh could not say. */
+export interface CrewPR extends BranchPRMark, Partial<PRMergeState> {
   repo: string;
   /** The delegated thread whose branch it came from. */
   thread_id: string;
@@ -16,7 +17,7 @@ export interface CrewPR extends BranchPRMark {
 /**
  * One PR a delegated thread's branch was opened as (its open one, else its newest merged one), oldest delegation first.
  * A PR two threads share shows once, under the first. One `gh` call per repo, cached (github.ts threadPRMarks); a repo
- * gh cannot read is left out.
+ * gh cannot read is left out. A repo with an open one costs a second call for the merge states (openPRStates).
  */
 export async function crewPRs(threadId: string): Promise<CrewPR[]> {
   const crew = threads.descendants(threadId).flatMap((t) => {
@@ -34,7 +35,12 @@ export async function crewPRs(threadId: string): Promise<CrewPR[]> {
     seen.add(pr.url);
     out.push({ ...pr, repo, thread_id: t.id, thread_title: t.title, channel_id: t.channel_id, task_id: t.task_id });
   }
-  return out;
+  const open = [...new Set(out.filter((p) => p.state === 'OPEN').map((p) => p.repo))];
+  const states = new Map(await Promise.all(open.map(async (repo) => [repo, await openPRStates(repo).catch((): Record<number, PRMergeState> => ({}))] as const)));
+  return out.map((p) => {
+    const s = p.state === 'OPEN' ? states.get(p.repo)?.[p.number] : undefined;
+    return s ? { ...p, ...s } : p;
+  });
 }
 
 /** The thread a PR came from, and the thread that delegated it, for a link back from the PR page. */

@@ -12,7 +12,10 @@
       "thread_id": "c5d1e2f3-0000-4000-8000-000000000004",
       "thread_title": "Add the size guide",
       "channel_id": "shop",
-      "task_id": "T-AB12"
+      "task_id": "T-AB12",
+      "mergeable": "MERGEABLE",
+      "reviewDecision": null,
+      "checks": { "passed": 3, "failed": 0, "pending": 0 }
     },
     {
       "number": 9,
