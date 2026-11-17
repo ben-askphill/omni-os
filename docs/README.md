@@ -13,6 +13,7 @@
 - [Remote access and security](user/remote-access.md), including the phone layout, home-screen setup and pairing the native iOS app
 - [Omni Connect](user/omni-connect.md): open any machine from a phone through your relay, without Tailscale
 - [claude.ai Artifacts](user/claude-artifacts.md): the list of your Artifacts on claude.ai beside the files threads made
+- [Notion](user/notion.md): threads use a Notion connection's token (`OMNI_NOTION_TOKEN`) and the shipped helper instead of the OAuth-only plugin, and which pages to share with it
 - [Link previews](user/link-previews.md)
 - [Mods](user/mods.md)
 - [The omni command](user/cli.md): `new`, `send`, `threads`/`show`, `status`, `doctor` and `open` from any terminal or agent shell, where the desktop app puts it, and the `--wait` exit codes
