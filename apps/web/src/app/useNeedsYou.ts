@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { api, type NeedsYou, type Thread } from '../api.ts';
+import { api, listGet, type NeedsYou, type Thread } from '../api.ts';
 import { coalesced, withoutResult, withoutThread } from '../needs-you.ts';
 
 /** The unread results and blockers across every thread (GET /api/needs-you), and the two ways Ben clears one. */
@@ -10,8 +10,7 @@ export function useNeedsYou(reloadChannels: () => Promise<void>) {
 
   const reloadNeedsYou = useCallback(() => {
     const epoch = needsYouEpoch.current;
-    return api
-      .get<NeedsYou>('/needs-you')
+    return listGet<NeedsYou>('/needs-you')
       .then((n) => void (epoch === needsYouEpoch.current && setNeedsYou(n)))
       .catch(() => {});
   }, []);

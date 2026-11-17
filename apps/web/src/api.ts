@@ -18,6 +18,7 @@ import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/au
 import type { ContinueLink } from '@omni/shared/continue.ts';
 import type { Clipped, HistoryHead } from '@omni/shared/history.ts';
 import { outputQuery, type OutputChunk } from '@omni/shared/tool-output.ts';
+import { createYieldGate } from '@omni/shared/yield-gate.ts';
 import type { FeedAlert } from '@omni/shared/attention.ts';
 
 export type { EventRow, Artifact, Attachment, HarnessInfo, ModelEntry, HarnessId, Folder, ContextUsage, ContextView, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult, ArtifactTrigger, WebhookTrigger, DeliveryView, DeliveryPage };
@@ -573,6 +574,15 @@ export const api = {
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   del: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 };
+
+/**
+ * The lists the app reloads by itself (channels, pins, status, Needs you) give way to the thread being opened: on a
+ * phone they share a narrow link with its first page (packages/shared/yield-gate.ts). A thread load holds it.
+ */
+export const listGate = createYieldGate();
+
+/** GET for a list the app reloads by itself: it waits while a thread's first page loads, and one cut off goes again after. */
+export const listGet = <T>(path: string) => listGate.run((signal) => api.get<T>(path, signal));
 
 /** GET /harnesses as a channel sees them (Cursor Cloud needs its GitHub repo), or as a whole with no channel. */
 export const harnessesPath = (channel?: string | null) => (channel ? `/harnesses?channel=${encodeURIComponent(channel)}` : '/harnesses');

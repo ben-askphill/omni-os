@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, errorText, useThreadStream, type Artifact, type ArtifactWithThread, type Channel, type ContextUsage, type HistoryEvent, type PendingMsg, type Thread, type ThreadOpen } from '../api.ts';
+import { api, errorText, listGate, useThreadStream, type Artifact, type ArtifactWithThread, type Channel, type ContextUsage, type HistoryEvent, type PendingMsg, type Thread, type ThreadOpen } from '../api.ts';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
@@ -110,6 +110,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
 
   const load = useCallback(
     async () => {
+      // The lists the app reloads by itself wait until this page is in (api.ts listGate).
+      const release = listGate.hold();
       try {
         const d = await api.get<ThreadOpen>(`/threads/${encodeURIComponent(id)}?history=recent`);
         const target = atRef.current;
@@ -135,6 +137,8 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
       } catch (e) {
         if ((e as { status?: number }).status === 404) setNotFound(true);
         else setError(errorText(e));
+      } finally {
+        release();
       }
     },
     [id, prepare, open, applyDetail],

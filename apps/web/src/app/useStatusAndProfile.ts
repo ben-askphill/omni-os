@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { api, type HarnessUsage, type Profile, type Status } from '../api.ts';
+import { api, listGet, type HarnessUsage, type Profile, type Status } from '../api.ts';
 import { secretStoreKind, type SecretStoreKind } from '@omni/shared/secret-store.ts';
 
 /** GET /api/status (running counts, limits, usage) and the profile it carries, plus the onboarding wizard's open state. */
@@ -11,7 +11,7 @@ export function useStatusAndProfile() {
 
   const reloadStatus = useCallback(async () => {
     try {
-      const s = await api.get<Status>('/status');
+      const s = await listGet<Status>('/status');
       setStatus({ running: s.running, queued: s.queued, maxConcurrent: s.maxConcurrent, maxUploadMb: s.maxUploadMb, slots: s.slots ?? {}, device: s.device, grokBot: !!s.grokBot, secretStore: secretStoreKind(s.server?.secretStore) });
       setProfile(s.profile ?? { name: '' });
       if (s.usage) setUsage((prev) => ({ ...prev, ...s.usage }));
