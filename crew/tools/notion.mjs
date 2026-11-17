@@ -327,31 +327,80 @@ function textArg(arg) {
 }
 
 export class NotionError extends Error {
-  constructor(status, body) {
+  constructor(status, body, { unknown = false } = {}) {
     super(body?.message ?? `HTTP ${status}`);
     this.status = status;
     this.code = body?.code;
+    /** A write that failed in a way that may still have landed (a 5xx, or no answer at all). */
+    this.unknown = unknown;
+    /** What Notion says a failed write did create anyway (a 503's committed_resource_id): never repeat that write. */
+    this.committed = body?.committed_resource_id ?? null;
+    /** What a create or append had done before it failed. */
+    this.progress = null;
   }
 }
 
-/** The client: `call(method, path, body)` with retries on 429 and 5xx. `fetchImpl` is for tests. */
+const API_ORIGIN = new URL(API).origin;
+
+/**
+ * Where a path goes: a relative path (`/pages/x`, `pages/x` or `/v1/pages/x`) resolves under the API, and an absolute
+ * URL must already be https://api.notion.com/v1/. Anything else is refused before a request is made, so the token can
+ * never reach another host, plain http or a path outside the API.
+ */
+export function notionUrl(path) {
+  const raw = String(path ?? '');
+  const absolute = /^[a-z][a-z0-9+.-]*:/i.test(raw);
+  let url;
+  try {
+    url = absolute ? new URL(raw) : new URL(raw.startsWith('/v1/') ? raw : `/v1${raw.startsWith('/') ? '' : '/'}${raw}`, API_ORIGIN);
+  } catch {
+    throw new Error(`Not a Notion API path: ${raw}`);
+  }
+  if (url.origin !== API_ORIGIN || url.username || url.password || !url.pathname.startsWith('/v1/')) {
+    throw new Error(`Refused ${raw}: the token only goes to ${API}/.`);
+  }
+  return url.href;
+}
+
+/**
+ * The client: `call(method, path, body)`. A 429 is retried for any method (Notion did not run the request); a 5xx only
+ * for GET, since a write may have landed before the error and a retry would make it twice. Redirects are not followed,
+ * so the token never goes anywhere else. `fetchImpl` is for tests.
+ */
 export function client(token, fetchImpl = globalThis.fetch) {
   async function call(method, path, body) {
-    const url = path.startsWith('http') ? path : `${API}${path.startsWith('/v1/') ? path.slice(3) : path.startsWith('/') ? path : `/${path}`}`;
+    const url = notionUrl(path);
+    const write = method !== 'GET';
     for (let attempt = 0; ; attempt++) {
-      const res = await fetchImpl(url, {
-        method,
-        headers: { Authorization: `Bearer ${token}`, 'Notion-Version': NOTION_VERSION, 'Content-Type': 'application/json' },
-        body: body == null ? undefined : JSON.stringify(body),
-      });
-      if ((res.status === 429 || res.status >= 500) && attempt < 4) {
-        const wait = Number(res.headers?.get?.('retry-after')) || 2 ** attempt;
+      let res;
+      try {
+        res = await fetchImpl(url, {
+          method,
+          redirect: 'manual',
+          headers: { Authorization: `Bearer ${token}`, 'Notion-Version': NOTION_VERSION, 'Content-Type': 'application/json' },
+          body: body == null ? undefined : JSON.stringify(body),
+        });
+      } catch (err) {
+        // No answer: a write may have landed all the same.
+        throw new NotionError(0, { code: 'no_response', message: err.message }, { unknown: write });
+      }
+      if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+        throw new Error(`Notion answered ${method} ${url} with a redirect (${res.status}), which is not followed.`);
+      }
+      if ((res.status === 429 || (res.status >= 500 && method === 'GET')) && attempt < 4) {
+        const after = Number(res.headers?.get?.('retry-after') ?? NaN);
+        const wait = Number.isFinite(after) && after >= 0 ? after : 2 ** attempt;
         await new Promise((r) => setTimeout(r, wait * 1000));
         continue;
       }
       const text = await res.text();
-      const json = text ? JSON.parse(text) : {};
-      if (!res.ok) throw new NotionError(res.status, json);
+      let json = {};
+      try {
+        json = text ? JSON.parse(text) : {};
+      } catch {
+        json = { message: text.slice(0, 200) };
+      }
+      if (!res.ok) throw new NotionError(res.status, json, { unknown: write && res.status >= 500 });
       return json;
     }
   }
@@ -385,6 +434,64 @@ export function client(token, fetchImpl = globalThis.fetch) {
   }
 
   return { call, all, children };
+}
+
+/** Notion's caps on one request: 100 blocks in any one children array, and two levels of nesting. */
+const MAX_CHILDREN = 100;
+const MAX_DEPTH = 2;
+const kidsOf = (block) => block[block.type]?.children ?? [];
+
+/**
+ * A block as one request may carry it: at most MAX_CHILDREN children per array and MAX_DEPTH levels below the top.
+ * `overflow` lists what was cut: the path of child indexes to the block that lost children, and those children.
+ */
+export function trimBlock(block, depth = MAX_DEPTH) {
+  const kids = kidsOf(block);
+  const { children: _drop, ...data } = block[block.type] ?? {};
+  const copy = { ...block, [block.type]: data };
+  const overflow = [];
+  if (kids.length) {
+    const keep = depth > 0 ? kids.slice(0, MAX_CHILDREN) : [];
+    if (keep.length) {
+      data.children = keep.map((kid, i) => {
+        const t = trimBlock(kid, depth - 1);
+        for (const o of t.overflow) overflow.push({ path: [i, ...o.path], rest: o.rest });
+        return t.block;
+      });
+    }
+    if (kids.length > keep.length) overflow.push({ path: [], rest: kids.slice(keep.length) });
+  }
+  return { block: copy, overflow };
+}
+
+/**
+ * Appends blocks under `parentId` in requests Notion accepts: 100 top-level blocks each, and any children cut by
+ * trimBlock appended afterwards to the block they belong to (a long table's rows, a long nested list). `sent` counts
+ * the top-level blocks that landed, for the error when one request fails.
+ */
+async function appendBlocks(n, parentId, blocks, done = { sent: 0 }, created = null) {
+  for (const [c, chunk] of chunks(blocks, MAX_CHILDREN).entries()) {
+    const trimmed = chunk.map((b) => trimBlock(b));
+    let ids;
+    if (c === 0 && created) {
+      // The page was created with this first chunk already: look its blocks up only if some need more children.
+      ids = trimmed.some((t) => t.overflow.length) ? (await n.all('GET', `/blocks/${parentId}/children`, {}, MAX_CHILDREN)).map((b) => b.id) : [];
+    } else {
+      const res = await n.call('PATCH', `/blocks/${parentId}/children`, { children: trimmed.map((t) => t.block) });
+      ids = (res.results ?? []).map((b) => b.id);
+      // The answer lists the new blocks. Should it hold anything else, they are the parent's last ones.
+      if (ids.length !== chunk.length && trimmed.some((t) => t.overflow.length)) ids = (await n.all('GET', `/blocks/${parentId}/children`)).slice(-chunk.length).map((b) => b.id);
+    }
+    done.sent += chunk.length;
+    for (const [i, t] of trimmed.entries()) {
+      for (const o of t.overflow) {
+        let id = ids[i];
+        for (const index of o.path) id = (await n.all('GET', `/blocks/${id}/children`))[index].id;
+        await appendBlocks(n, id, o.rest, { sent: 0 });
+      }
+    }
+  }
+  return done;
 }
 
 const row = (page) =>
@@ -468,13 +575,20 @@ export async function run(argv, env = process.env, fetchImpl = globalThis.fetch)
       throw err;
     });
     const titleKey = db ? Object.entries(db.properties ?? {}).find(([, p]) => p.type === 'title')?.[0] ?? 'Name' : 'title';
-    const [first = [], ...rest] = chunks(markdownToBlocks(textArg(content)), 100);
+    const blocks = markdownToBlocks(textArg(content));
+    const first = blocks.slice(0, MAX_CHILDREN);
     const page = await n.call('POST', '/pages', {
       parent: db ? { database_id: parentId } : { page_id: parentId },
       properties: { ...(props ?? {}), [titleKey]: { title: inline(title) } },
-      children: first,
+      children: first.map((b) => trimBlock(b).block),
     });
-    for (const chunk of rest) await n.call('PATCH', `/blocks/${page.id}/children`, { children: chunk });
+    const done = { sent: 0 };
+    try {
+      await appendBlocks(n, page.id, blocks, done, page);
+    } catch (err) {
+      if (err instanceof NotionError) err.progress = `Created ${page.url} (id ${page.id}) with ${done.sent} of ${blocks.length} top-level blocks before this failed.`;
+      throw err;
+    }
     return `Created ${page.url} (id ${page.id})`;
   }
   if (cmd === 'append') {
@@ -482,7 +596,13 @@ export async function run(argv, env = process.env, fetchImpl = globalThis.fetch)
     if (!id) throw new Error('append needs a page or block id or URL');
     const blocks = markdownToBlocks(textArg(args[1]));
     if (!blocks.length) throw new Error('append needs Markdown to add');
-    for (const chunk of chunks(blocks, 100)) await n.call('PATCH', `/blocks/${id}/children`, { children: chunk });
+    const done = { sent: 0 };
+    try {
+      await appendBlocks(n, id, blocks, done);
+    } catch (err) {
+      if (err instanceof NotionError) err.progress = `${done.sent} of ${blocks.length} top-level blocks were appended to ${id} before this failed.`;
+      throw err;
+    }
     return `Appended ${blocks.length} block${blocks.length === 1 ? '' : 's'} to ${id}`;
   }
   if (cmd === 'api') {
@@ -506,11 +626,15 @@ Reads ${TOKEN_ENV}. The connection only sees pages and databases shared with it 
 /** Why a call failed, with what to do about it. Never includes the token. */
 export function explain(err) {
   if (!(err instanceof NotionError)) return err.message;
+  const progress = err.progress ? ` ${err.progress}` : '';
+  if (err.committed) return `Notion ${err.status}: the write was committed anyway as ${err.committed}. Do not repeat it.${progress}`;
+  if (err.unknown)
+    return `Notion ${err.status || 'gave no answer'}${err.code ? ` (${err.code})` : ''}: this write may or may not have landed, so it was not retried. Check the page in Notion before running it again.${progress}`;
   if (err.status === 401) return `Notion refused the token (401 ${err.code}). ${TOKEN_ENV} is wrong or the connection was removed.`;
   if (err.status === 404 || err.code === 'object_not_found')
     return `Notion: not found (404). Either the id is wrong or the page is not shared with the Omni connection: ask the user to open it in Notion, ••• > Connections, and add Omni.`;
   if (err.status === 403) return `Notion: the connection lacks the capability for this (403 ${err.code}). Its capabilities are set in Notion's integration settings.`;
-  return `Notion ${err.status} ${err.code ?? ''}: ${err.message}`;
+  return `Notion ${err.status} ${err.code ?? ''}: ${err.message}${progress}`;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

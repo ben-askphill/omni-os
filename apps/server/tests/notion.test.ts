@@ -162,6 +162,135 @@ describe('crew/tools/notion.mjs', () => {
     expect(page.calls.at(-1)!.body).toMatchObject({ parent: { page_id: PAGE }, properties: { title: { title: [{ text: { content: 'Notes' } }] } }, children: [] });
   });
 
+  it('sends the token only to https://api.notion.com/v1/, refusing other hosts, http and paths outside the API', async () => {
+    const { calls, fetchImpl } = fakeNotion({ 'GET /v1/users/me': { object: 'user', id: 'u1', name: 'Omni', type: 'bot' } });
+    const env = { OMNI_NOTION_TOKEN: TOKEN };
+    for (const path of [
+      'https://foreign.invalid/collect',
+      'http://api.notion.com/v1/users/me',
+      'https://api.notion.com/v2/users/me',
+      'https://api.notion.com/oauth/token',
+      'https://user:pw@api.notion.com/v1/users/me',
+      'https://api.notion.com.foreign.invalid/v1/users/me',
+      '/v1/../oauth/token',
+      'file:///etc/passwd',
+    ]) {
+      await expect(helper.run(['api', 'GET', path], env, fetchImpl), path).rejects.toThrow(/Refused|Not a Notion API path/);
+    }
+    expect(calls).toHaveLength(0);
+    // Relative paths, with or without /v1, and the full API URL all land under it.
+    expect(helper.notionUrl('/users/me')).toBe('https://api.notion.com/v1/users/me');
+    expect(helper.notionUrl('users/me')).toBe('https://api.notion.com/v1/users/me');
+    expect(helper.notionUrl('//foreign.invalid/x')).toBe('https://api.notion.com/v1//foreign.invalid/x');
+    expect(helper.notionUrl('https://api.notion.com/v1/users/me')).toBe('https://api.notion.com/v1/users/me');
+    await helper.run(['api', 'GET', 'https://api.notion.com/v1/users/me'], env, fetchImpl);
+    expect(calls.map((c) => c.path)).toEqual(['/v1/users/me']);
+  });
+
+  it('follows no redirect and retries no write on a server error', async () => {
+    const seen: { url: string; init: any }[] = [];
+    const reply = (status: number, headers: Record<string, string> = {}) =>
+      (async (url: string, init: any) => {
+        seen.push({ url, init });
+        return new Response(status >= 300 && status < 400 ? null : JSON.stringify({ object: 'error', code: 'internal_server_error', message: 'boom' }), { status, headers });
+      }) as unknown as typeof fetch;
+    const env = { OMNI_NOTION_TOKEN: TOKEN };
+    await expect(helper.run(['api', 'GET', '/users/me'], env, reply(302, { location: 'https://foreign.invalid/' }))).rejects.toThrow('redirect');
+    expect(seen.map((s) => [s.url, s.init.redirect])).toEqual([['https://api.notion.com/v1/users/me', 'manual']]);
+
+    seen.length = 0;
+    const err = await helper.run(['api', 'POST', '/pages', '{}'], env, reply(500)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(helper.NotionError);
+    expect(seen).toHaveLength(1);
+  });
+
+  /** A fake that answers each call in turn from `answers` ([status, body, headers?]), recording the requests. */
+  function sequence(answers: [number, unknown, Record<string, string>?][]) {
+    const calls: { method: string; path: string; body?: any }[] = [];
+    const fetchImpl = (async (url: string, init: any) => {
+      const u = new URL(url);
+      calls.push({ method: init.method, path: `${u.pathname}${u.search}`, body: init.body && JSON.parse(init.body) });
+      const next = answers.shift();
+      if (!next) throw new Error(`unexpected ${init.method} ${url}`);
+      if (next[0] === 0) throw new TypeError('fetch failed');
+      return new Response(JSON.stringify(next[1]), { status: next[0], headers: next[2] });
+    }) as unknown as typeof fetch;
+    return { calls, fetchImpl };
+  }
+  const env = { OMNI_NOTION_TOKEN: TOKEN };
+
+  it('never repeats a write that may have landed, and says so', async () => {
+    // A 503 that names what it committed.
+    const committed = sequence([
+      [404, { object: 'error', code: 'object_not_found', message: 'not a database' }],
+      [503, { object: 'error', code: 'service_unavailable', message: 'Do not repeat the write', committed_resource_id: 'p-9' }],
+    ]);
+    let err = await helper.run(['create', PAGE, 'Notes', 'hello'], env, committed.fetchImpl).catch((e: unknown) => e);
+    expect(committed.calls.map((c) => c.method)).toEqual(['GET', 'POST']);
+    expect(helper.explain(err)).toContain('committed anyway as p-9. Do not repeat it.');
+
+    // A 503 halfway through an append: one try, and the message says how far it got and that the outcome is unknown.
+    const md = Array.from({ length: 150 }, (_, i) => `- item ${i}`).join('\n');
+    const half = sequence([
+      [200, { results: Array.from({ length: 100 }, (_, i) => ({ id: `n${i}` })) }],
+      [503, { object: 'error', code: 'service_unavailable', message: 'busy' }],
+    ]);
+    err = await helper.run(['append', PAGE, md], env, half.fetchImpl).catch((e: unknown) => e);
+    expect(half.calls.map((c) => c.body.children.length)).toEqual([100, 50]);
+    expect((err as any).unknown).toBe(true);
+    expect(helper.explain(err)).toMatch(/may or may not have landed, so it was not retried.*100 of 150 top-level blocks were appended/);
+
+    // No answer at all on a write is unknown too, and not retried.
+    const silent = sequence([[0, null]]);
+    err = await helper.run(['append', PAGE, 'x'], env, silent.fetchImpl).catch((e: unknown) => e);
+    expect(silent.calls).toHaveLength(1);
+    expect(helper.explain(err)).toContain('gave no answer');
+
+    // A 429 means Notion did not run it: the write is retried after Retry-After.
+    const limited = sequence([
+      [429, { object: 'error', code: 'rate_limited', message: 'slow down' }, { 'retry-after': '0' }],
+      [200, { results: [{ id: 'n0' }] }],
+    ]);
+    expect(await helper.run(['append', PAGE, 'x'], env, limited.fetchImpl)).toBe(`Appended 1 block to ${PAGE}`);
+    expect(limited.calls.map((c) => c.method)).toEqual(['PATCH', 'PATCH']);
+  });
+
+  it('cuts any children array at 100 and appends the rest to the block it belongs to', async () => {
+    // A header and 120 data rows: the table goes out with 100 rows, then 21 more are appended to it.
+    const table = ['| h1 | h2 |', '|---|---|', ...Array.from({ length: 120 }, (_, i) => `| r${i} | v${i} |`)].join('\n');
+    const created = sequence([
+      [404, { object: 'error', code: 'object_not_found', message: 'not a database' }],
+      [200, { object: 'page', id: PAGE, url: 'https://www.notion.so/new' }],
+      [200, { results: [{ id: 'tbl' }], has_more: false }],
+      [200, { results: Array.from({ length: 21 }, (_, i) => ({ id: `row${i}` })) }],
+    ]);
+    expect(await helper.run(['create', PAGE, 'Big table', table], env, created.fetchImpl)).toBe(`Created https://www.notion.so/new (id ${PAGE})`);
+    const [, post, list, rest] = created.calls;
+    expect(post.body.children[0].table.children).toHaveLength(100);
+    expect(list.path).toBe(`/v1/blocks/${PAGE}/children?page_size=100`);
+    expect(rest.method).toBe('PATCH');
+    expect(rest.path).toBe('/v1/blocks/tbl/children');
+    expect(rest.body.children).toHaveLength(21);
+    expect(rest.body.children[20].table_row.cells[0][0].text.content).toBe('r119');
+
+    // A list item with 101 nested items, appended: 100 go with it, the last one follows under the item's new id.
+    const list101 = ['- parent', ...Array.from({ length: 101 }, (_, i) => `  - child ${i}`)].join('\n');
+    const appended = sequence([
+      [200, { results: [{ id: 'item' }] }],
+      [200, { results: [{ id: 'c100' }] }],
+    ]);
+    await helper.run(['append', PAGE, list101], env, appended.fetchImpl);
+    expect(appended.calls[0].body.children[0].bulleted_list_item.children).toHaveLength(100);
+    expect(appended.calls[1].path).toBe('/v1/blocks/item/children');
+    expect(appended.calls[1].body.children.map((b: any) => b.bulleted_list_item.rich_text[0].text.content)).toEqual(['child 100']);
+
+    // trimBlock keeps two levels of nesting in one request; deeper children wait for their parent's id.
+    const deep = { type: 'toggle', toggle: { children: [{ type: 'toggle', toggle: { children: [{ type: 'toggle', toggle: { children: [{ type: 'paragraph', paragraph: {} }] } }] } }] } };
+    const { block, overflow } = helper.trimBlock(deep);
+    expect(block.toggle.children[0].toggle.children[0].toggle.children).toBeUndefined();
+    expect(overflow).toEqual([{ path: [0, 0], rest: [{ type: 'paragraph', paragraph: {} }] }]);
+  });
+
   it('renders the property and block types it knows, and a placeholder for the rest', () => {
     expect(helper.propValue({ type: 'date', date: { start: '2026-01-01', end: '2026-01-02' } })).toBe('2026-01-01 to 2026-01-02');
     expect(helper.propValue({ type: 'formula', formula: { type: 'number', number: 3 } })).toBe('3');
