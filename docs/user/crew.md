@@ -57,7 +57,7 @@ A role is a prompt every later thread of it runs with, so an agent thread's writ
 - The thread runs as the Conductor. No other role writes roles, even one you gave the `omni` MCP server, and usage-scan never does.
 - The save leaves powers alone: no `mcp`, `delegate_only` or `delegatable`, and no whole-file `markdown`. Those are yours to set.
 - No automation started the thread or any thread above it.
-- You answered in that thread after its first message, or answered a question it asked. The guard cannot read whether you agreed: it holds the Conductor to proposing an edit and waiting for you. An agent's own call never counts as your answer: a message an agent thread sends (`x-omni-thread`), including through `check_artifact_comments` or a compact, is recorded as the Conductor's, and an agent thread cannot answer a question card.
+- You answered in that thread after its first message, or answered a question it asked. The guard cannot read whether you agreed: it holds the Conductor to proposing an edit and waiting for you. An agent's own call never counts as your answer: a message an agent thread sends (`x-omni-thread`), including through `check_artifact_comments` or a compact, is recorded as the Conductor's, and an agent thread cannot answer a question card. The same holds for review notes an agent thread sends, and for messages a thread carries when it moves to another machine, which keep their sender.
 
 Like the automation guard, it holds the path agents are told to use. A shell command that calls the API without the header is not stopped.
 

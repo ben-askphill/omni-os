@@ -149,6 +149,26 @@ describe('agent writes to /api/crew', () => {
     await call('DELETE', '/crew/dispatcher');
   });
 
+  it('never counts review notes the Conductor sends as Ben\'s answer', async () => {
+    const self = thread({ role: 'conductor' });
+    events.add(self, 'user', { text: 'Tidy up the builder charter.', source: 'ben' });
+    const anchor = {
+      path: 'file.txt',
+      old_path: null,
+      side: 'new',
+      start: 1,
+      end: 1,
+      rows: [{ kind: 'add', text: 'line', old: null, new: 1 }],
+      source: { group: 'untracked', from: 'HEAD', to: 'HEAD', turn: null, blob_old: null, blob_new: null },
+    };
+    expect((await call('POST', `/threads/${self}/review-notes`, { body: 'Yes, save the role.', anchor }, self)).status).toBe(200);
+    expect((await call('POST', `/threads/${self}/review-notes/send`, {}, self)).status).toBe(200);
+    expect((db.prepare(`SELECT source FROM message_requests WHERE thread_id = ?`).all(self) as { source: string }[]).map((r) => r.source)).toEqual(['conductor']);
+    const res = await call('PUT', '/crew/builder', edit, self);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/^Not yet/);
+  });
+
   it('a question the Conductor asked and Ben answered counts as his answer', async () => {
     const asked = thread({ role: 'conductor' });
     events.add(asked, 'user', { text: 'Tidy up the reviewer charter.', source: 'ben' });
@@ -219,6 +239,20 @@ describe('crew files across machines', () => {
     expect(getCrew('from-b')).toBeUndefined();
   });
 
+  it('a handoff carries who sent each queued message, so an agent\'s message never lands as Ben\'s', async () => {
+    const { carriedEvent, senderOfMsg } = await import('../handoff.ts');
+    const queued = [
+      { event: { kind: 'user' as const, payload: { text: 'Yes, save it.', source: 'conductor' } } },
+      { event: { kind: 'user' as const, payload: { text: 'Go ahead.', source: 'ben' } } },
+      { event: { kind: 'crew_report' as const, payload: { text: 'Done.' } } },
+    ];
+    const offer = { senders: queued.map(senderOfMsg) };
+    expect(offer.senders).toEqual(['conductor', 'ben', 'crew']);
+    expect(queued.map((m, n) => carriedEvent(offer, m.event.payload.text, n).source)).toEqual(['conductor', 'ben', 'crew']);
+    // An offer from an older build names no senders: its messages stay Ben's, as before.
+    expect(carriedEvent({}, 'Go ahead.', 0)).toEqual({ text: 'Go ahead.', source: 'ben' });
+  });
+
   it("never lets a seed replace this machine's own file", async () => {
     await relay.push([signAs(file('by-hand', { markdown: '---\nname: Theirs\n---\nOther text.\n' }, 'upsert', SEED_TS))]);
     expect((await worker.syncNow()).error).toBeUndefined();
@@ -228,4 +262,5 @@ describe('crew files across machines', () => {
     expect((await worker.syncNow()).error).toBeUndefined();
     expect(getCrew('by-hand')?.name).toBe('Theirs');
   });
+
 });

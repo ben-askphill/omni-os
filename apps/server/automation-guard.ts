@@ -9,12 +9,20 @@
 // path agents are told to use, not a determined one: every thread can read the install token (sandbox.ts), so a shell
 // command that calls the API without the header, or posts a message as Ben, is not stopped. Closing that needs tokens
 // scoped to one thread.
+import type { Context } from 'hono';
 import { db } from './db.ts';
 import { ancestry, automationOf } from './lineage.ts';
 import { userName } from './profile.ts';
 import { SCAN_ROLE } from './usage-scan/asks.ts';
 
 export const CALLER_HEADER = 'x-omni-thread';
+
+/**
+ * Who a message an API call posts is from: an agent thread's call (one that names its thread, as Omni's MCP servers do)
+ * is the Conductor's, never Ben's, whatever it says. The guards read Ben's messages in a thread as his answer
+ * (benAnswered below, crew-guard.ts), so every route that posts a message on Ben's behalf takes its sender from here.
+ */
+export const senderOf = (c: Context, from: 'ben' | 'conductor' = 'ben'): 'ben' | 'conductor' => (c.req.header(CALLER_HEADER) ? 'conductor' : from);
 
 export type AutomationWrite = 'create' | 'edit' | 'enable' | 'run' | 'scan' | 'disable' | 'delete';
 
