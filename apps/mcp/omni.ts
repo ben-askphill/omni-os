@@ -78,6 +78,96 @@ server.registerTool(
   async () => text((await call('/crew')).filter((r: any) => r.delegatable).map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
 );
 
+// The crew roles the Conductor reads and writes (plan slice S7, docs/plans/2026-11-18-user-defined-crew.md). The API's
+// crew guard (apps/server/crew-guard.ts) decides every write: only a thread running as the Conductor, never under an
+// automation, only after Ben answered in it, and never a role's powers.
+
+const crewId = z.string().trim().min(1).max(64).describe('Crew role id: lowercase letters, digits and dashes. Use list_crew.');
+
+/** A role as get_crew_role and the writes return it: what a save may change, and the powers and locks it may not. */
+const crewRoleView = (d: any) => {
+  const r = d.role;
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    // shipped, edited (a built-in with the user's overlay) or own.
+    kind: r.kind,
+    ...(r.hidden && { hidden: true }),
+    harness: r.harness ?? null,
+    model: r.model ?? null,
+    effort: r.effort ?? null,
+    default_channel: r.channel ?? null,
+    ...(r.charterMode && { charter_mode: r.charterMode }),
+    ...(r.builtInChanged && { built_in_changed: true }),
+    powers: { mcp: r.mcp, delegate_only: r.delegateOnly, delegatable: r.delegatable, review: r.review },
+    ...(r.locks && { locks: r.locks }),
+    ...(r.error && { error: r.error }),
+    charters: { built_in: d.charters.builtIn, own: d.charters.own, effective: d.charters.effective },
+  };
+};
+
+server.registerTool(
+  'get_crew_role',
+  {
+    description:
+      'One crew role, to edit with save_crew_role: its fields, its powers and locks, and its charters as written. ' +
+      `charters.built_in is the shipped charter (null for a role of ${USER}'s own), charters.own the text of ${USER}'s file (their whole role, or their addition to or replacement of a built-in) ` +
+      'and charters.effective the charter its threads run with. Roles list_crew leaves out (the Conductor, usage-scan, hidden ones) are here by id.',
+    inputSchema: { id: crewId },
+  },
+  async ({ id }) => text(crewRoleView(await call(`/crew/${encodeURIComponent(id)}`))),
+);
+
+server.registerTool(
+  'save_crew_role',
+  {
+    description:
+      `Create a crew role or change one, only once ${USER} agreed in this thread to the exact change you proposed. Omni refuses it before ${USER} answers, and in a thread an automation started. ` +
+      `create: true makes a role of ${USER}'s own, with an id that never changes, fields.name, fields.description and its charter. ` +
+      'A new role has no powers: no conductor tools, not delegate-only, not a review role. It works in its own thread like any crewmate, and list_crew and delegate offer it at once. ' +
+      `Without create it edits the role; on a built-in it writes ${USER}'s overlay. Only the fields you pass change, and an empty string removes one, so a built-in's value comes back. ` +
+      `charter is the whole text of ${USER}'s file for the role: the charter of their own role, or what is added to a built-in's (charter_mode append, the default) or replaces it (replace). ` +
+      'Start from get_crew_role\'s charters.own and send all of it. ' +
+      `Powers (mcp, delegate_only, delegatable, review) are ${USER}'s to set in Settings > Crew, and Omni refuses a save that names one. The role syncs to ${USER}'s other machines.`,
+    inputSchema: {
+      id: crewId,
+      create: z.boolean().optional().describe(`Make a new role of ${USER}'s own. Needs fields.name.`),
+      fields: z
+        // Keys past these go to the API as sent, so a power gets the crew guard's refusal and its reason instead of
+        // vanishing from the save.
+        .looseObject({
+          name: z.string().max(80).optional(),
+          description: z.string().max(500).optional().describe('What it is for: list_crew shows it, so say what work to send it.'),
+          harness: z.string().max(80).optional().describe('Default harness. Leave it off for Auto. Use list_harnesses.'),
+          model: z.string().max(120).optional().describe('Default model, or "auto". Use list_harnesses.'),
+          effort: z.string().max(40).optional(),
+          channel: z.string().max(100).optional().describe('Default channel id when a delegation names none. Use list_channels.'),
+        })
+        .optional(),
+      charter: z.string().max(100_000).optional(),
+      charter_mode: z.enum(['append', 'replace']).optional().describe('A built-in only: add to its charter (append) or replace it. Replace only when asked: a release fixes the built-in charter.'),
+    },
+  },
+  async ({ id, create, fields, charter, charter_mode }) => {
+    const save = { ...(fields && { fields }), ...(charter !== undefined && { charter }), ...(charter_mode && { charter_mode }) };
+    if (create) return text(crewRoleView(await call('/crew', { method: 'POST', body: JSON.stringify({ id, ...save }) })));
+    if (!Object.keys(save).length) throw new Error('Pass the fields, charter or charter_mode to change.');
+    return text(crewRoleView(await call(`/crew/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(save) })));
+  },
+);
+
+server.registerTool(
+  'reset_crew_role',
+  {
+    description:
+      `Drop ${USER}'s edit of a built-in crew role, so it runs as shipped again, only once ${USER} agreed in this thread. ` +
+      `Refused for a role of ${USER}'s own, which only ${USER} deletes, in Settings, and for an edit that sets the role's powers, which only ${USER} resets.`,
+    inputSchema: { id: crewId },
+  },
+  async ({ id }) => text(crewRoleView(await call(`/crew/${encodeURIComponent(id)}/reset`, { method: 'POST' }))),
+);
+
 server.registerTool(
   'delegate',
   {
