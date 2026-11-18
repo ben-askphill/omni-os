@@ -1,4 +1,6 @@
-import { db, outbox, tx, type SyncEntity } from '../db.ts';
+import { paths } from '../config.ts';
+import { CREW_ID, crewFiles } from '../crew.ts';
+import { db, outbox, SEED_TS, tx, type SyncEntity } from '../db.ts';
 
 // Queue every existing row for the relay again: after moving to a new relay, or when the relay lost
 // history. The first sync on a machine already queues everything (outbox.arm); this is for later.
@@ -36,6 +38,17 @@ const SOURCES: [SyncEntity, string][] = [
 ];
 
 /**
+ * The files sync carries from disk, as a source like the tables': the crew files in data/crew/ by role id. One this
+ * machine never recorded (written by hand) goes at SEED_TS, as sync/handlers/crew-file.ts seeds it, so it only fills a
+ * gap on the other machines.
+ */
+function fileSources(): [SyncEntity, string, string][] {
+  const ids = [...crewFiles(paths.personalCrew).keys()].filter((id) => CREW_ID.test(id));
+  // Plain ids (CREW_ID), so the list is safe to inline.
+  return [['crew_file', `SELECT value AS k, key AS o1, 0 AS o2 FROM json_each('${JSON.stringify(ids)}')`, SEED_TS]];
+}
+
+/**
  * Queue every row this machine may send. A last-writer-wins row keeps the time of its last write, so it never
  * wins over a newer write on the other Mac. A row whose last writer is another machine is left to that machine.
  * Throws when sync was never set up here.
@@ -45,7 +58,7 @@ export function backfill(opts: { onProgress?: (count: BackfillCount) => void } =
   if (!self) throw new Error('sync is not set up on this machine: sign in from Settings, Sync first');
   const now = new Date().toISOString();
   const out: BackfillCount[] = [];
-  for (const [entity, select] of SOURCES) {
+  for (const [entity, select, unrecorded = now] of [...SOURCES, ...fileSources()]) {
     const count = tx(() => {
       const from = `FROM (${select}) s LEFT JOIN sync_meta m ON m.entity = :entity AND m.entity_id = s.k`;
       const mine = '(m.machine_id IS NULL OR m.machine_id = :self)';
@@ -62,7 +75,7 @@ export function backfill(opts: { onProgress?: (count: BackfillCount) => void } =
            SELECT :entity, s.k, 'upsert', COALESCE(m.ts, :now) ${from}
            WHERE s.k IS NOT NULL AND ${mine} AND NOT ${waiting} ORDER BY s.o1, s.o2`,
         )
-        .run({ entity, self, now });
+        .run({ entity, self, now: unrecorded });
       // A row no machine has claimed yet is this one's now, as a write through the repos would record.
       db.prepare(
         `INSERT OR IGNORE INTO sync_meta (entity, entity_id, ts, machine_id)

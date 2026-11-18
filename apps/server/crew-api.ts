@@ -60,7 +60,7 @@ crewApi.post('/crew/:id/duplicate', async (c) => {
   return run(c, () => duplicateCrew(c.req.param('id'), parsed.data.id, parsed.data.name, context()), 201);
 });
 
-crewApi.post('/crew/:id/reset', (c) => guard(c, 'reset') ?? run(c, () => resetCrew(c.req.param('id'))));
+crewApi.post('/crew/:id/reset', (c) => guard(c, 'reset', undefined, c.req.param('id')) ?? run(c, () => resetCrew(c.req.param('id'))));
 
 crewApi.post('/crew/:id/hidden', async (c) => {
   const refused = guard(c, 'hide');
@@ -71,8 +71,8 @@ crewApi.post('/crew/:id/hidden', async (c) => {
 });
 
 /** A 403 for an agent thread's write the crew guard refuses. Ben's own clients name no thread. */
-function guard(c: Context, write: CrewWrite, save?: CrewSave) {
-  const refusal = crewRefusal(c.req.header(CALLER_HEADER), write, save);
+function guard(c: Context, write: CrewWrite, save?: CrewSave, id?: string) {
+  const refusal = crewRefusal(c.req.header(CALLER_HEADER), write, save, id);
   return refusal ? c.json({ error: refusal }, 403) : null;
 }
 

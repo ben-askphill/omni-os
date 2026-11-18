@@ -86,6 +86,18 @@ function refusal(t: Thread, where: string): string | null {
  * What a message the turn never read said: Ben's own words for his, the whole prompt for one Omni wrote. Its context
  * goes as text, unchecked: the other Mac sends it later, as a plain message.
  */
+/** Who sent a carried message, as its event says: Ben, the Conductor, a crew report. */
+export function senderOfMsg(m: Pick<Msg, 'event'>): string {
+  const source = m.event.payload.source;
+  return typeof source === 'string' ? source : m.event.kind === 'crew_report' ? 'crew' : 'ben';
+}
+
+/**
+ * The event a carried message lands as: its text, from whoever sent it. An offer from an older build names no senders,
+ * so its messages are Ben's, as before.
+ */
+export const carriedEvent = (offer: { senders?: string[] }, text: string, n: number) => ({ text, source: offer.senders?.[n] ?? 'ben' });
+
 function textOf(m: Msg, t: Thread) {
   const said = !m.byOmni && typeof m.event.payload.text === 'string' ? m.event.payload.text : m.text;
   if (!m.contexts?.length) return said;
@@ -268,7 +280,7 @@ async function giveAway(offer: HandoffOffer, worker: SyncWorker) {
       bundle = await packWorktree(t.cwd, id, offer.id, worker.transport);
     } else left = await leftBehind(t.cwd, offer.from.name);
     tx(() => {
-      advance(b, { state: 'offered', queued: carried.map((m) => textOf(m, t)), bundle, leftBehind: left });
+      advance(b, { state: 'offered', queued: carried.map((m) => textOf(m, t)), senders: carried.map(senderOfMsg), bundle, leftBehind: left });
       // The other Mac sends them now. Here they leave the queue unsent, as a cancelled message does.
       for (const m of carried) if (m.requestId) messageRequests.mark(m.uuid, 'cancelled');
     });
@@ -290,7 +302,7 @@ async function giveAway(offer: HandoffOffer, worker: SyncWorker) {
 function restore(offer: Offered) {
   if (offer.fresh) return restoreFresh(offer);
   const saved = offer.queued.filter((text, n) => {
-    const row = saveOwn(offer.thread, `handoff-back:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: { text, source: 'ben' }, source: 'handoff', mode: 'queue' });
+    const row = saveOwn(offer.thread, `handoff-back:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: carriedEvent(offer, text, n), source: 'handoff', mode: 'queue' });
     return row && messageRequests.mark(row.id, 'recovered');
   });
   if (saved.length) publishFeed({ type: 'needs_you', thread_id: offer.thread });
@@ -308,7 +320,7 @@ function restoreFresh(offer: Offered) {
   const why = reply?.offer === offer.id && reply.state === 'failed' ? reply.error : null;
   const reason = why ? `${offer.to.name} could not start it: ${why}.` : `It was not sent to ${offer.to.name}.`;
   offer.queued.forEach((text, n) => {
-    const row = saveOwn(offer.thread, `handoff-back:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: { text, source: 'ben' }, source: 'handoff', mode: 'queue' });
+    const row = saveOwn(offer.thread, `handoff-back:${offer.id}:${n}`, { prompt: text, kind: 'user', payload: carriedEvent(offer, text, n), source: 'handoff', mode: 'queue' });
     if (row) messageRequests.park(row.id);
   });
   const channel = channels.get(t.channel_id);
@@ -455,7 +467,7 @@ async function take(offer: Offered, worker: SyncWorker) {
           saveOwn(id, offer.fresh ? START_REQUEST : `handoff:${offer.id}:${n}`, {
             prompt: text,
             kind: 'user',
-            payload: offer.fresh ? null : { text, source: 'ben' },
+            payload: offer.fresh ? null : carriedEvent(offer, text, n),
             source: offer.fresh ? 'ben' : 'handoff',
             mode: 'queue',
             ...(offer.fresh && n === 0 && attachments.length && { attachments }),
