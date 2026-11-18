@@ -19,6 +19,7 @@ import { useThreadPR } from '../components/thread/ThreadPR.tsx';
 import { usePRWatch } from '../components/thread/PRWatch.tsx';
 import { useBranchChanges } from '../mobile/ThreadTurn.tsx';
 import { prNext, prOffered, stepOf, stepParked, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
@@ -45,7 +46,7 @@ import { tailId } from '@omni/shared/history.ts';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
 
 export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: string; artifact?: number; at?: number; view?: ThreadView }) {
-  const { mods, tasks, channel: listedChannel } = useApp();
+  const { mods, tasks, crew: roles, channel: listedChannel } = useApp();
   const modLines = useMemo(() => mods.filter((m) => m.thread_id === id), [mods, id]);
   // GET /api/harnesses, the same list the reply pills load. Until it arrives, canSteer uses the Cursor fallback.
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
@@ -190,6 +191,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   }
 
   const reconnecting = !live && ready;
+  const roleName = crewRoleName(thread.role, roles);
   const artifactCount = files.length + shots.length + crew.files.length + crew.shots.length;
 
   return (
@@ -202,6 +204,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
           links={links}
           modLines={modLines}
           delegated={known}
+          roleName={roleName}
           actions={{
             thread,
             meter: (
@@ -366,7 +369,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               tab={panelTab}
               onTab={setPanelTab}
               onClose={panel.closeInspector}
-              details={{ channel, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, parked: parked?.step ?? null, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs(), onTab: setPanelTab }}
+              details={{ channel, roleName, parent, children, init, lastResult, warm, links, agents, onJump: jumpTo, prs, changes, next, step, parked: parked?.step ?? null, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs(), onTab: setPanelTab }}
               prs={{ data: prs, watch, next, step, parked: parked?.step ?? null, openPrompt: prompts.open, onAsk: (p) => void ask(p), onMerged: () => void reloadPRs() }}
             />
           </div>

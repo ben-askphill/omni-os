@@ -9,6 +9,7 @@ import { StaleSessionCard } from '../components/thread/StaleSessionCard.tsx';
 import { GoalLine } from '../components/thread/GoalLine.tsx';
 import { HistoryCtx, HistoryEdgeRow } from '../components/thread/HistoryEdgeRow.tsx';
 import { historyEdges } from '@omni/shared/history.ts';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import { HandoffCard, type HandoffAnswer } from '../components/thread/Handoff.tsx';
 import { TakeoverConfirm } from '../components/thread/Takeover.tsx';
@@ -44,7 +45,7 @@ export function ThreadScreen() {
   const shell = useShell();
   const s = useThread();
   const { thread, parent, children, events, history, revealTarget, clearReveal, files, shots, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover, init, warm, crew: crewArtifacts } = s;
-  const { needsYou, channel } = useApp();
+  const { needsYou, channel, crew: roles } = useApp();
   const hereName = useHereName();
   // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
   const [quick, setQuick] = useState(false);
@@ -98,7 +99,7 @@ export function ThreadScreen() {
   const card = item && item.blockers.length ? needsCard(item, ch, harnessLabel, now) : null;
   const latest = view.turns[view.turns.length - 1];
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
-  const theirs = conductor ? 'the Conductor' : thread.role ? `the ${thread.role}` : 'the agent';
+  const theirs = conductor ? 'the Conductor' : thread.role ? `the ${crewRoleName(thread.role, roles)}` : 'the agent';
 
   const openPR = async () => {
     try {
@@ -125,7 +126,7 @@ export function ThreadScreen() {
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
 
-  const sub = conductor ? `Conductor · ${plural(crew.length, 'crew thread')}` : [`#${ch?.name ?? thread.channel_id}`, thread.role, harnessLabel(thread.harness)].filter(Boolean).join(' · ');
+  const sub = conductor ? `Conductor · ${plural(crew.length, 'crew thread')}` : [`#${ch?.name ?? thread.channel_id}`, crewRoleName(thread.role, roles), harnessLabel(thread.harness)].filter(Boolean).join(' · ');
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
