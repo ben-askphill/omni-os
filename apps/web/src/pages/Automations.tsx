@@ -609,7 +609,7 @@ export function AutomationsPage() {
         title="Automations"
         subtitle={
           <>
-            Prompts that run on a schedule or when something happens. Each run becomes a thread in its channel. Edits here write the YAML in <span className="font-mono text-[length:var(--fs-code)] text-fg-2">data/automations/</span>, and hand edits to it or to <span className="font-mono text-[length:var(--fs-code)] text-fg-2">automations/*.yaml</span> reload when you save.
+            Prompts that run on a schedule or when something happens. Each run becomes a thread in its channel. Edits here write the YAML in <span className="font-mono text-[length:var(--fs-code)] text-fg-2">data/automations/</span>, and hand edits to it reload when you save.
           </>
         }
       />

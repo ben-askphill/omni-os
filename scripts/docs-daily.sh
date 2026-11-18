@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Daily docs automation helpers (see automations/docs-daily.yaml).
+# Helpers for an automation that keeps an Omni checkout's docs in step with merged changes. Omni ships no such
+# automation: the prompt that calls these lives in the user's own data/automations/.
 # State: $OMNI_ROOT/data/docs-daily/last-sha
 # Log:   $OMNI_ROOT/data/logs/docs-daily.log
 set -euo pipefail

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -15,7 +15,6 @@ const { configPath, userConfig, resolved, updateUserConfig } = await import('../
 const { legacyConfig, migrateLegacyConfig } = await import('../config-migrate.ts');
 const { listCrew } = await import('../crew.ts');
 const { loadAutomations } = await import('../automations.ts');
-const { setAutomationEnabled, resetAutomation } = await import('../automation-files.ts');
 const { paths } = await import('../config.ts');
 const { configureGithubAuth } = await import('../github-auth.ts');
 
@@ -228,33 +227,24 @@ describe('personal overrides', () => {
     expect(listCrew().find((c) => c.id === 'inbox')!.charter).not.toMatch(/\{\{|phillbert/);
   });
 
-  it('toggling a shared automation writes your own copy of its YAML, never the shipped file', () => {
-    const before = loadAutomations().find((a) => a.id === 'weekly-review')!;
-    const yaml = readFileSync(before.file, 'utf8');
-    setAutomationEnabled('weekly-review', !before.enabled);
-    const after = loadAutomations().find((a) => a.id === 'weekly-review')!;
-    expect(after.enabled).toBe(!before.enabled);
-    expect(after.file).toBe(join(paths.personalAutomations, 'weekly-review.yaml'));
-    expect(readFileSync(after.file, 'utf8')).toContain(`enabled: ${!before.enabled}`);
-    expect(userConfig().automations['weekly-review']).toBeUndefined();
-    expect(readFileSync(before.file, 'utf8')).toBe(yaml);
-    resetAutomation('weekly-review');
-    expect(loadAutomations().find((a) => a.id === 'weekly-review')!.file).toBe(before.file);
+  // Omni ships no automations, so the first run lists none. apps/desktop/tests/stage.test.ts guards the app's copy.
+  it('a fresh data dir lists no automations', async () => {
+    expect(loadAutomations()).toEqual([]);
+    expect(await json(await send('GET', '/api/automations'))).toEqual([]);
   });
 
-  it('an automation in data/automations wins over the shared one with the same id', () => {
+  it('an automation in data/automations loads with your placeholders and timezone', () => {
     mkdirSync(paths.personalAutomations, { recursive: true });
-    writeFileSync(join(paths.personalAutomations, 'weekly-review.yaml'), 'name: Mine\ncron: "0 9 * * 1"\nchannel: inbox\nprompt: hi {{user}}\n');
-    const a = loadAutomations().find((x) => x.id === 'weekly-review')!;
+    writeFileSync(join(paths.personalAutomations, 'digest.yaml'), 'name: Mine\ncron: "0 9 * * 1"\nchannel: inbox\nprompt: hi {{user}}\n');
+    const a = loadAutomations().find((x) => x.id === 'digest')!;
     expect(a.name).toBe('Mine');
     expect(a.prompt).toBe('hi Ada');
     // No timezone in the YAML: the user's.
     expect(a.timezone).toBe('Europe/London');
-    rmSync(join(paths.personalAutomations, 'weekly-review.yaml'));
+    rmSync(join(paths.personalAutomations, 'digest.yaml'));
   });
 
-  it('the shared automations and charters name nobody', () => {
-    for (const a of loadAutomations()) expect(a.prompt).not.toMatch(/central-brain|phillbert|\bBen\b|\{\{/);
+  it('the shared charters name nobody', () => {
     for (const c of listCrew()) expect(c.charter).not.toMatch(/phillbert|firstmate|\bBen\b|\{\{/);
   });
 });

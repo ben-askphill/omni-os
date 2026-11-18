@@ -52,8 +52,8 @@ up() {
   local seed=3
   [ "${1:-}" = "--seed" ] && seed="${2:?--seed needs a number}"
   alive server && { echo "already up"; status; return; }
-  # The scheduler watches the automations dir and crashes the server when it is missing.
-  mkdir -p "$DIR/data" "$DIR/brain" "$DIR/automations"
+  # No automations dir: Omni ships none, so the stack lists none, as a fresh install does.
+  mkdir -p "$DIR/data" "$DIR/brain"
   STARTING=1
   local fx="$ROOT/packages/test-fixtures"
   # A `security` that answers the global CURSOR_API_KEY with a stand-in and passes every other call to the real one.
@@ -78,7 +78,7 @@ SH
   # OMNI_TOKEN cleared: an agent's shell carries the live server's, and this stack makes its own.
   OMNI_TOKEN= OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="${QA_CLAUDE_BIN:-$fx/fake-claude.mjs}" OMNI_CODEX_BIN="${QA_CODEX_BIN:-$fx/fake-codex.mjs}" OMNI_CURSOR_BIN="${QA_CURSOR_BIN:-$fx/fake-cursor.mjs}" \
-    OMNI_BROWSER="${QA_BROWSER:-0}" OMNI_SUGGESTIONS="${QA_SUGGESTIONS:-0}" OMNI_UPDATE_CHECK="${QA_UPDATE_CHECK:-0}" OMNI_SUPERVISOR="${QA_SUPERVISOR:-}" OMNI_CAFFEINATE=0 OMNI_CLAUDE_LOGIN_SYNC=0 OMNI_HERMES_URL= OMNI_AUTOMATIONS_DIR="$DIR/automations" \
+    OMNI_BROWSER="${QA_BROWSER:-0}" OMNI_SUGGESTIONS="${QA_SUGGESTIONS:-0}" OMNI_UPDATE_CHECK="${QA_UPDATE_CHECK:-0}" OMNI_SUPERVISOR="${QA_SUPERVISOR:-}" OMNI_CAFFEINATE=0 OMNI_CLAUDE_LOGIN_SYNC=0 OMNI_HERMES_URL= \
     OMNI_CURSOR_API_URL="$cursor_api" OMNI_CURSOR_CLOUD_POLL_MS=1500 PATH="$DIR/bin:$PATH" \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     detach npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &

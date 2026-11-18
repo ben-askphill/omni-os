@@ -22,7 +22,7 @@ Or skip `npm run setup` and answer the same questions in the Web UI or the deskt
 | --- | --- |
 | `data/omni.config.json`: name, pronouns, email, timezone, folders, GitHub owner, integrations, automation on/off | `omni.config.example.json`: every field, with example values |
 | `data/crew/<role>.md`: your version of a charter | `crew/*.md`: the generic charters |
-| `data/automations/<id>.yaml`: your own automations | `automations/*.yaml`: generic examples, all off |
+| `data/automations/<id>.yaml`: your own automations | None: Omni ships no automations |
 | `data/omni.db`: channels, threads, folders, secret names | The schema and migrations |
 | `data/threads`, `data/worktrees`, `data/browsers`: thread files, checkouts, browser logins | |
 | `.env`: server options | `.env.example` |
@@ -42,9 +42,9 @@ The code copies of the tokens live in `apps/web/src/index.css`, `apps/ios/src/th
 ## Customising without touching tracked files
 
 - **A charter**: copy `crew/inbox.md` to `data/crew/inbox.md` and edit the copy. Your copy replaces the shared one.
-- **An automation**: edit or toggle it in the Automations page. Omni writes your own copy to
-  `data/automations/<id>.yaml` and never changes the shared file in `automations/`. You can also write one there by
-  hand. See [docs/user/automations.md](docs/user/automations.md).
+- **An automation**: make, edit or toggle it in the Automations page. Omni writes it to
+  `data/automations/<id>.yaml`. You can also write one there by hand. See
+  [docs/user/automations.md](docs/user/automations.md).
 - **Paths and names in shared files**: charters and automation prompts take `{{user}}`, `{{workspace}}`,
   `{{reposDir}}`, `{{githubOwner}}`, `{{omniRoot}}`, `{{omniRepo}}`, `{{centralBrain}}` and `{{timezone}}`, filled
   from your config. Use them instead of hardcoding your own.
@@ -64,8 +64,8 @@ npm run build:desktop            # if you build the desktop app from this checko
 ```
 
 Restart the server if you run it yourself. `npm run build:desktop` needs the app quit first, and opens the new build. Since none of your settings live in tracked files, this merges cleanly unless
-you changed shared code yourself. `git status` should be clean before you pull; if it shows `crew/` or
-`automations/` changes, move them into `data/crew/` or `data/automations/` and run `git checkout -- crew automations`.
+you changed shared code yourself. `git status` should be clean before you pull; if it shows `crew/`
+changes, move them into `data/crew/` and run `git checkout -- crew`.
 
 ## Upgrading an install from before the config file
 

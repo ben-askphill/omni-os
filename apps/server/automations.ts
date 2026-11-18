@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, watch } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, watch } from 'node:fs';
 import { removeOwnFileOnDisk, yamlFiles } from './automation-store.ts';
 import { Cron } from 'croner';
 import YAML from 'yaml';
@@ -117,7 +117,8 @@ function ageLabel(sec: number) {
 }
 
 /**
- * The shared automations in automations/ and the user's own in data/automations/ (same id there wins). The user
+ * The shared automations in automations/ (Omni ships none, tests point OMNI_AUTOMATIONS_DIR at their own) and the
+ * user's own in data/automations/ (same id there wins). The user
  * config's per-automation overrides (`enabled`, `channel`) apply last, so turning one on never edits a repo file.
  * A shared one deleted on this machine (`deleted`) is left out; the user's own file of that id still loads.
  */
@@ -297,7 +298,8 @@ export function startScheduler() {
   setInterval(catchUpAll, CATCHUP_EVERY_MS).unref();
   let t: NodeJS.Timeout | undefined;
   mkdirSync(paths.personalAutomations, { recursive: true });
-  for (const dir of [paths.automations, paths.personalAutomations])
+  // Omni ships no automations, so the shared folder is usually missing, and in the app it is read-only: never made here.
+  for (const dir of [paths.automations, paths.personalAutomations].filter((d) => existsSync(d)))
     watch(dir, () => {
       clearTimeout(t);
       t = setTimeout(schedule, 300);

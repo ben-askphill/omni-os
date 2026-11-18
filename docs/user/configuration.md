@@ -40,7 +40,7 @@ Crew charters and automation prompts can use these, filled from your config, so 
 
 `{{user}}`, `{{workspace}}`, `{{reposDir}}`, `{{githubOwner}}`, `{{omniRoot}}`, `{{omniRepo}}`, `{{centralBrain}}`, `{{timezone}}`
 
-`{{omniRoot}}` and `{{omniRepo}}` name an Omni git checkout, for the automations that work on Omni itself (docs-daily, brain-nightly, pr-babysitter, tool-failure-triage). A server run from a checkout uses that one. The packaged desktop app is not a checkout. It uses `OMNI_CHECKOUT` from its data dir's `.env`, or else the checkout whose `data/` it kept using. With neither, those automations show the error "needs an Omni checkout" and do not run.
+`{{omniRoot}}` and `{{omniRepo}}` name an Omni git checkout, for automations you write that work on Omni itself. A server run from a checkout uses that one. The packaged desktop app is not a checkout. It uses `OMNI_CHECKOUT` from its data dir's `.env`, or else the checkout whose `data/` it kept using. With neither, those automations show the error "needs an Omni checkout" and do not run.
 
 ## Server options
 

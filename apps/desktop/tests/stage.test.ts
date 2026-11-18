@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { builderArgs } from '../scripts/dist.ts';
@@ -16,6 +16,7 @@ import {
   keepPtyFile,
   parseStageArgs,
   resolveFrom,
+  SHIPPED_DIRS,
   stagedPtyProblems,
   type Lockfile,
   type Target,
@@ -119,6 +120,18 @@ describe('stage.ts and the server bundle', () => {
     const bundle = readFileSync(join(import.meta.dirname, '../../server/scripts/bundle.ts'), 'utf8');
     const listed = bundle.match(/export const EXTERNAL = \[([^\]]*)\]/)?.[1] ?? '';
     expect([...listed.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([...EXTERNALS]);
+  });
+
+  // A fresh install starts with no automations. The repo's automations/ once shipped one person's own to everyone.
+  it('ships no automations', () => {
+    const repo = join(import.meta.dirname, '../../..');
+    expect(SHIPPED_DIRS).not.toContain('automations');
+    const yaml = SHIPPED_DIRS.flatMap((dir) =>
+      readdirSync(join(repo, dir), { recursive: true, encoding: 'utf8' })
+        .filter((f) => /\.ya?ml$/.test(f))
+        .map((f) => join(dir, f)),
+    );
+    expect(yaml).toEqual([]);
   });
 });
 

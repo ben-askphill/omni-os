@@ -4,13 +4,13 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('../runner.ts', () => ({ createThread: vi.fn() }));
 vi.mock('../db.ts', () => ({ db: { prepare: vi.fn() } }));
 
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseAutomation } from '../automations.ts';
-import { config, paths } from '../config.ts';
+import { config, paths, ROOT } from '../config.ts';
+import { yamlFiles } from '../automation-store.ts';
 
 const valid = `
-name: Morning coffee
+name: Daily digest
 enabled: true
 cron: "0 8 * * 1-5"
 timezone: Europe/Amsterdam
@@ -18,23 +18,23 @@ channel: inbox
 role: inbox
 model: sonnet
 prompt: |
-  Run the morning-coffee skill.
+  Sum up yesterday.
 `;
 
 describe('parseAutomation', () => {
   it('parses a valid automation and computes the next run', () => {
-    const a = parseAutomation('morning-coffee', valid, '/x/morning-coffee.yaml');
+    const a = parseAutomation('daily-digest', valid, '/x/daily-digest.yaml');
     expect(a).toMatchObject({
-      id: 'morning-coffee',
-      name: 'Morning coffee',
+      id: 'daily-digest',
+      name: 'Daily digest',
       cron: '0 8 * * 1-5',
       timezone: 'Europe/Amsterdam',
       channel: 'inbox',
       role: 'inbox',
       model: 'sonnet',
-      prompt: 'Run the morning-coffee skill.',
+      prompt: 'Sum up yesterday.',
       enabled: true,
-      file: '/x/morning-coffee.yaml',
+      file: '/x/daily-digest.yaml',
     });
     expect(a.error).toBeUndefined();
     const next = new Date(a.next!);
@@ -118,23 +118,13 @@ describe('parseAutomation', () => {
     expect(parseAutomation('x', 'on: pr_opened\ncron: "0 8 * * *"\nprompt: p').error).toBe('set either cron or on, not both');
     expect(parseAutomation('x', 'on: pr_opened').error).toBe('missing prompt');
   });
+});
 
-  it('parses the shipped automation files', async () => {
-    const { loadAutomations } = await import('../automations.ts');
-    const all = loadAutomations();
-    expect(all.length).toBeGreaterThan(0);
-    for (const a of all) expect(a.error, `${a.id}: ${a.error}`).toBeUndefined();
-  });
-
-  // Off until the user turns it on, weekday mornings, and a missed slot still runs once the Mac is back.
-  it('ships tool-failure-triage as an off-by-default weekday builder run with catch-up', () => {
-    const file = join(paths.automations, 'tool-failure-triage.yaml');
-    const a = parseAutomation('tool-failure-triage', readFileSync(file, 'utf8'), file);
-    expect(a).toMatchObject({ cron: '30 8 * * 1-5', catchup: true, channel: 'omni-os', role: 'builder', enabled: false });
-    expect(a.error).toBeUndefined();
-    expect(a.prompt).not.toMatch(/\{\{/);
-    const next = new Date(a.next!);
-    expect([1, 2, 3, 4, 5]).toContain(next.getUTCDay());
-    expect(next.getUTCMinutes()).toBe(30);
+// A fresh install starts with no automations: nothing in the repo's automations/ loads for everyone.
+// apps/desktop/tests/stage.test.ts checks the app does not ship the folder either.
+describe('shared automations', () => {
+  it('ships none', () => {
+    expect(paths.automations).toBe(join(ROOT, 'automations'));
+    expect(yamlFiles(paths.automations)).toEqual([]);
   });
 });
