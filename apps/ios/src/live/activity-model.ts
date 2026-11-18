@@ -28,6 +28,8 @@ export interface InboxRow {
   status: InboxStatus | null;
   time: string;
   branch: string | null;
+  /** Someone else accountable for it (thread-owner.ts), shown as "for <name>" after the channel; null for the user's own. */
+  owner: string | null;
   pinned: boolean;
   /** Work in progress recedes, so what waits on Ben stands out. */
   receded: boolean;
@@ -127,6 +129,7 @@ export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }
       status,
       time: shortAgo(at(t), now),
       branch: t.branch ?? null,
+      owner: t.owner ?? null,
       pinned: !!t.pinned_at,
       receded: status?.glyph === 'running',
       canMarkDone: canMarkDone(t.status),

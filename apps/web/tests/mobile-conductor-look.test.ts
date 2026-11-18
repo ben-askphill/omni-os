@@ -29,6 +29,7 @@ vi.mock('../src/store.tsx', () => ({
   }),
   useNow: () => Date.parse('2026-01-05T12:00:00.000Z'),
   useHereName: () => undefined,
+  useUserName: () => undefined,
   useFeed: () => {},
   readPref: (_key: string, fallback: unknown) => fallback,
   writePref: () => {},

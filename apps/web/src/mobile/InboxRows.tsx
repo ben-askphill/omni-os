@@ -14,7 +14,8 @@ import { blockerMark, threadPhase, type RowStatus } from '@omni/shared/status.ts
 import type { InboxThread } from '../inbox.ts';
 import { canMarkDone } from '../needs-you.ts';
 import { href } from '../router.ts';
-import { useApp, useNeedOf, useNow } from '../store.tsx';
+import { useApp, useNeedOf, useNow, useUserName } from '../store.tsx';
+import { ownedByOther } from '@omni/shared/thread-owner.ts';
 import { MoAvatar, MoRound } from './parts.tsx';
 import { shortTime } from './rows.ts';
 import { useShell } from './shell.tsx';
@@ -71,7 +72,7 @@ export function MoInboxRow({
   pinned = false,
   last,
 }: {
-  t: InboxThread & Partial<Pick<Thread, 'branch' | 'role'>>;
+  t: InboxThread & Partial<Pick<Thread, 'branch' | 'role' | 'owner'>>;
   status: RowStatus | null;
   working?: boolean;
   pinned?: boolean;
@@ -86,6 +87,9 @@ export function MoInboxRow({
   const own = working ? tasks.filter((k) => k.thread_id === t.id && k.subagent) : [];
   const ch = channel(t.channel_id);
   const title = t.title || 'Untitled';
+  // Who it is for, when that is someone else (thread-owner.ts), after the channel as on desktop's Inbox card.
+  const userName = useUserName();
+  const forOwner = ownedByOther(t.owner, userName) ? ` · for ${t.owner!.trim()}` : '';
   const phase = threadPhase(t);
   const blocker = useNeedOf(t.id)?.blockers[0];
   // The machine it runs on or last ran on, then the run's time; the branch only without a machine.
@@ -109,7 +113,10 @@ export function MoInboxRow({
           <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
             {pinned && <Icon name="pin" size={12} className="shrink-0" />}
             {tree && <ChannelRollup threads={tree.threads} own={t.channel_id} size={16} className="-mr-0.5" />}
-            <span className={`min-w-0 truncate ${label ? 'max-w-[45%] shrink-0' : 'flex-1'}`}>#{ch?.name ?? t.channel_id}</span>
+            <span className={`min-w-0 truncate ${label ? 'max-w-[45%] shrink-0' : 'flex-1'}`}>
+              #{ch?.name ?? t.channel_id}
+              {forOwner}
+            </span>
             {label && (
               <span className="-ml-1 flex min-w-0 flex-1 items-center gap-1" title={where.title || undefined} data-ran-on={where.machine ?? undefined}>
                 <span aria-hidden>·</span>

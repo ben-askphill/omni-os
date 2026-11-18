@@ -53,9 +53,9 @@ export interface ThreadRow {
   title: string;
   status: ThreadStub['status'];
   busy: boolean;
-  /** The word after the title for a state worth naming. Null for a finished, done thread. */
   /** Someone else accountable for it (thread-owner.ts), shown as "for <name>"; null for the user's own. */
   owner?: string | null;
+  /** The word after the title for a state worth naming. Null for a finished, done thread. */
   statusLabel: string | null;
   /** "now", "5m", "3h", "2d". */
   ago: string;

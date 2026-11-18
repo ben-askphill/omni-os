@@ -257,8 +257,9 @@ const RedeemBody = z.object({
  * A one-time code for pairing a phone (the native app, or a phone's browser through GET /pair-link): 5 minutes,
  * single use. Only the install's token may mint one, or a session paired with it, as for /rotate-token: the desktop
  * window and a browser that pasted the token or opened its link. A session from Google or from a pairing code could
- * otherwise mint a replacement that outlives its own revoke or the Google account being unlinked. Rotating the token
- * ends every session, paired ones included.
+ * otherwise mint a replacement that outlives its own revoke or the Google account being unlinked. A token session can
+ * already rotate the token and start agents that read data/api-token, so a code gives it nothing new; the cleanup for
+ * a stolen one stays revoke, then rotate, which ends every session, the ones its codes made included.
  */
 authApi.post('/app-pairings', async (c) => {
   const auth = c.get('omniAuth');
