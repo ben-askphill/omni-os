@@ -6,8 +6,8 @@
 //   installs with --ignore-scripts, rebuilds only REBUILD_ALLOWED, runs npx --no-install, and checks out without
 //   keeping the token in .git/config.
 // - A job that has a secret or can write runs no package code and uses only GitHub's own actions. The only scripts it
-//   runs with node are the repo's, importing nothing but Node's built-ins and each other. It checks each artifact it
-//   downloads against a checksum.
+//   runs with node are the repo's, importing nothing but Node's built-ins and each other. It downloads each artifact
+//   packed (skip-decompress), since another job made it, and checks it against a checksum before it unpacks it.
 // - A job that has a secret cannot write, and only one job can write.
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
@@ -143,6 +143,9 @@ export function workflowProblems(workflow: unknown, repo: string): string[] {
       }
       steps.forEach((step, i) => {
         if (typeof step.uses !== 'string' || !step.uses.startsWith('actions/download-artifact@')) return;
+        if (!isDict(step.with) || step.with['skip-decompress'] !== true) {
+          say('lets actions/download-artifact unpack an artifact another job made (set skip-decompress: true)');
+        }
         if (!scripts.slice(i + 1).some((run) => CHECKSUM.test(run))) say('takes an artifact without checking it against a checksum');
       });
     }

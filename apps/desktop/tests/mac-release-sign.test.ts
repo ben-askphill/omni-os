@@ -1,9 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { codesignArgs, isMachO, parseSignArgs, signApp, signingOrder } from '../scripts/mac-release-sign.ts';
+import { bundleProblems, codesignArgs, isMachO, parseSignArgs, signApp, signingOrder } from '../scripts/mac-release-sign.ts';
 
 const require = createRequire(import.meta.url);
 const { TIMESTAMP_RETRY_WAITS, OTHER_RETRY_WAITS } = require('../scripts/codesign-retry.cjs');
@@ -54,6 +55,32 @@ describe('isMachO', () => {
     expect(isMachO(PNG)).toBe(false);
     expect(isMachO(Buffer.from('#!/bin/sh\n'))).toBe(false);
     expect(isMachO(Buffer.alloc(0))).toBe(false);
+  });
+});
+
+describe('bundleProblems', () => {
+  it('passes the app as built, with its framework links', () => {
+    expect(bundleProblems(fakeApp())).toEqual([]);
+  });
+
+  it('refuses links that leave the app and anything that is not a file, folder or link', () => {
+    const app = fakeApp();
+    symlinkSync('/Users/runner/work/omni-os/omni-os', join(app, 'Contents/Resources/repo'));
+    symlinkSync('../../../outside', join(app, 'Contents/Resources/up'));
+    execFileSync('mkfifo', [join(app, 'Contents/Resources/pipe')]);
+    expect(bundleProblems(app)).toEqual([
+      'Contents/Resources/pipe is not a file, folder or link',
+      'Contents/Resources/repo links to /Users/runner/work/omni-os/omni-os, outside the app',
+      'Contents/Resources/up links to ../../../outside, outside the app',
+    ]);
+  });
+
+  it('stops signApp before codesign runs', async () => {
+    const app = fakeApp();
+    symlinkSync('/etc', join(app, 'Contents/Resources/etc'));
+    const fake = fakeCodesign();
+    await expect(signApp(opts(app), fake.deps)).rejects.toThrow('Contents/Resources/etc links to /etc, outside the app');
+    expect(fake.calls).toEqual([]);
   });
 });
 

@@ -6,6 +6,8 @@
 # No dependency's code runs where a credential is. The build jobs run npm code with no secret, no token and read-only
 # access. The sign job holds the Developer ID and Apple's notarization key and runs only Apple's tools and the repo's
 # own dependency-free script. The publish job is the only one that can write, and it runs no npm code either.
+# Jobs hand each other one tarball each, uploaded as it is (archive: false). A job with a credential downloads it packed
+# (skip-decompress) and checks its checksum and its names before it unpacks it.
 # apps/desktop/tests/release-workflow.test.ts holds this file to that (scripts/release-policy.ts).
 name: Desktop release
 
@@ -88,19 +90,19 @@ jobs:
       - name: Build
         working-directory: apps/desktop
         run: npx --no-install tsx scripts/dist.ts --platform mac --arch universal --native required -- -c.mac.identity=null -c.mac.target=zip
+      # A tarball keeps the bundle's links and modes. COPYFILE_DISABLE and --no-mac-metadata keep extended attributes and
+      # ._ files out of it.
       - name: Pack the app
         id: pack
         run: |
-          out="$RUNNER_TEMP/mac-unsigned"
-          mkdir -p "$out"
-          ditto -c -k --sequesterRsrc --keepParent apps/desktop/release/mac-universal/Omni.app "$out/Omni.app.zip"
-          echo "sha256=$(shasum -a 256 "$out/Omni.app.zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          tarball="$RUNNER_TEMP/omni-mac-unsigned.tar.gz"
+          COPYFILE_DISABLE=1 tar --no-mac-metadata -czf "$tarball" -C apps/desktop/release/mac-universal Omni.app
+          echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
-          name: mac-unsigned
-          path: ${{ runner.temp }}/mac-unsigned/Omni.app.zip
+          path: ${{ runner.temp }}/omni-mac-unsigned.tar.gz
+          archive: false
           if-no-files-found: error
-          compression-level: 0
           retention-days: 7
           # A re-run uploads again under the same name.
           overwrite: true
@@ -113,6 +115,28 @@ jobs:
     outputs:
       sha256: ${{ steps.pack.outputs.sha256 }}
     steps:
+      # The build ran package code, so its tarball stays packed until its checksum checks out and every name in it is
+      # inside Omni.app. macOS tar then refuses .., absolute paths and writing through a link it made, and the signing
+      # script refuses a link that leads out of the app. This runs before the checkout, which starts from an empty folder.
+      - uses: actions/download-artifact@v8
+        with:
+          name: omni-mac-unsigned.tar.gz
+          path: ${{ runner.temp }}/in
+          skip-decompress: true
+      - name: Unpack the build
+        env:
+          SHA256: ${{ needs.mac-build.outputs.sha256 }}
+        run: |
+          cd "$RUNNER_TEMP/in"
+          echo "$SHA256  omni-mac-unsigned.tar.gz" | shasum -a 256 -c
+          names="$(tar -tzf omni-mac-unsigned.tar.gz)"
+          if grep -vE '^Omni\.app(/|$)' <<<"$names" >/dev/null || grep -E '(^|/)\.\.(/|$)' <<<"$names" >/dev/null; then
+            echo '::error::The build holds something outside Omni.app'
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/app"
+          tar -xzf omni-mac-unsigned.tar.gz -C "$RUNNER_TEMP/app"
+          echo "APP=$RUNNER_TEMP/app/Omni.app" >> "$GITHUB_ENV"
       # The repo at the commit the build job built, for the signing script, the entitlements and Apple's certificates.
       - uses: actions/checkout@v5
         with:
@@ -121,18 +145,6 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - uses: actions/download-artifact@v8
-        with:
-          name: mac-unsigned
-          path: ${{ runner.temp }}/in
-      - name: Check the build against its checksum
-        env:
-          SHA256: ${{ needs.mac-build.outputs.sha256 }}
-        run: |
-          cd "$RUNNER_TEMP/in"
-          echo "$SHA256  Omni.app.zip" | shasum -a 256 -c
-          ditto -x -k Omni.app.zip "$RUNNER_TEMP/app"
-          echo "APP=$RUNNER_TEMP/app/Omni.app" >> "$GITHUB_ENV"
       - name: Check the signing secrets
         env:
           MAC_CERTIFICATE_P12: ${{ secrets.MAC_CERTIFICATE_P12 }}
@@ -234,19 +246,18 @@ jobs:
           codesign -dvv "$APP" 2>&1 | grep -q 'Authority=Developer ID Application' || { echo '::error::Omni.app is not signed with a Developer ID'; exit 1; }
           spctl --assess --type execute --verbose=2 "$APP"
           xcrun stapler validate "$APP"
+      # The signatures and the stapled ticket are inside the bundle's files, so the tarball needs no extended attributes.
       - name: Pack the signed app
         id: pack
         run: |
-          out="$RUNNER_TEMP/mac-signed"
-          mkdir -p "$out"
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "$out/Omni.app.zip"
-          echo "sha256=$(shasum -a 256 "$out/Omni.app.zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          tarball="$RUNNER_TEMP/omni-mac-signed.tar.gz"
+          COPYFILE_DISABLE=1 tar --no-mac-metadata -czf "$tarball" -C "$RUNNER_TEMP/app" Omni.app
+          echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
-          name: mac-signed
-          path: ${{ runner.temp }}/mac-signed/Omni.app.zip
+          path: ${{ runner.temp }}/omni-mac-signed.tar.gz
+          archive: false
           if-no-files-found: error
-          compression-level: 0
           retention-days: 7
           # A re-run uploads again under the same name.
           overwrite: true
@@ -276,15 +287,17 @@ jobs:
       - run: npm ci --include=dev --ignore-scripts
       - uses: actions/download-artifact@v8
         with:
-          name: mac-signed
+          name: omni-mac-signed.tar.gz
           path: ${{ runner.temp }}/in
-      - name: Check the signed app against its checksum
+          skip-decompress: true
+      - name: Unpack the signed app
         env:
           SHA256: ${{ needs.mac-sign.outputs.sha256 }}
         run: |
           cd "$RUNNER_TEMP/in"
-          echo "$SHA256  Omni.app.zip" | shasum -a 256 -c
-          ditto -x -k Omni.app.zip "$RUNNER_TEMP/signed"
+          echo "$SHA256  omni-mac-signed.tar.gz" | shasum -a 256 -c
+          mkdir -p "$RUNNER_TEMP/signed"
+          tar -xzf omni-mac-signed.tar.gz -C "$RUNNER_TEMP/signed"
       # electron-builder packs the signed app as it is: no build, no signing, nothing changed inside it.
       - name: Pack the DMG, the zip and latest-mac.yml
         working-directory: apps/desktop
@@ -307,23 +320,16 @@ jobs:
         id: collect
         working-directory: apps/desktop/release
         run: |
-          out="$RUNNER_TEMP/mac-release"
-          mkdir -p "$out"
-          for file in "Omni-$VERSION-mac-universal.dmg" "Omni-$VERSION-mac-universal.dmg.blockmap" \
-            "Omni-$VERSION-mac-universal.zip" "Omni-$VERSION-mac-universal.zip.blockmap" latest-mac.yml; do
-            cp "$file" "$out/"
-          done
-          cd "$out"
-          shasum -a 256 -- * > "$RUNNER_TEMP/SHA256SUMS"
-          mv "$RUNNER_TEMP/SHA256SUMS" SHA256SUMS
-          cat SHA256SUMS
-          echo "sha256=$(shasum -a 256 SHA256SUMS | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          tarball="$RUNNER_TEMP/omni-mac-release.tar"
+          COPYFILE_DISABLE=1 tar --no-mac-metadata -cf "$tarball" "Omni-$VERSION-mac-universal.dmg" "Omni-$VERSION-mac-universal.dmg.blockmap" \
+            "Omni-$VERSION-mac-universal.zip" "Omni-$VERSION-mac-universal.zip.blockmap" latest-mac.yml
+          tar -tvf "$tarball"
+          echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
-          name: mac-release
-          path: ${{ runner.temp }}/mac-release
+          path: ${{ runner.temp }}/omni-mac-release.tar
+          archive: false
           if-no-files-found: error
-          compression-level: 0
           retention-days: 7
           # A re-run uploads again under the same name.
           overwrite: true
@@ -363,20 +369,15 @@ jobs:
         id: collect
         working-directory: apps/desktop/release
         run: |
-          out="$RUNNER_TEMP/linux-release"
-          mkdir -p "$out"
-          cp "Omni-$VERSION-linux-x86_64.AppImage" latest-linux.yml "$out/"
-          cd "$out"
-          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS"
-          mv "$RUNNER_TEMP/SHA256SUMS" SHA256SUMS
-          cat SHA256SUMS
-          echo "sha256=$(sha256sum SHA256SUMS | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          tarball="$RUNNER_TEMP/omni-linux-release.tar"
+          tar -cf "$tarball" "Omni-$VERSION-linux-x86_64.AppImage" latest-linux.yml
+          tar -tvf "$tarball"
+          echo "sha256=$(sha256sum "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
-          name: linux-release
-          path: ${{ runner.temp }}/linux-release
+          path: ${{ runner.temp }}/omni-linux-release.tar
+          archive: false
           if-no-files-found: error
-          compression-level: 0
           retention-days: 7
           # A re-run uploads again under the same name.
           overwrite: true
@@ -394,6 +395,44 @@ jobs:
       TAG: ${{ needs.prepare.outputs.tag }}
       SHA: ${{ needs.prepare.outputs.sha }}
     steps:
+      # Each tarball stays packed until its checksum checks out and it holds exactly the release's files for its
+      # platform, as plain files. This runs before the checkout puts the write token in .git/config.
+      - uses: actions/download-artifact@v8
+        with:
+          name: omni-mac-release.tar
+          path: ${{ runner.temp }}/mac
+          skip-decompress: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: omni-linux-release.tar
+          path: ${{ runner.temp }}/linux
+          skip-decompress: true
+      - name: Unpack the release files
+        env:
+          MAC_SHA256: ${{ needs.mac-package.outputs.sha256 }}
+          LINUX_SHA256: ${{ needs.linux-build.outputs.sha256 }}
+        run: |
+          assets="$RUNNER_TEMP/assets"
+          echo "ASSETS=$assets" >> "$GITHUB_ENV"
+          mkdir -p "$assets"
+          # take <tarball> <its sha256> <every file it must hold>
+          take() {
+            local tarball="$1" sum="$2" listing names
+            shift 2
+            echo "$sum  $tarball" | sha256sum -c
+            listing="$(tar -tvf "$tarball")"
+            names="$(tar -tf "$tarball" | LC_ALL=C sort)"
+            if [[ "$names" != "$(printf '%s\n' "$@" | LC_ALL=C sort)" ]] || grep -v '^-' <<<"$listing" >/dev/null; then
+              echo "::error::$(basename "$tarball") does not hold exactly $*, as plain files"
+              echo "$listing"
+              exit 1
+            fi
+            tar -xf "$tarball" -C "$assets" --keep-old-files --no-same-owner
+          }
+          take "$RUNNER_TEMP/mac/omni-mac-release.tar" "$MAC_SHA256" "Omni-$VERSION-mac-universal.dmg" "Omni-$VERSION-mac-universal.dmg.blockmap" \
+            "Omni-$VERSION-mac-universal.zip" "Omni-$VERSION-mac-universal.zip.blockmap" latest-mac.yml
+          take "$RUNNER_TEMP/linux/omni-linux-release.tar" "$LINUX_SHA256" "Omni-$VERSION-linux-x86_64.AppImage" latest-linux.yml
+          ls -l "$assets"
       - uses: actions/checkout@v5
         with:
           ref: ${{ needs.prepare.outputs.sha }}
@@ -401,31 +440,6 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - uses: actions/download-artifact@v8
-        with:
-          name: mac-release
-          path: ${{ runner.temp }}/mac
-      - uses: actions/download-artifact@v8
-        with:
-          name: linux-release
-          path: ${{ runner.temp }}/linux
-      - name: Check the files against their builds' checksums
-        env:
-          MAC_SUMS: ${{ needs.mac-package.outputs.sha256 }}
-          LINUX_SUMS: ${{ needs.linux-build.outputs.sha256 }}
-        run: |
-          echo "ASSETS=$RUNNER_TEMP/assets" >> "$GITHUB_ENV"
-          ASSETS="$RUNNER_TEMP/assets"
-          mkdir -p "$ASSETS"
-          take() {
-            cd "$1"
-            echo "$2  SHA256SUMS" | sha256sum -c
-            sha256sum -c SHA256SUMS
-            while read -r _ file; do mv -- "$file" "$ASSETS/"; done < SHA256SUMS
-          }
-          (take "$RUNNER_TEMP/mac" "$MAC_SUMS")
-          (take "$RUNNER_TEMP/linux" "$LINUX_SUMS")
-          ls -l "$ASSETS"
       - name: Check the update feeds
         working-directory: ${{ runner.temp }}/assets
         run: |

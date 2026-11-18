@@ -37,10 +37,10 @@ Or open the Actions tab, choose **Desktop release** and **Run workflow**. Most o
 | --- | --- | --- |
 | Version | a read-only token | Works out the new version from `main` (`scripts/version.ts`) and stops if its tag exists. Pushes nothing |
 | Mac build | a read-only token | Sets the version, installs with `npm ci --ignore-scripts`, builds the universal app unsigned with the Rust `omni-mcp` and `omni` binaries for both arches, and hands the app on with its checksum |
-| Mac sign and notarize | the signing and notarization secrets, a read-only token | Checks the build against its checksum, loads the Developer ID into a keychain of its own, signs every Mach-O file and bundle with `scripts/mac-release-sign.ts` on plain Node, notarizes and staples, then checks the signature, Gatekeeper's verdict and the staple |
+| Mac sign and notarize | the signing and notarization secrets, a read-only token | Checks the build's tarball against its checksum and that it holds only `Omni.app`, unpacks it, loads the Developer ID into a keychain of its own, signs every Mach-O file and bundle with `scripts/mac-release-sign.ts` on plain Node, notarizes and staples, then checks the signature, Gatekeeper's verdict and the staple |
 | Mac DMG, zip and update feed | a read-only token | Packs the signed app into the DMG, the zip and `latest-mac.yml` with electron-builder (`dist.ts --prepackaged`), which changes nothing inside it, then checks the app in both |
 | Linux | a read-only token | Builds the x64 AppImage with `npm ci --ignore-scripts` and `npm rebuild node-pty`, node-pty compiled for glibc 2.28 in docker and the Rust binaries linked statically (the job installs `musl-tools` for `omni`'s C code), and hands it on with `latest-linux.yml` |
-| Publish | a token that can write | Checks each file against its build's checksum and the feeds against the files, commits the version to `main`, tags `v<version>`, drafts the release with notes generated from the merged PRs, uploads, checks the attached feeds again and publishes the release as the latest |
+| Publish | a token that can write | Checks each tarball against its build's checksum and that it holds exactly the release's files, checks the feeds against the files, commits the version to `main`, tags `v<version>`, drafts the release with notes generated from the merged PRs, uploads, checks the attached feeds again and publishes the release as the latest |
 
 No dependency's code runs where a credential is. The build jobs run npm code with no secret, no token in `.git/config` and read-only access, and no dependency's install script runs in them: node-pty's is the only one a build needs, on Linux, and the job runs it by name. The sign job and Publish run Apple's tools, `git`, `gh` and the repo's own scripts that import nothing but Node's built-ins, and no npm code. Publish is the only job that can write, and it holds no signing secret. `tests/release-workflow.test.ts` fails on a change to the workflow that breaks any of this (`scripts/release-policy.ts` lists the rules).
 
@@ -52,10 +52,10 @@ The `mode` input picks how far a run goes. It is `release` unless you pass anoth
 | --- | --- | --- |
 | `release` | Every job | The published release, the version commit on `main` and the tag |
 | `draft` | Every job | The release as a draft with every file, the version commit and the tag. Publish it with `gh release edit v<version> --draft=false --latest`, or delete it |
-| `sign-only` | Both builds, signing and notarization, the DMG and zip | Nothing pushed. The signed DMG, zip and feed are the run's `mac-release` artifact |
-| `build-only` | Both builds, without the signing secrets | Nothing pushed. The unsigned app is the `mac-unsigned` artifact and the AppImage is `linux-release` |
+| `sign-only` | Both builds, signing and notarization, the DMG and zip | Nothing pushed. The signed DMG, zip and feed are the run's `omni-mac-release.tar` artifact |
+| `build-only` | Both builds, without the signing secrets | Nothing pushed. The unsigned app is the `omni-mac-unsigned.tar.gz` artifact and the AppImage is in `omni-linux-release.tar` |
 
-Download a run's artifact with `gh run download <run id> -n mac-release`.
+Each job hands the next one tarball, uploaded as it is, so an artifact downloads as that file: `gh run download <run id> -n omni-mac-release.tar`, then `tar -xf omni-mac-release.tar`.
 
 ### When a run fails
 
@@ -74,7 +74,7 @@ Any agent with `gh` can start a release the same way. Starting one is a deploy t
 Until 0.1.36, electron-builder signed and notarized the app inside the Mac build. Now the build is unsigned and the sign job signs it with Apple's tools. Check that before the first release made this way reaches installed copies, in three runs:
 
 1. **Build only.** `gh workflow run desktop-release.yml -f bump=patch -f mode=build-only`. Both builds pass with install scripts off, and the sign job is skipped, so no job reads a signing secret.
-2. **Sign only.** `-f mode=sign-only`. The sign job passes its own checks: the signature, Gatekeeper's verdict and the staple. Then download `mac-release`, open the DMG on the Mac and, in Finder, drag Omni into `~/OmniUpdateTest` (step 2 of the first update test below). Before you open it:
+2. **Sign only.** `-f mode=sign-only`. The sign job passes its own checks: the signature, Gatekeeper's verdict and the staple. Then download and unpack `omni-mac-release.tar`, open the DMG on the Mac and, in Finder, drag Omni into `~/OmniUpdateTest` (step 2 of the first update test below). Before you open it:
    - `spctl --assess --type execute --verbose=2 ~/OmniUpdateTest/Omni.app` says accepted, source=Notarized Developer ID
    - `codesign -d --entitlements - ~/OmniUpdateTest/Omni.app` lists allow-jit, allow-unsigned-executable-memory and disable-library-validation
 

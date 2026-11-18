@@ -47,7 +47,11 @@ describe('workflowProblems', () => {
       publish: {
         permissions: { contents: 'write' },
         env: { GH_TOKEN: '${{ github.token }}' },
-        steps: [{ uses: 'actions/checkout@v5' }, { uses: 'actions/download-artifact@v5' }, { run: 'shasum -a 256 -c SHA256SUMS\nversion="$(node v.ts patch)"' }],
+        steps: [
+          { uses: 'actions/checkout@v5' },
+          { uses: 'actions/download-artifact@v8', with: { name: 'release.tar', 'skip-decompress': true } },
+          { run: 'echo "$SUM  release.tar" | sha256sum -c\nversion="$(node v.ts patch)"' },
+        ],
       },
     };
     expect(problems(jobs, {}, repo)).toEqual([]);
@@ -118,12 +122,14 @@ describe('workflowProblems', () => {
     expect(problems({ sign: job('echo ok', 'someone/action@v1') }, {}, repo)).toEqual(['sign: has secrets or write permissions and runs someone/action@v1']);
   });
 
-  it('wants a downloaded artifact checked before a job with a secret or a write token uses it', () => {
+  it('wants a downloaded artifact left packed and checked before a job with a secret or a write token uses it', () => {
     const publish = (steps: unknown[]) => ({ publish: { permissions: { contents: 'write' }, steps } });
-    expect(problems(publish([{ uses: 'actions/download-artifact@v5' }, { run: 'gh release upload v1 *' }]))).toEqual([
-      'publish: takes an artifact without checking it against a checksum',
+    const download = { uses: 'actions/download-artifact@v8', with: { 'skip-decompress': true } };
+    expect(problems(publish([download, { run: 'gh release upload v1 *' }]))).toEqual(['publish: takes an artifact without checking it against a checksum']);
+    expect(problems(publish([download, { run: 'sha256sum --check SUMS' }]))).toEqual([]);
+    expect(problems(publish([{ uses: 'actions/download-artifact@v8' }, { run: 'sha256sum --check SUMS' }]))).toEqual([
+      'publish: lets actions/download-artifact unpack an artifact another job made (set skip-decompress: true)',
     ]);
-    expect(problems(publish([{ uses: 'actions/download-artifact@v5' }, { run: 'sha256sum --check SUMS' }]))).toEqual([]);
   });
 });
 

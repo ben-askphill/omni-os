@@ -7,10 +7,13 @@
 // It signs as electron-builder's signing did (@electron/osx-sign): every nested Mach-O file, .app and .framework,
 // deepest first, then the app, each forced, timestamped, with the hardened runtime and the same entitlements. It skips
 // what is not code (fonts, images, .pak), which the bundle's own signature seals. Then it verifies the app.
+//
+// The app comes from a build job that ran package code, so before signing it refuses a link that leads out of the app
+// and anything that is not a file, folder or link (bundleProblems).
 import { execFile } from 'node:child_process';
-import { closeSync, openSync, readSync, readdirSync } from 'node:fs';
+import { closeSync, openSync, readSync, readdirSync, readlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { extname, join, sep } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 
 const require = createRequire(import.meta.url);
@@ -50,6 +53,33 @@ function readHeader(path: string): Uint8Array {
   } finally {
     closeSync(fd);
   }
+}
+
+/**
+ * Why the app at `app` may not be signed: each link that is absolute or leads out of the app, and each entry that is
+ * not a file, folder or link (a pipe, a device), as paths inside the app. Empty when there is none.
+ */
+export function bundleProblems(app: string): string[] {
+  const problems: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      const inside = relative(app, path);
+      if (entry.isSymbolicLink()) {
+        const target = readlinkSync(path);
+        const lands = relative(app, resolve(dirname(path), target));
+        if (isAbsolute(target) || lands === '..' || lands.startsWith(`..${sep}`) || isAbsolute(lands)) {
+          problems.push(`${inside} links to ${target}, outside the app`);
+        }
+      } else if (entry.isDirectory()) {
+        walk(path);
+      } else if (!entry.isFile()) {
+        problems.push(`${inside} is not a file, folder or link`);
+      }
+    }
+  };
+  walk(app);
+  return problems.sort();
 }
 
 /**
@@ -108,6 +138,8 @@ async function runCodesign(args: string[]): Promise<void> {
 export async function signApp(opts: SignOptions, deps: SignDeps = {}): Promise<string[]> {
   const codesign = deps.codesign ?? runCodesign;
   const log = deps.log ?? ((message: string) => console.log(message));
+  const problems = bundleProblems(opts.app);
+  if (problems.length) throw new Error(`refusing to sign ${opts.app}: ${problems.join('; ')}`);
   const order = signingOrder(opts.app);
   for (const path of order) {
     await retrySigning(() => codesign(codesignArgs(path, opts)), { wait: deps.wait, log });
