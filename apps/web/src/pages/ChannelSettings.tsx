@@ -1,5 +1,6 @@
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { autoAvatarColor } from '@omni/shared/avatar-color.ts';
+import { claudeModelId } from '@omni/shared/claude-aliases.ts';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
@@ -137,7 +138,9 @@ export function RunDefaultsField({ channel, value, onChange, noReset }: { channe
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(channel));
   if (!harnesses) return null;
   const unset = !(value.harness || value.model || value.effort);
-  const choice = unset || asksAuto(value) ? AUTO_CHOICE : { harness: value.harness || 'claude-code', model: value.model };
+  // A role's file can name a Claude alias (`opus`): the pickers list catalog ids.
+  const harness = value.harness || 'claude-code';
+  const choice = unset || asksAuto(value) ? AUTO_CHOICE : { harness, model: harness === 'claude-code' && value.model ? claudeModelId(value.model) : value.model };
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <ModelPicker

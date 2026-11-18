@@ -3,6 +3,7 @@
 // and resolution live here; live probing of the CLIs is injected so this is testable.
 import type { HarnessId, HarnessInfo, ModelEntry } from './types.ts';
 import { CAPABILITIES, HARNESS_META, HARNESS_IDS } from './types.ts';
+import { CLAUDE_ALIASES } from '@omni/shared/claude-aliases.ts';
 
 // ---------- Claude Code (fixed) ----------
 
@@ -10,13 +11,7 @@ import { CAPABILITIES, HARNESS_META, HARNESS_IDS } from './types.ts';
 export const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 export const CLAUDE_DEFAULT_EFFORT = 'high';
 
-/** The short aliases stay valid for roles and the conductor. */
-export const CLAUDE_ALIASES: Record<string, string> = {
-  opus: 'claude-opus-5-5',
-  sonnet: 'claude-sonnet-5-5',
-  haiku: 'claude-haiku-4-5',
-  fable: 'claude-fable-5-2',
-};
+export { CLAUDE_ALIASES };
 
 const claudeModel = (id: string, label: string, isDefault = false): ModelEntry => ({
   id,
