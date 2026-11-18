@@ -138,6 +138,15 @@ describe('RelayStore: a token pushes as one machine (PRD #667, S9)', () => {
     await expect(store.push({ changes: [change('a', 't7')] }, tokB)).rejects.toMatchObject({ status: 401 });
     expect((await store.pull(0, 'nobody', 100)).map((c) => [c.machine_id, c.entity_id])).toEqual([['a', 't1'], ['a', 't2'], ['b', 't6']]);
   });
+
+  it('says which machine a token pushes as, for Connect registration, and nothing before its first push', async () => {
+    const { store } = setup();
+    const tok = await store.addToken('token-a', 'Mac A');
+    expect(store.tokenMachine(tok)).toBeNull();
+    await store.push({ changes: [change('a', 't1')] }, tok);
+    expect(store.tokenMachine(tok)).toBe('a');
+    expect(store.tokenMachine('no-such-token')).toBeNull();
+  });
 });
 
 describe('RelayStore: a machine that signs in again (PRD #667, S9)', () => {
