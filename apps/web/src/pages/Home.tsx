@@ -18,6 +18,7 @@ import { splitNeeds } from '../needs-you.ts';
 import { readPref, useApp, useFeed, useNow, writePref } from '../store.tsx';
 import { useInbox } from '../app/useInbox.ts';
 import { usePresetSeq } from '../router.ts';
+import { runningListFilter } from '../running-list.ts';
 
 const acceptAll = () => true;
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -134,8 +135,7 @@ function Freshness({ at, refreshing, onRefresh }: { at: number | undefined; refr
 function OpenList({ kind, insights, machine, machines, working }: { kind: ListKind; insights: Insights | undefined; machine: string | null; machines: MachinesView | undefined; working: ReadonlySet<string> }) {
   const { needsYou } = useApp();
   const on = machine ? machines?.machines.find((m) => m.id === machine) : undefined;
-  const onIds = new Set(on?.threadIds ?? []);
-  const running = (t: Thread) => working.has(t.id) && (!machine || onIds.has(t.id));
+  const running = runningListFilter(working, on, !!machine);
   const recent = useLiveThreads('/recent?limit=200', acceptAll, 200);
   const { needs, unread } = splitNeeds(needsYou?.items ?? []);
   const meta = LIST_TITLE[kind];
