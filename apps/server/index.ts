@@ -41,6 +41,7 @@ const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { flushSync, startSync } = await import('./sync/worker.ts');
 const { startConnect, stopConnect } = await import('./connect/service.ts');
+const { stopGithubLogin } = await import('./github-auth.ts');
 const { recoverHandoffs } = await import('./handoff.ts');
 const { startWorktreeRetention } = await import('./worktree-cleanup.ts');
 const { startDiskWatch } = await import('./disk-space.ts');
@@ -135,6 +136,7 @@ const shutdown = (sig: string, code = 0, last?: Promise<void>) => {
   closeAllTerminals();
   stopAllRuns();
   stopConnect();
+  stopGithubLogin();
   setTimeout(() => process.exit(code), 6000).unref();
   void Promise.allSettled([shutdownAll(), last]).finally(() => {
     closeAllBrowsers();

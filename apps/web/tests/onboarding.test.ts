@@ -16,10 +16,20 @@ const routes = async (path: string) => {
   if (path === '/setup/github' && github === undefined) throw new Error('Not found');
   return path === '/harnesses' ? harnesses : path === '/accounts' ? accounts : path === '/setup/github' ? github : {};
 };
-vi.mock('../src/api.ts', () => ({ api: { get: routes, post: async () => ({}), put: async () => ({}) }, errorText: String }));
+/** POSTs the page sent, and what each answers: Connect GitHub's start and poll, by path. */
+let posts: { path: string; body: unknown }[] = [];
+let postAnswers: Record<string, unknown[]> = {};
+const post = async (path: string, body: unknown) => {
+  posts.push({ path, body });
+  const queue = postAnswers[path];
+  return queue && queue.length > 1 ? queue.shift() : (queue?.[0] ?? {});
+};
+vi.mock('../src/api.ts', () => ({ api: { get: routes, post, put: async () => ({}) }, errorText: String, ApiError: class extends Error {} }));
 afterEach(() => {
   accounts = { machines: [], synced: false };
   github = undefined;
+  posts = [];
+  postAnswers = {};
 });
 
 const { HarnessScreen, NotificationsScreen, STEPS } = await import('../src/components/onboarding-parts.tsx');
@@ -147,6 +157,93 @@ describe('Harnesses step: accounts and the GitHub CLI', () => {
     gh = row(el, 'github');
     expect(text(gh)).toContain('Not installed');
     expect(labels(gh)).toEqual(['Install', 'Sign in']);
+  });
+
+  it('Connect GitHub only when gh is installed and signed out', async () => {
+    harnesses = [claude];
+    const connect = (el: HTMLElement) => [...row(el, 'github').querySelectorAll('button')].find((b) => text(b) === 'Connect GitHub');
+    github = { state: 'signed-out', command: 'gh auth login' };
+    let el = await render(createElement(HarnessScreen));
+    expect(connect(el)).toBeTruthy();
+    // The terminal way stays beside it.
+    expect(labels(row(el, 'github'))).toEqual(['Sign in']);
+    act(() => root?.unmount());
+    host.remove();
+
+    for (const g of [
+      { state: 'ready', login: 'ada-l' },
+      { state: 'missing', install: 'brew install gh', command: 'gh auth login' },
+      { state: 'error', reason: 'Omni could not read gh auth status.' },
+    ]) {
+      github = g;
+      el = await render(createElement(HarnessScreen));
+      expect(connect(el)).toBeUndefined();
+      act(() => root?.unmount());
+      host.remove();
+    }
+  });
+
+  const start = { flow: 'f1', secret: 's1', userCode: 'AB12-CD34', verificationUri: 'https://github.com/login/device', verificationUriComplete: null, interval: 0.01 };
+  const wait = (ms = 60) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+  const click = (el: Element, label: string) =>
+    act(async () => {
+      [...el.querySelectorAll('button')].find((b) => text(b) === label)!.click();
+      await new Promise((r) => setTimeout(r, 5));
+    });
+
+  it('Connect GitHub: the code with Copy, a link to GitHub, then signed in as the login gh reads', async () => {
+    harnesses = [claude];
+    github = { state: 'signed-out', command: 'gh auth login' };
+    const heard: unknown[] = [];
+    postAnswers = { '/setup/github/login': [start], '/setup/github/login/poll': [{ state: 'pending' }, { state: 'signed_in', login: 'ada-l' }] };
+    const el = await render(createElement(HarnessScreen, { onGithub: (g) => heard.push(g) }));
+    await click(row(el, 'github'), 'Connect GitHub');
+    const card = row(el, 'github').querySelector('[data-device-code]')!;
+    expect(text(card.querySelector('[aria-label="Sign-in code"]'))).toBe('AB12-CD34');
+    expect([...card.querySelectorAll('button')].map(text)).toContain('Copy code');
+    const open = card.querySelector('a')!;
+    expect([text(open), open.getAttribute('href'), open.getAttribute('target')]).toEqual(['Open GitHub', 'https://github.com/login/device', '_blank']);
+    expect(text(card)).toContain('Waiting for approval');
+
+    github = { state: 'ready', login: 'ada-l' };
+    await wait();
+    const gh = row(el, 'github');
+    expect(gh.getAttribute('data-state')).toBe('ready');
+    expect(text(gh.querySelector('[data-account]'))).toBe('Signed in as ada-l');
+    expect(gh.querySelector('[data-device-code]')).toBeNull();
+    expect(posts.filter((p) => p.path === '/setup/github/login/poll').every((p) => JSON.stringify(p.body) === '{"flow":"f1","secret":"s1"}')).toBe(true);
+    expect(heard.at(0)).toEqual({ state: 'signed-out', command: 'gh auth login' });
+    expect(heard.at(-1)).toEqual({ state: 'ready', login: 'ada-l' });
+  });
+
+  it('Cancel tells the server to stop gh and says gh is still signed out; a decline or an expired code says why', async () => {
+    harnesses = [claude];
+    github = { state: 'signed-out', command: 'gh auth login' };
+    postAnswers = { '/setup/github/login': [start], '/setup/github/login/poll': [{ state: 'pending' }] };
+    let el = await render(createElement(HarnessScreen));
+    await click(row(el, 'github'), 'Connect GitHub');
+    await click(row(el, 'github'), 'Cancel');
+    expect(posts.find((p) => p.path === '/setup/github/login/cancel')?.body).toEqual({ flow: 'f1', secret: 's1' });
+    expect(row(el, 'github').querySelector('[data-device-code]')).toBeNull();
+    expect(text(row(el, 'github').querySelector('[data-cancelled]'))).toBe('Cancelled. gh is still signed out.');
+    expect(row(el, 'github').getAttribute('data-state')).toBe('signed-out');
+    act(() => root?.unmount());
+    host.remove();
+
+    for (const [answer, words] of [
+      [{ state: 'denied' }, 'Sign-in was declined on GitHub.'],
+      [{ state: 'expired' }, 'The code expired before it was entered. Connect again.'],
+      [{ state: 'refused', error: 'Cancelled.' }, 'Cancelled.'],
+    ] as const) {
+      postAnswers = { '/setup/github/login': [start], '/setup/github/login/poll': [answer] };
+      el = await render(createElement(HarnessScreen));
+      await click(row(el, 'github'), 'Connect GitHub');
+      await wait();
+      expect(text(row(el, 'github'))).toContain(words);
+      expect([...row(el, 'github').querySelectorAll('button')].map(text)).toContain('Connect GitHub');
+      act(() => root?.unmount());
+      host.remove();
+    }
   });
 
   it('an older server without the gh check shows no GitHub row', async () => {

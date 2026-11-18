@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { githubLine, type GithubCheck } from '@omni/shared/github-check.ts';
+import { HARNESS_CHECK_LABEL } from '@omni/shared/harness-check.ts';
 import { NAME_MAX } from '@omni/shared/settings.ts';
 import { api, errorText, type SetupState, type UserConfigPatch } from '../api.ts';
 import { desktop } from '../desktop.ts';
@@ -107,6 +109,8 @@ function Wizard() {
   const [channelRepo, setChannelRepo] = useState('');
   const [channelStore, setChannelStore] = useState('');
   const [createdChannel, setCreatedChannel] = useState<string | null>(null);
+  /** The GitHub CLI as the Harnesses step last read it; null when this server cannot say. */
+  const [github, setGithub] = useState<GithubCheck | null>(null);
 
   useEffect(() => {
     api
@@ -218,7 +222,7 @@ function Wizard() {
               </Row>
             </Screen>
           )}
-          {state && step === 2 && <HarnessScreen />}
+          {state && step === 2 && <HarnessScreen onGithub={setGithub} />}
           {state && step === 3 && (
             <Screen
               caption="First channel"
@@ -260,6 +264,7 @@ function Wizard() {
                 <Summary k="Timezone" v={timezone || state.resolved.timezone} />
                 <Summary k="Workspace" v={root || state.fallbacks.workspaceRoot} mono />
                 <Summary k="GitHub" v={githubOwner || 'not set'} mono />
+                {github && <Summary k="GitHub CLI" v={githubLine(github) ?? HARNESS_CHECK_LABEL[github.state]} />}
                 {createdChannel && <Summary k="Channel" v={`#${createdChannel}`} />}
               </dl>
               <SavedNote path={state.path} install={state.install} />
