@@ -53,7 +53,7 @@ A save is refused when its run defaults, default channel or MCP servers are unkn
 
 A role is a prompt every later thread of it runs with, so an agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) goes through the crew guard (`apps/server/crew-guard.ts`) and gets a 403 unless all of these hold:
 
-- It is a save or a reset. Deleting, hiding and showing a role stay yours, in Settings.
+- It is a save or a reset. Deleting, hiding and showing a role stay yours, in Settings. A reset that would change the role's powers (your edit gave the built-in the conductor tools, say) is refused: reset it yourself.
 - The thread runs as the Conductor. No other role writes roles, even one you gave the `omni` MCP server, and usage-scan never does.
 - The save leaves powers alone: no `mcp`, `delegate_only` or `delegatable`, and no whole-file `markdown`. Those are yours to set.
 - No automation started the thread or any thread above it.

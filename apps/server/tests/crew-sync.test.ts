@@ -169,6 +169,19 @@ describe('agent writes to /api/crew', () => {
     expect(res.body.error).toMatch(/^Not yet/);
   });
 
+  it("refuses a Conductor's reset that would change the powers Ben gave a role", async () => {
+    // Ben gives the builder routing powers in his overlay; the Conductor, though Ben answered it, may not undo that.
+    expect((await call('PUT', '/crew/builder', { fields: { mcp: ['omni'], delegate_only: true } })).status).toBe(200);
+    const res = await call('POST', '/crew/builder/reset', undefined, conductor);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/^Resetting Builder would change its mcp, delegate_only, which are .+'s to set\. Ask .+ to reset it in Settings\.$/);
+    expect(getCrew('builder')).toMatchObject({ kind: 'edited', delegateOnly: true });
+    // An overlay that leaves the powers alone still resets, and Ben resets this one himself.
+    expect((await call('POST', '/crew/builder/reset')).status).toBe(200);
+    expect((await call('PUT', '/crew/builder', edit, conductor)).status).toBe(200);
+    expect((await call('POST', '/crew/builder/reset', undefined, conductor)).status).toBe(200);
+  });
+
   it('a question the Conductor asked and Ben answered counts as his answer', async () => {
     const asked = thread({ role: 'conductor' });
     events.add(asked, 'user', { text: 'Tidy up the reviewer charter.', source: 'ben' });
