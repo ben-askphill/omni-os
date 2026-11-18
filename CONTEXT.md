@@ -22,7 +22,7 @@ _Avoid_: Chat, session, conversation
 One run of the agent, from a message to its final reply.
 
 **Crew role**:
-A charter in `crew/*.md` that gives a thread its job, defaults and extra tools.
+A charter that gives a thread its job, defaults and extra tools: shipped in `crew/*.md`, or the user's own in `data/crew/`, where a file with a shipped role's name is an overlay on it.
 _Avoid_: Agent, persona, bot
 
 **Conductor**:
