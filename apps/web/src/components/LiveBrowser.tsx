@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
 import { api, ApiError, errorText, openSSE } from '../api.ts';
+import { apiUrl } from '../api-base.ts';
 import { AnnotateButton, AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from './BrowserAnnotate.tsx';
 import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from './BrowserAnnotationOverlay.tsx';
 import { Button, Icon, IconButton, Loader } from './ui.tsx';
@@ -129,7 +130,7 @@ export function useChannelBrowser(channelId: string) {
     const attach = () => {
       if (!alive) return;
       h = openSSE(
-        () => `/api${base}/stream`,
+        () => apiUrl(`${base}/stream`),
         (d) => {
           const m = d as { type: string; state?: BrowserState; data?: string; width?: number; height?: number; scrollX?: number; scrollY?: number; error?: string };
           if (m.type === 'state' && m.state) {

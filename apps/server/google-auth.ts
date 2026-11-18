@@ -120,8 +120,35 @@ interface SessionRow {
   sub: string;
   kind: SessionKind;
   method: SessionMethod;
+  cookie_path: string | null;
   last_seen_at: string;
   revoked_at: string | null;
+}
+
+/** A live session as requestGuard sees it. `cookiePath`: where a browser's cookie lives, null before it has one. */
+export interface LiveSession {
+  id: string;
+  kind: SessionKind;
+  method: SessionMethod;
+  cookiePath: string | null;
+}
+
+const ROW = 'id, sub, kind, method, cookie_path, last_seen_at, revoked_at';
+const live = (r: SessionRow): LiveSession => ({ id: r.id, kind: r.kind, method: r.method, cookiePath: r.cookie_path });
+
+/** Put a browser session's cookie on `path` (browser-session.ts newCookiePath). */
+export function setCookiePath(id: string, path: string) {
+  db.prepare('UPDATE device_sessions SET cookie_path = ? WHERE id = ?').run(path, id);
+}
+
+/**
+ * Give a session a new token, and its cookie a new path, keeping its id, name and age: a browser from before the
+ * keyed path moves onto one. The old token stops working at once, wherever a copy of it went.
+ */
+export function rekeySession(id: string, path: string): string {
+  const token = `omni_s_${randomBytes(32).toString('hex')}`;
+  db.prepare('UPDATE device_sessions SET token_hash = ?, cookie_path = ? WHERE id = ?').run(sha256(token), path, id);
+  return token;
 }
 
 /** Whether a row still opens the door: not revoked, used within IDLE_DAYS, and, for Google, the owner's. */
@@ -132,12 +159,21 @@ function liveRow(r: SessionRow | undefined, at: number): r is SessionRow {
 }
 
 /** The session a token names, while it is live. */
-export function sessionFor(token: string | undefined | null, at = Date.now()): { id: string; kind: SessionKind; method: SessionMethod } | null {
+export function sessionFor(token: string | undefined | null, at = Date.now()): LiveSession | null {
   if (!token?.startsWith('omni_s_')) return null;
-  const r = db.prepare('SELECT id, sub, kind, method, last_seen_at, revoked_at FROM device_sessions WHERE token_hash = ?').get(sha256(token)) as SessionRow | undefined;
+  const r = db.prepare(`SELECT ${ROW} FROM device_sessions WHERE token_hash = ?`).get(sha256(token)) as SessionRow | undefined;
   if (!liveRow(r, at)) return null;
   touch(r, at);
-  return { id: r.id, kind: r.kind, method: r.method };
+  return live(r);
+}
+
+/** The session an id names, while it is live: a signed document address, or the desktop window's id cookie. */
+export function sessionById(id: string | undefined | null, at = Date.now()): LiveSession | null {
+  if (!id) return null;
+  const r = db.prepare(`SELECT ${ROW} FROM device_sessions WHERE id = ?`).get(id) as SessionRow | undefined;
+  if (!liveRow(r, at)) return null;
+  touch(r, at);
+  return live(r);
 }
 
 function touch(r: SessionRow, at: number) {
@@ -173,7 +209,7 @@ export function revokeSession(id: string): boolean {
 
 /** Whether the session is live now, without counting as use. */
 export function sessionIsLive(id: string, at = Date.now()): boolean {
-  return liveRow(db.prepare('SELECT id, sub, kind, method, last_seen_at, revoked_at FROM device_sessions WHERE id = ?').get(id) as SessionRow | undefined, at);
+  return liveRow(db.prepare(`SELECT ${ROW} FROM device_sessions WHERE id = ?`).get(id) as SessionRow | undefined, at);
 }
 
 /**

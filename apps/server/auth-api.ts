@@ -5,10 +5,10 @@
 // nonce (desktop-pairing.ts), and the token never appears in the URL. A paired browser holds a session, never the token.
 // App pairing (app-pairing.ts) gives a native app its own revocable session; push-tokens.ts keeps its push token.
 import { Hono, type Context } from 'hono';
-import { deleteCookie, getCookie } from 'hono/cookie';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
-import { proofFor, rotateToken, sessionCookieName, TokenPinned } from './api-token.ts';
-import { setSessionCookie } from './browser-session.ts';
+import { deviceCookieName, proofFor, rotateToken, sessionCookieName, TokenPinned } from './api-token.ts';
+import { cookieOptions, DESKTOP_PAIR_COOKIE_PATH, newCookiePath, requestBase, sessionCookies, setSessionCookie } from './browser-session.ts';
 import { DESKTOP_SECRET_HEADER, mintNonce, secretMatches, takeNonce } from './desktop-pairing.ts';
 import { mintPairing, PairingError, redeemPairing } from './app-pairing.ts';
 import { clerkConfig } from './clerk.ts';
@@ -20,8 +20,11 @@ import {
   listSessions,
   owner,
   pollFlow,
+  rekeySession,
   revokeSession,
+  sessionById,
   sessionFor,
+  setCookiePath,
   sessionIsLive,
   SignInError,
   startFlow,
@@ -37,20 +40,61 @@ import { unattended } from './automation-guard.ts';
 
 export const authApi = new Hono();
 
-/** 200 when the request carried the token: the Web UI asks this to decide whether to show the pairing screen. */
-authApi.get('/', (c) => c.json({ ok: true }));
+// ---------- a browser's cookie and its path ----------
+// A browser's session cookie lives on a path of its own over plain HTTP (browser-session.ts). Every answer that hands
+// one out says where, as `api`: the base the page puts in front of every /api request from then on.
+
+/** Put a new browser session's cookie on its path, and answer that path. */
+function issueCookie(c: Context, s: { id: string; token: string }): string {
+  const path = newCookiePath(c);
+  setCookiePath(s.id, path);
+  setSessionCookie(c, s.token, path);
+  return path;
+}
+
+/**
+ * Move a browser session from before the keyed path onto one: a new token on a path of its own, and the old cookie on
+ * /api dropped. The old token stops working, wherever a copy of it went.
+ */
+function moveCookie(c: Context, id: string): string {
+  const path = newCookiePath(c);
+  setSessionCookie(c, rekeySession(id, path), path);
+  if (path !== '/api') deleteCookie(c, sessionCookieName(), { path: '/api' });
+  return path;
+}
+
+/** The live token-paired browser session whose cookie came with this request, on the path it came in on. */
+function heldSession(c: Context) {
+  const base = requestBase(c);
+  for (const token of sessionCookies(c)) {
+    const s = sessionFor(token);
+    if (s?.kind === 'browser' && s.method === 'token' && (s.cookiePath ?? '/api') === base) return s;
+  }
+  return null;
+}
+
+/**
+ * 200 when the request carried the token or a live session: the Web UI asks this to decide whether to show the
+ * pairing screen. `api` is where its requests go. A browser from before the keyed path, holding its session in the
+ * cookie, moves onto one here.
+ */
+authApi.get('/', (c) => {
+  const auth = c.get('omniAuth');
+  if (auth?.via !== 'session' || auth.kind !== 'browser') return c.json({ ok: true, api: '/api' });
+  if (auth.cookiePath) return c.json({ ok: true, api: auth.cookiePath });
+  return c.json({ ok: true, api: c.req.header('authorization') ? '/api' : moveCookie(c, auth.session) });
+});
 
 /**
  * Called with `Authorization: Bearer <token>`: hands the browser a device session paired with the token (method
- * `token`) as an HttpOnly, SameSite=Strict cookie on /api (browser-session.ts). Never the token itself: a session
- * can be revoked in Settings, Devices, and ends when the token is rotated. A browser that already holds a live session
- * paired with the token keeps it, so each reload of the desktop window does not add another device.
+ * `token`) as an HttpOnly, SameSite=Strict cookie (browser-session.ts), and answers its path. Never the token itself:
+ * a session can be revoked in Settings, Devices, and ends when the token is rotated. A browser that already holds a
+ * live session paired with the token keeps it.
  */
-function pairCookie(c: Context, name: string) {
-  const held = sessionFor(getCookie(c, sessionCookieName()));
-  if (held?.kind === 'browser' && held.method === 'token') return;
-  const s = createSession(name, 'browser', '', 'token');
-  setSessionCookie(c, s.token);
+function pairCookie(c: Context, name: string): string {
+  const held = heldSession(c);
+  if (held) return held.cookiePath ?? moveCookie(c, held.id);
+  return issueCookie(c, createSession(name, 'browser', '', 'token'));
 }
 
 /** Only a request that carries the install's token trades it for the cookie: a device session must never turn into the token it was issued instead of. */
@@ -60,8 +104,7 @@ const tokenOnlyCookie = (c: Context) =>
 authApi.post('/pair', (c) => {
   const refused = tokenOnlyCookie(c);
   if (refused) return refused;
-  pairCookie(c, browserName(c.req.header('user-agent')));
-  return c.json({ ok: true });
+  return c.json({ ok: true, api: pairCookie(c, browserName(c.req.header('user-agent'))) });
 });
 
 /**
@@ -77,13 +120,28 @@ authApi.post('/desktop-nonce', (c) => {
 });
 
 /**
+ * The desktop app's window session. A keyed cookie never reaches this path, so the window also holds its session's id
+ * on it (deviceCookieName): each window load keeps the one session, and the Devices list one row.
+ */
+function windowSession(c: Context): { id: string; path: string } {
+  const known = sessionById(getCookie(c, deviceCookieName()));
+  if (known?.kind === 'browser' && known.method === 'token' && known.cookiePath) return { id: known.id, path: known.cookiePath };
+  const held = heldSession(c);
+  if (held) return { id: held.id, path: held.cookiePath ?? moveCookie(c, held.id) };
+  const s = createSession('Desktop app', 'browser', '', 'token');
+  return { id: s.id, path: issueCookie(c, s) };
+}
+
+/**
  * The desktop app's window opens this with a nonce from /desktop-nonce. Sets a session cookie as /pair does, then sends
- * the window to the Web UI. A used or stale nonce sends it to the pairing screen instead.
+ * the window to the Web UI with the cookie's path as `?api=`, which the page keeps (apps/web/src/api-base.ts). A used or
+ * stale nonce sends it to the pairing screen instead.
  */
 authApi.get('/desktop-pair', (c) => {
   if (!takeNonce(c.req.query('nonce'))) return c.redirect('/#/pair?desktop=expired', 303);
-  pairCookie(c, 'Desktop app');
-  return c.redirect('/');
+  const { id, path } = windowSession(c);
+  setCookie(c, deviceCookieName(), id, cookieOptions(c, DESKTOP_PAIR_COOKIE_PATH));
+  return c.redirect(`/?api=${encodeURIComponent(path)}`);
 });
 
 /**
@@ -108,7 +166,7 @@ authApi.post('/rotate-token', (c) => {
     throw err;
   }
   endAllSessions();
-  deleteCookie(c, sessionCookieName(), { path: '/api' });
+  deleteCookie(c, sessionCookieName(), { path: (auth.via === 'session' && auth.cookiePath) || '/api' });
   return c.json({ ok: true });
 });
 
@@ -185,10 +243,7 @@ const PollBody = z.object({ flow: z.string().min(1).max(100), secret: z.string()
 /** What a poll answers. A signed-in browser gets its session as a cookie and never sees the token; an app gets the token. */
 function pollAnswer(c: Context, r: PollResult) {
   if (r.state === 'signed_in') {
-    if (r.kind === 'browser') {
-      setSessionCookie(c, r.session.token);
-      return c.json({ state: r.state });
-    }
+    if (r.kind === 'browser') return c.json({ state: r.state, api: issueCookie(c, r.session) });
     return c.json({ state: r.state, token: r.session.token });
   }
   if (r.state === 'linked') return c.json({ state: r.state, owner: { email: r.owner.email, name: r.owner.name, linkedAt: r.owner.linkedAt } });
@@ -233,7 +288,7 @@ authApi.delete('/devices/:id', (c) => {
 authApi.post('/signout', (c) => {
   const auth = c.get('omniAuth');
   if (auth?.via === 'session') revokeSession(auth.session);
-  deleteCookie(c, sessionCookieName(), { path: '/api' });
+  deleteCookie(c, sessionCookieName(), { path: (auth?.via === 'session' && auth.cookiePath) || '/api' });
   return c.json({ ok: true });
 });
 

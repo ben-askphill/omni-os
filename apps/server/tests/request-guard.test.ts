@@ -19,12 +19,18 @@ app.all('*', (c) => c.json({ ok: true }));
 const TOKEN = process.env.OMNI_TOKEN!;
 const AUTH = { authorization: `Bearer ${TOKEN}` };
 
-// Sessions without a db: one paired with the token, one signed in with Google.
-const SESSIONS: Record<string, { id: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token' }> = {
+// Sessions without a db: one paired with the token, one signed in with Google, and one whose cookie lives on a keyed
+// path (browser-session.ts), as a browser's does over plain HTTP.
+const KEYED = `/api/k/${'cd34'.repeat(8)}`;
+const SESSIONS: Record<string, { id: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token'; cookiePath?: string | null }> = {
   omni_s_paired: { id: 's-paired', kind: 'browser', method: 'token' },
   omni_s_google: { id: 's-google', kind: 'browser', method: 'google' },
+  omni_s_keyed: { id: '00000000-0000-4000-8000-000000000001', kind: 'browser', method: 'token', cookiePath: KEYED },
 };
-useSessionCheck((t) => SESSIONS[t] ?? null);
+useSessionCheck(
+  (t) => SESSIONS[t] ?? null,
+  (id) => Object.values(SESSIONS).find((s) => s.id === id) ?? null,
+);
 const upgraded: string[] = [];
 useLegacyUpgrade((c) => {
   upgraded.push(c.req.path);
@@ -137,6 +143,45 @@ describe('requestGuard: the token', () => {
     expect((await get('/api/threads/t1/terminal/stream', { cookie: `${sessionCookieName()}=omni_s_google` })).status).toBe(403);
     // Everything else stays open to it.
     expect((await get('/api/threads', { cookie: `${sessionCookieName()}=omni_s_google` })).status).toBe(200);
+  });
+});
+
+describe("requestGuard: a browser session's cookie path", () => {
+  const keyed = { cookie: `${sessionCookieName()}=omni_s_keyed` };
+
+  it('takes a keyed session only on its own path, as a cookie or a bearer token', async () => {
+    expect((await get(`${KEYED}/threads`, keyed)).status).toBe(200);
+    expect((await get('/api/threads', keyed)).status).toBe(401);
+    expect((await get(`/api/k/${'ef56'.repeat(8)}/threads`, keyed)).status).toBe(401);
+    expect((await get('/api/threads', { authorization: 'Bearer omni_s_keyed' })).status).toBe(401);
+    // A session from before the keyed path, or behind HTTPS, is on /api.
+    expect((await get(`${KEYED}/threads`, { cookie: `${sessionCookieName()}=omni_s_paired` })).status).toBe(401);
+  });
+
+  it('picks the cookie that fits when a stale one on /api comes along', async () => {
+    expect((await get(`${KEYED}/threads`, { cookie: `${sessionCookieName()}=omni_s_keyed; ${sessionCookieName()}=omni_s_gone` })).status).toBe(200);
+    expect((await get(`${KEYED}/threads`, { cookie: `${sessionCookieName()}=omni_s_gone; ${sessionCookieName()}=omni_s_keyed` })).status).toBe(200);
+  });
+
+  it('sends a tab, a frame or a download on the keyed path to a signed address on /api', async () => {
+    const loads: Record<string, string>[] = [{ 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }, { 'sec-fetch-dest': 'iframe' }, { 'sec-fetch-dest': 'embed' }];
+    for (const fetchMeta of loads) {
+      const res = await get(`${KEYED}/artifacts/a1/raw?v=1`, { ...keyed, 'sec-fetch-site': 'same-origin', ...fetchMeta });
+      expect(res.status).toBe(303);
+      const to = res.headers.get('location')!;
+      expect(to).toMatch(/^\/api\/artifacts\/a1\/raw\?v=1&omni_doc=/);
+      expect((await get(to)).status).toBe(200);
+      expect((await get(to.replace('a1', 'a2'))).status).toBe(401);
+    }
+    // A fetch, an image or a stream stays where it is.
+    expect((await get(`${KEYED}/artifacts/a1/raw`, { ...keyed, 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' })).status).toBe(200);
+    expect((await get(`${KEYED}/artifacts/a1/raw`, { ...keyed, 'sec-fetch-mode': 'no-cors', 'sec-fetch-dest': 'image' })).status).toBe(200);
+  });
+
+  it('opens nothing but a read with a signed address', async () => {
+    const to = (await get(`${KEYED}/threads/t1/terminal/stream`, { ...keyed, 'sec-fetch-mode': 'navigate' })).headers.get('location')!;
+    expect(to).toMatch(/omni_doc=/);
+    expect((await get(to)).status).toBe(401);
   });
 });
 

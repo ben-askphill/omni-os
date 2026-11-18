@@ -611,6 +611,9 @@ export function migrate() {
   // How a session was granted: 'google' (the owner signed in; ends when the owner changes) or 'pairing' (an app
   // redeemed a one-time code from an authenticated device; needs no Google owner). Older rows are all Google's.
   ensureColumn('device_sessions', 'method', `TEXT NOT NULL DEFAULT 'google'`);
+  // Where a browser session's cookie lives (apps/server/browser-session.ts): /api/k/<key> over plain HTTP, /api behind
+  // HTTPS. Null for an app's session, and for a browser's from before the keyed path, until its next GET /api/auth.
+  ensureColumn('device_sessions', 'cookie_path', 'TEXT');
   // The push token an app registered for its session (apps/server/push-tokens.ts). Deleted when the session ends.
   // Local, never synced: a token belongs to the app's session on this machine.
   db.exec(`CREATE TABLE IF NOT EXISTS push_tokens (

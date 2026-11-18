@@ -3,6 +3,7 @@
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 import { api, errorText, openSSE } from '../api.ts';
+import { apiUrl } from '../api-base.ts';
 
 export type TerminalMessage =
   | { kind: 'snapshot'; data: string; running: boolean; code: number | null }
@@ -64,7 +65,7 @@ export async function ensureShell(base: string, size: { cols: number; rows: numb
 export function attachReadOnly(term: Terminal, base: string, { setState, setError }: TerminalSink): () => void {
   let closed = false;
   const sse = openSSE(
-    () => `/api${base}/stream`,
+    () => apiUrl(`${base}/stream`),
     (d) => {
       const m = d as TerminalMessage & { cols?: number; rows?: number };
       if (m.kind === 'snapshot') {
@@ -155,7 +156,7 @@ export function attachInteractive(term: Terminal, fit: FitAddon, el: HTMLElement
   const attach = () => {
     if (closed || sse) return;
     sse = openSSE(
-      () => `/api${base}/stream?cols=${term.cols}&rows=${term.rows}`,
+      () => apiUrl(`${base}/stream?cols=${term.cols}&rows=${term.rows}`),
       (d) => {
         const m = d as TerminalMessage;
         if (m.kind === 'snapshot') {

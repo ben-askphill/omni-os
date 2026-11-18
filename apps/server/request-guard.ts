@@ -9,8 +9,9 @@ import type { IncomingMessage } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
-import { cookieName, sessionCookieName, tokenMatches } from './api-token.ts';
+import { cookieName, tokenMatches } from './api-token.ts';
 import { CALLER_HEADER as THREAD_HEADER } from './caller-header.ts';
+import { docSession, docUrl, requestBase, sessionCookies } from './browser-session.ts';
 import { nonceLive } from './desktop-pairing.ts';
 import { decideRequest, mayUseShell, type Credential, type RouteClass } from './request-trust.ts';
 import { config } from './config.ts';
@@ -119,11 +120,12 @@ const isConnectRoute = (c: Context) => CONNECT_OPEN_ROUTES.some(([m, p]) => c.re
 /**
  * How a request proved itself: the install's token, a device's session (`method`: signed in with Google, or an app
  * that redeemed a pairing code), a thread's own token (thread-tokens.ts: `thread` is the thread it was minted for), or
- * neither (the open routes).
+ * neither (the open routes). `cookiePath`: where a browser session's cookie lives (browser-session.ts), null for one
+ * from before the keyed path.
  */
 export type OmniAuth =
   | { via: 'token' }
-  | { via: 'session'; session: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token' }
+  | { via: 'session'; session: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token'; cookiePath?: string | null }
   | { via: 'thread'; thread: string }
   | { via: 'none' };
 
@@ -133,10 +135,17 @@ declare module 'hono' {
   }
 }
 
-/** Looks a session token up (google-auth.ts sessionFor). app.ts sets it, so this module and its tests never open the db. */
-let sessionCheck: (token: string) => { id: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token' } | null = () => null;
-export const useSessionCheck = (fn: typeof sessionCheck) => {
-  sessionCheck = fn;
+type Session = { id: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token'; cookiePath?: string | null };
+
+/**
+ * Looks a session up by its token (google-auth.ts sessionFor) and, for a signed document address, by its id
+ * (sessionById). app.ts sets them, so this module and its tests never open the db.
+ */
+let sessionCheck: (token: string) => Session | null = () => null;
+let sessionById: (id: string) => Session | null = () => null;
+export const useSessionCheck = (byToken: typeof sessionCheck, byId: typeof sessionById = () => null) => {
+  sessionCheck = byToken;
+  sessionById = byId;
 };
 
 /** Looks a thread's token up (thread-tokens.ts threadOfToken). app.ts sets it, so this module and its tests never open the db. */
@@ -145,6 +154,17 @@ export const useThreadTokenCheck = (fn: typeof threadTokenCheck) => {
   threadTokenCheck = fn;
 };
 
+/**
+ * A browser's session counts only on its own path (browser-session.ts): a keyed one under its /api/k/<key>, one behind
+ * HTTPS or from before the keyed path on /api. Another port on this host never gets a keyed cookie, and its value
+ * alone, sent from anywhere without the key, is refused. An app's session has no cookie and counts anywhere.
+ */
+const onItsPath = (s: Session, base: string) => s.kind !== 'browser' || (s.cookiePath ?? '/api') === base;
+
+/** A load that becomes a document: a tab, a frame, a download. Its address would show the page's key. */
+const DOCUMENT_DESTS = ['document', 'iframe', 'frame', 'embed', 'object'];
+const documentLoad = (c: Context) =>
+  c.req.method === 'GET' && (c.req.header('sec-fetch-mode') === 'navigate' || DOCUMENT_DESTS.includes(c.req.header('sec-fetch-dest') ?? ''));
 
 const bearer = (c: Context) => c.req.header('authorization')?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];
 
@@ -237,7 +257,7 @@ const isActionShellRoute = (c: Context) => ACTION_SHELL_ROUTES.some(([m, p]) => 
 export const DESKTOP_NONCE_PATH = '/api/auth/desktop-nonce';
 
 /** Swaps a raw-token cookie an older build set for a session (browser-session.ts). app.ts sets it, so the tests never open the db. */
-let legacyUpgrade: ((c: Context) => { id: string; token: string }) | null = null;
+let legacyUpgrade: ((c: Context) => { id: string; token: string; cookiePath?: string }) | null = null;
 export const useLegacyUpgrade = (fn: typeof legacyUpgrade) => {
   legacyUpgrade = fn;
 };
@@ -276,9 +296,11 @@ export const shellAllowed = (c: Context) => {
  *   a session paired with it;
  * - a thread's token from anywhere but this machine straight to the server, or one sent with an x-omni-thread header
  *   that names another thread (a wiring bug, which should surface);
+ * - a browser's session off its own path (onItsPath), and a signed document address for anything but a read;
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set.
  * A raw-token cookie an older build set still works once, and is swapped for a session cookie once the request is let through.
+ * A document load on a keyed path is sent to a signed address on /api for that one URL (browser-session.ts docUrl).
  * The desktop app's main process, apps/mcp/omni.ts, scripts and curl send no Origin or Sec-Fetch-Site, so the Host and token checks apply to them.
  */
 export const requestGuard: MiddlewareHandler = async (c, next) => {
@@ -288,6 +310,7 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   if (desktop && hostAllowed(hostnameOf(host)) && !directFromThisMac(c)) return refuse('desktop pairing is only from this machine');
   const open = desktop || (c.req.method === 'GET' && c.req.path === PROOF_PATH) || isWebhookPost(c) || isSignInRoute(c) || isAppPairingRoute(c) || isConnectRoute(c);
   const given = bearer(c);
+  const base = requestBase(c);
   let auth: OmniAuth = { via: 'none' };
   let legacy = false;
   const install = tokenMatches(given);
@@ -300,8 +323,21 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
     if (named && named !== thread) return refuse(`this token is thread ${thread}'s, and the ${THREAD_HEADER} header names another`);
     auth = { via: 'thread', thread };
   } else {
-    const session = sessionCheck(given ?? getCookie(c, sessionCookieName()) ?? '');
-    if (session) auth = { via: 'session', session: session.id, kind: session.kind, method: session.method };
+    let session: Session | null = null;
+    for (const token of given === undefined ? sessionCookies(c) : [given]) {
+      const s = sessionCheck(token);
+      if (s && onItsPath(s, base)) {
+        session = s;
+        break;
+      }
+    }
+    // A signed document address opens its one URL for reading, as the session that was sent to it. Never /api/auth,
+    // whose answers name the session's own path.
+    if (!session && given === undefined && route === 'read' && !c.req.path.startsWith('/api/auth')) {
+      const id = docSession(c);
+      session = id ? sessionById(id) : null;
+    }
+    if (session) auth = { via: 'session', session: session.id, kind: session.kind, method: session.method, cookiePath: session.cookiePath ?? null };
     // An older build's cookie held the token itself. It counts as a token-paired session, and is traded for one below.
     else legacy = !given && !!legacyUpgrade && tokenMatches(getCookie(c, cookieName()));
   }
@@ -338,8 +374,9 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   }
   if (legacy && legacyUpgrade) {
     const s = legacyUpgrade(c);
-    auth = { via: 'session', session: s.id, kind: 'browser', method: 'token' };
+    auth = { via: 'session', session: s.id, kind: 'browser', method: 'token', cookiePath: s.cookiePath ?? null };
   }
+  if (auth.via === 'session' && auth.kind === 'browser' && base !== '/api' && documentLoad(c)) return c.redirect(docUrl(c, auth.session), 303);
   c.set('omniAuth', auth);
   await next();
 };

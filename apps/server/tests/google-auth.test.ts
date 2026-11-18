@@ -94,16 +94,20 @@ describe('Google sign-in: a new device', () => {
 
     clerk.approve(s.userCode, { sub: 'user_ada', email: 'ada@example.com' });
     const { res, body } = await pollUntilDone(s.flow, s.secret);
-    expect(body).toEqual({ state: 'signed_in' });
+    // Over plain HTTP the cookie lives on a path of its own, which the answer names (browser-session.ts).
+    expect(body).toEqual({ state: 'signed_in', api: expect.stringMatching(/^\/api\/k\/[0-9a-f]{32}$/) });
+    const key = String(body.api).slice('/api'.length);
     const cookie = sessionCookie(res)!;
     expect(cookie).toMatch(/^omni_s_[0-9a-f]{64}$/);
     expect(res.headers.get('set-cookie')).toMatch(/HttpOnly/);
     expect(res.headers.get('set-cookie')).toMatch(/SameSite=Strict/);
+    expect(res.headers.get('set-cookie')).toContain(`Path=/api${key};`);
 
     const withCookie = { ...NO_TOKEN, cookie: `omni_session_4747=${cookie}` };
-    expect((await req('GET', '/auth', undefined, withCookie)).status).toBe(200);
-    expect((await req('GET', '/threads', undefined, withCookie)).status).toBe(200);
-    const devices = (await (await req('GET', '/auth/devices', undefined, withCookie)).json()) as { devices: { name: string; kind: string; current: boolean }[] };
+    expect((await req('GET', `${key}/auth`, undefined, withCookie)).status).toBe(200);
+    expect((await req('GET', `${key}/threads`, undefined, withCookie)).status).toBe(200);
+    expect((await req('GET', '/threads', undefined, withCookie)).status).toBe(401);
+    const devices = (await (await req('GET', `${key}/auth/devices`, undefined, withCookie)).json()) as { devices: { name: string; kind: string; current: boolean }[] };
     expect(devices.devices).toEqual([expect.objectContaining({ name: 'Safari on iPhone', kind: 'browser', current: true })]);
   });
 

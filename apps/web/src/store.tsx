@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, openSSE, taskHost, type BackgroundTask, type ChannelWithRunning, type CrewRole, type FeedEvent, type HarnessUsage, type ModStatus, type NeedsYou, type Profile, type Status, type Thread, type ThreadStub } from './api.ts';
+import { apiUrl } from './api-base.ts';
 import { type PinnedThread } from './pins.ts';
 import { pageTitle, type Route } from './router.ts';
 import { threadTitle, windowTitle } from './device.ts';
@@ -113,7 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const emit = (e: FeedEvent) => listeners.current.forEach((fn) => fn(e));
     const h = openSSE(
-      () => '/api/feed',
+      () => apiUrl('/feed'),
       (d) => {
         const e = d as FeedEvent;
         if (e.type === 'usage') {

@@ -4,7 +4,7 @@
 import { Hono, type Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import { sessionCookieName } from './api-token.ts';
-import { browserName } from './google-auth.ts';
+import { browserName, setCookiePath } from './google-auth.ts';
 import { answerHealth, answerMint, ConnectError, connectMachines, connectStatus, disableConnect, enableConnect, redeemCode } from './connect/service.ts';
 
 export const connectApi = new Hono();
@@ -32,13 +32,17 @@ const requestBody = async (c: Context) => ((await c.req.json().catch(() => null)
 connectApi.post('/mint', run(async (c) => c.json({ response: await answerMint(await requestBody(c)) })));
 connectApi.post('/health', run(async (c) => c.json({ response: await answerHealth(await requestBody(c)) })));
 
-/** A browser's code and proof become a session cookie, like the last poll of a Google sign-in. */
+/**
+ * A browser's code and proof become a session cookie, like the last poll of a Google sign-in. Omni Connect is HTTPS,
+ * so the cookie is Secure and stays on /api (browser-session.ts).
+ */
 connectApi.post(
   '/redeem',
   run(async (c) => {
     const body = (await c.req.json().catch(() => null)) as { code?: unknown } | null;
     const session = redeemCode(body?.code, c.req.header('dpop'), `${browserName(c.req.header('user-agent'))} via Omni Connect`);
+    setCookiePath(session.id, '/api');
     setCookie(c, sessionCookieName(), session.token, { path: '/api', httpOnly: true, sameSite: 'Strict', secure: true, maxAge: 400 * 24 * 3600 });
-    return c.json({ ok: true });
+    return c.json({ ok: true, api: '/api' });
   }),
 );

@@ -2,6 +2,7 @@ import { memo, useState, type ReactNode } from 'react';
 import { imageSource } from '@omni/shared/markdown-image.ts';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { onApiBase } from '../api-base.ts';
 import { ExternalLink } from './LinkChip.tsx';
 import { MermaidDiagram } from './MermaidDiagram.tsx';
 
@@ -94,7 +95,8 @@ function MarkdownImage({ src, alt, title, remote }: { src: string | undefined; a
       </button>
     );
   }
-  const url = source.src;
+  // The PR image proxy is on Omni's own API, so it goes on this browser's base (api-base.ts).
+  const url = source.kind === 'load' ? onApiBase(source.src) : source.src;
   return (
     <img
       src={url}
