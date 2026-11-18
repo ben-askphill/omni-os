@@ -130,6 +130,17 @@ describe('a session file behind a link', () => {
     expect(stored(`sessions/claude-code/${sid}.jsonl`)).toBeNull();
   });
 
+  it('fails a handoff upload rather than hand off without the session', async () => {
+    const sid = 'c0ffee00-0000-4000-8000-00000000a005';
+    const cwd = join(a.home, 'link-handoff');
+    const secret = a.put('home/.ssh/id_handoff', 'private key');
+    const dir = join(a.home, '.claude', 'projects', a.files.claudeProjectDir(cwd));
+    mkdirSync(dir, { recursive: true });
+    symlinkSync(secret, join(dir, `${sid}.jsonl`));
+    await expect(a.files.pushSession(thread('l5', cwd, { session_id: sid }), { ...a.opts, strict: true })).rejects.toThrow(/not a plain file/);
+    expect(stored(`sessions/claude-code/${sid}.jsonl`)).toBeNull();
+  });
+
   it('leaves a Codex rollout in a folder linked from outside the sessions folder', async () => {
     const sid = '01a0bc16-4ca5-79c3-805a-d8efb930a004';
     a.put(`outside/11/18/rollout-2026-11-18T12-00-00-${sid}.jsonl`, 'private\n');

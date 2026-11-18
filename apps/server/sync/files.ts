@@ -625,8 +625,9 @@ export const sessionObject = (harness: string, sessionId: string, rel: string) =
 const sessionKey = (t: Thread) => `${t.harness}:${t.session_id}`;
 
 /**
- * Upload the thread's session file when it changed. Returns the number of files uploaded. One over the size cap stays
- * on this Mac, or with `strict` fails the upload: a handoff cannot leave the session behind.
+ * Upload the thread's session file when it changed. Returns the number of files uploaded. One over the size cap, or
+ * one that is not a plain file inside the harness's folder, stays on this Mac, or with `strict` fails the upload: a
+ * handoff cannot leave the session behind.
  */
 export async function pushSession(t: Thread, opts: FileSyncOptions & { strict?: boolean }): Promise<number> {
   const home = opts.home ?? homedir();
@@ -643,7 +644,10 @@ export async function pushSession(t: Thread, opts: FileSyncOptions & { strict?: 
   for (const rel of rels) {
     // Hashed and uploaded from this one open file, never from the path again.
     const file = openSessionFile(base, root, rel);
-    if (!file) continue;
+    if (!file) {
+      if (opts.strict) throw new Error(`the ${t.harness} session file ${rel} is not a plain file in its session folder, so sync cannot carry it`);
+      continue;
+    }
     try {
       const { size } = file.st;
       if (size > MAX_FILE_BYTES) {
