@@ -9,6 +9,7 @@ import { serverOptions } from './server-options.ts';
 import { getCrew } from './crew.ts';
 import { cancelGithubLogin, GhLoginError, githubAuth, pollGithubLogin, startGithubLogin } from './github-auth.ts';
 import { channels, threads } from './db.ts';
+import { createThread } from './runner.ts';
 import { prepareWorkdir } from './sandbox.ts';
 import { addEvent, emitThread } from './runner/state.ts';
 import {
@@ -118,17 +119,31 @@ setupApi.put('/', async (c) => {
 
 /**
  * Finish onboarding: save what the last screen sent, make the workspace folder, and on the first run only, leave a
- * welcome message in a new #conductor thread. Running setup again from Settings ends here too, without a second welcome.
+ * welcome message in a new #conductor thread. A first question (`ask`) starts a thread in General and answers its id,
+ * so the page opens on the answer. Running setup again from Settings ends here too, without a second welcome.
  */
 setupApi.post('/complete', async (c) => {
-  const parsed = patchInput.safeParse((await c.req.json().catch(() => ({}))) ?? {});
+  const body = (await c.req.json().catch(() => ({}))) ?? {};
+  const extras = completeExtras.safeParse(body);
+  if (!extras.success) return c.json({ error: extras.error.issues[0]?.message ?? 'Invalid setup' }, 400);
+  const { ask = '', ...config } = body as Record<string, unknown>;
+  const parsed = patchInput.safeParse(config);
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid settings' }, 400);
   const first = !isOnboarded();
   updateUserConfig({ ...parsed.data, onboardedAt: new Date().toISOString() });
   ensureWorkspace();
-  const thread = first ? await welcomeThread() : null;
-  return c.json({ ...setupState(), threadId: thread?.id ?? null });
+  const welcome = first ? await welcomeThread() : null;
+  // The first question runs as a plain thread in the general channel: no charter, no worktree, answered in place.
+  const question = (ask as string).trim();
+  const asked = question && channels.get(GENERAL) ? await createThread({ channel: GENERAL, prompt: question, source: 'manual' }) : null;
+  return c.json({ ...setupState(), threadId: asked?.id ?? welcome?.id ?? null });
 });
+
+/** The channel for quick asks that belong to no project. Seeded as General (db/repos/channels.ts). */
+const GENERAL = 'inbox';
+
+/** What the last screen sends beside the config: a first question. */
+const completeExtras = z.object({ ask: z.string().max(20_000).optional() }).passthrough();
 
 /** Where crew charters live on this install, for the welcome message. */
 export interface CrewPlace {
@@ -147,16 +162,17 @@ export function welcomeText(name: string, place: CrewPlace = crewPlace()) {
     place.install === 'app'
       ? `- Crew charters (the roles I hand work to) ship with the app. To change one just for you, save a copy with the same name, like \`builder.md\`, in \`${place.personalCrew}/\`. Settings > About shows where Omni keeps its files.`
       : `- Crew charters live in \`${place.crew}/\`. To change one just for you, copy it into \`${place.personalCrew}/\` and edit that copy.`;
+  const general = channels.get(GENERAL)?.name ?? 'General';
   return [
     `Welcome to Omni${name ? `, ${name}` : ''}. I'm the Conductor: tell me what you need and I hand it to the right crew role in the right channel, then report back here.`,
     '',
     'A few things to try:',
-    '- Ask in plain words and say what done looks like, like "research how other stores do size guides and send me a table of 5 stores with links" or "fix the failing test in my repo channel and open a PR". If I can\'t tell what done looks like, I\'ll ask you a few questions first.',
+    '- Ask in plain words and say what done looks like, like "find three venues for a team day in May under 2,000 euros and send me a table with links" or "draft a reply to the last mail from my accountant". If I can\'t tell what done looks like, I\'ll ask you a few questions first.',
+    `- For a quick question, start a thread in #${general}: it answers there, with nothing handed on.`,
     '- The Inbox lists what needs you, what is working and what finished. Open it with the Inbox disc on the channel rail or by pressing I, or from Activity on a phone. Mark a thread done once you have dealt with it (E on a keyboard).',
     '- When a crew thread I started has a question for you, it shows up in the Conductor thread you asked me in. Answer it there; you don\'t need to open the crew thread.',
-    '- #inbox is a channel for quick asks that belong to no client or project.',
-    '- Add a channel per client or project: Add channel (+) at the foot of the channel rail, or Settings > Channels on a phone. A channel with a repo gives every thread its own git worktree.',
-    '- Settings holds your name, timezone, folders and integrations. You can run setup again from there.',
+    '- Add a channel per project: Add channel (+) at the foot of the channel rail, or Settings > Channels on a phone. A channel can also hold a code repo; then every thread gets its own copy to work in.',
+    '- Routines run on a schedule: see Automations. Settings holds your name, timezone, folders and integrations, and you can run setup again from there.',
     crew,
   ].join('\n');
 }

@@ -91,6 +91,28 @@ export const SETTING_FIELDS = [
   },
   { section: 'user', key: 'email', label: 'Email', input: 'email', page: 'general', placeholder: 'you@example.com', autoComplete: 'email', default: '', max: 200 },
   {
+    section: 'user',
+    key: 'work',
+    label: 'What you do',
+    input: 'text',
+    page: 'general',
+    hint: 'A line about your work, told to every agent so its answers fit.',
+    placeholder: 'I run a small design studio',
+    default: '',
+    max: 300,
+  },
+  {
+    section: 'user',
+    key: 'tools',
+    label: 'Tools you use',
+    input: 'text',
+    page: 'general',
+    hint: 'Comma separated. Agents reach for these first when they are connected.',
+    placeholder: 'Email, Calendar, Notion',
+    default: '',
+    max: 300,
+  },
+  {
     section: 'workspace',
     key: 'root',
     label: 'Workspace folder',
@@ -118,11 +140,11 @@ export const SETTING_FIELDS = [
   {
     section: 'integrations',
     key: 'centralBrainDir',
-    label: 'Central brain folder',
+    label: 'Notes folder',
     input: 'folder',
     page: 'workspace',
     hint: 'A git repo of notes. `npm run brain-export` writes thread digests into it. Leave it empty to turn that off.',
-    placeholder: '~/central-brain',
+    placeholder: '~/notes',
     default: '',
     max: 1024,
     env: { name: 'OMNI_CENTRAL_BRAIN_DIR' },
@@ -289,7 +311,7 @@ export interface SetupState {
    * in the file is kept but does nothing until the variable goes.
    */
   env: Record<string, string>;
-  /** POST /api/setup/complete only: the #conductor thread holding the welcome message, on the first run. */
+  /** POST /api/setup/complete only: the thread to open, the first question's (in General) or else the welcome's in #conductor. */
   threadId?: string | null;
 }
 

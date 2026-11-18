@@ -180,7 +180,7 @@ export function runListing(withTypes: boolean): Promise<RunOutput> {
           '--verbose',
           '--strict-mcp-config',
           '--no-session-persistence',
-          // Ben's own hooks and SessionStart context stay out: they cost tokens and do nothing for a listing.
+          // The user's own hooks and SessionStart context stay out: they cost tokens and do nothing for a listing.
           '--setting-sources', 'project',
           '--settings', guardSettings(),
           '--tools', TOOL,

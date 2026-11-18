@@ -6,7 +6,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 
 | Where | What |
 | --- | --- |
-| `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain, the Tailscale login allowed through `tailscale serve`, the public MCP URL of a [Cloudflare Tunnel](external-mcp.md#from-anywhere-else-http), the Clerk instance for [Google sign-in](remote-access.md#sign-in-with-google)), automation on/off and this Mac's worktree retention policy. `omni.config.example.json` lists every field |
+| `data/omni.config.json` | You, your folders, integrations (Hermes URL, notes folder, the Tailscale login allowed through `tailscale serve`, the public MCP URL of a [Cloudflare Tunnel](external-mcp.md#from-anywhere-else-http), the Clerk instance for [Google sign-in](remote-access.md#sign-in-with-google)), automation on/off and this Mac's worktree retention policy. `omni.config.example.json` lists every field |
 | `data/crew/*.md` | Your own crew roles, and your edits of the shipped ones in `crew/` ([Crew](crew.md)) |
 | `data/automations/*.yaml` | Your own automations; one with the same id as a shared one replaces it |
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file. In a checkout it sits at the repo root; the packaged desktop app reads it from its data dir instead ([Server options](#server-options)) |
@@ -16,9 +16,9 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 
 | Group | Sections |
 | --- | --- |
-| | General (you, run setup again), Appearance, Notifications |
+| | General (you, what you do and the tools you use, run setup again), Appearance, Notifications |
 | Agents | Harnesses & models (each harness, the Hermes URL, the default model per channel (tick several channels to set or reset them at once), the model options from `.env`), Crew (every crew role, hidden ones included, and its editor, see [Crew](crew.md#settings--crew)), Accounts (each machine's harnesses and the account each is signed in to, see [Harnesses](harnesses.md#accounts)), Threads (run new threads on, sessions and usage limits from `.env`, a link to Automations) |
-| Code | Channels (each channel's settings and actions), Workspace (your folders, GitHub owner, central brain folder), Worktrees (storage, cleanup now and Automatic cleanup) |
+| Code | Channels (each channel's settings and actions), Workspace (your folders, GitHub owner, notes folder), Worktrees (storage, cleanup now and Automatic cleanup) |
 | Connections | Machines (this machine, your machines and their updates, the desktop app's own updates, the machines Omni Connect reaches), Sync, Sharing & access (Google account, signed-in devices, Omni Connect, Tailscale logins, public MCP URL), Secrets |
 | | Desktop app, only in the desktop app (Quick Prompt and its shortcut, Wispr Flow on a Mac, open at login, and links to zoom, updates and the server); About on every surface (version, build, the server's address, port and log, where the files live, the port and host from `.env`; on iOS also runtime and the running update) |
 

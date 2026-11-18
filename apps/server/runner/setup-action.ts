@@ -5,7 +5,7 @@ import { startRun, stopRun } from '../actions.ts';
 import { channelActions, threadSetupRuns, threads, type Thread } from '../db.ts';
 import { isProviderHarness } from '../harness/types.ts';
 
-export const STOPPED = 'Stopped by Ben before the agent started.';
+export const STOPPED = 'Stopped by you before the agent started.';
 
 /** Threads whose current preparation attempt Ben stopped. */
 const stops = new Set<string>();

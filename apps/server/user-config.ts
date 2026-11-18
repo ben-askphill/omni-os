@@ -330,7 +330,7 @@ export function fillPlaceholders(text: string) {
       return checkout ? tildify(checkout) : '<your Omni checkout>';
     },
     omniRepo: () => omniRepo() ?? '<your Omni repo>',
-    centralBrain: () => tildify(resolved.centralBrainDir()) || '<your central brain folder>',
+    centralBrain: () => tildify(resolved.centralBrainDir()) || '<your notes folder>',
     timezone: resolved.timezone,
   };
   return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (all, key: string) => (values[key] ? values[key]() : all));

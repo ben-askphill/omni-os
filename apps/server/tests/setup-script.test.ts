@@ -78,7 +78,7 @@ describe('npm run setup', () => {
     expect(lines).toContain('ready          Claude Code');
     expect(lines).toContain('not ready      Codex');
     expect(lines).toContain(`${reason}.`);
-    expect(lines).toContain('Reviews the pull requests Claude writes. Without it, the Conductor asks you each time.');
+    expect(lines).toContain('Optional. Reviews a pull request Claude wrote when you ask the Conductor for a review.');
     expect(lines).toContain('not installed  Cursor Agent');
     expect(lines).toContain('install: curl https://cursor.com/install -fsS | bash');
     expect(lines).toContain('sign in: cursor-agent login');

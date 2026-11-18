@@ -62,7 +62,7 @@ export const sectionShows = (id: SettingsSectionId, desktopApp: boolean): boolea
 /**
  * Old names that still open a section: the pages Settings replaced (#/sync, #/storage, #/secrets) and section
  * names from before this layout. A section keeps its own name. Integrations folded into Harnesses & models (Hermes)
- * and Workspace (the central brain folder) until it has third-party connections of its own.
+ * and Workspace (the notes folder) until it has third-party connections of its own.
  */
 export const LEGACY_SETTINGS_SECTIONS: Record<string, SettingsSectionId> = {
   profile: 'general',
@@ -125,7 +125,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'channel-code', section: 'channels', title: 'Channel repo, worktrees and browser', keywords: ['repo path', 'github repo', 'git', 'browser window', 'headless', 'store domain', 'shopify', 'worktreeinclude', '.env', 'copy into new worktrees', 'shared directories', 'node_modules', 'symlink'] },
   { id: 'channel-actions', section: 'channels', title: 'Channel actions', keywords: ['commands', 'scripts', 'setup', 'port', 'preview', 'dev server'] },
   { id: 'folders', section: 'workspace', title: 'Workspace folder, repos folder and GitHub owner', keywords: ['workspace', 'repos', 'folder', 'github owner', 'org', 'CLAUDE.md', 'skills', 'base directory'] },
-  { id: 'brain', section: 'workspace', title: 'Central brain folder', keywords: ['notes', 'brain-export', 'export', 'digests'] },
+  { id: 'brain', section: 'workspace', title: 'Notes folder', keywords: ['notes', 'brain-export', 'export', 'digests'] },
   { id: 'worktree-retention', section: 'worktrees', title: 'Automatic cleanup', keywords: ['retention', 'idle days', 'delete', 'prune', 'cleanup'] },
   { id: 'worktree-storage', section: 'worktrees', title: 'Worktree storage', keywords: ['disk', 'size', 'scan', 'storage', 'eligible'] },
   { id: 'worktree-slim', section: 'worktrees', title: 'Strip caches', keywords: ['node_modules', 'build output', 'cache', 'free space', 'slim', 'disk'] },

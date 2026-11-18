@@ -150,7 +150,7 @@ export const folders = {
     });
   },
 
-  /** Ben's manual order: every folder of the channel, each once. From now on new folders land last. */
+  /** The user's manual order: every folder of the channel, each once. From now on new folders land last. */
   reorder(channelId: string, ids: string[]) {
     return tx(() => {
       const mine = folders.byChannel(channelId).map((f) => f.id);

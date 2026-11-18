@@ -243,7 +243,7 @@ threadRoutesApi.get('/:id/summary', (c) => {
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
     // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
     ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),
-    // What its last turn left open for Ben (packages/shared/open-items.ts). Only while some are.
+    // What its last turn left open for the user (packages/shared/open-items.ts). Only while some are.
     ...(t.open_items && { open_items: readOpenItems(t.open_items) }),
     // Whether its session is still in the prompt cache: a parent messages a warm one and continues a cold one in a new session.
     session: sessionWarmth(t),
@@ -271,7 +271,7 @@ threadActionsApi.post('/:id/messages', async (c) => {
       mode: z.enum(['steer', 'queue', 'interrupt']).default('steer'),
       // The client's id for this send, kept across its retries: a retry gets the first acceptance back.
       request_id: z.string().min(1).max(200).optional(),
-      // Records Ben attached (packages/shared/message-context.ts), checked and normalized by parseContexts.
+      // Records the user attached (packages/shared/message-context.ts), checked and normalized by parseContexts.
       context: z.unknown().optional(),
       // A parent thread's send to a thread whose session went cold is refused unless it was asked to resume that thread.
       wake_cold: z.boolean().default(false),

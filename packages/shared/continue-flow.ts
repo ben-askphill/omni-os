@@ -228,7 +228,7 @@ export function continueReducer(s: ContinueState, a: ContinueAction): ContinueSt
       return { ...s, device: a.device, preview: { kind: 'loading', last: shownPreview(s.preview) }, refusal: null };
     case 'text':
       return { ...s, text: a.text };
-    // An answer for a run, a set of attachments or a machine Ben has since changed is dropped: the current one's is on its way.
+    // An answer for a run, a set of attachments or a machine the user has since changed is dropped: the current one's is on its way.
     case 'previewed':
       return isPicked(s, a) ? { ...s, preview: { kind: 'ready', preview: a.preview } } : s;
     case 'previewFailed':
