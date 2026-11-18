@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { HarnessLogo } from '../components/brand.tsx';
-import { ErrorNote, Icon, Loading, StatusDot } from '../components/ui.tsx';
+import { Button, ErrorNote, Icon, Loading, StatusDot } from '../components/ui.tsx';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp } from '../store.tsx';
 import { asksAuto } from '@omni/shared/thread-run.ts';
-import { runBody } from '@omni/shared/channel-form.ts';
+import { runBody, type ChannelRun } from '@omni/shared/channel-form.ts';
+import { applyRunToChannels, bulkRunError, NO_RUN, picksRun, resetChannelsToAuto, selectedIds, toggleSelected } from '@omni/shared/channel-bulk-run.ts';
 import { RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, Origin, ResetButton, ServerOptions, useScopedChannel } from './settings-parts.tsx';
 
@@ -82,12 +83,15 @@ export function runDefaultLabel(c: Pick<Channel, 'default_harness' | 'default_mo
 
 const setsDefault = (c: Channel) => !!(c.default_harness || c.default_model || c.default_effort);
 
-/** Every channel: what a new thread starts on in each, and which set their own (T3's "mixed"). */
+/** Every channel: what a new thread starts on in each, and which set their own (T3's "mixed"). Tick several to set them at once. */
 function ChannelDefaultsCard() {
-  const { channels } = useApp();
+  const { channels, reloadChannels } = useApp();
   const harnesses = useApi<HarnessWithRunning[]>('/harnesses');
   const listed = channels.filter((c) => !c.archived);
   const own = listed.filter(setsDefault);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const ids = selectedIds(listed, selected);
+  const title = (c: Channel) => (c.id === 'conductor' ? 'Conductor' : `#${c.name}`);
   return (
     <Card
       entry="channel-model"
@@ -95,22 +99,93 @@ function ChannelDefaultsCard() {
       subtitle="Without one, Auto picks from the prompt. A thread or crew role that picks its own model wins."
       actions={<Origin of={own.length ? 'mixed' : 'default'} label={own.length ? `${own.length} of ${listed.length} channels set one` : 'Auto everywhere'} />}
     >
+      <div className="flex min-h-7 items-center gap-1 text-[12.5px] text-fg-3">
+        <span className="min-w-0 flex-1">{ids.length ? `${ids.length} of ${listed.length} selected` : 'Tick channels to set them at once.'}</span>
+        <Button variant="ghost" size="sm" disabled={ids.length === listed.length} onClick={() => setSelected(new Set(listed.map((c) => c.id)))}>
+          Select all
+        </Button>
+        <Button variant="ghost" size="sm" disabled={!ids.length} onClick={() => setSelected(new Set())}>
+          Select none
+        </Button>
+      </div>
+      {ids.length > 0 && (
+        <BulkRunBar
+          ids={ids}
+          name={(id) => title(listed.find((c) => c.id === id)!)}
+          onDone={async (failed) => {
+            await reloadChannels();
+            setSelected(new Set(failed));
+          }}
+        />
+      )}
       <ul className="divide-y divide-line">
-        {listed.map((c) => (
-          <li key={c.id}>
-            <button type="button" onClick={() => setSettingsScope(c.id)} className="group flex w-full min-w-0 items-center gap-3 py-2 text-left">
-              <span className="min-w-0 flex-1 truncate text-[13px] group-hover:underline group-hover:underline-offset-2">{c.id === 'conductor' ? 'Conductor' : `#${c.name}`}</span>
-              <span className="min-w-0 truncate text-[12.5px] text-fg-2">{runDefaultLabel(c, harnesses.data)}</span>
-              <span className="flex w-[104px] shrink-0 justify-end max-sm:hidden">
-                <Origin of={setsDefault(c) ? 'channel' : 'default'} label={setsDefault(c) ? 'Set on channel' : 'Built-in default'} />
-              </span>
-              <Icon name="chevronRight" size={14} className="shrink-0 text-fg-3" />
-            </button>
-          </li>
-        ))}
+        {listed.map((c) => {
+          const on = selected.has(c.id);
+          return (
+            <li key={c.id} className="flex min-w-0 items-center gap-3">
+              <SelectBox on={on} label={`Select ${title(c)}`} onClick={() => setSelected((s) => toggleSelected(s, c.id))} />
+              <button type="button" onClick={() => setSettingsScope(c.id)} className="group flex min-w-0 flex-1 items-center gap-3 py-2 text-left">
+                <span className="min-w-0 flex-1 truncate text-[13px] group-hover:underline group-hover:underline-offset-2">{title(c)}</span>
+                <span className="min-w-0 truncate text-[12.5px] text-fg-2">{runDefaultLabel(c, harnesses.data)}</span>
+                <span className="flex w-[104px] shrink-0 justify-end max-sm:hidden">
+                  <Origin of={setsDefault(c) ? 'channel' : 'default'} label={setsDefault(c) ? 'Set on channel' : 'Built-in default'} />
+                </span>
+                <Icon name="chevronRight" size={14} className="shrink-0 text-fg-3" />
+              </button>
+            </li>
+          );
+        })}
       </ul>
       <p className="text-[12.5px] text-fg-3">Pick a channel to change its default, here or in Showing above.</p>
     </Card>
+  );
+}
+
+/** A row's tick box, the multi-select mark of a question card (components/thread/QuestionCard.tsx). */
+function SelectBox({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
+  return (
+    <button type="button" role="checkbox" aria-checked={on} aria-label={label} onClick={onClick} className="-m-1.5 grid shrink-0 place-items-center p-1.5 max-sm:-m-3 max-sm:p-3">
+      <span aria-hidden="true" className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] ${on ? 'bg-fg text-on-ink' : 'shadow-[inset_0_0_0_1.5px_var(--line-strong)]'}`}>
+        {on && <Icon name="check" size={12} strokeWidth={2.6} />}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The picked channels' shared default: the single-channel picker (unavailable harnesses and models disabled, as there),
+ * Apply to send it to all of them, and Reset to Auto to clear theirs. `onDone` gets the ids that did not save.
+ */
+function BulkRunBar({ ids, name, onDone }: { ids: string[]; name: (id: string) => string; onDone: (failed: string[]) => Promise<void> }) {
+  const [run, setRun] = useState<ChannelRun>(NO_RUN);
+  const [busy, setBusy] = useState<'apply' | 'reset' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const send = async (kind: 'apply' | 'reset') => {
+    setBusy(kind);
+    setError(null);
+    const patch = (id: string, body: ReturnType<typeof runBody>) => api.patch(`/channels/${encodeURIComponent(id)}`, body);
+    const r = kind === 'apply' ? await applyRunToChannels(ids, run, patch) : await resetChannelsToAuto(ids, patch);
+    setError(bulkRunError(r, name));
+    await onDone(r.failed.map((f) => f.id));
+    if (!r.failed.length) setRun(NO_RUN);
+    setBusy(null);
+  };
+  const n = `${ids.length} ${ids.length === 1 ? 'channel' : 'channels'}`;
+  return (
+    <div role="group" aria-label="Set the selected channels" className="space-y-2 rounded-[14px] bg-bg p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <RunDefaultsField value={run} onChange={setRun} noReset />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button type="button" busy={busy === 'reset'} disabled={!!busy} onClick={() => void send('reset')}>
+            Reset to Auto
+          </Button>
+          <Button type="button" variant="primary" busy={busy === 'apply'} disabled={!!busy || !picksRun(run)} onClick={() => void send('apply')}>
+            Apply to {n}
+          </Button>
+        </div>
+      </div>
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </div>
   );
 }
 
