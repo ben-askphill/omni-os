@@ -16,6 +16,7 @@ import { ThreadIdCtx, ToolOutput } from '../components/thread/ToolOutput.tsx';
 import { Button, Chip, copyText, ErrorNote, Icon, SlideToConfirm, statusLabel, StatusDot } from '../components/ui.tsx';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { carriedText } from '@omni/shared/continue.ts';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { linkName } from '../components/ContinueLinks.tsx';
 import { fullDate, plural } from '../format.ts';
@@ -470,15 +471,17 @@ function AgentsGroup({ open }: { open: (id: string) => void }) {
 export function DetailsScreen() {
   const shell = useShell();
   const { thread, history, crew } = useThread();
-  const { channel } = useApp();
+  const { channel, crew: roles } = useApp();
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
   if (!thread) return <MoHeader onBack={shell.back} title="Details" />;
+  const roleName = crewRoleName(thread.role, roles);
   const turns = turnCount(history.history);
   // The model pill's own names, as on desktop's Details.
   const run = threadRunLabels(thread, harnesses);
   const rows: [string, ReactNode][] = [
     ['Channel', `#${channel(thread.channel_id)?.name ?? thread.channel_id}`],
-    ['Crew role', thread.role || 'None'],
+    // Only a thread started as a crew role has the row, as on desktop's Details.
+    ...(roleName ? ([['Role', roleName]] as [string, ReactNode][]) : []),
     [
       'Harness',
       <span className="inline-flex items-center gap-1.5">
@@ -492,7 +495,7 @@ export function DetailsScreen() {
     ['Started', fullDate(thread.created_at)],
     ['Turns', String(turns)],
   ];
-  if (thread.task_id) rows.splice(2, 0, ['Task', <span className="font-mono text-[13px]">{thread.task_id}</span>]);
+  if (thread.task_id) rows.splice(roleName ? 2 : 1, 0, ['Task', <span className="font-mono text-[13px]">{thread.task_id}</span>]);
   if (thread.branch) rows.push(['Branch', <span className="font-mono text-[13px]">{thread.branch}</span>]);
   const agentUrl = thread.harness === 'cursor-cloud' ? cloudAgentUrl(thread.session_id) : null;
   if (agentUrl)
@@ -532,7 +535,7 @@ export function DetailsScreen() {
 export function ViewerScreen({ route }: { route: Route }) {
   const shell = useShell();
   const { thread, files, shots, crew } = useThread();
-  const { channel } = useApp();
+  const { channel, crew: roles } = useApp();
   const id = route.name === 'thread' ? route.artifact : undefined;
   // A delegated thread's file or screenshot opens here too, from the Details list.
   const mine = files.find((f) => f.id === id) ?? shots.find((f) => f.id === id);
@@ -567,7 +570,7 @@ export function ViewerScreen({ route }: { route: Route }) {
         From {from}
       </a>
     ) : thread ? (
-      [`#${channel(thread.channel_id)?.name ?? thread.channel_id}`, thread.role].filter(Boolean).join(' · ')
+      [`#${channel(thread.channel_id)?.name ?? thread.channel_id}`, crewRoleName(thread.role, roles)].filter(Boolean).join(' · ')
     ) : undefined;
   return (
     <>
