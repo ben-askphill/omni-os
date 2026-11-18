@@ -2,7 +2,7 @@
 
 A plan for letting Omni users create and edit their own crew roles (Ben's "agent types"), each with its own instructions, run defaults, memory, connections and permissions, instead of the seven files that ship in `crew/`.
 
-- Status: proposal, nothing built. Task T-AGENTS, 2026-11-18.
+- Status: approved 2026-11-18. Ben took the recommendation for every decision, D1 to D11, as written (section 7). S0 and S1 are being built first. Task T-AGENTS.
 - Surveyed: `main` at `9e087e5a` (desktop 0.1.35). Every claim about current behavior cites `path:line` on that commit.
 - Wording: the glossary calls these **crew roles** and asks to avoid "agent" (`CONTEXT.md:24-26`). This plan follows it. What the UI calls them is open decision D1.
 
@@ -12,7 +12,8 @@ A plan for letting Omni users create and edit their own crew roles (Ben's "agent
 - Four role ids are wired into code: `conductor`, `reviewer`, `usage-scan` and `builder`. The reviewer's cross-family rule lives only in the Conductor's charter text.
 - Proposal: keep files as the source of truth and copy the automation editor's model (shipped, edited, own, reset, synced as a signed action). Edits to a built-in become an overlay, so release fixes to its charter still arrive. Special behavior moves from id checks to capability flags and server-side rules.
 - Memory: an Omni-owned memory folder per role, injected into every harness's prompt. Writes go through a tool and wait for Ben's approval by default.
-- Nine slices (S0 to S8) below. Eleven decisions for Ben at the end.
+- A role is a definition (charter, memory, connections, run defaults) plus a runtime binding. The binding stays open to agents Omni does not run itself (section 2.5).
+- Nine slices (S0 to S8) below. Eleven decisions, all settled, at the end.
 
 ## 1. Current state
 
@@ -80,7 +81,7 @@ Related, not keyed on the role: Auto sends any prompt that reads like a code rev
 
 ### 1.5 Ben's own content ships to every user
 
-The shipped charters name Ben's setup: the Ask Phill Portal (`crew/researcher.md:8`), the APA skills (`crew/builder.md:10`), Productive (`crew/inbox.md:3`, `:7`) and a Shopify-only role (`crew/store-ops.md`). `crew/` ships through the same `SHIPPED_DIRS` (`apps/desktop/scripts/stage.ts:27`) that carried Ben's automations into the public release. Thread 5e553d12 (T-5E55, "Remove Ben's automations from the default Omni release") is fixing that for `automations/` now. Slice S0 does the same for `crew/`.
+The shipped charters name Ben's setup: the Ask Phill Portal (`crew/researcher.md:8`), the APA skills (`crew/builder.md:10`), Productive (`crew/inbox.md:3`, `:7`) and a Shopify-only role (`crew/store-ops.md`). `crew/` ships through the same `SHIPPED_DIRS` (`apps/desktop/scripts/stage.ts:27`) that carried Ben's automations into the public release. T-5E55 fixed that for `automations/` in #791, which ships none and guards it in `apps/desktop/tests/stage.test.ts`. Slice S0 does the same for `crew/`.
 
 ### 1.6 Gaps this plan closes
 
@@ -165,7 +166,7 @@ Built-ins are never copied into `data/`. Omni reads the shipped file and lays th
 - **A user edit no longer hides release fixes.** With `charter_mode: append`, a shipped charter change flows through and the user's additions stay after it. Field overrides (model, channel) override one field each.
 - **Replaced charters get a notice.** With `charter_mode: replace`, Omni compares `based_on` with the current shipped hash. When they differ, the role shows "Built-in charter changed" with a diff and three actions: keep mine, take the new one, or move my text into additions.
 - **Hidden stays hidden** across releases (user config flag), and a new shipped role shows up as new.
-- **The release carries no one's personal roles** (S0): shipped charters hold only generic text and `{{placeholders}}`. A stage-time check fails the build when `crew/` names a user, company or client, the same kind of guard T-5E55 is adding for `automations/`. Ben's own roles move to his `data/crew/` and reach his other machines through sync (S2).
+- **The release carries no one's personal roles** (S0): shipped charters hold only generic text and `{{placeholders}}`. A stage-time check fails the build when `crew/` names a user, company or client, the same kind of guard #791 added for `automations/`. Ben's own roles move to his `data/crew/` and reach his other machines through sync (S2).
 
 ### 2.4 Connections: what Omni can enforce
 
@@ -185,6 +186,19 @@ Sources for today's columns: section 1.2. Notes:
 - **MCP is additive in v1.** Omni adds servers on top of the user's own config (`apps/server/sandbox.ts:254`). Taking the user's global servers away per role would need each harness's strict mode, untested here (D8).
 - **Secrets**: a new scope `crew:<id>` beside `global` and `channel:<id>` (`apps/server/secrets.ts:32`), and an optional allowlist filter in `secretsEnv`. No allowlist means today's behavior.
 - **Skills**: Omni cannot reliably hide skills a harness finds on its own. It can add them: a role's `skills/` folder ships to Claude Code as one more `--plugin-dir`, the way mods do (`apps/server/harness/claude/adapter.ts:145`). For other harnesses the prompt names the skills to prefer.
+
+### 2.5 Runtime binding: the extension point for outside agents
+
+Users will want to bring their own agents: a Hermes agent on a VPS, a Vercel eve agent, a Cloudflare agent. None of that is built in this plan, but the role schema must not block it.
+
+- **A role is a definition plus a binding.** The definition is the charter, memory, connections and powers. The binding is `harness` (with `model` and `effort`): which runtime runs the role's threads. Today every runtime is a harness adapter in `apps/server/harness/`, reached through `HarnessSession` (`apps/server/harness/adapter.ts:101`).
+- **Hermes is the reference case.** It is already a remote agent: an HTTP API on another machine with no process, its own keys and no Omni worktree (`apps/server/harness/hermes/adapter.ts:1-6`). What it cannot do (per-run tool limits, delegate-only, Keychain secrets) is a fact about the runtime in section 2.4's table, not a field on the role. An outside agent fits the same shape.
+- **Where the extension sits.** An outside agent becomes a runtime entry, not a new role field: Settings gets a runtime registry (id, protocol, endpoint, and an auth secret by name, never its value), and each entry joins the harness catalog under its id. A role binds to it the way it binds to Hermes now, with `harness: <runtime id>`. One VPS agent can then serve several roles, and its secret stays in the secret store. A `runtime:` key in the frontmatter is reserved for anything that has to be per role later (say, a different endpoint path per role).
+- **What S0 and S1 do so that needs no schema break:**
+  - `harness` stays an open string in role files and in the wire types (`apps/server/crew.ts`, `packages/client-core/src/api/crew.ts`, `apps/web/src/api.ts`). No enum of harness ids.
+  - The crew store checks `harness` against the harness catalog this machine has, not a fixed list, and only when a role is saved. A role whose harness this machine lacks still loads, with an `error` on it, the way a retired model shows today (`apps/server/meta-api.ts:30`).
+  - The store keeps frontmatter keys it does not know when it edits a file, so a `runtime:` block written by a later build survives an edit from an older one.
+- **What the runtime slice changes later.** Harness ids are a closed list today: `HarnessId` and `HARNESS_IDS` (`apps/server/harness/types.ts:7-9`), checked by `isHarnessId` in the resolver (`apps/server/harness/resolve.ts:44-45`, `:93`). That list becomes the built-in adapters plus the registry's entries. The role files and the crew store do not change.
 
 ## 3. Per-role memory
 
@@ -268,7 +282,7 @@ Ordered. Each slice ships on all three surfaces where it has UI, per the repo ru
 
 | Slice | Scope | Needs |
 | --- | --- | --- |
-| S0 Release hygiene | Generic shipped charters; Ben's roles move to his `data/crew/`; stage-time guard on `crew/` | T-5E55's automations guard, to share its check |
+| S0 Release hygiene | Generic shipped charters; Ben's roles move to his `data/crew/`; stage-time guard on `crew/` | #791's automations guard (merged), to share its check |
 | S1 Store and API | Crew store module, overlay merge, `based_on`, shipped/edited/own, hide, CRUD and reset routes, refuse unknown ids on create, `delegatable` in `list_crew`, wire fixture, `docs/user/crew.md` | none |
 | S2 Sync and guard | `crew_file` signed action entity with last-writer-wins handler, sync backfill label, guard for agent writes | S1 |
 | S3 Settings > Crew | List, Form and Markdown editor, duplicate, delete, hide, reset, compare; avatars; design system components | S1 |
@@ -280,9 +294,11 @@ Ordered. Each slice ships on all three surfaces where it has UI, per the repo ru
 
 S1 to S4 give a usable feature: roles you can create, edit, sync and trust. S5 to S8 deepen it.
 
-## 7. Open decisions for Ben
+## 7. Decisions
 
-| # | Decision | Options | Recommendation |
+Settled 2026-11-18: Ben took the recommendation for all eleven. For D11, the UI and docs say that no-edits is not read-only, since Bash stays.
+
+| # | Decision | Options | Recommendation (decided) |
 | --- | --- | --- | --- |
 | D1 | What the UI calls them | "Crew" (glossary) or "Agents" | Crew, as a section in the existing Agents group |
 | D2 | Storage | Markdown files, or a database table | Files |
