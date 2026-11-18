@@ -242,7 +242,8 @@ Channel settings > Access sets how much a channel's agents may do before they as
 - A channel with no level runs at this computer's default: Full access on an install that already had threads, Ask first on a new one. The setting shows which.
 - Ask first shows an approval card in the thread, on the same rails as a question card: Needs you, the alert, the phone and the other machine. Allow runs it once, Allow in this thread stops asking for that tool in the thread, Always allow for <role> stops asking for that crew role in the channel, and Don't allow (or a typed note) stops it and tells the agent. Channel settings lists the Always allowed tools with Remove.
 - A crew role's file can set `access: read` or `access: ask` to run stricter than its channel ([Crew](crew.md)).
-- Per harness: Claude Code and Codex ask per call. Cursor Agent cannot ask, so Ask first runs as Read only there. Hermes and Cursor Cloud run elsewhere, so a channel below Full access refuses them.
+- Per harness: Claude Code and Codex ask per call. Cursor Agent cannot ask, so Ask first runs as Read only there. Hermes and Cursor Cloud run elsewhere, so a channel below Full access refuses them. Connector levels other than the browser hold on Claude Code only: Codex and Cursor Agent run the MCP servers from your own Codex or Cursor config without asking Omni.
+- Ask first still asks before an edit to a file a tool runs code from, such as `.git/`, `.claude/` or `.mcp.json`.
 - Agents cannot change levels or grants: only you can, in Channel settings.
 
 ## What a thread gets

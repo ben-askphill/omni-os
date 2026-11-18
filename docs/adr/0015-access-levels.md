@@ -34,6 +34,10 @@ Every thread ran with every tool allowed: Claude Code with `--permission-mode by
 ## Consequences
 
 - A thread at Full access can still do anything a shell can, `curl` included; levels are a guard against mistakes and surprises, not a sandbox against a hostile agent.
-- The read-only command list errs on the side of asking: an unknown command under Ask first shows a card, under Read only it is refused.
+- The read-only command list errs on the side of asking: an unknown command, a lone `&`, a subshell, a `$` outside single quotes or a flag that writes (`sort -o`, `find -fls`, `git -c`) shows a card under Ask first and is refused under Read only.
+- Ask first lets edits inside the working folder run, except files a tool later runs code from: `.git/`, `.claude/`, `.codex/`, `.cursor/`, `.agents/`, hook folders, editor settings, `.mcp.json`, `.gitattributes`, `.gitmodules` and `.envrc`. Those wait for a yes.
+- Codex and Cursor Agent load the MCP servers in the user's own Codex or Cursor config, and neither reports those calls for approval, so connector levels other than the browser hold only on Claude Code. Refusing those harnesses below Full access whenever the user has their own servers is the fix if that gap matters.
+- Omni's own MCP servers run at every level, and the Conductor's tools include channel actions and secrets. The Conductor delegates rather than acts, so it is left as is.
+- Agent calls carry the user's API token. The "agents cannot change levels" rule reads the `x-omni-thread` header Omni's own tools send; an agent that `curl`s the API without it needs a command, which Read only refuses and Ask first shows on a card. At Full access an agent can do anything anyway.
 - Cursor Agent loses edits under Ask first until its CLI can ask in print mode.
 - Codex's sandbox and Omni's judge both apply under Ask first, so a call Codex itself refuses never reaches the card.

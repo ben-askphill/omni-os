@@ -33,6 +33,11 @@ describe('the access policy', () => {
     expect(judge(at('ask'), call('Bash', { command: 'npm publish' }))).toMatchObject({ decision: 'ask', request: { summary: 'npm publish' } });
     expect(judge(at('ask'), call('mcp__claude_ai_Gmail__create_draft', { to: 'x' }))).toMatchObject({ decision: 'ask', request: { connector: 'gmail' } });
     expect(judge(at('ask'), call('mcp__claude_ai_Gmail__search_threads', { q: 'x' })).decision).toBe('allow');
+    // Files a tool later runs code from wait for a yes even inside the folder: a git hook, git config, a Claude Code hook.
+    for (const file_path of ['/work/acme/.git/hooks/pre-commit', '/work/acme/.git/config', '/work/acme/.claude/settings.json', 'sub/.cursor/mcp.json', '/work/acme/.mcp.json', '/work/acme/.envrc']) {
+      expect(judge(at('ask'), call('Write', { file_path })).decision).toBe('ask');
+    }
+    expect(judge(at('ask'), call('Write', { file_path: '/work/acme/docs/git-notes.md' })).decision).toBe('allow');
   });
 
   it('runs everything at full access', () => {
@@ -59,6 +64,26 @@ describe('the access policy', () => {
     expect(readOnlyCommand('find . -name x -delete')).toBe(false);
     expect(readOnlyCommand('cat $(which sh)')).toBe(false);
     expect(readOnlyCommand('ls; curl -X POST x')).toBe(false);
+    // Anything that could hide a second command asks (security review of #823).
+    expect(readOnlyCommand('ls & rm -rf x')).toBe(false);
+    expect(readOnlyCommand('ls &rm -rf x')).toBe(false);
+    expect(readOnlyCommand('(rm -rf x)')).toBe(false);
+    expect(readOnlyCommand('{ rm -rf x; }')).toBe(false);
+    expect(readOnlyCommand('cat $HOME/.ssh/id_rsa')).toBe(false);
+    expect(readOnlyCommand('cat ${IFS}x')).toBe(false);
+    expect(readOnlyCommand('ls \\; rm x')).toBe(false);
+    expect(readOnlyCommand("find . '-delete'")).toBe(false);
+    expect(readOnlyCommand('find . -fls out.txt')).toBe(false);
+    expect(readOnlyCommand('sort -uo out.txt in.txt')).toBe(false);
+    expect(readOnlyCommand('sort --compress-program=sh in.txt')).toBe(false);
+    expect(readOnlyCommand('rg --pre ./run.sh foo')).toBe(false);
+    expect(readOnlyCommand('git -c core.pager=sh log')).toBe(false);
+    expect(readOnlyCommand('git diff --ext-diff')).toBe(false);
+    expect(readOnlyCommand('git diff --output=x.patch')).toBe(false);
+    expect(readOnlyCommand("git 'push'")).toBe(false);
+    // Single quotes keep reading commands reading.
+    expect(readOnlyCommand("rg -n 'foo$' src")).toBe(true);
+    expect(readOnlyCommand('grep -o foo file.txt')).toBe(true);
     expect(readOnlyConnectorTool('notion', 'notion-search')).toBe(true);
     expect(readOnlyConnectorTool('notion', 'notion-create-pages')).toBe(false);
   });

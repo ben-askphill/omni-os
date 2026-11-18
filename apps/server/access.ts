@@ -78,22 +78,40 @@ const SAFE_COMMANDS = new Set([
   'which', 'type', 'whoami', 'uname', 'date', 'echo', 'basename', 'dirname', 'realpath', 'sort', 'uniq', 'cut', 'jq', 'diff',
 ]);
 const SAFE_GIT = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'ls-files', 'blame', 'describe', 'shortlog']);
-/** Arguments that turn a reading command into one that writes or runs something. */
-const UNSAFE_ARG = /^(-exec|-execdir|-ok|-okdir|-delete|-fprint.*|--output.*|--pre(=.*)?|-o)$/;
+/**
+ * Arguments that turn a reading command into one that writes or runs something, per command. Short flags can come
+ * bundled (`sort -uo out`), so those patterns match a flag cluster. Git's run external programs or set config.
+ */
+const UNSAFE_ARGS: Record<string, RegExp> = {
+  find: /^-(exec|execdir|ok|okdir|delete|fprint.*|fls)$/,
+  sort: /^(-[a-zA-Z]*o.*|--output.*|--compress-program.*)$/,
+  rg: /^--pre(=.*)?$/,
+  tree: /^-o$/,
+  file: /^(-[a-zA-Z]*C|--compile)$/,
+  date: /^(-[a-zA-Z]*s.*|--set.*)$/,
+  git: /^(-c|--config-env.*|--exec-path.*|--ext-diff|--textconv|--output.*|-o)$/,
+};
 
 /**
  * Whether a shell line only reads: each part of a `&&`, `||`, `;` or `|` chain is a known reading command, and nothing
- * redirects into a file or substitutes a command. Anything else may change something, so it counts as an action.
+ * redirects into a file, substitutes, expands a variable, starts a subshell or runs in the background. Anything else
+ * may change something, so it counts as an action. It errs on the side of asking.
  */
 export function readOnlyCommand(command: string): boolean {
   const line = command.replace(/\s\d?>\s*\/dev\/null/g, ' ').replace(/\s2>&1/g, ' ').trim();
-  if (!line || /[<>`\n\r]|\$\(/.test(line)) return false;
+  // Inside single quotes the shell expands nothing, so `rg 'foo$'` still reads. Everything else is checked as written.
+  const bare = line.replace(/'[^'\n]*'/g, "''");
+  if (!line || /[<>`\n\r]/.test(bare)) return false;
+  // A lone & (background), a subshell or group, an escape or any $ expansion can hide a second command.
+  if (/[&(){}$\\]/.test(bare.replace(/&&|\|\|/g, ' '))) return false;
   return line.split(/&&|\|\||;|\|/).every((part) => {
     const words = part.trim().split(/\s+/).filter(Boolean);
     const [cmd, ...args] = words;
     if (!cmd || (!SAFE_COMMANDS.has(cmd) && cmd !== 'git')) return false;
-    if (args.some((a) => UNSAFE_ARG.test(a))) return false;
-    if (cmd === 'git') return SAFE_GIT.has(args.find((a) => !a.startsWith('-')) ?? '');
+    const unsafe = UNSAFE_ARGS[cmd];
+    // Quotes do not change what a flag does: `find . '-delete'` deletes.
+    if (unsafe && args.some((a) => unsafe.test(a.replace(/['"]/g, '')))) return false;
+    if (cmd === 'git') return SAFE_GIT.has(args.find((a) => !a.startsWith('-'))?.replace(/['"]/g, '') ?? '');
     return true;
   });
 }
@@ -119,6 +137,17 @@ export function readOnlyConnectorTool(server: string, tool: string): boolean {
 const inside = (dir: string, path: string) => {
   const rel = relative(resolve(dir), resolve(dir, path));
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+};
+
+/**
+ * Files a tool runs code from or reads its settings from: git's config and hooks, the harnesses' own settings (a
+ * Claude Code hook runs a command), editor tasks, direnv. An edit to one waits for a yes even inside the thread's folder.
+ */
+const CONFIG_DIRS = new Set(['.git', '.claude', '.codex', '.cursor', '.agents', '.husky', '.githooks', '.vscode', '.idea']);
+const CONFIG_FILES = new Set(['.mcp.json', '.gitattributes', '.gitmodules', '.envrc']);
+const toolConfig = (dir: string, path: string) => {
+  const parts = relative(resolve(dir), resolve(dir, path)).split(/[\\/]/);
+  return parts.some((p) => CONFIG_DIRS.has(p)) || CONFIG_FILES.has(parts.at(-1) ?? '');
 };
 
 const text = (v: unknown) => (typeof v === 'string' ? v : '');
@@ -153,9 +182,11 @@ export function judge(access: ChannelAccess, call: ToolCall): Verdict {
   if (READ_TOOLS.has(tool)) return { decision: 'allow' };
   if (EDIT_TOOLS.has(tool)) {
     const path = text(input.file_path) || text(input.notebook_path) || text(input.path);
-    if (path && inside(call.threadDir, path)) return { decision: 'allow' };
+    // A relative path is the harness's working folder's, never Omni's thread folder.
+    const abs = path && resolve(call.cwd, path);
+    if (abs && inside(call.threadDir, abs) && !toolConfig(call.threadDir, abs)) return { decision: 'allow' };
     const request: ApprovalRequest = { tool, level: access.level, summary: path || tool, detail: text(input.content) || text(input.new_string) || undefined };
-    if (access.level === 'ask' && path && inside(call.cwd, path)) return { decision: 'allow' };
+    if (access.level === 'ask' && abs && inside(call.cwd, abs) && !toolConfig(call.cwd, abs)) return { decision: 'allow' };
     return verdictAt(access.level, request, 'changing files');
   }
   if (SHELL_TOOLS.has(tool) || tool === 'command') {
