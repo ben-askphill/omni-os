@@ -14,6 +14,7 @@ const { parseAutomation } = await import('../automations.ts');
 const { isQuietReply, runRules, withRunRules, QUIET_REPLY } = await import('../automation-rules.ts');
 const { spanWords } = await import('@omni/shared/cron.ts');
 const { expireDrafts, expiredAnswer } = await import('../automation-drafts.ts');
+const { fileQuietRun } = await import('../automation-quiet.ts');
 const { askQuestion } = await import('../runner/questions.ts');
 const { app } = await import('../app.ts');
 const { db } = await import('../db.ts');
@@ -118,6 +119,33 @@ describe('post nothing when empty', () => {
     expect(r.db.threads.get(found.id)!.done_at).toBeNull();
     expect(r.db.threads.get(loud.id)!.done_at).toBeNull();
     expect(await needsYou()).toEqual(expect.arrayContaining([found.id, loud.id]));
+  });
+});
+
+describe('post nothing when empty: only the run itself', () => {
+  const send = async (id: string, prompt: string) => {
+    const res = await app.request(`/api/threads/${id}/messages`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, mode: 'queue' }) });
+    expect(res.status).toBeLessThan(300);
+  };
+
+  it('a later turn the user started is never filed away, however it ends', async () => {
+    yaml('q4', `name: Quiet later\ncron: "0 9 * * *"\nchannel: scratch\nquiet: true\nprompt: SAY:Found one thing\n`);
+    const t = await run('q4');
+    await r.untilResults(t.id, 1);
+    await send(t.id, `SAY:${QUIET_REPLY}`);
+    await r.untilResults(t.id, 2);
+    expect(r.db.threads.get(t.id)!.done_at).toBeNull();
+  });
+
+  it('a run that asked a question is not filed away when it then says the word', async () => {
+    yaml('q5', `name: Quiet asked\ncron: "0 9 * * *"\nchannel: scratch\nquiet: true\nprompt: SAY:Found one thing\n`);
+    const t = await run('q5');
+    await r.untilResults(t.id, 1);
+    expect(fileQuietRun(t.id, QUIET_REPLY)).toBe(true);
+    r.db.threads.setDone(t.id, false);
+    askQuestion(t.id, [{ question: 'Approve and go ahead?', header: 'Approve', multiSelect: false, options: [{ label: 'Approve', description: 'Send it' }, { label: 'Skip', description: 'Do nothing' }] }]);
+    expect(fileQuietRun(t.id, QUIET_REPLY)).toBe(false);
+    expect(r.db.threads.get(t.id)!.done_at).toBeNull();
   });
 });
 

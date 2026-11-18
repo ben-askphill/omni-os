@@ -84,7 +84,7 @@ expires: 8h     # an unanswered draft is skipped after this; needs approve
 ```
 
 - Omni adds what each one means to the end of the prompt it sends, so they hold on every harness.
-- `quiet`: a run with nothing to report replies with the one word `NOTHING_TO_REPORT`. Omni then marks its thread done, so it raises no alert or push and stays out of Needs you. The run history still lists it. A run that found something posts as usual.
+- `quiet`: a run with nothing to report replies with the one word `NOTHING_TO_REPORT`. Omni then marks its thread done, so it raises no alert or push and stays out of Needs you. The run history still lists it. A run that found something posts as usual, and so does any turn after you reply in the thread or once the run has asked a question, so text a run reads cannot talk it into hiding what it did.
 - `approve`: the run drafts what it would send, post or change, then asks on the question card, Approve or Skip, and acts only on Approve.
 - `expires`: seconds, or a duration like 90m, 8h or 2d. A card nobody answered in that time is answered as expired, so the run does nothing, and its thread is marked done. The machine that runs the automation checks every minute. Without `expires` the card waits for you; `expires` without `approve` is invalid.
 - **Dry run** on a card runs it now and has the agent list what it would do, each item with what it would send or change, without acting or asking for approval. It always reports, quiet or not. Its thread is titled `Dry run · <name>`. The Conductor's `run_automation` takes `dry_run: true` for the same.
