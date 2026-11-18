@@ -162,6 +162,12 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
   const [newId, setNewId] = useState<string | null>(null);
   const [mode, setMode] = useState<'form' | 'markdown'>('form');
   const [markdown, setMarkdown] = useState(id ? '' : crewMarkdownOf(null));
+  // The Markdown tab's text as it last matched the form. An edit there is read into the form on the way back.
+  const [synced, setSynced] = useState(markdown);
+  // The file the form was last read from, once the Markdown tab changed it, and the role it makes. A Form save then
+  // lays the form's changes over that text, so an edit made there and a key the form does not show are kept. Null:
+  // the saved file is the base.
+  const [base, setBase] = useState<{ own: string; detail: CrewDetail } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -169,6 +175,7 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
     if (!detail.data || draft) return;
     setDraft(crewDraftOf(detail.data));
     setMarkdown(crewMarkdownOf(detail.data));
+    setSynced(crewMarkdownOf(detail.data));
   }, [detail.data, draft]);
 
   const set = <K extends keyof CrewDraft>(k: K, v: CrewDraft[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
@@ -197,25 +204,56 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
 
   const problem = mode === 'form' && draft ? crewDraftProblem(draft, id ? undefined : theId) : mode === 'markdown' && !markdown.trim() ? 'The file is empty.' : null;
 
-  const act = async (fn: () => Promise<unknown>, close = true) => {
+  const work = async (fn: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true);
     setError(null);
     try {
       await fn();
-      onSaved();
-      if (close) onClose();
+      return true;
     } catch (err) {
       setError(errorText(err));
+      return false;
     } finally {
       setBusy(false);
     }
+  };
+  const act = async (fn: () => Promise<unknown>, close = true) => {
+    if (!(await work(fn))) return;
+    onSaved();
+    if (close) onClose();
+  };
+
+  // The file a save would write, nothing written (POST /api/crew/draft): how the two tabs turn into each other.
+  const drafted = (save: object, own?: string) => api.post<{ markdown: string; detail: CrewDetail }>('/crew/draft', { ...(id && { id }), ...(own !== undefined && { own }), save });
+
+  const switchTo = (next: 'form' | 'markdown') => {
+    if (next === mode || !draft || busy) return;
+    void work(async () => {
+      if (next === 'markdown') {
+        const changes = crewSaveBody(draft, base?.detail ?? d);
+        if (Object.keys(changes.fields).length || changes.charter !== undefined || changes.charter_mode) {
+          const { markdown: text, detail: made } = await drafted(changes, base?.own);
+          setMarkdown(text);
+          setSynced(text);
+          setBase({ own: text, detail: made });
+        }
+      } else if (markdown !== synced) {
+        const { detail: made } = await drafted({ markdown });
+        setDraft(crewDraftOf(made));
+        setBase({ own: markdown, detail: made });
+        setSynced(markdown);
+      }
+      setMode(next);
+    });
   };
 
   const save = (e?: FormEvent) => {
     e?.preventDefault();
     if (!draft || problem) return;
-    const body = mode === 'markdown' ? { markdown } : crewSaveBody(draft, d);
-    void act(() => (id ? api.put(`/crew/${encodeURIComponent(id)}`, body) : api.post('/crew', { id: theId, ...body })));
+    void act(async () => {
+      const body = mode === 'markdown' ? { markdown } : base ? { markdown: (await drafted(crewSaveBody(draft, base.detail), base.own)).markdown } : crewSaveBody(draft, d);
+      await (id ? api.put(`/crew/${encodeURIComponent(id)}`, body) : api.post('/crew', { id: theId, ...body }));
+    });
   };
   const path = (p = '') => `/crew/${encodeURIComponent(id ?? '')}${p}`;
 
@@ -261,7 +299,7 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
                   </Button>
                 )}
                 {can.hide && (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => void act(() => api.post(path('/hidden'), { hidden: !role.hidden }), false)} disabled={busy} title={role.hidden ? 'New threads can start as it again' : 'No new thread starts as it on this machine'}>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => void act(async () => detail.setData(await api.post<CrewDetail>(path('/hidden'), { hidden: !role.hidden })), false)} disabled={busy} title={role.hidden ? 'New threads can start as it again' : 'No new thread starts as it on this machine'}>
                     {role.hidden ? 'Show' : 'Hide'}
                   </Button>
                 )}
@@ -284,7 +322,7 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
           </div>
         )}
 
-        <Segmented label="Edit as" size="sm" value={mode} onChange={setMode} options={[{ id: 'form', label: 'Form' }, { id: 'markdown', label: 'Markdown' }]} />
+        <Segmented label="Edit as" size="sm" value={mode} onChange={switchTo} options={[{ id: 'form', label: 'Form' }, { id: 'markdown', label: 'Markdown' }]} />
 
         {mode === 'markdown' ? (
           <Field id="crew-md" label="Markdown" hint={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole role: frontmatter and charter. Saved as written.'}>

@@ -11,7 +11,7 @@ import { readOpenItems } from '@omni/shared/open-items.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
 import { getCrew } from './crew.ts';
-import { CALLER_HEADER } from './automation-guard.ts';
+import { senderOf as sender } from './automation-guard.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
 import { bus } from './bus.ts';
@@ -259,12 +259,6 @@ threadActionsApi.get('/:id/base', (c) => {
   const t = threads.get(c.req.param('id'));
   return t ? c.json(baseView(t)) : c.json({ error: 'not found' }, 404);
 });
-
-/**
- * Who a message is from: an agent thread's call (one that names its thread, as Omni's MCP servers do) is never Ben's,
- * whatever it says. The guards read Ben's messages in a thread as his answer (automation-guard.ts, crew-guard.ts).
- */
-const sender = (c: Context, from: 'ben' | 'conductor' = 'ben'): 'ben' | 'conductor' => (c.req.header(CALLER_HEADER) ? 'conductor' : from);
 
 threadActionsApi.post('/:id/messages', async (c) => {
   const id = c.req.param('id');

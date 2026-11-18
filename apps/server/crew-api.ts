@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { CALLER_HEADER } from './automation-guard.ts';
 import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { listCrew } from './crew.ts';
-import { crewDetail, crewRunProblem, crewSave, deleteCrew, duplicateCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
+import { crewDetail, crewRunProblem, crewSave, deleteCrew, draftCrew, duplicateCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
 import { channels } from './db.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 
@@ -41,6 +41,16 @@ crewApi.post('/crew', async (c) => {
   return write(c, (save) => saveCrew(id.data.id, save, context(), { create: true }), rest, 201);
 });
 
+/**
+ * The file a save would write and the role it makes, nothing written: `{ id?, own?, save }`. Settings' Form and
+ * Markdown tabs turn into each other through it, with `own` the Markdown tab's text.
+ */
+crewApi.post('/crew/draft', async (c) => {
+  const parsed = z.object({ id: z.string().optional(), own: z.string().max(200_000).nullable().optional(), save: crewSave }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Send { id?, own?, save }.' }, 400);
+  return run(c, () => draftCrew(parsed.data.id, parsed.data.save, parsed.data.own));
+});
+
 crewApi.put('/crew/:id', async (c) => write(c, (save) => saveCrew(c.req.param('id'), save, context()), await c.req.json().catch(() => null)));
 
 crewApi.delete('/crew/:id', (c) =>
@@ -60,7 +70,7 @@ crewApi.post('/crew/:id/duplicate', async (c) => {
   return run(c, () => duplicateCrew(c.req.param('id'), parsed.data.id, parsed.data.name, context()), 201);
 });
 
-crewApi.post('/crew/:id/reset', (c) => guard(c, 'reset') ?? run(c, () => resetCrew(c.req.param('id'))));
+crewApi.post('/crew/:id/reset', (c) => guard(c, 'reset', undefined, c.req.param('id')) ?? run(c, () => resetCrew(c.req.param('id'))));
 
 crewApi.post('/crew/:id/hidden', async (c) => {
   const refused = guard(c, 'hide');
@@ -71,8 +81,8 @@ crewApi.post('/crew/:id/hidden', async (c) => {
 });
 
 /** A 403 for an agent thread's write the crew guard refuses. Ben's own clients name no thread. */
-function guard(c: Context, write: CrewWrite, save?: CrewSave) {
-  const refusal = crewRefusal(c.req.header(CALLER_HEADER), write, save);
+function guard(c: Context, write: CrewWrite, save?: CrewSave, id?: string) {
+  const refusal = crewRefusal(c.req.header(CALLER_HEADER), write, save, id);
   return refusal ? c.json({ error: refusal }, 403) : null;
 }
 

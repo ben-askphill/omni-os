@@ -51,9 +51,22 @@ describe('the editor', () => {
     const d = { ...crewDraftOf(detail(edited, builtIn, 'Use pnpm.')), model: 'auto', description: 'Writes and tests code.' };
     expect(crewSaveBody(d, detail(edited, builtIn, 'Use pnpm.'))).toEqual({
       fields: { model: '', description: 'Writes and tests code.' },
-      charter: 'Use pnpm.',
-      charter_mode: 'append',
     });
+  });
+
+  it('leaves the charter and its mode out of a save that did not change them, so Built-in charter changed stays', () => {
+    const builtIn = role();
+    const changed = role({ kind: 'edited', charterMode: 'replace', builtInChanged: true });
+    const view = detail(changed, builtIn, 'My whole charter.');
+    const body = crewSaveBody({ ...crewDraftOf(view), description: 'Reviews code.' }, view);
+    expect(body).toEqual({ fields: { description: 'Reviews code.' } });
+    expect(body).not.toHaveProperty('charter');
+    expect(body).not.toHaveProperty('charter_mode');
+    // A charter edit, or a switch to adding, still goes.
+    expect(crewSaveBody({ ...crewDraftOf(view), charter: 'My new charter.' }, view)).toEqual({ fields: {}, charter: 'My new charter.' });
+    expect(crewSaveBody({ ...crewDraftOf(view), charterMode: 'append' }, view)).toEqual({ fields: {}, charter_mode: 'append' });
+    // An unedited built-in sends nothing for its charter: the server starts the overlay as an addition.
+    expect(crewSaveBody({ ...crewDraftOf(detail(role(), builtIn)), effort: 'high' }, detail(role(), builtIn))).toEqual({ fields: { effort: 'high' } });
   });
 
   it('sends a switch or list set back to the built-in as null, and the avatar whole', () => {

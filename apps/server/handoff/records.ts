@@ -46,7 +46,12 @@ function parseOffer(threadId: string, v: unknown): HandoffOffer | null {
   const bundle = (b: any) => b === null || (typeof b?.path === 'string' && isSha(b.base) && isSha(b.wip));
   const ok = {
     preparing: () => STEPS.has(o.step),
-    offered: () => Array.isArray(o.queued) && o.queued.every((q: unknown) => typeof q === 'string') && bundle(o.bundle) && isText(o.leftBehind),
+    offered: () =>
+      Array.isArray(o.queued) &&
+      o.queued.every((q: unknown) => typeof q === 'string') &&
+      (o.senders === undefined || (Array.isArray(o.senders) && o.senders.every((s: unknown) => typeof s === 'string'))) &&
+      bundle(o.bundle) &&
+      isText(o.leftBehind),
     cancelled: () => true,
     failed: () => typeof o.error === 'string',
     declined: () => typeof o.error === 'string',

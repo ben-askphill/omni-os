@@ -6,6 +6,7 @@ import { openNotes, parseNoteBody, parseNoteInput, sendRecords, THREAD_NOTES_MAX
 import { publishFeed } from './bus.ts';
 import { reviewNotes, threads, type Thread } from './db.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
+import { senderOf } from './automation-guard.ts';
 import { createThread, postMessage } from './runner.ts';
 
 export const reviewNotesApi = new Hono();
@@ -126,7 +127,8 @@ reviewNotesApi.post('/:id/review-notes/send', async (c) => {
     changed(id);
     return c.json({ target: thread.id, sent, created: true } satisfies ReviewNotesSent);
   }
-  await postMessage(to.id, message.value.prompt, { from: 'ben', mode, context: message.value.context, requestId: request_id });
+  // An agent thread can send its own notes, as the Conductor: they are never Ben's answer (automation-guard.ts senderOf).
+  await postMessage(to.id, message.value.prompt, { from: senderOf(c), mode, context: message.value.context, requestId: request_id });
   const sent = reviewNotes.markSent(open.map((n) => n.id));
   changed(id);
   return c.json({ target: to.id, sent } satisfies ReviewNotesSent);

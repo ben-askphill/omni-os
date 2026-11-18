@@ -161,6 +161,29 @@ describe('Settings > Crew (S3)', () => {
     expect((await json(await send('GET', '/crew/builder'))).charters).toEqual({ builtIn: 'You write, test and ship code.', own: null, effective: 'You write, test and ship code.' });
   });
 
+  it('turns the form into the file and the file into the form without writing, keeping keys the form does not show', async () => {
+    const saved = '---\nruntime: vps-agent\nmodel: opus\ncharter_mode: append\n---\nUse pnpm.\n';
+    writeOwn('builder', saved);
+    // The Markdown tab's text, edited: the form reads the role it makes.
+    const typed = '---\nruntime: vps-agent\nmodel: opus\ndescription: Builds and tests.\ncharter_mode: append\n---\nUse pnpm. Run the tests.\n';
+    const toForm = await send('POST', '/crew/draft', { id: 'builder', save: { markdown: typed } });
+    expect(toForm.status).toBe(200);
+    const read = (await json(toForm)).detail;
+    expect(read.role).toMatchObject({ kind: 'edited', description: 'Builds and tests.', model: 'opus', charterMode: 'append' });
+    expect(read.charters.own).toBe('Use pnpm. Run the tests.');
+    // A form edit laid over that text keeps the key the form never shows, and the file's own edit.
+    const md = (await json(await send('POST', '/crew/draft', { id: 'builder', own: typed, save: { fields: { effort: 'high' } } }))).markdown;
+    expect(md).toBe('---\nruntime: vps-agent\nmodel: opus\ndescription: Builds and tests.\ncharter_mode: append\neffort: high\n---\nUse pnpm. Run the tests.\n');
+    // Nothing is written.
+    expect(own('builder')).toBe(saved);
+    // A file that does not parse is refused rather than read as a blank form, and a new role has no id yet.
+    expect((await send('POST', '/crew/draft', { id: 'builder', save: { markdown: '---\nmodel: [\n---\nx\n' } })).status).toBe(400);
+    expect((await send('POST', '/crew/draft', { save: { markdown: '---\nname: [\n---\nx\n' } })).status).toBe(400);
+    expect((await json(await send('POST', '/crew/draft', { save: { fields: { name: 'Store ops' }, charter: 'Dry run.' } }))).markdown).toBe('---\nname: Store ops\n---\nDry run.\n');
+    expect((await send('POST', '/crew/draft', { id: 'nope', save: { fields: {} } })).status).toBe(404);
+    await send('POST', '/crew/builder/reset');
+  });
+
   it('duplicates a role into one of the user own, with the whole charter as written', async () => {
     await send('PUT', '/crew/builder', { fields: { model: 'opus', avatar: { icon: 'icon:tool' } }, charter: 'Use pnpm.' });
     const res = await send('POST', '/crew/builder/duplicate', { id: 'builder-two', name: 'Builder two' });

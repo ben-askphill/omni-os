@@ -77,6 +77,11 @@ export type HandoffOffer = {
       state: 'offered';
       /** Messages that were queued behind the stopped turn, delivered on the new Mac after the continue prompt. */
       queued: string[];
+      /**
+       * Who sent each of `queued`, by index: `ben`, `conductor` and so on, as the message's event had it. Each lands as that
+       * sender's again, so a message an agent queued never becomes Ben's answer in the thread. Absent from older builds: Ben.
+       */
+      senders?: string[];
       /** A fresh thread's first files, in Storage by sha (apps/server/sync/files.ts sendUploads). */
       files?: { name: string; sha: string; size: number; mime: string; image: boolean }[];
       /** Storage path of a git bundle with the worktree's commits and uncommitted changes, for a worktree thread. */
