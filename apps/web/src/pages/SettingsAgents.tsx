@@ -9,8 +9,10 @@ import { runBody, type ChannelRun } from '@omni/shared/channel-form.ts';
 import { applyRunToChannels, bulkRunError, NO_RUN, picksRun, resetChannelsToAuto, selectedIds, toggleSelected } from '@omni/shared/channel-bulk-run.ts';
 import { RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, Origin, ResetButton, ServerOptions, useScopedChannel } from './settings-parts.tsx';
+import { ModelVisibilityCard } from './SettingsModelVisibility.tsx';
 
-// Settings, Harnesses & models: each harness with whether it can run, how to fix it, its models and its cap; Hermes's
+// Settings, Harnesses & models: each harness with whether it can run, how to fix it, its models and its cap; which models
+// the pickers list (SettingsModelVisibility.tsx); Hermes's
 // server; the model a new thread starts on (a channel default, else Auto); and the .env options behind them. A thread or crew
 // role that picks its own model wins over the channel (apps/server/harness/resolve.ts).
 
@@ -20,6 +22,7 @@ export function ModelsSection({ hermes }: { hermes: ReactNode }) {
   return (
     <>
       <HarnessesCard channel={channel?.id} />
+      <ModelVisibilityCard />
       {hermes}
       {channel ? <ChannelModelCard channel={channel} /> : <ChannelDefaultsCard />}
       <ServerOptions section="models" entry="model-options" />

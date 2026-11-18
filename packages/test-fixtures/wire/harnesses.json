@@ -47,7 +47,8 @@
           "xhigh",
           "max"
         ],
-        "defaultEffort": "high"
+        "defaultEffort": "high",
+        "hidden": true
       },
       {
         "id": "claude-fable-5-2",
@@ -71,7 +72,8 @@
           "xhigh",
           "max"
         ],
-        "defaultEffort": "high"
+        "defaultEffort": "high",
+        "hidden": true
       },
       {
         "id": "claude-haiku-4-5",

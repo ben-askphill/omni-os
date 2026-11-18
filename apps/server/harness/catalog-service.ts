@@ -1,9 +1,17 @@
-// The live catalog: it probes the CLIs (and the Hermes and Cursor Cloud APIs) at server start and every 15 minutes.
-// A harness that is down is probed again on demand (freshCatalog, at most every 10 seconds), so a
-// `codex login` or the Mac joining the tailnet shows in the picker without a restart.
+// The live catalog: it asks each harness for its models (Claude Code's `initialize` answer, Codex's model/list,
+// `cursor-agent --list-models`, Cursor's /v1/models) at server start and every 15 minutes, the way T3 Code does, so a
+// model that ships in a CLI release shows without an Omni release.
+// - A harness that is down is probed again on demand (freshCatalog, at most every 10 seconds), so a `codex login` or
+//   the Mac joining the tailnet shows in the picker without a restart.
+// - A picker opening on a catalog older than ON_DEMAND_MS probes everything again in the background (refreshStale), as
+//   T3 Code's picker asks for newly released models on every open. Settings > Harnesses & models can ask at once.
+// - What Claude Code last reported is kept on disk, so a restart starts from it, not from the bundled list alone.
 // The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';
-import { config } from '../config.ts';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { config, paths } from '../config.ts';
+import { claudeInitialize } from './claude/commands.ts';
 import { CodexClient } from './codex/client.ts';
 import { codexBin } from './codex/bin.ts';
 import { PLAN_LIMIT_ID, normalizeRateLimits } from './codex/normalize.ts';
@@ -33,6 +41,7 @@ import {
   cursorCloudHarness,
   catalogForChannel,
   getHarness,
+  parseClaudeReported,
   CURSOR_CLOUD_REJECTED,
   CURSOR_CLOUD_UNREACHABLE,
   CODEX_API_KEY,
@@ -40,6 +49,7 @@ import {
   CODEX_NOT_FOUND,
   codexFix,
   type Catalog,
+  type ClaudeReportedModel,
   type CodexProbe,
   type CursorProbe,
   type HermesProbe,
@@ -50,10 +60,14 @@ type Probe = CodexProbe & { rateLimits?: RateLimits };
 
 /** How long a harness that is down stays down before a request probes it again. */
 const RECHECK_MS = 10_000;
+/** How old a catalog may be when a picker opens before every harness is asked again (T3 Code: 5 minutes). */
+export const ON_DEMAND_MS = 5 * 60 * 1000;
 
 let current: Catalog | null = null;
 let loading: Promise<Catalog> | null = null;
 let checkedAt = 0;
+/** When every harness was last probed, for refreshStale. */
+let fullAt = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 const caps = (): Record<HarnessId, number> => ({
@@ -63,6 +77,43 @@ const caps = (): Record<HarnessId, number> => ({
   hermes: config.maxConcurrentHermes,
   'cursor-cloud': config.maxConcurrentCursorCloud,
 });
+
+/** What Claude Code reported when Omni last asked, here or before a restart. Empty: the bundled list alone. */
+let claudeReported: ClaudeReportedModel[] | null = null;
+const claudeCache = () => join(paths.data, 'claude-models.json');
+
+function lastClaudeModels(): ClaudeReportedModel[] {
+  if (claudeReported) return claudeReported;
+  try {
+    claudeReported = parseClaudeReported((JSON.parse(readFileSync(claudeCache(), 'utf8')) as { models?: unknown }).models);
+  } catch {
+    claudeReported = [];
+  }
+  return claudeReported;
+}
+
+/**
+ * Ask Claude Code which models it offers: the `models` of its `initialize` answer, which a new Claude Code release
+ * extends. Nothing goes to the API. Null when it doesn't answer.
+ */
+export async function probeClaudeModels(): Promise<ClaudeReportedModel[] | null> {
+  const init = await claudeInitialize(paths.data, 'omni-os-models');
+  return init ? parseClaudeReported(init.models) : null;
+}
+
+/** Claude Code with what it reports now, or with what it reported last when it does not answer. */
+async function probeClaudeHarness(cap: number): Promise<HarnessInfo> {
+  const reported = await probeClaudeModels().catch(() => null);
+  if (reported) {
+    claudeReported = reported;
+    try {
+      writeFileSync(claudeCache(), JSON.stringify({ checkedAt: new Date().toISOString(), models: reported }, null, 2));
+    } catch {
+      // A read-only data dir only costs the head start after a restart.
+    }
+  }
+  return claudeHarness(cap, config.defaultModel, lastClaudeModels());
+}
 
 /**
  * Probe `cursor-agent --list-models` for the model list. Success means installed and logged in. No binary on PATH, or
@@ -265,14 +316,16 @@ export function loadCatalog(only: HarnessId[] = HARNESS_IDS): Promise<Catalog> {
   loading ??= (async () => {
     const c = caps();
     const keep = (id: HarnessId) => getHarness(getCatalog(), id)!;
-    const [codex, cursor, hermes, cursorCloud] = await Promise.all([
+    const [claude, codex, cursor, hermes, cursorCloud] = await Promise.all([
+      only.includes('claude-code') ? probeClaudeHarness(c['claude-code']) : keep('claude-code'),
       only.includes('codex') ? probeCodexHarness(c.codex) : keep('codex'),
       only.includes('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
       only.includes('hermes') ? probeHermesHarness(c.hermes) : keep('hermes'),
       only.includes('cursor-cloud') ? probeCursorCloudHarness(c['cursor-cloud']) : keep('cursor-cloud'),
     ]);
-    current = { harnesses: [claudeHarness(c['claude-code'], config.defaultModel), codex, cursor, hermes, cursorCloud] };
+    current = { harnesses: [claude, codex, cursor, hermes, cursorCloud] };
     checkedAt = Date.now();
+    if (only.length === HARNESS_IDS.length) fullAt = checkedAt;
     return current;
   })().finally(() => {
     loading = null;
@@ -286,7 +339,7 @@ export function getCatalog(): Catalog {
   const c = caps();
   return {
     harnesses: [
-      claudeHarness(c['claude-code'], config.defaultModel),
+      claudeHarness(c['claude-code'], config.defaultModel, lastClaudeModels()),
       codexHarness({ available: false, models: [] }, c.codex),
       cursorHarness({ available: false, models: [] }, c.cursor),
       hermesHarness({ available: false }, c.hermes),
@@ -304,6 +357,15 @@ export async function freshCatalog(): Promise<Catalog> {
   const down = getCatalog().harnesses.filter((h) => !h.available).map((h) => h.id);
   if (!down.length || Date.now() - checkedAt < RECHECK_MS) return getCatalog();
   return loadCatalog(down);
+}
+
+/**
+ * For a picker opening: when every harness was last asked over ON_DEMAND_MS ago, ask them all again in the background.
+ * The open picker shows the catalog as it is; the next one shows what the probes found.
+ */
+export function refreshStale(now = Date.now()) {
+  if (loading || now - fullAt < ON_DEMAND_MS) return;
+  void loadCatalog().catch(() => {});
 }
 
 export function startCatalogRefresh() {

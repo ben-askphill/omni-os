@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   claudeModels,
   claudeHarness,
+  parseClaudeReported,
   codexHarness,
   resolveModel,
   validateRun,
@@ -44,6 +45,52 @@ describe('claude catalog', () => {
     expect(resolveModel(cat, 'claude-code', 'opus')?.id).toBe('claude-opus-5-5');
     expect(resolveModel(cat, 'claude-code', 'claude-haiku-4-5')?.id).toBe('claude-haiku-4-5');
     expect(resolveModel(cat, 'claude-code', 'nope')).toBeNull();
+  });
+});
+
+describe('claude catalog from what Claude Code reports', () => {
+  // The `models` of claude 2.1.316's initialize answer, trimmed: its default pointer, an alias, a dated id and two
+  // models the bundled list lacks.
+  const reported = parseClaudeReported([
+    { value: 'default', resolvedModel: 'claude-opus-5-5', displayName: 'Default (recommended)', supportsEffort: true, supportedEffortLevels: ['low', 'high'] },
+    { value: 'opus', resolvedModel: 'claude-opus-5-5', displayName: 'Opus 5.5', supportsEffort: true, supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    { value: 'haiku', resolvedModel: 'claude-haiku-5-5', displayName: 'Haiku 5.5', supportsEffort: true, supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    { value: 'claude-haiku-4-5-20251001', resolvedModel: 'claude-haiku-4-5-20251001', displayName: 'Haiku 4.5', supportsThinkingOff: true },
+    { value: 'claude-opus-5', resolvedModel: 'claude-opus-5[1m]', displayName: 'Opus 5', supportsEffort: true, supportedEffortLevels: ['low', 'medium'] },
+    { nope: true },
+  ]);
+
+  it('adds the models the bundled list lacks, after it, with their own efforts', () => {
+    const models = claudeModels('sonnet', reported);
+    expect(models.map((m) => m.id)).toEqual([
+      'claude-sonnet-5-5',
+      'claude-opus-5-5',
+      'claude-sonnet-5',
+      'claude-fable-5-2',
+      'claude-fable-5-1',
+      'claude-haiku-4-5',
+      'claude-haiku-5-5',
+      'claude-opus-5',
+    ]);
+    expect(models.find((m) => m.id === 'claude-haiku-5-5')).toEqual({
+      id: 'claude-haiku-5-5',
+      label: 'Haiku 5.5',
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      defaultEffort: 'high',
+    });
+    expect(models.find((m) => m.id === 'claude-opus-5')).toMatchObject({ efforts: ['low', 'medium'], defaultEffort: 'low' });
+  });
+
+  it('keeps the bundled entry for an id it already has, so Auto and the aliases still resolve', () => {
+    const models = claudeModels('sonnet', reported);
+    expect(models.filter((m) => m.id === 'claude-haiku-4-5')).toHaveLength(1);
+    expect(models.find((m) => m.id === 'claude-haiku-4-5')?.efforts).toContain('low');
+    expect(models.find((m) => m.default)?.id).toBe('claude-sonnet-5-5');
+  });
+
+  it('validates a run on a reported model', () => {
+    const c: Catalog = { harnesses: [claudeHarness(4, 'sonnet', reported)] };
+    expect(validateRun(c, 'claude-code', 'claude-haiku-5-5', 'max')).toEqual({ ok: true, harness: 'claude-code', model: 'claude-haiku-5-5', effort: 'max' });
   });
 });
 
