@@ -127,6 +127,12 @@ describe('the phase a thread shows by name', () => {
     expect(rowOf({ ...t, status: 'running' }, undefined, 0)).toMatchObject({ status: 'running', phase: 'working', meta: 'Running' });
     expect(rowOf({ ...t, status: 'done' }, undefined, 0).phase).toBeUndefined();
   });
+
+  it('says who a thread is for when that is someone else', () => {
+    expect(rowOf({ ...t, status: 'done', owner: 'Sam' }, undefined, 0, 'Ada').meta).toBe('for Sam');
+    expect(rowOf({ ...t, status: 'running', owner: 'Sam' }, undefined, 0, 'Ada').meta).toBe('Running · for Sam');
+    expect(rowOf({ ...t, status: 'done', owner: 'ada' }, undefined, 0, 'Ada').meta).toBeNull();
+  });
 });
 
 /** What a spinner or a working Omni mark looks like in the source. */

@@ -136,7 +136,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'sync-keys', section: 'sync', title: 'Signing keys', keywords: ['key', 'fingerprint', 'key changed', 'confirm new key', 'pin', 'trust', 'signature'] },
   { id: 'sync-refused', section: 'sync', title: 'Refused changes', keywords: ['refused', 'rejected', 'unsigned', 'tampering', 'blocked', 'signature'] },
   { id: 'google', section: 'access', title: 'Google account and signed-in devices', keywords: ['sign in', 'owner', 'devices', 'revoke', 'sessions', 'phone', 'permissions'] },
-  { id: 'ios', section: 'access', title: 'Omni for iOS', keywords: ['iphone', 'ipad', 'qr', 'pair', 'app'] },
+  { id: 'ios', section: 'access', title: 'Pair a phone', keywords: ['iphone', 'ipad', 'qr', 'pair', 'app', 'omni for ios', 'phone browser', 'safari', 'android'] },
   { id: 'connect', section: 'access', title: 'Omni Connect', keywords: ['tunnel', 'cloudflared', 'remote', 'phone', 'other machines'] },
   { id: 'mcp-clients', section: 'access', title: 'MCP clients', keywords: ['mcp', 'oauth', 'claude.ai', 'chatgpt', 'approve', 'remove', 'connected apps', 'assistants'] },
   { id: 'install-token', section: 'access', title: 'Rotate install token', keywords: ['token', 'rotate', 'leak', 'reset', 'sign out all', 'api token', 'credential'] },

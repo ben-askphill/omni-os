@@ -114,6 +114,17 @@ describe('minting a code', () => {
     expect((await req('GET', '/auth', undefined, as(phone.token))).status).toBe(401);
   });
 
+  it('is minted for a session paired with the install token, the desktop window and a browser that used the token', async () => {
+    const res = await req('POST', '/auth/pair', {}, as(MASTER));
+    const cookie = res.headers.get('set-cookie')!.match(/(omni_session_\d+=[^;]+)/)![1];
+    const minted = await req('POST', '/auth/app-pairings', {}, { ...NONE, cookie });
+    expect(minted.status).toBe(200);
+    expect(((await minted.json()) as { code: string }).code).toMatch(/^omni_p_/);
+    // A phone that paired with that code cannot mint the next one.
+    const phone = await pairApp();
+    expect((await req('POST', '/auth/app-pairings', {}, as(phone.token))).status).toBe(403);
+  });
+
   it('still pairs a browser that submits the install token', async () => {
     const res = await req('POST', '/auth/pair', {}, as(MASTER));
     expect(res.status).toBe(200);
@@ -657,5 +668,32 @@ describe('SSE streams end with their session', () => {
     const w = watch(await lone.request('http://127.0.0.1:4747/s'));
     expect(await w.closed()).toBe(true);
     expect(ran).toBe(false);
+  });
+});
+
+describe('pairing a phone browser from the QR link', () => {
+  const open = (code: string) => req('GET', `/auth/pair-link?code=${encodeURIComponent(code)}`, undefined, NONE);
+  const cookieOf = (res: Response) => /(?:^|,\s*)([^=;,\s]+=[^;]+)/.exec(res.headers.get('set-cookie') ?? '')?.[1] ?? null;
+
+  it('spends the one-time code for a browser session cookie, then opens the Web UI', async () => {
+    const { code } = await mint();
+    const res = await open(code);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/');
+    const cookie = cookieOf(res)!;
+    expect(cookie.startsWith(`${sessionCookieName()}=`)).toBe(true);
+    expect(res.headers.get('set-cookie')).toMatch(/HttpOnly/i);
+    expect(sessions().filter((s) => !s.revoked_at)).toEqual([expect.objectContaining({ kind: 'browser', method: 'pairing' })]);
+    expect((await req('GET', '/threads', undefined, { ...NONE, cookie })).status).toBe(200);
+  });
+
+  it('a spent, wrong or missing code goes to the pairing screen and sets nothing', async () => {
+    const { code } = await mint();
+    await open(code);
+    for (const res of [await open(code), await open('omni_p_nope'), await req('GET', '/auth/pair-link', undefined, NONE)]) {
+      expect(res.status).toBe(303);
+      expect(res.headers.get('location')).toBe('/#/pair?link=expired');
+      expect(res.headers.get('set-cookie')).toBeNull();
+    }
   });
 });

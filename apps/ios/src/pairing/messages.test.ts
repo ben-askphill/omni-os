@@ -51,6 +51,6 @@ describe('revokedNotice', () => {
 
 describe('CONNECT_HINT', () => {
   it('names where on the computer the pairing code is made', () => {
-    expect(CONNECT_HINT).toContain('Settings > Sharing & access > Omni for iOS');
+    expect(CONNECT_HINT).toContain('Settings > Sharing & access > Pair a phone');
   });
 });

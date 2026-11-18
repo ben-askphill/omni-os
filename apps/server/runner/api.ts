@@ -27,6 +27,8 @@ import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
 import { parseGoalCommand } from '@omni/shared/goal.ts';
+import { ownerName } from '@omni/shared/thread-owner.ts';
+import { userConfig } from '../user-config.ts';
 import { assignRouted, remoteHolder } from '../ownership.ts';
 import { sendUploads } from '../sync/files.ts';
 
@@ -94,6 +96,8 @@ export interface CreateThreadInput {
   task_id?: string | null;
   source?: ThreadSource;
   automation?: string | null;
+  /** The person accountable for it, by name; null or unset is the user. Unset on a delegated thread takes the parent's. */
+  owner?: string | null;
   /** A sidebar folder of the channel to file the thread in, by id or name. A name no folder has makes one. */
   folder?: string | null;
   /**
@@ -204,6 +208,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     task_id: input.task_id ?? (input.parent_id ? `T-${id.slice(0, 4).toUpperCase()}` : null),
     source: input.source ?? 'manual',
     automation: input.automation ?? null,
+    owner: input.owner !== undefined ? ownerName(input.owner, userConfig().user.name) : input.parent_id ? (threads.get(input.parent_id)?.owner ?? null) : null,
     folder_id: filedIn?.id ?? null,
     // A thread for another machine has its worktree made there (handoff.ts take).
     setup: !elsewhere && needsWorktree(channel, { remote }) ? 'preparing' : null,

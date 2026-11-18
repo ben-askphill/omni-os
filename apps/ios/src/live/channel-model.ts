@@ -54,6 +54,8 @@ export interface ThreadRow {
   status: ThreadStub['status'];
   busy: boolean;
   /** The word after the title for a state worth naming. Null for a finished, done thread. */
+  /** Someone else accountable for it (thread-owner.ts), shown as "for <name>"; null for the user's own. */
+  owner?: string | null;
   statusLabel: string | null;
   /** "now", "5m", "3h", "2d". */
   ago: string;
@@ -100,6 +102,7 @@ export function threadRow(t: ThreadStub, now: number): ThreadRow {
     status: t.status,
     busy: t.status === 'running' || t.status === 'queued',
     statusLabel: t.status === 'done' || t.status === 'imported' ? null : statusLabel(t.status),
+    ...(t.owner && { owner: t.owner }),
     ago: shortAgo(t.updated_at ?? t.created_at, now),
     pinned: !!t.pinned_at,
     target: targetOfStub(t),

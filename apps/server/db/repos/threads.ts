@@ -86,6 +86,12 @@ export interface Thread {
   goal_checks: number;
   /** The thread this one continues on another harness (apps/server/continue.ts), null for most. Not a crew parent. Synced. */
   continued_from: string | null;
+  /**
+   * The person accountable for the thread, as a name; null is the install's own user. Separate from the agent doing
+   * the work (`role` on `harness`), as an issue's assignee is from its delegate. A delegated thread starts with its
+   * parent's. Synced, merged by its own edit time.
+   */
+  owner: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -151,7 +157,7 @@ const json = (v: object | null) => (v ? JSON.stringify(v) : null);
  * Metadata fields a sync change merges one by one, by the time each was last edited, and `exec` and `session` for
  * the execution and session fields as groups (sync/thread-merge.ts).
  */
-export type EditedField = 'title' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'exec' | 'session';
+export type EditedField = 'title' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'owner' | 'exec' | 'session';
 
 /**
  * Note that these fields of the thread were edited here now, so a sync change with an older edit of one of them
@@ -179,7 +185,7 @@ export function stampEdits(id: string, fields: readonly EditedField[], where = '
 
 /** The columns clients read, without sync's run_machine, the limit stop's id and owner, or the session state. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, open_items, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, open_items, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, owner, created_at, updated_at';
 
 /**
  * The machine whose status write this is: this one while it is running or queued here and sync is set up, else nobody.
@@ -361,19 +367,20 @@ export const threads = {
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'open_items' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'open_items' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from' | 'owner'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; auto_reason?: string | null; folder_id?: string | null; setup?: ThreadSetup | null;
+      owner?: string | null;
     },
   ) {
     const ts = t.created_at ?? now();
     return tx(() => {
       db.prepare(
-        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, auto_reason, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, folder_id, setup, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, auto_reason, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, folder_id, setup, owner, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         t.id, t.channel_id, t.title, t.status, t.role, t.model, t.harness ?? 'claude-code', t.effort ?? '', t.auto_reason ?? null, t.session_id, t.has_run ?? 0, t.cwd,
-        t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, t.setup ?? null, ts, ts,
+        t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, t.setup ?? null, t.owner ?? null, ts, ts,
       );
       record('thread', t.id);
       if (runMachine(t.status)) assignments.claim(t.id);
@@ -425,6 +432,14 @@ export const threads = {
    * Pin it to the sidebar, or unpin it. Like a rename it keeps the thread's place in the lists: updated_at stays. The
    * row syncs, so the other Mac pins it too. True when it changed.
    */
+  /** Who is accountable for it: a person's name, or null for the install's own user. Syncs. True when it changed. */
+  setOwner(id: string, owner: string | null) {
+    return tx(() => {
+      const changed = db.prepare('UPDATE threads SET owner = ? WHERE id = ? AND owner IS NOT ?').run(owner, id, owner).changes > 0;
+      if (changed) (stampEdits(id, ['owner']), record('thread', id));
+      return changed;
+    });
+  },
   setPinned(id: string, pinned: boolean) {
     return tx(() => {
       const changed =

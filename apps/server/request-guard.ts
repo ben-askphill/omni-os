@@ -100,7 +100,11 @@ export const SIGN_IN_ROUTES: readonly (readonly [string, string])[] = [
 const isSignInRoute = (c: Context) => SIGN_IN_ROUTES.some(([m, p]) => c.req.method === m && c.req.path === p);
 
 /** Redeeming a pairing code needs no token: the one-time code, which only an authenticated device could mint, is the proof. */
-export const APP_PAIRING_OPEN_ROUTES: readonly (readonly [string, string])[] = [['POST', '/api/auth/app-pairings/redeem']];
+export const APP_PAIRING_OPEN_ROUTES: readonly (readonly [string, string])[] = [
+  ['POST', '/api/auth/app-pairings/redeem'],
+  // The link a phone's camera opens from the pairing QR (auth-api.ts): the same one-time code, spent for a browser.
+  ['GET', '/api/auth/pair-link'],
+];
 const isAppPairingRoute = (c: Context) => APP_PAIRING_OPEN_ROUTES.some(([m, p]) => c.req.method === m && c.req.path === p);
 
 /** Omni Connect's routes that prove themselves: the relay's signed mint and health requests, and a browser's code and key proof. */

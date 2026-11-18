@@ -68,8 +68,7 @@ export interface DoneTip {
  */
 export function doneTips(install: SetupState['install'], where: 'phone' | 'rail' | 'classic'): DoneTip[] {
   const tips: DoneTip[] = [
-    { id: 'phone', text: 'Add your iPhone: make a pairing code in Settings > Sharing & access > Omni for iOS.' },
-    { id: 'machine', text: 'Run threads on a second machine: turn on Settings > Sync on both, then pick one with Run on.' },
+    { id: 'phone', text: 'Add your phone: scan the code in Settings > Sharing & access > Pair a phone.' },
   ];
   if (where !== 'phone') {
     tips.push(

@@ -132,7 +132,7 @@ interface FolderRows {
 /** One channel: what needs Ben and runs in it, or what finished, and a new thread in the thumb zone. */
 export function ChannelScreen({ id }: { id: string }) {
   const shell = useShell();
-  const { channel, channelsLoaded, needsYou } = useApp();
+  const { channel, channelsLoaded, needsYou, profile } = useApp();
   const folders = useFolders();
   const ch: ChannelWithRunning | undefined = channel(id);
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
@@ -152,7 +152,7 @@ export function ChannelScreen({ id }: { id: string }) {
 
     for (const t of (list.data ?? []).filter((x) => x.source !== 'team' && !handoffChildren.has(x.id))) {
       const item = needs.get(t.id);
-      const row = rowOf(t, info, now);
+      const row = rowOf(t, info, now, profile?.name);
       const finalRow = item ? { ...row, meta: reasonOf(item).label, status: asksForYou(reasonOf(item).glyph) ? reasonOf(item).glyph : row.status } : row;
       const isActive = !!item || busy(t);
 
@@ -181,7 +181,7 @@ export function ChannelScreen({ id }: { id: string }) {
         if (!group.children.some(isWorking)) continue;
         const inActive = activeRows.some((row) => row.id === group.parent.id);
         if (inActive) continue;
-        const parent = rowOf(group.parent, info, now);
+        const parent = rowOf(group.parent, info, now, profile?.name);
         const folder = ch ? folderOf(ch, group.parent) : null;
         if (folder) {
           if (!folderMap.has(folder)) folderMap.set(folder, { active: [], recent: [] });

@@ -123,10 +123,11 @@ function SectionBody({ section }: { section: SettingsSection }) {
     case 'sync':
       return (
         <>
-          <SyncSection />
-          <SyncKeysCard />
-          <RefusedChangesCard />
-          <PathMapEditor />
+          <SyncSection>
+            <SyncKeysCard />
+            <RefusedChangesCard />
+            <PathMapEditor />
+          </SyncSection>
         </>
       );
     case 'access':

@@ -1,3 +1,4 @@
+import { ownedByOther } from '@omni/shared/thread-owner.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { useCallback, useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { api, errorText, useApi, type BranchPRMark, type ChannelWithRunning, type FolderWithThreads, type Thread } from '../api.ts';
@@ -60,7 +61,7 @@ function PRMark({ pr }: { pr: BranchPRMark }) {
 
 export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boolean; pr?: BranchPRMark }) {
   useNow(60_000);
-  const { channels, mods } = useApp();
+  const { channels, mods, profile } = useApp();
   const source = SOURCE_LABEL[t.source];
   // A mod's pinned status, compact beside the running indicator. The newest one when several mods set one.
   const mod = mods.findLast((m) => m.thread_id === t.id);
@@ -84,6 +85,11 @@ export function ThreadRow({ t, showChannel, pr }: { t: Thread; showChannel?: boo
           <span className={`min-w-0 truncate text-[14px] group-hover:text-fg ${t.done_at ? 'text-fg-3' : 'text-fg-2'}`}>{t.title || 'Untitled'}</span>
           {t.done_at && <Chip tone="outline">Done</Chip>}
           {t.role && <Chip>{t.role}</Chip>}
+          {ownedByOther(t.owner, profile?.name) && (
+            <Chip tone="outline" title={`Owner: ${t.owner}`}>
+              for {t.owner}
+            </Chip>
+          )}
           {source && <Chip tone="outline">{source}</Chip>}
           {pr && <PRMark pr={pr} />}
           <span className="ml-auto shrink-0 pl-2 font-num text-[12px] text-fg-3 tabular-nums">{relTime(t.updated_at)}</span>

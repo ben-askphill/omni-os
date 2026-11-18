@@ -9,7 +9,8 @@ import { MARK, blockerMark, markOf, threadPhase, type RowStatus } from '@omni/sh
 import type { InboxThread } from '../../inbox.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { href } from '../../router.ts';
-import { useApp, useNeedOf, useNow } from '../../store.tsx';
+import { useApp, useNeedOf, useNow, useUserName } from '../../store.tsx';
+import { ownedByOther } from '@omni/shared/thread-owner.ts';
 import { HarnessLogo, OmniMark } from '../brand.tsx';
 import { Avatar, ChannelMark, DoneMark, Icon, StatusDot } from '../ui.tsx';
 import { useMarkDone } from '../../done-confirm.tsx';
@@ -163,7 +164,7 @@ function InboxCard({
   pinned,
   onNavigate,
 }: {
-  t: InboxThread & Partial<Pick<Thread, 'branch'>>;
+  t: InboxThread & Partial<Pick<Thread, 'branch' | 'owner'>>;
   channel: ReturnType<typeof useApp>['channels'][number] | undefined;
   status: RowStatus | null;
   agents?: BackgroundTask[];
@@ -184,6 +185,9 @@ function InboxCard({
   const mark = status ? (blocker ? blockerMark(blocker) : markOf(status.glyph, phase)) : null;
   const said = mark && (blocker || phase) ? MARK[mark].label : status?.label;
   const channelName = channel?.id === 'conductor' ? 'Conductor' : (channel?.name ?? t.channel_id);
+  // Who it is for, when that is someone else (thread-owner.ts).
+  const userName = useUserName();
+  const forOwner = ownedByOther(t.owner, userName) ? `for ${t.owner!.trim()}` : null;
   // The machine it runs on or last ran on, with the run's time while it runs; the branch only without a machine.
   const where = ranOnLine(t, now);
   const label = where.machine ?? where.branch;
@@ -199,7 +203,7 @@ function InboxCard({
       <a
         href={href.thread(t.id)}
         onClick={onNavigate}
-        title={`${title} · ${channelName}${status ? ` · ${said}` : ''}`}
+        title={`${title} · ${channelName}${forOwner ? ` · ${forOwner}` : ''}${status ? ` · ${said}` : ''}`}
         aria-current={active ? 'page' : undefined}
         data-active={active || undefined}
         className="item block [grid-area:1/1] px-3 py-2"
@@ -209,7 +213,10 @@ function InboxCard({
             <ChannelRollup threads={tree?.threads ?? NONE} own={t.channel_id} lead size={18} fallback={<ChannelLead channel={channel} />} />
           </span>
           {pinned && <Icon name="pin" size={11} className="shrink-0 text-fg-3" />}
-          <span className="min-w-0 flex-1 truncate">{channelName}</span>
+          <span className="min-w-0 flex-1 truncate">
+            {channelName}
+            {forOwner && <span data-owner-line> · {forOwner}</span>}
+          </span>
           <span className="flex shrink-0 items-center gap-1.5 md:group-focus-within/row:invisible md:group-hover/row:invisible">
             {status ? (
               <>

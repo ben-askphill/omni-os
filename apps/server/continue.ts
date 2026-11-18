@@ -383,6 +383,8 @@ export async function startContinue(sourceId: string, body: ContinueBody): Promi
           task_id: null,
           source: 'manual',
           automation: null,
+          // The same person stays accountable for the work it carries on.
+          owner: now.owner,
           folder_id: now.folder_id,
           // Its worktree is laid out on the machine that runs it.
           setup: at.branch && !route ? 'preparing' : null,

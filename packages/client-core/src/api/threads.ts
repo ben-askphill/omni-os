@@ -46,6 +46,8 @@ export interface Thread {
   limit_resets_at: string | null;
   limit_elsewhere: number;
   continued_from: string | null;
+  /** The person accountable for it (packages/shared/thread-owner.ts); null for the user. Older servers leave it out. */
+  owner?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -53,7 +55,7 @@ export interface Thread {
 /** The part of a thread the channel list sends for each of its threads. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at' | 'updated_at' | 'folder_id' | 'harness' | 'pinned_at' | 'done_at' | 'parent_id' | 'source' | 'limit_state'> &
   /** For the thread tree's child rows, and `setup` for the Starting dot. Older servers leave them out. */
-  Partial<Pick<Thread, 'model' | 'branch' | 'setup'>>;
+  Partial<Pick<Thread, 'model' | 'branch' | 'setup' | 'owner'>>;
 
 export interface ListThreads {
   channel?: string;

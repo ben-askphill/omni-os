@@ -14,7 +14,7 @@ import { logRefused } from '../verify.ts';
 // folder_id travels with the row. A folder that has not arrived yet waits in sync_folder_wait, and the folder's own
 // change files the thread (handlers/folder.ts). A change from an older build carries no folder_id: this Mac's stays,
 // unless the thread moved channel. pinned_at and done_at travel the same way: a change without them keeps this Mac's, and so does
-// auto_reason, which an older build does not send, sessions and handover (the run switch, runner/switch-plan.ts), the
+// owner (the person accountable) and auto_reason, which an older build does not send, sessions and handover (the run switch, runner/switch-plan.ts), the
 // queued run (runner/switch.ts), and continued_from (a continued thread's source, apps/server/continue.ts).
 
 const COLUMNS = [
@@ -39,6 +39,7 @@ const wait = db.prepare(
 const unwait = db.prepare('DELETE FROM sync_folder_wait WHERE thread_id = ?');
 const setPinned = db.prepare('UPDATE threads SET pinned_at = ? WHERE id = ?');
 const setDone = db.prepare('UPDATE threads SET done_at = ? WHERE id = ?');
+const setOwner = db.prepare('UPDATE threads SET owner = ? WHERE id = ?');
 const setAutoReason = db.prepare('UPDATE threads SET auto_reason = ? WHERE id = ?');
 const setSessionState = db.prepare('UPDATE threads SET sessions = ?, handover = ? WHERE id = ?');
 const setQueuedRun = db.prepare('UPDATE threads SET queued_harness = ?, queued_model = ?, queued_effort = ? WHERE id = ?');
@@ -154,6 +155,7 @@ registerHandler('thread', {
     if (took('folder_id')) file(change.entity_id, t.channel_id, t.folder_id ?? null);
     if (took('pinned_at')) setPinned.run(t.pinned_at ?? null, change.entity_id);
     if (took('done_at')) setDone.run(t.done_at ?? null, change.entity_id);
+    if (took('owner')) setOwner.run(t.owner ?? null, change.entity_id);
     if (took('auto_reason')) setAutoReason.run(t.auto_reason ?? null, change.entity_id);
     if (took('sessions') || took('handover')) {
       const s = merged.row as Partial<StoredSessionState>;

@@ -19,7 +19,9 @@ export function ThreadRowView({ row, onPress, onLongPress }: { row: ThreadRow & 
   const marked = row.target.done ? 'Marked done' : null;
   const glyph = row.target.done ? 'settled' : glyphFor(row.status);
   const settled = !row.busy && (row.target.done || row.status !== 'failed');
-  const meta = [channel, marked].filter(Boolean).join(' · ');
+  // The server stores no owner for the user's own threads, so any owner it names is someone else's (thread-owner.ts).
+  const owner = row.owner ? `for ${row.owner}` : null;
+  const meta = [channel, owner, marked].filter(Boolean).join(' · ');
   return (
     <Pressable
       accessibilityRole="button"

@@ -231,6 +231,13 @@ export function useHereName(): string | undefined {
   return useContext(Ctx)?.status?.device?.name;
 }
 
+/** The user's own name, for owner labels (thread-owner.ts). Undefined until the profile loads, or outside the provider. */
+export const useUserName = (): string | undefined => useContext(Ctx)?.profile?.name;
+
+/** The crew roles, for role names. Empty until they load, or outside the provider. */
+export const useCrewRoles = (): readonly CrewRole[] => useContext(Ctx)?.crew ?? NO_CREW;
+const NO_CREW: readonly CrewRole[] = [];
+
 /** Subscribe to /feed events for the lifetime of the component. */
 export function useFeed(fn: (e: FeedEvent) => void) {
   const { subscribe } = useApp();

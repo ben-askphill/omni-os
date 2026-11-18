@@ -4,6 +4,7 @@ import type { Thread, ThreadStub } from '../api.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
 import { PHASE, STATUS, threadGlyph, threadPhase, type Phase } from '@omni/shared/status.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
+import { ownedByOther } from '@omni/shared/thread-owner.ts';
 
 export interface RowItem {
   id: string;
@@ -32,14 +33,17 @@ export interface ChannelInfo {
 }
 
 /** Enough of a thread to list it: a full row, or the stub the pinned list types it as. */
-export type ListedThread = ThreadStub & Partial<Pick<Thread, 'role' | 'updated_at'>>;
+export type ListedThread = ThreadStub & Partial<Pick<Thread, 'role' | 'updated_at' | 'owner'>>;
 
 /** "3m", "2h", "now": a list's time column, without the "ago". */
 export const shortTime = (iso: string, now: number) => relTime(iso, now).replace(/ ago$/, '').replace(/^just now$/, 'now');
 
-export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: number): RowItem {
+/** `user`: the user's own name, so a thread someone else owns says "for <name>" on its second line. */
+export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: number, user?: string | null): RowItem {
   const glyph = threadGlyph(t);
   const phase = glyph === 'running' || glyph === 'queued' ? threadPhase(t) : null;
+  const state = glyph === 'done' || glyph === 'idle' ? null : t.status === 'running' ? runningLabel(t, phase ? PHASE[phase].label : STATUS[glyph].label) : phase ? PHASE[phase].label : STATUS[glyph].label;
+  const owner = ownedByOther(t.owner, user) ? `for ${t.owner}` : null;
   return {
     id: t.id,
     title: t.title || 'Untitled',
@@ -52,6 +56,6 @@ export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: nu
     ...(phase && { phase }),
     settled: !isWorking(t),
     time: shortTime(t.updated_at ?? t.created_at, now),
-    meta: glyph === 'done' || glyph === 'idle' ? null : t.status === 'running' ? runningLabel(t, phase ? PHASE[phase].label : STATUS[glyph].label) : phase ? PHASE[phase].label : STATUS[glyph].label,
+    meta: [state, owner].filter(Boolean).join(' · ') || null,
   };
 }

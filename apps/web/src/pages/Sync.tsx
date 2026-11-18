@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SyncSignedIn, type SyncStatus } from '../api.ts';
@@ -25,9 +25,14 @@ function stateOf(s: Status): { label: string; dot: string } {
 
 const WHAT_SYNCS = 'Channels, threads, transcripts, artifacts, automation runs and settings sync through an append-only change log. Secrets, browser profiles, worktrees and logs stay here.';
 
-export function SyncSection() {
+/**
+ * Settings, Sync. One computer is enough to start, so until sync is set up this is one card with a Set up sync button.
+ * `children` (signing keys, refused changes, the path map) show only once it is.
+ */
+export function SyncSection({ children }: { children?: ReactNode }) {
   const res = useApi<Status>('/sync/status');
   const { reload } = res;
+  const [wanted, setWanted] = useState(false);
 
   // The worker runs on its own; poll so the numbers move while the page is open.
   useEffect(() => {
@@ -38,12 +43,37 @@ export function SyncSection() {
   const s = res.data;
   if (res.error) return <ErrorNote onRetry={reload}>{res.error}</ErrorNote>;
   if (!s) return <Loading />;
+  if (!s.configured && !s.legacyRelay && !wanted) return <OneComputerCard onSetUp={() => setWanted(true)} />;
   return (
     <>
       {s.configured && <StatusCard s={s} onChange={reload} />}
       {(!s.configured || s.signedOut) && <SignInForm again={s.configured} legacy={s.legacyRelay} onDone={reload} />}
       {s.configured && <AccountCard onChange={reload} />}
+      {s.configured && children}
     </>
+  );
+}
+
+function OneComputerCard({ onSetUp }: { onSetUp: () => void }) {
+  return (
+    <Card
+      entry="sync-status"
+      title="One computer is enough"
+      subtitle="Omni keeps everything on this computer. Sync is for a second computer: it copies your channels and threads through a relay you deploy to your own Cloudflare account."
+    >
+      <p className="text-[13px] leading-relaxed text-fg-2" data-sync-phone>
+        A phone does not need sync. Pair it under{' '}
+        <a className="font-medium text-fg underline underline-offset-2" href={href.settingsSection('access', 'ios')}>
+          Sharing &amp; access
+        </a>
+        .
+      </p>
+      <div>
+        <Button variant="secondary" size="sm" icon="refresh" onClick={onSetUp}>
+          Set up sync
+        </Button>
+      </div>
+    </Card>
   );
 }
 
