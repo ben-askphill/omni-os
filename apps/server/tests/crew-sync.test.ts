@@ -276,4 +276,21 @@ describe('crew files across machines', () => {
     expect(getCrew('by-hand')?.name).toBe('Theirs');
   });
 
+  it('queues its crew files again when the relay lost them (Sync backfill), each at the time of its last write', async () => {
+    const { backfill } = await import('../sync/backfill.ts');
+    expect((await call('POST', '/crew', { id: 'saved-here', fields: { name: 'Saved here' }, charter: 'Mine.' })).status).toBe(201);
+    writeFileSync(ownPath('hand-later'), '---\nname: Hand later\n---\nTyped in an editor after the seed.\n');
+    expect((await worker.syncNow()).error).toBeUndefined();
+    const recorded = (db.prepare(`SELECT ts FROM sync_meta WHERE entity = 'crew_file' AND entity_id = 'saved-here'`).get() as { ts: string }).ts;
+    // The relay lost its history: nothing waits to go out, and the one-time seed ran long ago.
+    db.exec('DELETE FROM sync_outbox');
+    const count = backfill().find((c) => c.entity === 'crew_file');
+    // by-hand and builder were last written by mac-b, which sends its own.
+    expect(count).toMatchObject({ total: 4, queued: 2, elsewhere: 2 });
+    const queued = db.prepare(`SELECT entity_id, ts FROM sync_outbox WHERE entity = 'crew_file' ORDER BY entity_id`).all() as { entity_id: string; ts: string }[];
+    expect(queued.map((r) => ({ ...r }))).toEqual([
+      { entity_id: 'hand-later', ts: SEED_TS },
+      { entity_id: 'saved-here', ts: recorded },
+    ]);
+  });
 });
