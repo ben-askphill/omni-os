@@ -1,6 +1,8 @@
 import { ASK_PREFIX } from '@omni/shared/update-fleet.ts';
-import { db, kv, outbox } from '../db.ts';
+import { db, kv, outbox, remoteCommands, threads, type RemoteCommand } from '../db.ts';
+import { COMMAND_KINDS } from '../db/repos/remote-commands.ts';
 import { resolved } from '../user-config.ts';
+import { deviceRecord } from './device-records.ts';
 import { keyring } from './keyring.ts';
 import { OWNER_KEY } from './owner.ts';
 import { unsigned, verifyChange, type Verdict } from './signing.ts';
@@ -177,7 +179,10 @@ function logHeld(c: Pick<Change, 'machine_id' | 'entity' | 'entity_id'>, reason:
   ).run(key, c.machine_id, c.entity, c.entity_id, reason, now);
 }
 
-/** Confirming a key never authorizes unseen actions. Called in the confirmation transaction, before sync resumes. */
+/**
+ * Confirming a key never authorizes unseen actions. Called in the confirmation transaction, before sync resumes. A
+ * command for this machine is answered as rejected, so its sender says it was not delivered instead of waiting a day.
+ */
 export function discardHeld(machine: string) {
   const rows = db.prepare('SELECT seq, change FROM sync_deferred').all() as { seq: number; change: string }[];
   db.prepare('DELETE FROM sync_refused WHERE machine = ? AND reason IN (?, ?)').run(machine, UNTRUSTED, KEY_CHANGED);
@@ -187,7 +192,43 @@ export function discardHeld(machine: string) {
     if (change.machine_id !== machine || !isActionChange(change)) continue;
     logRefused(change, 'discarded when the key was confirmed; send again if still needed', false);
     db.prepare('DELETE FROM sync_deferred WHERE seq = ?').run(row.seq);
+    answerDropped(change);
   }
+}
+
+const KINDS: readonly unknown[] = COMMAND_KINDS;
+const isId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(v);
+
+/** A dropped command its signer sent to this machine, for a thread here: saved as rejected and synced back, never run. */
+function answerDropped(c: RemoteChange) {
+  const self = outbox.machineId();
+  const d = (c.data ?? {}) as Partial<RemoteCommand>;
+  if (c.entity !== 'remote_command' || c.op !== 'upsert' || !self || d.target !== self || d.sender !== c.machine_id || d.state !== 'sent') return;
+  if (!isId(c.entity_id) || !KINDS.includes(d.kind) || !isId(d.thread_id) || !threads.get(d.thread_id) || typeof d.expires_at !== 'string') return;
+  const here = typeof d.target_name === 'string' && d.target_name ? d.target_name : (deviceRecord(self)?.name ?? self);
+  const sender = deviceRecord(c.machine_id)?.name ?? c.machine_id;
+  remoteCommands.saveRejected(
+    {
+      id: c.entity_id,
+      thread_id: d.thread_id,
+      kind: d.kind!,
+      sender: c.machine_id,
+      target: self,
+      target_name: here,
+      prompt: typeof d.prompt === 'string' ? d.prompt : '',
+      mode: d.mode === 'steer' || d.mode === 'queue' || d.mode === 'interrupt' ? d.mode : null,
+      source: d.source === 'ben' || d.source === 'conductor' ? d.source : null,
+      context: Array.isArray(d.context) ? d.context : null,
+      files: Array.isArray(d.files) ? d.files : null,
+      report_key: typeof d.report_key === 'string' ? d.report_key : null,
+      report: d.report && typeof d.report === 'object' && !Array.isArray(d.report) ? d.report : null,
+      limit_action: d.limit_action === 'resume' || d.limit_action === 'schedule' || d.limit_action === 'cancel' ? d.limit_action : null,
+      expires_at: d.expires_at,
+      created_at: typeof d.created_at === 'string' ? d.created_at : c.ts,
+    },
+    self,
+    `${here} dropped it unread when you confirmed ${sender}'s key there. Send it again.`,
+  );
 }
 
 /** The machines whose actions this one holds, and how many, for the Inbox and Sync settings. */

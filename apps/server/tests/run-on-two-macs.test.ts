@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { generateKeyPairSync } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { newContext } from '@omni/shared/message-context.ts';
 import { terminalExcerpt, selectExcerpt } from '@omni/shared/message-context-terminal.ts';
+import { rawPublicKey } from '../sync/signing.ts';
 import { MemoryTransport } from '../sync/transport.ts';
 import { FAKE_CODEX, tailscaleStatus, waitFor } from './support.ts';
 import { bootMac, type Mac } from './two-macs.ts';
@@ -156,6 +158,32 @@ describe('a thread run on another machine', () => {
     await both();
     await waitFor(() => userTexts(b, id).some((t) => t.includes('Push it yourself later?')), () => `the answer on B: ${JSON.stringify(userTexts(b, id))}`);
     expect(stateOn(b, qid)).toBe('answered');
+  }, T.timeout);
+
+  it("hears that the machine running it dropped a message it held for the hub's new key", async () => {
+    // B pinned another key for A than the one A signs with now, as after A's key changed: B holds A's actions until
+    // Ben confirms the new key there, and confirming drops them unread.
+    const keyOfA = (b.db.db.prepare('SELECT sign_key FROM sync_keys WHERE machine_id = ?').get('mac-a') as { sign_key: string }).sign_key;
+    const older = rawPublicKey(generateKeyPairSync('ed25519').privateKey);
+    b.db.db.prepare('UPDATE sync_keys SET sign_key = ?, seen_sign_key = ?, seen_at = ? WHERE machine_id = ?').run(older, keyOfA, new Date().toISOString(), 'mac-a');
+    b.db.db.prepare('UPDATE sync_trusted SET sign_key = ? WHERE machine_id = ?').run(older, 'mac-a');
+    const forwarded = async (m: Mac) => ((await m.json(`/threads/${id}`)).body.pending as { forwarded_to?: string }[]).filter((p) => p.forwarded_to);
+
+    const res = await a.json(`/threads/${id}/messages`, { body: { prompt: 'run a review', request_id: 'msg-held' } });
+    expect(res.body.forwarded_to).toBe('Box B');
+    await both();
+    expect(b.db.remoteCommands.get('msg-held')).toBeUndefined();
+    expect((await b.json('/sync/refused')).body).toContainEqual(expect.objectContaining({ entityId: 'msg-held', reason: 'waiting for the new key to be confirmed' }));
+
+    expect((await b.json('/sync/devices/mac-a/confirm-key', { body: {} })).status).toBe(200);
+    for (let n = 0; n < 5 && (await forwarded(a)).length; n++) await both();
+    // Still never run on B. A hears why instead of listing it as on its way for a day, and Ben can send it again.
+    expect(b.db.messageRequests.byRequestId(id, 'runon:msg-held')).toBeUndefined();
+    expect(a.db.remoteCommands.get('msg-held')).toMatchObject({ state: 'rejected', acked_by: 'box-b', reason: "Box B dropped it unread when you confirmed Mac A's key there. Send it again." });
+    expect(await forwarded(a)).toEqual([]);
+    expect(a.byKind(id, 'user').find((e) => e.p.command === 'msg-held')?.p).toMatchObject({ text: 'run a review', dropped: true, undelivered: expect.stringContaining('Send it again') });
+    // A's actions apply on B again from now on.
+    expect((await b.json('/sync/devices')).body.find((d: { id: string }) => d.id === 'mac-a')).toMatchObject({ trusted: true, keyChanged: false });
   }, T.timeout);
 });
 
