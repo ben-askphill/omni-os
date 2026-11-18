@@ -466,4 +466,29 @@ describe('signing keys in Sync settings', () => {
     // Restore the handler registration for any later sync.
     registerHandler('artifact', artifactHandler);
   });
+
+  it('answers a dropped command for this machine only when it verifies with the confirmed key, and with its ids only', async () => {
+    const { discardHeld } = await import('../sync/verify.ts');
+    const machine = 'answer-mac';
+    await pull(record(machine, rawPublicKey(keyOf(machine))));
+    const forMe = (id: string): Change => {
+      const c = commandFrom(machine, id);
+      return { ...c, data: { ...(c.data as object), target: 'this-mac', target_name: 'This Mac', prompt: 'run a review', context: [{ kind: 'note', text: 'x' }] } };
+    };
+    // Its own command, and one under its name signed with a key it never announced, as one deferred before it had a key can be.
+    const held = (seq: number, c: Change) => r.db.db.prepare('INSERT INTO sync_deferred (seq, change, error) VALUES (?, ?, ?)').run(seq, JSON.stringify({ ...c, seq }), 'held');
+    held(920_001, signAs(forMe('cmd-answer-own')));
+    held(920_002, signChange(forMe('cmd-answer-forged'), generateKeyPairSync('ed25519').privateKey));
+    discardHeld(machine);
+    expect(r.db.remoteCommands.get('cmd-answer-own')).toMatchObject({
+      state: 'rejected', acked_by: 'this-mac', sender: machine, target: 'this-mac', prompt: '', context: null,
+      reason: "This Mac dropped it unread when you confirmed ANSWER-MAC's key there. Send it again.",
+    });
+    const queued = (id: string) => !!r.db.db.prepare("SELECT 1 FROM sync_outbox WHERE entity = 'remote_command' AND entity_id = ?").get(id);
+    expect(queued('cmd-answer-own')).toBe(true);
+    // Never answered under this machine's signature: no row, nothing pushed, and its id stays free for its sender.
+    expect(stored('cmd-answer-forged')).toBe(false);
+    expect(queued('cmd-answer-forged')).toBe(false);
+    expect(r.db.db.prepare('SELECT COUNT(*) AS n FROM sync_deferred WHERE seq IN (920001, 920002)').get()).toEqual({ n: 0 });
+  });
 });

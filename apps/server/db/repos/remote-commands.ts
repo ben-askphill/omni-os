@@ -97,6 +97,26 @@ export const remoteCommands = {
     });
   },
 
+  /**
+   * A command this machine held unread and then dropped (sync/verify.ts discardHeld): saved as rejected with why, never
+   * as sent, so nothing acts on it, and synced, so its sender stops listing it as on its way. False when it is here already.
+   */
+  saveRejected(c: NewRemoteCommand & { created_at: string }, by: string, reason: string): boolean {
+    return tx(() => {
+      const at = now();
+      const fresh =
+        db
+          .prepare(`INSERT INTO remote_commands (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'rejected', ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`)
+          .run(
+            c.id, c.thread_id, c.kind, c.sender, c.target, c.target_name, c.prompt ?? '', c.mode ?? null, c.source ?? null,
+            c.context?.length ? JSON.stringify(c.context) : null, c.files?.length ? JSON.stringify(c.files) : null,
+            c.report_key ?? null, c.report ? JSON.stringify(c.report) : null, c.limit_action ?? null, reason, by, c.created_at, c.expires_at, at,
+          ).changes > 0;
+      if (fresh) record('remote_command', c.id);
+      return fresh;
+    });
+  },
+
   get: (id: string) => parse(db.prepare(`SELECT ${COLUMNS} FROM remote_commands WHERE id = ?`).get(id) as Row | undefined),
 
   /** A thread's commands, newest first: the record of what was sent elsewhere and what came of it. */
