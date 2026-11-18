@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { href, navigate, parseHash, startNewThread } from '../src/router.ts';
+import { dropNewThreadPreset, href, navigate, openNewThread, parseHash, peekNewThreadPreset, setInboxUp, startNewThread, type Route } from '../src/router.ts';
+import { cameFromInbox, listMode, railSelection } from '../src/rail-model.ts';
 
 // The web tests run in node: stand in a location and history that keep the hash the way a browser does.
 const loc = { hash: '' };
@@ -11,7 +12,11 @@ beforeEach(() => {
   vi.stubGlobal('history', hist);
   vi.stubGlobal('HashChangeEvent', class extends Event {});
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  setInboxUp(false);
+  for (const p of [peekNewThreadPreset(), peekNewThreadPreset('acme'), peekNewThreadPreset('conductor')]) if (p) dropNewThreadPreset(p);
+  vi.unstubAllGlobals();
+});
 
 describe('navigate', () => {
   it('opens a channel\'s settings from the context menu\'s href, with one hash', () => {
@@ -122,5 +127,56 @@ describe('startNewThread', () => {
   it('opens Home from a page outside any channel', () => {
     expect(from('#/secrets')).toBe('#/');
     expect(from('#/')).toBe('#/');
+  });
+});
+
+describe('a new thread with the Inbox up', () => {
+  const conductor = { id: 'c1', channel_id: 'conductor' };
+
+  it('opens Home\'s composer, set to the open thread\'s channel, instead of the channel page', () => {
+    setInboxUp(true);
+    loc.hash = '#/t/c1';
+    startNewThread(parseHash(loc.hash), conductor);
+    expect(loc.hash).toBe('#/');
+    // Home's composer (no channel of its own) takes the preset; the Conductor channel page never sees it.
+    expect(peekNewThreadPreset()).toEqual({ channel: 'conductor' });
+    expect(peekNewThreadPreset('conductor')).toBeNull();
+  });
+
+  it('sends /new, Open items and Next thread to Home\'s composer too', () => {
+    setInboxUp(true);
+    loc.hash = '#/t/t1';
+    openNewThread({ channel: 'acme', prompt: 'Fix the docs' });
+    expect(loc.hash).toBe('#/');
+    expect(peekNewThreadPreset()).toEqual({ channel: 'acme', prompt: 'Fix the docs' });
+    expect(peekNewThreadPreset('acme')).toBeNull();
+  });
+
+  it('still opens the channel\'s page when the Inbox is not up', () => {
+    loc.hash = '#/t/c1';
+    startNewThread(parseHash(loc.hash), conductor);
+    expect(loc.hash).toBe('#/c/conductor');
+    openNewThread({ channel: 'acme' });
+    expect(loc.hash).toBe('#/c/acme');
+    expect(peekNewThreadPreset('acme')).toEqual({ channel: 'acme' });
+    expect(peekNewThreadPreset()).toBeNull();
+  });
+
+  it('keeps the rail on the Inbox from the Conductor thread to the thread it starts', () => {
+    // Ben opens the Conductor thread from the Inbox, presses New thread, and starts a thread from the composer.
+    let fromInbox = cameFromInbox({ name: 'inbox' }, false);
+    const step = (route: Route, open: { id: string; channel_id: string } | null) => {
+      fromInbox = cameFromInbox(route, fromInbox);
+      setInboxUp(listMode(railSelection(route, open, fromInbox)).kind === 'inbox');
+      return railSelection(route, open, fromInbox);
+    };
+    expect(step({ name: 'thread', id: 'c1' }, conductor)).toEqual({ kind: 'inbox', marked: 'conductor' });
+
+    startNewThread(parseHash('#/t/c1'), conductor);
+    expect(step(parseHash(loc.hash), conductor)).toEqual({ kind: 'inbox' });
+
+    // The composer navigates to the thread it started (Composer.tsx), which opens beside the Inbox.
+    navigate('/t/t2');
+    expect(step(parseHash(loc.hash), { id: 't2', channel_id: 'conductor' })).toEqual({ kind: 'inbox', marked: 'conductor' });
   });
 });

@@ -7,7 +7,7 @@ import { Sidebar } from './components/Sidebar.tsx';
 import { BrowserNotifier } from './components/BrowserNotifier.tsx';
 import { DesktopHooks, useDesktopLayoutActions } from './components/DesktopHooks.tsx';
 import { ThreadNotifier, ToastProvider } from './components/Toaster.tsx';
-import { startNewThread, useRoute } from './router.ts';
+import { setInboxUp, startNewThread, useRoute } from './router.ts';
 import { Page } from './pages/Page.tsx';
 import { AppProvider, readPref, useApp, useIsMobile, usePageTitle, useSyncOnReturn, writePref } from './store.tsx';
 import { FolderDeleteDialog, FolderProvider } from './folders.tsx';
@@ -121,6 +121,13 @@ function Shell() {
     writePref('rail.inbox', fromInbox);
   }, [fromInbox, lastFromInbox]);
   const selection = railSelection(route, openThread, fromInbox);
+  // With the Inbox in the rail's panel, New thread, /new and the like open Home's composer beside it, not a channel's
+  // page, so the thread Ben starts opens in the Inbox too. The Classic sidebar keeps its Inbox view on any page.
+  const inboxUp = layout === 'rail' && listMode(selection).kind === 'inbox';
+  useEffect(() => {
+    setInboxUp(inboxUp);
+    return () => setInboxUp(false);
+  }, [inboxUp]);
   // The desktop app puts its macOS traffic lights where this layout leaves room for them (apps/desktop windows.ts).
   // The rail also swaps the type faces (index.css :root[data-layout]); the phone layout keeps Apple's.
   useEffect(() => {

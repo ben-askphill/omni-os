@@ -1,24 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Artifact } from '../api.ts';
 import { PANEL_MIN, THREAD_MIN, defaultPanelWidth } from '../components/thread/panel/PanelResizeHandle.tsx';
 import { readPref, writePref } from '../store.tsx';
 import { readThreadPanelSurface, writeThreadPanelSurface, type ThreadPanelSurface } from './thread-panel-surface.ts';
 
 /**
- * The right side of a thread: a compact quick card by default, the full inspector on demand, or collapsed. Width applies
- * to the inspector only. It opens to the inspector for an artifact link and when a new HTML artifact lands, and keeps a
- * wide panel from squeezing the transcript below THREAD_MIN by measuring the page.
+ * The right side of a thread: the compact quick card by default, the full inspector only when Ben clicks into it (a
+ * card row, the header, an artifact link, a delegate count), or collapsed. Nothing opens the inspector by itself, not a
+ * new artifact and not the last thread's panel. Width applies to the inspector only. It keeps a wide panel from
+ * squeezing the transcript below THREAD_MIN by measuring the page.
  */
 export function useThreadPanel({
   artifactParam,
-  files,
-  ready,
   loaded,
   select,
 }: {
   artifactParam: number | undefined;
-  files: Artifact[];
-  ready: boolean;
   /** Whether the thread has arrived: the page root only exists then. */
   loaded: boolean;
   /** Show the linked artifact in the panel. */
@@ -43,15 +39,6 @@ export function useThreadPanel({
       set('inspector');
     }
   }, [artifactParam, select, set]);
-
-  // Open the inspector when a new HTML artifact lands.
-  const prevFiles = useRef(0);
-  useEffect(() => {
-    if (ready && files.length > prevFiles.current && prevFiles.current > 0 && files[files.length - 1]?.kind === 'html') {
-      set('inspector');
-    }
-    prevFiles.current = files.length;
-  }, [files, ready, set]);
 
   // Track the thread view width so a wide panel never squeezes the transcript below THREAD_MIN.
   useLayoutEffect(() => {

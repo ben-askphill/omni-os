@@ -198,12 +198,24 @@ export function takeComposerFocus() {
   return v;
 }
 
+// ---------- staying in the Inbox ----------
+
+// Whether the desktop shell has the Inbox up (App.tsx, rail-model.ts cameFromInbox). A new thread started there opens
+// the composer on the Inbox's own page, the Overview, rather than on a channel's: a channel page would swap the Inbox
+// for that channel's list, and the thread started from it would open there too.
+let inboxUp = false;
+export function setInboxUp(on: boolean) {
+  inboxUp = on;
+}
+
 /**
  * New thread from the sidebar or the palette: the current channel's composer, the open thread's channel on a thread,
- * else Home's. `open` is the store's open thread, which counts only while it is the one the route shows.
+ * else Home's. With the Inbox up, Home's composer, set to the open thread's channel. `open` is the store's open thread,
+ * which counts only while it is the one the route shows.
  */
 export function startNewThread(route: Route, open: { id: string; channel_id: string } | null) {
   const channel = route.name === 'channel' ? route.id : route.name === 'thread' && open?.id === route.id ? open.channel_id : null;
+  if (channel && inboxUp) return openNewThread({ channel });
   if (channel) {
     if (route.name !== 'channel' || route.tab !== 'threads') navigate(`/c/${encodeURIComponent(channel)}`);
   } else if (route.name !== 'home') navigate('/');
@@ -213,6 +225,8 @@ export function startNewThread(route: Route, open: { id: string; channel_id: str
 // ---------- a new thread from a thread (`/clear`) ----------
 
 let preset: NewThreadPreset | null = null;
+// Where the preset waits: on its channel's page, or on Home's composer when the Inbox was up.
+let presetHome = false;
 // Counts presets, so a composer already open on the channel (the folder's "New thread here") remounts to read it.
 let presetSeq = 0;
 const presetListeners = new Set<() => void>();
@@ -222,18 +236,22 @@ export const usePresetSeq = () =>
     () => presetSeq,
   );
 
-/** Open the channel's new-thread composer, set up from `p`. */
+/** Open the channel's new-thread composer, set up from `p`: Home's with the Inbox up, so the Inbox stays beside it. */
 export function openNewThread(p: NewThreadPreset) {
   preset = p;
+  presetHome = inboxUp;
   presetSeq++;
   presetListeners.forEach((fn) => fn());
   // The model picker takes the focus itself.
   if (!p.pickModel) focusPending = true;
-  navigate(`/c/${encodeURIComponent(p.channel)}`);
+  navigate(presetHome ? '/' : `/c/${encodeURIComponent(p.channel)}`);
 }
 
-/** The preset waiting for this channel's composer. Read while rendering, so it stays until `dropNewThreadPreset`. */
-export const peekNewThreadPreset = (channel: string) => (preset?.channel === channel ? preset : null);
+/**
+ * The preset waiting for a composer. Read while rendering, so it stays until `dropNewThreadPreset`. A channel's
+ * composer passes its channel; Home's passes none and takes one left for it with the Inbox up.
+ */
+export const peekNewThreadPreset = (channel?: string) => (channel === undefined ? (presetHome ? preset : null) : !presetHome && preset?.channel === channel ? preset : null);
 export function dropNewThreadPreset(p: NewThreadPreset) {
   if (preset === p) preset = null;
 }
