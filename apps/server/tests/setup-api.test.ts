@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -179,6 +179,115 @@ describe('GET /api/setup/github', () => {
     expect(body.state).toBe('error');
     expect(body.command).toBeUndefined();
     expect(body.reason).toMatch(/\.$/);
+  });
+});
+
+describe('Connect GitHub: gh auth login --web', () => {
+  // A gh that signs in the way the real one does without a terminal: the code and page on stderr, then a wait until
+  // the test writes what the person did on GitHub into `answer`. `auth status` reads whether it signed in.
+  const dir = join(home, 'gh-login');
+  const bin = join(dir, 'gh');
+  const answer = (what: 'ok' | 'deny' | 'expire') => writeFileSync(join(dir, 'answer'), what);
+  const fakeLogin = (login = "printf '\\n! First copy your one-time code: AB12-CD34\\nOpen this URL to continue in your web browser: https://github.com/login/device\\n' >&2") => {
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      bin,
+      [
+        '#!/bin/sh',
+        'd=$(dirname "$0")',
+        'if [ "$1 $2" = "auth status" ]; then',
+        '  if [ -f "$d/signed-in" ]; then printf "github.com\\n  ✓ Logged in to github.com account ada-l (keyring)\\n  - Active account: true\\n"; exit 0; fi',
+        '  echo "You are not logged into any GitHub hosts. To log in, run: gh auth login" >&2; exit 1',
+        'fi',
+        'echo "$*" > "$d/args"',
+        login,
+        'while [ ! -f "$d/answer" ]; do sleep 0.02; done',
+        'case "$(cat "$d/answer")" in',
+        '  ok) touch "$d/signed-in"; printf "✓ Authentication complete.\\n✓ Logged in as ada-l\\n" >&2; exit 0;;',
+        '  deny) echo "failed to authenticate via web browser: access_denied" >&2; exit 1;;',
+        '  expire) echo "failed to authenticate via web browser: authentication timed out" >&2; exit 1;;',
+        'esac',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    configureGithubAuth({ bin, platform: 'darwin', startMs: 5_000 });
+  };
+  /** Polls the way the page does until the sign-in is no longer pending. */
+  const settle = async (flow: { flow: string; secret: string }) => {
+    for (let i = 0; i < 200; i++) {
+      const r = await json(await send('POST', '/api/setup/github/login/poll', { flow: flow.flow, secret: flow.secret }));
+      if (r.state !== 'pending') return r;
+      await new Promise((ok) => setTimeout(ok, 20));
+    }
+    throw new Error('still pending');
+  };
+
+  it('answers the code and the page, then signed in with the login gh auth status reads', async () => {
+    fakeLogin();
+    const res = await send('POST', '/api/setup/github/login', {});
+    expect(res.status).toBe(200);
+    const flow = await json(res);
+    expect(flow).toMatchObject({ userCode: 'AB12-CD34', verificationUri: 'https://github.com/login/device', verificationUriComplete: null, interval: 2 });
+    expect(readFileSync(join(dir, 'args'), 'utf8').trim()).toBe('auth login --web --hostname github.com');
+    expect(await json(await send('POST', '/api/setup/github/login/poll', { flow: flow.flow, secret: flow.secret }))).toEqual({ state: 'pending' });
+    answer('ok');
+    expect(await settle(flow)).toEqual({ state: 'signed_in', login: 'ada-l' });
+    expect(await json(await send('GET', '/api/setup/github'))).toEqual({ state: 'ready', login: 'ada-l' });
+  });
+
+  it('declined on GitHub, or the code expired', async () => {
+    fakeLogin();
+    let flow = await json(await send('POST', '/api/setup/github/login', {}));
+    answer('deny');
+    expect(await settle(flow)).toEqual({ state: 'denied' });
+    fakeLogin();
+    flow = await json(await send('POST', '/api/setup/github/login', {}));
+    answer('expire');
+    expect(await settle(flow)).toEqual({ state: 'expired' });
+  });
+
+  it('Cancel stops gh, so a code entered afterwards signs nothing in', async () => {
+    fakeLogin();
+    const flow = await json(await send('POST', '/api/setup/github/login', {}));
+    expect((await send('POST', '/api/setup/github/login/cancel', { flow: flow.flow, secret: flow.secret })).status).toBe(200);
+    expect(await settle(flow)).toEqual({ state: 'refused', error: 'Cancelled.' });
+    await new Promise((ok) => setTimeout(ok, 100));
+    answer('ok');
+    await new Promise((ok) => setTimeout(ok, 150));
+    expect(existsSync(join(dir, 'signed-in'))).toBe(false);
+  });
+
+  it('only the page holding the secret polls or cancels, and a second Connect replaces the first', async () => {
+    fakeLogin();
+    const first = await json(await send('POST', '/api/setup/github/login', {}));
+    expect((await send('POST', '/api/setup/github/login/poll', { flow: first.flow, secret: 'nope' })).status).toBe(404);
+    expect((await send('POST', '/api/setup/github/login/cancel', { flow: first.flow, secret: 'nope' })).status).toBe(404);
+    expect((await send('POST', '/api/setup/github/login/poll', {})).status).toBe(400);
+    const second = await json(await send('POST', '/api/setup/github/login', {}));
+    expect(second.flow).not.toBe(first.flow);
+    const stale = await send('POST', '/api/setup/github/login/poll', { flow: first.flow, secret: first.secret });
+    expect(stale.status).toBe(404);
+    expect((await json(stale)).error).toBe('No such sign-in. Start again.');
+    await send('POST', '/api/setup/github/login/cancel', { flow: second.flow, secret: second.secret });
+  });
+
+  it('gh refusing before a code, a gh that prints none, and no gh: an error in words', async () => {
+    fakeLogin("echo 'The value of the GH_TOKEN environment variable is being used for authentication.' >&2; exit 1");
+    let res = await send('POST', '/api/setup/github/login', {});
+    expect(res.status).toBe(502);
+    expect((await json(res)).error).toBe('The value of the GH_TOKEN environment variable is being used for authentication.');
+
+    fakeLogin('sleep 5');
+    configureGithubAuth({ startMs: 200 });
+    res = await send('POST', '/api/setup/github/login', {});
+    expect(res.status).toBe(502);
+    expect((await json(res)).error).toContain('gh gave no sign-in code');
+
+    configureGithubAuth({ bin: join(dir, 'no-such-gh') });
+    res = await send('POST', '/api/setup/github/login', {});
+    expect(res.status).toBe(409);
+    expect((await json(res)).error).toBe('The GitHub CLI is not installed on the machine Omni runs on.');
   });
 });
 

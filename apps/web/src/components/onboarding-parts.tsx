@@ -1,13 +1,14 @@
 // The pieces the onboarding wizard (Onboarding.tsx) is built from: the screen frame, the form row, the step dots, the
 // harness check, and the timezone and pronoun fields Settings reuses.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { DesktopBridge } from '@omni/shared/desktop-bridge.ts';
-import { githubLine, type GithubCheck } from '@omni/shared/github-check.ts';
+import { githubLine, type GhLoginStart, type GithubCheck } from '@omni/shared/github-check.ts';
 import { accountsByHarness, machineAccounts, type AccountsView, type HarnessAccountView } from '@omni/shared/harness-accounts.ts';
 import { HARNESS_CHECK_LABEL, harnessAccountLine, harnessCheck, type HarnessCheck } from '@omni/shared/harness-check.ts';
 import { api, errorText, type HarnessWithRunning } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { desktop } from '../desktop.ts';
+import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
 import { Button, CopyButton, ErrorNote, Icon, Label, StatusDot, Toggle } from './ui.tsx';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
@@ -62,7 +63,8 @@ async function loadRows(): Promise<HarnessRows> {
   return { harnesses: harnesses.filter((h) => (h.id !== 'hermes' && h.id !== 'cursor-cloud') || h.available), accounts, github };
 }
 
-export function HarnessScreen() {
+/** `onGithub` hears the GitHub CLI's state each time it is read, so the Done screen can say whether it was connected. */
+export function HarnessScreen({ onGithub }: { onGithub?: (github: GithubCheck | null) => void }) {
   const [rows, setRows] = useState<HarnessRows | null>(null);
   const [checking, setChecking] = useState(false);
   const load = async () => {
@@ -80,6 +82,16 @@ export function HarnessScreen() {
   const claude = list?.find((h) => h.id === 'claude-code');
   const codex = list?.find((h) => h.id === 'codex');
   const github = rows?.github;
+  const heard = useRef(onGithub);
+  heard.current = onGithub;
+  useEffect(() => {
+    if (github !== undefined) heard.current?.(github);
+  }, [github]);
+  // Shown as signed in at once, then read again so the row matches what gh says.
+  const connected = (login: string) => {
+    setRows((r) => r && { ...r, github: { state: 'ready', login } });
+    void load().catch(() => {});
+  };
   const signedIn = list?.some((h) => harnessAccountLine(rows?.accounts[h.id]));
   return (
     <Screen
@@ -91,7 +103,17 @@ export function HarnessScreen() {
         {(list ?? []).map((h) => (
           <CheckRow key={h.id} id={h.id} name={h.name} plan={h.plan} check={harnessCheck(h)} note={HARNESS_NOTE[h.id]} account={harnessAccountLine(rows?.accounts[h.id])} />
         ))}
-        {github && <CheckRow id="github" name="GitHub CLI" plan="gh" check={github} note={GITHUB_NOTE} account={githubLine(github)} />}
+        {github && (
+          <CheckRow
+            id="github"
+            name="GitHub CLI"
+            plan="gh"
+            check={github}
+            note={GITHUB_NOTE}
+            account={githubLine(github)}
+            action={github.state === 'signed-out' ? <GithubConnect onDone={connected} /> : undefined}
+          />
+        )}
         {!list && <li className="py-6 text-center text-[13px] text-fg-3">Checking…</li>}
       </ul>
       {signedIn && <p className="text-[12px] leading-relaxed text-fg-3">Wrong account? Sign in to the right one in a terminal, then Check again. Settings {'>'} Accounts lists them later, for each of your machines.</p>}
@@ -115,8 +137,54 @@ export function HarnessScreen() {
 
 const GITHUB_NOTE = 'Pull requests: watching them, Auto-merge, rerunning failed checks and the Conductor’s PR reviews all run gh.';
 
-/** One harness, or the GitHub CLI: ready or not, who it is signed in as, and what to run when it is not ready. */
-function CheckRow({ id, name, plan, check, note, account }: { id: string; name: string; plan: string; check: HarnessCheck; note?: string; account?: string | null }) {
+const GITHUB_WORDS: DeviceCodeWords = {
+  intro: 'Enter this code on GitHub and approve. gh then signs in on the machine Omni runs on, and keeps the token itself.',
+  open: 'Open GitHub',
+  denied: 'Sign-in was declined on GitHub.',
+  expired: 'The code expired before it was entered. Connect again.',
+  cancelled: 'Cancelled. gh is still signed out.',
+};
+
+/**
+ * Connect GitHub: gh's own web sign-in (POST /api/setup/github/login runs `gh auth login --web`). The card shows
+ * gh's one-time code and links to GitHub's device page; Cancel stops gh. Skipping it changes nothing.
+ */
+function GithubConnect({ onDone }: { onDone: (login: string) => void }) {
+  return (
+    <DeviceCodeSignIn<{ state: 'signed_in'; login: string }>
+      label="Connect GitHub"
+      icon="plug"
+      variant="secondary"
+      start={() => api.post<GhLoginStart>('/setup/github/login', {})}
+      pollPath="/setup/github/login/poll"
+      onCancel={(f) => void api.post('/setup/github/login/cancel', { flow: f.flow, secret: f.secret }).catch(() => {})}
+      words={GITHUB_WORDS}
+      onDone={(r) => onDone(r.login)}
+    />
+  );
+}
+
+/**
+ * One harness, or the GitHub CLI: ready or not, who it is signed in as, and what to run when it is not ready.
+ * `action` sits above the commands, as Connect GitHub does.
+ */
+function CheckRow({
+  id,
+  name,
+  plan,
+  check,
+  note,
+  account,
+  action,
+}: {
+  id: string;
+  name: string;
+  plan: string;
+  check: HarnessCheck;
+  note?: string;
+  account?: string | null;
+  action?: ReactNode;
+}) {
   const ready = check.state === 'ready';
   return (
     <li className="rounded-[16px] bg-surface p-3.5" data-harness={id} data-state={check.state}>
@@ -136,6 +204,7 @@ function CheckRow({ id, name, plan, check, note, account }: { id: string; name: 
             </p>
           )}
           {note && <p className="text-[12px] leading-relaxed text-fg-3">{note}</p>}
+          {action}
           {check.install && <Command label="Install" cmd={check.install} />}
           {check.command && <Command label="Sign in" cmd={check.command} />}
           {check.reason && <p className="text-[12px] leading-relaxed text-fg-2">{check.reason}</p>}

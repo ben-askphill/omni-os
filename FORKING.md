@@ -21,7 +21,7 @@ Or skip `npm run setup` and answer the same questions in the Web UI or the deskt
 | Yours (in `data/`, gitignored) | Shared (in the repo) |
 | --- | --- |
 | `data/omni.config.json`: name, pronouns, email, timezone, folders, GitHub owner, integrations, automation on/off | `omni.config.example.json`: every field, with example values |
-| `data/crew/<role>.md`: your version of a charter | `crew/*.md`: the generic charters |
+| `data/crew/<role>.md`: your own roles, and overlays on the shipped ones | `crew/*.md`: the generic charters |
 | `data/automations/<id>.yaml`: your own automations | None: Omni ships no automations |
 | `data/omni.db`: channels, threads, folders, secret names | The schema and migrations |
 | `data/threads`, `data/worktrees`, `data/browsers`: thread files, checkouts, browser logins | |
@@ -41,7 +41,10 @@ The code copies of the tokens live in `apps/web/src/index.css`, `apps/ios/src/th
 
 ## Customising without touching tracked files
 
-- **A charter**: copy `crew/inbox.md` to `data/crew/inbox.md` and edit the copy. Your copy replaces the shared one.
+- **A charter**: put `data/crew/inbox.md` next to the shipped `crew/inbox.md`. It is an overlay: it sets only the
+  fields it names, and its body is added after the shipped charter (`charter_mode: append`) or replaces it
+  (`charter_mode: replace`, or a plain copy). A file with a new name is a role of your own. See
+  [docs/user/crew.md](docs/user/crew.md).
 - **An automation**: make, edit or toggle it in the Automations page. Omni writes it to
   `data/automations/<id>.yaml`. You can also write one there by hand. See
   [docs/user/automations.md](docs/user/automations.md).
