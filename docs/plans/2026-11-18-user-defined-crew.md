@@ -274,7 +274,7 @@ General rules:
 - **Format**: every current frontmatter key keeps its meaning. `delegate_only: true` reads as `tools: delegate-only`.
 - **Existing copies in `data/crew/`**: a file with no `charter_mode` and a shipped twin reads as `replace` (today's behavior) with `based_on` unknown. The list marks it "Compare with built-in" once, so Ben sees what he is missing, starting with his own `conductor.md` if he has one.
 - **Threads, automations and reports** store ids, which do not change. Nothing in the database migrates.
-- **Ben's personal content** moves from `crew/` to his `data/crew/` in S0, and S2 syncs it to his other machines.
+- **Ben's personal content** moves from `crew/` to his `data/crew/` in S0, and S2 syncs it to his other machines. As built: S0 drops it from `crew/` and hands Ben his four files (builder, researcher, inbox, store-ops) to drop into `data/crew/` on each machine before he installs a release with S0. Agents never write the live install's `data/`, so S0 cannot place them itself.
 
 ### 6.2 Slices
 
