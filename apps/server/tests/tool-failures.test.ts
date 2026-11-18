@@ -223,4 +223,12 @@ describe('adapter failure signals', () => {
       ['Invalid arguments for tool "browser_click"', 'invalid_input'],
     ]) expect(classifyFailure(text)).toBe(category);
   });
+  it('files a claude.ai connector sign-in prompt and its field validation under actionable categories', () => {
+    for (const [text, category] of [
+      ['MCP server "claude.ai Google Calendar" needs you to sign in again (run /mcp to re-authenticate)', 'authentication'],
+      ['MCP server "claude.ai Gmail" needs you to sign in again (run /mcp to re-authenticate)', 'authentication'],
+      ['end_time must be an ISO 8601 timestamp.', 'invalid_input'],
+      ['Exit code 1\nplease sign in again\nfield must be an ISO 8601 timestamp', 'command_exit'],
+    ]) expect(classifyFailure(text)).toBe(category);
+  });
 });
