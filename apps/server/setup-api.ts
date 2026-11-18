@@ -1,12 +1,13 @@
 // /api/setup: the user config behind onboarding and Settings in the Web UI. `npm run setup`
 // (apps/server/scripts/setup.ts) writes the same file from a terminal.
 import { randomUUID } from 'node:crypto';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { z } from 'zod';
 import type { ServerOptionsState, SetupState } from '@omni/shared/settings.ts';
 import { BUNDLED, paths } from './config.ts';
 import { serverOptions } from './server-options.ts';
 import { getCrew } from './crew.ts';
-import { githubAuth } from './github-auth.ts';
+import { cancelGithubLogin, GhLoginError, githubAuth, pollGithubLogin, startGithubLogin } from './github-auth.ts';
 import { channels, threads } from './db.ts';
 import { prepareWorkdir } from './sandbox.ts';
 import { addEvent, emitThread } from './runner/state.ts';
@@ -68,6 +69,44 @@ setupApi.get('/github', async (c) => c.json(await githubAuth()));
 setupApi.use('*', async (c, next) => {
   if (c.req.method !== 'GET' && !/^application\/json\b/i.test(c.req.header('content-type') ?? '')) return c.json({ error: 'send JSON' }, 415);
   await next();
+});
+
+// Connect GitHub on the Harnesses step: gh's own web sign-in on this machine (github-auth.ts). Start answers the
+// one-time code, the page polls until gh has finished, and Cancel stops gh. The token stays with gh.
+const LoginBody = z.object({ flow: z.string().min(1).max(100), secret: z.string().min(1).max(200) });
+
+function loginError(c: Context, err: unknown) {
+  if (err instanceof GhLoginError) return c.json({ error: err.message }, err.status);
+  throw err;
+}
+
+setupApi.post('/github/login', async (c) => {
+  try {
+    return c.json(await startGithubLogin());
+  } catch (err) {
+    return loginError(c, err);
+  }
+});
+
+setupApi.post('/github/login/poll', async (c) => {
+  const body = LoginBody.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: 'Send {flow, secret}' }, 400);
+  try {
+    return c.json(pollGithubLogin(body.data.flow, body.data.secret));
+  } catch (err) {
+    return loginError(c, err);
+  }
+});
+
+setupApi.post('/github/login/cancel', async (c) => {
+  const body = LoginBody.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: 'Send {flow, secret}' }, 400);
+  try {
+    cancelGithubLogin(body.data.flow, body.data.secret);
+    return c.json({ ok: true });
+  } catch (err) {
+    return loginError(c, err);
+  }
 });
 
 setupApi.put('/', async (c) => {
