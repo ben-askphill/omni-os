@@ -99,6 +99,11 @@ export function crewDetail(id: string): CrewDetail | null {
   const role = getCrew(id);
   if (!role) return null;
   const { shipped, own } = crewTexts(id);
+  return detailOf(role, shipped, own);
+}
+
+function detailOf(role: CrewRole, shipped: string | null, own: string | null): CrewDetail {
+  const id = role.id;
   const base = shipped === null ? null : splitCrewFile(shipped);
   const mine = own === null ? null : splitCrewFile(own);
   return {
@@ -186,37 +191,55 @@ export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts:
     throw refused(`No crew role "${id}".`, 404);
   }
 
-  let text: string;
-  if ('markdown' in save) {
-    text = save.markdown;
-    if (shipped !== null) {
-      // A hand-written overlay still records what it was written against, unless it says so itself.
-      const { doc, body } = openOwn(text);
-      if (!doc.has('based_on') && (own === null || splitCrewFile(own).body !== body)) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
-      text = serialize(doc, body);
-    }
-  } else {
-    const { doc, body: oldBody } = openOwn(own);
-    for (const [key, value] of Object.entries(save.fields ?? {})) {
-      if (value === undefined) continue;
-      if (value === '' || value === null || (Array.isArray(value) && !value.length && shipped === null)) doc.delete(key);
-      else doc.set(key, value);
-    }
-    if (shipped !== null) {
-      if (save.charter_mode) doc.set('charter_mode', save.charter_mode);
-      else if (own === null) doc.set('charter_mode', 'append');
-      if (own === null || save.charter !== undefined || save.charter_mode) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
-    } else if (save.charter_mode) {
-      throw refused('Only an edit of a built-in role adds to or replaces its charter.');
-    }
-    text = serialize(doc, save.charter === undefined ? oldBody : save.charter.trim());
-  }
-
-  const role = shipped !== null ? mergeCrew(id, splitCrewFile(shipped), splitCrewFile(text)) : parseCrewFile(id, text);
+  const text = savedText(save, shipped, own);
+  const role = roleIn(id, shipped, text);
   if (shipped === null && !splitCrewFile(text).meta.name) throw refused('Give the role a name.');
   check(id, role, ctx);
   writeOwn(id, text);
   return crewDetail(id)!;
+}
+
+/** The user's file a save leaves: `own` with the save's keys and charter, or the save's markdown as written. */
+function savedText(save: CrewSave, shipped: string | null, own: string | null): string {
+  if ('markdown' in save) {
+    if (shipped === null) return save.markdown;
+    // A hand-written overlay still records what it was written against, unless it says so itself.
+    const { doc, body } = openOwn(save.markdown);
+    if (!doc.has('based_on') && (own === null || splitCrewFile(own).body !== body)) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
+    return serialize(doc, body);
+  }
+  const { doc, body: oldBody } = openOwn(own);
+  for (const [key, value] of Object.entries(save.fields ?? {})) {
+    if (value === undefined) continue;
+    if (value === '' || value === null || (Array.isArray(value) && !value.length && shipped === null)) doc.delete(key);
+    else doc.set(key, value);
+  }
+  if (shipped !== null) {
+    if (save.charter_mode) doc.set('charter_mode', save.charter_mode);
+    else if (own === null) doc.set('charter_mode', 'append');
+    if (own === null || save.charter !== undefined || save.charter_mode) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
+  } else if (save.charter_mode) {
+    throw refused('Only an edit of a built-in role adds to or replaces its charter.');
+  }
+  return serialize(doc, save.charter === undefined ? oldBody : save.charter.trim());
+}
+
+const roleIn = (id: string, shipped: string | null, text: string): CrewRole =>
+  shipped !== null ? mergeCrew(id, splitCrewFile(shipped), splitCrewFile(text)) : parseCrewFile(id, text);
+
+/**
+ * What a save would write and the role it would make, without writing or checking it: how Settings turns its Form
+ * into the Markdown tab and back. `own` stands in for the user's file (the Markdown tab's text), so keys the form does
+ * not show stay. `id` names the role being edited; a new role has none.
+ */
+export function draftCrew(id: string | undefined, save: CrewSave, own?: string | null): { markdown: string; detail: CrewDetail } {
+  const texts = id ? crewTexts(id) : { shipped: null, own: null };
+  if (id && texts.shipped === null && texts.own === null) throw refused(`No crew role "${id}".`, 404);
+  const markdown = savedText(save, texts.shipped, own === undefined ? texts.own : own);
+  const role = { ...roleIn(id ?? 'new-role', texts.shipped, markdown), hidden: (id && getCrew(id)?.hidden) || false };
+  // A form read from a file that does not parse would come out blank, and a save from it would empty the role.
+  if (role.error) throw refused(role.error.replace(/^bad frontmatter/, 'The frontmatter is not valid YAML'));
+  return { markdown, detail: detailOf(role, texts.shipped, markdown) };
 }
 
 /** What a duplicate never copies: how an overlay joins the built-in, which a whole role of its own has no use for. */

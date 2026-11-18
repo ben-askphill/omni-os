@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { CALLER_HEADER } from './automation-guard.ts';
 import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { listCrew } from './crew.ts';
-import { crewDetail, crewRunProblem, crewSave, deleteCrew, duplicateCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
+import { crewDetail, crewRunProblem, crewSave, deleteCrew, draftCrew, duplicateCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
 import { channels } from './db.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 
@@ -39,6 +39,16 @@ crewApi.post('/crew', async (c) => {
   if (!id.success) return c.json({ error: 'Give the role an id.' }, 400);
   const { id: _, ...rest } = body as { id: string };
   return write(c, (save) => saveCrew(id.data.id, save, context(), { create: true }), rest, 201);
+});
+
+/**
+ * The file a save would write and the role it makes, nothing written: `{ id?, own?, save }`. Settings' Form and
+ * Markdown tabs turn into each other through it, with `own` the Markdown tab's text.
+ */
+crewApi.post('/crew/draft', async (c) => {
+  const parsed = z.object({ id: z.string().optional(), own: z.string().max(200_000).nullable().optional(), save: crewSave }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Send { id?, own?, save }.' }, 400);
+  return run(c, () => draftCrew(parsed.data.id, parsed.data.save, parsed.data.own));
 });
 
 crewApi.put('/crew/:id', async (c) => write(c, (save) => saveCrew(c.req.param('id'), save, context()), await c.req.json().catch(() => null)));
