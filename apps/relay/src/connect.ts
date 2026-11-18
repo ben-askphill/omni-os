@@ -319,16 +319,28 @@ export class ConnectStore {
         const tunnelId = !r.tunnel_name
           ? await this.ownTunnel(r)
           : (r.tunnel_id ?? (await this.cf.findTunnel(r.tunnel_name))?.id ?? null);
-        await this.cf.remove(tunnelId, r.dns_record_id);
+        // One that lost the answer to its DNS create has a CNAME to its tunnel and no record id.
+        let dnsRecordId = r.dns_record_id;
+        if (!dnsRecordId && tunnelId) {
+          const record = await this.cf.findCname(r.hostname);
+          if (record?.content === tunnelTarget(tunnelId)) dnsRecordId = record.id;
+        }
+        await this.cf.remove(tunnelId, dnsRecordId);
       }
       this.sql.exec('DELETE FROM connect_machines WHERE id = ?', id);
     });
   }
 
-  /** A machine that signs out of the relay loses its tunnel too. Best effort: Cloudflare may be down. */
+  /**
+   * A machine that signs out of the relay loses its tunnel too. Best effort: Cloudflare may be down. The token is
+   * checked again under the lock: the machine may have registered again under a new token meanwhile.
+   */
   async removeForToken(tokenId: string) {
     const rows = this.sql.exec('SELECT id FROM connect_machines WHERE token_id = ?', tokenId).toArray() as { id: string }[];
-    for (const { id } of rows) await this.remove(id).catch((err) => console.warn(`[connect] could not remove ${id}: ${(err as Error).message}`));
+    for (const { id } of rows)
+      await this.remove(id, tokenId).catch((err) => {
+        if (!(err instanceof RelayError && err.code === 'not_this_machine')) console.warn(`[connect] could not remove ${id}: ${(err as Error).message}`);
+      });
   }
 
   list(): Machine[] {

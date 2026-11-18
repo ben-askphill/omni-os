@@ -24,19 +24,34 @@ function fakeCloudflare() {
   /** `METHOD /path` prefixes that fail once each, with this status (500 when added with add()), as an interrupted request would. */
   const failures = new Map<string, number>();
   const failOnce = { add: (prefix: string, status = 500) => failures.set(prefix, status) };
+  /** `METHOD /path` prefixes whose change is made but whose answer is lost, once each. */
+  const lostOnce = new Set<string>();
+  /** `METHOD /path` prefixes that wait for this promise first. */
+  const holds = new Map<string, Promise<void>>();
   let n = 0;
   const ok = (result: unknown) => Response.json({ success: true, result });
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
     const method = init?.method ?? 'GET';
-    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
-    const path = url.pathname.replace('/client/v4', '');
-    calls.push(`${method} ${path}`);
+    const call = `${method} ${url.pathname.replace('/client/v4', '')}`;
+    for (const [f, hold] of holds) if (call.startsWith(f)) await hold;
+    calls.push(call);
     for (const [f, status] of failures)
-      if (`${method} ${path}`.startsWith(f)) {
+      if (call.startsWith(f)) {
         failures.delete(f);
         return Response.json({ success: false, errors: [{ code: 1000, message: 'interrupted' }] }, { status });
       }
+    const res = answer(url, method, init);
+    for (const f of lostOnce)
+      if (call.startsWith(f)) {
+        lostOnce.delete(f);
+        return Response.json({ success: false, errors: [{ code: 1000, message: 'lost' }] }, { status: 504 });
+      }
+    return res;
+  }) as typeof fetch;
+  const answer = (url: URL, method: string, init?: RequestInit) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    const path = url.pathname.replace('/client/v4', '');
     let m: RegExpMatchArray | null;
     if ((m = path.match(/^\/accounts\/acct\/cfd_tunnel$/))) {
       if (method === 'POST') {
@@ -69,10 +84,10 @@ function fakeCloudflare() {
       if (method === 'DELETE') return ok(records.delete(m[2]));
     }
     return Response.json({ success: false, errors: [{ code: 0, message: `no fake for ${method} ${path}` }] }, { status: 400 });
-  }) as typeof fetch;
+  };
   /** The calls that change something on Cloudflare. */
   const writes = () => calls.filter((c) => !c.startsWith('GET '));
-  return { fetchImpl, tunnels, records, calls, failOnce, writes };
+  return { fetchImpl, tunnels, records, calls, failOnce, lostOnce, holds, writes };
 }
 
 const cfConfig = { token: 't', accountId: 'acct', zoneId: 'zone', zone: 'omni-os.app' };
@@ -477,6 +492,33 @@ describe('ConnectStore.remove', () => {
     expect(cf.records.size).toBe(1);
     await store.remove('mac-1', 'tok-1');
     expect(store.list()).toEqual([]);
+  });
+
+  it('turning Connect off after a first registration lost the DNS answer deletes that record too, so registering again works', async () => {
+    const { cf, store, register } = await setup();
+    cf.lostOnce.add('POST /zones/zone/dns_records');
+    await expect(register()).rejects.toMatchObject({ code: 'cloudflare' });
+    expect(cf.records.size).toBe(1);
+    await store.remove('mac-1', 'tok-1');
+    expect(cf.records.size).toBe(0);
+    const r = await register();
+    expect(store.list()).toMatchObject([{ id: 'mac-1', hostname: r.hostname }]);
+  });
+
+  it("an old token signing out while the machine registers again under a new one leaves the new registration", async () => {
+    const { cf, store, register, machine } = await setup();
+    await register();
+    let release!: () => void;
+    cf.holds.set('PUT /accounts/acct/cfd_tunnel/t1/configurations', new Promise<void>((r) => (release = r)));
+    const proof = await registerProof(machine.keys.privateJwk, { machineId: 'mac-1', user: 'user_ben', tokenId: 'tok-2', publicKey: machine.keys.publicJwk });
+    const again = store.register({ machineId: 'mac-1', name: "Ben's MacBook Pro", publicKey: machine.keys.publicJwk, port: 4747, proof }, await caller('tok-2', 'mac-1'));
+    await new Promise((r) => setTimeout(r, 10));
+    const signout = store.removeForToken('tok-1');
+    release();
+    await again;
+    await signout;
+    expect(store.list()).toMatchObject([{ id: 'mac-1' }]);
+    expect(cf.tunnels.get('t1')!.deleted).toBe(false);
   });
 
   it('removes the machines of a relay token that signs out', async () => {
