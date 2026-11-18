@@ -37,6 +37,7 @@ describe('the access policy', () => {
     for (const file_path of ['/work/acme/.git/hooks/pre-commit', '/work/acme/.git/config', '/work/acme/.claude/settings.json', 'sub/.cursor/mcp.json', '/work/acme/.mcp.json', '/work/acme/.envrc']) {
       expect(judge(at('ask'), call('Write', { file_path })).decision).toBe('ask');
     }
+    expect(judge(at('ask'), call('Write', { file_path: '/work/acme/.GIT/hooks/pre-commit' })).decision).toBe('ask');
     expect(judge(at('ask'), call('Write', { file_path: '/work/acme/docs/git-notes.md' })).decision).toBe('allow');
   });
 
@@ -81,6 +82,11 @@ describe('the access policy', () => {
     expect(readOnlyCommand('git diff --ext-diff')).toBe(false);
     expect(readOnlyCommand('git diff --output=x.patch')).toBe(false);
     expect(readOnlyCommand("git 'push'")).toBe(false);
+    expect(readOnlyCommand(`echo "'"$(touch x)"'"`)).toBe(false);
+    expect(readOnlyCommand('sort --comp=sh in.txt')).toBe(false);
+    expect(readOnlyCommand('sort --out=x in.txt')).toBe(false);
+    expect(readOnlyCommand('git diff --ext')).toBe(false);
+    expect(readOnlyCommand('git log --oneline')).toBe(true);
     // Single quotes keep reading commands reading.
     expect(readOnlyCommand("rg -n 'foo$' src")).toBe(true);
     expect(readOnlyCommand('grep -o foo file.txt')).toBe(true);

@@ -2,7 +2,8 @@
 // Pure, so every harness asks the same question: Claude Code for each can_use_tool request, Codex for each approval
 // request (harness/*/adapter.ts). runner/approvals.ts turns an "ask" into an approval card and waits for the answer.
 // ADR 0015.
-import { isAbsolute, relative, resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
   connectorAccessOf,
   connectorIdOf,
@@ -84,12 +85,28 @@ const SAFE_GIT = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'ls-file
  */
 const UNSAFE_ARGS: Record<string, RegExp> = {
   find: /^-(exec|execdir|ok|okdir|delete|fprint.*|fls)$/,
-  sort: /^(-[a-zA-Z]*o.*|--output.*|--compress-program.*)$/,
-  rg: /^--pre(=.*)?$/,
+  sort: /^-[a-zA-Z]*o/,
   tree: /^-o$/,
-  file: /^(-[a-zA-Z]*C|--compile)$/,
-  date: /^(-[a-zA-Z]*s.*|--set.*)$/,
-  git: /^(-c|--config-env.*|--exec-path.*|--ext-diff|--textconv|--output.*|-o)$/,
+  file: /^-[a-zA-Z]*C/,
+  date: /^-[a-zA-Z]*s/,
+  git: /^(-c|-o)$/,
+};
+/** Long options that write or run something. GNU tools and git take any unambiguous prefix (`--comp=sh`), so a prefix counts. */
+const UNSAFE_LONG: Record<string, string[]> = {
+  sort: ['--output', '--compress-program'],
+  rg: ['--pre'],
+  file: ['--compile'],
+  date: ['--set'],
+  git: ['--config-env', '--exec-path', '--ext-diff', '--textconv', '--output'],
+  diff: ['--output'],
+  tree: ['--output'],
+};
+const unsafeArg = (cmd: string, arg: string) => {
+  const a = arg.replace(/['"]/g, '');
+  if (UNSAFE_ARGS[cmd]?.test(a)) return true;
+  if (!a.startsWith('--')) return false;
+  const name = a.split('=')[0];
+  return (UNSAFE_LONG[cmd] ?? []).some((o) => (name.length >= 3 && o.startsWith(name)) || name.startsWith(o));
 };
 
 /**
@@ -100,7 +117,8 @@ const UNSAFE_ARGS: Record<string, RegExp> = {
 export function readOnlyCommand(command: string): boolean {
   const line = command.replace(/\s\d?>\s*\/dev\/null/g, ' ').replace(/\s2>&1/g, ' ').trim();
   // Inside single quotes the shell expands nothing, so `rg 'foo$'` still reads. Everything else is checked as written.
-  const bare = line.replace(/'[^'\n]*'/g, "''");
+  // Not when the line has a double quote too: `"'"$(x)"'"` would read as single-quoted. Then every $ asks.
+  const bare = line.includes('"') ? line : line.replace(/'[^'\n]*'/g, "''");
   if (!line || /[<>`\n\r]/.test(bare)) return false;
   // A lone & (background), a subshell or group, an escape or any $ expansion can hide a second command.
   if (/[&(){}$\\]/.test(bare.replace(/&&|\|\|/g, ' '))) return false;
@@ -108,9 +126,8 @@ export function readOnlyCommand(command: string): boolean {
     const words = part.trim().split(/\s+/).filter(Boolean);
     const [cmd, ...args] = words;
     if (!cmd || (!SAFE_COMMANDS.has(cmd) && cmd !== 'git')) return false;
-    const unsafe = UNSAFE_ARGS[cmd];
     // Quotes do not change what a flag does: `find . '-delete'` deletes.
-    if (unsafe && args.some((a) => unsafe.test(a.replace(/['"]/g, '')))) return false;
+    if (args.some((a) => unsafeArg(cmd, a))) return false;
     if (cmd === 'git') return SAFE_GIT.has(args.find((a) => !a.startsWith('-'))?.replace(/['"]/g, '') ?? '');
     return true;
   });
@@ -134,8 +151,19 @@ export function readOnlyConnectorTool(server: string, tool: string): boolean {
   return READ_VERBS.has(words[0] ?? '');
 }
 
+/** A path with its symlinks resolved, as far as it exists: a link inside the folder can point out of it. */
+function real(path: string): string {
+  const abs = resolve(path);
+  try {
+    return realpathSync(abs);
+  } catch {
+    const parent = dirname(abs);
+    return parent === abs ? abs : join(real(parent), basename(abs));
+  }
+}
+
 const inside = (dir: string, path: string) => {
-  const rel = relative(resolve(dir), resolve(dir, path));
+  const rel = relative(real(dir), real(resolve(dir, path)));
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 };
 
@@ -146,7 +174,8 @@ const inside = (dir: string, path: string) => {
 const CONFIG_DIRS = new Set(['.git', '.claude', '.codex', '.cursor', '.agents', '.husky', '.githooks', '.vscode', '.idea']);
 const CONFIG_FILES = new Set(['.mcp.json', '.gitattributes', '.gitmodules', '.envrc']);
 const toolConfig = (dir: string, path: string) => {
-  const parts = relative(resolve(dir), resolve(dir, path)).split(/[\\/]/);
+  // Lowercased: on a case-insensitive disk `.GIT/hooks` is `.git/hooks`.
+  const parts = relative(real(dir), real(resolve(dir, path))).split(/[\\/]/).map((p) => p.toLowerCase());
   return parts.some((p) => CONFIG_DIRS.has(p)) || CONFIG_FILES.has(parts.at(-1) ?? '');
 };
 
