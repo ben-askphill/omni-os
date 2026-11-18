@@ -13,14 +13,22 @@ const PARALLEL = 3;
 const rootDir = () => new Directory(Paths.cache, 'omni-artifacts');
 
 /**
- * Each session's hub gets its own generation and its own folder in the cache. A file, a share copy or a download of
- * one generation is never handed to another, so a viewer opened after a server switch never shows the last server's
- * bytes, even for an artifact with the same id and version.
+ * Each session's hub gets its own generation: an id no earlier session or launch of the app used, its own folder in the
+ * cache, and one abort for its downloads. A file, a share copy or a download of one generation is never handed to
+ * another, so a viewer opened after a server switch never shows the last server's bytes, even for an artifact with the
+ * same id and version.
  */
-const generations = new WeakMap<Session, number>();
-let current = 0;
+interface Generation {
+  id: string;
+  downloads: AbortController;
+}
 
-const sessionDir = (generation: number) => new Directory(rootDir(), String(generation));
+const generations = new WeakMap<Session, Generation>();
+let current: Generation | null = null;
+let started = 0;
+
+const sessionDir = (generation: Generation) => new Directory(rootDir(), generation.id);
+const inside = (file: File, dir: Directory) => file.uri.startsWith(dir.uri.endsWith('/') ? dir.uri : `${dir.uri}/`);
 
 const inFlight = new Map<string, Promise<File>>();
 const waiting: (() => void)[] = [];
@@ -32,10 +40,10 @@ class EndedSession extends Error {
   }
 }
 
-/** The hub's generation while it is the session in use, else an error: an ended session gets no file at all. */
-function liveGeneration(hub: Session): number {
+/** The hub's generation while it is the session in use. An ended session gets no file at all. */
+function liveGeneration(hub: Session): Generation {
   const generation = generations.get(hub);
-  if (generation === undefined || generation !== current) throw new EndedSession();
+  if (!generation || generation !== current) throw new EndedSession();
   return generation;
 }
 
@@ -51,11 +59,14 @@ async function slot<T>(run: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Starts the cache for a new session's hub. Runs when a session starts. Every file and share copy an earlier session
- * kept is deleted, and its downloads still on the way are refused when they finish, so nothing of theirs is cached.
+ * Starts the cache for a new session's hub. Runs when a session starts. The last session's downloads are aborted, so
+ * they free their slots and cache nothing, and every file and share copy it kept is deleted.
  */
 export function startArtifactSession(hub: Session): void {
-  current += 1;
+  current?.downloads.abort();
+  started += 1;
+  // The time keeps the id apart from an earlier launch's, whose folder may still be there if the delete below fails.
+  current = { id: `${Date.now().toString(36)}-${started}`, downloads: new AbortController() };
   generations.set(hub, current);
   try {
     const dir = rootDir();
@@ -70,7 +81,7 @@ export function startArtifactSession(hub: Session): void {
  * a copy is never shown for a newer version. The file holds the artifact's bytes and nothing else.
  */
 export function artifactFile(hub: Session, artifact: Version): Promise<File> {
-  let generation: number;
+  let generation: Generation;
   try {
     generation = liveGeneration(hub);
   } catch (e) {
@@ -81,24 +92,32 @@ export function artifactFile(hub: Session, artifact: Version): Promise<File> {
   const file = new File(dir, name);
   if (file.exists && file.size === artifact.size) return Promise.resolve(file);
 
-  const key = `${generation}/${name}`;
+  const key = `${generation.id}/${name}`;
   const pending = inFlight.get(key);
   if (pending) return pending;
+  const ended = () => generation !== current;
   const load = slot(async () => {
-    // A download that waited for a slot past a server switch is not started.
-    liveGeneration(hub);
-    // No abort signal: callers share one download, and a finished one lands in the cache for the next open.
-    const { bytes } = await hub.fetchArtifactFile(artifact);
-    // The server changed while it came in: its bytes are not this session's.
-    liveGeneration(hub);
-    dir.create({ idempotent: true, intermediates: true });
-    file.create({ overwrite: true });
-    await file.write(bytes);
-    if (generation !== current) {
-      file.delete();
+    try {
+      // A download that waited for a slot past a server switch is not started.
+      if (ended()) throw new EndedSession();
+      // The session's abort, not a viewer's: viewers share one download, and only a server switch ends it.
+      const { bytes } = await hub.fetchArtifactFile(artifact, generation.downloads.signal);
+      if (ended()) throw new EndedSession();
+      dir.create({ idempotent: true, intermediates: true });
+      file.create({ overwrite: true });
+      await file.write(bytes);
+      if (ended()) throw new EndedSession();
+      return file;
+    } catch (e) {
+      if (!ended()) throw e;
+      // Whatever failed after a switch, the answer is the same, and none of the bytes stay in the cache.
+      try {
+        if (file.exists) file.delete();
+      } catch {
+        // The next session's start deletes the folder.
+      }
       throw new EndedSession();
     }
-    return file;
   }).finally(() => {
     inFlight.delete(key);
   });
@@ -107,12 +126,15 @@ export function artifactFile(hub: Session, artifact: Version): Promise<File> {
 }
 
 /**
- * A copy of the artifact's cached file under its own name, so the share sheet offers "report.html" and not a cache key.
- * It comes from this session's cache, and the copy lives there too, so the next session's start deletes it.
+ * A copy of the file the viewer opened, under the artifact's own name, so the share sheet offers "report.html" and not
+ * a cache key. Only a file from this session's own folder is copied, and the copy lives there too, so the next session's
+ * start deletes it.
  */
-export async function shareableFile(hub: Session, artifact: Version): Promise<File> {
-  const file = await artifactFile(hub, artifact);
-  const dir = new Directory(sessionDir(liveGeneration(hub)), 'share', String(artifact.id));
+export async function shareableFile(hub: Session, file: File, artifact: Pick<Artifact, 'id' | 'name'>): Promise<File> {
+  const sessionFolder = sessionDir(liveGeneration(hub));
+  // A server switch can leave the viewer holding the last session's file.
+  if (!inside(file, sessionFolder)) throw new EndedSession();
+  const dir = new Directory(sessionFolder, 'share', String(artifact.id));
   dir.create({ idempotent: true, intermediates: true });
   const copy = new File(dir, artifact.name.replace(/[/\\]/g, '_'));
   await file.copy(copy, { overwrite: true });

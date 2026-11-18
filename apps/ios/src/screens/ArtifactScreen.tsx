@@ -31,8 +31,8 @@ export function ArtifactScreen({ navigation, route }: RootScreenProps<'Artifact'
   const share = useCallback(async () => {
     if (!file) return;
     try {
-      // From this session's cache, never a file an earlier server's session left behind.
-      const copy = await shareableFile(hub, artifact);
+      // Refused for a file an earlier server's session left on screen.
+      const copy = await shareableFile(hub, file, artifact);
       await Share.share({ url: copy.uri });
     } catch {
       // Closing the sheet is not an error, and nothing else here is worth interrupting Ben for.
