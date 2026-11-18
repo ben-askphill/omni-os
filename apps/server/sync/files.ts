@@ -579,6 +579,13 @@ interface OpenFile {
 const O_NOFOLLOW_ANY = (constants as Record<string, number | undefined>).O_NOFOLLOW_ANY ?? (process.platform === 'darwin' ? 0x20000000 : 0);
 
 /**
+ * How a session file opens: read only, no wait on a named pipe, and no link as the last part of the path (on macOS, in
+ * any part). macOS fails the open with EINVAL when O_NOFOLLOW and O_NOFOLLOW_ANY come together, so it gets only the
+ * second, which covers the last part too.
+ */
+const SESSION_OPEN = constants.O_RDONLY | constants.O_NONBLOCK | (O_NOFOLLOW_ANY || constants.O_NOFOLLOW);
+
+/**
  * Open a session file to upload, only when it is a regular file in root and nothing between the harness's folder and
  * the file is a link, so a folder swapped for a link cannot redirect the read. On macOS the open itself refuses a
  * link anywhere in the path; on Linux the path the kernel holds for the open file must be the expected one. Both
@@ -592,8 +599,7 @@ function openSessionFile(base: string, root: string, rel: string): OpenFile | nu
   try {
     // The harness's folder as it really is, then real folders only.
     want = join(realpathSync(base), relative(base, root), rel);
-    // No link as the last part of the path (on macOS, in any part), and no wait on a named pipe.
-    fd = openSync(want, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK | O_NOFOLLOW_ANY);
+    fd = openSync(want, SESSION_OPEN);
   } catch {
     return null;
   }
