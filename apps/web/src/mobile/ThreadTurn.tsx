@@ -17,8 +17,9 @@ import { atStart } from '@omni/shared/history.ts';
 import { href } from '../router.ts';
 import { isRenderPath } from '@omni/shared/html-render.ts';
 import { HtmlRender } from '../components/HtmlRender.tsx';
-import { ArtifactCard, ChangesCard, Clamped, Delegation, MoProse, NowLine, Outcome, Plan, Report, StepsRow, type TurnView } from './ThreadCards.tsx';
+import { ArtifactCard, ChangesCard, Clamped, Delegation, MoProse, MoSteps, NowLine, Outcome, Report, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
+import { showsSteps } from '@omni/shared/steps.ts';
 import { shortTime } from './rows.ts';
 import { limitLabel } from '../limits.ts';
 import type { useShell, useThread } from './shell.tsx';
@@ -61,7 +62,7 @@ export type TurnCtx = {
 };
 
 function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
-  const { view, conductor, conductorChannel, ch, thread, changes, pr, now, shell } = c;
+  const { conductor, conductorChannel, ch, thread, changes, pr, now, shell } = c;
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
     const delegated = t.children.length > 0 && <Delegation kids={t.children} />;
@@ -73,10 +74,9 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
           ) : (
             <ThinkingLine label={c.status ?? (c.turn === 'starting' ? PHASE.starting.label : 'Thinking')} phase={c.turn ?? 'working'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
           )}
-          {view.plan && <Plan plan={view.plan} />}
+          {showsSteps(t.progress) && <MoSteps v={t.progress} failed={t.failed} onActions={() => steps(t)} />}
           {t.cloud && <CloudAgentCard p={t.cloud} />}
           {delegated}
-          {t.steps > 0 && <StepsRow t={t} live onClick={() => steps(t)} />}
         </>
       );
     }
@@ -110,7 +110,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
           <ArtifactCard key={a.id} a={a} sub={`#${ch?.name ?? thread.channel_id} · ${shortTime(a.updated_at, now)}`} onOpen={() => viewer(a)} />
         ))}
         {last && changes && changes.files.length > 0 && <ChangesCard files={changes.files} onOpen={() => shell.open(href.threadView(thread.id, pr?.pr ? 'pr' : 'changes'))} />}
-        {t.steps > 0 && <StepsRow t={t} onClick={() => steps(t)} />}
+        {showsSteps(t.progress) && <MoSteps v={t.progress} failed={t.failed} onActions={() => steps(t)} />}
       </>
     );
 }

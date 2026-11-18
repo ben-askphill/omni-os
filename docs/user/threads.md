@@ -144,10 +144,6 @@ Claude Code reports its agents itself. Omni maps Codex (multi-agent spawns), Cur
 
 On Claude Code, `/goal <condition>` keeps the thread working until the condition holds. A line under the transcript shows the goal: **Pursuing goal** while a turn works on it, **Goal set** while it waits, and **Goal complete** once a turn ends with it met. It also counts how often Claude's check found the condition unmet. **Clear** sends `/goal clear`. A `/goal` message never steers into a running turn: it queues, and a new goal or a clear while one is active stops the turn first. A met goal leaves the line when your next message reaches the session, and any goal goes away when the thread starts a new session. While the thread works toward a goal, its status reads **Goal**, not Running. Claude Code has no pause or resume for goals. The goal stays on the machine that runs the thread and does not sync. Desktop web, phone web and the desktop app show the line; the iOS app does not. Codex, Cursor Agent, Cursor Cloud and Hermes get no goal line.
 
-## Plan steps
-
-When the agent posts a plan, click a step's checkbox to cycle it through pending, in progress and completed. Omni saves the change as a `plan_step_update` event, so it survives reloads. This works on desktop web, phone web and the desktop app.
-
 ## Point the agent at lines of a diff
 
 In a thread's Changes panel (desktop web, phone and the desktop app), click a line number to pick it, and shift-click another in the same hunk to pick the lines between. On a phone, tap a line, then tap another. Write a note and press **Add to message**. The lines and the note go into the reply box as a chip, next to whatever you have typed. Click a chip to see what it holds, or x to take it out. A message can be just chips.
@@ -215,13 +211,15 @@ While a turn runs, a thinking line stays up for the whole turn, tool calls inclu
 
 Replies render as Markdown on desktop web, phone web and the desktop app. A `mermaid` code fence draws as a diagram in light and dark. A fence that fails to parse keeps its source visible. Wide diagrams scroll sideways on a phone.
 
-Open a tool row to read its output. Long output starts with a preview, then loads in chunks with Load more. A running Codex command can show its live tail. The other harnesses show output when the call ends. If the harness cut the output before saving it, loading more cannot recover it. The budgets and client rules are in [Thread history](../internals/thread-history.md).
+Open a call under a step's **N actions** to read its output. Long output starts with a preview, then loads in chunks with Load more. A running Codex command can show its live tail. The other harnesses show output when the call ends. If the harness cut the output before saving it, loading more cannot recover it. The budgets and client rules are in [Thread history](../internals/thread-history.md).
 
 ## Steps
 
 An agent on a task with more than one stage posts its plan as 3 to 6 steps in plain words with Omni's `set_steps` tool, then moves the marker as each step starts or finishes. Claude Code, Codex and Cursor threads have it through the `omni-steps` MCP server, and their system prompt asks for it. When the agent posts no list, Omni uses the plan the harness keeps (Claude Code's todo list or its tasks, a Codex plan, Cursor's todos). With neither, Omni groups the turn's calls into plain phases such as "Searching the web" or "Looking through the files", ending in "Writing the answer". Hermes and Cursor Cloud threads have no Omni MCP servers, so they show phases. No step names a tool, a path or a command.
 
-While a thread runs, the step it is on goes out with the thread as one line: "Step 2 of 3 · Read the reviews" for a list, or the phase ("Searching the web"). Every machine reads it from the thread's own events, so a thread that runs on another machine shows the same line. How it is built: `packages/shared/steps.ts` and `apps/server/step-line.ts`.
+The steps take the place of the tool rows. A running turn shows its list under the transcript, above the thinking line: a status mark per step, "Now:" under the step it is on, and the threads a step handed work to. Each step's **N actions** opens the calls it made, with their output as before. A finished turn folds to one line ("3 steps · 12 actions") with **Show steps**. A turn that made no call shows no list, only the thinking line. On a phone the list sits in the turn the same way, and **N actions** opens the turn's Actions screen. The iOS app shows the running turn's list, and its actions under the turn. Steps are the agent's to move: you cannot tick one.
+
+While a thread runs, the step it is on goes out with the thread as one line: "Step 2 of 3 · Read the reviews" for a list, or the phase ("Searching the web"). The Inbox card shows it under the title on desktop web, the desktop app, phone web and the iOS app's Activity, and a question's notification on the desktop app names it ("Step 2 of 3 · Read the reviews · waiting on your answer in #volero"). Every machine reads it from the thread's own events, so a thread that runs on another machine shows the same line. How it is built: `packages/shared/steps.ts` and `apps/server/step-line.ts`.
 
 ## When the agent asks you
 

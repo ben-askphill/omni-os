@@ -48,6 +48,8 @@ export interface Thread {
   continued_from: string | null;
   created_at: string;
   updated_at: string;
+  /** The step a running thread is on ("Step 2 of 3 · Read the reviews"), from @omni/shared/steps.ts. Absent otherwise. */
+  step?: string;
 }
 
 /** The part of a thread the channel list sends for each of its threads. */

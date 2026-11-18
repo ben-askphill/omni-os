@@ -1,7 +1,8 @@
 import type { Artifact, HistoryEvent, Thread } from '@omni/client-core';
 import type { Span } from '@omni/shared/history.ts';
 import { same, type CloudAgentP, type Item, type ModLine, type ReportP, type SwitchItem, type ToolCall } from '@omni/shared/transcript-fold.ts';
-import { threadView, type NowDoing, type PlanView, type Prompt, type ThreadView, type TurnView } from '@omni/shared/thread-view.ts';
+import { threadView, type NowDoing, type Prompt, type ThreadView, type TurnView } from '@omni/shared/thread-view.ts';
+import { showsSteps, stepsHeader, type StepState, type StepsView } from '@omni/shared/steps.ts';
 import type { ThreadQuestion } from '@omni/shared/question.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { hasOwnLook } from '@omni/shared/channel-icon.ts';
@@ -31,6 +32,7 @@ export type ThreadRow =
   | { kind: 'prose'; key: string; text: string; clipped: number | null }
   | { kind: 'delegation'; key: string; kids: Thread[] }
   | { kind: 'artifact'; key: string; a: Artifact }
+  /** The turn's calls ("12 actions"), opening them under it. */
   | { kind: 'steps'; key: string; turn: number; steps: number; failed: number; live: boolean; open: boolean }
   | { kind: 'note'; key: string; text: string; clipped: number | null }
   | { kind: 'call'; key: string; call: ToolCall; depth: number; open: boolean; running: boolean }
@@ -39,7 +41,25 @@ export type ThreadRow =
   | { kind: 'now'; key: string; now: NowDoing; meta: string | null }
   /** The running turn's thinking line (web: ThinkingLine): the mark, the label shimmering and the time since `since`. */
   | { kind: 'thinking'; key: string; label: string; since: string }
-  | { kind: 'plan'; key: string; plan: PlanView };
+  /** The running turn's plain steps (@omni/shared/steps.ts), as phone web's MoSteps shows them. */
+  | { kind: 'progress'; key: string; header: string; done: number; listed: boolean; steps: ProgressStep[] };
+
+/** One step as the progress row draws it: no calls, so an unchanged list compares equal. */
+export interface ProgressStep {
+  key: string;
+  title: string;
+  state: StepState;
+  now: string | null;
+}
+
+const progressRow = (key: number, v: StepsView): ThreadRow => ({
+  kind: 'progress',
+  key: `pg${key}`,
+  header: stepsHeader(v),
+  done: v.done,
+  listed: v.source !== 'phases',
+  steps: v.steps.map((s) => ({ key: s.key, title: s.title, state: s.state, now: s.now })),
+});
 
 export type RowKind = ThreadRow['kind'];
 
@@ -117,7 +137,7 @@ function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, in
     // As phone web: the thinking line stays up for the whole turn, tool calls included, and gives way to a question.
     if (t.status === 'queued') yield { kind: 'now', key: `now${t.key}`, now: { verb: 'Waiting for a free slot', target: '' }, meta: null };
     else if (!view.asking) yield { kind: 'thinking', key: `th${t.key}`, label: statusLabel(input.events) ?? 'Thinking', since: t.at || thread.created_at };
-    if (view.plan) yield { kind: 'plan', key: `plan${t.key}`, plan: view.plan };
+    if (showsSteps(t.progress)) yield progressRow(t.key, t.progress);
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };
     if (t.prose) yield { kind: 'prose', key: `a${t.key}`, text: t.prose, clipped: t.proseClipped?.key ?? null };
     if (t.children.length) yield { kind: 'delegation', key: `d${t.key}`, kids: t.children };
@@ -125,7 +145,7 @@ function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, in
   } else {
     const quiet = input.conductor && t.status === 'done';
     if (quiet && (t.prose || t.children.length)) yield { kind: 'conductor', key: `co${t.key}`, look: conductorLook(input.conductorChannel) };
-    else if (t.result || t.error || t.status !== 'done') yield { kind: 'outcome', key: `o${t.key}`, status: t.status, tookMs: t.result?.duration_ms, steps: t.steps, harness: t.harness };
+    else if (t.result || t.error || t.status !== 'done') yield { kind: 'outcome', key: `o${t.key}`, status: t.status, tookMs: t.result?.duration_ms, steps: t.progress?.steps.length ?? 0, harness: t.harness };
     if (t.error) yield { kind: 'error', key: `e${t.key}`, text: t.error };
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };
     if (t.prose) yield { kind: 'prose', key: `a${t.key}`, text: t.prose, clipped: t.proseClipped?.key ?? null };

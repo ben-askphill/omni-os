@@ -168,6 +168,12 @@ describe('questions', () => {
     expect(a).toMatchObject({ kind: 'question', body: 'Waiting on your answer in #acme: Which store should the digest cover first?' });
     expect(a!.id).toBe(`question:${byTitle('Daily digest · 5 Jan').thread.id}:2026-01-05T09:00:00.000Z`);
   });
+
+  it('names the step a running thread stopped at to ask', () => {
+    const item = byTitle('Daily digest · 5 Jan');
+    const a = questionAlert({ ...item, thread: { ...item.thread, status: 'running', step: 'Step 2 of 3 · Read the reviews' } });
+    expect(a?.body).toBe('Step 2 of 3 · Read the reviews · waiting on your answer in #acme: Which store should the digest cover first?');
+  });
 });
 
 describe('worktree setup', () => {

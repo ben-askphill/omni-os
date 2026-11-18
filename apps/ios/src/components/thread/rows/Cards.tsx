@@ -10,6 +10,7 @@ import { AttachmentRow } from '../../../attachments/AttachmentRow';
 import { showsBubble } from '../../../context/labels';
 import { duration, plural } from '../../../thread/format';
 import { outcomeText, type ThreadRow } from '../../../thread/rows';
+import { STEP_GLYPH } from '@omni/shared/steps.ts';
 import { fontSize, minTarget, radius, space, useOmniTheme, weight } from '../../../theme';
 import { ContextChips } from '../../ContextChips';
 import { ChannelAvatar, OmniMark } from '../../ChannelAvatar';
@@ -240,7 +241,7 @@ export function StepsRow({ row }: Of<'steps'>) {
       style={({ pressed }) => [styles.pill, { backgroundColor: pressed ? colors.surface3 : colors.surface }]}
     >
       <Text style={[styles.pillText, { color: colors.fg2 }]}>
-        {row.live ? `${plural(row.steps, 'step')} so far` : plural(row.steps, 'step')}
+        {row.live ? `${plural(row.steps, 'action')} so far` : plural(row.steps, 'action')}
         {row.failed > 0 ? <Text style={{ color: colors.fg3 }}>{`  ·  ${row.failed} failed`}</Text> : null}
       </Text>
       <View style={{ transform: [{ rotate: row.open ? '90deg' : '0deg' }] }}>
@@ -264,23 +265,26 @@ export function NowRow({ row }: Of<'now'>) {
   );
 }
 
-export function PlanRow({ row }: Of<'plan'>) {
+export function ProgressRow({ row }: Of<'progress'>) {
   const { colors } = useOmniTheme();
-  const { plan } = row;
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, gap: 9 }]}>
       <View style={styles.line}>
-        <Text style={[styles.cardTitle, { color: colors.fg }]}>Plan</Text>
+        <Text style={[styles.cardTitle, { color: colors.fg }]}>{row.header}</Text>
         <View style={styles.grow} />
-        <Text style={[styles.caption, { color: colors.fg3 }]}>{`${plan.done}/${plan.todos.length}`}</Text>
+        {row.listed ? <Text style={[styles.caption, { color: colors.fg3 }]}>{`${row.done}/${row.steps.length}`}</Text> : null}
       </View>
-      {plan.todos.map((t, i) => {
-        const running = t.status === 'in_progress';
-        const done = t.status === 'completed';
+      {row.steps.map((s) => {
+        const on = s.state === 'active' || s.state === 'needs';
         return (
-          <View key={i} style={styles.line}>
-            {done ? <Icon name="check" size={13} color={colors.fg3} /> : <StatusDot glyph={running ? 'running' : 'idle'} />}
-            <Text style={[styles.todo, { color: running ? colors.fg : done ? colors.fg3 : colors.fg2 }]}>{(running && t.activeForm) || t.content}</Text>
+          <View key={s.key} style={styles.step}>
+            <View style={styles.stepMark}>
+              <StatusDot glyph={STEP_GLYPH[s.state]} />
+            </View>
+            <View style={styles.grow}>
+              <Text style={[styles.todo, { color: on ? colors.fg : s.state === 'pending' ? colors.fg3 : colors.fg2 }]}>{s.title}</Text>
+              {s.now ? <Text style={[styles.caption, { color: colors.fg3 }]}>{`Now: ${s.now}`}</Text> : null}
+            </View>
           </View>
         );
       })}
@@ -312,6 +316,8 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.xl, paddingHorizontal: space.s6, paddingVertical: space.s6, gap: space.s4 },
   cardTitle: { fontSize: fontSize.ui, fontWeight: weight.semibold },
   line: { flexDirection: 'row', alignItems: 'center', gap: space.s4 },
+  step: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s4 },
+  stepMark: { width: 12, height: 19, alignItems: 'center', justifyContent: 'center' },
   grow: { flex: 1 },
   loadWhole: { minHeight: 32, justifyContent: 'center' },
   mono: { fontFamily: MONO, fontSize: fontSize.small, lineHeight: 19 },
@@ -331,7 +337,7 @@ const styles = StyleSheet.create({
   pill: { minHeight: minTarget, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: space.s7 },
   pillText: { flex: 1, fontSize: 13.5 },
   nowText: { flex: 1, fontSize: fontSize.body },
-  todo: { flex: 1, fontSize: fontSize.body, lineHeight: 19 },
+  todo: { fontSize: fontSize.body, lineHeight: 19 },
   switch: { alignItems: 'center', gap: space.s2, paddingVertical: space.s2 },
   rule: { height: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginBottom: space.s2 },
 });

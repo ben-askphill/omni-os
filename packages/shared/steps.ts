@@ -4,9 +4,11 @@
 // from Omni grouping the turn's calls into phases ("Searching the web"). Hermes and Cursor cloud agents get no local
 // MCP servers, so they show phases. Wording stays plain: no tool names, paths or commands. The calls stay one tap away.
 // Pure, on top of the transcript fold.
-import { isRenderTool } from './html-render.ts';
 import { isQuestionTool } from './question.ts';
 import { str, type Item, type ToolCall } from './transcript-fold.ts';
+
+/** html_render, as html-render.ts names it. Not imported from there: that module holds the frame's script, and the fold must stay free of browser globals for iOS (tests/transcript-portable.test.ts). */
+const isRenderTool = (name: string) => /^mcp__omni[-_]render__html_render$/.test(name);
 
 /** The MCP server with set_steps (apps/server/sandbox.ts). */
 export const STEPS_SERVER = 'omni-steps';
@@ -27,6 +29,16 @@ const isListCall = (name: string) => isStepsTool(name) || isPlanCall(name);
 export const isHandOff = (name: string) => name === 'mcp__omni__delegate' || name === 'mcp__omni__delegate_team' || name === 'Agent' || name === 'Task';
 
 export type StepState = 'done' | 'active' | 'pending' | 'needs' | 'failed' | 'stopped';
+
+/** Each state's status mark (status.ts glyphs), the same on every client. */
+export const STEP_GLYPH: Record<StepState, 'done' | 'running' | 'idle' | 'needs' | 'failed' | 'settled'> = {
+  done: 'done',
+  active: 'running',
+  pending: 'idle',
+  needs: 'needs',
+  failed: 'failed',
+  stopped: 'settled',
+};
 
 export interface Step {
   /** Stable within a turn, for React keys: the title for a listed step, the phase for a grouped one. */
@@ -54,6 +66,14 @@ export interface StepsView {
   actions: number;
   /** The turn still runs. */
   live: boolean;
+}
+
+/**
+ * The field the server adds to a running thread it lists, opens or sends on the feed (apps/server/step-line.ts): the
+ * step it is on as `stepLine` words it. Absent unless it runs and is on a step, and from an older server.
+ */
+export interface StepField {
+  step?: string;
 }
 
 /** How a turn ended, as the fold's result and error items say. Null: it did not say (it runs, or a newer turn began). */
@@ -91,6 +111,8 @@ const threadsOf = (calls: readonly ToolCall[]) => calls.map(delegatedThread).fil
 const actionsIn = (calls: readonly ToolCall[]) => calls.reduce((n, c) => n + 1 + count(c), 0);
 
 export const actionsLabel = (n: number) => `${n} ${n === 1 ? 'action' : 'actions'}`;
+
+export const stepsLabel = (n: number) => `${n} ${n === 1 ? 'step' : 'steps'}`;
 
 // ---------- plain words for a call ----------
 
@@ -513,10 +535,16 @@ export function stepsHeader(v: StepsView): string {
     return 'Working';
   }
   const n = v.steps.length;
-  const steps = `${n} ${n === 1 ? 'step' : 'steps'}`;
+  const steps = stepsLabel(n);
   if (v.source !== 'phases' && v.done < n) return `${v.done} of ${steps}`;
   return steps;
 }
+
+/**
+ * Whether a turn's steps are worth a card: a list the agent or harness made, or calls to group. A turn that has only
+ * the floor (Working on it, Writing the answer) leaves it to the thinking line and the Inbox's step line.
+ */
+export const showsSteps = (v: StepsView | null): v is StepsView => !!v && (v.source !== 'phases' || v.actions > 0);
 
 /**
  * A running turn's step in one line, for an Inbox card, a phone row or a notification: "Step 3 of 5 · Compare prices"

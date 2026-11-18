@@ -47,7 +47,7 @@ describe('threadView', () => {
     expect(v.turns[0].prompts.map((p) => p.text)).toEqual(['Rebuild the metafields', 'Skip the kids sizes']);
   });
 
-  it('says what a running thread does now and shows its plan from the latest TodoWrite', () => {
+  it('says what a running thread does now and shows its steps from the latest TodoWrite', () => {
     const todos = [
       { content: 'Find the cart code', status: 'completed' },
       { content: 'Patch the rate step', status: 'in_progress' },
@@ -56,9 +56,22 @@ describe('threadView', () => {
     const events = [user('Fix shipping', 0), tool('p', 'TodoWrite', { todos }, 1), out('p', 1), tool('e', 'Edit', { file_path: '/w/volero/snippets/shipping-rates.liquid' }, 2)];
     const v = threadView({ events, thread: thread('running'), artifacts: [], children: [] });
     expect(v.now).toEqual({ verb: 'Editing', target: 'snippets/shipping-rates.liquid' });
-    expect(v.plan?.done).toBe(1);
-    expect(v.plan?.todos).toHaveLength(3);
-    expect(threadView({ events, thread: thread('stopped'), artifacts: [], children: [] })).toMatchObject({ now: null, plan: null });
+    expect(v.turns[0].progress).toMatchObject({ source: 'plan', done: 1, at: 2, live: true });
+    expect(v.turns[0].progress?.steps.map((s) => s.state)).toEqual(['done', 'active', 'pending']);
+    const stopped = threadView({ events, thread: thread('stopped'), artifacts: [], children: [] });
+    expect(stopped.now).toBeNull();
+    expect(stopped.turns[0].progress).toMatchObject({ live: false });
+    expect(stopped.turns[0].progress?.steps[1].state).toBe('stopped');
+  });
+
+  it('gives every turn its steps, live only on the running one, none on a plain answer', () => {
+    const events = [user('Hi', 0), text('Hello', 1), result(2), user('Look it up', 3), tool('w', 'WebSearch', { query: 'omni' }, 4)];
+    const v = threadView({ events, thread: thread('running'), artifacts: [], children: [] });
+    expect(v.turns[0].progress).toBeNull();
+    expect(v.turns[1].progress?.steps.map((s) => [s.title, s.state])).toEqual([
+      ['Searching the web', 'active'],
+      ['Writing the answer', 'pending'],
+    ]);
   });
 
   it('is thinking between calls, and names a tool it has no verb for', () => {
