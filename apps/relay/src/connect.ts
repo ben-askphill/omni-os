@@ -314,8 +314,11 @@ export class ConnectStore {
       if (!r) return;
       if (tokenId !== undefined && r.token_id !== tokenId) throw new RelayError(403, 'Only that machine can turn its Omni Connect off', 'not_this_machine');
       if (this.cf) {
-        // A first registration that stopped after making its tunnel recorded the name, not yet the id.
-        const tunnelId = r.tunnel_id ?? (r.tunnel_name ? ((await this.cf.findTunnel(r.tunnel_name))?.id ?? null) : null);
+        // A row an earlier relay wrote deletes its tunnel only when it passes the adoption check. A first registration
+        // that stopped after making its tunnel recorded the name, not yet the id.
+        const tunnelId = !r.tunnel_name
+          ? await this.ownTunnel(r)
+          : (r.tunnel_id ?? (await this.cf.findTunnel(r.tunnel_name))?.id ?? null);
         await this.cf.remove(tunnelId, r.dns_record_id);
       }
       this.sql.exec('DELETE FROM connect_machines WHERE id = ?', id);

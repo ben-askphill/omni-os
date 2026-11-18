@@ -385,6 +385,20 @@ describe('ConnectStore: registrations made before tunnel names carried the user'
     expect(cf.records.get('r-old')).toMatchObject({ name: hostname, content: `${r.connectorToken.replace('token-for-', '')}.cfargotunnel.com` });
   });
 
+  it("turning Connect off deletes the row's DNS record but not a recorded tunnel that fails the check", async () => {
+    const { cf, store } = await legacy({ ingressHost: 'someone-else-abcdef.omni-os.app' });
+    await store.remove('mac-1', 'tok-1');
+    expect(cf.records.has('r-old')).toBe(false);
+    expect(cf.tunnels.get('t-old')!.deleted).toBe(false);
+    expect(store.list()).toEqual([]);
+  });
+
+  it('turning Connect off deletes a recorded tunnel that passes the check', async () => {
+    const { cf, store } = await legacy();
+    await store.remove('mac-1', 'tok-1');
+    expect(cf.tunnels.get('t-old')!.deleted).toBe(true);
+  });
+
   it('does not adopt a recorded tunnel with a name the relay never gave it', async () => {
     const { cf, register } = await legacy({ tunnelName: 'omni-mac-2' });
     const r = await register();
