@@ -1,4 +1,4 @@
-// Claude Code's commands, as its `initialize` control request lists them.
+// Claude Code's commands, as its `initialize` control request lists them. The model catalog reads its models the same way.
 import { spawn } from 'node:child_process';
 import { isCommandName, type SlashCommand } from '@omni/shared/slash.ts';
 import { config } from '../../config.ts';
@@ -21,20 +21,29 @@ const PROBE_ARGS = [
 ];
 
 /** Ask Claude Code which commands it has in a folder. Null when it doesn't answer. */
-export function probeClaudeCommands(cwd: string): Promise<SlashCommand[] | null> {
+export async function probeClaudeCommands(cwd: string): Promise<SlashCommand[] | null> {
+  const init = await claudeInitialize(cwd, 'omni-os-commands');
+  return Array.isArray(init?.commands) ? normalizeClaudeCommands(init.commands) : null;
+}
+
+/**
+ * Claude Code's answer to the `initialize` control request in a folder: its commands, models, account and more. It sends
+ * nothing to the API: no prompt is ever written. Null when it doesn't answer.
+ */
+export function claudeInitialize(cwd: string, entrypoint: string): Promise<Record<string, unknown> | null> {
   return new Promise((resolve) => {
     const child = spawn(config.claudeBin, PROBE_ARGS, {
       cwd,
-      env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: 'omni-os-commands' }),
+      env: harnessEnv('claude-code', { CLAUDE_CODE_ENTRYPOINT: entrypoint }),
       stdio: ['pipe', 'pipe', 'ignore'],
     });
     let settled = false;
-    const finish = (list: SlashCommand[] | null) => {
+    const finish = (answer: Record<string, unknown> | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       child.kill('SIGKILL');
-      resolve(list);
+      resolve(answer);
     };
     const timer = setTimeout(() => finish(null), PROBE_TIMEOUT_MS);
     child.on('error', () => finish(null));
@@ -46,15 +55,15 @@ export function probeClaudeCommands(cwd: string): Promise<SlashCommand[] | null>
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (d: string) => {
       for (const line of splitter.push(d)) {
-        let msg: { type?: string; response?: { subtype?: string; request_id?: string; response?: { commands?: unknown } } };
+        let msg: { type?: string; response?: { subtype?: string; request_id?: string; response?: unknown } };
         try {
           msg = JSON.parse(line);
         } catch {
           continue;
         }
         if (msg.type !== 'control_response' || msg.response?.request_id !== 'commands') continue;
-        const commands = msg.response.subtype === 'success' ? msg.response.response?.commands : undefined;
-        finish(Array.isArray(commands) ? normalizeClaudeCommands(commands) : null);
+        const answer = msg.response.subtype === 'success' ? msg.response.response : undefined;
+        finish(answer && typeof answer === 'object' ? (answer as Record<string, unknown>) : null);
       }
     });
     child.stdin.write(JSON.stringify({ type: 'control_request', request_id: 'commands', request: { subtype: 'initialize' } }) + '\n');

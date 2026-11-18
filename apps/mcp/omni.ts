@@ -322,7 +322,8 @@ server.registerTool(
     description:
       'List the agent harnesses (Claude Code, Codex, Cursor, Hermes, Cursor Cloud) with their availability, fix command, models and effort levels, so you can pass valid ids to delegate. ' +
       'Pass channel to see them as that channel does: cursor-cloud needs the channel\'s GitHub repo. ' +
-      'Model "auto" is not listed: it is Omni picking among these per brief, and it never picks hermes or cursor-cloud.',
+      'Model "auto" is not listed: it is Omni picking among these per brief, and it never picks hermes or cursor-cloud. ' +
+      `A model marked hidden is one ${USER} left out of the pickers in Settings. It still runs: pass it when asked for it.`,
     inputSchema: {
       channel: z.string().optional().describe('Channel id the thread would run in. Cursor Cloud is unavailable in a channel with no GitHub repo.'),
     },
@@ -338,7 +339,7 @@ server.registerTool(
         fix: h.available ? undefined : h.fix,
         cap: h.cap,
         running: h.running,
-        models: (h.models ?? []).map((m: any) => ({ id: m.id, label: m.label, efforts: m.efforts, default_effort: m.defaultEffort, default: m.default })),
+        models: (h.models ?? []).map((m: any) => ({ id: m.id, label: m.label, efforts: m.efforts, default_effort: m.defaultEffort, default: m.default, hidden: m.hidden })),
       })),
     );
   },

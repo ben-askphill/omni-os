@@ -5,6 +5,7 @@ import { Icon, Picker, type PickerOption } from './ui.tsx';
 import { HarnessLogo } from './brand.tsx';
 import { ModelList } from './model-picker/ModelList.tsx';
 import { asksAuto } from '@omni/shared/thread-run.ts';
+import { pickerModels } from '@omni/shared/model-visibility.ts';
 
 export interface ModelChoice {
   harness: string;
@@ -22,7 +23,8 @@ function opensUp(btn: HTMLElement | null) {
 
 /**
  * One model pill whose list starts with Auto, then groups models under each harness, with a sticky header naming the
- * plan, one search across all groups, and the harness default marked "(default)". A harness that
+ * plan, one search across all groups, and the harness default marked "(default)". Models hidden in Settings > Harnesses
+ * & models are left out, unless one is the model already picked. A harness that
  * isn't installed or logged in shows disabled with the command that fixes it. `onOpen` fires as
  * the list opens, so the caller can refetch and a fresh login shows up without a reload. With `effort`, the pill also
  * reads the effort ("Sonnet 5.5 · high") and the list ends with the picked model's levels, as the phone's model sheet.
@@ -79,13 +81,15 @@ export function ModelPicker({
 
   const groups = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return harnesses.map((h) => ({
-      harness: h,
-      models: s
-        ? h.models.filter((m) => `${m.label} ${m.id} ${h.name} ${h.plan}`.toLowerCase().includes(s))
-        : h.models,
-    }));
-  }, [harnesses, q]);
+    return harnesses.map((h) => {
+      // Models hidden in Settings stay out, except the one already picked.
+      const listed = pickerModels(h.models, h.id === value.harness ? value.model : null);
+      return {
+        harness: h,
+        models: s ? listed.filter((m) => `${m.label} ${m.id} ${h.name} ${h.plan}`.toLowerCase().includes(s)) : listed,
+      };
+    });
+  }, [harnesses, q, value]);
   const showAuto = offerAuto && 'auto'.includes(q.trim().toLowerCase());
 
   useEffect(() => {

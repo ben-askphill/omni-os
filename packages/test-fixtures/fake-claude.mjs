@@ -62,6 +62,8 @@
 //   FAKE_CLAUDE_SIGINT_EXIT_MS=<ms>  on SIGINT, go quiet and exit only after that long, like the real CLI running its
 //                                 shutdown hooks and closing its MCP servers
 //   FAKE_CLAUDE_INIT_FAIL=1       exit 1 on an initialize control request instead of answering it
+//   FAKE_CLAUDE_MODELS=<file>     the initialize answer's `models`, read from that JSON file on each request, in place of
+//                                 MODELS. Change the file and the next answer lists a model no Omni release knows
 //   FAKE_CLAUDE_STDIN_LOG=<file>  stream mode: append one JSON line per stdin line read (pid, thread, type, control subtype,
 //                                 a message's text and the media type of each image block)
 //   FAKE_CLAUDE_MCP_MS=<ms>       how long after startup the user's MCP servers connect (default 30)
@@ -88,6 +90,21 @@ import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const VERSION = '2.1.278';
+/**
+ * The initialize answer's `models`, the shape claude 2.1.316 sends: Claude Code's `default` pointer, aliases with the
+ * model they resolve to, and dated ids. The same models Omni bundles, so a test catalog stays Omni's bundled list.
+ */
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+const MODELS = [
+  { value: 'default', resolvedModel: 'claude-sonnet-5-5', displayName: 'Default (recommended)', supportsEffort: true, supportedEffortLevels: EFFORTS },
+  { value: 'opus', resolvedModel: 'claude-opus-5-5', displayName: 'Opus 5.5', supportsEffort: true, supportedEffortLevels: EFFORTS },
+  { value: 'sonnet', resolvedModel: 'claude-sonnet-5-5', displayName: 'Sonnet 5.5', supportsEffort: true, supportedEffortLevels: EFFORTS },
+  { value: 'claude-sonnet-5', resolvedModel: 'claude-sonnet-5', displayName: 'Sonnet 5', supportsEffort: true, supportedEffortLevels: EFFORTS },
+  { value: 'claude-fable-5-2', resolvedModel: 'claude-fable-5-2', displayName: 'Fable 5.2', supportsEffort: true, supportedEffortLevels: EFFORTS },
+  { value: 'fable', resolvedModel: 'claude-fable-5-1', displayName: 'Fable 5.1', supportsEffort: true, supportedEffortLevels: EFFORTS },
+  { value: 'claude-haiku-4-5-20251001', resolvedModel: 'claude-haiku-4-5-20251001', displayName: 'Haiku 4.5' },
+];
+const modelList = () => (process.env.FAKE_CLAUDE_MODELS ? JSON.parse(readFileSync(process.env.FAKE_CLAUDE_MODELS, 'utf8')) : MODELS);
 /** What ASK asks, the shape of Claude Code's AskUserQuestion. */
 const QUESTIONS = [
   {
@@ -808,7 +825,7 @@ function onControl(msg) {
       process.stderr.write('fake-claude: initialize failed\n');
       return finish(1);
     }
-    writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: { commands: commandList() } } });
+    writeRaw({ type: 'control_response', response: { subtype: 'success', request_id: id, response: { commands: commandList(), models: modelList() } } });
   } else if (sub === 'get_context_usage') {
     const fixed = 12_000;
     writeRaw({

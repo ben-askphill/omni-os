@@ -66,6 +66,11 @@ export interface ModelEntry {
   defaultEffort: string;
   /** Whether this is the harness's default model. */
   default?: boolean;
+  /**
+   * Left out of the pickers by Ben's model visibility settings (harness/model-visibility.ts). Only GET /harnesses sets
+   * it. The model still runs: anything that already names it keeps working.
+   */
+  hidden?: boolean;
 }
 
 /** A harness plus its availability, models and cap, as the catalog reports it. */
