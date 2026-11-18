@@ -2,7 +2,7 @@
 // Pure, so every harness asks the same question: Claude Code for each can_use_tool request, Codex for each approval
 // request (harness/*/adapter.ts). runner/approvals.ts turns an "ask" into an approval card and waits for the answer.
 // ADR 0015.
-import { realpathSync } from 'node:fs';
+import { lstatSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
   connectorAccessOf,
@@ -75,7 +75,7 @@ const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 
 /** Commands that only read, when nothing in the line redirects or substitutes. */
 const SAFE_COMMANDS = new Set([
-  'cd', 'ls', 'pwd', 'cat', 'head', 'tail', 'wc', 'grep', 'egrep', 'fgrep', 'rg', 'find', 'tree', 'file', 'stat', 'du', 'df',
+  'cd', 'ls', 'pwd', 'cat', 'head', 'tail', 'wc', 'grep', 'egrep', 'fgrep', 'rg', 'find', 'file', 'stat', 'du', 'df',
   'which', 'type', 'whoami', 'uname', 'date', 'echo', 'basename', 'dirname', 'realpath', 'sort', 'uniq', 'cut', 'jq', 'diff',
 ]);
 const SAFE_GIT = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'ls-files', 'blame', 'describe', 'shortlog']);
@@ -86,7 +86,7 @@ const SAFE_GIT = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'ls-file
 const UNSAFE_ARGS: Record<string, RegExp> = {
   find: /^-(exec|execdir|ok|okdir|delete|fprint.*|fls)$/,
   sort: /^-[a-zA-Z]*o/,
-  tree: /^-o$/,
+  rg: /^-[a-zA-Z]*z/,
   file: /^-[a-zA-Z]*C/,
   date: /^-[a-zA-Z]*s/,
   git: /^(-c|-o)$/,
@@ -94,12 +94,12 @@ const UNSAFE_ARGS: Record<string, RegExp> = {
 /** Long options that write or run something. GNU tools and git take any unambiguous prefix (`--comp=sh`), so a prefix counts. */
 const UNSAFE_LONG: Record<string, string[]> = {
   sort: ['--output', '--compress-program'],
-  rg: ['--pre'],
+  // --pre and --hostname-bin run a program; --search-zip runs decompressors.
+  rg: ['--pre', '--hostname-bin', '--search-zip'],
   file: ['--compile'],
   date: ['--set'],
   git: ['--config-env', '--exec-path', '--ext-diff', '--textconv', '--output'],
   diff: ['--output'],
-  tree: ['--output'],
 };
 const unsafeArg = (cmd: string, arg: string) => {
   const a = arg.replace(/['"]/g, '');
@@ -151,19 +151,35 @@ export function readOnlyConnectorTool(server: string, tool: string): boolean {
   return READ_VERBS.has(words[0] ?? '');
 }
 
-/** A path with its symlinks resolved, as far as it exists: a link inside the folder can point out of it. */
-function real(path: string): string {
+/**
+ * A path with its symlinks resolved, as far as it exists: a link inside the folder can point out of it. Null when a
+ * part of it is a link that does not resolve (dangling, or a loop): the caller then treats it as outside and asks.
+ */
+function real(path: string): string | null {
   const abs = resolve(path);
   try {
     return realpathSync(abs);
   } catch {
+    try {
+      if (lstatSync(abs).isSymbolicLink()) return null;
+    } catch {
+      // Not there at all: resolve its parent and append the name.
+    }
     const parent = dirname(abs);
-    return parent === abs ? abs : join(real(parent), basename(abs));
+    if (parent === abs) return abs;
+    const up = real(parent);
+    return up === null ? null : join(up, basename(abs));
   }
 }
 
+/** A path segment as a case-insensitive, normalising disk may store it: `.GIT`, `.git.`, `.g\u200bit` are `.git`. */
+const segment = (p: string) => p.normalize('NFKC').replace(/\p{Default_Ignorable_Code_Point}/gu, '').replace(/[. ]+$/, (m) => (m === p ? m : '')).toLowerCase();
+
 const inside = (dir: string, path: string) => {
-  const rel = relative(real(dir), real(resolve(dir, path)));
+  const from = real(dir);
+  const to = real(resolve(dir, path));
+  if (from === null || to === null) return false;
+  const rel = relative(from, to);
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 };
 
@@ -175,7 +191,10 @@ const CONFIG_DIRS = new Set(['.git', '.claude', '.codex', '.cursor', '.agents', 
 const CONFIG_FILES = new Set(['.mcp.json', '.gitattributes', '.gitmodules', '.envrc']);
 const toolConfig = (dir: string, path: string) => {
   // Lowercased: on a case-insensitive disk `.GIT/hooks` is `.git/hooks`.
-  const parts = relative(real(dir), real(resolve(dir, path))).split(/[\\/]/).map((p) => p.toLowerCase());
+  const from = real(dir);
+  const to = real(resolve(dir, path));
+  if (from === null || to === null) return true;
+  const parts = relative(from, to).split(/[\\/]/).map(segment);
   return parts.some((p) => CONFIG_DIRS.has(p)) || CONFIG_FILES.has(parts.at(-1) ?? '');
 };
 

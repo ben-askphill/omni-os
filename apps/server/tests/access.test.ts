@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { channelAccess, codexPolicy, harnessRefusal, judge, readOnlyCommand, readOnlyConnectorTool, unrestricted, type ChannelAccess } from '../access.ts';
 import { approvalGrant, approvalQuestion, connectorIdOf, NEW_INSTALL_ACCESS } from '@omni/shared/access.ts';
@@ -38,6 +41,8 @@ describe('the access policy', () => {
       expect(judge(at('ask'), call('Write', { file_path })).decision).toBe('ask');
     }
     expect(judge(at('ask'), call('Write', { file_path: '/work/acme/.GIT/hooks/pre-commit' })).decision).toBe('ask');
+    expect(judge(at('ask'), call('Write', { file_path: '/work/acme/.git./hooks/pre-commit' })).decision).toBe('ask');
+    expect(judge(at('ask'), call('Write', { file_path: '/work/acme/.g\u200bit/hooks/pre-commit' })).decision).toBe('ask');
     expect(judge(at('ask'), call('Write', { file_path: '/work/acme/docs/git-notes.md' })).decision).toBe('allow');
   });
 
@@ -87,6 +92,10 @@ describe('the access policy', () => {
     expect(readOnlyCommand('sort --out=x in.txt')).toBe(false);
     expect(readOnlyCommand('git diff --ext')).toBe(false);
     expect(readOnlyCommand('git log --oneline')).toBe(true);
+    expect(readOnlyCommand('rg --hostname-bin ./run.sh foo')).toBe(false);
+    expect(readOnlyCommand('rg -iz foo')).toBe(false);
+    expect(readOnlyCommand('rg --search-z foo')).toBe(false);
+    expect(readOnlyCommand('tree -fo out.txt')).toBe(false);
     // Single quotes keep reading commands reading.
     expect(readOnlyCommand("rg -n 'foo$' src")).toBe(true);
     expect(readOnlyCommand('grep -o foo file.txt')).toBe(true);
@@ -125,5 +134,18 @@ describe('the access policy', () => {
     expect(approvalGrant({ selected: ['Always allow for Builder'], other: null })).toBe('role');
     expect(approvalGrant({ selected: [], other: 'not now' })).toBeNull();
     expect(approvalGrant({ selected: ['Don’t allow'], other: null })).toBeNull();
+  });
+
+  it('asks for an edit through a symlink that leads out of the folder, or one that does not resolve', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omni-access-'));
+    const work = join(dir, 'work');
+    mkdirSync(work);
+    symlinkSync('/etc', join(work, 'out'));
+    symlinkSync(join(dir, 'nowhere', 'deeper'), join(work, 'dangling'));
+    const edit = (file_path: string) => judge(at('ask'), { tool: 'Write', input: { file_path }, cwd: work, threadDir: join(dir, 'thread') }).decision;
+    expect(edit(join(work, 'notes.md'))).toBe('allow');
+    expect(edit(join(work, 'out', 'hosts'))).toBe('ask');
+    expect(edit(join(work, 'dangling', 'x.txt'))).toBe('ask');
+    expect(edit(join(work, 'dangling'))).toBe('ask');
   });
 });
