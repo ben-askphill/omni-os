@@ -27,6 +27,8 @@ import { ModelsSection } from './SettingsAgents.tsx';
 import { CrewSection } from './SettingsCrew.tsx';
 import { AccountsSection } from './SettingsAccounts.tsx';
 import { StorageSection } from './Storage.tsx';
+import { useTemplates } from '../templates.tsx';
+import { sortTemplates } from '@omni/shared/templates.ts';
 import { PathMapEditor, SyncSection } from './Sync.tsx';
 import {
   Advanced,
@@ -219,6 +221,44 @@ function WorktreesSection() {
   );
 }
 
+/** Settings > Threads: the templates the `/` menu and the New box offer, and where their files live. */
+function TemplatesCard() {
+  const { data, error, reload } = useTemplates();
+  return (
+    <Card entry="templates" title="Templates" subtitle="Ready-made jobs in the / menu and under a new thread's box. Type / and a template's name, then what it is about.">
+      {error ? (
+        <ErrorNote onRetry={reload}>{error}</ErrorNote>
+      ) : !data ? (
+        <Loading />
+      ) : (
+        <div className="space-y-3">
+          {sortTemplates(data.templates).map((t) => (
+            <SettingRow
+              key={t.id}
+              label={t.name}
+              hint={t.description}
+              origin={
+                <code className="text-[12px] text-fg-3">
+                  /{t.id}
+                  {t.argumentHint ? ` ${t.argumentHint}` : ''}
+                </code>
+              }
+            />
+          ))}
+          {data.hidden > 0 && (
+            <FootNote>
+              {data.hidden} Shopify template{data.hidden === 1 ? '' : 's'} show{data.hidden === 1 ? 's' : ''} once the Shopify add-on is on.
+            </FootNote>
+          )}
+          <FootNote>
+            Add your own as Markdown files in <code>data/templates/</code>. A file with the same name as a shipped one replaces it.
+          </FootNote>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function ThreadsSection() {
   const { state } = useSetupState();
   return (
@@ -229,6 +269,7 @@ function ThreadsSection() {
         <span id={settingAnchor('thread-features')} />
         <ServerOptions section="threads" />
       </div>
+      <TemplatesCard />
       <div id={settingAnchor('automations')} className="scroll-mt-6">
         <LinkLine href={href.automations()}>Automations have their own page</LinkLine>
       </div>

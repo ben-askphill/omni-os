@@ -140,6 +140,12 @@ describe('stage.ts and the server bundle', () => {
     expect(personalCrewProblems(join(import.meta.dirname, '../../../crew'))).toEqual([]);
   });
 
+  // Templates ship the same way: the Shopify pack is generic, and anything about one person's company lives in data/templates/.
+  it('ships templates that name no one in particular', () => {
+    expect(SHIPPED_DIRS).toContain('templates');
+    expect(personalCrewProblems(join(import.meta.dirname, '../../../templates'), 'templates')).toEqual([]);
+  });
+
   it("flags a charter that names a person's own setup, and passes the same words in plain prose", () => {
     const dir = mkdtempSync(join(tmpdir(), 'omni-stage-crew-'));
     try {

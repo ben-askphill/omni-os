@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startRunner } from './runner-boot.ts';
 import { FAKE_CODEX } from './support.ts';
 
 // GET /api/commands?thread=<id>: the thread's `/` menu, from the folder the thread runs in.
 
-const r = await startRunner({ OMNI_CODEX_BIN: FAKE_CODEX });
+// No templates: their rows end every list (templates.test.ts covers them).
+const r = await startRunner({ OMNI_CODEX_BIN: FAKE_CODEX, OMNI_TEMPLATES_DIR: mkdtempSync(join(tmpdir(), 'omni-no-templates-')) });
 const { commandsApi } = await import('../commands-api.ts');
 const { runAutomation } = await import('../automations.ts');
 await (await import('../harness/catalog-service.ts')).loadCatalog();

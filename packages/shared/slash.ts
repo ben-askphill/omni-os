@@ -1,8 +1,11 @@
 // The slash grammar, shared by the server and the web app so both agree on what a message runs.
 // See CONTEXT.md: a Slash command is a Harness command or an Omni command.
 
-/** Where a command comes from, as the menu groups it. `mcp`: an MCP server's prompt, which only a thread's running process lists. */
-export type CommandSource = 'omni' | 'project' | 'personal' | 'plugin' | 'mcp' | 'builtin';
+/**
+ * Where a command comes from, as the menu groups it. `mcp`: an MCP server's prompt, which only a thread's running process
+ * lists. `template`: one of Omni's templates (templates.ts), which Omni expands into its instructions on every harness.
+ */
+export type CommandSource = 'template' | 'omni' | 'project' | 'personal' | 'plugin' | 'mcp' | 'builtin';
 
 /** One command a thread's `/` menu offers, in the same shape for every harness. */
 export interface SlashCommand {
@@ -168,7 +171,7 @@ export interface SlashHit {
 }
 
 export interface SlashRecord {
-  /** The harness command the message starts with. */
+  /** The harness command the message starts with, or the template it starts with (source `template`). */
   command?: SlashHit;
   /** The Mentions after it, in order. */
   mentions?: SlashHit[];

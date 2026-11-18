@@ -78,6 +78,18 @@ server.registerTool(
   async () => text((await call('/crew')).filter((r: any) => r.delegatable).map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
 );
 
+server.registerTool(
+  'list_templates',
+  {
+    description:
+      'List the templates the user can start a job from (a client question, a meeting agenda, a CRO audit): skills Omni expands on every harness. ' +
+      'Start one by putting `/<id> <input>` at the very start of a prompt to delegate or message_thread; quick ones answer in one reply, task ones do work.',
+  },
+  // GET /api/templates lists only the templates in packs that are on.
+  async () =>
+    text((await call('/templates')).templates.map((t: any) => ({ id: t.id, name: t.name, description: t.description, input: t.argumentHint ?? null, kind: t.kind, ...(t.skill && { skill: t.skill }) }))),
+);
+
 // The crew roles the Conductor reads and writes (plan slice S7, docs/plans/2026-11-18-user-defined-crew.md). The API's
 // crew guard (apps/server/crew-guard.ts) decides every write: only a thread running as the Conductor, never under an
 // automation, only after Ben answered in it, and never a role's powers.

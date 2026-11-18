@@ -27,7 +27,7 @@ export const EXTERNALS = ['node-pty', '@playwright/mcp'] as const;
  * Copied as they are, beside the bundles. No automations: a fresh install starts with none, and the user's own live
  * in their data dir. tests/stage.test.ts keeps it that way.
  */
-export const SHIPPED_DIRS = ['crew', 'mods', 'prototypes/activity-monitor'] as const;
+export const SHIPPED_DIRS = ['crew', 'templates', 'mods', 'prototypes/activity-monitor'] as const;
 
 /**
  * Words that mark a crew charter as one person's own: their name, company, clients and tools. Shipped charters reach
@@ -39,8 +39,8 @@ export const PERSONAL_TERMS = [
   'Volero', 'Pink Gellac', 'Kamera Express', 'Acne Studios', 'North Sails', 'Patta',
 ] as const;
 
-/** Each shipped charter line that names one of PERSONAL_TERMS, as `crew/<file>:<line>: <term>`. */
-export function personalCrewProblems(crewDir: string): string[] {
+/** Each shipped charter or template line that names one of PERSONAL_TERMS, as `<dir>/<file>:<line>: <term>`. */
+export function personalCrewProblems(crewDir: string, name = 'crew'): string[] {
   const term = new RegExp(`\\b(${PERSONAL_TERMS.join('|')})\\b`);
   return readdirSync(crewDir)
     .filter((f) => f.endsWith('.md'))
@@ -49,7 +49,7 @@ export function personalCrewProblems(crewDir: string): string[] {
         .split('\n')
         .flatMap((line, i) => {
           const hit = line.match(term);
-          return hit ? [`crew/${f}:${i + 1}: ${hit[1]}`] : [];
+          return hit ? [`${name}/${f}:${i + 1}: ${hit[1]}`] : [];
         }),
     );
 }
@@ -435,8 +435,10 @@ export async function stage(args: StageArgs, out = STAGE_DIR): Promise<void> {
   if (!existsSync(join(webDist, 'index.html'))) throw new Error('apps/web/dist has no index.html. Run without --skip-web.');
   cpSync(webDist, join(out, 'apps/web/dist'), { recursive: true });
 
-  const personal = personalCrewProblems(join(REPO, 'crew'));
-  if (personal.length) throw new Error(`crew/ names one person's own setup, and it ships to every install: ${personal.join('; ')}`);
+  for (const dir of ['crew', 'templates']) {
+    const personal = personalCrewProblems(join(REPO, dir), dir);
+    if (personal.length) throw new Error(`${dir}/ names one person's own setup, and it ships to every install: ${personal.join('; ')}`);
+  }
   for (const dir of SHIPPED_DIRS) cpSync(join(REPO, dir), join(out, dir), { recursive: true });
   const version = stampPackageJson(out);
 

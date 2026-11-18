@@ -475,6 +475,8 @@ export type FeedEvent =
   | { type: 'automations' }
   /** A crew role was saved, reset, deleted, hidden or shown, here or on another machine: refetch GET /api/crew. */
   | { type: 'crew' }
+  /** Show technical details or the Shopify add-on changed, here or on another machine: refetch GET /api/display. */
+  | { type: 'display' }
   /** The update check or Update moved on: refetch GET /api/update. */
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed. Refetch the list once `refreshing` is false. */

@@ -1,4 +1,4 @@
-import type { CreateThreadRequest, CrewRole, Thread } from '@omni/client-core';
+import type { CreateThreadRequest, CrewRole, Template, Thread } from '@omni/client-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { toUploadFiles, type Staged } from '../attachments/model';
@@ -20,6 +20,23 @@ export function useCrew(): CrewRole[] | null {
     };
   }, [hub]);
   return crew;
+}
+
+/** The templates the New box offers, empty while they load or when the server has none (one from before templates). */
+export function useTemplates(): Template[] {
+  const hub = useLiveHub();
+  const [list, setList] = useState<Template[]>([]);
+  useEffect(() => {
+    let live = true;
+    hub
+      .request((api) => api.templates())
+      .then((r) => live && setList(r.templates))
+      .catch(() => live && setList([]));
+    return () => {
+      live = false;
+    };
+  }, [hub]);
+  return list;
 }
 
 export type StartState = { status: 'idle' } | { status: 'starting' } | { status: 'failed'; failure: CreateFailure };

@@ -119,6 +119,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'keep-alive', section: 'threads', title: 'Keep sessions warm', keywords: ['keepalive', 'idle', 'process', 'background agents', 'interrupt'] },
   { id: 'limits', section: 'threads', title: 'Usage-limit recovery', keywords: ['rate limit', 'usage limit', 'reset', 'continue', 'resume', 'grace'] },
   { id: 'thread-features', section: 'threads', title: 'Reply suggestions, turn snapshots, browser and uploads', keywords: ['suggestions', 'haiku', 'snapshots', 'this turn', 'diff', 'browser', 'playwright', 'chrome', 'uploads', 'attachments', 'mods', 'plugins'] },
+  { id: 'templates', section: 'threads', title: 'Templates', keywords: ['template', 'templates', 'skills', 'cro', 'audit', 'agenda', 'meeting', 'recall', 'proposal', 'ticket', 'adr', 'decision', 'client question', 'data/templates'] },
   { id: 'automations', section: 'threads', title: 'Automations', keywords: ['scheduled', 'schedule', 'cron', 'webhook', 'tasks', 'recurring'] },
   { id: 'channel-list', section: 'channels', title: 'Channels', keywords: ['projects', 'clients', 'new channel', 'archive'] },
   { id: 'channel-basics', section: 'channels', title: 'Channel name, icon, notes and design system', keywords: ['emoji', 'kind', 'notes', 'system prompt', 'instructions', 'design system'] },

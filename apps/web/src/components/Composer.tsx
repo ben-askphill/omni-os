@@ -38,6 +38,8 @@ import { finePointer, SteerButton, ThreadRunPills } from './composer/ReplyContro
 import { ThreadMachineChip, type MachineHeld } from './composer/MachineChip.tsx';
 import { LivesOnNote, sendRefusal, type SendRefusal } from './thread/LivesOn.tsx';
 import { TakeoverConfirm } from './thread/Takeover.tsx';
+import { TemplateChips, useTemplates } from '../templates.tsx';
+import { templateDraft, type Template } from '@omni/shared/templates.ts';
 
 export { AttachmentStrip, useAttachments };
 
@@ -141,6 +143,7 @@ export function NewThreadComposer({
   };
 
   const { slashMenu, fileMenu, menus, hint } = useNewThreadMenus({ ref, text, onText: update, choice, channel });
+  const templates = useTemplates();
 
   /** POST /api/grokbot with the text and the channel, the route Send to Grok Bot uses. The box empties once it took it. */
   const sendToGrok = async (prompt: string) => {
@@ -191,77 +194,90 @@ export function NewThreadComposer({
   };
 
   const { channelOptions, roleOptions } = pickerOptions(visibleChannels, channel, crew);
+  // A template chip puts `/<name> ` in the box, ready for what the job is about.
+  const pickTemplate = (t: Template) => {
+    update(templateDraft(t));
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+  };
   return (
-    <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
-      <DropHint over={att.over} />
-      {/* Near the top of the page, so it opens downward. */}
-      {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
-      {fileMenu.menu && <FileMenu {...fileMenu.menu} below />}
-      <ContextChips records={refs} onRemove={(id) => removeDraftContext(key, id)} className="px-3 pt-3 pb-0.5" />
-      <AttachmentStrip files={att.files} onRemove={att.remove} />
-      <textarea
-        ref={ref}
-        value={text}
-        {...menus.textarea}
-        onPaste={att.onPaste}
-        onKeyDown={(e) => {
-          if (menus.onKey(e)) return;
-          if (enterKey(e, text, update)) void submit();
-        }}
-        rows={big ? 3 : 2}
-        placeholder={toGrok ? GROK_BOT_PLACEHOLDER : withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
-        className={`block max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none placeholder:text-fg-3 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
-      />
-      <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
-        {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
-        {showRole && <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />}
-        {harnesses && !toGrok && (
-          <ModelPicker
-            harnesses={harnesses}
-            onOpen={() => {
-              reloadHarnesses();
-              accounts.reload();
-            }}
-            accounts={target}
-            defaultOpen={preset?.pickModel}
-            value={choice}
-            onChange={(c) => {
-              setPicked({ choice: c, effort: '' }); // changing the model resets effort to the default
-            }}
-            effort={{ value: effort, onChange: (effort) => setPicked({ choice, effort }) }}
-          />
-        )}
-        {!toGrok && <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />}
-        <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} />
-        <AttachButton onPick={att.add} disabled={busy} />
-        {!toGrok && <ReferenceThreadButton to={{ draft: key, channel }} disabled={busy} />}
-        {folder && channel === preset?.channel && !toGrok && (
-          <button
-            type="button"
-            onClick={() => setFolder(null)}
-            title="Filed in this folder. Click to start it ungrouped."
-            aria-label={`In folder ${folder.name}. Remove`}
-            className="hov inline-flex h-[30px] max-w-[180px] items-center gap-1.5 rounded-full px-2.5 text-[12.5px] text-fg-2 hover:text-fg"
-          >
-            <Icon name="folder" size={13} className="text-fg-3" />
-            <span className="truncate">{folder.name}</span>
-            <Icon name="x" size={12} className="text-fg-3" />
-          </button>
-        )}
-        <div className="ml-auto flex items-center gap-2.5">
-          <SendButton armed={!!text.trim() && !grokBlock} busy={busy} onClick={submit}>
-            {toGrok ? 'Send' : 'Start'}
-          </SendButton>
+    <>
+      <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
+        <DropHint over={att.over} />
+        {/* Near the top of the page, so it opens downward. */}
+        {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
+        {fileMenu.menu && <FileMenu {...fileMenu.menu} below />}
+        <ContextChips records={refs} onRemove={(id) => removeDraftContext(key, id)} className="px-3 pt-3 pb-0.5" />
+        <AttachmentStrip files={att.files} onRemove={att.remove} />
+        <textarea
+          ref={ref}
+          value={text}
+          {...menus.textarea}
+          onPaste={att.onPaste}
+          onKeyDown={(e) => {
+            if (menus.onKey(e)) return;
+            if (enterKey(e, text, update)) void submit();
+          }}
+          rows={big ? 3 : 2}
+          placeholder={toGrok ? GROK_BOT_PLACEHOLDER : withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
+          className={`block max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none placeholder:text-fg-3 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
+        />
+        <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
+          {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
+          {showRole && <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />}
+          {harnesses && !toGrok && (
+            <ModelPicker
+              harnesses={harnesses}
+              onOpen={() => {
+                reloadHarnesses();
+                accounts.reload();
+              }}
+              accounts={target}
+              defaultOpen={preset?.pickModel}
+              value={choice}
+              onChange={(c) => {
+                setPicked({ choice: c, effort: '' }); // changing the model resets effort to the default
+              }}
+              effort={{ value: effort, onChange: (effort) => setPicked({ choice, effort }) }}
+            />
+          )}
+          {!toGrok && <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />}
+          <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} />
+          <AttachButton onPick={att.add} disabled={busy} />
+          {!toGrok && <ReferenceThreadButton to={{ draft: key, channel }} disabled={busy} />}
+          {folder && channel === preset?.channel && !toGrok && (
+            <button
+              type="button"
+              onClick={() => setFolder(null)}
+              title="Filed in this folder. Click to start it ungrouped."
+              aria-label={`In folder ${folder.name}. Remove`}
+              className="hov inline-flex h-[30px] max-w-[180px] items-center gap-1.5 rounded-full px-2.5 text-[12.5px] text-fg-2 hover:text-fg"
+            >
+              <Icon name="folder" size={13} className="text-fg-3" />
+              <span className="truncate">{folder.name}</span>
+              <Icon name="x" size={12} className="text-fg-3" />
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-2.5">
+            <SendButton armed={!!text.trim() && !grokBlock} busy={busy} onClick={submit}>
+              {toGrok ? 'Send' : 'Start'}
+            </SendButton>
+          </div>
         </div>
+        {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
+        <div aria-live="polite">{hint && !menus.open && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
+        {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
+        {toGrok && !grokBlock && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{GROK_BOT_NOTE}</div>}
+        {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
+        {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
+        {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
       </div>
-      {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
-      <div aria-live="polite">{hint && !menus.open && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
-      {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
-      {toGrok && !grokBlock && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{GROK_BOT_NOTE}</div>}
-      {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
-      {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
-      {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
-    </div>
+      {!text.trim() && !toGrok && templates.data && <TemplateChips templates={templates.data.templates} onPick={pickTemplate} className="mt-3 px-1" />}
+    </>
   );
 }
 
