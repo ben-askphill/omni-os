@@ -7,6 +7,7 @@ import { turnFinished } from '../sync/files.ts';
 import { followBranch } from '../branch-follow.ts';
 import { notifyEnded } from '../push-sender.ts';
 import { observeToolResult } from '../tool-failures.ts';
+import { noteInitServers } from '../sign-in-check.ts';
 import { toolTails } from '../tool-tail.ts';
 import { isSubagent, type ModUi, type Record as StreamRecord, type TaskUpdate } from '../stream.ts';
 import { goalOf, nextGoal, type GoalSignal } from '@omni/shared/goal.ts';
@@ -216,6 +217,8 @@ export function onRecord(live: Live, rec: StreamRecord) {
     case 'init':
       // The CLI emits one per turn. Only the first per process is worth showing.
       if (!live.sawInit()) return;
+      // Claude Code's connector sign-ins, for the next job's sign-in check (connectors.ts).
+      if (threads.get(id)?.harness === 'claude-code') noteInitServers(rec.payload.mcp);
       addEvent(id, 'init', rec.payload);
       return;
     case 'result':

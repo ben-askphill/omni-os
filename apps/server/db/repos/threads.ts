@@ -7,7 +7,8 @@ import { assignments } from './assignments.ts';
 export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'imported';
 /** `team`: a member of a team, run under its lead thread and listed only there. */
 /** A worktree thread's preparation: `preparing` until its worktree is made and checked, `failed` (with why) until Ben retries. */
-export type ThreadSetup = 'preparing' | 'failed';
+/** `signin`: a connector the job needs is signed out (runner/setup.ts holdForSignIn); `setup_error` says which. */
+export type ThreadSetup = 'preparing' | 'failed' | 'signin';
 /** A turn stopped at the harness's usage limit: `limited` until Ben acts, `scheduled` to resume at the reset time. */
 export type ThreadLimit = 'limited' | 'scheduled';
 export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';

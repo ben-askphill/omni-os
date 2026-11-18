@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   claudeModels,
   claudeHarness,
+  claudeProbeOf,
+  CLAUDE_LOGIN,
+  CLAUDE_NOT_FOUND,
   parseClaudeReported,
   codexHarness,
   resolveModel,
@@ -185,5 +188,26 @@ describe('hermes catalog', () => {
     );
     expect(h.fix).toBe(HERMES_FIX);
     expect(h.models).toEqual([]);
+  });
+});
+
+describe('Claude Code availability probe', () => {
+  it('reads a signed-in, a signed-out and a missing claude from `claude auth status --json`', () => {
+    expect(claudeProbeOf({ stdout: '{"loggedIn":true,"email":"a@b.c"}', missing: false })).toEqual({ available: true });
+    expect(claudeProbeOf({ stdout: '{"loggedIn":false,"authMethod":"none"}', missing: false })).toEqual({ available: false, fix: CLAUDE_LOGIN });
+    expect(claudeProbeOf({ stdout: null, missing: true })).toEqual({ available: false, missing: true, fix: CLAUDE_NOT_FOUND });
+  });
+
+  it('keeps an answer it cannot read available, so an old CLI is never shown as down', () => {
+    expect(claudeProbeOf({ stdout: null, missing: false })).toEqual({ available: true });
+    expect(claudeProbeOf({ stdout: 'error: unknown command auth', missing: false })).toEqual({ available: true });
+  });
+
+  it('is no longer Ready when signed out: unavailable, with the sign-in command and no models', () => {
+    const h = claudeHarness(4, undefined, [], { available: false, fix: CLAUDE_LOGIN });
+    expect(h).toMatchObject({ id: 'claude-code', available: false, fix: 'claude auth login', models: [] });
+    expect(h.missing).toBeUndefined();
+    expect(claudeHarness(4, undefined, [], { available: false, missing: true, fix: CLAUDE_NOT_FOUND }).missing).toBe(true);
+    expect(claudeHarness(4).available).toBe(true);
   });
 });

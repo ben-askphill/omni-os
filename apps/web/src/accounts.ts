@@ -30,10 +30,10 @@ export function pickerAccounts(view: AccountsView | undefined, pick: string | nu
 }
 
 /** The account a thread last ran as, read again when the thread's feed message comes (a new stamp sends one) and on reconnect. */
-export function useThreadAccount(threadId: string): ThreadAccount | null {
-  const res = useApi<{ account: ThreadAccount | null }>(`/accounts/threads/${encodeURIComponent(threadId)}`);
+export function useThreadAccount(threadId: string | null | undefined): ThreadAccount | null {
+  const res = useApi<{ account: ThreadAccount | null }>(threadId ? `/accounts/threads/${encodeURIComponent(threadId)}` : null);
   useFeed((e) => {
-    if ((e.type === 'thread' && e.thread.id === threadId) || e.type === 'reconnect') res.reload();
+    if (threadId && ((e.type === 'thread' && e.thread.id === threadId) || e.type === 'reconnect')) res.reload();
   });
   return res.data?.account ?? null;
 }

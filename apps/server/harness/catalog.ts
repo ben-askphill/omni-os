@@ -96,16 +96,42 @@ export function claudeModels(defaultModelId = 'claude-sonnet-5-5', reported: rea
   return models;
 }
 
-/** `reported`: what Claude Code listed when Omni last asked. Empty before the first answer: the bundled list alone. */
-export function claudeHarness(cap: number, defaultModelId?: string, reported: readonly ClaudeReportedModel[] = []): HarnessInfo {
-  return {
-    id: 'claude-code',
-    ...HARNESS_META['claude-code'],
-    capabilities: CAPABILITIES['claude-code'],
-    available: true,
-    models: claudeModels(defaultModelId, reported),
-    cap,
-  };
+/** Signed out. Three words or fewer, so the clients show it as a command to run. */
+export const CLAUDE_LOGIN = 'claude auth login';
+export const CLAUDE_NOT_FOUND = 'Omni found no claude on its PATH. Install Claude Code or set OMNI_CLAUDE_BIN to its path';
+
+/**
+ * What `claude auth status --json` said (catalog-service.ts). Unknown (a CLI too old to have the command, or one that
+ * did not answer in time) stays available: only a clear "signed out" or a missing binary takes Claude Code down.
+ */
+export interface ClaudeProbe {
+  available: boolean;
+  missing?: boolean;
+  fix?: string;
+}
+
+/**
+ * `reported`: what Claude Code listed when Omni last asked. Empty before the first answer: the bundled list alone.
+ * `probe`: whether it is installed and signed in. Before the first probe it counts as available, as it did before
+ * the probe existed, so a restart never shows Claude Code down for the seconds the probe takes.
+ */
+export function claudeHarness(cap: number, defaultModelId?: string, reported: readonly ClaudeReportedModel[] = [], probe: ClaudeProbe = { available: true }): HarnessInfo {
+  const base = { id: 'claude-code' as const, ...HARNESS_META['claude-code'], capabilities: CAPABILITIES['claude-code'], cap };
+  if (!probe.available) return { ...base, available: false, fix: probe.fix ?? CLAUDE_LOGIN, ...(probe.missing && { missing: true as const }), models: [] };
+  return { ...base, available: true, models: claudeModels(defaultModelId, reported) };
+}
+
+/** `claude auth status --json`'s stdout as a probe; null stdout is a CLI that did not answer. */
+export function claudeProbeOf(out: { stdout: string | null; missing: boolean }): ClaudeProbe {
+  if (out.missing) return { available: false, missing: true, fix: CLAUDE_NOT_FOUND };
+  if (!out.stdout) return { available: true };
+  let j: { loggedIn?: unknown } | null = null;
+  try {
+    j = JSON.parse(out.stdout) as { loggedIn?: unknown };
+  } catch {
+    return { available: true };
+  }
+  return j?.loggedIn === false ? { available: false, fix: CLAUDE_LOGIN } : { available: true };
 }
 
 // ---------- Codex ----------

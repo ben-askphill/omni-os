@@ -12,8 +12,8 @@ export type NeedsAction =
   | { kind: 'open'; label: string; thread?: string }
   /** POST /needs-you/read with the result's uid. */
   | { kind: 'read'; label: string; uid: string }
-  /** POST /threads/:id/setup/retry. */
-  | { kind: 'retry'; label: string }
+  /** POST /threads/:id/setup/retry. `skipSignIn`: Start anyway, past a sign-in the thread waits for. */
+  | { kind: 'retry'; label: string; skipSignIn?: boolean }
   /** POST /threads/:id/limit/<action>. */
   | { kind: 'limit'; label: string; action: LimitAction }
   /** POST /threads/:id/requests/resume: the messages a restart kept. */
@@ -52,7 +52,9 @@ function actionsOf(item: NeedsYouItem, harness: (id: string) => string, now: num
       out = [{ kind: 'open', label: 'Answer' }];
       break;
     case 'setup':
-      out = [{ kind: 'retry', label: 'Retry' }];
+      out = b.signin
+        ? [{ kind: 'retry', label: 'Try again' }, { kind: 'retry', label: 'Start anyway', skipSignIn: true }]
+        : [{ kind: 'retry', label: 'Retry' }];
       break;
     case 'limited':
       out = (limitView(t, harness(t.harness), now)?.actions ?? []).map((a) => ({ kind: 'limit', label: LIMIT_ACTION[a].label, action: a }));

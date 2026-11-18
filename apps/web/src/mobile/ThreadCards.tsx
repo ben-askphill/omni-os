@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { setupWait } from '@omni/shared/setup-wait.ts';
 import { api, errorText, type Artifact, type PendingMsg, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
 import { Markdown } from '../components/Markdown.tsx';
@@ -230,7 +231,7 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
     <>
       {items.map((m) => (
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
-          <span className="text-[12px] leading-[1.3] text-fg-3">{isForwarded(m) ? forwardedLabel(m, trouble) : (parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
+          <span className="text-[12px] leading-[1.3] text-fg-3">{isForwarded(m) ? forwardedLabel(m, trouble) : (setupWait(thread.setup)?.label ?? parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
           {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} /> : null}
           <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
           {(m.text || !hasContext(m.context)) && (

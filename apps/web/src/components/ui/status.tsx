@@ -56,6 +56,13 @@ const SHAPE: Record<Mark | 'loading', ReactNode> = {
     </>
   ),
   held: <path d="M8 2 14 8 8 14 2 8Z" {...line} strokeWidth="2.4" />,
+  // Waiting for a sign-in: a hollow diamond, as nothing ran yet, with a keyhole dot, as Ben signs in to let it start.
+  signin: (
+    <>
+      <path d="M8 2 14 8 8 14 2 8Z" {...line} strokeWidth="2.4" />
+      <circle cx="8" cy="8" r="1.7" />
+    </>
+  ),
   review: (
     <>
       <path d="M8 2 14 8 8 14 2 8Z" {...line} strokeWidth="2.4" />

@@ -50,6 +50,8 @@ export interface NeedsYouBlocker {
   kind: 'question' | 'setup' | 'recovered' | 'uncertain' | 'limited' | 'child_failed';
   detail: string | null;
   count: number;
+  /** setup: the thread waits for a sign-in to a connector (`detail` says which and how), not a worktree that failed. */
+  signin?: true;
   /** question: when the newest question card was asked, so a client can tell a new card from one it already saw. */
   at?: string;
   /** question and child_failed: the threads under this one that asked or failed, newest first. Absent when it asked itself. */
@@ -163,7 +165,7 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
     )
     .all(...args) as unknown as ResultRow[];
   const setup = db
-    .prepare(`SELECT ${prefixed} FROM threads t WHERE ${LISTED} ${scope} AND t.setup = 'failed'`)
+    .prepare(`SELECT ${prefixed} FROM threads t WHERE ${LISTED} ${scope} AND t.setup IN ('failed', 'signin')`)
     .all(...args) as unknown as Thread[];
   // Only this Mac's: another Mac's parked requests are that Mac's to resume.
   const parked = db
@@ -245,7 +247,7 @@ export function needsYou(channelId?: string, threadId?: string): NeedsYou {
       b.results = [...(b.results ?? []), f.r_uid];
     }
   }
-  for (const t of setup) item(t, t.updated_at).blockers.unshift({ kind: 'setup', detail: t.setup_error, count: 0 });
+  for (const t of setup) item(t, t.updated_at).blockers.unshift({ kind: 'setup', detail: t.setup_error, count: 0, ...(t.setup === 'signin' && { signin: true as const }) });
   for (const p of parked) item(p, p.p_at).blockers.push({ kind: p.p_state, detail: null, count: Number(p.p_count) });
   for (const t of limited) {
     item(t, t.updated_at).blockers.push({

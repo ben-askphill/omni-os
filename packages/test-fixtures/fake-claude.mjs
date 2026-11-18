@@ -55,6 +55,7 @@
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen,
 //                                 MCP_TOOL_TIMEOUT)
 //   FAKE_CLAUDE_LATENCY_MS=<ms>   simulated model call latency per step (default 20)
+//   FAKE_CLAUDE_MCP_LIST=<file>   what `claude mcp list` prints (sign-in check), else $HOME/.fake-claude-mcp-list.txt
 //   FAKE_CLAUDE_RESUME_FLUSH=1    on --resume, emit a zero-turn success result at startup like the real CLI can
 //   FAKE_CLAUDE_STARTUP_MS=<ms>   stream mode: read no stdin until then, like the real CLI connecting its MCP servers
 //   FAKE_CLAUDE_TURN_GAP_MS=<ms>  pause between a result and the next queued turn (the real CLI takes about 200ms);
@@ -209,6 +210,16 @@ if (process.argv[2] === 'auth' && process.argv[3] === 'status') {
     : JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', email: 'dev@example.com', orgName: 'Example Org', subscriptionType: 'max' }, null, 2);
   process.stdout.write(status + '\n');
   process.exit(JSON.parse(status).loggedIn ? 0 : 1);
+}
+
+// `claude mcp list`: each MCP server and whether it is connected, for the sign-in check (apps/server/sign-in-check.ts).
+// FAKE_CLAUDE_MCP_LIST names a text file to print, else $HOME/.fake-claude-mcp-list.txt, else one connected server. Read
+// on every call, so a QA stack can sign a connector out and back in while the server runs.
+if (process.argv[2] === 'mcp' && process.argv[3] === 'list') {
+  const file = process.env.FAKE_CLAUDE_MCP_LIST || join(process.env.HOME ?? '', '.fake-claude-mcp-list.txt');
+  const listed = file && existsSync(file) ? readFileSync(file, 'utf8').trim() : 'omni: node omni.js - \u2714 Connected';
+  process.stdout.write(`Checking MCP server health\u2026\n\n${listed}\n`);
+  process.exit(/Failed/.test(listed) ? 1 : 0);
 }
 
 const { opts, unknown, positional } = parseArgs(process.argv.slice(2));

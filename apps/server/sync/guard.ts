@@ -72,6 +72,7 @@ export function turnBlocked(t: Thread, here = false, taking = false): string | n
   // A worktree thread runs only in its own worktree, once Omni has made and checked it (apps/server/runner/setup.ts).
   if (t.setup === 'preparing') return "Omni is still preparing this thread's worktree.";
   if (t.setup === 'failed') return `This thread's worktree could not be prepared: ${(t.setup_error ?? 'unknown error').replace(/\.?$/, '.')} Retry to try again.`;
+  if (t.setup === 'signin') return t.setup_error ?? 'This thread waits for a sign-in. Sign in, then press Try again.';
   const held = elsewhereBlocked(t, here, taking);
   if (held) return held;
   if (!outbox.machineId() || existsSync(t.cwd) || rebuildable(t)) return null;
