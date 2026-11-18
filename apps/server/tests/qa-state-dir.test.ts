@@ -164,6 +164,32 @@ describe('qa-stack.sh state dir', () => {
     expect(r.stderr).toMatch(/evil\/state is a dir group or others can write/);
   });
 
+  it('runs its checks from a checkout reached through a symlink', () => {
+    const checkout = join(scratch(), 'checkout');
+    symlinkSync(ROOT, checkout);
+    const missing = join(scratch(), 'missing');
+    const quiet = run('bash', [join(checkout, 'scripts/qa-stack.sh'), 'status'], { QA_DIR: missing, QA_NO_WEB: '1' });
+    expect(quiet.stdout).toMatch(`no stack at ${missing}`);
+    const open = run('bash', [join(checkout, 'scripts/qa-stack.sh'), 'status'], { QA_DIR: stateDir(0o777), QA_NO_WEB: '1' });
+    expect(open.status).toBe(1);
+    expect(open.stderr).toMatch(/others can write/);
+  });
+
+  it('refuses a state dir name with a line break, which the shell would read without it', () => {
+    const root = scratch();
+    const hostile = join(root, 'state');
+    mkdirSync(hostile, { mode: 0o700 });
+    chmodSync(hostile, 0o777);
+    writeFileSync(join(hostile, 'server.pid'), String(stranger()));
+    mkdirSync(join(hostile, 'data'));
+    writeFileSync(join(hostile, 'data', 'api-token'), 'PLANTED-TOKEN');
+    mkdirSync(`${hostile}\n`, { mode: 0o700 });
+    const r = run('bash', [STACK, 'status'], { QA_DIR: `${hostile}\n`, QA_NO_WEB: '1' });
+    expect(r.status).toBe(1);
+    expect(r.stdout).not.toMatch(/PLANTED-TOKEN/);
+    expect(r.stderr).toMatch(/line break/);
+  });
+
   it('refuses a state dir in a folder others can write without the sticky bit', () => {
     const open = join(scratch(), 'open');
     mkdirSync(open);

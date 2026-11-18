@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
  * and `..` included, so the caller reads the same dir this checked. `missing` is true when it does not exist.
  */
 export function checkPrivateDir(dir, { create = false } = {}) {
+  // The shell's $(...) drops a trailing line break, so it would read another dir than the one checked here.
+  if (/[\x00-\x1f\x7f]/.test(dir)) return { path: dir, missing: false, problem: 'the state dir path holds a line break or another control character' };
   const leaf = basename(dir);
   if (leaf === '.' || leaf === '..') return { path: dir, missing: false, problem: `${dir} must name the dir itself, not . or ..` };
   // Not path.resolve on the whole path: that drops `link/..` on paper, while the shell follows the link first.
@@ -77,7 +79,8 @@ function lstatOrNull(path) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths on both sides: run from a checkout reached through a link, argv keeps the link and import.meta.url does not.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const args = process.argv.slice(2);
   const create = args[0] === '--create';
   const dir = create ? args[1] : args[0];

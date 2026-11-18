@@ -55,6 +55,7 @@ private_dir() {
   local rc=0 path
   path="$(node "$ROOT/scripts/qa-private-dir.mjs" "$@" "$DIR")" || rc=$?
   [ "$rc" = 0 ] || [ "$rc" = 3 ] || exit 1
+  [ -n "$path" ] || { echo "qa state dir: the check printed no path for $DIR" >&2; exit 1; }
   DIR="$path"
   [ "$rc" = 0 ]
 }
