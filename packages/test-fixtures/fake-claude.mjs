@@ -34,6 +34,7 @@
 //   MODS              before the answer, what a mod's hooks send (Claude Code 2.1.287+): a ui_status, a ui_log, a
 //                     ui_toast, and a ui_render with no text that Omni ignores
 //   MOD_CLEAR         before the answer, a ui_status with null text, which clears that mod's status
+//   NEEDS_TASK:<title>  answer as a quick ask does when the work needs a task: `TASK: <title>` (dashes are spaces), then why
 //   RUN:<path>        before the answer, run that shell script in the cwd, like a Bash call that edits files or runs git
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
 //   RENDER:<title>    before the answer, show inline-page.html (an interactive chart) with Omni's html_render, as the real
@@ -481,6 +482,7 @@ async function runTurn() {
   const tools = [];
   let think = 0;
   let rich = false;
+  let needsTask = null;
   let mods = false;
   let modClear = false;
   let limit = null;
@@ -528,6 +530,7 @@ async function runTurn() {
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
       for (const x of m.text.matchAll(/RENDER:(\S+)/g)) renders.push(x[1].replace(/-/g, ' '));
       for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
+      for (const x of m.text.matchAll(/NEEDS_TASK:(\S+)/g)) needsTask = x[1].replace(/-/g, ' ');
     }
     return true;
   };
@@ -670,7 +673,7 @@ async function runTurn() {
     }
     if (think && !(await pause(t, think))) break;
     steps++;
-    finalText = `ack: ${[...seen, ...answers].join(' | ')}`;
+    finalText = needsTask ? `TASK: ${needsTask}\nIt has to change files, which a quick ask cannot do.` : `ack: ${[...seen, ...answers].join(' | ')}`;
     assistant(`msg_fake_${++seq}`, [{ type: 'text', text: finalText }]);
     if (goal && goalMisses > 0) {
       // The goal hook blocks the stop: its reason goes in as a synthetic message and the model goes on.

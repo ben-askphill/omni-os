@@ -1,4 +1,5 @@
 // Interrupt, kill, idle, close, and shutdown.
+import { runnerPorts } from './ports.ts';
 import { randomUUID } from 'node:crypto';
 import { resolveDelivery } from '../delivery.ts';
 import { config } from '../config.ts';
@@ -138,14 +139,16 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
     has_run: 1,
     last_text: runText ? runText.slice(0, 600) : threads.get(id)?.last_text ?? null,
   });
-  if (!more) notifyEnded(id, status, events.lastRunReply(id, turnFrom));
+  // A quick ask is read where it was asked, so it alerts nobody. The task it turns into does.
+  if (!more && !t?.quick) notifyEnded(id, status, events.lastRunReply(id, turnFrom));
   applyQueued(id);
   // Shown done at once; the checkout after the turn is saved behind it.
   finishTurnSnapshot(live);
   emitThread(id);
   // Even while Omni shuts down: the report is saved and parked for Resume (queue.ts), not lost.
   if (t?.parent_id && !more) reportToParent(id, status, runText);
-  if (status === 'done' && !more && !t?.parent_id && runText && !isShuttingDown()) {
+  if (t?.quick && status === 'done' && !more && runText) void runnerPorts().reporting.quickTurn(id, events.lastRunReply(id, turnFrom));
+  if (status === 'done' && !more && !t?.parent_id && !t?.quick && runText && !isShuttingDown()) {
     suggestReply(id, runText);
     suggestNextThread(id, runText);
     suggestOpenItems(id, runText);

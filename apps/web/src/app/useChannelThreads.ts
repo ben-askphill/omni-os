@@ -78,8 +78,8 @@ export function useChannelThreads(channelId: string, accept: (t: Thread) => bool
     setData((prev) => {
       if (!prev) return prev;
       const list = prev.filter((t) => t.id !== e.thread.id);
-      // An archived thread leaves the list; a restored one comes back.
-      if (!e.thread.archived) list.push(e.thread);
+      // An archived thread leaves the list; a restored one comes back. A quick ask lists only under Recent asks.
+      if (!e.thread.archived && !e.thread.quick) list.push(e.thread);
       return list.sort(newestFirst);
     });
   });

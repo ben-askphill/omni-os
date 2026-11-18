@@ -8,6 +8,7 @@ import { publishFeed, publishThread } from './bus.ts';
 import { assignments, events, threads } from './db.ts';
 import { sendNewThread } from './handoff.ts';
 import { onToolResult } from './published.ts';
+import { afterQuickTurn } from './quick-ask.ts';
 import { forwardMessage, forwardReport, targetFor } from './run-on.ts';
 import { bindRunner } from './runner/ports.ts';
 
@@ -15,7 +16,7 @@ bindRunner({
   ports: {
     routing: { targetFor, forwardMessage, forwardReport },
     handoff: { sendNewThread },
-    reporting: { toolResult: onToolResult },
+    reporting: { toolResult: onToolResult, quickTurn: afterQuickTurn },
   },
   deps: {
     reporting: {

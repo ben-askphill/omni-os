@@ -141,7 +141,8 @@ export const claudeAdapter: HarnessAdapter = {
     if (mcpFile) args.push('--mcp-config', mcpFile);
     // Its own AskUserQuestion cannot be answered in -p mode: agents ask with Omni's ask_user_question instead.
     // A delegate-only role (the Conductor) also loses every tool that does work, so it can only hand it off.
-    args.push('--disallowedTools', ['AskUserQuestion', ...(ctx.role?.delegateOnly ? DELEGATE_ONLY_DENIED : [])].join(','));
+    // A quick ask only reads: the same tools go, and needing one is what turns it into a task (apps/server/quick-ask.ts).
+    args.push('--disallowedTools', ['AskUserQuestion', ...(ctx.role?.delegateOnly || thread.quick ? DELEGATE_ONLY_DENIED : [])].join(','));
     for (const dir of modDirs()) args.push('--plugin-dir', dir);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
 

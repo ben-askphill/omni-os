@@ -113,7 +113,7 @@ async function spawnLive(live: Live, thread: Thread) {
   // Chrome locks a profile dir: the first live process in a channel keeps it until it exits.
   const holder = browserHolder.get(channel.id);
   const browserBusy = !!holder && holder !== thread.id;
-  if (config.browser && !browserBusy && !remote) {
+  if (config.browser && !browserBusy && !remote && !thread.quick) {
     browserHolder.set(channel.id, thread.id);
     live.holdsBrowser();
   }
@@ -127,7 +127,7 @@ async function spawnLive(live: Live, thread: Thread) {
   live.setBrowserHold(attached?.hold ?? null);
   const cdpEndpoint = attached?.endpoint ?? null;
   if (!remote) writeDesignSystem(thread.id, channel);
-  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl() });
+  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl(), quick: !!thread.quick });
 
   let secretEnv: Record<string, string> = {};
   try {

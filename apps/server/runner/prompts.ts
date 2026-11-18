@@ -1,4 +1,5 @@
 // The system prompt handed to a harness for one thread.
+import { quickAskRule } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile } from '../config.ts';
 import { artifacts, type Channel, type Thread } from '../db.ts';
@@ -135,7 +136,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   const cloud = thread.harness === 'cursor-cloud';
   const name = userName();
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
-  const hands = !role?.delegateOnly;
+  // A quick ask only reads, and turns into a task for the rest (packages/shared/quick-ask.ts).
+  const hands = !role?.delegateOnly && !thread.quick;
   const lines = [
     '# Omni OS context',
     TOOL_FAILURE_POLICY,
@@ -160,6 +162,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? `- Shell commands run in zsh: quote glob arguments (--include='*.ts'), and never start a word with = (zsh reads echo === as a command lookup).${process.platform === 'darwin' ? ' The command-line tools are BSD, not GNU.' : ''}`
       : '',
     channel.notes ? `- Channel notes: ${channel.notes}` : '',
+    ...(thread.quick ? ['', ...quickAskRule(name)] : []),
     // A usage scan's lead gets the omni tools to save what Ben picks, not to route work: it never delegates.
     ...(role?.mcp.includes('omni') && role.id !== SCAN_ROLE
       ? [

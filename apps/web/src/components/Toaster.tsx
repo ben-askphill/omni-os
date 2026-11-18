@@ -128,6 +128,8 @@ export function ThreadNotifier() {
     seen.current.set(t.id, t.status);
     if (prev !== 'running' && prev !== 'queued') return;
     if (!FINISHED.has(t.status)) return;
+    // A quick ask is read where it was asked (packages/shared/quick-ask.ts), so its finish needs no toast.
+    if (t.quick) return;
     const glyph = threadGlyph(t);
     const r = routeRef.current;
     if (r.name === 'thread' && r.id === t.id && document.visibilityState === 'visible') return;

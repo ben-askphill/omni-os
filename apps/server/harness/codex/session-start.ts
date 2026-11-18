@@ -65,13 +65,15 @@ export function sessionParams(ctx: AdapterContext) {
     browserBusy: ctx.browserBusy,
     cdpEndpoint: ctx.cdpEndpoint,
     omniUrl: ctx.omniUrl,
+    quick: !!thread.quick,
   });
   return {
     model: thread.model || undefined,
     cwd: thread.cwd,
     approvalPolicy: 'never',
-    // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off.
-    sandbox: ctx.role?.delegateOnly ? 'read-only' : 'danger-full-access',
+    // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off. A quick ask
+    // only reads too (apps/server/quick-ask.ts): needing more is what turns it into a task.
+    sandbox: ctx.role?.delegateOnly || thread.quick ? 'read-only' : 'danger-full-access',
     developerInstructions: ctx.systemPrompt,
     config: threadConfig(mcp.mcpServers),
   };

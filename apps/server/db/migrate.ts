@@ -476,6 +476,12 @@ export function migrate() {
   // tree, the ref that holds them) and the client's request id, so a retried start gets the same thread back.
   // Local, not synced: the refs are this Mac's.
   ensureColumn('threads', 'continued_from', 'TEXT');
+  // A quick ask (packages/shared/quick-ask.ts): 1 while it answers in place, out of every list but Recent asks. `workspace`
+  // is what its agent may touch: none (its own folder), read (the channel's folder, read-only tools) or worktree; null is a
+  // thread from before, in the channel's folder as it always was. `promoted_to` names the task thread it turned into.
+  ensureColumn('threads', 'quick', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('threads', 'workspace', 'TEXT');
+  ensureColumn('threads', 'promoted_to', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS threads_continued_from ON threads(continued_from) WHERE continued_from IS NOT NULL');
   db.exec(`CREATE TABLE IF NOT EXISTS thread_continuations (
     thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
