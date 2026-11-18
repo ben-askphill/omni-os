@@ -13,7 +13,8 @@ import { startRunner } from './runner-boot.ts';
 const r = await startRunner();
 const LAUNCHES = join(r.tmp, 'launches.log');
 const STUB_SHELL = join(r.tmp, 'bin', 'stub-login-shell');
-writeFileSync(STUB_SHELL, `#!/bin/sh\n[ "$1" = "-lc" ] && printf '%s\\n' "$2" >> '${LAUNCHES}'\nexit 0\n`, { mode: 0o755 });
+// A command with FAIL in it exits 3, for a setup step that fails.
+writeFileSync(STUB_SHELL, `#!/bin/sh\n[ "$1" = "-lc" ] && printf '%s\\n' "$2" >> '${LAUNCHES}'\ncase "$2" in *FAIL*) exit 3;; esac\nexit 0\n`, { mode: 0o755 });
 process.env.SHELL = STUB_SHELL;
 
 const { app } = await import('../app.ts');
@@ -161,18 +162,67 @@ describe('another spelling of a shell route', () => {
   });
 });
 
+const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=t', '-C', cwd, ...args]);
+/** A worktree channel over a fresh repo with one commit. */
+function worktreeChannel() {
+  const ch = `hook-${++n}`;
+  const repo = join(r.tmp, ch);
+  mkdirSync(repo, { recursive: true });
+  git(repo, 'init', '-q', '-b', 'main');
+  writeFileSync(join(repo, 'README.md'), 'hello\n');
+  git(repo, 'add', '.');
+  git(repo, 'commit', '-q', '-m', 'init');
+  r.db.channels.create({ id: ch, name: ch, repo_path: repo, use_worktree: 1 });
+  return ch;
+}
+
+describe('Retry setup, which runs the setup step again', () => {
+  for (const who of WHO)
+    it(`${who}: ${CREDENTIALS[who].shell ? 'reruns' : 'never reruns'} a failed setup step, through Retry setup or Resume`, async () => {
+      const ch = worktreeChannel();
+      const install = await call<ChannelAction>(TOKEN, 'POST', `/channels/${ch}/actions`, { name: 'Install', command: `echo install-${++n} FAIL`, setup: 'blocking' });
+      expect(install.status, JSON.stringify(install.body)).toBe(201);
+      const t = await r.runner.createThread({ channel: ch, prompt: 'fix the cart' });
+      await r.until('setup to fail', () => r.thread(t.id).setup === 'failed');
+      const runs = () => launched().filter((x) => x === install.body.command).length;
+      expect(runs()).toBe(1);
+      // Resume and Fresh context refuse a thread whose setup failed before they would send anything.
+      for (const path of [`/threads/${t.id}/session/retry`, `/threads/${t.id}/session/fresh`]) {
+        const before = runs();
+        expect((await call(who, 'POST', path, {})).status, path).toBe(who === 'no credential' ? 401 : 409);
+        expect(runs(), path).toBe(before);
+      }
+      for (const path of [`/threads/${t.id}/setup/retry`, `/threads/${t.id}/requests/resume`]) {
+        const before = runs();
+        const res = await call(who, 'POST', path, {});
+        if (!CREDENTIALS[who].shell) {
+          expectRefused(who, res);
+          await new Promise((done) => setTimeout(done, 300));
+          expect(runs(), path).toBe(before);
+          expect(r.thread(t.id).setup).toBe('failed');
+          continue;
+        }
+        expect(res.status, JSON.stringify(res.body)).toBe(200);
+        await r.until(`setup to run again through ${path}`, () => runs() === before + 1 && r.thread(t.id).setup === 'failed');
+      }
+    });
+
+  it('stays open to every signed-in device when the channel has no setup step, since nothing runs a shell', async () => {
+    for (const who of WHO.filter((w) => w !== 'no credential')) {
+      const ch = worktreeChannel();
+      const t = await r.runner.createThread({ channel: ch, prompt: 'fix the cart' });
+      await r.untilResults(t.id, 1);
+      r.db.threads.update(t.id, { setup: 'failed', setup_error: 'checkout failed' });
+      const res = await call(who, 'POST', `/threads/${t.id}/setup/retry`, {});
+      expect(res.status, `${who}: ${JSON.stringify(res.body)}`).toBe(200);
+    }
+  });
+});
+
 describe('a setup step a restricted session tried to add', () => {
-  const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=t', '-C', cwd, ...args]);
   for (const who of WHO.filter((w) => !CREDENTIALS[w].shell && w !== 'no credential'))
     it(`${who}: never runs when a new worktree is prepared`, async () => {
-      const ch = `hook-${++n}`;
-      const repo = join(r.tmp, ch);
-      mkdirSync(repo, { recursive: true });
-      git(repo, 'init', '-q', '-b', 'main');
-      writeFileSync(join(repo, 'README.md'), 'hello\n');
-      git(repo, 'add', '.');
-      git(repo, 'commit', '-q', '-m', 'init');
-      r.db.channels.create({ id: ch, name: ch, repo_path: repo, use_worktree: 1 });
+      const ch = worktreeChannel();
       const command = marker(who);
       expectRefused(who, await call(who, 'POST', `/channels/${ch}/actions`, { name: 'Install', command, setup: 'blocking' }));
       const t = await r.runner.createThread({ channel: ch, prompt: 'fix the cart' });

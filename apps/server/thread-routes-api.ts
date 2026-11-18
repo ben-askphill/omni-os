@@ -63,6 +63,7 @@ import { basePick, baseView } from './worktree-base.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
 import { stepOf, stepPrompts } from '@omni/shared/thread-glance.ts';
 import { fixChecksPrompt } from './fix-checks.ts';
+import { shellAllowed } from './request-guard.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
 export const threadRoutesApi = new Hono();
@@ -319,7 +320,7 @@ threadActionsApi.post('/:id/requests/resume', async (c) => {
   const id = c.req.param('id');
   const { ids } = z.object({ ids: z.array(z.string().min(1)).max(200).optional() }).parse(await c.req.json().catch(() => ({})));
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  await resumeRequests(id, ids);
+  await resumeRequests(id, ids, { shell: shellAllowed(c) });
   return c.json(afterRecovery(id));
 });
 
@@ -330,7 +331,7 @@ threadActionsApi.post('/:id/requests/resume', async (c) => {
 threadActionsApi.post('/:id/setup/retry', (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  retrySetup(id);
+  retrySetup(id, { shell: shellAllowed(c) });
   return c.json(afterRecovery(id));
 });
 
@@ -340,11 +341,11 @@ threadActionsApi.post('/:id/setup/retry', (c) => {
  * Each sends the messages waiting for Resume; with none, Ben's next message goes the chosen way. A 409 while it runs.
  */
 threadActionsApi.post('/:id/session/retry', async (c) => {
-  await retryResume(c.req.param('id'));
+  await retryResume(c.req.param('id'), { shell: shellAllowed(c) });
   return c.json(afterRecovery(c.req.param('id')));
 });
 threadActionsApi.post('/:id/session/fresh', async (c) => {
-  await startFresh(c.req.param('id'));
+  await startFresh(c.req.param('id'), { shell: shellAllowed(c) });
   return c.json(afterRecovery(c.req.param('id')));
 });
 

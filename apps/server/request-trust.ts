@@ -9,6 +9,8 @@
 //   app's window), may open, type into or watch a thread's terminal, or add, change, run or retry a channel action,
 //   whose command a login shell runs. A Google, Omni Connect or app session cannot, so a stolen session cannot read
 //   data/api-token through a shell. Reading actions and runs, stopping a run and removing an action stay open to it.
+//   Retry setup reruns the channel's setup step, so it is a shell too, but only while the thread has one to rerun:
+//   that depends on the thread, not the path, so runner/setup.ts checks it with request-guard.ts shellAllowed.
 // - No GET opens a shell or starts Chrome: the terminal and channel browser start on POST, and their streams only
 //   attach (terminal-api.ts, browser-api.ts), so an <img> in a PR body cannot do either. Reads that run git (the PR
 //   lookup's branch follow) stay GETs.
@@ -47,6 +49,12 @@ const SIMPLE_TYPES = ['text/plain', 'application/x-www-form-urlencoded'];
 
 const no = (status: 401 | 403 | 415, reason: string): Decision => ({ ok: false, status, reason });
 
+/** The credentials that may reach a shell on this machine: the install's token, or a session paired with it. */
+export const mayUseShell = (c: Credential) => c === 'token' || c === 'session-token';
+
+/** Why a shell was refused. Retry setup (runner/setup.ts) says the same. */
+export const SHELL_REFUSAL = "a terminal or a channel action runs a shell on this machine, so it needs the install's token or a browser paired with it";
+
 export function decideRequest(f: RequestFacts): Decision {
   if (!f.hostAllowed) return no(403, 'host not allowed');
   const site = f.fetchSite?.toLowerCase();
@@ -69,8 +77,6 @@ export function decideRequest(f: RequestFacts): Decision {
     return f.credential === 'nonce' || f.credential === 'token' ? { ok: true } : no(403, 'desktop pairing needs a fresh nonce from the desktop app');
   }
   if (f.credential === 'none' && !f.open) return no(401, "Unauthorized: send this install's token (data/api-token), pair this browser, or sign in with Google");
-  if (f.route === 'shell' && f.credential !== 'token' && f.credential !== 'session-token') {
-    return no(403, "a terminal or a channel action runs a shell on this machine, so it needs the install's token or a browser paired with it");
-  }
+  if (f.route === 'shell' && !mayUseShell(f.credential)) return no(403, SHELL_REFUSAL);
   return { ok: true };
 }

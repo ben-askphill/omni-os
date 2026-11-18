@@ -11,7 +11,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { cookieName, sessionCookieName, tokenMatches } from './api-token.ts';
 import { nonceLive } from './desktop-pairing.ts';
-import { decideRequest, type Credential, type RouteClass } from './request-trust.ts';
+import { decideRequest, mayUseShell, type Credential, type RouteClass } from './request-trust.ts';
 import { config } from './config.ts';
 import { resolved } from './user-config.ts';
 
@@ -233,6 +233,16 @@ const routeClass = (c: Context): RouteClass => {
 
 const credentialOf = (auth: OmniAuth): Credential =>
   auth.via === 'token' ? 'token' : auth.via === 'session' ? (auth.method === 'token' ? 'session-token' : 'session') : 'none';
+
+/**
+ * Whether the request requestGuard let through may reach a shell (request-trust.ts mayUseShell), for a route whose
+ * shell depends on state its path does not show: Retry setup and the routes that fall through to it. A request that
+ * never passed the guard has no credential and may not.
+ */
+export const shellAllowed = (c: Context) => {
+  const auth = c.get('omniAuth');
+  return !!auth && mayUseShell(credentialOf(auth));
+};
 
 /**
  * Lets through what Omni's own clients send and refuses what a browser sends on another site's behalf, as

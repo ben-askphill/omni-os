@@ -1,6 +1,8 @@
 // A worktree thread's preparation: its worktree is made and checked before any harness runs, and a failure waits
 // for Retry with the first prompt and its files saved. Nothing runs in the channel's own checkout instead.
-import { channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+import { channelActions, channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+import { isProviderHarness } from '../harness/types.ts';
+import { SHELL_REFUSAL } from '../request-trust.ts';
 import { ensureRepo } from '../repo-clone.ts';
 import { prepareWorktree } from '../sandbox.ts';
 import { followBranch } from '../branch-follow.ts';
@@ -147,13 +149,22 @@ export function failSetup(threadId: string, reason: string, stopped = false) {
   else reportToParent(threadId, 'failed', `Omni could not prepare this thread's worktree, so it has not run: ${reason}`);
 }
 
+/** What the caller of Retry setup may do: `shell` when its request may reach a shell (request-guard.ts shellAllowed). */
+export interface SetupRetryBy {
+  shell?: boolean;
+}
+
 /**
  * Ben's Retry. Idempotent: a thread that is ready is left as it is, one being prepared keeps that preparation, and
- * the same thread, branch and session are used again, so a retry never makes a second of either.
+ * the same thread, branch and session are used again, so a retry never makes a second of either. A failed thread
+ * whose channel has a setup step reruns that command in a login shell, so only a caller that may reach a shell
+ * retries it (request-trust.ts); without one the retry only checks the branch out again, which anyone may.
  */
-export function retrySetup(threadId: string): Thread {
+export function retrySetup(threadId: string, by: SetupRetryBy = {}): Thread {
   const t = threads.get(threadId);
   if (!t) throw refusal('thread not found', 404);
-  if (t.setup === 'failed') void setUpThread(threadId);
+  if (t.setup !== 'failed') return t;
+  if (!by.shell && !isProviderHarness(t.harness) && channelActions.setupFor(t.channel_id)) throw refusal(`Forbidden: ${SHELL_REFUSAL}`, 403);
+  void setUpThread(threadId);
   return threads.get(threadId)!;
 }
