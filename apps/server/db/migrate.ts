@@ -679,6 +679,22 @@ export function migrate() {
     updated_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS review_notes_thread ON review_notes(thread_id, created_at);`);
+  // Omni's memory store (db/repos/memories.ts): channel learnings, and crew role memory once that lands. A fact with
+  // a channel applies only there. Synced, last writer wins on the whole row, as a signed action entity
+  // (sync/handlers/memory.ts): an approved fact is a prompt later threads run with.
+  db.exec(`CREATE TABLE IF NOT EXISTS memories (
+    id TEXT PRIMARY KEY,
+    channel_id TEXT,
+    role TEXT,
+    text TEXT NOT NULL,
+    status TEXT NOT NULL,
+    proposed_by TEXT NOT NULL,
+    source_thread_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    approved_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS memories_channel ON memories(channel_id, status, created_at);`);
   // Builds before trust on first pin (ADR 0013) left paired machines untrusted until a Trust click, so their commands
   // sat in sync_deferred. Trust every machine with a pinned signing key and no changed key waiting, with that key; the
   // next sync applies what was held. One trusted with another key keeps that. Safe to run again: it is the same rule.

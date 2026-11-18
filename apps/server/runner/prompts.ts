@@ -1,7 +1,8 @@
 // The system prompt handed to a harness for one thread.
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile } from '../config.ts';
-import { artifacts, type Channel, type Thread } from '../db.ts';
+import { artifacts, memories, type Channel, type Thread } from '../db.ts';
+import { learningsPrompt } from '@omni/shared/memory.ts';
 import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
@@ -157,6 +158,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? `- Shell commands run in zsh: quote glob arguments (--include='*.ts'), and never start a word with = (zsh reads echo === as a command lookup).${process.platform === 'darwin' ? ' The command-line tools are BSD, not GNU.' : ''}`
       : '',
     channel.notes ? `- Channel notes: ${channel.notes}` : '',
+    // What the user approved as lessons for this channel (memory-api.ts). Only this channel's: one client's never reaches another's.
+    ...learningsPrompt(memories.approvedIn(channel.id)),
     // A usage scan's lead gets the omni tools to save what Ben picks, not to route work: it never delegates.
     ...(role?.mcp.includes('omni') && role.id !== SCAN_ROLE
       ? [
