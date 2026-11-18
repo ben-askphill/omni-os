@@ -79,6 +79,8 @@ Three built-ins keep fields and refuse actions, each with a reason the API sends
 | usage-scan | `delegate_only`, the `omni` MCP server, `delegatable: false`, and its charter can only be added to (`charter_mode: append`) | Duplicate (a copy would not be a usage scan: only Omni starts one), Hide |
 | reviewer | `review: true` | none: duplicate it for a reviewer without the review rules |
 
+The locks hold however the file got there. A crew file another machine syncs that breaks one is refused and listed under Refused changes in Settings > Sync, and an overlay written by hand loads with the locked fields as the built-in has them (its other edits still apply).
+
 No role of your own takes one of these ids. Builder has no locks; Review PR runs as it, so while it is hidden Review PR refuses with a note to show it again.
 
 A role is a prompt every later thread of it runs with, so an agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) goes through the crew guard (`apps/server/crew-guard.ts`) and gets a 403 unless all of these hold:

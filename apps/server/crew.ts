@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { join } from 'node:path';
 import YAML from 'yaml';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import type { CrewLocks } from '@omni/shared/crew-settings.ts';
+import type { CrewLockedField, CrewLocks } from '@omni/shared/crew-settings.ts';
 import { paths } from './config.ts';
 import { fillPlaceholders, userConfig } from './user-config.ts';
 
@@ -198,6 +198,40 @@ export function mergeCrew(id: string, shipped: CrewSource, overlay: CrewSource):
   return role;
 }
 
+/** A locked field as the role reads it, so a role is compared with its built-in. The conductor tools count, not the whole list. */
+export const LOCKED_VALUE: Record<CrewLockedField, (r: CrewRole) => unknown> = {
+  delegate_only: (r) => r.delegateOnly,
+  mcp: (r) => r.mcp.includes('omni'),
+  delegatable: (r) => r.delegatable,
+  review: (r) => r.review,
+  charter_mode: (r) => r.charterMode ?? 'append',
+};
+
+/** The locks (CREW_LOCKS) an overlay on built-in `id` breaks, each with why it holds. */
+export function lockBreaks(id: string, shipped: CrewSource, overlay: CrewSource): [CrewLockedField, string][] {
+  const locks = Object.entries(CREW_LOCKS[id]?.fields ?? {}) as [CrewLockedField, string][];
+  if (!locks.length) return [];
+  const role = mergeCrew(id, shipped, overlay);
+  const builtIn = roleOf(id, shipped.meta, shipped.body, 'shipped');
+  return locks.filter(([key]) => LOCKED_VALUE[key](role) !== LOCKED_VALUE[key](builtIn));
+}
+
+/**
+ * The overlay as Omni runs it: a key that breaks a lock is left out, so the built-in's value holds (a charter that
+ * must be added to is added). crew-store.ts refuses such a save and the sync handler such a file, so only a file
+ * written by hand gets here.
+ */
+export function lockedOverlay(id: string, shipped: CrewSource, overlay: CrewSource): CrewSource {
+  const breaks = lockBreaks(id, shipped, overlay);
+  if (!breaks.length) return overlay;
+  const meta = { ...overlay.meta };
+  for (const [key] of breaks) {
+    if (key === 'charter_mode') meta.charter_mode = 'append';
+    else delete meta[key];
+  }
+  return { ...overlay, meta };
+}
+
 /** The .md files in dir, by role id. */
 export function crewFiles(dir: string): Map<string, string> {
   const files = new Map<string, string>();
@@ -238,7 +272,10 @@ export function removeOwnCrew(id: string): boolean {
 
 function readRole(id: string, shipped: string | null, own: string | null): CrewRole | null {
   let role: CrewRole;
-  if (shipped !== null && own !== null) role = mergeCrew(id, splitCrewFile(shipped), splitCrewFile(own));
+  if (shipped !== null && own !== null) {
+    const base = splitCrewFile(shipped);
+    role = mergeCrew(id, base, lockedOverlay(id, base, splitCrewFile(own)));
+  }
   else if (shipped !== null) role = { ...parseCrewFile(id, shipped), kind: 'shipped' };
   else if (own !== null) role = parseCrewFile(id, own);
   else return null;

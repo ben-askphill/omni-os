@@ -11,7 +11,7 @@ import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { publishFeed } from './bus.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import { AVATAR_BG, charterHash, CREW_ID, CREW_LOCKS, crewTexts, getCrew, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
+import { AVATAR_BG, charterHash, CREW_ID, CREW_LOCKS, crewTexts, getCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
 import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
 import { record } from './db/sync.ts';
 import { validateRun, type Catalog } from './harness/catalog.ts';
@@ -26,15 +26,6 @@ export { CREW_ID };
 
 /** Built-ins Omni itself relies on (crew.ts CREW_LOCKS). Only ever an overlay on the shipped file: no role of the user's own takes the id. */
 export const RESERVED_CREW = Object.keys(CREW_LOCKS);
-
-/** A locked field as the role reads it, so a write is compared with the built-in. The conductor tools count, not the whole list. */
-const LOCKED_VALUE: Record<CrewLockedField, (r: CrewRole) => unknown> = {
-  delegate_only: (r) => r.delegateOnly,
-  mcp: (r) => r.mcp.includes('omni'),
-  delegatable: (r) => r.delegatable,
-  review: (r) => r.review,
-  charter_mode: (r) => r.charterMode ?? 'append',
-};
 
 /** Omni's own MCP servers a role can name. More come with the MCP registry (plan slice S5). */
 const OMNI_MCP = new Set(['omni']);
@@ -123,7 +114,7 @@ function detailOf(role: CrewRole, shipped: string | null, own: string | null): C
     charters: {
       builtIn: base?.body ?? null,
       own: mine?.body ?? null,
-      effective: base && mine ? mergeSources(base, mine).body : (base ?? mine)!.body,
+      effective: base && mine ? mergeSources(base, lockedOverlay(id, base, mine)).body : (base ?? mine)!.body,
     },
   };
 }
@@ -266,7 +257,7 @@ export function duplicateCrew(from: string, to: string, name: string | undefined
   const locked = shipped !== null && CREW_LOCKS[from]?.actions?.duplicate;
   if (locked) throw refused(locked, 409);
   const source =
-    shipped !== null && own !== null ? mergeSources(splitCrewFile(shipped), splitCrewFile(own)) : splitCrewFile((shipped ?? own)!);
+    shipped !== null && own !== null ? mergeSources(splitCrewFile(shipped), lockedOverlay(from, splitCrewFile(shipped), splitCrewFile(own))) : splitCrewFile((shipped ?? own)!);
   const doc = new Document(Object.fromEntries(Object.entries(source.meta).filter(([k, v]) => !OVERLAY_KEYS.includes(k) && v !== undefined && v !== null)));
   doc.set('name', name?.trim() || `${text(source.meta.name) ?? from} copy`);
   return saveCrew(to, { markdown: serialize(doc, source.body) }, ctx, { create: true });

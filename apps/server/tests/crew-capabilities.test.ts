@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -114,6 +114,33 @@ describe('the review capability', () => {
   });
 });
 
+describe('a lock against a file written by hand', () => {
+  const writeOwn = (id: string, text: string) => {
+    mkdirSync(paths.personalCrew, { recursive: true });
+    writeFileSync(join(paths.personalCrew, `${id}.md`), text);
+  };
+
+  it("loads each built-in Omni relies on with its locks, whatever its overlay says, and keeps the overlay's other edits", async () => {
+    try {
+      writeOwn('reviewer', '---\nreview: false\ndescription: Reviews with care.\n---\nMy review steps.\n');
+      expect(getCrew('reviewer')).toMatchObject({ review: true, description: 'Reviews with care.', charter: 'My review steps.' });
+
+      writeOwn('conductor', '---\ndelegate_only: false\nmcp: []\ndelegatable: true\nmodel: opus\ncharter_mode: append\n---\nAsk before you merge.\n');
+      expect(getCrew('conductor')).toMatchObject({ delegateOnly: true, mcp: ['omni'], delegatable: false, model: 'opus', charter: 'Route everything.\n\nAsk before you merge.' });
+
+      // Usage scan's steps come with each release: a replacing overlay is read as an addition.
+      writeOwn('usage-scan', '---\ndelegate_only: false\n---\nAlso look at cron jobs.\n');
+      expect(getCrew('usage-scan')).toMatchObject({ delegateOnly: true, charterMode: 'append', charter: 'Scan.\n\nAlso look at cron jobs.' });
+      expect((await json(await send('GET', '/crew/usage-scan'))).charters.effective).toBe('Scan.\n\nAlso look at cron jobs.');
+
+      // A review delegation still finds the reviewer.
+      expect((await json(await send('GET', '/crew?all=1'))).filter((r: { review: boolean }) => r.review).map((r: { id: string }) => r.id)).toEqual(['reviewer']);
+    } finally {
+      for (const id of ['reviewer', 'conductor', 'usage-scan']) rmSync(join(paths.personalCrew, `${id}.md`), { force: true });
+    }
+  });
+});
+
 /** GPT-6.1 Sol, which the fake Codex does not list: a test that reviews on it adds it to the catalog for its run. */
 const sol = { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' };
 async function withSol<T>(fn: () => Promise<T>): Promise<T> {
@@ -174,7 +201,7 @@ describe('review_of', () => {
 
   it('comes through the thread API as the delegate tool sends it', async () => {
     const byClaude = await H.runner.createThread({ channel: 'scratch', prompt: 'build it', role: 'builder' });
-    const res = await withSol(() => send('POST', '/threads', { channel: 'scratch', role: 'reviewer', prompt: 'review it', review_of: byClaude.id, source: 'conductor' }));
+    const res = await withSol(async () => send('POST', '/threads', { channel: 'scratch', role: 'reviewer', prompt: 'review it', review_of: byClaude.id, source: 'conductor' }));
     expect(res.status).toBe(200);
     expect(await json(res)).toMatchObject({ harness: 'codex', model: 'gpt-6.1-sol', effort: 'high' });
   });
