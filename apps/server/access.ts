@@ -85,10 +85,10 @@ const SAFE_GIT = new Set(['status', 'log', 'diff', 'show', 'rev-parse', 'ls-file
  */
 const UNSAFE_ARGS: Record<string, RegExp> = {
   find: /^-(exec|execdir|ok|okdir|delete|fprint.*|fls)$/,
-  sort: /^-[a-zA-Z]*o/,
-  rg: /^-[a-zA-Z]*z/,
-  file: /^-[a-zA-Z]*C/,
-  date: /^-[a-zA-Z]*s/,
+  sort: /^-[^-]*o/,
+  rg: /^-[^-]*z/,
+  file: /^-[^-]*C/,
+  date: /^-[^-]*s/,
   git: /^(-c|-o)$/,
 };
 /** Long options that write or run something. GNU tools and git take any unambiguous prefix (`--comp=sh`), so a prefix counts. */

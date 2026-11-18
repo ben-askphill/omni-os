@@ -94,6 +94,8 @@ describe('the access policy', () => {
     expect(readOnlyCommand('git log --oneline')).toBe(true);
     expect(readOnlyCommand('rg --hostname-bin ./run.sh foo')).toBe(false);
     expect(readOnlyCommand('rg -iz foo')).toBe(false);
+    expect(readOnlyCommand('rg -A3z foo')).toBe(false);
+    expect(readOnlyCommand('sort -k2o out.txt in.txt')).toBe(false);
     expect(readOnlyCommand('rg --search-z foo')).toBe(false);
     expect(readOnlyCommand('tree -fo out.txt')).toBe(false);
     // Single quotes keep reading commands reading.
