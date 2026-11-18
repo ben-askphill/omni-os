@@ -67,9 +67,14 @@ Inside an Omni thread the server sets `OMNI_URL`, `OMNI_TOKEN` or `OMNI_TOKEN_FI
 
 Without `OMNI_URL`, the command talks to this machine's Omni on its port and first asks it to prove it holds the same token (`GET /api/auth/proof`, as the desktop app does). `omni open --pair` does the same before it prints a link with the token in it. If another install or another program holds the port, the command stops with exit 3 and sends neither the token nor your prompt. With no token found, it sends nothing either. `omni doctor` shows what is there.
 
+- **A data folder's token stays on this machine.** The install's `data/api-token`, which the desktop app's command and `scripts/omni.sh` use, and the one in `OMNI_DATA_DIR` go only to a server here that proves it holds them. That includes an `OMNI_URL` on loopback, such as a QA server. They never go to another machine.
+- **Another machine needs its own token** in `OMNI_TOKEN` or `OMNI_TOKEN_FILE`. Without one the command stops with exit 3 and sends nothing.
+- **Plain `http://` stays on this machine or your tailnet.** An `http://` `OMNI_URL` has to be loopback or a Tailscale address (`100.64.0.0/10`, `fd7a:115c:a1e0::/48` or a `.ts.net` name), because Tailscale encrypts the link. Anything else needs `https://`, or the command stops with exit 3 and sends nothing.
+- **`omni open --pair` through your own address.** A pairing link for this Mac's `.ts.net` or tunnel address ([Remote access](remote-access.md)) needs no `OMNI_TOKEN`. The command first checks that the address leads back to this install, whose server signs its proof with its own port, and prints the link only then.
+
 ## Another machine
 
-`OMNI_URL` points the command at another Omni, such as the other Mac over Tailscale, with that machine's token in `OMNI_TOKEN`. `omni open` then uses the browser. For a quick look without a token, `omni status --machine <name>` reads what sync already brought here.
+`OMNI_URL` points the command at another Omni, such as the other Mac over Tailscale, with that machine's token in `OMNI_TOKEN`. Use its `https://` address, or over Tailscale its `.ts.net` name or `100.x` address. `omni open` then uses the browser. For a quick look without a token, `omni status --machine <name>` reads what sync already brought here.
 
 ## Scope
 

@@ -1,8 +1,11 @@
-import { afterAll, describe, expect, it } from 'vitest';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { proofFor } from '../src/backend/launch.ts';
 import { installCommandLine, legacyLauncher, NATIVE_CLI, nativeCommand, ownsUserCommand, planShim, shimText, type ShimFacts } from '../src/cli-shim.ts';
 
 const tmp = mkdtempSync(join(tmpdir(), 'omni-cli-shim-'));
@@ -158,5 +161,81 @@ describe('which launch claims ~/.local/bin/omni', () => {
     expect(ownsUserCommand({ ...installed, app: '/Volumes/Omni/Omni.app/Contents/MacOS/Omni' })).toBe(false);
     expect(ownsUserCommand({ ...installed, app: '/private/var/folders/x/AppTranslocation/y/d/Omni.app/Contents/MacOS/Omni' })).toBe(false);
     expect(ownsUserCommand({ ...installed, app: '/tmp/.mount_OmniAbc/omni-os' })).toBe(false);
+  });
+});
+
+// The real command behind the real shim: the shim always names this install's data folder, so the command must keep
+// that folder's token to a server on this machine that proves it holds it (crates/omni-cli/src/connection.rs). Needs
+// cargo, as the server's tests do; a machine without it skips.
+const ROOT = resolve(import.meta.dirname, '../../..');
+const cargo = spawnSync('cargo', ['--version'], { cwd: ROOT, stdio: 'ignore' });
+
+describe.skipIf(!!cargo.error || cargo.status !== 0)('the command the shim starts, with only this install token', () => {
+  const INSTALL_TOKEN = 'install-token-0123456789abcdef0123456789abcdef';
+  const dir = join(tmp, 'install');
+  const seen: { method: string; url: string; authorization: string | null }[] = [];
+  let answersProof = false;
+  let server: Server;
+  let port = 0;
+  let shim = '';
+
+  beforeAll(async () => {
+    const built = spawnSync('cargo', ['build', '--locked', '--quiet', '-p', 'omni-cli', '--target-dir', join(ROOT, 'target')], { cwd: ROOT, stdio: ['ignore', 'inherit', 'inherit'] });
+    if (built.status !== 0) throw new Error(`cargo build -p omni-cli exited with ${built.status ?? built.signal}`);
+    mkdirSync(join(dir, 'data'), { recursive: true });
+    writeFileSync(join(dir, 'data', 'api-token'), INSTALL_TOKEN, { mode: 0o600 });
+    server = createServer((req, res) => {
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+      seen.push({ method: req.method ?? '', url: url.pathname, authorization: req.headers.authorization ?? null });
+      res.setHeader('content-type', 'application/json');
+      if (url.pathname === '/api/auth/proof') {
+        if (!answersProof) return void res.writeHead(404).end('{}');
+        return void res.end(JSON.stringify({ proof: proofFor(INSTALL_TOKEN, port, url.searchParams.get('nonce') ?? '') }));
+      }
+      res.end('[]');
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', () => done()));
+    port = (server.address() as AddressInfo).port;
+    shim = join(dir, 'omni');
+    // The install's own port is one nothing holds: OMNI_URL names the server.
+    writeFileSync(shim, shimText({ ...facts, dataDir: join(dir, 'data'), port: 9, binary: join(ROOT, 'target', 'debug', 'omni') }), { mode: 0o755 });
+  }, 600_000);
+  afterAll(() => new Promise<void>((done) => (server ? server.close(() => done()) : done())));
+
+  /** The shim in a terminal with nothing of this machine's Omni set but OMNI_URL. */
+  const run = (url: string, args: string[]) =>
+    new Promise<{ code: number; stdout: string; stderr: string }>((done) => {
+      execFile(shim, args, { env: { PATH: '/usr/bin:/bin', HOME: dir, OMNI_URL: url }, encoding: 'utf8' }, (err, stdout, stderr) =>
+        done({ code: err ? Number((err as { code?: unknown }).code ?? 1) : 0, stdout, stderr }),
+      );
+    });
+
+  it('sends neither the token nor the prompt to a loopback OMNI_URL that cannot prove it is this install', async () => {
+    seen.length = 0;
+    answersProof = false;
+    const r = await run(`http://127.0.0.1:${port}`, ['new', 'a secret prompt']);
+    expect(r.code).toBe(3);
+    expect(r.stderr).toContain('The token was not sent');
+    expect(seen).toEqual([{ method: 'GET', url: '/api/auth/proof', authorization: null }]);
+  });
+
+  it('refuses another machine before it sends anything, and says which token to set', async () => {
+    seen.length = 0;
+    const r = await run('https://omni.example.test', ['new', 'a secret prompt']);
+    expect(r.code).toBe(3);
+    expect(r.stderr).toContain("https://omni.example.test is another machine. The only token here is this machine's own");
+    expect(r.stderr).toContain('Put that machine\'s token in OMNI_TOKEN or OMNI_TOKEN_FILE.');
+    expect(seen).toEqual([]);
+  });
+
+  it('still reaches this install on a loopback OMNI_URL once it proves itself', async () => {
+    seen.length = 0;
+    answersProof = true;
+    const r = await run(`http://localhost:${port}/`, ['threads']);
+    expect(r).toEqual({ code: 0, stdout: 'No threads.\n', stderr: '' });
+    expect(seen).toEqual([
+      { method: 'GET', url: '/api/auth/proof', authorization: null },
+      { method: 'GET', url: '/api/threads', authorization: `Bearer ${INSTALL_TOKEN}` },
+    ]);
   });
 });
