@@ -51,6 +51,8 @@ pub struct Connection {
     pub port: u16,
     /// OMNI_URL set the address, and it is not this machine's loopback.
     pub remote: bool,
+    /// OMNI_URL is a Tailscale address: it leads to a machine on your own tailnet.
+    pub tailnet: bool,
     /// Whatever holds the address proves it holds the token (GET /api/auth/proof) before it gets it: the install's
     /// port without OMNI_URL, and any address on this machine when the token is a data folder's.
     pub prove_first: bool,
@@ -191,6 +193,7 @@ impl Connection {
             base_url: parsed.as_ref().map_or_else(|| format!("http://127.0.0.1:{install_port}"), |p| p.url.clone()),
             port: parsed.as_ref().map_or(install_port, |p| p.port),
             remote: parsed.as_ref().is_some_and(|p| !p.loopback),
+            tailnet: parsed.as_ref().is_some_and(|p| p.tailnet),
             prove_first: parsed.is_none() || local_token,
             install_port,
             token_source,
@@ -330,13 +333,20 @@ impl Client {
     }
 
     /// Before a link that carries the token is printed (`open --pair`), which takes it wherever the link points. To
-    /// another machine with a data folder's token, only when that address leads back to this install, as
-    /// `tailscale serve` or a tunnel does: the server behind it proves it with the port it listens on, the install's.
+    /// another machine with a data folder's token, only when that address is this Mac's own on your tailnet, as
+    /// `tailscale serve` gives it: the server behind it proves it with the port it listens on, the install's. A public
+    /// address does not get that pass, since a server there could hand on the proof from this install's own public
+    /// address (Omni Connect).
     pub fn prove_for_link(&self) -> Result<()> {
         if !self.conn.token_stays_here() {
             return self.prove();
         }
         let at = &self.conn.base_url;
+        if !self.conn.tailnet {
+            return Err(Error::cli(format!(
+                "{at} is another machine, and the link would take this machine's own token there, so it was not printed. Pair through this Mac's Tailscale address, or put that machine's token in OMNI_TOKEN."
+            )));
+        }
         let who = match probe_install(&self.conn) {
             Probe::Omni { mine: Some(true) } => return Ok(()),
             Probe::Free => return Err(Error::unreachable("connection refused")),
@@ -526,6 +536,8 @@ mod tests {
             assert!(Client::new(conn, false).prove().is_ok(), "{named:?}");
         }
         // Inside a thread: OMNI_URL on loopback with the thread's token, which the server set for it.
+        assert!(connect(&[("OMNI_URL", "https://mac.tail1234.ts.net"), ("OMNI_INSTALL_DATA_DIR", "/i")]).tailnet);
+        assert!(!connect(&[("OMNI_URL", remote), ("OMNI_INSTALL_DATA_DIR", "/i")]).tailnet);
         let thread = connect(&[("OMNI_URL", "http://127.0.0.1:4747"), ("OMNI_TOKEN", "thread-token"), ("OMNI_INSTALL_DATA_DIR", "/i")]);
         assert!(!thread.remote && !thread.local_token && !thread.prove_first);
         // A data folder's token on an address here goes only to a server that proves it holds it.
@@ -575,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    fn prints_a_pairing_link_to_another_address_only_when_it_leads_back_to_this_install() {
+    fn prints_a_pairing_link_to_a_tailnet_address_only_when_it_leads_back_to_this_install() {
         let dir = std::env::temp_dir().join(format!("omni-cli-pair-{}", sys::uuid()));
         std::fs::create_dir_all(&dir).expect("a temp folder");
         std::fs::write(dir.join("api-token"), "install-token\n").expect("the token file");
@@ -584,7 +596,7 @@ mod tests {
         let through = |a: &Answerer| {
             let url = format!("http://127.0.0.1:{}", a.port);
             let mut conn = connect(&[("OMNI_URL", &url), ("OMNI_INSTALL_DATA_DIR", &dir_text), ("OMNI_INSTALL_PORT", "4999")]);
-            conn.remote = true;
+            (conn.remote, conn.tailnet) = (true, true);
             Client::new(conn, false)
         };
 
@@ -607,6 +619,15 @@ mod tests {
             );
             assert!(a.seen.lock().unwrap().iter().all(|r| !r.ends_with("+token")));
         }
+
+        // A public address, even one that would prove itself: a server there can hand on this install's own proof.
+        let public = answerer(|nonce| crate::proof::proof_for("install-token", 4999, nonce));
+        let c = through(&public);
+        let mut conn = c.conn.clone();
+        conn.tailnet = false;
+        let refused = Client::new(conn, false).prove_for_link().expect_err("a public address");
+        assert!(refused.message().contains("so it was not printed. Pair through this Mac's Tailscale address"), "{}", refused.message());
+        assert!(public.seen.lock().unwrap().is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
