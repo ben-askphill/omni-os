@@ -5,9 +5,10 @@
 //   a container's UI): cookies ignore ports, so it counts as foreign, like cross-site.
 // - An Origin, when sent, must be the Host the request came in on.
 // - A body type a page can send without a preflight (text/plain, form-urlencoded) is refused.
-// - A thread's terminal: only the install's token, or a session paired with the token (a browser or the desktop app's
-//   window), may open, type into or watch a shell. A Google or app session cannot, so a stolen session cannot read
-//   data/api-token through a shell.
+// - A shell on this machine: only the install's token, or a session paired with the token (a browser or the desktop
+//   app's window), may open, type into or watch a thread's terminal, or add, change, run or retry a channel action,
+//   whose command a login shell runs. A Google, Omni Connect or app session cannot, so a stolen session cannot read
+//   data/api-token through a shell. Reading actions and runs, stopping a run and removing an action stay open to it.
 // - No GET opens a shell or starts Chrome: the terminal and channel browser start on POST, and their streams only
 //   attach (terminal-api.ts, browser-api.ts), so an <img> in a PR body cannot do either. Reads that run git (the PR
 //   lookup's branch follow) stay GETs.
@@ -17,8 +18,8 @@
 /** How a request proved itself. `session-token`: a device session paired with the install's token. */
 export type Credential = 'token' | 'session-token' | 'session' | 'nonce' | 'none';
 
-/** What the route does. The terminal and pairing are the ones with stricter rules. */
-export type RouteClass = 'read' | 'act' | 'terminal' | 'pairing';
+/** What the route does. A shell (a thread's terminal, a channel action's command) and pairing have stricter rules. */
+export type RouteClass = 'read' | 'act' | 'shell' | 'pairing';
 
 export interface RequestFacts {
   method: string;
@@ -68,8 +69,8 @@ export function decideRequest(f: RequestFacts): Decision {
     return f.credential === 'nonce' || f.credential === 'token' ? { ok: true } : no(403, 'desktop pairing needs a fresh nonce from the desktop app');
   }
   if (f.credential === 'none' && !f.open) return no(401, "Unauthorized: send this install's token (data/api-token), pair this browser, or sign in with Google");
-  if (f.route === 'terminal' && f.credential !== 'token' && f.credential !== 'session-token') {
-    return no(403, "a terminal needs the install's token or a browser paired with it");
+  if (f.route === 'shell' && f.credential !== 'token' && f.credential !== 'session-token') {
+    return no(403, "a terminal or a channel action runs a shell on this machine, so it needs the install's token or a browser paired with it");
   }
   return { ok: true };
 }
