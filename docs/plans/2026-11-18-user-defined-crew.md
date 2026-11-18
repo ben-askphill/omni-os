@@ -326,6 +326,11 @@ S1 to S4 give a usable feature: roles you can create, edit, sync and trust. S5 t
 - **The reviewer stays hideable and duplicable.** Section 5 locks only its capability. Duplicating it is how to get a reviewer without the review rules, since a role of the user's own has no locks.
 - **The reviewer's `tools: no-edits` (D11) waits for S5**, which adds the `tools` key. S4 adds only `review: true` to the shipped file.
 - **Review PR checks Builder before asking GitHub**, so a hidden Builder gets "show it in Settings > Crew" instead of the role check's list of other roles.
+- **S7 ships `get_crew_role`, `save_crew_role` and `reset_crew_role` first.** `crew_memory` waits for S6's memory store. The tools are in the Conductor's TypeScript server (`apps/mcp/omni.ts`): `crates/omni-mcp` has no Conductor tools, since that port is not scheduled (`docs/internals/rust-port.md`).
+- **A role the Conductor creates names no power.** It reads as every role without one does: no `mcp`, not `delegate_only`, `delegatable`, no `review`. Delegatable is what makes it useful to the Conductor, and full working tools are what every crewmate has until S5 adds `tools: no-edits`. The guard already refuses a save that names a power, so the server needed no change.
+- **`save_crew_role` passes keys past its listed fields to the API**, so a power the Conductor names gets the guard's refusal and its reason rather than being dropped from the save without a word.
+- **The external MCP gets no crew writes in S7.** Its calls name no thread (`x-omni-thread`), so the guard would treat them as Ben's own and let them set powers. Its `list_crew` fields stay as S1 left them.
+- **The Conductor's charter now applies the edits it proposes** with `save_crew_role` once Ben agrees, and proposes a new role when work keeps finding none.
 
 ## 7. Decisions
 
