@@ -149,4 +149,18 @@ describe('who sets levels', () => {
     expect((await previewSwitch(t.id, { harness: 'hermes', model: 'hermes', effort: '' })).blocked).toMatch(/Hermes runs off this machine/);
     setLevel(null);
   });
+
+  it('does not start a Hermes thread whose channel went below full access after it began', async () => {
+    const id = `hermes-${randomUUID()}`;
+    r.db.threads.create({
+      id, channel_id: 'scratch', title: 'Remote', status: 'done', role: null, model: 'hermes', session_id: id, cwd: folder(),
+      branch: null, parent_id: null, task_id: null, source: 'manual', automation: null,
+    });
+    r.db.threads.update(id, { harness: 'hermes' });
+    setLevel('ask');
+    await r.runner.postMessage(id, 'go on');
+    await r.until('the refusal', () => r.texts(id, 'error').some((t) => /Hermes runs off this machine/.test(t)));
+    expect(r.spawns(id)).toHaveLength(0);
+    setLevel(null);
+  });
 });
