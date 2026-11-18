@@ -40,6 +40,8 @@ scripts/qa-stack.sh up               # server on :4757, Web UI on :4768, own dat
 QA_SERVER_PORT=4757 scripts/qa-stack.sh down
 ```
 
+The stack keeps its PID files, logs, API token and fake CLIs in `$TMPDIR/omni-qa-<port>` (`QA_DIR` moves it). `up` makes that dir with mode 0700, and every command refuses one that is a symlink, belongs to another user or that others can write.
+
 Threads in the stack run on `packages/test-fixtures/fake-claude.mjs`, so prompts like `RICH` or `TOOL:2000` drive a turn without spending a plan. The desktop app's QA harness attaches the app to the same stack: see "QA harness" in [apps/desktop/README.md](apps/desktop/README.md#qa-harness).
 
 ### Two linked servers, for handoff, Take over and Run on
@@ -50,7 +52,7 @@ node scripts/qa-handoff-smoke.mjs    # proves devices, offline, idle and running
 scripts/qa-handoff-stack.sh down     # stops only what up started, deletes the rig's dir
 ```
 
-`up` runs `scripts/qa-relay.mjs` (an in-memory stand-in for `apps/relay` with the same HTTP and WebSocket protocol and one shared token) and two `qa-stack.sh` servers with no Web UI. Each has its own data dir, secret file store (`OMNI_SECRET_STORE=file`, never a Keychain), `HOME`, sync id, device name (`OMNI_DEVICE_NAME`) and fake Tailscale status (`OMNI_TAILSCALE_BIN`). `up` stores the relay URL and token as the sync secrets and switches sync on. It makes the channel `qa-shared`, with the same folder on both, on A, and the channel syncs to B. Everything lives in `$TMPDIR/omni-qa-handoff`; `QA_HANDOFF_PORT` (47300 to 47397) and `QA_HANDOFF_DIR` move it.
+`up` runs `scripts/qa-relay.mjs` (an in-memory stand-in for `apps/relay` with the same HTTP and WebSocket protocol and one shared token) and two `qa-stack.sh` servers with no Web UI. Each has its own data dir, secret file store (`OMNI_SECRET_STORE=file`, never a Keychain), `HOME`, sync id, device name (`OMNI_DEVICE_NAME`) and fake Tailscale status (`OMNI_TAILSCALE_BIN`). `up` stores the relay URL and token as the sync secrets and switches sync on. It makes the channel `qa-shared`, with the same folder on both, on A, and the channel syncs to B. Everything lives in `$TMPDIR/omni-qa-handoff`, checked the same way; `QA_HANDOFF_PORT` (47300 to 47397) and `QA_HANDOFF_DIR` move it.
 
 - `env A|B` prints the `EXPO_PUBLIC_OMNI_DEV_URL` and `EXPO_PUBLIC_OMNI_DEV_TOKEN` exports for the iOS dev build ([apps/ios/README.md](apps/ios/README.md#development-shortcut)). `status` shows ports and token files.
 - `offline B` makes A's Tailscale report B asleep (`online B` reverses it); it waits until `GET /api/devices` on A shows it, which takes up to 5 seconds because the server caches Tailscale. The server refuses a handoff or Run on to an offline device with 409.

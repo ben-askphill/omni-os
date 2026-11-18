@@ -15,8 +15,8 @@
 #                                           with TOOL:600000 keeps the turn running for ten minutes (fake-claude.mjs)
 #
 # QA_HANDOFF_PORT sets the relay's port (default 47300); A is that +1 and B +2. QA_HANDOFF_DIR moves the rig's dir
-# (default $TMPDIR/omni-qa-handoff). The channel "qa-shared" (folder $QA_HANDOFF_DIR/shared on both) is made on A and
-# syncs to B. Bash 3.2 and macOS safe.
+# (default $TMPDIR/omni-qa-handoff, mode 0700, checked like qa-stack.sh's). The channel "qa-shared" (folder
+# $QA_HANDOFF_DIR/shared on both) is made on A and syncs to B. Bash 3.2 and macOS safe.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -32,6 +32,10 @@ die() { echo "qa-handoff-stack: $*" >&2; exit 1; }
 # A failed up tears the rig down, unless QA_HANDOFF_KEEP=1 leaves it to read the logs.
 abort() { [ "${QA_HANDOFF_KEEP:-0}" = 1 ] || down >/dev/null 2>&1; die "$*"; }
 [ "$BASE" -ge 47300 ] && [ "$BASE" -le 47397 ] || die "QA_HANDOFF_PORT must be in 47300-47397, got $BASE"
+# The rig's dir holds the relay token, PID files and both servers' state dirs. Refuse one that is a link, another
+# user's, or writable by others, before reading anything in it; up makes it with mode 0700 (scripts/qa-private-dir.mjs).
+private_dir() { node "$ROOT/scripts/qa-private-dir.mjs" "$@" "$DIR" || exit 1; }
+private_dir
 
 lower() { echo "$1" | tr 'A-Z' 'a-z'; }
 side() { case "$1" in A | a) echo a ;; B | b) echo b ;; *) die "name a server: A or B (got '${1:-}')" ;; esac; }
@@ -89,6 +93,7 @@ stop_pid() { # <name>
 up() {
   if alive relay; then echo "already up"; status; return; fi
   for p in $BASE $((BASE + 1)) $((BASE + 2)); do port_free "$p" || die "port $p is in use (QA_HANDOFF_PORT moves all three)"; done
+  private_dir --create
   mkdir -p "$DIR/shared"
   : >"$DIR/.qa-handoff"
   local token; token="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(24).toString("hex"))')"

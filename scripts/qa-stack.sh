@@ -10,7 +10,7 @@
 #   scripts/qa-stack.sh logs            tail the server and vite logs
 #
 # QA_SERVER_PORT (default 4757) and QA_WEB_PORT (default 4768) move the ports, QA_DIR the state dir
-# (default $TMPDIR/omni-qa-<server port>). QA_NO_WEB=1 starts no vite, for a client that only needs the API
+# (default $TMPDIR/omni-qa-<server port>, mode 0700; a link, another user's dir or one others can write is refused). QA_NO_WEB=1 starts no vite, for a client that only needs the API
 # (scripts/qa-handoff-stack.sh runs two servers that way). QA_CLAUDE_BIN, QA_CODEX_BIN and QA_CURSOR_BIN swap a fake CLI for a real one
 # (a live turn spends that plan). QA_SUGGESTIONS=1 turns on the Haiku sidecars (reply suggestion, follow-up thread, open items), answered by the fake CLI. QA_BROWSER=1 turns the channel browser on, so a thread's Browser tab launches a real
 # headless Chrome on the stack's own profile dir. Otherwise threads run on fake-claude, so a prompt with directives such as
@@ -47,11 +47,17 @@ api() { local p="$1"; shift; curl -fsS -H "Authorization: Bearer $(tok)" "$@" "$
 cwd_of() { if command -v lsof >/dev/null; then lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; else readlink "/proc/$1/cwd" 2>/dev/null; fi; }
 
 [ "$SERVER_PORT" != 4747 ] || die "refusing port 4747, that is the live server"
+# The state dir holds the PID files, the logs, the API token and bin/, which goes first on the server's PATH, and by
+# default it sits in a shared temp dir. Every command refuses one that is a link, another user's, or writable by
+# others, before reading anything in it; up makes it with mode 0700 (scripts/qa-private-dir.mjs).
+private_dir() { node "$ROOT/scripts/qa-private-dir.mjs" "$@" "$DIR" || exit 1; }
+private_dir
 
 up() {
   local seed=3
   [ "${1:-}" = "--seed" ] && seed="${2:?--seed needs a number}"
   alive server && { echo "already up"; status; return; }
+  private_dir --create
   # No automations dir: Omni ships none, so the stack lists none, as a fresh install does.
   mkdir -p "$DIR/data" "$DIR/brain"
   STARTING=1
