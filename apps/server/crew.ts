@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import YAML from 'yaml';
 import { paths } from './config.ts';
@@ -9,7 +9,9 @@ import { fillPlaceholders, userConfig } from './user-config.ts';
 // replaces them. The user's own live in data/crew/: a file there with a new id is a whole role of theirs, and one with
 // a shipped id is an overlay on that built-in. An overlay sets only the fields it names, and its body is added after
 // the shipped charter (`charter_mode: append`) or replaces it (`replace`, and any overlay that names no mode, which is
-// how a copy behaved before overlays). crew-store.ts writes the files; this module only reads them.
+// how a copy behaved before overlays). crew-store.ts decides what a write may change; this module reads the files and
+// writes the user's whole, with nothing but fs and the user config, so the sync handler (sync/handlers/crew-file.ts)
+// can write one without loading the harness catalog.
 //
 // `harness` is the role's runtime binding and stays an open string: whatever harness catalog this machine has decides
 // what it can run, and an outside agent later joins that catalog by id (docs/plans/2026-11-18-user-defined-crew.md
@@ -135,6 +137,27 @@ export function crewTexts(id: string): { shipped: string | null; own: string | n
     return file ? readFileSync(file, 'utf8') : null;
   };
   return { shipped: read(paths.crew), own: read(paths.personalCrew) };
+}
+
+/** A role id as a file name: lowercase words and dashes, like an automation's. Never changes once a role has it. */
+export const CREW_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+const ownCrewFile = (id: string) => join(paths.personalCrew, `${id}.md`);
+
+/** Write the user's file for a role whole: a tmp file, then a rename, so a reader never sees half of it. */
+export function writeOwnCrew(id: string, text: string) {
+  mkdirSync(paths.personalCrew, { recursive: true });
+  const tmp = join(paths.personalCrew, `.${id}.md.tmp`);
+  writeFileSync(tmp, text);
+  renameSync(tmp, ownCrewFile(id));
+}
+
+/** Remove the user's file for a role. False when there was none. */
+export function removeOwnCrew(id: string): boolean {
+  const file = crewFiles(paths.personalCrew).get(id);
+  if (!file) return false;
+  rmSync(file);
+  return true;
 }
 
 function readRole(id: string, shipped: string | null, own: string | null): CrewRole | null {

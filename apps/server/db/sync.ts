@@ -4,12 +4,13 @@ import { db, now, tx } from './connection.ts';
 /**
  * What the sync relay carries. Events, artifacts, automation runs, completions and trigger deliveries are keyed by their uid, a
  * result_read, a limit_stop and an assignment by their thread's id, a remote_command by its command id, the rest by id or key.
- * A review_note is keyed by its id, an automation_file (a YAML in data/automations/) by its automation id, an
- * mcp_client (an OAuth client that reached /mcp, mcp-clients.ts) by its client id.
+ * A review_note is keyed by its id, an automation_file (a YAML in data/automations/) by its automation id, a crew_file
+ * (a role or an overlay in data/crew/) by its role id, an mcp_client (an OAuth client that reached /mcp, mcp-clients.ts)
+ * by its client id.
  */
 export type SyncEntity =
   | 'channel' | 'folder' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv' | 'completion' | 'result_read' | 'limit_stop'
-  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file' | 'mcp_client';
+  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file' | 'crew_file' | 'mcp_client';
 export type SyncOp = 'upsert' | 'delete';
 
 export interface OutboxRow {
@@ -27,7 +28,7 @@ export interface OutboxRow {
  * the newest result read, whenever the write was (db/repos/needs-you.ts). A limit_stop is a thread's limit stop
  * alone, apart from the row, so a write to either never undoes the other.
  */
-const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note', 'automation_file']);
+const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note', 'automation_file', 'crew_file']);
 /** kv keys that stay on this machine: the sync cursor, machine id, switches and path map. */
 export const localKey = (key: string) => key.startsWith('sync.');
 
@@ -148,6 +149,8 @@ export const outbox = {
         // The phone alert sender id (push-sender.ts pushSenderId) is that Mac's too: sharing it, either Mac would settle
         // the other's alerts. This one makes its own on its next alert.
         db.exec(`DELETE FROM kv WHERE key = 'sync.push_sender'`);
+        // Its crew files go out again as this machine's (seedOnce).
+        db.exec(`DELETE FROM kv WHERE key = 'sync.crew_files_seeded'`);
       }
       // A thread mid-run as sync is set up is this machine's run, and its row should say so.
       db.prepare(`UPDATE threads SET run_machine = ? WHERE status IN ('running','queued') AND run_machine IS NULL`).run(id);
@@ -157,6 +160,20 @@ export const outbox = {
       armedId = id;
       return id;
     });
+  },
+  /**
+   * Queue rows that live outside the database (the user's crew files) once, the way the first arm queues the tables:
+   * at SEED_TS, so each only fills a gap on the other machines and never replaces what they have. `flag` is the kv key
+   * that records it ran. Does nothing before sync is set up here.
+   */
+  seedOnce(flag: string, entity: SyncEntity, ids: readonly string[]) {
+    if (!armedId || kvGet<boolean>(flag)) return;
+    tx(() => {
+      const insert = db.prepare(`INSERT INTO sync_outbox (entity, entity_id, op, ts) VALUES (?, ?, 'upsert', ?)`);
+      for (const id of ids) insert.run(entity, id, SEED_TS);
+      db.prepare(`INSERT INTO kv (key, value) VALUES (?, 'true') ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(flag);
+    });
+    onRecord?.();
   },
   /** The oldest queued changes for these entities. Rows for other entities wait until a handler exists. */
   pending(limit: number, entities: readonly SyncEntity[]): OutboxRow[] {

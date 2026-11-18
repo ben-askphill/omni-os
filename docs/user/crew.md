@@ -49,7 +49,18 @@ The clients edit roles through the API, the same files underneath:
 | `POST /api/crew/:id/reset` | Drop your edit of a built-in |
 | `POST /api/crew/:id/hidden` | `{ hidden }` for a built-in |
 
-A save is refused when its run defaults, default channel or MCP servers are unknown here, or when it would give the conductor or usage-scan working tools. An agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) is refused: roles are a prompt every later thread of them runs with, so for now only you change them.
+A save is refused when its run defaults, default channel or MCP servers are unknown here, or when it would give the conductor or usage-scan working tools.
+
+A role is a prompt every later thread of it runs with, so an agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) goes through the crew guard (`apps/server/crew-guard.ts`) and gets a 403 unless all of these hold:
+
+- It is a save or a reset. Deleting, hiding and showing a role stay yours, in Settings.
+- The thread's role holds Omni's conductor tools (`mcp: [omni]`, the Conductor). Usage-scan never writes roles.
+- No automation started the thread or any thread above it.
+- You answered in that thread after its first message, or answered a question it asked. The guard cannot read whether you agreed: it holds the Conductor to proposing an edit and waiting for you.
+
+Like the automation guard, it holds the path agents are told to use. A shell command that calls the API without the header is not stopped.
+
+Your edits sync to your other Macs as `crew_file`, a signed action that applies only from a trusted machine ([Sync](sync.md)). Hiding stays per Mac.
 
 The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Overview and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
 

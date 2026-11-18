@@ -44,8 +44,11 @@ export function lineage(threadId: string): Lineage {
   return { automation: automationOf(line), scan: line.find((t) => t.role === SCAN_ROLE)?.id ?? null };
 }
 
-/** Ben answered in the scan's thread: a message of his after Omni's report, or an answer to a question the lead asked. */
-function answered(threadId: string): boolean {
+/**
+ * Ben answered in this thread: a message of his after its first one (Omni's report in a scan, his own request in the
+ * Conductor), or an answer to a question the thread asked. The crew guard (crew-guard.ts) asks the same.
+ */
+export function benAnswered(threadId: string): boolean {
   return !!db
     .prepare(
       `SELECT 1 FROM events WHERE thread_id = ? AND (kind = 'question_answer'
@@ -62,6 +65,6 @@ export function automationRefusal(caller: string | null | undefined, write: Auto
   if (l.automation && !STOPS.has(write)) return `This thread runs under the automation "${l.automation}", and threads an automation started cannot ${WHAT[write]}. Ask ${userName()} to do it.`;
   if (!l.scan) return null;
   if (write !== 'create') return `A usage scan only suggests new automations; it cannot ${WHAT[write]}.`;
-  if (!answered(l.scan)) return `Not yet: a usage scan saves automations only after ${userName()} says which ones in its thread.`;
+  if (!benAnswered(l.scan)) return `Not yet: a usage scan saves automations only after ${userName()} says which ones in its thread.`;
   return null;
 }

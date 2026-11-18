@@ -302,6 +302,10 @@ S1 to S4 give a usable feature: roles you can create, edit, sync and trust. S5 t
 - **`GET /api/crew` leaves hidden roles out unless asked (`?all=1`),** so the composer pickers and `list_crew` drop them with no client change. Settings (S3) asks for all.
 - **The external MCP's `list_crew` keeps the conductor,** which is not delegatable but which an outside client may start a thread as. It drops hidden roles and usage-scan.
 - **`crew` in the user config is optional on the wire** (`packages/shared/settings.ts`), so a newer client reads an older server's config.
+- **S2's guard opens saves and resets only, and only to roles that hold the conductor tools.** Section 4.3 puts `save_crew_role` and `reset_crew_role` on the conductor tools, so the guard (`apps/server/crew-guard.ts`) lets an agent save or reset only from a thread whose role has `mcp: [omni]`, never under an automation or in a usage scan, and only once Ben answered in that thread after its first message (or answered a question it asked). The guard cannot read agreement; D10's "after Ben agrees" becomes "after Ben spoke", the same test the usage scan's save takes. Delete, hide and show stay Ben's: no planned tool makes them. Until S7 adds the tools, no agent has a way to reach the open path, since the Conductor has no shell.
+- **S2 sends the files written by hand once.** Section 6.1 has S2 carry Ben's roles to his other machines, but a save-only entity would never send a file dropped in `data/crew/` by hand. The first sync after this build queues each one at `SEED_TS`, and the handler never lets such a seed replace a file the receiving machine has. Hand edits after that stay on their machine until a save in Omni, as automation files do.
+- **S2 adds a `crew` feed event,** published on every save, reset, delete, hide and synced file, so open Settings and pickers refetch `GET /api/crew` (S3).
+- **A synced overlay whose built-in a machine lacks loads as a role of the user's own** there (an older build without that shipped file). Nothing is lost: the file is the same, and it reads as an overlay again once that machine has the built-in.
 
 ## 7. Decisions
 

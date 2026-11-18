@@ -466,6 +466,8 @@ export type FeedEvent =
   /** A delivery to this automation was saved or changed state. */
   | { type: 'automation_delivery'; automation: string }
   | { type: 'automations' }
+  /** A crew role was saved, reset, deleted, hidden or shown, here or on another machine: refetch GET /api/crew. */
+  | { type: 'crew' }
   /** The update check or Update moved on: refetch GET /api/update. */
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed. Refetch the list once `refreshing` is false. */
