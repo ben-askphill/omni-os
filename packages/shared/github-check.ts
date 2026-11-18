@@ -36,3 +36,43 @@ export function parseGhAuthStatus(output: string, ok: boolean): GithubCheck {
 
 /** The line under a ready GitHub CLI row. */
 export const githubLine = (c: GithubCheck) => (c.state === 'ready' && c.login ? `Signed in as ${c.login}` : null);
+
+/**
+ * POST /api/setup/github/login: the one-time code `gh auth login --web` got from GitHub, the page to enter it on, and
+ * the flow to poll. The same shape as a Clerk sign-in's start, so the Web UI's device-code card shows either.
+ * GitHub's page never carries the code, so there is no complete URI.
+ */
+export interface GhLoginStart {
+  flow: string;
+  secret: string;
+  userCode: string;
+  verificationUri: string;
+  verificationUriComplete: null;
+  interval: number;
+}
+
+/** POST /api/setup/github/login/poll. `signed_in` names the login `gh auth status` reads once gh has finished. */
+export type GhLoginPoll = { state: 'pending' } | { state: 'signed_in'; login: string } | { state: 'refused'; error: string } | { state: 'denied' } | { state: 'expired' };
+
+/**
+ * The code and page from `gh auth login --web`'s output so far. Without a terminal gh prints "! First copy your
+ * one-time code: ABCD-1234", or "! One-time code (ABCD-1234) copied to clipboard" when it could copy it, then
+ * "Open this URL to continue in your web browser: https://github.com/login/device". Null until both are there.
+ */
+export function parseGhDeviceCode(output: string): { userCode: string; verificationUri: string } | null {
+  const userCode = /one-time code\W+([A-Z0-9]{4}-[A-Z0-9]{4})\b/i.exec(output)?.[1];
+  const verificationUri = /\bhttps:\/\/[^\s/]+\/login\/device\b/.exec(output)?.[0];
+  return userCode && verificationUri ? { userCode: userCode.toUpperCase(), verificationUri } : null;
+}
+
+/**
+ * Why `gh auth login --web` stopped without signing in, from what it printed after the code. gh says "authentication
+ * timed out" once the code expires and passes on GitHub's "access_denied" when the person declines.
+ */
+export function ghLoginFailure(output: string): Exclude<GhLoginPoll, { state: 'pending' | 'signed_in' }> {
+  const after = output.split(/\/login\/device\b/).pop() ?? output;
+  if (/access_denied|\bdenied\b/i.test(after)) return { state: 'denied' };
+  if (/timed out|expired/i.test(after)) return { state: 'expired' };
+  const last = after.trim().split('\n').pop()?.trim();
+  return { state: 'refused', error: last || 'gh auth login stopped without signing in.' };
+}
