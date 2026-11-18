@@ -7,7 +7,7 @@ import { navigate, href } from '../router.ts';
 import { useApp, useIsMobile } from '../store.tsx';
 import { OmniMark } from './brand.tsx';
 import { HarnessScreen, NotificationsScreen, PronounsInput, Row, STEPS, Screen, Steps, Summary, TimezoneInput, browserTimezone, createChannel } from './onboarding-parts.tsx';
-import { Button, ErrorNote } from './ui.tsx';
+import { Button, ErrorNote, FolderInput } from './ui.tsx';
 import { ModalFooter, SCRIM } from './ui/modal.tsx';
 
 export { PronounsInput, TimezoneInput } from './onboarding-parts.tsx';
@@ -208,10 +208,10 @@ function Wizard() {
           {state && step === 1 && (
             <Screen caption="Workspace" title="Where your work lives" body="Threads in a channel without a repo run in the workspace folder, and its CLAUDE.md and skills load in every Claude thread. Omni makes it if it is missing.">
               <Row label="Workspace folder" htmlFor="ob-root">
-                <input id="ob-root" className="field w-full font-mono !text-[13px]" value={root} placeholder={state.fallbacks.workspaceRoot} spellCheck={false} onChange={(e) => setRoot(e.target.value)} />
+                <FolderInput id="ob-root" dialogTitle="Workspace folder" value={root} placeholder={state.fallbacks.workspaceRoot} spellCheck={false} onChange={setRoot} />
               </Row>
               <Row label="Repos folder" htmlFor="ob-repos" hint="Where your git checkouts live. Used to suggest repo paths for channels.">
-                <input id="ob-repos" className="field w-full font-mono !text-[13px]" value={reposDir} placeholder={state.fallbacks.reposDir} spellCheck={false} onChange={(e) => setReposDir(e.target.value)} />
+                <FolderInput id="ob-repos" dialogTitle="Repos folder" value={reposDir} placeholder={state.fallbacks.reposDir} spellCheck={false} onChange={setReposDir} />
               </Row>
               <Row label="GitHub owner" htmlFor="ob-gh" hint="Your GitHub user or org, for your repos and your fork of Omni.">
                 <input id="ob-gh" className="field w-full font-mono !text-[13px]" value={githubOwner} placeholder="octocat" spellCheck={false} autoCapitalize="off" onChange={(e) => setGithubOwner(e.target.value)} />
@@ -235,13 +235,13 @@ function Wizard() {
                     <input id="ob-ch-name" className="field w-full" value={channelName} placeholder="Acme" onChange={(e) => setChannelName(e.target.value)} />
                   </Row>
                   <Row label="Repo folder" htmlFor="ob-ch-repo" hint="Optional. A git checkout on this machine.">
-                    <input
+                    <FolderInput
                       id="ob-ch-repo"
-                      className="field w-full font-mono !text-[13px]"
+                      dialogTitle="Repo folder"
                       value={channelRepo}
                       placeholder={`${state.resolved.reposDir}/acme-theme`}
                       spellCheck={false}
-                      onChange={(e) => setChannelRepo(e.target.value)}
+                      onChange={setChannelRepo}
                     />
                   </Row>
                   <Row label="Shopify store" htmlFor="ob-ch-store" hint="Optional. The myshopify domain.">

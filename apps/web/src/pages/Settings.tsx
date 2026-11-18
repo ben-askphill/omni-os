@@ -10,7 +10,7 @@ import { useTheme } from '../components/theme.tsx';
 import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
-import { Avatar, Button, ErrorNote, Icon, LinkButton, Loading, PageHeader, Picker, Segmented } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
@@ -575,6 +575,21 @@ function ConfigField({
     </>
   ) : f.input === 'pronouns' ? (
     <PronounsField id={id} value={value} onChange={onChange} onPick={pick} onCommit={onCommit} describedBy={describedBy} />
+  ) : f.input === 'folder' ? (
+    <FolderInput
+      id={id}
+      aria-describedby={describedBy}
+      dialogTitle={f.label}
+      className="h-10 w-full !text-[13px]"
+      value={value}
+      maxLength={f.max}
+      placeholder={settingPlaceholder(f, fallbacks)}
+      spellCheck={false}
+      onChange={onChange}
+      onPick={(v) => onCommit(v)}
+      onKeyDown={commitOnEnter}
+      onBlur={() => onCommit()}
+    />
   ) : f.input === 'timezone' ? (
     <Picker
       id={id}

@@ -7,6 +7,7 @@ import type {
   DesktopSettings,
   DesktopSettingsPatch,
   DesktopUpdateView,
+  FolderPickRequest,
   NativeBrowserShot,
   QuickPromptStatus,
 } from '@omni/shared/desktop-bridge.ts';
@@ -36,6 +37,8 @@ export interface InvokeChannels {
   'omni:native-browser:capture': { args: [webContentsId: number]; result: NativeBrowserShot };
   /** Onboarding's sample notification. False when the system cannot show one. */
   'omni:notifications:test': { args: []; result: boolean };
+  /** The system folder dialog. The chosen folder's absolute path, or null when cancelled. */
+  'omni:pick-folder': { args: [request?: FolderPickRequest]; result: string | null };
 }
 
 /** One way, page to main, through ipcRenderer.send and ipcMain.on. */

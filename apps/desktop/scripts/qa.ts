@@ -41,6 +41,8 @@ export type QAStep =
   | { kind: 'expect'; selector: string; text: string | null; timeoutMs: number }
   /** A link the app handed to the system browser (shell.openExternal, stubbed in a QA run) contains this text. */
   | { kind: 'expectExternal'; text: string; timeoutMs: number }
+  /** What the system folder dialog (dialog.showOpenDialog, stubbed in a QA run) answers from now on: a path, or null for Cancel. */
+  | { kind: 'folderDialog'; path: string | null }
   | { kind: 'command'; command: DesktopCommand }
   | { kind: 'menu'; path: string[] }
   | { kind: 'window'; target: WindowTarget; timeoutMs: number }
@@ -133,7 +135,7 @@ export function swiftUICondition(value: string): string | null {
 }
 
 const STEP_KEYS = [
-  'route', 'click', 'fill', 'type', 'press', 'wait', 'sleep', 'expect', 'expectExternal', 'command', 'menu', 'window', 'openWindow',
+  'route', 'click', 'fill', 'type', 'press', 'wait', 'sleep', 'expect', 'expectExternal', 'folderDialog', 'command', 'menu', 'window', 'openWindow',
   'openThread', 'appearance', 'zoom', 'size', 'screenshot', 'snapshot', 'quit',
 ] as const;
 
@@ -199,6 +201,10 @@ export function parseStep(raw: unknown): Result<QAStep> {
       if (isError(timeoutMs)) return timeoutMs;
       return { kind: 'expectExternal', text: want, timeoutMs };
     }
+    case 'folderDialog':
+      return value === null || (typeof value === 'string' && value.startsWith('/'))
+        ? { kind: 'folderDialog', path: value }
+        : { error: 'folderDialog needs the absolute path the folder dialog answers, or null for Cancel' };
     case 'command':
       return (QA_COMMANDS as readonly unknown[]).includes(value)
         ? { kind: 'command', command: value as DesktopCommand }
@@ -443,8 +449,16 @@ interface Report {
   port: number | null;
   dataDir: string | null;
   steps: StepReport[];
-  /** `external`: the links the app handed to the system browser during the run, in order. */
-  facts: { route: string | null; windows: { url: string; title: string; bounds: Bounds | null; zoom: number | null; trafficLights: { x: number; y: number } | null }[]; external: string[] };
+  /**
+   * `external`: the links the app handed to the system browser during the run, in order. `folderDialogs`: the titles of
+   * the folder dialogs the app opened, in order.
+   */
+  facts: {
+    route: string | null;
+    windows: { url: string; title: string; bounds: Bounds | null; zoom: number | null; trafficLights: { x: number; y: number } | null }[];
+    external: string[];
+    folderDialogs: string[];
+  };
   pageErrors: string[];
 }
 
@@ -467,7 +481,7 @@ function bail(out: string | null, report: Report, message: string, code: number)
 }
 
 async function main(argv: readonly string[]): Promise<number> {
-  const report: Report = { ok: true, error: null, app: { executable: null, packaged: false }, port: null, dataDir: null, steps: [], facts: { route: null, windows: [], external: [] }, pageErrors: [] };
+  const report: Report = { ok: true, error: null, app: { executable: null, packaged: false }, port: null, dataDir: null, steps: [], facts: { route: null, windows: [], external: [], folderDialogs: [] }, pageErrors: [] };
   const args = parseArgs(argv);
   if (isError(args)) bail(null, report, args.error, 2);
   const out = resolve(args.out);
@@ -562,6 +576,9 @@ async function main(argv: readonly string[]): Promise<number> {
     );
     report.facts.route = current && !current.isClosed() ? new URL(current.url()).hash || null : null;
     report.facts.external = await external();
+    report.facts.folderDialogs = await app
+      .evaluate(() => [...((globalThis as unknown as { __qaFolderDialogs?: string[] }).__qaFolderDialogs ?? [])])
+      .catch(() => [] as string[]);
   };
 
   // A QA run never opens the real browser: the system-browser hand-off is recorded instead, for expectExternal.
@@ -577,6 +594,22 @@ async function main(argv: readonly string[]): Promise<number> {
     });
   } catch (err) {
     report.pageErrors.push(`could not stub shell.openExternal: ${(err as Error).message}`);
+  }
+  // Nor a real folder dialog, which would hold the run: it answers what the last folderDialog step said, Cancel at first.
+  try {
+    await app.evaluate(({ dialog }) => {
+      const g = globalThis as unknown as { __qaFolderDialogs: string[]; __qaFolderAnswer: string | null };
+      g.__qaFolderDialogs = [];
+      g.__qaFolderAnswer = null;
+      dialog.showOpenDialog = (async (...args: unknown[]) => {
+        const options = (args.length > 1 ? args[1] : args[0]) as { title?: string } | undefined;
+        g.__qaFolderDialogs.push(options?.title ?? '');
+        const path = g.__qaFolderAnswer;
+        return { canceled: path === null, filePaths: path === null ? [] : [path] };
+      }) as typeof dialog.showOpenDialog;
+    });
+  } catch (err) {
+    report.pageErrors.push(`could not stub dialog.showOpenDialog: ${(err as Error).message}`);
   }
   try {
     const first = await app.firstWindow({ timeout: 60_000 });
@@ -683,6 +716,11 @@ async function main(argv: readonly string[]): Promise<number> {
             }
             break;
           }
+          case 'folderDialog':
+            await app.evaluate((_electron, path) => {
+              (globalThis as unknown as { __qaFolderAnswer: string | null }).__qaFolderAnswer = path;
+            }, step.path);
+            break;
           case 'command':
             await (await browserWindow(page)).evaluate((win, payload) => win.webContents.send(payload.channel, payload.event), {
               channel: EVENT,

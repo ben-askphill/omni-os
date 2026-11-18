@@ -3,7 +3,7 @@ import { machineLabel } from '@omni/shared/handoff.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SyncSignedIn, type SyncStatus } from '../api.ts';
 import { DeviceCodeSignIn, type FlowStart } from '../components/GoogleSignIn.tsx';
-import { Button, CopyButton, ErrorNote, Icon, InlineConfirm, Label, Loading, StatusDot } from '../components/ui.tsx';
+import { Button, CopyButton, ErrorNote, FolderInput, Icon, InlineConfirm, Label, Loading, StatusDot } from '../components/ui.tsx';
 import { plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useHereName, useSecretStoreLabel } from '../store.tsx';
@@ -281,7 +281,17 @@ export function PathMapEditor() {
                 <li key={i} className="flex items-center gap-2">
                   <input aria-label="Path on the other machine" className="field min-w-0 flex-1 font-mono !text-[12.5px]" value={r.from} onChange={(e) => edit(i, { from: e.target.value })} placeholder="~/work" spellCheck={false} />
                   <Icon name="arrowRight" size={14} className="shrink-0 text-fg-3" />
-                  <input aria-label="Path on this machine" className="field min-w-0 flex-1 font-mono !text-[12.5px]" value={r.to} onChange={(e) => edit(i, { to: e.target.value })} placeholder="~/code" spellCheck={false} />
+                  <FolderInput
+                    aria-label="Path on this machine"
+                    dialogTitle="Folder on this machine"
+                    compact
+                    className="min-w-0 flex-1 !text-[12.5px]"
+                    wrapperClassName="flex-1"
+                    value={r.to}
+                    onChange={(to) => edit(i, { to })}
+                    placeholder="~/code"
+                    spellCheck={false}
+                  />
                   <Button variant="ghost" size="sm" icon="trash" aria-label="Remove mapping" onClick={() => (setSaved(false), setRows(rows.filter((_, j) => j !== i)))} />
                 </li>
               ))}

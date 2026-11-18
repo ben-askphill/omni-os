@@ -9,4 +9,5 @@ export { KbdFooter, MENU_SURFACE, MOD_KEY, overlayRow } from './ui/overlay.tsx';
 export { InlineConfirm } from './ui/inline-confirm.tsx';
 export { SlideToConfirm } from './ui/slide-confirm.tsx';
 export { Picker, type PickerOption } from './ui/picker.tsx';
+export { FolderInput } from './ui/folder-input.tsx';
 export { ErrorNote, Empty, Loading, Ticks, CheckItem, copyText, CopyButton, Toggle, PageHeader, PageToolbar, SearchField, RefreshButton, pageColumn, type PageWidth, Label, Kbd } from './ui/feedback.tsx';

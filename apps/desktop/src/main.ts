@@ -13,6 +13,7 @@ import type { LaunchOptions } from './options.ts';
 import { handle, on, trusted, trustOrigins } from './handle.ts';
 import { BOOTSTRAP, EVENT, type Bootstrap } from './ipc.ts';
 import { installCommandLine, nativeCommand, ownsUserCommand } from './cli-shim.ts';
+import { installFolderPicker } from './folder-picker.ts';
 import { linkRouter } from './link-routing.ts';
 import { installLoginItem, LOGIN_ITEM_SUPPORTED } from './login-item.ts';
 import { installMenu, showServerLog } from './menu.ts';
@@ -185,6 +186,7 @@ async function boot(): Promise<void> {
   installQuitHold(ctx);
   installLoginItem(ctx);
   installNotifications(ctx);
+  installFolderPicker();
 
   // Opening the app again while it runs, perhaps on a page (`omni open`, an omni:// link): the main window there once
   // the server is up, else the failure screen. Until then the page is held, and the next main window opens on the one
