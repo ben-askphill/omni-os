@@ -33,6 +33,9 @@ export function classifyFailure(text: string): FailureCategory {
   // DesignSync's headless login and required-parameter replies do not use the usual error keywords.
   if (/^DesignSync needs design-system authorization\b/.test(text)) return 'authentication';
   if (/^<tool_use_error>\w+ requires:/.test(text)) return 'invalid_input';
+  // A claude.ai connector whose login lapsed, and its field checks, say neither "unauthorized" nor "invalid".
+  if (/\b(sign in again|re-?authenticate)\b/i.test(text)) return 'authentication';
+  if (/^\w+ must be an? [\w ]{0,40}\b(timestamp|date|string|number|integer|boolean|array|object|url|uuid)\b/i.test(text)) return 'invalid_input';
   if (/\b(401|unauthorized|unauthenticated|authentication|invalid.api.key)\b/i.test(text)) return 'authentication';
   if (/\b(403|forbidden|permission denied|access denied|EACCES|EPERM)\b/i.test(text)) return 'permission';
   if (/\b(429|rate.limit|quota.exceeded)\b/i.test(text)) return 'rate_limit';
