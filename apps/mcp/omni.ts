@@ -74,7 +74,8 @@ server.registerTool(
 server.registerTool(
   'list_crew',
   { description: 'List crew roles you can delegate to, with their charters summarized.' },
-  async () => text((await call('/crew')).filter((r: any) => r.id !== 'conductor').map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
+  // GET /api/crew leaves hidden roles out. The Conductor and usage-scan are not delegatable, and delegate refuses them.
+  async () => text((await call('/crew')).filter((r: any) => r.delegatable).map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
 );
 
 server.registerTool(

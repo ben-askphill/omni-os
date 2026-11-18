@@ -29,7 +29,10 @@ describe('parseCrewFile', () => {
       channel: 'volero',
       mcp: ['omni'],
       delegateOnly: false,
+      delegatable: true,
       charter: 'You write and ship code.\n\n- Keep changes scoped.',
+      kind: 'own',
+      hidden: false,
     });
   });
 
@@ -43,7 +46,10 @@ describe('parseCrewFile', () => {
       channel: undefined,
       mcp: [],
       delegateOnly: false,
+      delegatable: true,
       charter: 'Just do quick asks.',
+      kind: 'own',
+      hidden: false,
     });
   });
 

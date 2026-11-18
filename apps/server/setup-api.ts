@@ -49,7 +49,7 @@ export function setupState(): SetupState {
 
 // Automation overrides change through POST /api/automations/:id/enabled, not here. Each text field is checked by
 // checkSettingFields, as @omni/shared/settings.ts says.
-const patchInput = userConfigPatch.omit({ automations: true, onboardedAt: true }).superRefine((p, ctx) => {
+const patchInput = userConfigPatch.omit({ automations: true, crew: true, onboardedAt: true }).superRefine((p, ctx) => {
   checkSettingFields(p, ctx);
   const device = p.runOn?.device;
   if (device && !/^[A-Za-z0-9-]{1,100}$/.test(device)) ctx.addIssue({ code: 'custom', path: ['runOn', 'device'], message: 'Pick a synced machine, or this one.' });

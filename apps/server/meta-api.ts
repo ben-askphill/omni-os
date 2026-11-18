@@ -1,4 +1,4 @@
-// /api/crew, /harnesses, /secrets, /automations, /profile, /devices.
+// /harnesses, /secrets, /automations, /profile, /devices.
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { deleteAutomation, lastRuns, loadAutomations, runAutomation } from './automations.ts';
@@ -10,7 +10,6 @@ import { isPrTrigger } from './automation-events.ts';
 import { recentDeliveries } from './automation-deliveries.ts';
 import { webhookInfo } from './github-webhook-api.ts';
 import { webhookSecretName } from './github-webhook.ts';
-import { listCrew } from './crew.ts';
 import { channelCatalog, freshCatalog, getCatalog } from './harness/catalog-service.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { HARNESS_INSTALL, type HarnessInfo } from './harness/types.ts';
@@ -21,16 +20,6 @@ import { listDevices } from './sync/devices.ts';
 import { checkSecret, secretDrop, secretDrops, sendSecret } from './secret-drop.ts';
 
 export const metaApi = new Hono();
-
-metaApi.get('/crew', (c) => {
-  const cat = getCatalog();
-  return c.json(
-    listCrew().map((r) => ({
-      ...r,
-      error: r.error ?? validateDefaults({ harness: r.harness, model: r.model, effort: r.effort }, cat),
-    })),
-  );
-});
 
 // The harnesses with their availability, fix command, models, efforts, cap and running count, and the install
 // command for a CLI Omni found no binary for (a signed-out one gets only its sign-in `fix`).

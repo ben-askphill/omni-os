@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
-import { getCrew, remoteDelegateOnlyRefusal } from '../crew.ts';
+import { crewForNewThread, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { checkBase } from '../worktree-base.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
@@ -115,8 +115,18 @@ export interface CreateThreadInput {
  * Resolve the run, make the workdir and write the row. Nothing is delivered yet. A thread that needs a worktree is
  * written as preparing, with the worktree's planned folder and branch: setUpThread makes them before anything runs.
  */
+/** A thread the Conductor delegates, or a team member, may only start as a delegatable role. */
+const isDelegated = (source: ThreadSource | undefined) => source === 'conductor' || source === 'team';
+
+/** The role a new thread starts as. An id no role has, or a hidden one, is refused rather than run with no charter. */
+function roleFor(id: string | null | undefined, source: ThreadSource | undefined): CrewRole | undefined {
+  const r = crewForNewThread(id, isDelegated(source));
+  if ('refused' in r) throw refusal(r.refused, r.status);
+  return r.role ?? undefined;
+}
+
 async function openThread(input: CreateThreadInput, status: Thread['status'] = 'queued', elsewhere = false) {
-  const role = getCrew(input.role);
+  const role = roleFor(input.role, input.source);
   const channelId = input.channel || role?.channel || 'inbox';
   const channel = channels.get(channelId);
   if (!channel) throw refusal(`unknown channel "${channelId}"`, 404);
@@ -264,6 +274,8 @@ export interface CreateTeamInput {
  */
 export async function createTeam(input: CreateTeamInput): Promise<{ lead: Thread; members: Thread[] }> {
   if (!input.tasks.length) throw new Error('a team needs at least one task');
+  // Every member's role before the lead exists, so a bad one leaves nothing behind.
+  for (const t of input.tasks) roleFor(t.role ?? input.role, 'team');
   const { thread: lead } = await openThread({ ...input, source: input.source ?? 'conductor' }, 'running');
   addEvent(lead.id, 'user', { text: input.prompt, source: lead.source });
   // Its brief is in the transcript already; it runs once its worktree and its team are both ready.

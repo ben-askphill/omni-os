@@ -59,6 +59,8 @@ const runOnDevice = z.string().trim().max(100);
 
 const automationOverride = z.object({ enabled: z.boolean().optional(), channel: z.string().optional(), deleted: z.boolean().optional() });
 
+const crewOverride = z.object({ hidden: z.boolean().optional() });
+
 const schema = z.object({
   version: z.literal(1).default(1),
   onboardedAt: z.string().optional(),
@@ -68,6 +70,7 @@ const schema = z.object({
   /** Per machine, like the rest of this file (apps/server/run-on.ts). */
   runOn: z.object({ device: runOnDevice.default('') }).prefault({}),
   automations: z.record(z.string(), automationOverride).default({}),
+  crew: z.record(z.string(), crewOverride).default({}),
   /** Off until turned on in Settings > Worktrees. */
   worktrees: z
     .object({
@@ -99,6 +102,7 @@ export const userConfigPatch = z.object({
   integrations: patchSectionSchema('integrations').optional(),
   runOn: z.object({ device: runOnDevice.optional() }).optional(),
   automations: z.record(z.string(), automationOverride.nullable()).optional(),
+  crew: z.record(z.string(), crewOverride.nullable()).optional(),
 });
 
 /** A client's save, each text field checked as `settingProblem(.., 'save')` says. For a zod superRefine. */
@@ -166,6 +170,11 @@ export function updateUserConfig(patch: UserConfigPatch): UserConfig {
     if (o === null) delete automations[id];
     else automations[id] = { ...automations[id], ...o };
   }
+  const crew = { ...cur.crew };
+  for (const [id, o] of Object.entries(patch.crew ?? {})) {
+    if (o === null) delete crew[id];
+    else crew[id] = { ...crew[id], ...o };
+  }
   const next: UserConfig = {
     ...cur,
     user: { ...cur.user, ...patch.user },
@@ -173,6 +182,7 @@ export function updateUserConfig(patch: UserConfigPatch): UserConfig {
     integrations: { ...cur.integrations, ...patch.integrations },
     runOn: { ...cur.runOn, ...patch.runOn },
     automations,
+    crew,
   };
   if (patch.onboardedAt === null) delete next.onboardedAt;
   else if (patch.onboardedAt) next.onboardedAt = patch.onboardedAt;

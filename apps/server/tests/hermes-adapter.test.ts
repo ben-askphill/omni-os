@@ -283,7 +283,7 @@ describe('Hermes adapter', () => {
 
   it('fails the turn for a delegate-only role without starting a run, for a thread that was on Hermes already', async () => {
     const before = fake.calls.length;
-    const s = boot({ role: { id: 'conductor', name: 'Conductor', description: '', mcp: ['omni'], delegateOnly: true, charter: 'x' } });
+    const s = boot({ role: { id: 'conductor', name: 'Conductor', description: '', mcp: ['omni'], delegateOnly: true, delegatable: false, kind: 'shipped', hidden: false, charter: 'x' } });
     s.user('fix the cart', 'm1');
     await waitFor(() => resultOf(s.records).length === 1, 'refusal');
     expect(String(s.records.find((r) => r.kind === 'error')?.payload.text)).toMatch(/^Conductor only routes work/);

@@ -88,7 +88,8 @@ export function registerExternalTools(server: McpServer, call: Call) {
   server.registerTool(
     'list_crew',
     { description: 'List the crew roles a thread can run as (conductor, builder, researcher and so on), with what each is for.', annotations: { readOnlyHint: true } },
-    async () => text((await call('/crew')).map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
+    // Hidden roles are left out by the API. The Conductor stays: a client may start a thread as it. usage-scan, which only Omni starts, does not.
+    async () => text((await call('/crew')).filter((r: any) => r.delegatable || r.id === 'conductor').map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
   );
 
   server.registerTool(
