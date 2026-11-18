@@ -1,5 +1,6 @@
 import type { OmniApi } from '@omni/client-core';
 import { takeoverShown } from '@omni/shared/thread-machine.ts';
+import { crewRoleName, headerShowsRole } from '@omni/shared/crew-role.ts';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
@@ -17,6 +18,7 @@ import { ThreadHeader } from '../components/thread/ThreadHeader';
 import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { StepChip } from '../components/thread/StepChip';
 import { ThreadTitle } from '../components/thread/ThreadTitle';
+import { useCrew } from '../newthread/hooks';
 import { useChannels, useThreadLive, useThreadView } from '../live/react';
 import { useRemote } from '../live/use-remote';
 import { useThreadMachine } from '../machine/hooks';
@@ -66,6 +68,8 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const hasThread = thread !== null;
   const status = thread?.status;
   const channelName = listed?.name ?? view?.channel?.name ?? null;
+  const crew = useCrew();
+  const roleName = thread && headerShowsRole(thread) ? crewRoleName(thread.role, crew ?? []) : null;
   const device = view ? threadDeviceName({ takeover: takeoverShown(view.takeover, view.handoff), machine: machine.machine, hereName: server.data?.device?.name }) : null;
   const canPick = machine.machine !== null;
   const openMenu = useCallback((page: 'menu' | 'machine') => {
@@ -81,13 +85,14 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
           status={status}
           statusLabel={threadStatusLabel(status)}
           channel={channelName}
+          role={roleName}
           device={device}
           onOpenMachine={canPick ? () => openMenu('machine') : undefined}
         />
       ),
       headerRight: hasThread ? () => <HeaderButton label="Thread menu" icon="ellipsis" onPress={() => openMenu('menu')} /> : undefined,
     });
-  }, [navigation, title, status, channelName, device, canPick, hasThread, openMenu]);
+  }, [navigation, title, status, channelName, roleName, device, canPick, hasThread, openMenu]);
 
   // A machine can fall asleep while the thread stays open: read the list again each time the menu opens.
   const { reload: reloadMachines } = machine;
