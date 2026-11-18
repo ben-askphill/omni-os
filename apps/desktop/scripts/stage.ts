@@ -29,6 +29,31 @@ export const EXTERNALS = ['node-pty', '@playwright/mcp'] as const;
  */
 export const SHIPPED_DIRS = ['crew', 'mods', 'prototypes/activity-monitor'] as const;
 
+/**
+ * Words that mark a crew charter as one person's own: their name, company, clients and tools. Shipped charters reach
+ * every install, so they stay generic and the user's own roles live in their data dir (docs/user/crew.md). Matched as
+ * whole words, case and all, so "productive" or "portal" in plain prose still pass.
+ */
+export const PERSONAL_TERMS = [
+  'Ben', 'Rosenberg', 'brosenb', 'Ask Phill', 'askphill', 'APA', 'Phillbert', 'Productive', 'Portal',
+  'Volero', 'Pink Gellac', 'Kamera Express', 'Acne Studios', 'North Sails', 'Patta',
+] as const;
+
+/** Each shipped charter line that names one of PERSONAL_TERMS, as `crew/<file>:<line>: <term>`. */
+export function personalCrewProblems(crewDir: string): string[] {
+  const term = new RegExp(`\\b(${PERSONAL_TERMS.join('|')})\\b`);
+  return readdirSync(crewDir)
+    .filter((f) => f.endsWith('.md'))
+    .flatMap((f) =>
+      readFileSync(join(crewDir, f), 'utf8')
+        .split('\n')
+        .flatMap((line, i) => {
+          const hit = line.match(term);
+          return hit ? [`crew/${f}:${i + 1}: ${hit[1]}`] : [];
+        }),
+    );
+}
+
 export type Arch = 'x64' | 'arm64';
 export interface Target {
   platform: 'darwin' | 'linux';
@@ -410,6 +435,8 @@ export async function stage(args: StageArgs, out = STAGE_DIR): Promise<void> {
   if (!existsSync(join(webDist, 'index.html'))) throw new Error('apps/web/dist has no index.html. Run without --skip-web.');
   cpSync(webDist, join(out, 'apps/web/dist'), { recursive: true });
 
+  const personal = personalCrewProblems(join(REPO, 'crew'));
+  if (personal.length) throw new Error(`crew/ names one person's own setup, and it ships to every install: ${personal.join('; ')}`);
   for (const dir of SHIPPED_DIRS) cpSync(join(REPO, dir), join(out, dir), { recursive: true });
   const version = stampPackageJson(out);
 

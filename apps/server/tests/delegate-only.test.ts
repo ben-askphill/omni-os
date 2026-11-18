@@ -52,7 +52,7 @@ describe('a delegate-only role', () => {
     const thread = r.thread(t.id);
     const channel = r.db.channels.get('scratch')!;
     const rule = 'show the result with html_render';
-    for (const role of ['conductor', 'builder', 'researcher', 'store-ops', 'inbox']) {
+    for (const role of ['conductor', 'builder', 'researcher', 'inbox']) {
       expect(buildSystemPrompt(thread, channel, getCrew(role))).toContain(rule);
     }
     expect(buildSystemPrompt({ ...thread, harness: 'hermes' }, channel)).not.toContain(rule);

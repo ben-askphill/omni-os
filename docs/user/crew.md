@@ -1,16 +1,30 @@
 # Crew and Conductor
 
-Each role is a file in `crew/*.md` with frontmatter and a charter. Edit them freely; Omni reads them on every run.
+Each role is a file in `crew/*.md` with frontmatter and a charter. Omni reads them on every run. The shipped charters are generic and go to every install, so they name no person, company, client or tool of anyone's own. The desktop build fails when one does (`personalCrewProblems` in `apps/desktop/scripts/stage.ts`).
 
 | Role | For |
 | --- | --- |
 | conductor | Front agent in #conductor. Routes every task to a crew thread, never does the work |
 | researcher | Research, audits, answers to client questions, HTML reports |
-| store-ops | Shopify store work, PSI/SEO, translations, imports |
 | builder | Code in a repo channel, own worktree, opens PRs. |
 | reviewer | Reviews a PR against its brief, from the spec and diff only. Read only |
-| inbox | Mail, calendar, Productive, Notion, Slack drafts. Never sends on its own |
+| inbox | Mail, calendar, time tracking, tasks, notes and chat drafts. Never sends on its own |
 | usage-scan | Leads Scan my usage in #inbox: turns the repeated asks Omni found into up to 3 suggested automations ([Automations](automations.md#scan-my-usage)). Omni starts it; not for delegation |
+
+Your own roles live in `data/crew/`, which is never shipped. A file there with a new name is a new role; one with a shipped role's name replaces that role. For example, a role for hands-on store work:
+
+```markdown
+---
+name: Store ops
+description: Hands-on store work. Admin API, theme checks, translations, imports, PageSpeed, SEO, using the channel browser.
+model: auto
+---
+You operate on client stores.
+
+- Never write to a published theme or a live store unless the brief explicitly says so. When unsure, do a dry run and report.
+- For performance and SEO work, report numbers before and after.
+- End with: what changed, where, and how to undo it.
+```
 
 The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Overview and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
 

@@ -15,6 +15,7 @@ import {
   glibcProblems,
   keepPtyFile,
   parseStageArgs,
+  personalCrewProblems,
   resolveFrom,
   SHIPPED_DIRS,
   stagedPtyProblems,
@@ -132,6 +133,22 @@ describe('stage.ts and the server bundle', () => {
         .map((f) => join(dir, f)),
     );
     expect(yaml).toEqual([]);
+  });
+
+  // Shipped charters reach every install. They once named one person's company, clients and tools.
+  it('ships crew charters that name no one in particular', () => {
+    expect(personalCrewProblems(join(import.meta.dirname, '../../../crew'))).toEqual([]);
+  });
+
+  it("flags a charter that names a person's own setup, and passes the same words in plain prose", () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omni-stage-crew-'));
+    try {
+      writeFileSync(join(dir, 'builder.md'), '---\nname: Builder\n---\nUse the APA skills.\nLog it in Productive for Ben.\n');
+      writeFileSync(join(dir, 'inbox.md'), '---\nname: Inbox\n---\nStay productive; check the portal and the benchmark.\n');
+      expect(personalCrewProblems(dir)).toEqual(['crew/builder.md:4: APA', 'crew/builder.md:5: Productive']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
