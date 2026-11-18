@@ -9,6 +9,7 @@ import { userName } from '../profile.ts';
 import { getHarness, resolveModel, unavailableError, validateRun, type Catalog } from '../harness/catalog.ts';
 import { freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { HARNESS_META, isHarnessId, type HarnessId } from '../harness/types.ts';
+import { getCrew } from '../crew.ts';
 import { reviewerEffort } from '../harness/resolve.ts';
 import { turnBlocked } from '../sync/guard.ts';
 import { buildHandover } from './handover.ts';
@@ -31,8 +32,8 @@ export function runName(run: Run, cat: Catalog = getCatalog()): RunName {
 
 const runOf = (t: Thread): Run => ({ harness: t.harness, model: t.model ?? '', effort: t.effort });
 
-/** The run a switch asks for, at the effort the thread's role allows: a GPT reviewer stays at high (resolve.ts reviewerEffort). */
-export const runForRole = (t: Thread, to: Run): Run => ({ ...to, effort: reviewerEffort(to, t.role, getCatalog()) });
+/** The run a switch asks for, at the effort the thread's role allows: a review role on GPT stays at high (resolve.ts reviewerEffort). */
+export const runForRole = (t: Thread, to: Run): Run => ({ ...to, effort: reviewerEffort(to, getCrew(t.role), getCatalog()) });
 
 /** The run Ben picked while a turn ran, or null. */
 export const queuedRun = (t: Thread | undefined): Run | null =>

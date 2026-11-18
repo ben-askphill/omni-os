@@ -14,11 +14,22 @@ export interface CrewListed {
   mcp: string[];
   delegateOnly: boolean;
   delegatable: boolean;
+  review: boolean;
   kind: 'shipped' | 'edited' | 'own';
   hidden: boolean;
   charterMode?: 'append' | 'replace';
   builtInChanged?: boolean;
+  locks?: CrewLocks;
   error?: string;
+}
+
+/** A key a save may not change on a built-in Omni relies on. `charter_mode` locked: the charter may only be added to. */
+export type CrewLockedField = 'delegate_only' | 'mcp' | 'delegatable' | 'review' | 'charter_mode';
+
+/** What keeps a built-in Omni relies on working (apps/server/crew.ts CREW_LOCKS), each with why, for Settings to show. */
+export interface CrewLocks {
+  fields?: Partial<Record<CrewLockedField, string>>;
+  actions?: Partial<Record<'duplicate' | 'hide', string>>;
 }
 
 /** GET /api/crew/:id: the role, the built-in alone, and the two charters as written (placeholders kept). */
@@ -103,6 +114,7 @@ export interface CrewDraft {
   delegateOnly: boolean;
   delegatable: boolean;
   conductorTools: boolean;
+  review: boolean;
   /** For a built-in: the text added to or put in place of its charter. For a role of the user's own: the whole charter. */
   charter: string;
   charterMode: 'append' | 'replace';
@@ -120,6 +132,7 @@ const fieldsOf = (r: CrewListed) => ({
   delegateOnly: r.delegateOnly,
   delegatable: r.delegatable,
   conductorTools: r.mcp.includes('omni'),
+  review: r.review,
 });
 
 /** The form for a role as it stands. A built-in no one edited adds to its charter until the user picks Replace. */
@@ -129,7 +142,7 @@ export function crewDraftOf(d: CrewDetailView): CrewDraft {
 
 /** A blank role of the user's own. */
 export function blankCrewDraft(): CrewDraft {
-  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, delegatable: true, conductorTools: false, charter: '', charterMode: 'replace' };
+  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, delegatable: true, conductorTools: false, review: false, charter: '', charterMode: 'replace' };
 }
 
 /** Why the form cannot be saved yet, or null. */
@@ -180,7 +193,7 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
 }
 
 /** What a role is when its file leaves a switch out (apps/server/crew.ts). */
-const SWITCH_DEFAULTS = { delegateOnly: false, delegatable: true } as const;
+const SWITCH_DEFAULTS = { delegateOnly: false, delegatable: true, review: false } as const;
 
 const WIRE: Record<FieldKey, string> = {
   name: 'name',
@@ -194,6 +207,7 @@ const WIRE: Record<FieldKey, string> = {
   delegateOnly: 'delegate_only',
   delegatable: 'delegatable',
   conductorTools: 'mcp',
+  review: 'review',
 };
 
 /** The draft read back as a listed role, so a save compares like with like. */
@@ -211,6 +225,7 @@ function fromDraft(d: CrewDraft, base: CrewListed | undefined): CrewListed {
     mcp: d.conductorTools ? ['omni', ...mcp] : mcp,
     delegateOnly: d.delegateOnly,
     delegatable: d.delegatable,
+    review: d.review,
     kind: base?.kind ?? 'own',
     hidden: base?.hidden ?? false,
   };

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { join } from 'node:path';
 import YAML from 'yaml';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
+import type { CrewLocks } from '@omni/shared/crew-settings.ts';
 import { paths } from './config.ts';
 import { fillPlaceholders, userConfig } from './user-config.ts';
 
@@ -46,6 +47,11 @@ export interface CrewRole {
   delegateOnly: boolean;
   /** The Conductor may hand work to it: list_crew offers it and `delegate` takes it. False for the Conductor and usage-scan. */
   delegatable: boolean;
+  /**
+   * A review role: a run on a GPT model is held at high effort (resolve.ts reviewerEffort), and a delegation with
+   * `review_of` runs on the other model family from the thread it reviews (harness/review.ts). On for `reviewer`.
+   */
+  review: boolean;
   charter: string;
   kind: CrewKind;
   /** Hidden on this machine. Built-ins only: no new thread starts as it, and lists leave it out unless asked. */
@@ -57,14 +63,52 @@ export interface CrewRole {
    * against (or the overlay never recorded which, as a hand copy does). The user may be missing a release's fixes.
    */
   builtInChanged?: boolean;
+  /** What a save may not change on this role, and what may not be done to it, with why. Only the built-ins Omni relies on. */
+  locks?: CrewLocks;
   error?: string;
 }
 
 /**
- * Built-ins that are never hidden, whatever the user config says: the Conductor is the front agent, and Omni starts a
- * usage scan as usage-scan. crew-store.ts refuses to hide them; this covers a config written by hand.
+ * The built-ins Omni itself relies on, and what keeps them working (plan section 5). Keyed on the id, since what the
+ * Conductor and a usage scan do is about Omni itself; the reviewer's lock only keeps its capability on. crew-store.ts
+ * refuses a write that breaks one, and Settings shows each reason beside the field or action.
  */
-export const UNHIDEABLE = new Set(['conductor', 'usage-scan']);
+export const CREW_LOCKS: Record<string, CrewLocks> = {
+  conductor: {
+    fields: {
+      delegate_only: 'The Conductor only routes work, so it never gets working tools.',
+      mcp: 'The Conductor delegates with the conductor tools, so it keeps them.',
+      delegatable: 'Nothing delegates to the Conductor: it is the one that delegates.',
+    },
+    actions: {
+      duplicate: 'The Conductor is not duplicated: there is one. Make another role with New role.',
+      hide: 'The Conductor is never hidden: it is the front agent in #conductor.',
+    },
+  },
+  'usage-scan': {
+    fields: {
+      delegate_only: 'A usage scan reads and suggests. It never does the work itself.',
+      mcp: 'A usage scan suggests automations with the conductor tools, so it keeps them.',
+      delegatable: 'Only Omni starts a usage scan, from the Automations page.',
+      charter_mode: "Add to the built-in only: the scan's steps come with each release.",
+    },
+    actions: {
+      duplicate: 'Usage scan is not duplicated: a copy would not be a usage scan, since only Omni starts one, with its report.',
+      hide: 'Usage scan is never hidden: Omni starts it from the Automations page.',
+    },
+  },
+  reviewer: {
+    fields: {
+      review: "Omni's review rules come with this role. Duplicate it for a reviewer without them.",
+    },
+  },
+};
+
+/**
+ * Built-ins that are never hidden, whatever the user config says. crew-store.ts refuses to hide them; this covers a
+ * config written by hand.
+ */
+export const UNHIDEABLE = new Set(Object.keys(CREW_LOCKS).filter((id) => CREW_LOCKS[id].actions?.hide));
 
 /** A crew file split into its frontmatter and body. `meta` is {} when the frontmatter does not parse. */
 export interface CrewSource {
@@ -122,6 +166,7 @@ function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: C
     mcp: Array.isArray(meta.mcp) ? meta.mcp.filter((x): x is string => typeof x === 'string') : [],
     delegateOnly: meta.delegate_only === true,
     delegatable: meta.delegatable !== false,
+    review: meta.review === true,
     charter: fillPlaceholders(body),
     kind,
     hidden: false,
@@ -198,6 +243,7 @@ function readRole(id: string, shipped: string | null, own: string | null): CrewR
   else if (own !== null) role = parseCrewFile(id, own);
   else return null;
   role.hidden = role.kind !== 'own' && !UNHIDEABLE.has(id) && userConfig().crew?.[id]?.hidden === true;
+  if (role.kind !== 'own' && CREW_LOCKS[id]) role.locks = CREW_LOCKS[id];
   return role;
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankCrewDraft, CHANGED_CHARTER_ACTIONS, crewChips, crewDraftOf, crewDraftProblem, crewIdFrom, crewMarkdownOf, crewRunLine, crewSaveBody, lineDiff, type CrewDetailView, type CrewListed } from '../crew-settings.ts';
 
-const role = (over: Partial<CrewListed> = {}): CrewListed => ({ id: 'builder', name: 'Builder', description: 'Writes code.', model: 'auto', mcp: [], delegateOnly: false, delegatable: true, kind: 'shipped', hidden: false, ...over });
+const role = (over: Partial<CrewListed> = {}): CrewListed => ({ id: 'builder', name: 'Builder', description: 'Writes code.', model: 'auto', mcp: [], delegateOnly: false, delegatable: true, review: false, kind: 'shipped', hidden: false, ...over });
 
 const detail = (r: CrewListed, builtIn: CrewListed | null, own: string | null = null): CrewDetailView => ({
   role: r,
@@ -64,11 +64,21 @@ describe('the editor', () => {
     expect(crewSaveBody({ ...d, icon: '', bg: '' }, detail(edited, builtIn)).fields.avatar).toBeNull();
   });
 
+  it('sends the review switch like the others: true when turned on, null when back to its default', () => {
+    const own = role({ kind: 'own' });
+    const on = { ...crewDraftOf(detail(own, null)), review: true };
+    expect(crewSaveBody(on, detail(own, null)).fields).toEqual({ review: true });
+    const reviewer = role({ id: 'reviewer', review: true });
+    const off = { ...crewDraftOf(detail(role({ id: 'reviewer', review: true, kind: 'own' }), null)), review: false };
+    expect(crewSaveBody(off, detail(role({ id: 'reviewer', review: true, kind: 'own' }), null)).fields).toEqual({ review: null });
+    expect(crewDraftOf(detail(reviewer, reviewer)).review).toBe(true);
+  });
+
   it('sends every field for a new role of the user own, and no charter mode', () => {
     const d = { ...blankCrewDraft(), name: 'Store ops', charter: 'Dry run first.' };
     const body = crewSaveBody(d, null);
     expect(body).toEqual({
-      fields: { name: 'Store ops', description: '', harness: '', model: 'auto', effort: '', channel: '', delegate_only: null, delegatable: null, mcp: [], avatar: null },
+      fields: { name: 'Store ops', description: '', harness: '', model: 'auto', effort: '', channel: '', delegate_only: null, delegatable: null, mcp: [], review: null, avatar: null },
       charter: 'Dry run first.',
     });
   });

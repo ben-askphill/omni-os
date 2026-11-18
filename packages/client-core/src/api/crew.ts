@@ -1,4 +1,5 @@
 import { apiPath, type HttpClient } from '../http.ts';
+import type { CrewLocks } from '@omni/shared/crew-settings.ts';
 
 /** A crew role: a charter with the run it defaults to. A new thread can start as one (`createThread`'s `role`). */
 export interface CrewRole {
@@ -17,6 +18,8 @@ export interface CrewRole {
   delegateOnly: boolean;
   /** The Conductor may delegate to it. False for the Conductor and usage-scan. */
   delegatable: boolean;
+  /** A review role: held at high effort on GPT, and a delegation with `review_of` runs on the other model family. */
+  review: boolean;
   charter: string;
   /** Shipped with Omni, a built-in with the user's edit, or the user's own. */
   kind: 'shipped' | 'edited' | 'own';
@@ -26,6 +29,8 @@ export interface CrewRole {
   charterMode?: 'append' | 'replace';
   /** An edited built-in that replaces a shipped charter which changed since the edit. */
   builtInChanged?: boolean;
+  /** What a save may not change on a built-in Omni relies on, and what may not be done to it, with why. */
+  locks?: CrewLocks;
   /** Why the role's own run defaults are unusable, when they are. */
   error?: string;
 }

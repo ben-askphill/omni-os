@@ -29,7 +29,7 @@ const BENS: Partial<Record<CrewWrite, string>> = { duplicate: 'duplicates', dele
 const EDITOR_ROLE = 'conductor';
 
 /** Frontmatter keys that give a role its powers. Only Ben sets them. */
-const POWERS = ['mcp', 'delegate_only', 'delegatable'] as const;
+const POWERS = ['mcp', 'delegate_only', 'delegatable', 'review'] as const;
 
 /**
  * Why the thread `caller` may not make this change to a crew role, or null when it may. No caller is one of Ben's

@@ -18,6 +18,7 @@ import { changesCheckout, defaultBranch, git, gitOr, parseNameStatus, real, thre
 import { threadDir, uploadsDir } from './config.ts';
 import { asksAuto } from './harness/auto.ts';
 import { freshCatalog, getCatalog } from './harness/catalog-service.ts';
+import { getCrew } from './crew.ts';
 import { reviewerEffort } from './harness/resolve.ts';
 import { isHarnessId, isProviderHarness, providerWhere } from './harness/types.ts';
 import { userName } from './profile.ts';
@@ -85,12 +86,12 @@ export function sourceBlock(t: Thread): ContinueBlock | null {
 
 /**
  * The run Ben picked, checked: a local harness the catalog offers, on a model he chose. Cursor's own `auto` is one. The
- * continued thread keeps the source's role, so a GPT reviewer's runs at high effort (resolve.ts reviewerEffort).
+ * continued thread keeps the source's role, so a review role's runs on GPT are held at high effort (resolve.ts reviewerEffort).
  */
 async function targetRun(picked: Run, role: string | null): Promise<RunName> {
   if (asksAuto(picked)) throw refusal('Pick a model: a continued thread runs on the one you choose, not Auto.', 400);
   if (!isHarnessId(picked.harness)) throw refusal(`Unknown harness "${picked.harness}".`, 400);
-  const run = { ...picked, harness: picked.harness, effort: reviewerEffort(picked, role, getCatalog()) };
+  const run = { ...picked, harness: picked.harness, effort: reviewerEffort(picked, getCrew(role), getCatalog()) };
   const remote = continueRefusal(run.harness);
   if (remote) throw refusal(remote, 400);
   const to = { ...run, harness: run.harness };
