@@ -180,8 +180,9 @@ function logHeld(c: Pick<Change, 'machine_id' | 'entity' | 'entity_id'>, reason:
 }
 
 /**
- * Confirming a key never authorizes unseen actions. Called in the confirmation transaction, before sync resumes. A
- * command for this machine is answered as rejected, so its sender says it was not delivered instead of waiting a day.
+ * Confirming a key never authorizes unseen actions. Called in the confirmation transaction, after the key is pinned and
+ * before sync resumes. A command for this machine that verifies with that key is answered as rejected, so its sender
+ * says it was not delivered instead of waiting a day.
  */
 export function discardHeld(machine: string) {
   const rows = db.prepare('SELECT seq, change FROM sync_deferred').all() as { seq: number; change: string }[];
@@ -199,11 +200,18 @@ export function discardHeld(machine: string) {
 const KINDS: readonly unknown[] = COMMAND_KINDS;
 const isId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(v);
 
-/** A dropped command its signer sent to this machine, for a thread here: saved as rejected and synced back, never run. */
-function answerDropped(c: RemoteChange) {
+/**
+ * A dropped command its signer sent to this machine, for a thread here: saved as rejected and synced back, never run.
+ * Only one signed with the key Ben just confirmed: the queue also holds changes that never verified (one deferred
+ * before the machine had a key), and answering those would push forged ids, signed by this machine, that the sender
+ * may use later. Its ids only: the sender has its own copy of what it said, and the answer carries none of it.
+ */
+function answerDropped(raw: RemoteChange) {
   const self = outbox.machineId();
+  const { verdict, change: c } = verifyChange(raw, signKeyOf);
+  if (verdict !== 'valid' || !self) return;
   const d = (c.data ?? {}) as Partial<RemoteCommand>;
-  if (c.entity !== 'remote_command' || c.op !== 'upsert' || !self || d.target !== self || d.sender !== c.machine_id || d.state !== 'sent') return;
+  if (c.entity !== 'remote_command' || c.op !== 'upsert' || d.target !== self || d.sender !== c.machine_id || d.state !== 'sent') return;
   if (!isId(c.entity_id) || !KINDS.includes(d.kind) || !isId(d.thread_id) || !threads.get(d.thread_id) || typeof d.expires_at !== 'string') return;
   const here = typeof d.target_name === 'string' && d.target_name ? d.target_name : (deviceRecord(self)?.name ?? self);
   const sender = deviceRecord(c.machine_id)?.name ?? c.machine_id;
@@ -215,14 +223,6 @@ function answerDropped(c: RemoteChange) {
       sender: c.machine_id,
       target: self,
       target_name: here,
-      prompt: typeof d.prompt === 'string' ? d.prompt : '',
-      mode: d.mode === 'steer' || d.mode === 'queue' || d.mode === 'interrupt' ? d.mode : null,
-      source: d.source === 'ben' || d.source === 'conductor' ? d.source : null,
-      context: Array.isArray(d.context) ? d.context : null,
-      files: Array.isArray(d.files) ? d.files : null,
-      report_key: typeof d.report_key === 'string' ? d.report_key : null,
-      report: d.report && typeof d.report === 'object' && !Array.isArray(d.report) ? d.report : null,
-      limit_action: d.limit_action === 'resume' || d.limit_action === 'schedule' || d.limit_action === 'cancel' ? d.limit_action : null,
       expires_at: d.expires_at,
       created_at: typeof d.created_at === 'string' ? d.created_at : c.ts,
     },
