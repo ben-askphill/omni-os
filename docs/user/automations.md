@@ -1,6 +1,8 @@
 # Automations
 
-`automations/*.yaml` are shared examples (`morning-coffee`, `weekly-review`, `artifact-comments`, `brain-nightly`, `pr-babysitter`, `fix-failing-checks`, `tool-failure-triage`, `docs-daily`), all off until you turn them on. Your own automations go in `data/automations/`; the same id there wins over the shared one.
+Omni ships no automations, so a fresh install lists none. Yours are YAML files in `data/automations/`, one per automation: make one with New on the Automations page, ask the Conductor, or add a file there by hand.
+
+A server also loads shared automations from `automations/` beside it (`OMNI_AUTOMATIONS_DIR` names another folder), under yours: the same id in `data/automations/` wins. Omni's own builds leave it empty, and the desktop app does not ship it.
 
 ## Edit in Omni
 
@@ -16,17 +18,17 @@ The Automations page edits every field of an automation and writes the result in
 Delete on an automation's card removes it from this machine after a confirmation. One of your own in `data/automations/` loses its YAML file. A shared one stays in `automations/`, Omni hides it with `automations.<id>.deleted` in `data/omni.config.json`, so an update cannot bring it back, and removing that key restores it. Either way its schedule stops at once, a webhook automation's signing secret goes with it, and threads it already started stay. Hiding a shared one is per machine. With sync on, delete it on the machine that runs it too. Desktop web, phone web and the desktop app all have Delete. The native iOS Automations screen can only toggle, which writes the YAML the same way.
 
 ```yaml
-name: Morning coffee
+name: Daily digest
 enabled: false          # the default; the UI toggle writes it here
 cron: "0 8 * * 1-5"
 timezone: Europe/Amsterdam  # optional, defaults to your timezone
 channel: inbox          # default inbox
-role: inbox
+role: researcher
 harness: claude         # optional, like model and effort
 model: sonnet
-machine: omarchy        # optional: the synced machine that runs it, by name or sync id
+machine: studio         # optional: the synced machine that runs it, by name or sync id
 prompt: |
-  Run the morning-coffee skill for today.
+  Sum up what changed on my open PRs since yesterday, in at most 10 bullets.
 ```
 
 `timezone` defaults to your timezone from the config (`OMNI_TZ` wins, else the system's). Omni watches both folders, so edits apply without a restart. The Mac has to be awake at the scheduled time, unless the automation sets `catchup: true`. Then a missed slot runs once Omni is back.
@@ -71,8 +73,6 @@ catchup_max_age: 6h     # seconds, or 45s, 90m, 6h, 2d
 - `catchup_max_age` caps a catch-up: when the missed slot is older than this, Omni skips it instead of starting a stale run after the Mac wakes. A missed slot within the age still runs once.
 - A skipped run makes no thread and nothing in the Inbox. It shows in the automation's run history as Skipped with its reason (the precheck's exit code and last line of stderr, the timeout, or the missed slot's time) on desktop web, phone web, the desktop app and iOS, and it counts as that slot's run, so a catch-up does not try it again.
 
-`pr-babysitter` skips when you have no open PR on the repo, and `docs-daily` skips when `scripts/docs-daily.sh preflight` finds nothing that needs docs.
-
 ## Choose a machine
 
 In Automations, "Run automations on" picks this machine or another synced machine for every scheduled and event-triggered automation that does not name its own. The choice reaches the other machines through sync.
@@ -83,23 +83,6 @@ The chosen machine needs the channel folders and credentials the automation uses
 
 The Conductor makes the shared choice with `set_automations_machine`, and one automation's with `save_automation` (`fields.machine`), using an id or name from `list_devices`, or `here`.
 
-## Tool-failure triage
-
-`tool-failure-triage` reviews the tool-failure log (`GET /api/tool-failures`) at 08:30 on weekdays in the `omni-os` channel as a builder:
-
-- It reads only occurrences newer than the `Reviewed through <time>` that starts each group's guidance, and skips its own thread.
-- The run investigates a group once it has 3 or more occurrences or spans 2 or more threads, or when one occurrence is plainly an Omni bug. The run reads each failed call's context from its thread's events and never copies arguments or output anywhere.
-- Expected noise (a grep with no match, a probe, a test failing mid-fix) goes into the group's guidance. Its status is left as it was, because one group can mix noise and real causes.
-- The run fixes recurring causes in Omni or in your workspace folder's repo (its skills, rules and CLAUDE.md) in one PR per repo, labelled `tool-failure-triage`. While one is open, later runs push to it. It merges nothing.
-- Groups a PR addresses become `investigating` with `owner/repo#N` in their guidance (guidance drops links). A later run marks them `fixed` once the PR is merged.
-- It never sets `avoid` or `replacement` and never disables a tool. It proposes those in its reply instead.
-
-The log is local to each Mac, and with sync on, scheduled runs fire only on the Mac that owns automations. That is the Mac whose failures get reviewed.
-
-## Docs daily
-
-`docs-daily` runs at 16:00 Europe/Amsterdam every day in the `omni-os` channel as a builder. It uses `scripts/docs-daily.sh` to fetch `ben-askphill/omni-os`, compare `origin/main` to the last processed SHA in `data/docs-daily/last-sha`, and exit when only documentation changed. Otherwise it updates docs in a scratch worktree, opens a `docs/auto-YYYY-MM-DD` PR, squash-merges it once its checks pass (or at once when it has none), leaves it open when a check fails, and records the new SHA. The script aborts before merging if the diff is not docs-only. Its log is `data/logs/docs-daily.log`. Scheduled runs use the Mac that owns automations, and `catchup: true` runs a missed slot once Omni is back.
-
 ## Event automations
 
 Replace `cron` with `on` and the automation runs when something happens instead of on a schedule: a change on a PR, a page a thread published, or a signed GitHub webhook.
@@ -107,10 +90,10 @@ Replace `cron` with `on` and the automation runs when something happens instead 
 ### PR events
 
 ```yaml
-name: Fix failing PR checks
+name: Fix failed checks
 enabled: false
 on: pr_checks_failed    # or { event: pr_checks_failed, repo: owner/name, drafts: true, trust: any }
-channel: omni-os        # without on.repo, the channel's GitHub repo is watched
+channel: acme           # without on.repo, the channel's GitHub repo is watched
 role: builder
 prompt: |
   A PR's checks failed. Fix the cause on its branch, verify, push.
@@ -138,8 +121,8 @@ prompt: |
 ```yaml
 name: Review published pages
 enabled: false
-on: { event: artifact_published, channels: [omni-os] }  # or just `on: artifact_published` for any channel
-channel: omni-os
+on: { event: artifact_published, channels: [acme] }  # or just `on: artifact_published` for any channel
+channel: acme
 role: builder
 prompt: |
   Review the page that was just published and list what to fix.

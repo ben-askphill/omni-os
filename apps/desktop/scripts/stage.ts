@@ -23,8 +23,11 @@ const CACHE_DIR = join(DESKTOP, 'build', 'cache');
 /** The packages apps/server/scripts/bundle.ts leaves out of the bundle (its EXTERNAL). tests/stage.test.ts keeps the two equal. */
 export const EXTERNALS = ['node-pty', '@playwright/mcp'] as const;
 
-/** Copied as they are, beside the bundles. */
-const SHIPPED_DIRS = ['crew', 'automations', 'mods', 'prototypes/activity-monitor'] as const;
+/**
+ * Copied as they are, beside the bundles. No automations: a fresh install starts with none, and the user's own live
+ * in their data dir. tests/stage.test.ts keeps it that way.
+ */
+export const SHIPPED_DIRS = ['crew', 'mods', 'prototypes/activity-monitor'] as const;
 
 export type Arch = 'x64' | 'arm64';
 export interface Target {

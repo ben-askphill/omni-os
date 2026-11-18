@@ -121,7 +121,7 @@ export const SETTING_FIELDS = [
     label: 'Central brain folder',
     input: 'folder',
     page: 'workspace',
-    hint: 'A git repo of notes. The brain-nightly automation exports thread digests into it. Leave it empty to turn that off.',
+    hint: 'A git repo of notes. `npm run brain-export` writes thread digests into it. Leave it empty to turn that off.',
     placeholder: '~/central-brain',
     default: '',
     max: 1024,

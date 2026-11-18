@@ -4,7 +4,7 @@ import { configPath, omniCheckout, resolved } from './user-config.ts';
 import { TEARDOWN_LIMIT_MINUTES } from '@omni/shared/channel-actions.ts';
 
 /**
- * The repo root: data/, crew/, automations/ and mods/ live here, beside apps/ and packages/. The desktop app ships the
+ * The repo root: data/, crew/ and mods/ live here, beside apps/ and packages/. The desktop app ships the
  * server as apps/server/index.mjs in a copy of that layout (apps/desktop/scripts/stage.ts), so the same path holds there.
  */
 export const ROOT = resolve(import.meta.dirname, '../..');
@@ -121,7 +121,10 @@ export const paths = {
   crew: join(ROOT, 'crew'),
   /** The user's own charters: a file here replaces the shared one in crew/ with the same name. Never in git. */
   personalCrew: join(DATA, 'crew'),
-  /** OMNI_AUTOMATIONS_DIR lets tests toggle automations without rewriting the repo's own. */
+  /**
+   * Shared automations. Omni ships none, so a fresh install lists none (apps/server/tests/automations.test.ts and
+   * apps/desktop/tests/stage.test.ts check it). OMNI_AUTOMATIONS_DIR points tests at their own.
+   */
   automations: env.OMNI_AUTOMATIONS_DIR ? resolve(ROOT, env.OMNI_AUTOMATIONS_DIR) : join(ROOT, 'automations'),
   /** The user's own automations, beside the shared ones in automations/. Same id here wins. */
   personalAutomations: join(DATA, 'automations'),

@@ -195,7 +195,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
         ) : (
           <>
             <Field id="auto-name" label="Name">
-              <input id="auto-name" className="field" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Morning coffee" autoFocus={!id} />
+              <input id="auto-name" className="field" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="Daily digest" autoFocus={!id} />
             </Field>
             <SwitchRow label="On" hint={draft.enabled ? 'Runs on its schedule or events.' : 'Paused. Run now still works.'} checked={draft.enabled} onChange={(v) => set('enabled', v)} />
 
@@ -283,7 +283,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
               </Field>
             </div>
             <Field id="auto-prompt" label="Prompt" hint="{{user}}, {{omniRoot}} and the other placeholders are filled in when it runs.">
-              <textarea id="auto-prompt" className="field min-h-[160px] resize-y font-mono !text-[12.5px] leading-relaxed" value={draft.prompt} onChange={(e) => set('prompt', e.target.value)} placeholder="Run the morning-coffee skill for today." spellCheck={false} />
+              <textarea id="auto-prompt" className="field min-h-[160px] resize-y font-mono !text-[12.5px] leading-relaxed" value={draft.prompt} onChange={(e) => set('prompt', e.target.value)} placeholder="Sum up what changed on my open PRs since yesterday." spellCheck={false} />
             </Field>
           </>
         )}

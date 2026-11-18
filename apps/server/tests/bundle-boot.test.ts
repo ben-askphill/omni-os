@@ -16,6 +16,8 @@ const tmp = mkdtempSync(join(realpathSync(tmpdir()), 'omni-bundle-'));
 const app = join(tmp, 'app');
 const data = join(tmp, 'data');
 const children: ChildProcess[] = [];
+/** A user's automation about Omni itself: {{omniRoot}} needs an Omni checkout. */
+const OMNI_DOCS_YAML = 'name: Omni docs\ncron: "0 16 * * *"\nprompt: Run {{omniRoot}}/scripts/docs-daily.sh preflight.\n';
 
 afterAll(() => {
   for (const c of children) if (c.exitCode === null && c.signalCode === null) c.kill('SIGKILL');
@@ -24,7 +26,8 @@ afterAll(() => {
 
 beforeAll(async () => {
   await bundleServer(app);
-  for (const dir of ['crew', 'automations', 'mods']) cpSync(join(REPO, dir), join(app, dir), { recursive: true });
+  // What apps/desktop/scripts/stage.ts ships (its SHIPPED_DIRS, less the Activity Monitor). No automations/.
+  for (const dir of ['crew', 'mods']) cpSync(join(REPO, dir), join(app, dir), { recursive: true });
   cpSync(join(REPO, 'package.json'), join(app, 'package.json'));
   // The packaged app ships only the external packages in node_modules; the repo's own stand in for them. Nothing
   // else may resolve from the bundle, or a module esbuild left out would pass here and fail in the app.
@@ -102,10 +105,17 @@ describe('the bundled server', () => {
     const applied = await fetch(`http://127.0.0.1:${port}/api/update`, { method: 'POST', headers: auth });
     expect(applied.status).toBe(409);
 
+    // A fresh install starts with no automations: the app ships none.
+    const listAutomations = async () => (await (await fetch(`http://127.0.0.1:${port}/api/automations`, { headers: auth })).json()) as { id: string; error?: string }[];
+    expect(await listAutomations()).toEqual([]);
+
     // Automations about Omni itself work in an Omni checkout, and this data dir is in none.
-    const automations = (await (await fetch(`http://127.0.0.1:${port}/api/automations`, { headers: auth })).json()) as { id: string; error?: string }[];
-    expect(automations.find((a) => a.id === 'docs-daily')?.error).toMatch(/needs an Omni checkout/);
-    expect(automations.find((a) => a.id === 'morning-coffee')?.error).toBeUndefined();
+    mkdirSync(join(data, 'automations'), { recursive: true });
+    writeFileSync(join(data, 'automations', 'omni-docs.yaml'), OMNI_DOCS_YAML);
+    writeFileSync(join(data, 'automations', 'digest.yaml'), 'name: Digest\ncron: "0 8 * * 1-5"\nprompt: Sum up yesterday.\n');
+    const automations = await listAutomations();
+    expect(automations.find((a) => a.id === 'omni-docs')?.error).toMatch(/needs an Omni checkout/);
+    expect(automations.find((a) => a.id === 'digest')?.error).toBeUndefined();
 
     // Onboarding knows it is the desktop app: no `npm run setup`, and the welcome names the data folder's crew.
     const setup = (await (await fetch(`http://127.0.0.1:${port}/api/setup`, { headers: auth })).json()) as { install: string };
@@ -125,6 +135,8 @@ describe('the bundled server', () => {
     writeFileSync(join(checkout, '.env'), 'OMNI_KEEPALIVE_SECONDS=5\nOMNI_MAX_CONCURRENT=3\n');
     mkdirSync(adopted);
     writeFileSync(join(adopted, '.env'), 'OMNI_KEEPALIVE_SECONDS=7\n');
+    mkdirSync(join(adopted, 'automations'));
+    writeFileSync(join(adopted, 'automations', 'omni-docs.yaml'), OMNI_DOCS_YAML);
     const { port, token } = await boot(adopted);
     const res = await fetch(`http://127.0.0.1:${port}/api/setup/server`, { headers: { authorization: `Bearer ${token}` } });
     const { options: rows } = (await res.json()) as { options: { env: string; value: string; source: string }[] };
@@ -133,7 +145,7 @@ describe('the bundled server', () => {
 
     // The adopted checkout is where automations about Omni itself work.
     const list = await fetch(`http://127.0.0.1:${port}/api/automations`, { headers: { authorization: `Bearer ${token}` } });
-    const docs = ((await list.json()) as { id: string; error?: string; prompt: string }[]).find((a) => a.id === 'docs-daily');
+    const docs = ((await list.json()) as { id: string; error?: string; prompt: string }[]).find((a) => a.id === 'omni-docs');
     expect(docs?.error).toBeUndefined();
     expect(docs?.prompt).toContain(`${checkout}/scripts/docs-daily.sh`);
   }, 60_000);

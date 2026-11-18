@@ -50,7 +50,7 @@ export function AutomationsScreen() {
       remote={remote}
       what="automations"
       emptyTitle="No automations"
-      emptyHint="Add a YAML file to automations/ on the server and it shows up here."
+      emptyHint="Make one on the Automations page in Omni, or add a YAML file to data/automations/ on the server."
     >
       <GroupedList>
         {rows.map((row, i) => (

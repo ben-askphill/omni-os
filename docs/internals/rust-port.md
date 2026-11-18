@@ -28,7 +28,7 @@ Lines are source lines, then test lines, counted on `main` at a336f918 (2026-11-
 | `packages/test-fixtures` | TypeScript, JSON | fixtures | Fake CLIs, corpora and the wire fixtures the tests share |
 | `packages/typescript-config` | JSON | config | The shared `tsconfig` |
 | `scripts/` | Shell, JavaScript | 1,577 | QA stacks, desktop build, screenshots, daily docs |
-| `crew/`, `automations/`, `mods/` | Markdown, YAML, TypeScript | 748 | Role charters, automation definitions, one Claude Code mod |
+| `crew/`, `mods/` | Markdown, TypeScript | 526 | Role charters, one Claude Code mod |
 | `design-system/`, `prototypes/`, `docs/` | HTML, JSX, Markdown | not code that ships | The design system mirror, experiments and these docs |
 
 ### Inside `apps/server`
@@ -165,7 +165,7 @@ Per slice:
 | `packages/client-core` | kept | Used by the iOS app, its only client now that the CLI is Rust |
 | `apps/relay` | kept | A Cloudflare Worker each user deploys. JavaScript is the platform's first language for Durable Object SQLite, and the Worker has no start cost to win back |
 | `packages/test-fixtures`, `packages/typescript-config` | kept | Test data and config. `native/` holds the records the Rust tests replay |
-| `scripts/`, `crew/`, `automations/`, `mods/`, `design-system/`, `prototypes/` | kept | Shell, Markdown, YAML and HTML. Nothing to port |
+| `scripts/`, `crew/`, `mods/`, `design-system/`, `prototypes/` | kept | Shell, Markdown and HTML. Nothing to port |
 
 ## How parity is checked
 

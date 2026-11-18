@@ -22,10 +22,7 @@
     "mcpClients": "",
     "syncSignatures": "actions"
   },
-  "automations": {
-    "weekly-review": { "enabled": true },
-    "pr-babysitter": { "enabled": true, "channel": "omni-os" }
-  },
+  "automations": {},
   "worktrees": {
     "retention": { "enabled": false, "idleDays": 14 }
   }
