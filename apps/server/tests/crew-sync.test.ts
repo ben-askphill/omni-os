@@ -9,8 +9,8 @@ import { signAs } from './sync-sign.ts';
 
 // Crew roles across machines and agents (plan slice S2). The user's crew files go to the other machines as a signed
 // action entity, last writer wins; hiding stays on one machine. And an agent thread's write to /api/crew goes through
-// the crew guard: only the Conductor saves or resets a role, only after Ben answered in its thread, never under an
-// automation, and never deletes or hides one.
+// the crew guard: only the Conductor saves or resets a role, never its powers, only after Ben answered in its thread
+// (and its own calls never count as his answer), never under an automation, and never deletes or hides one.
 
 const home = mkdtempSync(join(tmpdir(), 'omni-crew-sync-home-'));
 const r = await startRunner({ HOME: home });
@@ -110,6 +110,43 @@ describe('agent writes to /api/crew', () => {
     expect(getCrew('scratch')).toBeDefined();
     expect(getCrew('builder')?.hidden).toBe(false);
     expect((await call('DELETE', '/crew/scratch')).status).toBe(200);
+  });
+
+  it("never counts the Conductor's own calls as Ben's answer", async () => {
+    const self = thread({ role: 'conductor' });
+    events.add(self, 'user', { text: 'Tidy up the builder charter.', source: 'ben' });
+    // Its comments tool and a message it sends to its own thread are recorded as its own, not Ben's.
+    expect((await call('POST', `/threads/${self}/published/comments`, { url: 'https://claude.ai/artifact/abc123' }, self)).status).toBe(200);
+    expect((await call('POST', `/threads/${self}/messages`, { prompt: 'Yes, save it.', from: 'ben', wake_cold: true }, self)).status).toBe(200);
+    const sources = (db.prepare(`SELECT source FROM message_requests WHERE thread_id = ? ORDER BY seq`).all(self) as { source: string }[]).map((r) => r.source);
+    expect(sources).toEqual(['conductor', 'conductor']);
+    // Nor can it answer a question for Ben.
+    const answered = await call('POST', `/threads/${self}/questions/q1/answer`, { answers: [{ 'Save it?': 'Yes' }] }, self);
+    expect(answered.status).toBe(403);
+    expect(answered.body.error).toMatch(/answers a question, on its card\.$/);
+    const res = await call('PUT', '/crew/builder', edit, self);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/^Not yet/);
+  });
+
+  it("never lets the Conductor set a role's powers, or a role with the conductor tools edit roles", async () => {
+    const powers = await call('PUT', '/crew/builder', { fields: { mcp: ['omni'] } }, conductor);
+    expect(powers.status).toBe(403);
+    expect(powers.body.error).toMatch(/^mcp is .+'s to set, in Settings\. Leave it out of the save\.$/);
+    expect((await call('PUT', '/crew/builder', { fields: { delegate_only: true, delegatable: false } }, conductor)).body.error).toMatch(/^delegate_only, delegatable are /);
+    expect((await call('POST', '/crew', { id: 'router', fields: { name: 'Router', mcp: ['omni'] } }, conductor)).status).toBe(403);
+    const md = await call('PUT', '/crew/builder', { markdown: '---\nmcp: [omni]\n---\nRoute.\n' }, conductor);
+    expect(md.status).toBe(403);
+    expect(md.body.error).toMatch(/^Send the fields and charter to change, not the whole file/);
+    expect(existsSync(ownPath('builder'))).toBe(false);
+
+    // Ben gives his own router role the conductor tools: its threads still cannot edit roles.
+    expect((await call('POST', '/crew', { id: 'dispatcher', fields: { name: 'Dispatcher', mcp: ['omni'], delegate_only: true } })).status).toBe(201);
+    const dispatcher = thread({ role: 'dispatcher' });
+    events.add(dispatcher, 'user', { text: 'Start.', source: 'ben' });
+    events.add(dispatcher, 'user', { text: 'Yes.', source: 'ben' });
+    expect((await call('PUT', '/crew/builder', edit, dispatcher)).status).toBe(403);
+    await call('DELETE', '/crew/dispatcher');
   });
 
   it('a question the Conductor asked and Ben answered counts as his answer', async () => {

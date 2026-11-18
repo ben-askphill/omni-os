@@ -1,13 +1,13 @@
 // /api/crew: the crew roles, and their edits from the clients (crew-store.ts).
 // An agent thread names itself on every call (CALLER_HEADER), and a role is a prompt every later thread of it runs
-// with, so an agent's write goes through the crew guard (crew-guard.ts): only the Conductor saves or resets a role, and
-// only after Ben agreed in its thread. Ben's own clients name no thread.
+// with, so an agent's write goes through the crew guard (crew-guard.ts): only the Conductor saves or resets a role,
+// never its powers, and only after Ben answered in its thread. Ben's own clients name no thread.
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { CALLER_HEADER } from './automation-guard.ts';
 import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { listCrew } from './crew.ts';
-import { crewDetail, crewRunProblem, crewSave, deleteCrew, resetCrew, saveCrew, setCrewHidden, type CrewSaveContext } from './crew-store.ts';
+import { crewDetail, crewRunProblem, crewSave, deleteCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
 import { channels } from './db.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 
@@ -62,17 +62,17 @@ crewApi.post('/crew/:id/hidden', async (c) => {
 });
 
 /** A 403 for an agent thread's write the crew guard refuses. Ben's own clients name no thread. */
-function guard(c: Context, write: CrewWrite) {
-  const refusal = crewRefusal(c.req.header(CALLER_HEADER), write);
+function guard(c: Context, write: CrewWrite, save?: CrewSave) {
+  const refusal = crewRefusal(c.req.header(CALLER_HEADER), write, save);
   return refusal ? c.json({ error: refusal }, 403) : null;
 }
 
-function write(c: Context, save: (body: z.infer<typeof crewSave>) => unknown, body: unknown, ok: 200 | 201 = 200) {
+function write(c: Context, save: (body: CrewSave) => unknown, body: unknown, ok: 200 | 201 = 200) {
   const refused = guard(c, 'save');
   if (refused) return refused;
   const parsed = crewSave.safeParse(body);
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid crew role' }, 400);
-  return run(c, () => save(parsed.data), ok);
+  return guard(c, 'save', parsed.data) ?? run(c, () => save(parsed.data), ok);
 }
 
 /** A refused write's message and status (crew-store.ts sets one), else a 500. */
