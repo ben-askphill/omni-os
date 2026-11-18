@@ -1,7 +1,7 @@
 // createThread, sendMessage, and postMessage. Slash commands are resolved here, then delivered.
 import { randomUUID } from 'node:crypto';
 import type { MessageContext } from '@omni/shared/message-context.ts';
-import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
+import { channels, folders, messageRequests, outbox, reportFollowUps, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
 import { crewForNewThread, listCrew, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { checkBase } from '../worktree-base.ts';
@@ -101,6 +101,11 @@ export interface CreateThreadInput {
    * thread's (harness/review.ts), and one on the same family is refused.
    */
   review_of?: string | null;
+  /**
+   * A delegation whose report wakes a delegate-only parent, because it will act on it. Without it, the report shows in
+   * that parent's transcript and starts no turn there (runner/queue.ts showsInPlace).
+   */
+  follow_up?: boolean;
   /** The base a new worktree thread's branch is cut from (worktree-base.ts). None, or a thread with no worktree: the repo's HEAD. */
   base?: BasePick | null;
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
@@ -209,6 +214,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     setup: !elsewhere && needsWorktree(channel, { remote }) ? 'preparing' : null,
   });
   if (base) threadBasePicks.set(id, base);
+  if (input.follow_up && input.parent_id) reportFollowUps.set(id);
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }
 

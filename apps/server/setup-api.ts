@@ -148,7 +148,7 @@ export function welcomeText(name: string, place: CrewPlace = crewPlace()) {
       ? `- Crew charters (the roles I hand work to) ship with the app. To change one just for you, save a copy with the same name, like \`builder.md\`, in \`${place.personalCrew}/\`. Settings > About shows where Omni keeps its files.`
       : `- Crew charters live in \`${place.crew}/\`. To change one just for you, copy it into \`${place.personalCrew}/\` and edit that copy.`;
   return [
-    `Welcome to Omni${name ? `, ${name}` : ''}. I'm the Conductor: tell me what you need and I hand it to the right crew role in the right channel, then report back here.`,
+    `Welcome to Omni${name ? `, ${name}` : ''}. I'm the Conductor: ask me anything. I answer quick questions here myself, and hand real work to the right crew role in the right channel, whose report then shows up here.`,
     '',
     'A few things to try:',
     '- Ask in plain words and say what done looks like, like "research how other stores do size guides and send me a table of 5 stores with links" or "fix the failing test in my repo channel and open a PR". If I can\'t tell what done looks like, I\'ll ask you a few questions first.',

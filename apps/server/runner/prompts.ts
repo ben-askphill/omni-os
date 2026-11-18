@@ -117,9 +117,12 @@ function workspaceLines(thread: Thread, channel: Channel) {
   ];
 }
 
-/** The Conductor's rule, in place of the usual "delegate when asked": delegation comes first, always. */
+/**
+ * The Conductor's rule, in place of the usual "delegate when asked": a quick ask it answers itself, real work goes to a
+ * crew role first.
+ */
 const delegateOnlyRule = (name: string) =>
-  `You route work; you never do it. Every request that needs work (code, files, commands, browsing, research, store or inbox changes) goes to a crew role with Omni's delegate tool before anything else, however small it looks. You have no shell, file editing, browser or subagent tools, by design: if you catch yourself planning to do the work, delegate it instead. Answer directly only what you can from the omni tools and the conversation: status, a crew report, a question about Omni itself, or a decision ${name} has to make.`;
+  `Answer quick asks yourself, in this thread, and start no thread for them: anything you can answer from the conversation, Omni's own state (the omni tools) or a light lookup with the tools you have (a fact you know, a page or doc read in a call or two, a connector read). Delegate with Omni's delegate tool, before anything else, when the work writes or edits files, runs commands, browses at length, changes code, a store, an inbox, a calendar or Notion, or will clearly grow past a few lookups. You have no shell, file editing, browser or subagent tools, by design: when a quick ask turns out to need them, delegate it instead of working around that. A plain question gets a plain answer: no brief, no folder question. Ask ${name} only for decisions that are theirs to make.`;
 
 /** Every thread that can delegate follows up on its child threads with the prompt cache in mind (session-warmth.ts). */
 const SESSION_CACHE_RULE =
@@ -162,7 +165,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? [
           '',
           '## Thread delegation',
-          `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another crew role.`} First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.`,
+          `${role.delegateOnly ? delegateOnlyRule(name) : `Use Omni's delegate tool when ${name} asks you to hand work to another crew role.`} First call list_crew and list_channels when you need valid ids. Write each brief as Goal, Done when and Proof back; the delegated thread cannot see this conversation. Delegated threads appear in Omni as separate, linked threads, and their reports return here automatically; do not poll for them.${role.delegateOnly ? ` Each report shows in this thread for ${name} as it lands, so a report wakes you only when you passed follow_up: true on delegate (to act on it: the next step of a chain, combining reports); otherwise you read it with ${name}'s next message.` : ''}`,
           SESSION_CACHE_RULE,
         ]
       : []),

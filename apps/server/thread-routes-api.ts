@@ -84,6 +84,8 @@ const createSchema = z.object({
   task_id: z.string().nullish(),
   /** A review: the thread whose work it reviews. The run goes to the other model family (harness/review.ts). */
   review_of: z.string().max(100).nullish(),
+  /** A delegation whose report wakes its delegate-only parent, which will act on it (runner/queue.ts showsInPlace). */
+  follow_up: z.boolean().optional(),
   source: z.enum(['manual', 'conductor', 'capture']).default('manual'),
   /** A sidebar folder of the channel, by id or name. A name no folder has makes one. */
   folder: z.string().max(200).nullish(),
