@@ -283,7 +283,7 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
               </Button>
             )}
             {builtIn && (
-              <Button type="button" size="sm" variant="ghost" onClick={() => void act(() => api.post(path('/hidden'), { hidden: !role.hidden }), false)} disabled={busy} title={role.hidden ? 'New threads can start as it again' : 'No new thread starts as it on this machine'}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => void act(async () => detail.setData(await api.post<CrewDetail>(path('/hidden'), { hidden: !role.hidden })), false)} disabled={busy} title={role.hidden ? 'New threads can start as it again' : 'No new thread starts as it on this machine'}>
                 {role.hidden ? 'Show' : 'Hide'}
               </Button>
             )}

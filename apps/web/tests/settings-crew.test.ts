@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Channel, CrewRole } from '../src/api.ts';
 
 // Settings > Crew's editor: the Form and Markdown tabs are one draft, so an edit in either survives a switch to the
-// other and a save from it, and a key only the file has stays.
+// other and a save from it, and a key only the file has stays. Hide shows the role hidden at once.
 
 const state = vi.hoisted(() => ({ channels: [] as Channel[], crew: [] as CrewRole[] }));
 vi.mock('../src/store.tsx', async (importOriginal) => ({
@@ -130,4 +130,12 @@ it('reads a Markdown edit into the form, and a Form save keeps it and the keys t
   expect(saved).toContain('runtime: vps-agent');
   expect(saved).toContain('description: From the file.');
   expect(saved).toContain('Use pnpm. Run the tests.');
+});
+
+it('shows the role hidden once Hide is done, offering Show', async () => {
+  await click(button('Hide'));
+  expect(calls.some((c) => c.url === '/api/crew/builder/hidden' && c.body.hidden === true)).toBe(true);
+  expect(button('Hide')).toBeUndefined();
+  expect(button('Show')).toBeDefined();
+  expect(host.querySelector('[role="dialog"]')?.textContent).toContain('Hidden');
 });
