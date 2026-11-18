@@ -1,8 +1,10 @@
 import type { ComponentProps } from 'react';
 import type { Channel, ModStatus, Thread } from '../../api.ts';
+import { headerShowsRole } from '@omni/shared/crew-role.ts';
 import { ChannelStack } from '../ChannelStack.tsx';
 import { ContinueCrumbs } from '../ContinueLinks.tsx';
-import { Avatar, Icon } from '../ui.tsx';
+import { CrewMark, isCrewRole } from '../brand.tsx';
+import { Avatar, Chip, Icon } from '../ui.tsx';
 import { href } from '../../router.ts';
 import { HeaderActions } from './HeaderActions.tsx';
 
@@ -21,9 +23,20 @@ function ModStatusLines({ lines }: { lines: ModStatus[] }) {
   );
 }
 
+/** The crew role the thread runs as, beside the crumbs: its mark when it has one, and its name. */
+function RoleChip({ role, name }: { role: string; name: string }) {
+  return (
+    <Chip className="ml-1 gap-1 font-normal" title={`Runs as ${name}`}>
+      {isCrewRole(role) && <CrewMark role={role} size={12} className="text-fg-3" />}
+      <span data-role={role}>{name}</span>
+    </Chip>
+  );
+}
+
 /**
- * The thread page's header: the channel and parent crumbs, the title, mod status lines, the channels its delegated
- * threads work in and the header actions. `delegated`: those threads, finished ones and team members included.
+ * The thread page's header: the channel and parent crumbs, the crew role it runs as, the title, mod status lines, the
+ * channels its delegated threads work in and the header actions. `delegated`: those threads, finished ones and team
+ * members included.
  */
 export function ThreadHeader({
   thread,
@@ -33,6 +46,7 @@ export function ThreadHeader({
   modLines,
   delegated,
   actions,
+  roleName = null,
 }: {
   thread: Thread;
   channel: Channel | null | undefined;
@@ -41,6 +55,8 @@ export function ThreadHeader({
   modLines: ModStatus[];
   delegated: readonly Thread[];
   actions: ComponentProps<typeof HeaderActions>;
+  /** The display name of its crew role (crewRoleName), shown when headerShowsRole says so. */
+  roleName?: string | null;
 }) {
   return (
     <div className="@container flex shrink-0 items-center gap-3 px-3 pt-3 pb-2 md:px-6 md:pt-4">
@@ -60,6 +76,7 @@ export function ThreadHeader({
               </a>
             </>
           )}
+          {roleName && headerShowsRole(thread) && <RoleChip role={thread.role!} name={roleName} />}
           {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-3">{thread.task_id}</span>}
           <ContinueCrumbs links={links} />
         </div>

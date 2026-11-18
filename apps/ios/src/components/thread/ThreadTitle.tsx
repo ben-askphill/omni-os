@@ -14,6 +14,8 @@ interface ThreadTitleProps {
   status: ThreadStatus | undefined;
   statusLabel: string;
   channel: string | null;
+  /** The display name of the crew role the thread runs as (crewRoleName), null on a thread not started as one. */
+  role?: string | null;
   device: string | null;
   /** Opens the Runs on page. Without it the machine name is plain text: there is nothing to pick. */
   onOpenMachine?: () => void;
@@ -21,9 +23,9 @@ interface ThreadTitleProps {
 
 /**
  * The open thread's navigation bar title, left-aligned: the title on one line, and under it the status dot and word,
- * the channel and the machine the thread runs on. They replace the status and chips rows under the bar.
+ * the channel, the crew role it runs as and the machine the thread runs on. They replace the status and chips rows under the bar.
  */
-export function ThreadTitle({ title, status, statusLabel, channel, device, onOpenMachine }: ThreadTitleProps) {
+export function ThreadTitle({ title, status, statusLabel, channel, role = null, device, onOpenMachine }: ThreadTitleProps) {
   const { colors } = useOmniTheme();
   const { width } = useWindowDimensions();
   const live = status === 'running';
@@ -50,7 +52,13 @@ export function ThreadTitle({ title, status, statusLabel, channel, device, onOpe
             #{channel}
           </Text>
         ) : null}
-        {(statusLabel || channel) && device ? sep : null}
+        {(statusLabel || channel) && role ? sep : null}
+        {role ? (
+          <Text numberOfLines={1} accessibilityLabel={`Runs as ${role}`} style={[styles.sub, styles.role, { color: colors.fg3 }]}>
+            {role}
+          </Text>
+        ) : null}
+        {(statusLabel || channel || role) && device ? sep : null}
         {device ? (
           <Pressable
             accessibilityRole="button"
@@ -94,6 +102,9 @@ const styles = StyleSheet.create({
     fontWeight: weight.regular,
   },
   channel: {
+    flexShrink: 1,
+  },
+  role: {
     flexShrink: 1,
   },
   device: {
