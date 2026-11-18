@@ -12,6 +12,7 @@ import { parseTrigger, type EventTrigger } from './automation-events.ts';
 import { fillPlaceholders, NEEDS_CHECKOUT, omniCheckout, updateUserConfig, userConfig } from './user-config.ts';
 import { parsePrecheck, runPrecheck, type Precheck } from './automation-precheck.ts';
 import { commandsFolder } from './sandbox.ts';
+import { DRY_RUN_TITLE, withRunRules } from './automation-rules.ts';
 
 export interface Automation {
   id: string;
@@ -36,6 +37,12 @@ export interface Automation {
   precheck?: Precheck;
   /** The synced machine that runs it, by name or sync id. Unset, the one picked in "Run automations on" (sync/owner.ts). */
   machine?: string;
+  /** Post nothing when there is nothing to report: such a run ends marked done, with no alert (automation-rules.ts). */
+  quiet?: boolean;
+  /** Act outside Omni only after the user approves a draft on the run's question card (automation-rules.ts). */
+  approve?: boolean;
+  /** `expires`, in seconds: a draft waiting for approval this long is answered as expired (automation-drafts.ts). */
+  expiresAfter?: number;
   file: string;
   error?: string;
   next?: string | null;
@@ -65,6 +72,8 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     file,
     catchup: y.catchup === true,
     ...(typeof y.machine === 'string' && y.machine.trim() && { machine: y.machine.trim() }),
+    ...(y.quiet === true && { quiet: true }),
+    ...(y.approve === true && { approve: true }),
   };
   let rawPrecheck = '';
   if (!yamlError && y.on !== undefined) {
@@ -76,6 +85,12 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     const p = parsePrecheck(y.precheck);
     if (typeof p === 'string') a.error = p;
     else (rawPrecheck = p.command), (a.precheck = { ...p, command: fillPlaceholders(p.command) });
+  }
+  if (!yamlError && !a.error && y.expires !== undefined) {
+    const age = parseAge(y.expires);
+    if (age === null || age <= 0) a.error = 'expires must be seconds or a duration like 90m, 6h or 2d';
+    else if (!a.approve) a.error = 'expires needs approve: true, since only a draft waiting for approval expires';
+    else a.expiresAfter = age;
   }
   if (!yamlError && !a.error && y.catchup_max_age !== undefined) {
     const age = parseAge(y.catchup_max_age);
@@ -140,10 +155,17 @@ const jobs = new Map<string, Cron>();
 
 /**
  * `event` runs pass their own prompt (the automation's plus what happened) and title, and a delivery its thread's id
- * (automation-triggers.ts), fixed in advance so a restart never makes the thread twice.
+ * (automation-triggers.ts), fixed in advance so a restart never makes the thread twice. A dry run (`dry`, only from Run
+ * now) says what it would do and does none of it.
  */
-export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 'catchup' | 'event', event?: { prompt: string; title: string; id?: string }) {
+export async function runAutomation(
+  a: Automation,
+  trigger: 'cron' | 'manual' | 'catchup' | 'event',
+  event?: { prompt: string; title: string; id?: string },
+  opts: { dry?: boolean } = {},
+) {
   const date = new Date().toLocaleDateString('en-GB', { timeZone: a.timezone, day: 'numeric', month: 'short' });
+  const title = event?.title ?? `${a.name} · ${date}`;
   const thread = await createThread({
     id: event?.id,
     channel: a.channel,
@@ -151,8 +173,8 @@ export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 
     harness: a.harness,
     model: a.model,
     effort: a.effort,
-    prompt: event?.prompt ?? a.prompt,
-    title: event?.title ?? `${a.name} · ${date}`,
+    prompt: withRunRules(a, event?.prompt ?? a.prompt, !!opts.dry),
+    title: opts.dry ? `${DRY_RUN_TITLE} · ${title}` : title,
     source: 'automation',
     automation: a.id,
   });

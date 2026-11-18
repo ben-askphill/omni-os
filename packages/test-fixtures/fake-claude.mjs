@@ -50,6 +50,8 @@
 //                     its tool_result once it returns), and wait as long as MCP_TOOL_TIMEOUT allows (else the SDK's 60s).
 //                     Interruptible like TOOL. Messages sent meanwhile join after its result; the answer quotes the result
 //   ASK_ONE           ASK with only the first of those questions
+//   SAY:<text>        answer with exactly <text> (the rest of that line) instead of "ack: ...", as a quiet automation
+//                     run that has nothing to report does
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen,
@@ -86,7 +88,7 @@
 // list again, their prompts included, as system/commands_changed.
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const VERSION = '2.1.278';
@@ -209,6 +211,26 @@ if (process.argv[2] === 'auth' && process.argv[3] === 'status') {
     : JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', email: 'dev@example.com', orgName: 'Example Org', subscriptionType: 'max' }, null, 2);
   process.stdout.write(status + '\n');
   process.exit(JSON.parse(status).loggedIn ? 0 : 1);
+}
+
+// `claude auth login`, as the real CLI runs without a terminal: it prints the page to open, waits for the code that page
+// shows on stdin, and signs in. The code `bad` fails the way a wrong code does. Signing in writes FAKE_CLAUDE_AUTH (only
+// when it is set, so a QA stack never writes the real home folder) as signed in, so `auth status` reads it next.
+if (process.argv[2] === 'auth' && process.argv[3] === 'login') {
+  process.stdout.write('Opening browser to sign in\u2026\nIf the browser didn\'t open, visit: https://claude.com/cai/oauth/authorize?code=true&client_id=fake&response_type=code&state=fake\nPaste code here if prompted > ');
+  let code = '';
+  process.stdin.on('data', (b) => {
+    code += b;
+    if (!code.includes('\n')) return;
+    if (code.trim() === 'bad') {
+      process.stdout.write("Login failed: That code wasn't accepted. It may be incomplete, expired, already used, or from an earlier sign-in attempt.\n");
+      process.exit(1);
+    }
+    if (process.env.FAKE_CLAUDE_AUTH) writeFileSync(process.env.FAKE_CLAUDE_AUTH, JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', email: 'new@example.com', subscriptionType: 'pro' }));
+    process.stdout.write('Login successful.\n');
+    process.exit(0);
+  });
+  await new Promise(() => {});
 }
 
 const { opts, unknown, positional } = parseArgs(process.argv.slice(2));
@@ -670,7 +692,8 @@ async function runTurn() {
     }
     if (think && !(await pause(t, think))) break;
     steps++;
-    finalText = `ack: ${[...seen, ...answers].join(' | ')}`;
+    const said = /\bSAY:([^\n]+)/.exec(seen.join('\n'))?.[1]?.trim();
+    finalText = said || `ack: ${[...seen, ...answers].join(' | ')}`;
     assistant(`msg_fake_${++seq}`, [{ type: 'text', text: finalText }]);
     if (goal && goalMisses > 0) {
       // The goal hook blocks the stop: its reason goes in as a synthetic message and the model goes on.

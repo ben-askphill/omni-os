@@ -4,6 +4,7 @@
 // scheduling and persistence bound here. app.ts and the test boot import this before the runner is used; a port
 // used before that throws naming this file. The ownership lines this keeps are checked by
 // tests/import-boundaries.test.ts and drawn in docs/internals/execution-state.md.
+import { fileQuietRun } from './automation-quiet.ts';
 import { publishFeed, publishThread } from './bus.ts';
 import { assignments, events, threads } from './db.ts';
 import { sendNewThread } from './handoff.ts';
@@ -15,7 +16,7 @@ bindRunner({
   ports: {
     routing: { targetFor, forwardMessage, forwardReport },
     handoff: { sendNewThread },
-    reporting: { toolResult: onToolResult },
+    reporting: { toolResult: onToolResult, quietRun: fileQuietRun },
   },
   deps: {
     reporting: {

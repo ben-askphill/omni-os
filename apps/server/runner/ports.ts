@@ -33,6 +33,11 @@ export interface RunnerPorts {
   /** What the rest of Omni does with a tool result once it is in the transcript (published.ts, then the automations). */
   reporting: {
     toolResult(threadId: string, r: { tool_use_id: string; text: string; is_error: boolean }): void;
+    /**
+     * A finished turn's last reply, before its alert (automation-quiet.ts): true when it was a quiet automation run with
+     * nothing to report, which it then filed as done, so the runner sends no alert.
+     */
+    quietRun(threadId: string, reply: string | null): boolean;
   };
 }
 
@@ -62,7 +67,7 @@ const unbound = (what: string) => () => {
 const ports: RunnerPorts = {
   routing: { targetFor: unbound('routing.targetFor'), forwardMessage: unbound('routing.forwardMessage'), forwardReport: unbound('routing.forwardReport') },
   handoff: { sendNewThread: unbound('handoff.sendNewThread') },
-  reporting: { toolResult: unbound('reporting.toolResult') },
+  reporting: { toolResult: unbound('reporting.toolResult'), quietRun: unbound('reporting.quietRun') },
 };
 
 let deps: ControllerDeps | null = null;

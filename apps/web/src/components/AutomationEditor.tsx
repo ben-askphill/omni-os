@@ -263,6 +263,20 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
             <Field id="auto-prompt" label="Prompt" hint="{{user}}, {{omniRoot}} and the other placeholders are filled in when it runs.">
               <textarea id="auto-prompt" className="field min-h-[160px] resize-y font-mono !text-[12.5px] leading-relaxed" value={draft.prompt} onChange={(e) => set('prompt', e.target.value)} placeholder="Sum up what changed on my open PRs since yesterday." spellCheck={false} />
             </Field>
+            <div className="space-y-3 rounded-[18px] p-4 shadow-[inset_0_0_0_1px_var(--line)]" data-run-rules>
+              <SwitchRow label="Quiet when empty" hint="A run with nothing to report posts nothing and files itself as done, with no alert." checked={draft.quiet} onChange={(v) => set('quiet', v)} />
+              <SwitchRow
+                label="Ask before acting"
+                hint="It drafts what it would send or change and asks on a card, Approve or Skip. Nothing leaves Omni until you approve."
+                checked={draft.approve}
+                onChange={(v) => set('approve', v)}
+              />
+              {draft.approve && (
+                <Field id="auto-expires" label="Draft expires after" hint="Like 8h or 2d. An unanswered draft is then skipped. Empty: it waits for you.">
+                  <input id="auto-expires" className="field font-mono !text-[13px]" value={draft.expires} onChange={(e) => set('expires', e.target.value)} placeholder="8h" spellCheck={false} />
+                </Field>
+              )}
+            </div>
           </>
         )}
         {(error || harnesses.error) && (

@@ -16,6 +16,7 @@ import { toolTails } from '../tool-tail.ts';
 import { endTasks } from './records.ts';
 import { stopPreparation } from './setup-action.ts';
 import { applyQueued } from './switch.ts';
+import { runnerPorts } from './ports.ts';
 import {
   addEvent,
   browserHolder,
@@ -138,7 +139,10 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
     has_run: 1,
     last_text: runText ? runText.slice(0, 600) : threads.get(id)?.last_text ?? null,
   });
-  if (!more) notifyEnded(id, status, events.lastRunReply(id, turnFrom));
+  if (!more) {
+    const reply = events.lastRunReply(id, turnFrom);
+    if (!(status === 'done' && runnerPorts().reporting.quietRun(id, reply))) notifyEnded(id, status, reply);
+  }
   applyQueued(id);
   // Shown done at once; the checkout after the turn is saved behind it.
   finishTurnSnapshot(live);

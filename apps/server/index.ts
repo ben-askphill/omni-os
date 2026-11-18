@@ -36,6 +36,7 @@ const { watchAutomationFailures } = await import('./automation-pause.ts');
 const { startClaudeArtifacts } = await import('./claude-artifacts.ts');
 const { startEventWatch } = await import('./automation-watch.ts');
 const { startTriggerDeliveries } = await import('./automation-triggers.ts');
+const { startDraftExpiry } = await import('./automation-drafts.ts');
 const { watchDelegating } = await import('./delegating.ts');
 const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
@@ -89,6 +90,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startClaudeArtifacts();
   startEventWatch();
   startTriggerDeliveries();
+  startDraftExpiry();
   // A parent shows running while a thread it delegated works: sent again on the feed when that changes.
   watchDelegating();
   startPRWatch();

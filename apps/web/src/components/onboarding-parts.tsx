@@ -3,17 +3,19 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { DesktopBridge } from '@omni/shared/desktop-bridge.ts';
 import { githubLine, type GhLoginStart, type GithubCheck } from '@omni/shared/github-check.ts';
+import { claudeAccountLine, claudeCheck, type ClaudeLoginStart, type ClaudeSetup, type ClaudeStep } from '@omni/shared/claude-setup.ts';
 import { accountsByHarness, machineAccounts, type AccountsView, type HarnessAccountView } from '@omni/shared/harness-accounts.ts';
 import { HARNESS_CHECK_LABEL, harnessAccountLine, harnessCheck, type HarnessCheck } from '@omni/shared/harness-check.ts';
 import { ONBOARDING_TOOLS, otherTools, toolLine, toolList, withOtherTools } from '@omni/shared/onboarding.ts';
+import { STARTER_AUTOMATIONS } from '@omni/shared/starter-automations.ts';
 import { api, errorText, type HarnessWithRunning } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { desktop } from '../desktop.ts';
 import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
-import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, Icon, Label, StatusDot, Toggle } from './ui.tsx';
+import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, Icon, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
-export const STEPS = ['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Done'] as const;
+export const STEPS = ['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Routines', 'Done'] as const;
 
 /** The answers the Work step asks for: a line about the user's work, and the tools line (packages/shared/onboarding.ts). */
 export function WorkScreen({ work, tools, onWork, onTools }: { work: string; tools: string; onWork: (v: string) => void; onTools: (v: string) => void }) {
@@ -125,10 +127,12 @@ export interface HarnessRows {
   accounts: Record<string, HarnessAccountView>;
   /** Null when this server has no /api/setup/github (an older one) or the check failed. */
   github: GithubCheck | null;
+  /** Claude Code as its own CLI says (GET /api/setup/claude). Null on an older server. */
+  claude: ClaudeSetup | null;
 }
 
 async function loadRows(): Promise<HarnessRows> {
-  const [harnesses, accounts, github] = await Promise.all([
+  const [harnesses, accounts, github, claude] = await Promise.all([
     api.get<HarnessWithRunning[]>('/harnesses'),
     api
       .get<AccountsView>('/accounts')
@@ -139,9 +143,10 @@ async function loadRows(): Promise<HarnessRows> {
       .get<GithubCheck>('/setup/github')
       .then((g) => (g && g.state in HARNESS_CHECK_LABEL ? g : null))
       .catch(() => null),
+    api.get<ClaudeSetup>('/setup/claude').catch(() => null),
   ]);
   // Hermes and Cursor Cloud run off this Mac: listed once they work, never as something to install.
-  return { harnesses: harnesses.filter((h) => (h.id !== 'hermes' && h.id !== 'cursor-cloud') || h.available), accounts, github };
+  return { harnesses: harnesses.filter((h) => (h.id !== 'hermes' && h.id !== 'cursor-cloud') || h.available), accounts, github, claude };
 }
 
 /**
@@ -160,10 +165,17 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
     }
   };
   useEffect(() => {
-    load().catch(() => setRows({ harnesses: [], accounts: {}, github: null }));
+    load().catch(() => setRows({ harnesses: [], accounts: {}, github: null, claude: null }));
   }, []);
   const list = rows?.harnesses;
+  // Claude Code's row asks the CLI itself, so a signed-out claude never shows as Ready.
+  const checkOf = (h: HarnessWithRunning) => (h.id === 'claude-code' ? claudeCheck(rows?.claude ?? null, harnessCheck(h)) : harnessCheck(h));
+  // What the CLI says now wins over the accounts list, which can still hold the login it had before.
+  const claudeSays = rows?.claude && rows.claude.state !== 'unknown' ? rows.claude : null;
+  const accountOf = (id: string) =>
+    id === 'claude-code' && claudeSays ? (claudeSays.state === 'ready' ? (harnessAccountLine(rows?.accounts[id]) ?? claudeAccountLine(claudeSays)) : null) : harnessAccountLine(rows?.accounts[id]);
   const claude = list?.find((h) => h.id === 'claude-code');
+  const claudeReady = claude ? checkOf(claude).state === 'ready' : true;
   const github = code ? rows?.github : null;
   const heard = useRef(onGithub);
   heard.current = onGithub;
@@ -175,7 +187,7 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
     setRows((r) => r && { ...r, github: { state: 'ready', login } });
     void load().catch(() => {});
   };
-  const signedIn = list?.some((h) => harnessAccountLine(rows?.accounts[h.id]));
+  const signedIn = list?.some((h) => accountOf(h.id));
   return (
     <Screen
       caption="Harnesses"
@@ -184,7 +196,16 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
     >
       <ul className="space-y-2">
         {(list ?? []).map((h) => (
-          <CheckRow key={h.id} id={h.id} name={h.name} plan={h.plan} check={harnessCheck(h)} note={HARNESS_NOTE[h.id]} account={harnessAccountLine(rows?.accounts[h.id])} />
+          <CheckRow
+            key={h.id}
+            id={h.id}
+            name={h.name}
+            plan={h.plan}
+            check={checkOf(h)}
+            note={HARNESS_NOTE[h.id]}
+            account={accountOf(h.id)}
+            action={h.id === 'claude-code' && rows?.claude ? <ClaudeConnect setup={rows.claude} onDone={() => void load().catch(() => {})} /> : undefined}
+          />
         ))}
         {github && (
           <CheckRow
@@ -202,7 +223,7 @@ export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: G
       {signedIn && <p className="text-[12px] leading-relaxed text-fg-3">Wrong account? Sign in to the right one in a terminal, then Check again. Settings {'>'} Accounts lists them later, for each of your machines.</p>}
       <div className="mt-3 flex items-center justify-between gap-3">
         <span className="text-[12px] text-fg-3">
-          {claude && !claude.available
+          {!claudeReady
             ? 'Set up Claude Code before your first thread.'
             : github && github.state !== 'ready'
                 ? 'Set up the GitHub CLI before you work on pull requests.'
@@ -242,6 +263,151 @@ function GithubConnect({ onDone }: { onDone: (login: string) => void }) {
       words={GITHUB_WORDS}
       onDone={(r) => onDone(r.login)}
     />
+  );
+}
+
+/**
+ * Claude Code with no terminal (apps/server/claude-setup.ts): Install runs Claude Code's own installer on the machine
+ * Omni runs on; Sign in opens claude.com's page, which shows a code to paste back here for the CLI. Either reads the
+ * rows again when it is done. Nothing for a ready or an unreadable Claude Code.
+ */
+export function ClaudeConnect({ setup, onDone }: { setup: ClaudeSetup; onDone: () => void }) {
+  if (setup.state === 'missing') return <ClaudeInstall onDone={onDone} />;
+  if (setup.state === 'signed-out') return <ClaudeSignIn onDone={onDone} />;
+  return null;
+}
+
+const INSTALL_POLL_MS = 1500;
+
+function ClaudeInstall({ onDone }: { onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [],
+  );
+  const install = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { flow } = await api.post<{ flow: string }>('/setup/claude/install', {});
+      let step: ClaudeStep = { state: 'running' };
+      while (step.state === 'running') {
+        await new Promise((r) => setTimeout(r, INSTALL_POLL_MS));
+        if (!alive.current) return;
+        step = await api.get<ClaudeStep>(`/setup/claude/install/${flow}`);
+      }
+      if (step.state === 'failed') throw new Error(step.error || 'The installer stopped without saying why.');
+      onDone();
+    } catch (err) {
+      if (alive.current) setError(errorText(err));
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-1.5" data-claude="install">
+      <Button variant="secondary" icon="download" busy={busy} onClick={() => void install()}>
+        {busy ? 'Installing Claude Code…' : 'Install Claude Code'}
+      </Button>
+      {error && <ErrorNote>{error}</ErrorNote>}
+      <p className="text-[12px] leading-relaxed text-fg-3">Runs Claude Code’s own installer on the machine Omni runs on. Or run it yourself:</p>
+    </div>
+  );
+}
+
+function ClaudeSignIn({ onDone }: { onDone: () => void }) {
+  const [flow, setFlow] = useState<ClaudeLoginStart | null>(null);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const waiting = useRef<ClaudeLoginStart | null>(null);
+  waiting.current = flow;
+  // Leaving the step stops a sign-in still waiting for its code.
+  useEffect(
+    () => () => {
+      if (waiting.current) void api.post('/setup/claude/login/cancel', { flow: waiting.current.flow }).catch(() => {});
+    },
+    [],
+  );
+  const start = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setFlow(await api.post<ClaudeLoginStart>('/setup/claude/login', {}));
+      setCode('');
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const finish = async () => {
+    if (!flow || !code.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.post<ClaudeStep>('/setup/claude/login/code', { flow: flow.flow, code });
+      // Either way this flow is over: the CLI took the code and finished, or refused it and stopped.
+      setFlow(null);
+      if (r.state === 'done') onDone();
+      else setError(r.error || 'Claude Code is still signed out. Start again.');
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const cancel = () => {
+    if (flow) void api.post('/setup/claude/login/cancel', { flow: flow.flow }).catch(() => {});
+    setFlow(null);
+  };
+  if (!flow) {
+    return (
+      <div className="space-y-1.5" data-claude="sign-in">
+        <Button variant="secondary" icon="key" busy={busy} onClick={() => void start()}>
+          Sign in to Claude
+        </Button>
+        {error && <ErrorNote>{error}</ErrorNote>}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3 rounded-[16px] bg-bg p-4" data-claude="code">
+      <p className="text-[13px] text-fg-2">Open the Claude page and sign in. It then shows a code: paste it here. Claude Code keeps the login itself, as it does in a terminal.</p>
+      <LinkButton href={flow.url} target="_blank" variant="primary" icon="external">
+        Open Claude sign-in
+      </LinkButton>
+      {/* Not a form: the wizard around it is one, and Enter here finishes the sign-in, not the step. */}
+      <div className="space-y-2">
+        <input
+          className="field w-full font-mono !text-[13px]"
+          value={code}
+          placeholder="Paste the code"
+          aria-label="Code from the Claude page"
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            void finish();
+          }}
+        />
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" busy={busy} disabled={!code.trim()} onClick={() => void finish()}>
+            Finish
+          </Button>
+          <Button variant="ghost" onClick={cancel} disabled={busy}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -307,7 +473,7 @@ export function NotificationsScreen({ bridge = desktop }: { bridge?: DesktopBrid
 
 const MORE = 'Pick which kinds notify, and which channels stay quiet, in Settings > Notifications.';
 
-function NotifyRow({ title, detail, checked, onChange, disabled }: { title: string; detail: string; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
+function SwitchRow({ title, detail, checked, onChange, disabled }: { title: string; detail: string; checked: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
   return (
     <div className="flex items-start gap-4 rounded-[16px] bg-surface p-3.5">
       <div className="min-w-0 flex-1">
@@ -327,7 +493,7 @@ function BrowserNotify() {
   const toggle = async (on: boolean) => setPermission(await setNotificationsEnabled(on));
   return (
     <Screen caption="Notifications" title="Hear when work needs you" body={`${NOTIFY_BODY} In a browser they start off.`}>
-      <NotifyRow
+      <SwitchRow
         title="Notify in this browser"
         detail="While an Omni tab is open. Turning it on asks the browser once."
         checked={prefs.enabled}
@@ -384,7 +550,7 @@ function AppNotify({ bridge }: { bridge: DesktopBridge }) {
       title="Hear when work needs you"
       body={`${NOTIFY_BODY} The app sends them even with every window closed.${bridge.platform === 'darwin' ? ' macOS asks once whether Omni may; send a test now so it asks here, not mid-task.' : ''}`}
     >
-      <NotifyRow title="Notify from the desktop app" detail="Native notifications. Clicking one opens its thread." checked={enabled ?? true} onChange={(on) => void save(on)} disabled={enabled === null} />
+      <SwitchRow title="Notify from the desktop app" detail="Native notifications. Clicking one opens its thread." checked={enabled ?? true} onChange={(on) => void save(on)} disabled={enabled === null} />
       {bridge.testNotification && (
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void test()} busy={busy} disabled={enabled === false}>
@@ -399,6 +565,45 @@ function AppNotify({ bridge }: { bridge: DesktopBridge }) {
       )}
       {error && <ErrorNote>{error}</ErrorNote>}
       <p className="text-[12px] text-fg-3">{MORE}</p>
+    </Screen>
+  );
+}
+
+/**
+ * The starter routines (packages/shared/starter-automations.ts), each off until turned on here. One that is already
+ * an automation (a second run of setup) shows as on and stays as it is; Automations edits or removes it.
+ */
+export function RoutinesScreen({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
+  const [have, setHave] = useState<string[]>([]);
+  useEffect(() => {
+    api
+      .get<{ id: string }[]>('/automations')
+      .then((list) => setHave(list.map((a) => a.id)))
+      .catch(() => {});
+  }, []);
+  return (
+    <Screen
+      caption="Routines"
+      title="Start with a routine or two"
+      body="Each runs on a schedule as the Admin role and answers in General. They start off: turn one on and it becomes an automation you can change or turn off in Automations."
+    >
+      {STARTER_AUTOMATIONS.map((s) => {
+        const saved = have.includes(s.id);
+        return (
+          <div key={s.id} data-starter={s.id}>
+            <SwitchRow
+              title={s.name}
+              detail={`${s.when}. ${s.blurb}`}
+              checked={saved || value.includes(s.id)}
+              disabled={saved}
+              onChange={(on) => onChange(on ? [...value, s.id] : value.filter((id) => id !== s.id))}
+            />
+          </div>
+        );
+      })}
+      <p className="text-[12px] leading-relaxed text-fg-3">
+        Morning plan and Mail follow-ups post nothing on a day with nothing to report. Mail follow-ups asks before it sends anything, and a draft nobody approves expires after 8 hours.
+      </p>
     </Screen>
   );
 }

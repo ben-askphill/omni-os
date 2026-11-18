@@ -6,9 +6,10 @@ Each role is a file in `crew/*.md` with frontmatter and a charter. Omni reads th
 | --- | --- |
 | conductor | Front agent in #conductor. Routes every task to a crew thread, never does the work |
 | researcher | Research, audits, answers to client questions, HTML reports |
+| writer | Drafts and edits writing in your voice: emails, posts, proposals, docs, summaries. Never sends or publishes |
 | builder | Code in a repo channel, own worktree, opens PRs. |
 | reviewer | Reviews a PR against its brief, from the spec and diff only. Read only. A review role (`review: true`) |
-| inbox | Mail, calendar, time tracking, tasks, notes and chat drafts. Never sends on its own |
+| inbox | Admin: mail, calendar, time tracking, tasks, notes and chat drafts. Never sends on its own; Approve on a run's question card is the go-ahead for that draft |
 | usage-scan | Leads Scan my usage in #inbox: turns the repeated asks Omni found into up to 3 suggested automations ([Automations](automations.md#scan-my-usage)). Omni starts it; not for delegation |
 
 Your own roles live in `data/crew/`, which is never shipped and which a release never touches. A file there with a new name is a role of your own. For example, a role for hands-on store work:

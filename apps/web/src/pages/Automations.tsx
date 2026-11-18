@@ -9,7 +9,7 @@ import { Button, Chip, ConfirmDialog, CopyButton, Empty, ErrorNote, Icon, Inline
 import { pageColumn, PageToolbar, RefreshButton, SearchField } from '../components/ui/feedback.tsx';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
 import { statusLabel } from '@omni/shared/status.ts';
-import { describeCron } from '@omni/shared/cron.ts';
+import { describeCron, spanWords } from '@omni/shared/cron.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
 import { artifactChannels, describeArtifactSource, describeEvent, describeWebhookSource, nextRunLabel } from '../format.ts';
@@ -230,7 +230,7 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
   const machine = machineChip(a, devices, hereName);
   const [enabled, setEnabled] = useState(a.enabled);
   const [toggling, setToggling] = useState(false);
-  const [running, setRunning] = useState(false);
+  const [running, setRunning] = useState<'run' | 'dry' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
@@ -256,15 +256,16 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
     }
   };
 
-  const runNow = async () => {
-    setRunning(true);
+  // A dry run says what it would do and does none of it (apps/server/automation-rules.ts).
+  const runNow = async (dry = false) => {
+    setRunning(dry ? 'dry' : 'run');
     setError(null);
     try {
-      const t = await api.post<Thread>(`/automations/${encodeURIComponent(a.id)}/run`);
+      const t = await api.post<Thread>(`/automations/${encodeURIComponent(a.id)}/run`, dry ? { dry: true } : undefined);
       navigate(`/t/${t.id}`);
     } catch (e) {
       setError(errorText(e));
-      setRunning(false);
+      setRunning(null);
     }
   };
 
@@ -284,7 +285,7 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
           {a.error && <Chip tone="needs">Invalid</Chip>}
         </div>
         <div className="flex shrink-0 items-center gap-2.5 md:row-span-2">
-          <Button size="sm" icon="play" onClick={runNow} busy={running} disabled={!!a.error}>
+          <Button size="sm" icon="play" onClick={() => void runNow()} busy={running === 'run'} disabled={!!a.error || !!running}>
             Run now
           </Button>
           <Toggle checked={enabled} onChange={toggle} disabled={toggling || !!a.error} label={enabled ? 'Pause automation' : 'Enable automation'} />
@@ -309,6 +310,16 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
               </span>
             )}
             {a.model && <span className="inline-flex h-6 items-center rounded-full bg-bg px-2.5 font-num text-[11px]">{a.model}</span>}
+            {a.quiet && (
+              <Chip tone="outline" title="A run with nothing to report posts nothing and is filed as done">
+                Quiet when empty
+              </Chip>
+            )}
+            {a.approve && (
+              <Chip tone="outline" title="Drafts first and asks on a card before anything leaves Omni">
+                {a.expiresAfter ? `Asks first · expires in ${spanWords(a.expiresAfter)}` : 'Asks first'}
+              </Chip>
+            )}
             {a.source === 'edited' && <Chip tone="outline" title="Your copy of a shipped automation, in data/automations/">Edited</Chip>}
           </div>
           {enabled && a.on?.event === 'artifact_published' && !a.error && (
@@ -372,6 +383,19 @@ function AutomationCard({ a, devices, onChanged, onDelete, onEdit }: { a: Automa
             <Icon name="chevronRight" size={12} className={`transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${showPrompt ? 'rotate-90' : ''}`} /> Prompt
           </button>
           <span className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="search"
+              className="[--hov:var(--surface-2)]"
+              onClick={() => void runNow(true)}
+              busy={running === 'dry'}
+              disabled={!!a.error || !!running}
+              title="Runs it now and says what it would do, without sending or changing anything"
+              aria-label={`Dry run ${a.name}`}
+            >
+              Dry run
+            </Button>
             <Button size="sm" variant="ghost" icon="pencil" className="[--hov:var(--surface-2)]" onClick={onEdit} aria-label={`Edit ${a.name}`}>
               Edit
             </Button>
