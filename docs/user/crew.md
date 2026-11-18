@@ -11,7 +11,7 @@ Each role is a file in `crew/*.md` with frontmatter and a charter. Omni reads th
 | inbox | Mail, calendar, time tracking, tasks, notes and chat drafts. Never sends on its own |
 | usage-scan | Leads Scan my usage in #inbox: turns the repeated asks Omni found into up to 3 suggested automations ([Automations](automations.md#scan-my-usage)). Omni starts it; not for delegation |
 
-Your own roles live in `data/crew/`, which is never shipped. A file there with a new name is a new role; one with a shipped role's name replaces that role. For example, a role for hands-on store work:
+Your own roles live in `data/crew/`, which is never shipped and which a release never touches. A file there with a new name is a role of your own. For example, a role for hands-on store work:
 
 ```markdown
 ---
@@ -25,6 +25,31 @@ You operate on client stores.
 - For performance and SEO work, report numbers before and after.
 - End with: what changed, where, and how to undo it.
 ```
+
+A file there with a shipped role's name is your edit of that built-in, an overlay:
+
+- It sets only the frontmatter fields it names. The rest, and any the next release changes, come from the shipped file.
+- With `charter_mode: append` its body is added after the shipped charter, so a release's fixes to the charter still reach you. Omni writes new edits this way.
+- With `charter_mode: replace`, or no `charter_mode` at all (a copy made before overlays), its body is the whole charter. Omni then records the shipped charter it was written against as `based_on`, and the role shows `builtInChanged` once a release changes that charter, or when a hand copy never recorded it.
+- Hiding a built-in is per machine (`crew` in `data/omni.config.json`): no new thread starts as it, and lists leave it out. The conductor and usage-scan cannot be hidden.
+
+`delegatable: false` keeps a role out of the Conductor's `list_crew` and makes `delegate` and `delegate_team` refuse it. The conductor and usage-scan set it. Starting a thread as a role no file has, or one hidden on this machine, is refused with the valid ids; it used to run with no charter.
+
+`harness` is the role's runtime binding: any harness id this machine's catalog has, checked when the role is saved. A role whose harness this machine lacks still loads, with an error on it. Omni keeps frontmatter keys it does not know when it edits a file.
+
+The clients edit roles through the API, the same files underneath:
+
+| Call | Does |
+| --- | --- |
+| `GET /api/crew` | Every role this machine offers, each with `kind` (`shipped`, `edited` or `own`), `hidden`, `delegatable` and, for an edit, `charterMode` and `builtInChanged`. `?all=1` adds the hidden ones |
+| `GET /api/crew/:id` | The role, the shipped file's text, your file's text and the shipped charter's hash |
+| `POST /api/crew` | A new role of your own: `{ id, fields, charter }` or `{ id, markdown }` |
+| `PUT /api/crew/:id` | Edit a role: `{ fields, charter, charter_mode }` or `{ markdown }`. On a built-in it writes the overlay. An empty field removes it |
+| `DELETE /api/crew/:id` | Delete a role of your own |
+| `POST /api/crew/:id/reset` | Drop your edit of a built-in |
+| `POST /api/crew/:id/hidden` | `{ hidden }` for a built-in |
+
+A save is refused when its run defaults, default channel or MCP servers are unknown here, or when it would give the conductor or usage-scan working tools. An agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) is refused: roles are a prompt every later thread of them runs with, so for now only you change them.
 
 The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Overview and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
 

@@ -7,7 +7,7 @@ Everything personal lives in `data/` (gitignored) or the secret store. Tracked f
 | Where | What |
 | --- | --- |
 | `data/omni.config.json` | You, your folders, integrations (Hermes URL, central brain, the Tailscale login allowed through `tailscale serve`, the public MCP URL of a [Cloudflare Tunnel](external-mcp.md#from-anywhere-else-http), the Clerk instance for [Google sign-in](remote-access.md#sign-in-with-google)), automation on/off and this Mac's worktree retention policy. `omni.config.example.json` lists every field |
-| `data/crew/*.md` | Your own version of a crew charter; replaces the one in `crew/` with the same name |
+| `data/crew/*.md` | Your own crew roles, and your edits of the shipped ones in `crew/` ([Crew](crew.md)) |
 | `data/automations/*.yaml` | Your own automations; one with the same id as a shared one replaces it |
 | `.env` | Server options (port, model defaults, concurrency). Example: `.env.example`. An env var wins over the config file. In a checkout it sits at the repo root; the packaged desktop app reads it from its data dir instead ([Server options](#server-options)) |
 | Secret store | Secret values: the Keychain on a Mac, `data/secrets.json` on Linux. The database keeps their names only |

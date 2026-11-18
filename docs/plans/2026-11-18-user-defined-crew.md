@@ -294,6 +294,15 @@ Ordered. Each slice ships on all three surfaces where it has UI, per the repo ru
 
 S1 to S4 give a usable feature: roles you can create, edit, sync and trust. S5 to S8 deepen it.
 
+### 6.3 Where the build differs from this plan
+
+- **S1 refuses every agent write.** `/api/crew` writes that carry `x-omni-thread` get a 403, instead of waiting for S2's guard. S1 opens a write path to a prompt every later thread runs with, and nothing needs an agent to write roles before the Conductor's tools (S7) and their guard exist. S2 and S7 replace the blanket refusal with the guard's rules.
+- **S1 keeps the routers routing.** A save that drops `delegate_only` or the `omni` MCP server from the conductor or usage-scan is refused, and neither can be hidden. Section 5 put locked fields in S4, but the API that could unlock them ships in S1. The rest of S4's locks (charter Add-only, no duplicate) stay in S4.
+- **S1 also makes `delegate` refuse a non-delegatable role** (section 4.3), since the flag that `list_crew` reads would otherwise only hide the role, not stop it. Server-side: a thread the Conductor or a team starts may only take a delegatable role.
+- **`GET /api/crew` leaves hidden roles out unless asked (`?all=1`),** so the composer pickers and `list_crew` drop them with no client change. Settings (S3) asks for all.
+- **The external MCP's `list_crew` keeps the conductor,** which is not delegatable but which an outside client may start a thread as. It drops hidden roles and usage-scan.
+- **`crew` in the user config is optional on the wire** (`packages/shared/settings.ts`), so a newer client reads an older server's config.
+
 ## 7. Decisions
 
 Settled 2026-11-18: Ben took the recommendation for all eleven. For D11, the UI and docs say that no-edits is not read-only, since Bash stays.

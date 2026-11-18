@@ -235,6 +235,12 @@ export interface AutomationOverride {
   deleted?: boolean;
 }
 
+/** Per-machine choices about a crew role (apps/server/crew.ts). */
+export interface CrewOverride {
+  /** A built-in this machine hides: no new thread starts as it, and lists leave it out. */
+  hidden?: boolean;
+}
+
 export interface UserConfig {
   version: 1;
   /** Set when onboarding (the Web UI or `npm run setup`) finished. Missing means the Web UI shows the wizard. */
@@ -245,6 +251,8 @@ export interface UserConfig {
   /** Where new threads run unless the composer picks another machine: a synced machine's sync id, or '' for this one. */
   runOn: { device: string };
   automations: Record<string, AutomationOverride>;
+  /** Older servers send none. */
+  crew?: Record<string, CrewOverride>;
   /** This machine's worktree retention (apps/server/worktree-cleanup.ts). */
   worktrees: { retention: { enabled: boolean; idleDays: number }; slim: { enabled: boolean; idleDays: number } };
 }
@@ -257,6 +265,7 @@ export interface UserConfigPatch {
   integrations?: Partial<UserConfig['integrations']>;
   runOn?: Partial<UserConfig['runOn']>;
   automations?: Record<string, AutomationOverride | null>;
+  crew?: Record<string, CrewOverride | null>;
 }
 
 /** GET and PUT /api/setup, POST /api/setup/complete. */

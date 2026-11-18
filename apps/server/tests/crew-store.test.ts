@@ -1,0 +1,186 @@
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { startRunner } from './runner-boot.ts';
+
+// The crew store and /api/crew: built-ins in crew/ with the user's overlays in data/crew/, roles of the user's own,
+// hiding, reset, and the thread create that refuses a role it cannot run as. The shipped files here are the test's
+// own, so nothing reads or writes the repo's crew/.
+
+const home = mkdtempSync(join(tmpdir(), 'omni-crew-home-'));
+await startRunner({ HOME: home });
+const { app } = await import('../app.ts');
+const { paths } = await import('../config.ts');
+const { charterHash, crewForNewThread, getCrew, listCrew } = await import('../crew.ts');
+const { crewRunProblem } = await import('../crew-store.ts');
+const { channels } = await import('../db.ts');
+
+const shipped = mkdtempSync(join(tmpdir(), 'omni-crew-shipped-'));
+paths.crew = shipped;
+const ship = (id: string, text: string) => writeFileSync(join(shipped, `${id}.md`), text);
+const own = (id: string) => readFileSync(join(paths.personalCrew, `${id}.md`), 'utf8');
+const writeOwn = (id: string, text: string) => {
+  mkdirSync(paths.personalCrew, { recursive: true });
+  writeFileSync(join(paths.personalCrew, `${id}.md`), text);
+};
+
+ship('conductor', '---\nname: Conductor\nchannel: conductor\nmcp: [omni]\ndelegate_only: true\ndelegatable: false\n---\nRoute everything.\n');
+ship('usage-scan', '---\nname: Usage scan\nmcp: [omni]\ndelegate_only: true\ndelegatable: false\n---\nScan.\n');
+ship('reviewer', '---\nname: Reviewer\nmodel: auto\n---\nReview the PR.\n');
+ship('builder', '---\nname: Builder\ndescription: Writes code.\nmodel: auto\n---\nYou write and ship code.\n');
+
+const send = (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) =>
+  app.request(`/api${path}`, { method, headers: { 'content-type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+const json = async (res: Response) => (await res.json()) as any;
+
+describe('a built-in with an overlay', () => {
+  it('adds to the shipped charter by default, sets only the fields it names, and keeps a release fix', async () => {
+    const res = await send('PUT', '/crew/builder', { fields: { channel: 'inbox' }, charter: 'Use pnpm in every repo.' });
+    expect(res.status).toBe(200);
+    const detail = await json(res);
+    expect(detail.role).toMatchObject({ kind: 'edited', charterMode: 'append', channel: 'inbox', model: 'auto', name: 'Builder' });
+    expect(detail.role.charter).toBe('You write and ship code.\n\nUse pnpm in every repo.');
+    expect(detail.role.builtInChanged).toBeUndefined();
+    expect(own('builder')).toBe(`---\nchannel: inbox\ncharter_mode: append\nbased_on: ${charterHash('You write and ship code.')}\n---\nUse pnpm in every repo.\n`);
+
+    // A release changes the shipped charter: the user's addition stays after it, and nothing asks to compare.
+    ship('builder', '---\nname: Builder\ndescription: Writes code.\nmodel: auto\n---\nYou write, test and ship code.\n');
+    expect(getCrew('builder')).toMatchObject({ charter: 'You write, test and ship code.\n\nUse pnpm in every repo.', channel: 'inbox' });
+  });
+
+  it('reads a hand copy with no mode as a replacement, and says when the built-in changed under it', async () => {
+    writeOwn('reviewer', '---\nname: Reviewer\nmodel: auto\n---\nMy own review steps.\n');
+    expect(getCrew('reviewer')).toMatchObject({ kind: 'edited', charterMode: 'replace', charter: 'My own review steps.', builtInChanged: true });
+
+    // Saving the charter records the shipped one it was written against, which clears the notice.
+    const saved = await json(await send('PUT', '/crew/reviewer', { charter: 'My own review steps, revised.' }));
+    expect(saved.role).toMatchObject({ charterMode: 'replace', builtInChanged: false, charter: 'My own review steps, revised.' });
+    expect(saved.shippedHash).toBe(charterHash('Review the PR.'));
+
+    ship('reviewer', '---\nname: Reviewer\nmodel: auto\n---\nReview the PR against its brief.\n');
+    expect(getCrew('reviewer')?.builtInChanged).toBe(true);
+  });
+
+  it('keeps frontmatter keys it does not know, such as a runtime binding a later build writes', async () => {
+    writeOwn('builder', '---\n# mine\nruntime:\n  protocol: hermes\n  endpoint: https://agent.example.com\n  auth: secret:AGENT_TOKEN\ncharter_mode: append\n---\nUse pnpm.\n');
+    await send('PUT', '/crew/builder', { fields: { model: 'opus' } });
+    const text = own('builder');
+    expect(text).toContain('# mine\nruntime:\n  protocol: hermes\n  endpoint: https://agent.example.com\n  auth: secret:AGENT_TOKEN\n');
+    expect(text).toContain('model: opus');
+    expect(text).toContain('Use pnpm.');
+  });
+
+  it('resets to the shipped role', async () => {
+    const detail = await json(await send('POST', '/crew/builder/reset'));
+    expect(detail.role.kind).toBe('shipped');
+    expect(detail.own).toBeNull();
+    expect((await send('POST', '/crew/builder/reset')).status).toBe(409);
+  });
+
+  it('keeps the routers routing', async () => {
+    const off = await send('PUT', '/crew/conductor', { fields: { delegate_only: false } });
+    expect(off.status).toBe(409);
+    expect((await json(off)).error).toMatch(/keeps delegate_only and the omni MCP server/);
+    expect((await send('PUT', '/crew/usage-scan', { fields: { mcp: [] } })).status).toBe(409);
+    // Adding to its charter is fine.
+    expect((await send('PUT', '/crew/conductor', { charter: 'Reply in Dutch.' })).status).toBe(200);
+    expect(getCrew('conductor')?.charter).toBe('Route everything.\n\nReply in Dutch.');
+    await send('POST', '/crew/conductor/reset');
+  });
+});
+
+describe('a role of the user own', () => {
+  it('is created, listed, edited from markdown and deleted', async () => {
+    const res = await send('POST', '/crew', { id: 'store-ops', fields: { name: 'Store ops', description: 'Store work.', channel: 'inbox' }, charter: 'You operate on stores.' });
+    expect(res.status).toBe(201);
+    expect((await json(res)).role).toMatchObject({ id: 'store-ops', kind: 'own', delegatable: true, charter: 'You operate on stores.' });
+    expect(listCrew().map((r) => r.id)).toEqual(['conductor', 'builder', 'reviewer', 'store-ops', 'usage-scan']);
+
+    const md = await send('PUT', '/crew/store-ops', { markdown: '---\nname: Store ops\nmodel: auto\n---\nDry run first.\n' });
+    expect((await json(md)).role).toMatchObject({ model: 'auto', charter: 'Dry run first.' });
+
+    expect((await send('POST', '/crew/store-ops/hidden', { hidden: true })).status).toBe(409);
+    expect((await send('DELETE', '/crew/store-ops')).status).toBe(200);
+    expect(getCrew('store-ops')).toBeUndefined();
+  });
+
+  it('refuses a taken, reserved or malformed id, a missing name, and run defaults this machine cannot run', async () => {
+    const error = async (res: Response) => [res.status, (await json(res)).error];
+    expect(await error(await send('POST', '/crew', { id: 'builder', fields: { name: 'B' } }))).toEqual([409, 'A role "builder" already exists.']);
+    expect((await send('POST', '/crew', { id: 'Store Ops', fields: { name: 'S' } })).status).toBe(400);
+    expect(await error(await send('POST', '/crew', { id: 'x', charter: 'no name' }))).toEqual([400, 'Give the role a name.']);
+    expect((await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', harness: 'nope' } })))[1]).toMatch(/^Run defaults: unknown harness "nope" \(this machine has: /);
+    expect(await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', channel: 'nowhere' } }))).toEqual([400, 'No channel "nowhere" for the role\'s default channel.']);
+    expect((await error(await send('POST', '/crew', { id: 'x', fields: { name: 'X', mcp: ['shopify'] } })))[1]).toMatch(/Unknown MCP server "shopify"/);
+    expect(await error(await send('PUT', '/crew/x', { charter: 'nothing here' }))).toEqual([404, 'No crew role "x".']);
+    expect(await error(await send('DELETE', '/crew/builder'))).toEqual([409, 'A built-in role cannot be deleted. Hide it, or reset your edit.']);
+  });
+
+  it('refuses every write from an agent thread', async () => {
+    const res = await send('POST', '/crew', { id: 'sneaky', fields: { name: 'S' } }, { 'x-omni-thread': 'some-thread' });
+    expect(res.status).toBe(403);
+    expect((await send('POST', '/crew/builder/hidden', { hidden: true }, { 'x-omni-thread': 'some-thread' })).status).toBe(403);
+    expect(getCrew('sneaky')).toBeUndefined();
+  });
+});
+
+describe('hiding a built-in', () => {
+  it('leaves it out of the list and refuses new threads as it, but a running thread keeps its charter', async () => {
+    expect((await json(await send('POST', '/crew/reviewer/hidden', { hidden: true }))).role.hidden).toBe(true);
+    expect((await json(await send('GET', '/crew'))).map((r: any) => r.id)).not.toContain('reviewer');
+    expect((await json(await send('GET', '/crew?all=1'))).find((r: any) => r.id === 'reviewer')).toMatchObject({ hidden: true });
+    expect(getCrew('reviewer')?.charter).toBeTruthy();
+
+    const res = await send('POST', '/threads', { channel: 'inbox', role: 'reviewer', prompt: 'review it' });
+    expect(res.status).toBe(409);
+    expect((await json(res)).error).toMatch(/^The crew role "reviewer" is hidden on this machine\. Show it in Settings, or pick one of: /);
+
+    await send('POST', '/crew/reviewer/hidden', { hidden: false });
+    expect(getCrew('reviewer')?.hidden).toBe(false);
+  });
+
+  it('never hides the Conductor or usage-scan', async () => {
+    expect((await send('POST', '/crew/conductor/hidden', { hidden: true })).status).toBe(409);
+    expect((await send('POST', '/crew/usage-scan/hidden', { hidden: true })).status).toBe(409);
+  });
+});
+
+describe('a new thread role', () => {
+  it('refuses an id no role has, naming the valid ones, instead of running with no charter', async () => {
+    const res = await send('POST', '/threads', { channel: 'inbox', role: 'biulder', prompt: 'fix it' });
+    expect(res.status).toBe(400);
+    expect((await json(res)).error).toBe('No crew role "biulder". Roles: conductor, builder, reviewer, usage-scan.');
+  });
+
+  it('lets only delegatable roles take delegated work', () => {
+    expect(crewForNewThread('usage-scan', true)).toEqual({ refused: 'The crew role "usage-scan" cannot be delegated to. Roles: builder, reviewer.', status: 409 });
+    expect(crewForNewThread('usage-scan', false)).toMatchObject({ role: { id: 'usage-scan' } });
+    expect(crewForNewThread('builder', true)).toMatchObject({ role: { id: 'builder' } });
+    expect(crewForNewThread(null, true)).toEqual({ role: null });
+  });
+
+  it('lists delegatable roles only to the Conductor', async () => {
+    const crew = await json(await send('GET', '/crew'));
+    expect(crew.filter((r: any) => r.delegatable).map((r: any) => r.id)).toEqual(['builder', 'reviewer']);
+  });
+});
+
+describe('the runtime binding', () => {
+  const harness = (id: string, models: string[] = []) => ({ id, name: id, available: true, models: models.map((m, i) => ({ id: m, default: i === 0, efforts: [] })) }) as any;
+
+  it('takes any harness the catalog has, not a fixed list', () => {
+    const cat = { harnesses: [harness('claude-code', ['opus']), harness('vps-agent')] };
+    expect(crewRunProblem({ harness: 'vps-agent' }, cat)).toBeUndefined();
+    expect(crewRunProblem({ harness: 'vps-agent', model: 'anything' }, cat)).toBeUndefined();
+    expect(crewRunProblem({ harness: 'elsewhere' }, cat)).toBe('unknown harness "elsewhere" (this machine has: claude-code, vps-agent)');
+  });
+
+  it('loads a role whose harness this machine lacks, with an error rather than a crash', async () => {
+    writeOwn('remote-ops', '---\nname: Remote ops\nharness: vps-agent\n---\nRuns elsewhere.\n');
+    const role = (await json(await send('GET', '/crew'))).find((r: any) => r.id === 'remote-ops');
+    expect(role).toMatchObject({ harness: 'vps-agent', kind: 'own' });
+    expect(role.error).toMatch(/^unknown harness "vps-agent"/);
+    expect(channels.get('inbox')).toBeTruthy();
+  });
+});
