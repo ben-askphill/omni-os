@@ -191,6 +191,14 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     remote
       ? ''
       : `When ${name} asks you to "show me", "list out" or "visualize" something, or a brief passes that ask on, show the result with html_render as cards, a table or a chart above your reply instead of a wall of text. A short answer stays plain text.`,
+    // The thread's step view (@omni/shared/steps.ts). set_steps is on omni-mcp, which Hermes and Cursor cloud do not get.
+    ...(remote
+      ? []
+      : [
+          '',
+          '## Progress',
+          `For a task with more than one stage, call set_steps before you start, with 3 to 6 steps in the plain words ${name} would use ("Find candidate apps", "Compare prices"), then again each time a step starts or finishes. Omni shows the list as the thread's progress. Skip it for a quick answer.`,
+        ]),
   ];
   if (thread.source === 'team') {
     lines.push(
