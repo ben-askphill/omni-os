@@ -59,7 +59,7 @@ The clients edit roles through the API, the same files underneath:
 | `GET /api/crew` | Every role this machine offers, each with `kind` (`shipped`, `edited` or `own`), `hidden`, `delegatable` and, for an edit, `charterMode` and `builtInChanged`. `?all=1` adds the hidden ones |
 | `GET /api/crew/:id` | The role, the built-in alone (`builtIn`), the shipped file's text, your file's text, the shipped charter's hash, and the charters as written (`charters.builtIn`, `charters.own`, `charters.effective`) |
 | `POST /api/crew` | A new role of your own: `{ id, fields, charter }` or `{ id, markdown }` |
-| `PUT /api/crew/:id` | Edit a role: `{ fields, charter, charter_mode }` or `{ markdown }`. On a built-in it writes the overlay. An empty field (or null, for `avatar`, `mcp`, `delegate_only` and `delegatable`) removes it |
+| `PUT /api/crew/:id` | Edit a role: `{ fields, charter?, charter_mode? }` or `{ markdown }`. On a built-in it writes the overlay. An empty field (or null, for `avatar`, `mcp`, `delegate_only` and `delegatable`) removes it. Send `charter` and `charter_mode` only to change them: either one records the built-in charter as seen |
 | `POST /api/crew/:id/duplicate` | `{ id, name? }`: a new role of your own with everything this one has |
 | `DELETE /api/crew/:id` | Delete a role of your own |
 | `POST /api/crew/:id/reset` | Drop your edit of a built-in |

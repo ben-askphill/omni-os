@@ -144,7 +144,7 @@ type FieldKey = keyof ReturnType<typeof fieldsOf>;
 
 export interface CrewSaveBody {
   fields: Record<string, unknown>;
-  charter: string;
+  charter?: string;
   charter_mode?: 'append' | 'replace';
 }
 
@@ -152,6 +152,8 @@ export interface CrewSaveBody {
  * What a save sends (PUT /api/crew/:id, or POST /api/crew with an id). On a built-in, a field set back to the built-in's
  * value is sent empty (null for a list or a switch), so the overlay drops it and later releases set it; a field the form
  * left alone is not sent at all. On a role of the user's own, every field is sent and an empty one removes its key.
+ * The charter and its mode go only when they changed: the server reads either as "written against today's built-in"
+ * (`based_on`), so sending them with a description edit would clear "Built-in charter changed" unseen.
  */
 export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewSaveBody {
   const now = fieldsOf(fromDraft(d, detail?.role));
@@ -174,8 +176,9 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
     const avatar = { ...(now.icon && { icon: now.icon }), ...(now.bg && { bg: now.bg }) };
     fields.avatar = Object.keys(avatar).length ? avatar : null;
   }
-  const body: CrewSaveBody = { fields, charter: d.charter };
-  if (detail?.builtIn) body.charter_mode = d.charterMode;
+  const body: CrewSaveBody = { fields };
+  if (!detail || d.charter.trim() !== (detail.charters.own ?? '').trim()) body.charter = d.charter;
+  if (detail?.builtIn && d.charterMode !== (detail.role.charterMode ?? 'append')) body.charter_mode = d.charterMode;
   return body;
 }
 
