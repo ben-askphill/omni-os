@@ -173,6 +173,11 @@ describe("requestGuard: a browser session's cookie path", () => {
       expect((await get(to)).status).toBe(200);
       expect((await get(to.replace('a1', 'a2'))).status).toBe(401);
     }
+    // A browser that sends no Sec-Fetch headers (Safari before 16.4) still asks for a page as text/html.
+    const old = await get(`${KEYED}/artifacts/a1/raw`, { ...keyed, accept: 'text/html,application/xhtml+xml,*/*;q=0.8' });
+    expect(old.status).toBe(303);
+    expect(old.headers.get('location')).toMatch(/^\/api\/artifacts\/a1\/raw\?omni_doc=/);
+    expect((await get(`${KEYED}/artifacts/a1/raw`, { ...keyed, accept: '*/*' })).status).toBe(200);
     // A fetch, an image or a stream stays where it is.
     expect((await get(`${KEYED}/artifacts/a1/raw`, { ...keyed, 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' })).status).toBe(200);
     expect((await get(`${KEYED}/artifacts/a1/raw`, { ...keyed, 'sec-fetch-mode': 'no-cors', 'sec-fetch-dest': 'image' })).status).toBe(200);

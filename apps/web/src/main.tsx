@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import { PairGate } from './components/Pair.tsx';
 import { takeApiParam } from './api-base.ts';
+import { desktop } from './desktop.ts';
 import './index.css';
 // The channel rail's faces (index.css :root[data-layout="rail"]). Each @font-face downloads only when used.
 import '@fontsource/adwaita-sans/400.css';
@@ -16,7 +17,7 @@ import '@fontsource-variable/jetbrains-mono/wght.css';
 import '@fontsource-variable/jetbrains-mono/wght-italic.css';
 
 // The desktop app's window arrives as /?api=<path>: keep where this browser's requests go, and drop it from the address.
-const clean = takeApiParam(window.location);
+const clean = takeApiParam(window.location, undefined, !!desktop);
 if (clean !== null) history.replaceState(history.state, '', clean);
 
 createRoot(document.getElementById('root')!).render(

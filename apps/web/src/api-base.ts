@@ -6,6 +6,7 @@
 
 const STORE_KEY = 'omni.api';
 const SHAPE = /^\/api(?:\/k\/[0-9a-f]{32})?$/;
+const KEYED = /^\/api\/k\/[0-9a-f]{32}(?=\/|\?|$)/;
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
@@ -57,13 +58,25 @@ export const apiUrl = (path: string, store?: Store | null) => `${apiBase(store)}
 export const onApiBase = (src: string, store?: Store | null) => (src.startsWith('/api/') ? apiUrl(src.slice(4), store) : src);
 
 /**
- * The desktop app's first load arrives as `/?api=<path>` (auth-api.ts desktop-pair). Keep the path, and take it out of
- * the address bar and history. Returns the address without it, or null when there was none.
+ * A request went to `base` and was refused, and this browser now keeps a keyed path instead: another tab moved the
+ * session onto one in the meantime (auth-api.ts GET /auth), so the request is worth one more try on the new path.
  */
-export function takeApiParam(loc: Pick<Location, 'pathname' | 'search' | 'hash'>, store: Store | null = storage()): string | null {
+export const movedSince = (base: string, store: Store | null = storage()) => base === '/api' && apiBase(store) !== base;
+
+/** An /api address to copy or share, without this browser's key, which must not leave the page. */
+export const sharedApiUrl = (url: string, page: string) => new URL(url.replace(KEYED, '/api'), page).href;
+
+/**
+ * The desktop app's first load arrives as `/?api=<path>` (auth-api.ts desktop-pair). Keep the path, and take it out of
+ * the address bar and history. Returns the address without it, or null when there was none. Only the desktop app's
+ * window (`fromDesktop`) keeps it, and only a keyed path: in a browser any site could link here with `?api=/api` and
+ * send this browser to the pairing screen.
+ */
+export function takeApiParam(loc: Pick<Location, 'pathname' | 'search' | 'hash'>, store: Store | null = storage(), fromDesktop = false): string | null {
   const q = new URLSearchParams(loc.search);
   if (!q.has('api')) return null;
-  rememberApiBase(q.get('api'), store);
+  const path = q.get('api');
+  if (fromDesktop && path !== '/api') rememberApiBase(path, store);
   q.delete('api');
   const rest = q.toString();
   return `${loc.pathname}${rest ? `?${rest}` : ''}${loc.hash}`;

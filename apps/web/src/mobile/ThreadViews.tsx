@@ -4,6 +4,7 @@ import { OwnerField } from '../components/thread/OwnerField.tsx';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
+import { sharedApiUrl } from '../api-base.ts';
 import { HarnessLogo, HarnessMark, harnessLabel } from '../components/brand.tsx';
 import { ArtifactBody } from '../components/ArtifactViewer.tsx';
 import { AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from '../components/BrowserAnnotate.tsx';
@@ -560,7 +561,7 @@ export function ViewerScreen({ route }: { route: Route }) {
       const file = new File([blob], a.name, { type: blob.type });
       if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: a.name });
       else {
-        await copyText(new URL(artifactUrl(a), location.href).href);
+        await copyText(sharedApiUrl(artifactUrl(a), location.href));
         shell.toast('Link copied. It opens where Omni is paired.');
       }
     } catch (e) {

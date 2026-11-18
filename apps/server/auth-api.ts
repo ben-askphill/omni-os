@@ -121,15 +121,18 @@ authApi.post('/desktop-nonce', (c) => {
 
 /**
  * The desktop app's window session. A keyed cookie never reaches this path, so the window also holds its session's id
- * on it (deviceCookieName): each window load keeps the one session, and the Devices list one row.
+ * on it (deviceCookieName): each window load keeps the one session, and the Devices list one row. The id cookie is set
+ * only in the answer that sets the session cookie, with the same lifetime, so the two run out together and the window
+ * then gets a new session rather than a path whose cookie is gone.
  */
-function windowSession(c: Context): { id: string; path: string } {
+function windowSession(c: Context): string {
   const known = sessionById(getCookie(c, deviceCookieName()));
-  if (known?.kind === 'browser' && known.method === 'token' && known.cookiePath) return { id: known.id, path: known.cookiePath };
+  if (known?.kind === 'browser' && known.method === 'token' && known.cookiePath) return known.cookiePath;
   const held = heldSession(c);
-  if (held) return { id: held.id, path: held.cookiePath ?? moveCookie(c, held.id) };
-  const s = createSession('Desktop app', 'browser', '', 'token');
-  return { id: s.id, path: issueCookie(c, s) };
+  const s = held ? null : createSession('Desktop app', 'browser', '', 'token');
+  const path = held ? (held.cookiePath ?? moveCookie(c, held.id)) : issueCookie(c, s!);
+  setCookie(c, deviceCookieName(), held?.id ?? s!.id, cookieOptions(c, DESKTOP_PAIR_COOKIE_PATH));
+  return path;
 }
 
 /**
@@ -139,9 +142,7 @@ function windowSession(c: Context): { id: string; path: string } {
  */
 authApi.get('/desktop-pair', (c) => {
   if (!takeNonce(c.req.query('nonce'))) return c.redirect('/#/pair?desktop=expired', 303);
-  const { id, path } = windowSession(c);
-  setCookie(c, deviceCookieName(), id, cookieOptions(c, DESKTOP_PAIR_COOKIE_PATH));
-  return c.redirect(`/?api=${encodeURIComponent(path)}`);
+  return c.redirect(`/?api=${encodeURIComponent(windowSession(c))}`);
 });
 
 /**

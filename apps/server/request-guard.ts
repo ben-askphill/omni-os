@@ -161,10 +161,19 @@ export const useThreadTokenCheck = (fn: typeof threadTokenCheck) => {
  */
 const onItsPath = (s: Session, base: string) => s.kind !== 'browser' || (s.cookiePath ?? '/api') === base;
 
-/** A load that becomes a document: a tab, a frame, a download. Its address would show the page's key. */
+/**
+ * A load that becomes a document: a tab, a frame, a download. Its address would show the page's key. A browser that
+ * sends no Sec-Fetch headers (Safari before 16.4) still asks for a page as text/html, which fetch, images and streams
+ * do not.
+ */
 const DOCUMENT_DESTS = ['document', 'iframe', 'frame', 'embed', 'object'];
-const documentLoad = (c: Context) =>
-  c.req.method === 'GET' && (c.req.header('sec-fetch-mode') === 'navigate' || DOCUMENT_DESTS.includes(c.req.header('sec-fetch-dest') ?? ''));
+function documentLoad(c: Context): boolean {
+  if (c.req.method !== 'GET') return false;
+  const mode = c.req.header('sec-fetch-mode');
+  const dest = c.req.header('sec-fetch-dest');
+  if (mode === undefined && dest === undefined) return (c.req.header('accept') ?? '').includes('text/html');
+  return mode === 'navigate' || DOCUMENT_DESTS.includes(dest ?? '');
+}
 
 const bearer = (c: Context) => c.req.header('authorization')?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];
 

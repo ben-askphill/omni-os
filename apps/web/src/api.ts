@@ -4,7 +4,7 @@ import type { DiskLevel } from '@omni/shared/disk-space.ts';
 import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
 import type { MachineStats } from '@omni/shared/machines.ts';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { apiUrl, rememberApiBase } from './api-base.ts';
+import { apiBase, apiUrl, movedSince, rememberApiBase } from './api-base.ts';
 import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '@omni/server/harness/types.ts';
@@ -554,7 +554,14 @@ const keepApiBase = async (res: Response) => rememberApiBase(((await res.json().
 
 /** Whether this browser holds a live session in its HttpOnly cookie. The answer names where its requests go. */
 export async function isPaired(): Promise<boolean> {
-  const res = await fetch(apiUrl('/auth'));
+  const base = apiBase();
+  let res = await fetch(`${base}/auth`);
+  // Several tabs that reload at once after an update: the first moves the session onto a keyed path, which ends the
+  // others' copy of the old cookie. Once that tab has kept the new path, check again on it.
+  if (res.status === 401 && base === '/api') {
+    await new Promise((done) => setTimeout(done, 500));
+    if (movedSince(base)) res = await fetch(apiUrl('/auth'));
+  }
   if (res.status === 401) return false;
   if (!res.ok) throw new ApiError(`Request failed (${res.status})`, res.status);
   await keepApiBase(res);

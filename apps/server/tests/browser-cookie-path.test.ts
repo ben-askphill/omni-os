@@ -156,10 +156,23 @@ describe("a paired browser's session cookie, with another service on a sibling p
     const before = auth.listSessions().length;
     const api = await pair();
     expect(api).toMatch(/^\/api\/k\/[0-9a-f]{32}$/);
+    const device = jar.cookies.find((c) => c.name.startsWith('omni_device_'))!;
+    expect(device.path).toBe('/api/auth/desktop-pair');
     expect(await pair()).toBe(api);
     expect(auth.listSessions()).toHaveLength(before + 1);
     expect((await jar.fetch(`${OMNI}${api}/channels`, { headers: fromPage })).status).toBe(200);
     expect((await visitSibling(jar)).join('\n')).not.toContain(sessionCookieName());
+
+    // The id cookie is set only with the session cookie, so the two run out together. Once both have, the window gets a
+    // session it holds again rather than a path whose cookie is gone.
+    const reuse = await fetch(`${OMNI}/api/auth/desktop-nonce`, { method: 'POST', headers: { authorization: `Bearer ${process.env.OMNI_TOKEN}` } });
+    const { nonce } = (await reuse.json()) as { nonce: string };
+    const again = await fetch(`${OMNI}/api/auth/desktop-pair?nonce=${nonce}`, { redirect: 'manual', headers: { cookie: jar.header(`${OMNI}/api/auth/desktop-pair`), 'sec-fetch-site': 'none' } });
+    expect(again.headers.getSetCookie()).toEqual([]);
+    jar.cookies = [];
+    const fresh = await pair();
+    expect(fresh).not.toBe(api);
+    expect((await jar.fetch(`${OMNI}${fresh}/channels`, { headers: fromPage })).status).toBe(200);
   });
 
   it('sends a document load on the keyed path to a signed address for that one URL, which shows no key', async () => {

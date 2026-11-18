@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { apiBase, apiUrl, onApiBase, rememberApiBase, resetApiBase, takeApiParam } from '../src/api-base.ts';
+import { apiBase, apiUrl, movedSince, onApiBase, rememberApiBase, resetApiBase, sharedApiUrl, takeApiParam } from '../src/api-base.ts';
 
 // Where the page's /api requests go (apps/server/browser-session.ts): /api, or the session cookie's own keyed path,
 // kept in localStorage on this origin.
@@ -54,12 +54,41 @@ describe('apiBase', () => {
 describe('takeApiParam', () => {
   it("keeps the desktop app's ?api= and gives the address without it", () => {
     const s = memoryStore();
-    expect(takeApiParam({ pathname: '/', search: `?api=${encodeURIComponent(KEY)}`, hash: '#/t/abc' }, s)).toBe('/#/t/abc');
+    expect(takeApiParam({ pathname: '/', search: `?api=${encodeURIComponent(KEY)}`, hash: '#/t/abc' }, s, true)).toBe('/#/t/abc');
     expect(apiBase(s)).toBe(KEY);
-    expect(takeApiParam({ pathname: '/', search: `?x=1&api=${KEY}`, hash: '' }, s)).toBe('/?x=1');
+    expect(takeApiParam({ pathname: '/', search: `?x=1&api=${KEY}`, hash: '' }, s, true)).toBe('/?x=1');
+  });
+
+  it("takes it only in the desktop app, and only a keyed path, so a link from another site cannot unpair a browser", () => {
+    const s = memoryStore();
+    rememberApiBase(KEY, s);
+    resetApiBase();
+    expect(takeApiParam({ pathname: '/', search: '?api=%2Fapi', hash: '#/' }, s, false)).toBe('/#/');
+    expect(takeApiParam({ pathname: '/', search: `?api=/api/k/${'ef56'.repeat(8)}`, hash: '#/' }, s, false)).toBe('/#/');
+    expect(takeApiParam({ pathname: '/', search: '?api=%2Fapi', hash: '#/' }, s, true)).toBe('/#/');
+    expect(apiBase(s)).toBe(KEY);
   });
 
   it('leaves an address without one alone', () => {
-    expect(takeApiParam({ pathname: '/', search: '', hash: '#/' }, memoryStore())).toBeNull();
+    expect(takeApiParam({ pathname: '/', search: '', hash: '#/' }, memoryStore(), true)).toBeNull();
+  });
+});
+
+describe('movedSince', () => {
+  it('tells a check another tab overtook: it went to /api, and that tab has since kept a keyed path', () => {
+    const s = memoryStore();
+    expect(movedSince('/api', s)).toBe(false);
+    rememberApiBase(KEY, s);
+    expect(movedSince('/api', s)).toBe(true);
+    expect(movedSince(KEY, s)).toBe(false);
+  });
+});
+
+describe('sharedApiUrl', () => {
+  it('copies an /api address without the key, which stays on this origin', () => {
+    const s = memoryStore();
+    rememberApiBase(KEY, s);
+    expect(sharedApiUrl(`${KEY}/artifacts/1/raw?v=2`, 'http://127.0.0.1:4747/#/t/x')).toBe('http://127.0.0.1:4747/api/artifacts/1/raw?v=2');
+    expect(sharedApiUrl('/api/artifacts/1/raw', 'https://box.tail1.ts.net/')).toBe('https://box.tail1.ts.net/api/artifacts/1/raw');
   });
 });
