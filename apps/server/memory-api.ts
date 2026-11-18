@@ -3,6 +3,10 @@
 // only propose, never approve, edit or delete, because an approved fact is a prompt every later thread in the channel
 // runs with. A thread other than the Conductor proposes only for its own channel, so what it saw in one client's work
 // cannot land in another's. Text is masked for secrets before it is saved. Its own app so tests call it directly.
+// The header holds the path agents are told to use (the Conductor's tools), not a determined one, as automation-guard.ts
+// says of its own rules: every thread can read the install token (sandbox.ts), so a shell call without the header reads
+// as the user's and can approve. Closing that needs tokens scoped to one thread, for this route, crew files and
+// automations alike.
 import { Hono } from 'hono';
 import { parseMemoryText, sortLearnings } from '@omni/shared/memory.ts';
 import { CALLER_HEADER } from './automation-guard.ts';
