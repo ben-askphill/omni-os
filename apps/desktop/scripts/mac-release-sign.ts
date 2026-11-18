@@ -11,7 +11,7 @@
 // The app comes from a build job that ran package code, so before signing it refuses a link that leads out of the app
 // and anything that is not a file, folder or link (bundleProblems).
 import { execFile } from 'node:child_process';
-import { closeSync, openSync, readSync, readdirSync, readlinkSync } from 'node:fs';
+import { closeSync, lstatSync, openSync, readSync, readdirSync, readlinkSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
@@ -56,10 +56,17 @@ function readHeader(path: string): Uint8Array {
 }
 
 /**
- * Why the app at `app` may not be signed: each link that is absolute or leads out of the app, and each entry that is
- * not a file, folder or link (a pipe, a device), as paths inside the app. Empty when there is none.
+ * Why the app at `app` may not be signed: it is not a folder itself, or it holds a link that is absolute, leads
+ * nowhere or lands outside the app once every link on the way is followed, or an entry that is not a file, folder or
+ * link (a pipe, a device). Paths are inside the app. Empty when there is none.
  */
 export function bundleProblems(app: string): string[] {
+  const top = lstatSync(app);
+  if (top.isSymbolicLink() || !top.isDirectory()) return [`${app} is not a folder`];
+  // realpathSync.native is the system's realpath(3), which follows each link before the .. after it. Node's own
+  // realpathSync joins a link's target with what follows as text first, so a/../.. through a link lands elsewhere.
+  const root = realpathSync.native(app);
+  const within = (path: string) => path === root || path.startsWith(`${root}${sep}`);
   const problems: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -67,9 +74,16 @@ export function bundleProblems(app: string): string[] {
       const inside = relative(app, path);
       if (entry.isSymbolicLink()) {
         const target = readlinkSync(path);
-        const lands = relative(app, resolve(dirname(path), target));
-        if (isAbsolute(target) || lands === '..' || lands.startsWith(`..${sep}`) || isAbsolute(lands)) {
+        let lands: string | null = null;
+        try {
+          lands = realpathSync.native(path);
+        } catch {
+          lands = null;
+        }
+        if (isAbsolute(target) || (lands !== null && !within(lands)) || !within(resolve(root, relative(app, dirname(path)), target))) {
           problems.push(`${inside} links to ${target}, outside the app`);
+        } else if (lands === null) {
+          problems.push(`${inside} links to ${target}, which leads nowhere`);
         }
       } else if (entry.isDirectory()) {
         walk(path);

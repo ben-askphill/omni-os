@@ -67,12 +67,34 @@ describe('bundleProblems', () => {
     const app = fakeApp();
     symlinkSync('/Users/runner/work/omni-os/omni-os', join(app, 'Contents/Resources/repo'));
     symlinkSync('../../../outside', join(app, 'Contents/Resources/up'));
+    symlinkSync('missing', join(app, 'Contents/Resources/dangling'));
     execFileSync('mkfifo', [join(app, 'Contents/Resources/pipe')]);
     expect(bundleProblems(app)).toEqual([
+      'Contents/Resources/dangling links to missing, which leads nowhere',
       'Contents/Resources/pipe is not a file, folder or link',
       'Contents/Resources/repo links to /Users/runner/work/omni-os/omni-os, outside the app',
       'Contents/Resources/up links to ../../../outside, outside the app',
     ]);
+  });
+
+  it('follows a chain of links to where it really lands', () => {
+    const app = fakeApp();
+    const outside = mkdtempSync(join(scratch, 'outside-'));
+    // hop names a path inside the app on its own; only through the second link does it land outside.
+    mkdirSync(join(app, 'Contents/Resources/deep/er'), { recursive: true });
+    symlinkSync(outside, join(app, 'Contents/Resources/deep/er/out'));
+    symlinkSync('deep/er/out/../..', join(app, 'Contents/Resources/hop'));
+    expect(bundleProblems(app)).toEqual([
+      `Contents/Resources/deep/er/out links to ${outside}, outside the app`,
+      'Contents/Resources/hop links to deep/er/out/../.., outside the app',
+    ]);
+  });
+
+  it('refuses an app that is itself a link', () => {
+    const app = fakeApp();
+    const link = join(dirname(app), 'Linked.app');
+    symlinkSync(app, link);
+    expect(bundleProblems(link)).toEqual([`${link} is not a folder`]);
   });
 
   it('stops signApp before codesign runs', async () => {

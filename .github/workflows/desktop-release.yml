@@ -136,7 +136,9 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/app"
           tar -xzf omni-mac-unsigned.tar.gz -C "$RUNNER_TEMP/app"
-          echo "APP=$RUNNER_TEMP/app/Omni.app" >> "$GITHUB_ENV"
+          app="$RUNNER_TEMP/app/Omni.app"
+          [[ -d "$app" && ! -L "$app" ]] || { echo '::error::Omni.app in the build is not a folder'; exit 1; }
+          echo "APP=$app" >> "$GITHUB_ENV"
       # The repo at the commit the build job built, for the signing script, the entitlements and Apple's certificates.
       - uses: actions/checkout@v5
         with:
