@@ -14,6 +14,11 @@ describe('Settings sections on the phone', () => {
     expect(settingsGroups()[0].title).toBe('Omni');
   });
 
+  it('leaves Crew out until the app has its screen (crew plan slice S8), in the list and in search', () => {
+    expect(settingsGroups().flatMap((g) => g.rows.map((r) => r.id))).not.toContain('crew');
+    expect(settingsHits('charter')).toEqual([]);
+  });
+
   it('opens notifications and secrets on their own screens', () => {
     expect(targetOf('notifications')).toEqual({ route: 'NotificationSettings' });
     expect(targetOf('secrets')).toEqual({ route: 'Secrets' });

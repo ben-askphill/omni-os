@@ -1,5 +1,6 @@
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { autoAvatarColor } from '@omni/shared/avatar-color.ts';
+import { claudeModelId } from '@omni/shared/claude-aliases.ts';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
@@ -50,7 +51,11 @@ function AutoValue({ label, value, note, onEdit }: { label: string; value: strin
 /** Bigger than any SVG that could be kept once cleaned, so it is refused before being read. */
 const SVG_FILE_MAX = 512 * 1024;
 
-function IconPicker({ value, name, avatarBg, omni, onChange }: { avatarBg?: string; value: string; name: string; omni?: boolean; onChange: (v: string) => void }) {
+/**
+ * A channel's or crew role's icon: an emoji, one of the shared icons or, unless `svg` is off, an uploaded SVG. A crew
+ * role's lives in its markdown file, where an SVG would not read.
+ */
+export function IconPicker({ value, name, avatarBg, omni, onChange, svg = true, inputId = 'ch-icon', preview }: { avatarBg?: string; value: string; name: string; omni?: boolean; onChange: (v: string) => void; svg?: boolean; inputId?: string; preview?: ReactNode }) {
   const mark = parseChannelIcon(value);
   const fileRef = useRef<HTMLInputElement>(null);
   const [svgError, setSvgError] = useState<string | null>(null);
@@ -72,18 +77,20 @@ function IconPicker({ value, name, avatarBg, omni, onChange }: { avatarBg?: stri
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Avatar name={name} omni={omni} channelIcon={value} avatarBg={avatarBg} size={36} />
+        {preview ?? <Avatar name={name} omni={omni} channelIcon={value} avatarBg={avatarBg} size={36} />}
         <input
-          id="ch-icon"
+          id={inputId}
           className="field w-24 text-center !text-[18px] placeholder:!text-[13px]"
           value={mark?.kind === 'emoji' ? mark.text : ''}
           onChange={(e) => change(lastGrapheme(e.target.value))}
           placeholder="Emoji"
           aria-label="Emoji"
         />
-        <Button type="button" icon="image" onClick={() => fileRef.current?.click()}>
-          {mark?.kind === 'svg' ? 'Replace SVG' : 'Upload SVG'}
-        </Button>
+        {svg && (
+          <Button type="button" icon="image" onClick={() => fileRef.current?.click()}>
+            {mark?.kind === 'svg' ? 'Replace SVG' : 'Upload SVG'}
+          </Button>
+        )}
         <input
           ref={fileRef}
           type="file"
@@ -131,7 +138,9 @@ export function RunDefaultsField({ channel, value, onChange, noReset }: { channe
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(channel));
   if (!harnesses) return null;
   const unset = !(value.harness || value.model || value.effort);
-  const choice = unset || asksAuto(value) ? AUTO_CHOICE : { harness: value.harness || 'claude-code', model: value.model };
+  // A role's file can name a Claude alias (`opus`): the pickers list catalog ids.
+  const harness = value.harness || 'claude-code';
+  const choice = unset || asksAuto(value) ? AUTO_CHOICE : { harness, model: harness === 'claude-code' && value.model ? claudeModelId(value.model) : value.model };
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <ModelPicker

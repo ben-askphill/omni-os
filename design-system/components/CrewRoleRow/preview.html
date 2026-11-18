@@ -1,0 +1,49 @@
+<!-- @dsCard group="13 Panels" name="CrewRoleRow — Settings > Crew" subtitle="Avatar, name, source chips, description and run line; light and dark" width=1120 height=760 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+body{margin:0;padding:20px 24px;background:var(--canvas);color:var(--fg);font:var(--type-body)}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.pane{min-width:0;padding:14px 16px;border-radius:var(--r-2xl);background:var(--bg);color:var(--fg);box-shadow:0 0 0 1px var(--line)}
+.pane h3{margin:2px 0 10px;font:500 12px/1.2 var(--font-sans);color:var(--fg-3)}
+.card{padding:16px 18px;border-radius:20px;background:var(--surface)}
+.card h2{margin:0;font:500 15px/1.3 var(--font-sans)}
+.card .sub{margin:2px 0 12px;font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3)}
+.row{display:flex;gap:12px;align-items:flex-start;padding:10px 4px;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.av{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:var(--surface-2);color:var(--fg-2);font:500 12.5px/1 var(--font-rounded,var(--font-sans))}
+.av svg{width:17px;height:17px}
+.dim{opacity:.5}
+.body{min-width:0;flex:1}
+.name{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.name b{font:500 13px/1.3 var(--font-sans)}
+.chip{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;font:500 11px/1 var(--font-sans)}
+.chip.default{background:var(--surface-2);color:var(--fg-2)}
+.chip.outline{box-shadow:inset 0 0 0 1px var(--line-strong);color:var(--fg-3)}
+.chip.needs{background:var(--needs);color:var(--on-needs)}
+.desc{margin:2px 0 0;font:400 12.5px/1.4 var(--font-sans);color:var(--fg-3)}
+.run{margin:2px 0 0;font:400 12px/1.4 var(--font-sans);color:var(--fg-3)}
+.chev{flex:none;margin-top:4px;color:var(--fg-3)}
+</style>
+</head><body>
+<template id="rows">
+  <div class="card">
+    <h2>Crew roles</h2>
+    <p class="sub">A thread started as a role runs with its charter. The Conductor hands work to the ones it may delegate to.</p>
+    <div class="row"><span class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="5"/></svg></span><div class="body"><div class="name"><b>Conductor</b><span class="chip outline">Built-in</span></div><p class="desc">Front agent. Routes every piece of work to a crew thread.</p><p class="run">Auto · #conductor · routes only</p></div><span class="chev">›</span></div>
+    <div class="row"><span class="av" style="background:#d4e9fa;color:#17181a">&#128295;</span><div class="body"><div class="name"><b>Builder</b><span class="chip default">Edited</span></div><p class="desc">Writes code in a repo channel and opens PRs.</p><p class="run">Auto</p></div><span class="chev">›</span></div>
+    <div class="row"><span class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/></svg></span><div class="body"><div class="name"><b>Researcher</b><span class="chip default">Edited</span><span class="chip default">Built-in charter changed</span></div><p class="desc">Research, audits and answers to client questions.</p><p class="run">Codex · GPT 6.1 Sol · high</p></div><span class="chev">›</span></div>
+    <div class="row"><span class="av dim">RE</span><div class="body"><div class="name"><b style="color:var(--fg-3)">Reviewer</b><span class="chip outline">Built-in</span><span class="chip outline">Hidden</span></div><p class="desc">Reviews a pull request against its brief.</p><p class="run">Auto</p></div><span class="chev">›</span></div>
+    <div class="row"><span class="av" style="background:#f5e6ba">&#128722;</span><div class="body"><div class="name"><b>Store ops</b><span class="chip default">Yours</span></div><p class="desc">Hands-on store work: admin, theme checks, imports.</p><p class="run">Auto · #acme</p></div><span class="chev">›</span></div>
+    <div class="row"><span class="av">VA</span><div class="body"><div class="name"><b>VPS agent</b><span class="chip default">Yours</span><span class="chip needs">Can't run here</span></div><p class="desc">Runs on a harness this machine does not have.</p><p class="run">vps-agent · its default model</p></div><span class="chev">›</span></div>
+  </div>
+</template>
+<div class="pair">
+  <div class="pane" data-theme="light"><h3>Light</h3><div class="slot"></div></div>
+  <div class="pane" data-theme="dark"><h3>Dark</h3><div class="slot"></div></div>
+</div>
+<script>
+for (const slot of document.querySelectorAll('.slot')) slot.appendChild(document.getElementById('rows').content.cloneNode(true));
+</script>
+</body></html>

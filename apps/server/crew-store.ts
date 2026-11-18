@@ -10,7 +10,8 @@
 import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { publishFeed } from './bus.ts';
-import { charterHash, CREW_ID, crewTexts, getCrew, mergeCrew, parseCrewFile, removeOwnCrew, splitCrewFile, UNHIDEABLE, writeOwnCrew, type CrewRole } from './crew.ts';
+import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
+import { AVATAR_BG, charterHash, CREW_ID, crewTexts, getCrew, mergeCrew, mergeSources, parseCrewFile, removeOwnCrew, splitCrewFile, UNHIDEABLE, writeOwnCrew, type CrewRole } from './crew.ts';
 import { record } from './db/sync.ts';
 import { validateRun, type Catalog } from './harness/catalog.ts';
 import { asksAuto } from './harness/auto.ts';
@@ -33,18 +34,33 @@ const OMNI_MCP = new Set(['omni']);
 
 const optText = (max: number) => z.string().trim().max(max).optional();
 
-/** What a client sets, by frontmatter key. An empty string removes the key: an overlay then falls back to the built-in. */
+/** A role's avatar: a shared icon (`icon:<name>`) or one emoji, and a hex background. Null removes it. */
+const avatar = z
+  .object({
+    icon: z
+      .string()
+      .max(64)
+      .refine((v) => ['glyph', 'emoji'].includes(parseChannelIcon(v)?.kind ?? ''), 'An avatar icon is one of the shared icons or one emoji.')
+      .optional(),
+    bg: z.string().regex(AVATAR_BG, 'An avatar background is a hex color like #f5e6ba.').optional(),
+  })
+  .strict()
+  .nullable()
+  .optional();
+
+/** What a client sets, by frontmatter key. An empty string or null removes the key: an overlay then falls back to the built-in. */
 export const crewFields = z
   .object({
     name: optText(80),
     description: optText(500),
+    avatar,
     harness: optText(80),
     model: optText(120),
     effort: optText(40),
     channel: optText(100),
-    mcp: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
-    delegate_only: z.boolean().optional(),
-    delegatable: z.boolean().optional(),
+    mcp: z.array(z.string().trim().min(1).max(80)).max(20).nullable().optional(),
+    delegate_only: z.boolean().nullable().optional(),
+    delegatable: z.boolean().nullable().optional(),
   })
   .strict();
 export type CrewFields = z.infer<typeof crewFields>;
@@ -67,19 +83,41 @@ export type CrewSave = z.infer<typeof crewSave>;
 
 export interface CrewDetail {
   role: CrewRole;
+  /** The shipped role without the user's overlay: what a field set back to it falls back to. Null for a role of their own. */
+  builtIn: CrewRole | null;
   /** The shipped file, or null for a role of the user's own. */
   shipped: string | null;
   /** The user's file: their role, or their overlay on the built-in. Null for an unedited built-in. */
   own: string | null;
   /** The shipped charter's hash, which a replacing overlay records as `based_on`. */
   shippedHash: string | null;
+  /** The charters as written, placeholders kept: the built-in's, the user's file's body, and the one the role runs with. */
+  charters: { builtIn: string | null; own: string | null; effective: string };
 }
 
 export function crewDetail(id: string): CrewDetail | null {
   const role = getCrew(id);
   if (!role) return null;
   const { shipped, own } = crewTexts(id);
-  return { role, shipped, own, shippedHash: shipped === null ? null : charterHash(splitCrewFile(shipped).body) };
+  return detailOf(role, shipped, own);
+}
+
+function detailOf(role: CrewRole, shipped: string | null, own: string | null): CrewDetail {
+  const id = role.id;
+  const base = shipped === null ? null : splitCrewFile(shipped);
+  const mine = own === null ? null : splitCrewFile(own);
+  return {
+    role,
+    builtIn: shipped === null ? null : { ...parseCrewFile(id, shipped), kind: 'shipped', hidden: role.hidden },
+    shipped,
+    own,
+    shippedHash: base ? charterHash(base.body) : null,
+    charters: {
+      builtIn: base?.body ?? null,
+      own: mine?.body ?? null,
+      effective: base && mine ? mergeSources(base, mine).body : (base ?? mine)!.body,
+    },
+  };
 }
 
 /** Write the user's file and send it to the other machines (sync/handlers/crew-file.ts). */
@@ -153,38 +191,75 @@ export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts:
     throw refused(`No crew role "${id}".`, 404);
   }
 
-  let text: string;
-  if ('markdown' in save) {
-    text = save.markdown;
-    if (shipped !== null) {
-      // A hand-written overlay still records what it was written against, unless it says so itself.
-      const { doc, body } = openOwn(text);
-      if (!doc.has('based_on') && (own === null || splitCrewFile(own).body !== body)) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
-      text = serialize(doc, body);
-    }
-  } else {
-    const { doc, body: oldBody } = openOwn(own);
-    for (const [key, value] of Object.entries(save.fields ?? {})) {
-      if (value === undefined) continue;
-      if (value === '' || (Array.isArray(value) && !value.length && shipped === null)) doc.delete(key);
-      else doc.set(key, value);
-    }
-    if (shipped !== null) {
-      if (save.charter_mode) doc.set('charter_mode', save.charter_mode);
-      else if (own === null) doc.set('charter_mode', 'append');
-      if (own === null || save.charter !== undefined || save.charter_mode) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
-    } else if (save.charter_mode) {
-      throw refused('Only an edit of a built-in role adds to or replaces its charter.');
-    }
-    text = serialize(doc, save.charter === undefined ? oldBody : save.charter.trim());
-  }
-
-  const role = shipped !== null ? mergeCrew(id, splitCrewFile(shipped), splitCrewFile(text)) : parseCrewFile(id, text);
+  const text = savedText(save, shipped, own);
+  const role = roleIn(id, shipped, text);
   if (shipped === null && !splitCrewFile(text).meta.name) throw refused('Give the role a name.');
   check(id, role, ctx);
   writeOwn(id, text);
   return crewDetail(id)!;
 }
+
+/** The user's file a save leaves: `own` with the save's keys and charter, or the save's markdown as written. */
+function savedText(save: CrewSave, shipped: string | null, own: string | null): string {
+  if ('markdown' in save) {
+    if (shipped === null) return save.markdown;
+    // A hand-written overlay still records what it was written against, unless it says so itself.
+    const { doc, body } = openOwn(save.markdown);
+    if (!doc.has('based_on') && (own === null || splitCrewFile(own).body !== body)) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
+    return serialize(doc, body);
+  }
+  const { doc, body: oldBody } = openOwn(own);
+  for (const [key, value] of Object.entries(save.fields ?? {})) {
+    if (value === undefined) continue;
+    if (value === '' || value === null || (Array.isArray(value) && !value.length && shipped === null)) doc.delete(key);
+    else doc.set(key, value);
+  }
+  if (shipped !== null) {
+    if (save.charter_mode) doc.set('charter_mode', save.charter_mode);
+    else if (own === null) doc.set('charter_mode', 'append');
+    if (own === null || save.charter !== undefined || save.charter_mode) doc.set('based_on', charterHash(splitCrewFile(shipped).body));
+  } else if (save.charter_mode) {
+    throw refused('Only an edit of a built-in role adds to or replaces its charter.');
+  }
+  return serialize(doc, save.charter === undefined ? oldBody : save.charter.trim());
+}
+
+const roleIn = (id: string, shipped: string | null, text: string): CrewRole =>
+  shipped !== null ? mergeCrew(id, splitCrewFile(shipped), splitCrewFile(text)) : parseCrewFile(id, text);
+
+/**
+ * What a save would write and the role it would make, without writing or checking it: how Settings turns its Form
+ * into the Markdown tab and back. `own` stands in for the user's file (the Markdown tab's text), so keys the form does
+ * not show stay. `id` names the role being edited; a new role has none.
+ */
+export function draftCrew(id: string | undefined, save: CrewSave, own?: string | null): { markdown: string; detail: CrewDetail } {
+  const texts = id ? crewTexts(id) : { shipped: null, own: null };
+  if (id && texts.shipped === null && texts.own === null) throw refused(`No crew role "${id}".`, 404);
+  const markdown = savedText(save, texts.shipped, own === undefined ? texts.own : own);
+  const role = { ...roleIn(id ?? 'new-role', texts.shipped, markdown), hidden: (id && getCrew(id)?.hidden) || false };
+  // A form read from a file that does not parse would come out blank, and a save from it would empty the role.
+  if (role.error) throw refused(role.error.replace(/^bad frontmatter/, 'The frontmatter is not valid YAML'));
+  return { markdown, detail: detailOf(role, texts.shipped, markdown) };
+}
+
+/** What a duplicate never copies: how an overlay joins the built-in, which a whole role of its own has no use for. */
+const OVERLAY_KEYS = ['charter_mode', 'based_on'];
+
+/**
+ * A new role of the user's own, `to`, with everything `from` has now: its fields, unknown keys included, and its whole
+ * charter as written (placeholders kept), so a copy of a built-in no longer follows the built-in.
+ */
+export function duplicateCrew(from: string, to: string, name: string | undefined, ctx: CrewSaveContext): CrewDetail {
+  const { shipped, own } = crewTexts(from);
+  if (shipped === null && own === null) throw refused(`No crew role "${from}".`, 404);
+  const source =
+    shipped !== null && own !== null ? mergeSources(splitCrewFile(shipped), splitCrewFile(own)) : splitCrewFile((shipped ?? own)!);
+  const doc = new Document(Object.fromEntries(Object.entries(source.meta).filter(([k, v]) => !OVERLAY_KEYS.includes(k) && v !== undefined && v !== null)));
+  doc.set('name', name?.trim() || `${text(source.meta.name) ?? from} copy`);
+  return saveCrew(to, { markdown: serialize(doc, source.body) }, ctx, { create: true });
+}
+
+const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
 /** Delete a role of the user's own. A built-in is hidden or reset instead. */
 export function deleteCrew(id: string) {

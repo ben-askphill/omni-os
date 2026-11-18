@@ -105,7 +105,7 @@ describe('agent writes to /api/crew', () => {
     ] as const) {
       const res = await call(method, path, body, conductor);
       expect(res.status).toBe(403);
-      expect(res.body.error).toMatch(/deletes, hides or shows crew roles, in Settings\.$/);
+      expect(res.body.error).toMatch(/(deletes|hides or shows) crew roles, in Settings\.$/);
     }
     expect(getCrew('scratch')).toBeDefined();
     expect(getCrew('builder')?.hidden).toBe(false);

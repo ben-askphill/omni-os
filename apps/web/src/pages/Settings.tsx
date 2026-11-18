@@ -24,6 +24,7 @@ import { SecretsSection } from './Secrets.tsx';
 import { AppServerRows, DesktopSection, ZoomRow } from './SettingsDesktop.tsx';
 import { NotificationsCard } from './SettingsNotifications.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
+import { CrewSection } from './SettingsCrew.tsx';
 import { AccountsSection } from './SettingsAccounts.tsx';
 import { StorageSection } from './Storage.tsx';
 import { PathMapEditor, SyncSection } from './Sync.tsx';
@@ -105,6 +106,8 @@ function SectionBody({ section }: { section: SettingsSection }) {
       return <NotificationsCard scoped={channel?.id} />;
     case 'models':
       return <ModelsSection hermes={<ConfigSection part="models" />} />;
+    case 'crew':
+      return <CrewSection />;
     case 'accounts':
       return <AccountsSection />;
     case 'threads':

@@ -53,6 +53,13 @@
       "scoped": true
     },
     {
+      "id": "crew",
+      "group": "agents",
+      "title": "Crew",
+      "icon": "delegate",
+      "blurb": "The roles threads run as: their charters, run defaults and powers."
+    },
+    {
       "id": "accounts",
       "group": "agents",
       "title": "Accounts",
@@ -319,6 +326,30 @@
         "binary",
         "path",
         ".env"
+      ]
+    },
+    {
+      "id": "crew-roles",
+      "section": "crew",
+      "title": "Crew roles",
+      "keywords": [
+        "role",
+        "roles",
+        "charter",
+        "conductor",
+        "builder",
+        "reviewer",
+        "researcher",
+        "inbox",
+        "agent",
+        "agents",
+        "persona",
+        "prompt",
+        "instructions",
+        "new role",
+        "duplicate",
+        "hide",
+        "reset"
       ]
     },
     {

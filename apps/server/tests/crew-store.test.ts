@@ -126,6 +126,84 @@ describe('a role of the user own', () => {
   });
 });
 
+describe('Settings > Crew (S3)', () => {
+  it('saves an avatar of a shared icon or an emoji with a hex background, and drops it on null', async () => {
+    const res = await send('PUT', '/crew/builder', { fields: { avatar: { icon: 'icon:zap', bg: '#F5E6BA' } } });
+    expect(res.status).toBe(200);
+    expect((await json(res)).role.avatar).toEqual({ icon: 'icon:zap', bg: '#f5e6ba' });
+    expect(own('builder')).toContain('avatar:\n  icon: icon:zap\n  bg: "#F5E6BA"');
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: { icon: '🛒' } } })).status).toBe(200);
+    expect(getCrew('builder')?.avatar).toEqual({ icon: '🛒' });
+    // An uploaded SVG would not read in a file, and a color must be hex.
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: { icon: 'svg:<svg/>' } } })).status).toBe(400);
+    expect((await send('PUT', '/crew/builder', { fields: { avatar: { bg: 'amber' } } })).status).toBe(400);
+    await send('PUT', '/crew/builder', { fields: { avatar: null } });
+    expect(getCrew('builder')?.avatar).toBeUndefined();
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('a field set back to null leaves the overlay, so the built-in sets it again', async () => {
+    await send('PUT', '/crew/builder', { fields: { delegatable: false, mcp: ['omni'], delegate_only: true } });
+    expect(getCrew('builder')).toMatchObject({ delegatable: false, delegateOnly: true, mcp: ['omni'] });
+    await send('PUT', '/crew/builder', { fields: { delegatable: null, mcp: null, delegate_only: null } });
+    expect(getCrew('builder')).toMatchObject({ delegatable: true, delegateOnly: false, mcp: [] });
+    expect(own('builder')).not.toMatch(/delegatable|mcp|delegate_only/);
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('shows the built-in alone and the charters as written beside the role', async () => {
+    await send('PUT', '/crew/builder', { fields: { model: 'opus' }, charter: 'Use {{user}}\'s pnpm.' });
+    const d = await json(await send('GET', '/crew/builder'));
+    expect(d.builtIn).toMatchObject({ kind: 'shipped', model: 'auto', name: 'Builder' });
+    expect(d.role.model).toBe('opus');
+    expect(d.charters).toEqual({ builtIn: 'You write, test and ship code.', own: "Use {{user}}'s pnpm.", effective: "You write, test and ship code.\n\nUse {{user}}'s pnpm." });
+    await send('POST', '/crew/builder/reset');
+    expect((await json(await send('GET', '/crew/builder'))).charters).toEqual({ builtIn: 'You write, test and ship code.', own: null, effective: 'You write, test and ship code.' });
+  });
+
+  it('turns the form into the file and the file into the form without writing, keeping keys the form does not show', async () => {
+    const saved = '---\nruntime: vps-agent\nmodel: opus\ncharter_mode: append\n---\nUse pnpm.\n';
+    writeOwn('builder', saved);
+    // The Markdown tab's text, edited: the form reads the role it makes.
+    const typed = '---\nruntime: vps-agent\nmodel: opus\ndescription: Builds and tests.\ncharter_mode: append\n---\nUse pnpm. Run the tests.\n';
+    const toForm = await send('POST', '/crew/draft', { id: 'builder', save: { markdown: typed } });
+    expect(toForm.status).toBe(200);
+    const read = (await json(toForm)).detail;
+    expect(read.role).toMatchObject({ kind: 'edited', description: 'Builds and tests.', model: 'opus', charterMode: 'append' });
+    expect(read.charters.own).toBe('Use pnpm. Run the tests.');
+    // A form edit laid over that text keeps the key the form never shows, and the file's own edit.
+    const md = (await json(await send('POST', '/crew/draft', { id: 'builder', own: typed, save: { fields: { effort: 'high' } } }))).markdown;
+    expect(md).toBe('---\nruntime: vps-agent\nmodel: opus\ndescription: Builds and tests.\ncharter_mode: append\neffort: high\n---\nUse pnpm. Run the tests.\n');
+    // Nothing is written.
+    expect(own('builder')).toBe(saved);
+    // A file that does not parse is refused rather than read as a blank form, and a new role has no id yet.
+    expect((await send('POST', '/crew/draft', { id: 'builder', save: { markdown: '---\nmodel: [\n---\nx\n' } })).status).toBe(400);
+    expect((await send('POST', '/crew/draft', { save: { markdown: '---\nname: [\n---\nx\n' } })).status).toBe(400);
+    expect((await json(await send('POST', '/crew/draft', { save: { fields: { name: 'Store ops' }, charter: 'Dry run.' } }))).markdown).toBe('---\nname: Store ops\n---\nDry run.\n');
+    expect((await send('POST', '/crew/draft', { id: 'nope', save: { fields: {} } })).status).toBe(404);
+    await send('POST', '/crew/builder/reset');
+  });
+
+  it('duplicates a role into one of the user own, with the whole charter as written', async () => {
+    await send('PUT', '/crew/builder', { fields: { model: 'opus', avatar: { icon: 'icon:tool' } }, charter: 'Use pnpm.' });
+    const res = await send('POST', '/crew/builder/duplicate', { id: 'builder-two', name: 'Builder two' });
+    expect(res.status).toBe(201);
+    const copy = (await json(res)).role;
+    expect(copy).toMatchObject({ id: 'builder-two', kind: 'own', name: 'Builder two', model: 'opus', description: 'Writes code.', avatar: { icon: 'icon:tool' } });
+    expect(copy.charter).toBe('You write, test and ship code.\n\nUse pnpm.');
+    expect(own('builder-two')).not.toMatch(/charter_mode|based_on/);
+    // No name: "<name> copy". A taken or reserved id is refused.
+    expect((await json(await send('POST', '/crew/builder/duplicate', { id: 'builder-three' }))).role.name).toBe('Builder copy');
+    expect((await send('POST', '/crew/builder/duplicate', { id: 'builder-two' })).status).toBe(409);
+    expect((await send('POST', '/crew/builder/duplicate', { id: 'reviewer' })).status).toBe(409);
+    expect((await send('POST', '/crew/nope/duplicate', { id: 'nope-two' })).status).toBe(404);
+    // Never from an agent thread: a copy carries the role's powers.
+    expect((await send('POST', '/crew/builder/duplicate', { id: 'sneaky' }, { 'x-omni-thread': 'some-thread' })).status).toBe(403);
+    for (const id of ['builder-two', 'builder-three']) await send('DELETE', `/crew/${id}`);
+    await send('POST', '/crew/builder/reset');
+  });
+});
+
 describe('hiding a built-in', () => {
   it('leaves it out of the list and refuses new threads as it, but a running thread keeps its charter', async () => {
     expect((await json(await send('POST', '/crew/reviewer/hidden', { hidden: true }))).role.hidden).toBe(true);

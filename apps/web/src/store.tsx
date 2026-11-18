@@ -130,6 +130,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setMods(e.mods);
         } else if (e.type === 'needs_you') {
           needsYouChanged();
+        } else if (e.type === 'crew') {
+          // A role saved in Settings, by the Conductor or on another machine: the pickers list the new set.
+          reloadCrew();
         }
         emit(e);
       },

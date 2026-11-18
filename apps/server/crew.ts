@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import YAML from 'yaml';
+import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { paths } from './config.ts';
 import { fillPlaceholders, userConfig } from './user-config.ts';
 
@@ -22,10 +23,19 @@ export type CrewKind = 'shipped' | 'edited' | 'own';
 /** How an overlay's body joins the shipped charter. */
 export type CharterMode = 'append' | 'replace';
 
+/** A role's own look, as a channel's: an icon (`icon:<name>` from the shared set, or one emoji) and a background. */
+export interface CrewAvatar {
+  icon?: string;
+  /** A six-digit hex color. */
+  bg?: string;
+}
+
 export interface CrewRole {
   id: string;
   name: string;
   description: string;
+  /** Unset: a built-in keeps its mark, any other role its monogram. */
+  avatar?: CrewAvatar;
   harness?: string;
   model?: string;
   effort?: string;
@@ -81,6 +91,20 @@ export function splitCrewFile(src: string): CrewSource {
 export const charterHash = (body: string) => createHash('sha256').update(body.trim()).digest('hex').slice(0, 12);
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+export const AVATAR_BG = /^#[0-9a-f]{6}$/i;
+
+/** The avatar a file names: a shared icon or an emoji (never an uploaded SVG, which would not read in a file), and a hex color. */
+export function avatarOf(v: unknown): CrewAvatar | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const { icon, bg } = v as Record<string, unknown>;
+  const kind = typeof icon === 'string' ? parseChannelIcon(icon)?.kind : undefined;
+  const out: CrewAvatar = {
+    ...(kind === 'glyph' || kind === 'emoji' ? { icon: icon as string } : {}),
+    ...(typeof bg === 'string' && AVATAR_BG.test(bg) ? { bg: bg.toLowerCase() } : {}),
+  };
+  return out.icon || out.bg ? out : undefined;
+}
 /** A field the overlay sets wins; one it leaves out (or empties) falls back to the shipped file's. */
 const pick = (key: string, over: Record<string, unknown>, base: Record<string, unknown>) =>
   over[key] !== undefined && over[key] !== null && over[key] !== '' ? over[key] : base[key];
@@ -90,6 +114,7 @@ function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: C
     id,
     name: text(meta.name) ?? id,
     description: typeof meta.description === 'string' ? meta.description : '',
+    avatar: avatarOf(meta.avatar),
     harness: text(meta.harness),
     model: text(meta.model),
     effort: text(meta.effort),
@@ -110,12 +135,18 @@ export function parseCrewFile(id: string, src: string): CrewRole {
   return roleOf(id, meta, body, 'own', error);
 }
 
-/** A built-in with the user's overlay laid over it. */
-export function mergeCrew(id: string, shipped: CrewSource, overlay: CrewSource): CrewRole {
+/** A built-in's frontmatter and charter with the overlay laid over them, placeholders not yet filled. */
+export function mergeSources(shipped: CrewSource, overlay: CrewSource): { meta: Record<string, unknown>; body: string; mode: CharterMode } {
   const keys = new Set([...Object.keys(shipped.meta), ...Object.keys(overlay.meta)]);
   const meta = Object.fromEntries([...keys].map((k) => [k, pick(k, overlay.meta, shipped.meta)]));
   const mode: CharterMode = overlay.meta.charter_mode === 'append' ? 'append' : 'replace';
   const body = mode === 'append' ? [shipped.body, overlay.body].filter(Boolean).join('\n\n') : overlay.body;
+  return { meta, body, mode };
+}
+
+/** A built-in with the user's overlay laid over it. */
+export function mergeCrew(id: string, shipped: CrewSource, overlay: CrewSource): CrewRole {
+  const { meta, body, mode } = mergeSources(shipped, overlay);
   const role = roleOf(id, meta, body, 'edited', overlay.error ?? shipped.error);
   role.charterMode = mode;
   if (mode === 'replace') role.builtInChanged = overlay.meta.based_on !== charterHash(shipped.body);

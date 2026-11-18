@@ -26,7 +26,8 @@ export function ModalFooter({ hint, children, className = '' }: { hint?: { keys:
   );
 }
 
-export function Modal({ open, onClose, children, title, wide }: { open: boolean; onClose: () => void; children: ReactNode; title?: ReactNode; wide?: boolean }) {
+/** `wide` for a page-sized view (a diff, a viewer), `roomy` for a form with long text (a crew role's charter). */
+export function Modal({ open, onClose, children, title, wide, roomy }: { open: boolean; onClose: () => void; children: ReactNode; title?: ReactNode; wide?: boolean; roomy?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useDismissable(open, onClose, { outside: false });
@@ -52,7 +53,7 @@ export function Modal({ open, onClose, children, title, wide }: { open: boolean;
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={`modal-in max-h-[92vh] w-full overflow-auto rounded-t-[28px] bg-elev pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-menu)] sm:rounded-[28px] sm:pb-0 ${wide ? 'sm:max-w-5xl' : 'sm:max-w-md'}`}
+        className={`modal-in max-h-[92vh] w-full overflow-auto rounded-t-[28px] bg-elev pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-menu)] sm:rounded-[28px] sm:pb-0 ${wide ? 'sm:max-w-5xl' : roomy ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}
       >
         {title && (
           <div className="flex items-center justify-between gap-3 py-3 pr-3 pl-6">
