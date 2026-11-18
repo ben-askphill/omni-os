@@ -11,6 +11,7 @@ const { DISPLAY_KEY } = await import('../display.ts');
 const { applyChange } = await import('../sync/apply.ts');
 await import('../sync/handlers/index.ts');
 const raw = (await import('../db.ts')).db;
+const { buildSystemPrompt } = await import('../runner/prompts.ts');
 
 const get = async () => (await metaApi.request('/display')).json();
 const put = (body: unknown) => metaApi.request('/display', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -58,5 +59,19 @@ describe('display switches', () => {
     expect(await get()).toEqual({ technical: true, shopify: false });
     expect(f.seen).toContain('display');
     f.stop();
+  });
+
+  it("gives the agent the channel's store and Portal lines only while the Shopify pack is on", async () => {
+    db.channels.update('shop', { store_domain: 'acme.myshopify.com', portal_slug: 'acme' });
+    const t = await r.start('hello');
+    const shop = db.channels.get('shop')!;
+    await put({ shopify: true });
+    const on = buildSystemPrompt(r.thread(t.id), shop);
+    expect(on).toContain('- Shopify store: acme.myshopify.com');
+    expect(on).toContain('- Ask Phill Portal company slug: acme');
+    await put({ shopify: false });
+    const off = buildSystemPrompt(r.thread(t.id), shop);
+    expect(off).not.toContain('Shopify store');
+    expect(off).not.toContain('Portal company slug');
   });
 });

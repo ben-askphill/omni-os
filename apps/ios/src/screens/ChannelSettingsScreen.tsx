@@ -12,7 +12,7 @@ import { ActivityIndicator, Alert, Keyboard, Pressable, ScrollView, StyleSheet, 
 import { ChannelAvatar } from '../components/ChannelAvatar';
 import { HeaderButton } from '../components/HeaderButton';
 import { RunOptions } from '../components/thread/RunOptions';
-import { useChannels, useLiveHub } from '../live/react';
+import { useChannels, useLiveHub, useStore } from '../live/react';
 import { useRemote } from '../live/use-remote';
 import type { RootScreenProps } from '../navigation/types';
 import { draftSheetModel } from '../newthread/draft';
@@ -53,6 +53,8 @@ function Missing({ loading }: { loading: boolean }) {
 
 function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null; navigation: RootScreenProps<'ChannelSettings'>['navigation'] }) {
   const hub = useLiveHub();
+  // The Shopify pack (Settings > Extras). An older server has no switch and keeps the store fields.
+  const shopify = useStore(hub.display)?.shopify ?? true;
   const { colors } = useOmniTheme();
   const harnesses = useRemote(loadHarnesses);
   const [form, setForm] = useState<ChannelForm>(() => channelForm(channel ?? undefined));
@@ -211,10 +213,12 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         </Group>
       ) : null}
 
+      {shopify ? (
       <Group title="Store">
         <InputRow first label="Store domain" value={form.store_domain} code keyboardType="url" placeholder="acme.myshopify.com" onChangeText={(t) => set('store_domain', t)} />
         <InputRow label="Portal slug" value={form.portal_slug} code placeholder="acme" hint="Ask Phill Portal company slug, for client context." onChangeText={(t) => set('portal_slug', t)} />
       </Group>
+      ) : null}
 
       {channel ? <ActionsGroup channel={channel} navigation={navigation} /> : null}
 

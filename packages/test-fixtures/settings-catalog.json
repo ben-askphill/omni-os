@@ -144,7 +144,7 @@
       "group": "extras",
       "title": "Extras",
       "icon": "plug",
-      "blurb": "Optional add-ons: Wispr Flow, Grok Bot, Hermes and the central brain."
+      "blurb": "Optional add-ons: Wispr Flow, Grok Bot, Shopify, Hermes and the central brain."
     },
     {
       "id": "about",
@@ -784,6 +784,22 @@
       ]
     },
     {
+      "id": "shopify",
+      "section": "extras",
+      "title": "Shopify add-on",
+      "keywords": [
+        "shopify",
+        "store",
+        "store domain",
+        "myshopify",
+        "portal",
+        "portal slug",
+        "ask phill",
+        "pack",
+        "add-on"
+      ]
+    },
+    {
       "id": "grok-bot",
       "section": "extras",
       "title": "Grok Bot",
@@ -980,6 +996,7 @@
       "expected": [
         "server",
         "channel-actions",
+        "shopify",
         "brain"
       ]
     },
