@@ -1,3 +1,4 @@
+import type { CrewLocks } from '@omni/shared/crew-settings.ts';
 import type { ClaudeArtifactsState } from '@omni/shared/claude-artifacts.ts';
 import type { DiskLevel } from '@omni/shared/disk-space.ts';
 import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
@@ -204,6 +205,8 @@ export interface CrewRole {
   delegateOnly: boolean;
   /** The Conductor may delegate to it. False for the Conductor and usage-scan. */
   delegatable: boolean;
+  /** A review role: held at high effort on GPT, and a delegation with `review_of` runs on the other model family. */
+  review: boolean;
   charter: string;
   /** Shipped with Omni, a built-in with the user's edit, or the user's own. */
   kind: 'shipped' | 'edited' | 'own';
@@ -213,6 +216,8 @@ export interface CrewRole {
   charterMode?: 'append' | 'replace';
   /** An edited built-in that replaces a shipped charter which changed since the edit. */
   builtInChanged?: boolean;
+  /** What a save may not change on a built-in Omni relies on, and what may not be done to it, with why. */
+  locks?: CrewLocks;
   error?: string;
 }
 

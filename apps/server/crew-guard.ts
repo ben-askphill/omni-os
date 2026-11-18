@@ -31,10 +31,10 @@ const BENS: Partial<Record<CrewWrite, string>> = { duplicate: 'duplicates', dele
 const EDITOR_ROLE = 'conductor';
 
 /** Frontmatter keys that give a role its powers. Only Ben sets them. */
-const POWERS = ['mcp', 'delegate_only', 'delegatable'] as const;
+const POWERS = ['mcp', 'delegate_only', 'delegatable', 'review'] as const;
 
 /** A role's powers as they compare: by frontmatter key. */
-const powersOf = (r: CrewRole): Record<(typeof POWERS)[number], unknown> => ({ mcp: [...r.mcp].sort(), delegate_only: r.delegateOnly, delegatable: r.delegatable });
+const powersOf = (r: CrewRole): Record<(typeof POWERS)[number], unknown> => ({ mcp: [...r.mcp].sort(), delegate_only: r.delegateOnly, delegatable: r.delegatable, review: r.review });
 
 /** The powers resetting role `id` would change: the ones the user's overlay sets differently from the built-in. */
 function resetPowers(id: string): string[] {

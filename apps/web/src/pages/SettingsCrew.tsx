@@ -19,7 +19,7 @@ import { CrewAvatar } from '../components/CrewAvatar.tsx';
 import { Button, Chip, ErrorNote, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from '../components/ui.tsx';
 import { useApp } from '../store.tsx';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
-import { Card } from './settings-parts.tsx';
+import { Card, LockNote } from './settings-parts.tsx';
 
 // Settings > Crew: every crew role this machine has, hidden ones included, and an editor for each (plan slice S3,
 // docs/plans/2026-11-18-user-defined-crew.md). Saves go to /api/crew (apps/server/crew-api.ts): a role of your own is
@@ -76,6 +76,7 @@ export function CrewSection() {
                       {crewRunLine(r, names)}
                       {r.channel && ` · #${r.channel}`}
                       {r.delegateOnly && ' · routes only'}
+                      {r.review && ' · reviews'}
                     </span>
                   </span>
                   <Icon name="chevronRight" size={14} className="mt-1 shrink-0 text-fg-3" />
@@ -153,14 +154,16 @@ function Field({ id, label, hint, children }: { id?: string; label: string; hint
   );
 }
 
-function Switch({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+/** A power's switch. `locked`: why the built-in keeps it as it ships, shown under the hint, with the switch off limits. */
+function Switch({ label, hint, checked, onChange, locked }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void; locked?: string }) {
   return (
     <div className="flex items-start justify-between gap-3">
       <span className="min-w-0">
         <span className="block text-[12.5px] font-medium text-fg-2">{label}</span>
         <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">{hint}</span>
+        {locked && <LockNote>{locked}</LockNote>}
       </span>
-      <Toggle checked={checked} onChange={onChange} label={label} />
+      <Toggle checked={checked} onChange={onChange} label={label} disabled={!!locked} />
     </div>
   );
 }
@@ -192,6 +195,15 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
   const d = detail.data ?? null;
   const builtIn = !!d?.builtIn;
   const role = d?.role;
+  const locked = role?.locks?.fields ?? {};
+  const refusedActions = role?.locks?.actions ?? {};
+  // What the role's action row offers: an edited built-in compares and resets, a built-in hides, a role of the user's own is deleted.
+  const can = {
+    duplicate: !refusedActions.duplicate,
+    edited: builtIn && role?.kind === 'edited',
+    hide: builtIn && (!!role?.hidden || !refusedActions.hide),
+    delete: !builtIn,
+  };
   const theId = id ?? newId ?? crewIdFrom(draft?.name ?? '');
 
   const channelOptions = useMemo<PickerOption<string>[]>(
@@ -286,24 +298,32 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
           </div>
         )}
         {role && (
-          <div className="flex flex-wrap gap-1.5" aria-label="Role actions">
-            <Button type="button" size="sm" variant="ghost" icon="copy" onClick={() => setView('duplicate')} disabled={busy}>
-              Duplicate
-            </Button>
-            {builtIn && role.kind === 'edited' && (
-              <Button type="button" size="sm" variant="ghost" icon="diff" onClick={() => setView('compare')} disabled={busy}>
-                Compare with built-in
-              </Button>
+          <div>
+            {Object.values(can).some(Boolean) && (
+              <div className="flex flex-wrap gap-1.5" aria-label="Role actions">
+                {can.duplicate && (
+                  <Button type="button" size="sm" variant="ghost" icon="copy" onClick={() => setView('duplicate')} disabled={busy}>
+                    Duplicate
+                  </Button>
+                )}
+                {can.edited && (
+                  <Button type="button" size="sm" variant="ghost" icon="diff" onClick={() => setView('compare')} disabled={busy}>
+                    Compare with built-in
+                  </Button>
+                )}
+                {can.hide && (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => void act(async () => detail.setData(await api.post<CrewDetail>(path('/hidden'), { hidden: !role.hidden })), false)} disabled={busy} title={role.hidden ? 'New threads can start as it again' : 'No new thread starts as it on this machine'}>
+                    {role.hidden ? 'Show' : 'Hide'}
+                  </Button>
+                )}
+                {can.edited && (
+                  <InlineConfirm label="Reset to built-in" icon="undo" confirmLabel="Reset" busyLabel="Resetting" onConfirm={() => act(() => api.post(path('/reset')))} />
+                )}
+                {can.delete && <InlineConfirm label="Delete" icon="trash" tone="danger" confirmLabel="Delete role" busyLabel="Deleting" onConfirm={() => act(() => api.del(path()))} />}
+              </div>
             )}
-            {builtIn && (
-              <Button type="button" size="sm" variant="ghost" onClick={() => void act(async () => detail.setData(await api.post<CrewDetail>(path('/hidden'), { hidden: !role.hidden })), false)} disabled={busy} title={role.hidden ? 'New threads can start as it again' : 'No new thread starts as it on this machine'}>
-                {role.hidden ? 'Show' : 'Hide'}
-              </Button>
-            )}
-            {builtIn && role.kind === 'edited' && (
-              <InlineConfirm label="Reset to built-in" icon="undo" confirmLabel="Reset" busyLabel="Resetting" onConfirm={() => act(() => api.post(path('/reset')))} />
-            )}
-            {!builtIn && <InlineConfirm label="Delete" icon="trash" tone="danger" confirmLabel="Delete role" busyLabel="Deleting" onConfirm={() => act(() => api.del(path()))} />}
+            {refusedActions.duplicate && <LockNote>{refusedActions.duplicate}</LockNote>}
+            {refusedActions.hide && <LockNote>{refusedActions.hide}</LockNote>}
           </div>
         )}
         {role?.builtInChanged && (
@@ -354,17 +374,21 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
             <Section title="Instructions">
               {builtIn && (
                 <>
-                  <Segmented
-                    radio
-                    label="Your text"
-                    size="sm"
-                    value={draft.charterMode}
-                    onChange={(v) => set('charterMode', v)}
-                    options={[
-                      { id: 'append', label: 'Add to built-in' },
-                      { id: 'replace', label: 'Replace' },
-                    ]}
-                  />
+                  {locked.charter_mode ? (
+                    <LockNote>{locked.charter_mode}</LockNote>
+                  ) : (
+                    <Segmented
+                      radio
+                      label="Your text"
+                      size="sm"
+                      value={draft.charterMode}
+                      onChange={(v) => set('charterMode', v)}
+                      options={[
+                        { id: 'append', label: 'Add to built-in' },
+                        { id: 'replace', label: 'Replace' },
+                      ]}
+                    />
+                  )}
                   <details className="rounded-[14px] bg-surface-2 px-3.5 py-2.5">
                     <summary className="cursor-pointer text-[12.5px] font-medium text-fg-2">Built-in charter</summary>
                     <pre className="mt-2 max-h-60 overflow-auto font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-fg-2">{d?.charters.builtIn}</pre>
@@ -399,9 +423,16 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
             </Section>
 
             <Section title="Powers">
-              <Switch label="The Conductor may delegate to it" hint="Off: the Conductor's list and the role pickers leave it out, and delegate refuses it." checked={draft.delegatable} onChange={(v) => set('delegatable', v)} />
-              <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other roles." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} />
-              <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} />
+              <Switch label="The Conductor may delegate to it" hint="Off: the Conductor's list and the role pickers leave it out, and delegate refuses it." checked={draft.delegatable} onChange={(v) => set('delegatable', v)} locked={locked.delegatable} />
+              <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other roles." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
+              <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} locked={locked.delegate_only} />
+              <Switch
+                label="Reviews work"
+                hint="A review on a GPT model runs at high effort, and one the Conductor starts for a thread runs on the other model family from that thread's."
+                checked={draft.review}
+                onChange={(v) => set('review', v)}
+                locked={locked.review}
+              />
             </Section>
           </>
         )}

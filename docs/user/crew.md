@@ -7,7 +7,7 @@ Each role is a file in `crew/*.md` with frontmatter and a charter. Omni reads th
 | conductor | Front agent in #conductor. Routes every task to a crew thread, never does the work |
 | researcher | Research, audits, answers to client questions, HTML reports |
 | builder | Code in a repo channel, own worktree, opens PRs. |
-| reviewer | Reviews a PR against its brief, from the spec and diff only. Read only |
+| reviewer | Reviews a PR against its brief, from the spec and diff only. Read only. A review role (`review: true`) |
 | inbox | Mail, calendar, time tracking, tasks, notes and chat drafts. Never sends on its own |
 | usage-scan | Leads Scan my usage in #inbox: turns the repeated asks Omni found into up to 3 suggested automations ([Automations](automations.md#scan-my-usage)). Omni starts it; not for delegation |
 
@@ -31,7 +31,7 @@ A file there with a shipped role's name is your edit of that built-in, an overla
 - It sets only the frontmatter fields it names. The rest, and any the next release changes, come from the shipped file.
 - With `charter_mode: append` its body is added after the shipped charter, so a release's fixes to the charter still reach you. Omni writes new edits this way.
 - With `charter_mode: replace`, or no `charter_mode` at all (a copy made before overlays), its body is the whole charter. Omni then records the shipped charter it was written against as `based_on`, and the role shows `builtInChanged` once a release changes that charter, or when a hand copy never recorded it.
-- Hiding a built-in is per machine (`crew` in `data/omni.config.json`): no new thread starts as it, and lists leave it out. The conductor and usage-scan cannot be hidden.
+- Hiding a built-in is per machine (`crew` in `data/omni.config.json`): no new thread starts as it, and lists leave it out. The conductor and usage-scan cannot be hidden (see [Roles Omni relies on](#roles-omni-relies-on)).
 
 `delegatable: false` keeps a role out of the Conductor's `list_crew` and makes `delegate` and `delegate_team` refuse it. The conductor and usage-scan set it. Starting a thread as a role no file has, or one hidden on this machine, is refused with the valid ids; it used to run with no charter.
 
@@ -47,6 +47,7 @@ Settings > Crew, in the Agents group, lists every role this machine has, hidden 
 - **Duplicate** makes a role of your own with everything the role has now, its whole charter included. A copy of a built-in no longer changes with a release.
 - **Compare with built-in** shows the built-in charter and yours line by line. When the built-in changed under a charter you replaced, it offers Keep mine, Add mine to the new one, or Take the new one.
 - **Hide** and **Show** a built-in on this machine, **Reset to built-in** drops your overlay, and **Delete** removes a role of your own.
+- **Powers**: whether the Conductor may delegate to it, the conductor tools, whether it only routes work, and whether it reviews work (`review: true`). A field or action the role cannot change shows a lock and why.
 
 The composer's Role picker leaves out roles the Conductor may not delegate to, as `list_crew` does, except the Conductor itself, which the composer attaches in #conductor.
 
@@ -56,23 +57,37 @@ The clients edit roles through the API, the same files underneath:
 
 | Call | Does |
 | --- | --- |
-| `GET /api/crew` | Every role this machine offers, each with `kind` (`shipped`, `edited` or `own`), `hidden`, `delegatable` and, for an edit, `charterMode` and `builtInChanged`. `?all=1` adds the hidden ones |
+| `GET /api/crew` | Every role this machine offers, each with `kind` (`shipped`, `edited` or `own`), `hidden`, `delegatable`, `review`, `locks` on the roles Omni relies on and, for an edit, `charterMode` and `builtInChanged`. `?all=1` adds the hidden ones |
 | `GET /api/crew/:id` | The role, the built-in alone (`builtIn`), the shipped file's text, your file's text, the shipped charter's hash, and the charters as written (`charters.builtIn`, `charters.own`, `charters.effective`) |
 | `POST /api/crew` | A new role of your own: `{ id, fields, charter }` or `{ id, markdown }` |
-| `PUT /api/crew/:id` | Edit a role: `{ fields, charter?, charter_mode? }` or `{ markdown }`. On a built-in it writes the overlay. An empty field (or null, for `avatar`, `mcp`, `delegate_only` and `delegatable`) removes it. Send `charter` and `charter_mode` only to change them: either one records the built-in charter as seen |
+| `PUT /api/crew/:id` | Edit a role: `{ fields, charter?, charter_mode? }` or `{ markdown }`. On a built-in it writes the overlay. An empty field (or null, for `avatar`, `mcp`, `delegate_only`, `delegatable` and `review`) removes it. Send `charter` and `charter_mode` only to change them: either one records the built-in charter as seen |
 | `POST /api/crew/draft` | `{ id?, own?, save }`: the file a save would write and the role it makes, nothing written. `own` stands in for your file. Settings' Form and Markdown tabs turn into each other through it |
 | `POST /api/crew/:id/duplicate` | `{ id, name? }`: a new role of your own with everything this one has |
 | `DELETE /api/crew/:id` | Delete a role of your own |
 | `POST /api/crew/:id/reset` | Drop your edit of a built-in |
 | `POST /api/crew/:id/hidden` | `{ hidden }` for a built-in |
 
-A save is refused when its run defaults, default channel or MCP servers are unknown here, or when it would give the conductor or usage-scan working tools.
+A save is refused when its run defaults, default channel or MCP servers are unknown here, when it breaks a lock below, or when it puts a role that only routes work on Hermes or Cursor Cloud, where it would never start.
+
+## Roles Omni relies on
+
+Three built-ins keep fields and refuse actions, each with a reason the API sends as `locks` and Settings shows by the field. Everything else about them is yours to edit, and Reset always works.
+
+| Role | Locked | Refused |
+| --- | --- | --- |
+| conductor | `delegate_only`, the `omni` MCP server, `delegatable: false` | Duplicate, Hide |
+| usage-scan | `delegate_only`, the `omni` MCP server, `delegatable: false`, and its charter can only be added to (`charter_mode: append`) | Duplicate (a copy would not be a usage scan: only Omni starts one), Hide |
+| reviewer | `review: true` | none: duplicate it for a reviewer without the review rules |
+
+The locks hold however the file got there. A crew file another machine syncs that breaks one is refused and listed under Refused changes in Settings > Sync, and an overlay written by hand loads with the locked fields as the built-in has them (its other edits still apply).
+
+No role of your own takes one of these ids. Builder has no locks; Review PR runs as it, so while it is hidden Review PR refuses with a note to show it again.
 
 A role is a prompt every later thread of it runs with, so an agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) goes through the crew guard (`apps/server/crew-guard.ts`) and gets a 403 unless all of these hold:
 
 - It is a save or a reset. Deleting, hiding and showing a role stay yours, in Settings. A reset that would change the role's powers (your edit gave the built-in the conductor tools, say) is refused: reset it yourself.
 - The thread runs as the Conductor. No other role writes roles, even one you gave the `omni` MCP server, and usage-scan never does.
-- The save leaves powers alone: no `mcp`, `delegate_only` or `delegatable`, and no whole-file `markdown`. Those are yours to set.
+- The save leaves powers alone: no `mcp`, `delegate_only`, `delegatable` or `review`, and no whole-file `markdown`. Those are yours to set.
 - No automation started the thread or any thread above it.
 - You answered in that thread after its first message, or answered a question it asked. The guard cannot read whether you agreed: it holds the Conductor to proposing an edit and waiting for you. An agent's own call never counts as your answer: a message an agent thread sends (`x-omni-thread`), including through `check_artifact_comments` or a compact, is recorded as the Conductor's, and an agent thread cannot answer a question card. The same holds for review notes an agent thread sends, and for messages a thread carries when it moves to another machine, which keep their sender.
 
@@ -82,9 +97,15 @@ Your edits sync to your other Macs as `crew_file`, a signed action that applies 
 
 The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Overview and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
 
-The conductor does not review a PR by itself. When a builder reports one, it relays the PR and you say whether you want it reviewed. When you ask, it reviews on the other model family from the one that wrote it, read from the builder thread's harness and model (`get_thread`): Codex `gpt-6.1-sol` at `high` for a PR Claude wrote, following `/code-review:code-review` from the `gpt-review` skill where the machine has it in `~/.agents/skills`, else the reviewer charter's own steps; Claude Code `claude-opus-5-5` at `xhigh` for any other. When that harness or model is unavailable, or the builder's model does not say its family, it asks you instead of reviewing on the same family.
+The conductor does not review a PR by itself. When a builder reports one, it relays the PR and you say whether you want it reviewed. When you ask, it delegates to `reviewer` with `review_of: <builder thread id>` and no run, and Omni picks the other model family from that thread's run (`apps/server/harness/review.ts`):
 
-A `reviewer` thread on a GPT model (Codex, or a `gpt-*` model on Cursor) always runs at `high` effort. Omni sets it when the thread is made, switched to another run or continued, even when `xhigh` or no effort was asked for. Claude reviewers keep the effort they were given.
+- Work Claude wrote (Claude Code, Hermes, or a `claude-*` model on Cursor) is reviewed on Codex, on `gpt-6.1-sol` at `high`. The Conductor's brief then follows `/code-review:code-review` from the `gpt-review` skill where the machine has it in `~/.agents/skills`, else the reviewer charter's own steps.
+- Work any other model wrote (GPT, Composer, Grok, Gemini) is reviewed on Claude Code, on `claude-opus-5-5` at `xhigh`.
+- Those runs are pinned. When this machine's catalog lacks the model, or the model lacks the effort, the review is refused (409): Omni never runs it on Codex's default or the nearest model or effort instead.
+- A run the delegation names is kept when it is on the other family. The same family is refused, and so is a thread whose run does not say its family (Cursor's own `auto`, a runtime Omni does not know), or a review whose harness is not available here. The Conductor then asks you.
+- `review_of` needs a review role. It is on `POST /api/threads` and on the Conductor's `delegate` tool.
+
+A thread as a review role (`review: true`: the shipped reviewer, or a role of your own with Reviews work on) on a GPT model (Codex, or a `gpt-*` model on Cursor) always runs at `high` effort. Omni sets it when the thread is made, switched to another run or continued, even when `xhigh` or no effort was asked for. Claude reviewers keep the effort they were given.
 
 `delegate_only: true` in a role's frontmatter makes it a router that runs without the tools that do work. The conductor sets it, and so does usage-scan, which only reads its first message and saves what you pick.
 

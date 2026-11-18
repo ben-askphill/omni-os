@@ -104,6 +104,14 @@ server.registerTool(
         .optional()
         .describe('Any catalog model id, a Claude alias (opus, sonnet, haiku, fable), or "auto" (with no harness) to let Omni pick for this brief. Use list_harnesses.'),
       effort: z.string().optional().describe('Reasoning effort supported by the model, e.g. high. Use list_harnesses.'),
+      review_of: z
+        .string()
+        .optional()
+        .describe(
+          'For a PR review: the id of the thread whose work it reviews (the builder thread). The role must be a review role (reviewer). ' +
+            'Leave harness, model and effort off: Omni runs the review on the other model family from that thread\'s run, and refuses the same family ' +
+            'or a run that does not say its family. When it refuses, tell the user and ask.',
+        ),
       folder: z.string().optional().describe('Sidebar folder in the channel to file the thread in, by name or id. Use list_channels. It must exist unless create_folder is true.'),
       create_folder: z.boolean().optional().describe(`Create \`folder\` when the channel has none by that name. Only when ${USER} asked for the folder or agreed to it.`),
       base: z
@@ -122,11 +130,11 @@ server.registerTool(
         ),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, folder, create_folder, base, device }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, base, device }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, folder, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device) }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device) }),
     });
     return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch });
   },

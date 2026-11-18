@@ -82,7 +82,7 @@ describe('a built-in with an overlay', () => {
   it('keeps the routers routing', async () => {
     const off = await send('PUT', '/crew/conductor', { fields: { delegate_only: false } });
     expect(off.status).toBe(409);
-    expect((await json(off)).error).toMatch(/keeps delegate_only and the omni MCP server/);
+    expect((await json(off)).error).toMatch(/only routes work, so it never gets working tools\. Leave delegate_only as the built-in has it\.$/);
     expect((await send('PUT', '/crew/usage-scan', { fields: { mcp: [] } })).status).toBe(409);
     // Adding to its charter is fine.
     expect((await send('PUT', '/crew/conductor', { charter: 'Reply in Dutch.' })).status).toBe(200);

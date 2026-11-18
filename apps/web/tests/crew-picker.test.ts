@@ -5,7 +5,7 @@ import { pickerOptions } from '../src/components/composer/pickerOptions.tsx';
 // mark, and a role the Conductor may not delegate to is left out, as list_crew leaves it out. The Conductor stays,
 // since the composer attaches it in #conductor.
 
-const role = (id: string, over: Record<string, unknown> = {}) => ({ id, name: id, description: '', mcp: [], delegateOnly: false, delegatable: true, charter: '', kind: 'shipped' as const, hidden: false, ...over });
+const role = (id: string, over: Record<string, unknown> = {}) => ({ id, name: id, description: '', mcp: [], delegateOnly: false, delegatable: true, review: false, charter: '', kind: 'shipped' as const, hidden: false, ...over });
 
 describe('the Role picker', () => {
   const crew = [

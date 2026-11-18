@@ -11,23 +11,21 @@ import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { publishFeed } from './bus.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
-import { AVATAR_BG, charterHash, CREW_ID, crewTexts, getCrew, mergeCrew, mergeSources, parseCrewFile, removeOwnCrew, splitCrewFile, UNHIDEABLE, writeOwnCrew, type CrewRole } from './crew.ts';
+import { AVATAR_BG, charterHash, CREW_ID, CREW_LOCKS, crewTexts, getCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
+import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
 import { record } from './db/sync.ts';
 import { validateRun, type Catalog } from './harness/catalog.ts';
 import { asksAuto } from './harness/auto.ts';
 import { validateDefaults } from './harness/resolve.ts';
+import { isProviderHarness, providerWhere } from './harness/types.ts';
 import { updateUserConfig } from './user-config.ts';
 
 const refused = (message: string, status: 400 | 404 | 409 = 400) => Object.assign(new Error(message), { status });
 
 export { CREW_ID };
 
-/** Built-ins Omni itself relies on. Only ever an overlay on the shipped file: no role of the user's own takes the id. */
-export const RESERVED_CREW = ['conductor', 'reviewer', 'usage-scan'] as const;
-
-
-/** The routers. A save that gives one working tools, or takes its omni tools away, is refused. */
-const ROUTERS = new Set(['conductor', 'usage-scan']);
+/** Built-ins Omni itself relies on (crew.ts CREW_LOCKS). Only ever an overlay on the shipped file: no role of the user's own takes the id. */
+export const RESERVED_CREW = Object.keys(CREW_LOCKS);
 
 /** Omni's own MCP servers a role can name. More come with the MCP registry (plan slice S5). */
 const OMNI_MCP = new Set(['omni']);
@@ -61,6 +59,7 @@ export const crewFields = z
     mcp: z.array(z.string().trim().min(1).max(80)).max(20).nullable().optional(),
     delegate_only: z.boolean().nullable().optional(),
     delegatable: z.boolean().nullable().optional(),
+    review: z.boolean().nullable().optional(),
   })
   .strict();
 export type CrewFields = z.infer<typeof crewFields>;
@@ -115,7 +114,7 @@ function detailOf(role: CrewRole, shipped: string | null, own: string | null): C
     charters: {
       builtIn: base?.body ?? null,
       own: mine?.body ?? null,
-      effective: base && mine ? mergeSources(base, mine).body : (base ?? mine)!.body,
+      effective: base && mine ? mergeSources(base, lockedOverlay(id, base, mine)).body : (base ?? mine)!.body,
     },
   };
 }
@@ -163,17 +162,20 @@ export interface CrewSaveContext {
   channelExists: (id: string) => boolean;
 }
 
-/** Check the role a write would leave behind. Throws a refusal with the first problem. */
-function check(id: string, role: CrewRole, ctx: CrewSaveContext) {
+/** Check the role a write would leave behind, against the built-in it overlays (null for a role of the user's own). Throws a refusal with the first problem. */
+function check(id: string, role: CrewRole, builtIn: CrewRole | null, ctx: CrewSaveContext) {
   if (role.error) throw refused(role.error.replace(/^bad frontmatter/, 'The frontmatter is not valid YAML'));
   const run = crewRunProblem(role, ctx.catalog);
   if (run) throw refused(`Run defaults: ${run}.`);
   if (role.channel && !ctx.channelExists(role.channel)) throw refused(`No channel "${role.channel}" for the role's default channel.`);
   const unknown = role.mcp.filter((s) => !OMNI_MCP.has(s));
   if (unknown.length) throw refused(`Unknown MCP server ${unknown.map((s) => `"${s}"`).join(', ')}. A role can name: ${[...OMNI_MCP].join(', ')}.`);
-  if (ROUTERS.has(id) && (!role.delegateOnly || !role.mcp.includes('omni'))) {
-    throw refused(`${role.name} only routes work: it keeps delegate_only and the omni MCP server.`, 409);
+  for (const [key, why] of Object.entries(CREW_LOCKS[id]?.fields ?? {}) as [CrewLockedField, string][]) {
+    if (!builtIn || LOCKED_VALUE[key](role) === LOCKED_VALUE[key](builtIn)) continue;
+    throw refused(key === 'charter_mode' ? `${why} Save your text as an addition (charter_mode: append).` : `${why} Leave ${key} as the built-in has it.`, 409);
   }
+  // It would never start: a remote runtime gets no delegate tools and keeps its own work tools (runner/api.ts).
+  if (role.delegateOnly && isProviderHarness(role.harness)) throw refused(remoteDelegateOnlyRefusal(role.name, providerWhere(role.harness!)), 409);
 }
 
 /**
@@ -186,7 +188,7 @@ export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts:
   const { shipped, own } = crewTexts(id);
   if (opts.create) {
     if (shipped !== null || own !== null) throw refused(`A role "${id}" already exists.`, 409);
-    if ((RESERVED_CREW as readonly string[]).includes(id)) throw refused(`"${id}" is a built-in role's id.`, 409);
+    if (RESERVED_CREW.includes(id)) throw refused(`"${id}" is a built-in role's id.`, 409);
   } else if (shipped === null && own === null) {
     throw refused(`No crew role "${id}".`, 404);
   }
@@ -194,7 +196,7 @@ export function saveCrew(id: string, save: CrewSave, ctx: CrewSaveContext, opts:
   const text = savedText(save, shipped, own);
   const role = roleIn(id, shipped, text);
   if (shipped === null && !splitCrewFile(text).meta.name) throw refused('Give the role a name.');
-  check(id, role, ctx);
+  check(id, role, shipped === null ? null : parseCrewFile(id, shipped), ctx);
   writeOwn(id, text);
   return crewDetail(id)!;
 }
@@ -252,8 +254,10 @@ const OVERLAY_KEYS = ['charter_mode', 'based_on'];
 export function duplicateCrew(from: string, to: string, name: string | undefined, ctx: CrewSaveContext): CrewDetail {
   const { shipped, own } = crewTexts(from);
   if (shipped === null && own === null) throw refused(`No crew role "${from}".`, 404);
+  const locked = shipped !== null && CREW_LOCKS[from]?.actions?.duplicate;
+  if (locked) throw refused(locked, 409);
   const source =
-    shipped !== null && own !== null ? mergeSources(splitCrewFile(shipped), splitCrewFile(own)) : splitCrewFile((shipped ?? own)!);
+    shipped !== null && own !== null ? mergeSources(splitCrewFile(shipped), lockedOverlay(from, splitCrewFile(shipped), splitCrewFile(own))) : splitCrewFile((shipped ?? own)!);
   const doc = new Document(Object.fromEntries(Object.entries(source.meta).filter(([k, v]) => !OVERLAY_KEYS.includes(k) && v !== undefined && v !== null)));
   doc.set('name', name?.trim() || `${text(source.meta.name) ?? from} copy`);
   return saveCrew(to, { markdown: serialize(doc, source.body) }, ctx, { create: true });
@@ -288,7 +292,8 @@ function removeOwn(id: string) {
 export function setCrewHidden(id: string, hidden: boolean): CrewDetail {
   const { shipped, own } = crewTexts(id);
   if (shipped === null) throw refused(own === null ? `No crew role "${id}".` : 'Only a built-in role is hidden. Delete a role of your own instead.', own === null ? 404 : 409);
-  if (hidden && UNHIDEABLE.has(id)) throw refused(`${getCrew(id)?.name ?? id} cannot be hidden: Omni relies on it.`, 409);
+  const locked = CREW_LOCKS[id]?.actions?.hide;
+  if (hidden && locked) throw refused(locked, 409);
   updateUserConfig({ crew: { [id]: hidden ? { hidden: true } : null } });
   publishFeed({ type: 'crew' });
   return crewDetail(id)!;
