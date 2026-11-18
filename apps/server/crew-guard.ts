@@ -2,8 +2,8 @@
 // permissions, on every machine that syncs it (sync/handlers/crew-file.ts), so the rules are tighter than the
 // automation guard's (automation-guard.ts), whose caller header and lineage they reuse:
 // - Ben's own clients name no thread, and may do whatever the store allows (crew-store.ts).
-// - An agent may only save or reset a role: the calls the Conductor's crew tools make (plan slice S7). Delete, hide and
-//   show stay Ben's, in Settings.
+// - An agent may only save or reset a role: the calls the Conductor's crew tools make (plan slice S7). Duplicate, delete,
+//   hide and show stay Ben's, in Settings.
 // - Only a thread running as the Conductor may: the reserved id, whose powers no save can change (crew-store.ts). Never
 //   one an automation started, any thread below one, or a usage scan.
 // - A save from an agent changes charters, descriptions, run defaults and default channels, never powers: no `mcp`,
@@ -20,7 +20,10 @@ import type { CrewSave } from './crew-store.ts';
 import { threads } from './db.ts';
 import { userName } from './profile.ts';
 
-export type CrewWrite = 'save' | 'reset' | 'delete' | 'hide';
+export type CrewWrite = 'save' | 'reset' | 'duplicate' | 'delete' | 'hide';
+
+/** The writes that stay Ben's: no tool an agent has makes them. A duplicate copies a role's powers with it. */
+const BENS: Partial<Record<CrewWrite, string>> = { duplicate: 'duplicates', delete: 'deletes', hide: 'hides or shows' };
 
 /** The crew role whose threads may change roles, once Ben agrees. */
 const EDITOR_ROLE = 'conductor';
@@ -35,7 +38,8 @@ const POWERS = ['mcp', 'delegate_only', 'delegatable'] as const;
 export function crewRefusal(caller: string | null | undefined, write: CrewWrite, save?: CrewSave): string | null {
   if (!caller) return null;
   const who = userName();
-  if (write === 'delete' || write === 'hide') return `Only ${who} deletes, hides or shows crew roles, in Settings.`;
+  const bens = BENS[write];
+  if (bens) return `Only ${who} ${bens} crew roles, in Settings.`;
   const thread = threads.get(caller);
   const settings = `Crew roles change from Settings, or from the Conductor once ${who} agrees in its thread.`;
   if (!thread) return settings;

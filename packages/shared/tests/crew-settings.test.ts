@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import { blankCrewDraft, CHANGED_CHARTER_ACTIONS, crewChips, crewDraftOf, crewDraftProblem, crewIdFrom, crewMarkdownOf, crewRunLine, crewSaveBody, lineDiff, type CrewDetailView, type CrewListed } from '../crew-settings.ts';
+
+const role = (over: Partial<CrewListed> = {}): CrewListed => ({ id: 'builder', name: 'Builder', description: 'Writes code.', model: 'auto', mcp: [], delegateOnly: false, delegatable: true, kind: 'shipped', hidden: false, ...over });
+
+const detail = (r: CrewListed, builtIn: CrewListed | null, own: string | null = null): CrewDetailView => ({
+  role: r,
+  builtIn,
+  shipped: builtIn ? '---\nname: Builder\n---\nShip code.\n' : null,
+  own: own === null ? null : `---\n---\n${own}\n`,
+  shippedHash: builtIn ? 'abc' : null,
+  charters: { builtIn: builtIn ? 'Ship code.' : null, own, effective: builtIn ? ['Ship code.', own].filter(Boolean).join('\n\n') : (own ?? '') },
+});
+
+describe('the list', () => {
+  it('names where a role comes from, then what needs a look', () => {
+    expect(crewChips(role()).map((c) => c.label)).toEqual(['Built-in']);
+    expect(crewChips(role({ kind: 'edited', charterMode: 'replace', builtInChanged: true, hidden: true })).map((c) => [c.label, c.tone])).toEqual([
+      ['Edited', 'default'],
+      ['Hidden', 'outline'],
+      ['Built-in charter changed', 'default'],
+    ]);
+    expect(crewChips(role({ kind: 'own', error: 'unknown harness "vps"' })).map((c) => [c.label, c.title])).toEqual([
+      ['Yours', 'A role of your own, in data/crew/.'],
+      ["Can't run here", 'unknown harness "vps"'],
+    ]);
+  });
+
+  it('says the run in one line', () => {
+    expect(crewRunLine({ model: 'auto' })).toBe('Auto');
+    expect(crewRunLine({})).toBe('Auto, or the channel default');
+    expect(crewRunLine({ harness: 'codex', model: 'gpt-6.1-sol', effort: 'high' }, { harness: () => 'Codex', model: () => 'GPT 6.1 Sol' })).toBe('Codex · GPT 6.1 Sol · high');
+    expect(crewRunLine({ harness: 'vps-agent' })).toBe('vps-agent · its default model');
+  });
+
+  it('makes an id from a name', () => {
+    expect(crewIdFrom('Store ops')).toBe('store-ops');
+    expect(crewIdFrom('  Ünïcode & co!  ')).toBe('unicode-co');
+  });
+});
+
+describe('the editor', () => {
+  it('reads a built-in nobody edited as adding to its charter', () => {
+    const d = crewDraftOf(detail(role(), role()));
+    expect(d).toMatchObject({ name: 'Builder', model: 'auto', charter: '', charterMode: 'append', conductorTools: false });
+  });
+
+  it('sends only what changed on a built-in, and empties a field set back to the built-in', () => {
+    const builtIn = role();
+    const edited = role({ kind: 'edited', model: 'opus', channel: 'inbox', charterMode: 'append' });
+    const d = { ...crewDraftOf(detail(edited, builtIn, 'Use pnpm.')), model: 'auto', description: 'Writes and tests code.' };
+    expect(crewSaveBody(d, detail(edited, builtIn, 'Use pnpm.'))).toEqual({
+      fields: { model: '', description: 'Writes and tests code.' },
+      charter: 'Use pnpm.',
+      charter_mode: 'append',
+    });
+  });
+
+  it('sends a switch or list set back to the built-in as null, and the avatar whole', () => {
+    const builtIn = role();
+    const edited = role({ kind: 'edited', delegatable: false, mcp: ['omni'], delegateOnly: true, avatar: { icon: 'icon:zap' } });
+    const d = { ...crewDraftOf(detail(edited, builtIn)), delegatable: true, conductorTools: false, delegateOnly: false, bg: '#f5e6ba' };
+    expect(crewSaveBody(d, detail(edited, builtIn)).fields).toEqual({ delegatable: null, mcp: null, delegate_only: null, avatar: { icon: 'icon:zap', bg: '#f5e6ba' } });
+    expect(crewSaveBody({ ...d, icon: '', bg: '' }, detail(edited, builtIn)).fields.avatar).toBeNull();
+  });
+
+  it('sends every field for a new role of the user own, and no charter mode', () => {
+    const d = { ...blankCrewDraft(), name: 'Store ops', charter: 'Dry run first.' };
+    const body = crewSaveBody(d, null);
+    expect(body).toEqual({
+      fields: { name: 'Store ops', description: '', harness: '', model: 'auto', effort: '', channel: '', delegate_only: null, delegatable: null, mcp: [], avatar: null },
+      charter: 'Dry run first.',
+    });
+  });
+
+  it('says why a form cannot be saved', () => {
+    expect(crewDraftProblem(blankCrewDraft())).toBe('Give the role a name.');
+    expect(crewDraftProblem({ ...blankCrewDraft(), name: 'X' }, 'Bad Id')).toBe('The id takes lowercase letters, digits and dashes.');
+    expect(crewDraftProblem({ ...blankCrewDraft(), name: 'X', delegateOnly: true })).toMatch(/needs the conductor tools/);
+    expect(crewDraftProblem({ ...blankCrewDraft(), name: 'X' }, 'x')).toBeNull();
+  });
+
+  it('opens the markdown of the file, or a fresh overlay', () => {
+    expect(crewMarkdownOf(detail(role(), role()))).toBe('---\ncharter_mode: append\n---\n');
+    expect(crewMarkdownOf(detail(role({ kind: 'edited' }), role(), 'Use pnpm.'))).toBe('---\n---\nUse pnpm.\n');
+    expect(crewMarkdownOf(null)).toMatch(/^---\nname: /);
+  });
+});
+
+describe('Compare', () => {
+  it('diffs line by line', () => {
+    expect(lineDiff('a\nb\nc', 'a\nc\nd')).toEqual([
+      { kind: 'same', text: 'a' },
+      { kind: 'del', text: 'b' },
+      { kind: 'same', text: 'c' },
+      { kind: 'add', text: 'd' },
+    ]);
+    expect(lineDiff('same', 'same')).toEqual([{ kind: 'same', text: 'same' }]);
+  });
+
+  it('turns the three ways out of a changed built-in into saves', () => {
+    expect(CHANGED_CHARTER_ACTIONS.keep('Mine.')).toEqual({ charter: 'Mine.', charter_mode: 'replace' });
+    expect(CHANGED_CHARTER_ACTIONS.takeBuiltIn()).toEqual({ charter: '', charter_mode: 'append' });
+    expect(CHANGED_CHARTER_ACTIONS.addMine('Mine.')).toEqual({ charter: 'Mine.', charter_mode: 'append' });
+  });
+});

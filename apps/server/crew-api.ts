@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { CALLER_HEADER } from './automation-guard.ts';
 import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { listCrew } from './crew.ts';
-import { crewDetail, crewRunProblem, crewSave, deleteCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
+import { crewDetail, crewRunProblem, crewSave, deleteCrew, duplicateCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
 import { channels } from './db.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 
@@ -50,6 +50,15 @@ crewApi.delete('/crew/:id', (c) =>
     return { ok: true };
   }),
 );
+
+/** A new role of the user's own with everything this one has: `{ id, name? }`. */
+crewApi.post('/crew/:id/duplicate', async (c) => {
+  const refused = guard(c, 'duplicate');
+  if (refused) return refused;
+  const parsed = z.object({ id: z.string(), name: z.string().max(80).optional() }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: 'Give the copy an id.' }, 400);
+  return run(c, () => duplicateCrew(c.req.param('id'), parsed.data.id, parsed.data.name, context()), 201);
+});
 
 crewApi.post('/crew/:id/reset', (c) => guard(c, 'reset') ?? run(c, () => resetCrew(c.req.param('id'))));
 

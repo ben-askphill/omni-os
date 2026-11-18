@@ -37,14 +37,30 @@ A file there with a shipped role's name is your edit of that built-in, an overla
 
 `harness` is the role's runtime binding: any harness id this machine's catalog has, checked when the role is saved. A role whose harness this machine lacks still loads, with an error on it. Omni keeps frontmatter keys it does not know when it edits a file.
 
+## Settings > Crew
+
+Settings > Crew, in the Agents group, lists every role this machine has, hidden ones included, on desktop web, phone web and the desktop app. Each row shows the role's avatar, its chips (Built-in, Edited or Yours, then Hidden, Built-in charter changed, or Can't run here when its run defaults name a harness or model this machine lacks), its description and the run it defaults to. The iOS app gets the section later; until then use phone web.
+
+- **New role** makes a role of your own: a name, an id (made from the name; it never changes), a description, an avatar, a charter, run defaults, a default channel and its powers.
+- **Edit** opens a Form or the Markdown. On a built-in, the form writes your overlay: a field you set back to the built-in's value leaves the overlay, so a release sets it again, and your text is added to the built-in charter (Add to built-in) or replaces it (Replace). Markdown saves the file as written.
+- **Avatar**: one of the shared icons or one emoji, on a background color, as channels have (no SVG upload: it would not read in a markdown file). `avatar: { icon: icon:tool, bg: "#d4e9fa" }` in the frontmatter. Without one a built-in keeps its mark and any other role shows its initials. The composer's Role picker shows the same avatar.
+- **Duplicate** makes a role of your own with everything the role has now, its whole charter included. A copy of a built-in no longer changes with a release.
+- **Compare with built-in** shows the built-in charter and yours line by line. When the built-in changed under a charter you replaced, it offers Keep mine, Add mine to the new one, or Take the new one.
+- **Hide** and **Show** a built-in on this machine, **Reset to built-in** drops your overlay, and **Delete** removes a role of your own.
+
+The composer's Role picker leaves out roles the Conductor may not delegate to, as `list_crew` does, except the Conductor itself, which the composer attaches in #conductor.
+
+## The API
+
 The clients edit roles through the API, the same files underneath:
 
 | Call | Does |
 | --- | --- |
 | `GET /api/crew` | Every role this machine offers, each with `kind` (`shipped`, `edited` or `own`), `hidden`, `delegatable` and, for an edit, `charterMode` and `builtInChanged`. `?all=1` adds the hidden ones |
-| `GET /api/crew/:id` | The role, the shipped file's text, your file's text and the shipped charter's hash |
+| `GET /api/crew/:id` | The role, the built-in alone (`builtIn`), the shipped file's text, your file's text, the shipped charter's hash, and the charters as written (`charters.builtIn`, `charters.own`, `charters.effective`) |
 | `POST /api/crew` | A new role of your own: `{ id, fields, charter }` or `{ id, markdown }` |
-| `PUT /api/crew/:id` | Edit a role: `{ fields, charter, charter_mode }` or `{ markdown }`. On a built-in it writes the overlay. An empty field removes it |
+| `PUT /api/crew/:id` | Edit a role: `{ fields, charter, charter_mode }` or `{ markdown }`. On a built-in it writes the overlay. An empty field (or null, for `avatar`, `mcp`, `delegate_only` and `delegatable`) removes it |
+| `POST /api/crew/:id/duplicate` | `{ id, name? }`: a new role of your own with everything this one has |
 | `DELETE /api/crew/:id` | Delete a role of your own |
 | `POST /api/crew/:id/reset` | Drop your edit of a built-in |
 | `POST /api/crew/:id/hidden` | `{ hidden }` for a built-in |

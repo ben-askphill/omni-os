@@ -192,6 +192,8 @@ export interface CrewRole {
   id: string;
   name: string;
   description: string;
+  /** The role's own look: a shared icon (`icon:<name>`) or an emoji, and a hex background. Unset: its mark or monogram. */
+  avatar?: { icon?: string; bg?: string };
   /** A harness id from the server's catalog. An open string, not a fixed list: outside runtimes join the catalog by id. */
   harness?: string;
   model?: string;

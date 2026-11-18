@@ -17,11 +17,19 @@ export interface SectionGroup {
   rows: SectionRow[];
 }
 
+/**
+ * Sections the app has no screen for yet: Crew comes with its own slice (docs/plans/2026-11-18-user-defined-crew.md,
+ * S8). Until then the phone edits crew roles in phone web.
+ */
+const NOT_YET: ReadonlySet<SettingsSectionId> = new Set(['crew']);
+
 export function settingsGroups(): SectionGroup[] {
   return SETTINGS_GROUPS.map((g) => ({
     id: g.id,
     title: g.title || (g.id === 'omni' ? 'Omni' : 'App'),
-    rows: sectionsIn(g.id, { desktopApp: false }).map((d) => ({ id: d.id as SettingsSectionId, title: d.title, icon: d.icon, blurb: d.blurb })),
+    rows: sectionsIn(g.id, { desktopApp: false })
+      .filter((d) => !NOT_YET.has(d.id as SettingsSectionId))
+      .map((d) => ({ id: d.id as SettingsSectionId, title: d.title, icon: d.icon, blurb: d.blurb })),
   })).filter((g) => g.rows.length > 0);
 }
 
@@ -48,7 +56,7 @@ export interface SettingsHit {
 
 /** What a search finds, best first, as phone web's Settings search ranks it. */
 export function settingsHits(query: string): SettingsHit[] {
-  return searchSettings(query, 'web').map((e) => ({
+  return searchSettings(query, 'web').filter((e) => !NOT_YET.has(e.section)).map((e) => ({
     id: e.id,
     title: e.title,
     section: sectionDef(e.section).title,

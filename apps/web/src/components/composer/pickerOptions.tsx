@@ -16,7 +16,12 @@ export function channelAvatar(c: Channels[number]): Pick<PickerOption<string>, '
   return { avatar: c.name, avatarBg: c.avatar_bg, channelIcon: c.icon, omni: conductor, lead: conductor && !hasOwnLook(c) ? <StaticMark size={13} title="" /> : undefined };
 }
 
-/** The new-thread composer's Channel and Role pickers: the channels still open (plus the one in use) and the crew. */
+/**
+ * The new-thread composer's Channel and Role pickers: the channels still open (plus the one in use) and the crew. A role
+ * the Conductor may not delegate to (usage-scan) is left out, as list_crew leaves it out; the Conductor stays, since
+ * the composer attaches it in #conductor. Each role wears its avatar, as CrewAvatar draws it: its own look, else a
+ * built-in's mark, else its initials.
+ */
 export function pickerOptions(visibleChannels: Channels, channel: string, crew: Crew) {
   const channelOptions: PickerOption<string>[] = visibleChannels.map((c) => ({
     value: c.id,
@@ -27,7 +32,17 @@ export function pickerOptions(visibleChannels: Channels, channel: string, crew: 
   if (!visibleChannels.some((c) => c.id === channel)) channelOptions.push({ value: channel, label: channel, avatar: channel });
   const roleOptions: PickerOption<string>[] = [
     { value: '', label: 'No role', sub: 'No charter', avatar: false, icon: 'user' },
-    ...crew.map((r) => ({ value: r.id, label: r.name, sub: r.description, avatar: r.name, lead: isCrewRole(r.id) ? <CrewMark role={r.id} size={13} /> : undefined })),
+    ...crew
+      .filter((r) => r.delegatable !== false || r.id === CONDUCTOR_CHANNEL)
+      .map((r) => ({
+        value: r.id,
+        label: r.name,
+        sub: r.description,
+        avatar: r.name,
+        channelIcon: r.avatar?.icon,
+        avatarBg: r.avatar?.bg,
+        lead: !r.avatar && isCrewRole(r.id) ? <CrewMark role={r.id} size={13} /> : undefined,
+      })),
   ];
   return { channelOptions, roleOptions };
 }
