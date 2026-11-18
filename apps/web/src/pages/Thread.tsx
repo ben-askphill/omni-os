@@ -121,7 +121,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     },
     [setSelected, setPanelTab],
   );
-  const panel = useThreadPanel({ artifactParam, files, ready, loaded: thread !== null, select: selectArtifact });
+  const panel = useThreadPanel({ artifactParam, loaded: thread !== null, select: selectArtifact });
   const hereName = useHereName();
   const now = useNow(60_000);
   const workCwd = init?.cwd || thread?.cwd || '';

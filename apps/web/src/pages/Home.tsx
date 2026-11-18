@@ -17,6 +17,7 @@ import { isFresh, keepInsights, keptInsights } from '../insights-cache.ts';
 import { splitNeeds } from '../needs-you.ts';
 import { readPref, useApp, useFeed, useNow, writePref } from '../store.tsx';
 import { useInbox } from '../app/useInbox.ts';
+import { usePresetSeq } from '../router.ts';
 
 const acceptAll = () => true;
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -187,6 +188,8 @@ export function HomePage() {
     setRangeState(r);
   };
   const [startIn, setStartIn] = useState<string | null>(null);
+  // New thread with the Inbox up leaves a preset for this composer (router.ts openNewThread): remount to read it.
+  const presetSeq = usePresetSeq();
   const { kind: open, machine } = useOpenList();
   const machines = useMachines();
   const insights = useInsights(range);
@@ -228,7 +231,7 @@ export function HomePage() {
           </ErrorNote>
         )}
 
-        <NewThreadComposer key={startIn ?? 'default'} defaultChannel={startIn ?? undefined} big />
+        <NewThreadComposer key={`${startIn ?? 'default'}:${presetSeq}`} defaultChannel={startIn ?? undefined} big />
         {chips.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 px-1">
             <span className="caption">Start in</span>

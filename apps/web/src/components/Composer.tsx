@@ -59,8 +59,9 @@ export function NewThreadComposer({
 }) {
   const { channels, crew } = useApp();
   const key = `new:${channelId ?? '*'}`;
-  // Set up from the thread Ben came from, when `/clear` opened this.
-  const [preset] = useState(() => (channelId ? peekNewThreadPreset(channelId) : null));
+  // Set up from the thread Ben came from, when `/clear` opened this. Home's composer (no `channelId`) takes one left for
+  // it while the Inbox was up, channel and all.
+  const [preset] = useState(() => peekNewThreadPreset(channelId));
   useEffect(() => {
     if (!preset) return;
     dropNewThreadPreset(preset);
@@ -69,8 +70,8 @@ export function NewThreadComposer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset]);
   const [text, setText] = useState(() => preset?.prompt ?? drafts.get(key) ?? '');
-  const [channel, setChannel] = useState(channelId ?? defaultChannel);
-  const [role, setRole] = useState<string>(() => preset?.role ?? ((channelId ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
+  const [channel, setChannel] = useState(channelId ?? preset?.channel ?? defaultChannel);
+  const [role, setRole] = useState<string>(() => preset?.role ?? ((channelId ?? preset?.channel ?? defaultChannel) === 'conductor' ? 'conductor' : ''));
   const [picked, setPicked] = useState<DraftRun | null>(() => preset?.choice ? { choice: preset.choice, effort: preset.effort ?? '' } : null);
   // "New thread here" on a sidebar folder files the thread in it, until Ben takes it out.
   const [folder, setFolder] = useState(preset?.folder ?? null);

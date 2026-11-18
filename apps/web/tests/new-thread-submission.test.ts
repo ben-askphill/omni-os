@@ -10,6 +10,7 @@ vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: vi.fn(), sh
 
 import { NewThreadComposer } from '../src/components/Composer.tsx';
 import { NewSheet } from '../src/mobile/NewSheet.tsx';
+import { openNewThread, setInboxUp } from '../src/router.ts';
 
 const harnesses = [{
   id: 'claude-code', name: 'Claude Code', available: true, plan: 'Claude plan', models: [
@@ -96,5 +97,16 @@ describe.each([false, true])('serialized new-thread submission, phone=%s', (phon
     expect(await typeAndSend(phone)).toEqual({
       channel: 'conductor', prompt: 'Fix the typo', role: 'conductor', harness: 'claude-code', model: 'claude-opus-5-5',
     });
+  });
+});
+
+describe('Home\'s composer with the Inbox up', () => {
+  it('starts the thread in the channel New thread came from', async () => {
+    state.channels.push({ id: 'acme', name: 'Acme', kind: 'client', default_model: 'auto' } as Channel);
+    setInboxUp(true);
+    openNewThread({ channel: 'acme' });
+    setInboxUp(false);
+    await act(async () => root.render(createElement(NewThreadComposer, { big: true })));
+    expect(await typeAndSend(false)).toEqual({ channel: 'acme', prompt: 'Fix the typo' });
   });
 });
