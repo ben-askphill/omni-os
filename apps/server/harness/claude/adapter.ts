@@ -1,5 +1,6 @@
 // Claude Code behind the harness adapter interface: one warm `claude -p` process per thread,
 // stream-json both ways. The env strips the API auth vars, and output goes through stream.ts.
+import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -142,7 +143,7 @@ export const claudeAdapter: HarnessAdapter = {
     // Its own AskUserQuestion cannot be answered in -p mode: agents ask with Omni's ask_user_question instead.
     // A delegate-only role (the Conductor) also loses every tool that does work, so it can only hand it off.
     // A quick ask only reads: the same tools go, and needing one is what turns it into a task (apps/server/quick-ask.ts).
-    args.push('--disallowedTools', ['AskUserQuestion', ...(ctx.role?.delegateOnly || thread.quick ? DELEGATE_ONLY_DENIED : [])].join(','));
+    args.push('--disallowedTools', ['AskUserQuestion', ...(ctx.role?.delegateOnly || readsOnly(thread) ? DELEGATE_ONLY_DENIED : [])].join(','));
     for (const dir of modDirs()) args.push('--plugin-dir', dir);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
 

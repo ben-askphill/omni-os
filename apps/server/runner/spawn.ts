@@ -1,4 +1,5 @@
 // Start a thread's process, including its browser profile and MCP config.
+import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { config } from '../config.ts';
 import { channels, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
@@ -113,7 +114,7 @@ async function spawnLive(live: Live, thread: Thread) {
   // Chrome locks a profile dir: the first live process in a channel keeps it until it exits.
   const holder = browserHolder.get(channel.id);
   const browserBusy = !!holder && holder !== thread.id;
-  if (config.browser && !browserBusy && !remote && !thread.quick) {
+  if (config.browser && !browserBusy && !remote && !readsOnly(thread)) {
     browserHolder.set(channel.id, thread.id);
     live.holdsBrowser();
   }
@@ -127,7 +128,7 @@ async function spawnLive(live: Live, thread: Thread) {
   live.setBrowserHold(attached?.hold ?? null);
   const cdpEndpoint = attached?.endpoint ?? null;
   if (!remote) writeDesignSystem(thread.id, channel);
-  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl(), quick: !!thread.quick });
+  const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl(), quick: readsOnly(thread) });
 
   let secretEnv: Record<string, string> = {};
   try {

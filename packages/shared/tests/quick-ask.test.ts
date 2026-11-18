@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { quickAskKey, quickTurns, taskPrompt, taskRequest } from '../quick-ask.ts';
+import { quickAskKey, quickTurns, readsOnly, taskPrompt, taskRequest } from '../quick-ask.ts';
 
 const key = (k: Partial<Parameters<typeof quickAskKey>[0]>) => quickAskKey({ key: 'Enter', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...k });
 
@@ -50,7 +50,22 @@ describe('quickAskView', () => {
     expect(quickAskView({ status: 'running', quick: 1 }, events)).toMatchObject({ busy: true, copy: null, promoted: null, kept: false });
     expect(quickAskView({ status: 'done', quick: 1 }, events)).toMatchObject({ busy: false, copy: 'a', kept: false });
     expect(quickAskView({ status: 'done', quick: 0 }, events).kept).toBe(true);
-    const made = quickAskView({ status: 'done', quick: 0, promoted_to: 't2' }, [...events, ev('promoted', { thread_id: 't2', title: 'Do it', auto: true })]);
-    expect(made).toMatchObject({ kept: false, promoted: { thread_id: 't2', title: 'Do it', auto: true } });
+    const made = quickAskView({ status: 'done', quick: 0, promoted_to: 't2' }, [...events, ev('task_suggested', { title: 'Do it', reason: '' }), ev('promoted', { thread_id: 't2', title: 'Do it' })]);
+    expect(made).toMatchObject({ kept: false, suggested: null, promoted: { thread_id: 't2', title: 'Do it' } });
+  });
+
+  it("shows the agent's suggested task until Ben asks something else", async () => {
+    const { quickAskView } = await import('../quick-ask.ts');
+    const asked = [ev('user', { text: 'rename it' }), ev('assistant_text', { text: 'TASK: Rename it' }), ev('task_suggested', { title: 'Rename it', reason: 'It edits files.' })];
+    expect(quickAskView({ status: 'done', quick: 1 }, asked).suggested).toEqual({ title: 'Rename it', reason: 'It edits files.' });
+    expect(quickAskView({ status: 'running', quick: 1 }, [...asked, ev('user', { text: 'never mind' })]).suggested).toBeNull();
+  });
+
+  it('keeps a kept ask read-only', () => {
+    expect(readsOnly({ quick: 1, workspace: 'read' })).toBe(true);
+    expect(readsOnly({ quick: 0, workspace: 'read' })).toBe(true);
+    expect(readsOnly({ quick: 0, workspace: 'none' })).toBe(true);
+    expect(readsOnly({ quick: 0, workspace: 'worktree' })).toBe(false);
+    expect(readsOnly({ quick: 0, workspace: null })).toBe(false);
   });
 });

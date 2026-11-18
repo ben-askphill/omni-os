@@ -2,7 +2,7 @@
 // live from the thread's stream, a follow-up box, Copy, Keep as thread and Make it a task. The rules are
 // packages/shared/quick-ask.ts; the server side is apps/server/quick-ask.ts.
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { quickAskKey, quickAskView, promotedLine, type QuickEvent } from '@omni/shared/quick-ask.ts';
+import { quickAskKey, quickAskView, promotedLine, suggestedLine, type QuickEvent } from '@omni/shared/quick-ask.ts';
 import { api, errorText, useThreadStream, type EventRow, type Thread, type ThreadDetail } from '../api.ts';
 import { Markdown } from './Markdown.tsx';
 import { Button, copyText, Icon, Loader } from './ui.tsx';
@@ -124,7 +124,7 @@ export function QuickAnswer({ id, onOpen, touch = false }: { id: string; onOpen:
       {view.promoted ? (
         <div className="flex items-center gap-2 text-[12.5px] text-fg-2" aria-live="polite">
           <Icon name="check" size={13} className="shrink-0 text-fg-3" />
-          <span className="min-w-0 flex-1 truncate">{promotedLine(view.promoted.auto)}</span>
+          <span className="min-w-0 flex-1 truncate">{promotedLine()}</span>
           <Button size="sm" variant="secondary" onClick={() => onOpen(view.promoted!.thread_id)}>
             Open task
           </Button>
@@ -136,6 +136,11 @@ export function QuickAnswer({ id, onOpen, touch = false }: { id: string; onOpen:
           <Button size="sm" variant="secondary" onClick={() => onOpen(id)}>
             Open
           </Button>
+        </div>
+      ) : view.suggested ? (
+        <div className="flex items-center gap-2 text-[12.5px] text-fg-2" aria-live="polite">
+          <Icon name="alert" size={13} className="shrink-0 text-fg-3" />
+          <span className="min-w-0 flex-1">{suggestedLine(view.suggested.title)}</span>
         </div>
       ) : null}
       {!done && (
@@ -163,7 +168,7 @@ export function QuickAnswer({ id, onOpen, touch = false }: { id: string; onOpen:
             <Button size="sm" variant="secondary" busy={busy === 'keep'} disabled={view.busy} onClick={() => void act('keep')}>
               Keep as thread
             </Button>
-            <Button size="sm" variant="secondary" busy={busy === 'task'} onClick={() => void act('task', true)}>
+            <Button size="sm" variant={view.suggested ? 'primary' : 'secondary'} busy={busy === 'task'} onClick={() => void act('task', true)}>
               Make it a task
             </Button>
           </div>

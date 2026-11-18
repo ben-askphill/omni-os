@@ -1,7 +1,7 @@
 // A quick ask's answer on the New screen, as the phone web's New sheet and the desktop app's Quick Prompt show it
 // (apps/web/src/components/QuickAnswer.tsx): the questions and answers live, a follow-up box, Copy (through the share
 // sheet), Keep as thread and Make it a task. The rules are @omni/shared/quick-ask.ts.
-import { promotedLine, quickAskView } from '@omni/shared/quick-ask.ts';
+import { promotedLine, quickAskView, suggestedLine } from '@omni/shared/quick-ask.ts';
 import { useState } from 'react';
 import { ActivityIndicator, Share, StyleSheet, View } from 'react-native';
 
@@ -68,7 +68,7 @@ function Answer({ live, id, onOpen }: { live: NonNullable<ReturnType<typeof useT
       ))}
       {view.promoted ? (
         <View style={styles.line}>
-          <Text style={[styles.note, styles.grow, { color: colors.fg2 }]}>{promotedLine(view.promoted.auto)}</Text>
+          <Text style={[styles.note, styles.grow, { color: colors.fg2 }]}>{promotedLine()}</Text>
           <Button size="compact" variant="secondary" label="Open task" onPress={() => onOpen(view.promoted!.thread_id)} />
         </View>
       ) : view.kept ? (
@@ -78,6 +78,7 @@ function Answer({ live, id, onOpen }: { live: NonNullable<ReturnType<typeof useT
         </View>
       ) : (
         <>
+          {view.suggested ? <Text style={[styles.note, { color: colors.fg2 }]}>{suggestedLine(view.suggested.title)}</Text> : null}
           <TextInput
             multiline
             value={text}
@@ -88,10 +89,10 @@ function Answer({ live, id, onOpen }: { live: NonNullable<ReturnType<typeof useT
             style={[styles.input, { color: colors.fg, backgroundColor: colors.surface }]}
           />
           <View style={styles.actions}>
-            <Button size="small" variant="primary" label="Send" disabled={!text.trim() || busy !== null} onPress={() => void act('send')} />
+            <Button size="small" variant={view.suggested ? 'secondary' : 'primary'} label="Send" disabled={!text.trim() || busy !== null} onPress={() => void act('send')} />
             <Button size="small" variant="secondary" label="Copy" disabled={!view.copy} onPress={() => view.copy && void Share.share({ message: view.copy })} />
             <Button size="small" variant="secondary" label="Keep as thread" disabled={view.busy || busy !== null} onPress={() => void act('keep')} />
-            <Button size="small" variant="secondary" label="Make it a task" disabled={busy !== null} onPress={() => void act('task')} />
+            <Button size="small" variant={view.suggested ? 'primary' : 'secondary'} label="Make it a task" disabled={busy !== null} onPress={() => void act('task')} />
           </View>
         </>
       )}

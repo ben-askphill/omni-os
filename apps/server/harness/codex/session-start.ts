@@ -1,5 +1,6 @@
 // How a Codex session starts: its process environment, the initialize handshake, and the
 // thread/start or thread/resume request with the per-thread config.
+import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { apiToken } from '../../api-token.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { ASK_SERVER, ASK_TIMEOUT_SEC, buildMcpConfig } from '../../sandbox.ts';
@@ -65,7 +66,7 @@ export function sessionParams(ctx: AdapterContext) {
     browserBusy: ctx.browserBusy,
     cdpEndpoint: ctx.cdpEndpoint,
     omniUrl: ctx.omniUrl,
-    quick: !!thread.quick,
+    quick: readsOnly(thread),
   });
   return {
     model: thread.model || undefined,
@@ -73,7 +74,7 @@ export function sessionParams(ctx: AdapterContext) {
     approvalPolicy: 'never',
     // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off. A quick ask
     // only reads too (apps/server/quick-ask.ts): needing more is what turns it into a task.
-    sandbox: ctx.role?.delegateOnly || thread.quick ? 'read-only' : 'danger-full-access',
+    sandbox: ctx.role?.delegateOnly || readsOnly(thread) ? 'read-only' : 'danger-full-access',
     developerInstructions: ctx.systemPrompt,
     config: threadConfig(mcp.mcpServers),
   };

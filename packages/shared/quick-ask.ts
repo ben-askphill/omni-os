@@ -1,7 +1,7 @@
 // Quick asks: a question answered in place, in a thread flagged `quick` that has no charter, worktree, folder or task
-// id and stays out of every list but Recent asks. It turns into a task thread, with the answer carried over, when the
-// work has to write, run or browse, or when Ben asks for one. Pure, so the server, the Web UI and the iOS app share
-// the rules: the agent's TASK line, the task's first message and the keys.
+// id and stays out of every list but Recent asks. It turns into a task thread, with the answer carried over, only when
+// Ben makes it one: the agent's TASK line, when the work has to write, run or browse, is only a suggestion. Pure, so
+// the server, the Web UI and the iOS app share the rules: the agent's TASK line, the task's first message and the keys.
 
 /** How long a quick ask stays under Recent asks. */
 export const RECENT_ASKS_DAYS = 7;
@@ -56,7 +56,7 @@ export function quickAskRule(name: string): string[] {
     '## Quick ask',
     `${name} asked this from the quick ask box and reads your answer in place. Answer it directly and briefly: lead with the answer, then a source line when you looked something up.`,
     'You can read files, search and fetch the web, and read connectors. You cannot edit or write files, run commands, use a browser or delegate.',
-    `When the request needs any of those (changing files or a store, running a command, browsing a site, making a file or a page, or work that runs long), do not attempt it and do not explain how to do it. Reply with exactly \`TASK: <a title of at most 8 words>\` on the first line, then one sentence on why it needs a task, then anything you already found that the task should start from. Omni turns it into a task thread and carries your answer over.`,
+    `When the request needs any of those (changing files or a store, running a command, browsing a site, making a file or a page, or work that runs long), do not attempt it and do not explain how to do it. Reply with exactly \`TASK: <a title of at most 8 words>\` on the first line, then one sentence on why it needs a task, then anything you already found that the task should start from. Omni offers ${name} a task that starts from your answer; only they can start it.`,
   ];
 }
 
@@ -77,11 +77,21 @@ export function quickAskKey(e: { key: string; metaKey: boolean; ctrlKey: boolean
   return e.shiftKey ? 'task' : 'ask';
 }
 
-/** Who promoted it: the agent's TASK line, Ben's "Make it a task", or Ben's "Keep as thread". */
-export type Promotion = 'task' | 'keep';
+/**
+ * A thread whose agent only reads: a quick ask, and one kept as a thread from it (its `workspace` stays `read` or
+ * `none`). The harness adapters take the write, shell and browser tools away for it, so keeping an ask never gives
+ * its agent a checkout to change: real work goes to a task thread, with a worktree of its own.
+ */
+export const readsOnly = (t: { quick?: number | null; workspace?: string | null }) => !!t.quick || t.workspace === 'read' || t.workspace === 'none';
+
+/** The event that records the agent's TASK line: a task it suggests, which only Ben's Make it a task starts. */
+export const TASK_SUGGESTED = 'task_suggested';
+
+/** The line under an answer whose agent suggested a task. */
+export const suggestedLine = (title: string) => `This needs a task: ${title}.`;
 
 /** The quick ask's line once it turned into a task. */
-export const promotedLine = (auto: boolean) => (auto ? 'That needs real work, so I made it a task.' : 'Made it a task.');
+export const promotedLine = () => 'Made it a task.';
 
 /** An event as a client or the server holds it: the payload parsed, or still the stored JSON. */
 export interface QuickEvent {
@@ -115,9 +125,11 @@ export interface QuickAskView {
   /** It is answering: the newest question has no finished answer yet. */
   busy: boolean;
   /** The task thread it turned into, and whether its agent asked for that (TASK line) or Ben did. */
-  promoted: { thread_id: string; title: string; auto: boolean } | null;
+  promoted: { thread_id: string; title: string } | null;
   /** Kept as a thread where it is (Keep as thread), so it now opens as one. */
   kept: boolean;
+  /** The task its agent's TASK line suggests, until Ben makes it a task. */
+  suggested: { title: string; reason: string } | null;
   /** The text Copy copies: the newest answer. */
   copy: string | null;
 }
@@ -125,12 +137,15 @@ export interface QuickAskView {
 export function quickAskView(thread: { status: string; quick?: number | null; promoted_to?: string | null }, events: readonly QuickEvent[]): QuickAskView {
   const turns = quickTurns(events);
   let promoted: QuickAskView['promoted'] = null;
+  let suggested: QuickAskView['suggested'] = null;
   for (const e of events) {
-    if (e.kind !== 'promoted') continue;
     const p = payloadOf(e);
-    if (typeof p.thread_id === 'string') promoted = { thread_id: p.thread_id, title: typeof p.title === 'string' ? p.title : '', auto: p.auto === true };
+    if (e.kind === TASK_SUGGESTED && typeof p.title === 'string') suggested = { title: p.title, reason: typeof p.reason === 'string' ? p.reason : '' };
+    else if (e.kind === 'user') suggested = null;
+    if (e.kind !== 'promoted') continue;
+    if (typeof p.thread_id === 'string') promoted = { thread_id: p.thread_id, title: typeof p.title === 'string' ? p.title : '' };
   }
   const busy = thread.status === 'running' || thread.status === 'queued';
   const last = turns[turns.length - 1];
-  return { turns, busy, promoted, kept: !thread.quick && !thread.promoted_to && !promoted, copy: busy ? null : (last?.answer ?? null) };
+  return { turns, busy, promoted, kept: !thread.quick && !thread.promoted_to && !promoted, suggested: promoted ? null : suggested, copy: busy ? null : (last?.answer ?? null) };
 }

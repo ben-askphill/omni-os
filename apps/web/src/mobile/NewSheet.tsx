@@ -301,7 +301,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
           {toGrok
             ? GROK_BOT_NOTE
             : asking
-              ? 'Answered here with read-only tools. Work that changes something becomes a task. Recent asks keep it for 7 days.'
+              ? 'Answered here with read-only tools. Work that changes something needs a task. Recent asks keep it for 7 days.'
               : ch
               ? `Runs in #${ch.name} with its repo, store and browser profile.`
               : 'The Conductor picks the crew and reports back here. Activity shows you when something needs you.'}
