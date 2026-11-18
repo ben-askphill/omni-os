@@ -87,7 +87,7 @@ export function CrewSection() {
         )}
         <p className="text-[12.5px] text-fg-3">Yours live in data/crew/ and sync to your other machines. Hiding a built-in is for this machine only.</p>
       </Card>
-      <CrewEditor target={editing} onClose={() => setEditing(null)} onOpen={(id) => setEditing({ id })} onSaved={reload} />
+      <CrewEditor target={editing} roles={roles.data} onClose={() => setEditing(null)} onOpen={(id) => setEditing({ id })} onSaved={reload} />
     </>
   );
 }
@@ -106,13 +106,26 @@ function RoleChips({ role }: { role: Pick<CrewRole, 'kind' | 'hidden' | 'builtIn
 
 type View = 'edit' | 'compare' | 'duplicate';
 
-function CrewEditor({ target, onClose, onOpen, onSaved }: { target: { id: string | null } | null; onClose: () => void; onOpen: (id: string) => void; onSaved: () => void }) {
+function CrewEditor({
+  target,
+  roles,
+  onClose,
+  onOpen,
+  onSaved,
+}: {
+  target: { id: string | null } | null;
+  roles: CrewRole[] | undefined;
+  onClose: () => void;
+  onOpen: (id: string) => void;
+  onSaved: () => void;
+}) {
   const { crew } = useApp();
   const [view, setView] = useState<View>('edit');
   const id = target?.id ?? null;
   // Each role opens on its form.
   useEffect(() => setView('edit'), [id]);
-  const name = id ? (crew.find((r) => r.id === id)?.name ?? id) : null;
+  // Settings' list has hidden roles too; the app's crew list, which pickers use, leaves them out.
+  const name = id ? ((roles ?? crew).find((r) => r.id === id)?.name ?? crew.find((r) => r.id === id)?.name ?? id) : null;
   const title = !id ? 'New role' : view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : `Edit ${name}`;
   return (
     <Modal open={!!target} onClose={onClose} title={title} roomy>

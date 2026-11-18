@@ -64,6 +64,8 @@ beforeEach(async () => {
       if (url === '/api/crew/draft') return Response.json(draft(body));
       if (url === '/api/crew/builder/hidden') {
         detail = { ...detail, role: { ...detail.role, hidden: body.hidden } };
+        // The app's crew list, which the pickers read, leaves a hidden role out.
+        state.crew = body.hidden ? [] : [detail.role as unknown as CrewRole];
         return Response.json(detail);
       }
       if (url === '/api/crew/builder') return Response.json(detail);
@@ -137,5 +139,8 @@ it('shows the role hidden once Hide is done, offering Show', async () => {
   expect(calls.some((c) => c.url === '/api/crew/builder/hidden' && c.body.hidden === true)).toBe(true);
   expect(button('Hide')).toBeUndefined();
   expect(button('Show')).toBeDefined();
-  expect(host.querySelector('[role="dialog"]')?.textContent).toContain('Hidden');
+  const dialog = host.querySelector('[role="dialog"]')!;
+  expect(dialog.textContent).toContain('Hidden');
+  // The title keeps the role's name, though the app's crew list no longer has it.
+  expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)?.textContent).toBe('Edit Builder');
 });
