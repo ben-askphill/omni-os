@@ -13,6 +13,7 @@ A plan for letting Omni users create and edit their own crew roles (Ben's "agent
 - Proposal: keep files as the source of truth and copy the automation editor's model (shipped, edited, own, reset, synced as a signed action). Edits to a built-in become an overlay, so release fixes to its charter still arrive. Special behavior moves from id checks to capability flags and server-side rules.
 - Memory: an Omni-owned memory folder per role, injected into every harness's prompt. Writes go through a tool and wait for Ben's approval by default.
 - Nine slices (S0 to S8) below. Eleven decisions for Ben at the end.
+- Addendum A (T-AGENTS-BYO) adds roles that run on the user's own agent: Hermes on a VPS, an eve agent on Vercel, a Cloudflare agent or any A2A endpoint. It adds slices B1 to B8 after S4 and ten more decisions (E1 to E10).
 
 ## 1. Current state
 
@@ -309,3 +310,341 @@ Why:
 - **D9**: no change for existing threads. The Conductor needs no secrets, so it can ship with an empty list.
 - **D10**: the Conductor already drafts charter edits; applying them after a yes saves Ben the copy and paste, and the automation guard's lineage rule keeps loops out.
 - **D11**: today a reviewer can edit and push despite its charter (`crew/reviewer.md:11`). No-edits stops the edit tools and keeps Bash for `gh` and checks.
+
+## Addendum A. Bring your own agent
+
+Ben wants users to add agents they run themselves to the crew, next to Claude Code, Codex and Cursor. Examples are Hermes Agent on a VPS, an agent built on Vercel's eve framework and a Cloudflare agent.
+
+- Status: proposal, nothing built. Task T-AGENTS-BYO, 2026-11-18. Read-only survey of the same commit, `9e087e5a`.
+- Omni claims cite `path:line`. Claims about outside frameworks cite the doc page, read on 2026-11-18.
+- Wording: the glossary calls the thing a thread runs in a **harness** and asks to avoid "runtime" and "provider" (`CONTEXT.md:100-102`). The brief's "runtime adapter" is the harness adapter here. A user's own agent joins as a **custom harness**, one the user registers and Omni reaches over the network. "Remote harness" covers Hermes, Cursor Cloud and custom ones; ADR 0003 uses that term, and the code says provider harness (`apps/server/harness/types.ts:11-17`). The crew role stays who does the work. A role binds to a custom harness the way it binds to Codex today.
+
+### A.0 Summary
+
+- The seam exists. Every harness runs behind `HarnessAdapter` and `HarnessSession` (`apps/server/harness/adapter.ts:100-130`). Hermes and Cursor Cloud already use it with no process (`apps/server/harness/session.ts:44-64`).
+- The list is closed. `HarnessId` is a fixed union of five ids (`apps/server/harness/types.ts:7-9`). Hermes has one global URL and one global key (`apps/server/config.ts:61-64`, `apps/server/runner/spawn.ts:137`). Capabilities cover steer, interrupt, images and usage, nothing else (`apps/server/harness/types.ts:28-40`).
+- Proposal: a custom harness is a synced file with a kind (its wire protocol), a URL, the name of an auth secret and declared capabilities. Roles bind to it by id. Omni reads capability flags, not `harness === 'hermes'`, to decide what it offers, refuses or warns about.
+- First adapter: turn the Hermes adapter into kind `runs-api` with any number of instances, and document its HTTP shape as Omni's remote harness protocol. eve and Cloudflare agents can serve it from a small shim.
+- Second adapter: A2A 1.0, the one stable protocol for remote agents. eve already serves it. It has no usage and no tool-call events, so those degrade.
+- Security: a remote agent runs its own tools with its own secrets, and Omni cannot limit either. Its reply reaches the Conductor as a crew report. Remote harnesses never run delegate-only roles and never get the install's API token. They get Omni tools only through a scoped per-thread token, in a later slice.
+
+### A.1 How Hermes is wired today
+
+Hermes is the reference remote harness. ADR 0003 records the decision (`docs/adr/0003-hermes-remote-harness.md:3-14`). This is what ships:
+
+| Step | What happens | Where |
+| --- | --- | --- |
+| Config | One base URL, from `OMNI_HERMES_URL` or Settings. Unset means off | `apps/server/config.ts:61-64`, `apps/server/user-config.ts:224` |
+| Auth | One global secret, `HERMES_API_KEY`, sent as a Bearer header and never as an env var | `apps/server/runner/spawn.ts:134-141`, `apps/server/harness/hermes/adapter.ts:54-58` |
+| Env guard | Every harness's environment drops `HERMES_API_KEY` | `docs/user/harnesses.md:17` |
+| Availability | `GET /v1/capabilities` answers 200. Redirects are not followed, so the token cannot reach another host | `apps/server/harness/hermes/client.ts:69-90`, probe at `apps/server/harness/catalog-service.ts:218-227` |
+| Catalog | One model, "Hermes default". The server picks the LLM | `apps/server/harness/catalog.ts:141-166` |
+| Capabilities | No warm process, steer and interrupt, no inline images, no plan usage | `apps/server/harness/types.ts:48-49` |
+| Adapter | Looked up by id. An unknown id falls back to Claude Code | `apps/server/runner/state.ts:24-31` |
+| Session | No process. `detachedSession` ends on the first `end` | `apps/server/harness/session.ts:44-64` |
+| Session id | `omni-<thread id>` continues the remote conversation | `apps/server/harness/hermes/adapter.ts:35-36`, `:49`, `:55-56` |
+| Start a turn | `POST /v1/runs` with `input`, `session_id` and, on the first run, `instructions`. A 400 that names instructions moves the prompt into the first message | `apps/server/harness/hermes/adapter.ts:175-193`, `apps/server/harness/hermes/client.ts:125-135` |
+| Retries | The message uuid is the `Idempotency-Key`. A 429 backs off and retries with the same key | `apps/server/harness/hermes/client.ts:105-123`, `:130` |
+| Tool-failure policy | Goes in front of the first input of a resumed session | `apps/server/harness/hermes/adapter.ts:66-68`, `:176` |
+| Events | SSE on `GET /v1/runs/{id}/events`. `seq` drops replayed events. One reconnect, then up to three `GET /v1/runs/{id}`, then the turn fails and Omni stops the run | `apps/server/harness/hermes/adapter.ts:103-159`, `apps/server/harness/hermes/client.ts:173-211` |
+| Normalizing | Deltas become one bubble, `tool.*` become tool rows under Claude's tool names, `subagent.*` become tasks, `run.*` become status and result | `apps/server/harness/hermes/normalize.ts:10-24`, `:180-292` |
+| Steer | `POST /v1/runs/{id}/steer`. A 409 or 400 queues the text as the next run | `apps/server/harness/hermes/adapter.ts:219-240`, `apps/server/harness/hermes/client.ts:148-153` |
+| Interrupt | A `control` record acks at once, then `POST /v1/runs/{id}/stop` | `apps/server/harness/hermes/adapter.ts:279-285` |
+| End | Aborts the stream and stops the active run | `apps/server/harness/hermes/adapter.ts:242-247` |
+| Approvals | `approval.request` shows as a status line. The client has `approval()`, and nothing calls it | `apps/server/harness/hermes/normalize.ts:263-269`, `apps/server/harness/hermes/client.ts:166-171` |
+| Usage | Tokens, cache tokens and the serving model land on the result record. Nothing adds them up. Accounts says "not reported" | `apps/server/harness/hermes/normalize.ts:136-157`, `apps/server/stream.ts:39-44`, `apps/server/harness-accounts.ts:144-158` |
+| Attachments | Described in the message and not transferred | `apps/server/harness/hermes/adapter.ts:20-33` |
+| Workdir | The thread's data folder. No worktree and no branch | `apps/server/sandbox.ts:52-55`, `apps/server/runner/api.ts:153-170` |
+| MCP and browser | None. No MCP config file, no browser hold, no design-system file | `apps/server/runner/spawn.ts:101-130` |
+| Prompt | Hard-coded "You are Hermes, running on your own server", work on your own clone, no Keychain secrets, no html_render | `apps/server/runner/prompts.ts:139-142`, `:150-151`, `:182-184`, `:190-193` |
+| Roles | Thread create and the adapter both refuse a delegate-only role | `apps/server/runner/api.ts:148`, `apps/server/harness/hermes/adapter.ts:249-265`, reason at `apps/server/crew.ts:58-63` |
+| Auto | Never picks Hermes | `apps/server/harness/auto.ts:294-297` |
+| Switch and continue | Refused to or from Hermes | `apps/server/runner/switch-plan.ts:19-20`, `:35`, `docs/user/harnesses.md:65` |
+
+Other code that branches on `isProviderHarness` and would read a capability instead: `apps/server/actions.ts:76`, `:84`, `apps/server/changes.ts:50`, `apps/server/continue.ts:67`, `:170`, `apps/server/handoff.ts:315`, `:439`, `apps/server/turns.ts:31`, `apps/server/message-context/project.ts:55`, `apps/server/runner/fresh-context.ts:42`, `apps/server/runner/setup-action.ts:58`, `apps/server/runner/teardown-action.ts:18`, `apps/server/runner/snapshots.ts:60`, `apps/server/runner/prompts.ts:77`, `:87`, `:98`, `apps/server/sync/files.ts:841`.
+
+Doc drift: ADR 0003 still says the adapter holds a dummy process open (`docs/adr/0003-hermes-remote-harness.md:5`). The code uses `detachedSession`. B1 fixes the ADR.
+
+What Hermes shows about any remote agent:
+
+- **One instance.** One URL and one key, so a second server cannot be added.
+- **Its PRs are invisible.** A remote thread has no branch (`apps/server/runner/api.ts:170`), so crew PRs (`apps/server/crew-prs.ts:23-25`), PR watch (`apps/server/pr-watch/api.ts:33`) and the thread card miss what it opened. Cursor Cloud reports its branch and PR, but only in a transcript row (`apps/server/harness/cursor-cloud/normalize.ts:11-24`, `apps/server/stream.ts:68-84`). Nothing writes them to the thread.
+- **Spend is shown, not counted.** Token counts stop at the result record.
+- **Approvals dead-end.** The agent waits, and Ben sees a status line with no button.
+- **An unknown harness id runs on Claude Code.** `adapterFor` falls back to `claudeAdapter` (`apps/server/runner/state.ts:31`). With five fixed ids that never happens. With user-defined ids, a deleted harness would run its threads on this Mac with full permissions.
+
+### A.2 What a harness adapter contract needs
+
+The runner side stays as it is: `spawn`, then `send`, `interrupt` and `end`, with the callbacks (`apps/server/harness/adapter.ts:14-33`, `:65-98`, `:100-130`). The runner already degrades by capability. It queues a steer for a harness that cannot steer, and stops the session for an interrupt the harness cannot take (`apps/server/runner/queue.ts:56-90`). What is new is the wire side, meaning what a remote agent has to offer, and flags for what it lacks.
+
+| Need | Omni today | The remote offers | Without it |
+| --- | --- | --- | --- |
+| Start | `spawn(ctx)` gets the system prompt, secrets and a resume flag (`apps/server/harness/adapter.ts:14-33`) | Create a run on a key Omni sends, so a retry makes no second run. Take Omni's prompt as instructions | The prompt goes in the first message, as Hermes' fallback and Cursor Cloud do (`apps/server/harness/cursor-cloud/adapter.ts:209`) |
+| Stream events | `cb.record` into Omni's record kinds (`apps/server/stream.ts:6-46`) | Ordered events with a cursor: text, tool start and end, subtasks, status, one terminal event per turn. A status call for a dropped stream | Polling, as Cursor Cloud does (`apps/server/harness/cursor-cloud/adapter.ts:1-5`). No tool rows |
+| Steer | `send()` during a turn, `steer` flag (`apps/server/harness/types.ts:32-33`) | Add a message to the running turn, and say when the turn already ended | Queued as the next turn (`apps/server/runner/queue.ts:68-71`) |
+| Interrupt | `interrupt(requestId)`, answered by a `control` record (`apps/server/harness/adapter.ts:111-115`) | Cancel the turn and keep the session | Stop ends the session (`apps/server/harness/types.ts:34-35`) |
+| Resume | `cb.session` stores the session id on the thread (`apps/server/harness/adapter.ts:71-72`), `ctx.resume` (`:29-30`) | A durable session that the next turn continues, by an id Omni picks or stores | Refused in this plan. A transcript replay per turn would reuse the Carryover (`CONTEXT.md:125`) and can come later |
+| Artifacts | `artifacts/` exists only on the Mac (`docs/adr/0003-hermes-remote-harness.md:9`) | An artifact event with a name, a media type, and a URL or small inline bytes | Links in the reply text, as today |
+| PRs | Found through the thread's branch (`apps/server/crew-prs.ts:23-25`) | Report the repo, branch and PR it pushed, or push to a branch Omni names | No PR on the thread card, in crew PRs or in PR watch |
+| Tools and MCP | Local harnesses get Omni's MCP servers (`apps/server/sandbox.ts:254-293`). Remote ones get none (`apps/server/runner/spawn.ts:130`) | Its own tools. Later, calls back to a scoped set of Omni tools | No questions, html_render, thread reads or memory writes. Delegate-only roles refused |
+| Approvals | The Questions card, for local agents (`CONTEXT.md:71`) | An approval event and a call that answers it | A status line, as Hermes today |
+| Secrets | Only the harness's own key, as a header (`apps/server/runner/spawn.ts:134-141`) | Its own secrets | No change. Omni sends no other secret |
+| Usage and cost | The `result` record carries tokens and model (`apps/server/stream.ts:30-45`) | Tokens per turn, cost when known, the serving model | Accounts says "not reported" |
+| Worktree | The thread's data folder (`apps/server/sandbox.ts:52-55`) | Its own clone. Best if it takes repo, base and branch from Omni | No Changes tab, actions, snapshots, switch or continue |
+| Attachments | Paths on the Mac (`apps/server/harness/hermes/adapter.ts:20-33`) | File parts in the message, or an upload call | Described as not transferred |
+| Availability | A probe every 15 minutes (`apps/server/harness/catalog-service.ts:1`) | An authenticated health call that lists capabilities and models | Shown as unavailable in pickers |
+| Concurrency | A cap per harness (`apps/server/config.ts:56-65`) | 429 when full | Omni's cap only |
+
+#### A.2.1 Capability flags
+
+Extend `HarnessCapabilities` (`apps/server/harness/types.ts:28-40`). Built-ins keep fixed values. A custom harness takes its values from the probe answer, and the user can turn a flag off but never on.
+
+```ts
+interface HarnessCapabilities {
+  // today
+  warmProcess: boolean;
+  steer: boolean;
+  interrupt: boolean;
+  inlineImages: boolean;
+  usage: 'five-hour-week' | 'monthly' | 'per-turn' | 'none'; // per-turn is new
+  // new
+  remote: boolean;                          // replaces PROVIDER_HARNESSES (types.ts:16)
+  workspace: 'worktree' | 'own-clone' | 'none';
+  git: 'local' | 'reports' | 'takes-branch' | 'none';
+  omniTools: 'all' | 'scoped' | 'none';
+  browser: boolean;
+  toolLimits: boolean;                      // Omni can enforce delegate-only and no-edits
+  approvals: boolean;                       // the remote asks, Omni's Questions card answers
+  attachments: 'inline' | 'upload' | 'note';
+  sessions: 'durable' | 'none';
+  switchable: boolean;                      // handover to and from (switch-plan.ts:33-35)
+}
+```
+
+| Harness | steer | interrupt | workspace | git | omniTools | toolLimits | usage |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | yes | yes | worktree | local | all | yes | five-hour-week |
+| Codex | yes | yes | worktree | local | all | yes | five-hour-week |
+| Cursor Agent | no | no | worktree | local | all | yes | monthly |
+| Hermes | yes | yes | own-clone | none | none | no | per-turn |
+| Cursor Cloud | no | yes | own-clone | reports | none | no | none |
+
+#### A.2.2 Wire protocol: Runs API v1
+
+Document the HTTP shape Omni already speaks to Hermes as Omni's remote harness protocol, in a new `docs/internals/remote-harness-protocol.md`. Hermes keeps working unchanged. Each addition is optional, and the probe answer says which ones a server supports.
+
+| Call | Today, with Hermes | Addition |
+| --- | --- | --- |
+| `GET /v1/capabilities` | 200 means up. Omni throws the body away (`apps/server/harness/hermes/client.ts:83`) | Body: protocol version, the flags above, models, model family |
+| `POST /v1/runs` | `input`, `session_id`, `instructions`, `Idempotency-Key` | `git: {repo, base, branch}`, `files`, and `tools: {url, token}` once scoped tools exist |
+| `GET /v1/runs/{id}/events` | SSE with `seq` | `artifact.created`, `git.pushed`, and `usage` with `cost_usd` on the terminal event |
+| `GET /v1/runs/{id}` | Status after a dropped stream | No change |
+| `POST /v1/runs/{id}/steer` | 409 once the run ended | No change |
+| `POST /v1/runs/{id}/stop` | Cancels the run | No change |
+| `POST /v1/runs/{id}/approval` | Exists, unused | Answers from the Questions card |
+
+Why our own protocol first, and A2A second:
+
+- Omni already speaks this one, with tests, retries on one key, steer, reconnect and approval events.
+- A shim on eve or Cloudflare is one route file on their side (A.3.2, A.3.3).
+- A2A has no usage and no tool-call events (A.3.4), so an A2A thread shows less than a Hermes thread does.
+
+### A.3 Per-target fit
+
+#### A.3.1 Hermes Agent on a VPS
+
+- **Works today.** Everything in A.1, on one server over Tailscale.
+- **Works after B1.** Several servers, each a custom harness with its own key, cap and URL, with HTTPS for a server outside the tailnet.
+- **Degrades.** No worktree, browser, artifacts folder or Omni tools. Attachments are only described. No switch or continue. Delegate-only roles are refused. No PR link until B3, no spend totals until B4.
+- **Trust and security.**
+  - Hermes runs its own tools with its own secrets on the VPS, and Omni cannot take tools away there (`apps/server/crew.ts:58-63`). A role's `tools: no-edits` or `browser: false` is only prompt text on Hermes.
+  - The bearer token travels over plain HTTP today; the documented URL is `http://100.x.y.z:8642` (`apps/server/config.ts:61`). WireGuard encrypts that on a tailnet. On a public VPS address it needs HTTPS, so B1 refuses `http://` unless the host is on the tailnet or localhost.
+  - A VPS is easier to break into than a Mac on a home network. Whoever controls it controls the text that reaches the Conductor (A.5).
+- Hermes Agent also speaks ACP (https://agentclientprotocol.com/get-started/agents.md, https://hermes-agent.nousresearch.com/docs/user-guide/features/acp). ACP's remote transport is still a draft, so the Runs API stays the way in (A.3.4).
+
+#### A.3.2 Vercel eve
+
+What the docs say:
+
+- A deployed eve agent serves its own HTTP API under `/eve/v1`: create a session, send a follow-up, `cancel`, `end`, `GET .../stream`, `health` and `info`. https://eve.dev/docs/channels/eve
+- The server assigns session ids. `operationId` makes a create safe to retry and `idempotencyKey` does the same for follow-ups. Unknown top-level fields get a 400. https://eve.dev/docs/channels/eve
+- Each session is a durable workflow that survives restarts and redeploys. https://eve.dev/docs/concepts/execution-model-and-durability
+- The stream is NDJSON with a `startIndex` cursor for reconnects. Events include `turn.*`, `call.*` for tools, agents and skills, and `usage.recorded` with tokens and `costUsd`. https://eve.dev/docs/concepts/sessions-runs-and-streaming
+- A follow-up during a turn steers it by default, but only from the turn's own caller; other callers' messages queue. Cancel takes a `turnId` guard. https://eve.dev/docs/concepts/sessions-runs-and-streaming
+- Approvals pause the turn. The client answers with `answers: [{interactionId, optionId}]`. https://eve.dev/docs/human-in-the-loop
+- There is no per-call instructions field. `clientContext` adds context to one turn and is not saved to history. https://eve.dev/docs/guides/client/messages
+- Auth fails closed: production traffic is rejected unless an authenticator accepts it, such as Vercel OIDC, HTTP Basic, a JWT or a custom function. https://eve.dev/docs/guides/auth-and-route-protection
+- Each session gets a Vercel Sandbox. Private clones go through credential brokering, and `git__pr` opens a draft PR. https://eve.dev/docs/sandbox/vercel, https://eve.dev/docs/concepts/security-model, https://eve.dev/docs/code-extension
+- Secrets live in the app runtime's `process.env`, never in the sandbox. The docs show no per-call secrets. https://eve.dev/docs/concepts/security-model
+- eve also serves A2A 1.0 (`/.well-known/agent-card.json`, `POST /eve/v1/a2a`) and an MCP channel with `agent_start`, `agent_get`, `agent_update` and `agent_cancel`. https://eve.dev/docs/channels/a2a, https://eve.dev/docs/channels/mcp
+
+Fit:
+
+- **Works.** Start, stream with a cursor, steer, cancel, durable resume, approvals, tokens with cost, and PRs from its sandbox. Of the three targets, eve matches Omni's thread model most closely.
+- **Degrades.** Omni's charter cannot go as a system prompt. It goes in `clientContext` every turn, which costs tokens each turn, or once in the first message, which compaction can drop. The agent's own `instructions.md` stays in charge. No Omni tools, browser or worktree. The model picker shows one entry, the agent's.
+- **Adapter.** B6 reaches eve through its A2A channel with no eve code. A native `eve` kind maps cleanly too: NDJSON with a cursor, and a server-assigned id stored through `cb.session`. Build it only if the A2A path loses too much (B7).
+- **Trust and security.**
+  - Ben has to add an authenticator Omni can pass, such as HTTP Basic or an HMAC JWT. `eve init` scaffolds a `placeholderAuth()` that must be replaced (https://eve.dev/docs/guides/auth-and-route-protection). Omni stores the secret by name.
+  - Steering works only when every Omni message for a thread comes from the same caller. One secret per harness gives that.
+  - The agent runs on Vercel with its own env secrets and connections, and Omni cannot see what it can reach.
+  - eve's A2A docs warn that a public agent makes context and task ids bearer capabilities (https://eve.dev/docs/channels/a2a). Omni refuses an eve or A2A harness with no auth.
+  - It bills AI Gateway on Ben's Vercel team, not his plans.
+
+#### A.3.3 Cloudflare Agents
+
+What the docs say:
+
+- An agent is a class on a Durable Object. Each name is one instance with its own state and SQLite, served at `/agents/{binding}/{name}`. Clients use `AgentClient` over WebSocket, or plain HTTP to the agent's `onRequest`. https://developers.cloudflare.com/agents/getting-started/add-to-existing-project/
+- `AIChatAgent` chat runs over WebSocket with Cloudflare's `CF_AGENT_*` messages. It saves messages, resumes a stream after a reconnect and cancels with `CF_AGENT_CHAT_REQUEST_CANCEL`. Overlapping messages are queued, replaced, merged, dropped or debounced (`messageConcurrency`). It has no steering. https://developers.cloudflare.com/agents/agent-class/communication-channels/chat/chat-agents/
+- The experimental harnesses differ. Pi and OpenCode take `submit` with an `operationId`, `steer` and `abort(operationId)`. The Claude Code and Codex harnesses run the CLI in a Container and document no interrupt. https://developers.cloudflare.com/agents/harnesses/pi/, https://developers.cloudflare.com/agents/harnesses/opencode/, https://developers.cloudflare.com/agents/harnesses/claude-code/
+- Auth is the author's code, in `onBeforeConnect` and `onBeforeRequest`. https://developers.cloudflare.com/agents/runtime/routing/authentication/
+- Secrets are per Worker. The docs show no per-request secrets. https://developers.cloudflare.com/workers/configuration/secrets/
+- `AIChatAgent` has no usage API. AI Gateway analytics show tokens and an estimated cost. https://developers.cloudflare.com/ai-gateway/observability/analytics/
+- The Sandbox guide for private repos blocks `git push` on purpose. https://developers.cloudflare.com/sandbox/network/clone-a-private-repository/
+- The Agents docs do not mention A2A.
+
+Fit:
+
+- **Works.** Durable sessions by instance name (`omni-<thread id>`), streaming with resume, cancel. A Pi or OpenCode harness adds steer and abort.
+- **Degrades.** No standard wire protocol. Every Cloudflare agent is the author's own code, and chat is a WebSocket with Cloudflare's message set, which the Omni server would hold open per thread. No usage per turn unless the agent reports it. PRs need the author to set up push credentials.
+- **Adapter.** Skip a native adapter. Ship a Worker template that serves the Runs API from `onRequest` and calls the agent by name (B7). Swap to A2A if Cloudflare ships it.
+- **Trust and security.**
+  - Auth is whatever the author writes. A Worker with no `onBeforeRequest` check is open to anyone who guesses an instance name. Omni's names are random UUIDs, but B1 refuses an entry with no auth secret anyway.
+  - Secrets sit in the Worker. Omni never sends any.
+  - It bills the author's Cloudflare account.
+
+#### A.3.4 Generic endpoint: A2A, MCP and ACP
+
+A2A:
+
+- The current release is 1.0.1 (https://github.com/a2aproject/A2A/releases). Clients find an agent through its card at `/.well-known/agent-card.json`. Bindings are JSON-RPC, gRPC and REST. `SendStreamingMessage` streams over SSE, and `CancelTask` and `SubscribeToTask` exist. `contextId` is the conversation and `taskId` one unit of work. Parts carry text, bytes, URLs or JSON. The card declares auth schemes. https://a2a-protocol.org/latest/specification/
+- Steering: "Agents MAY accept additional messages for tasks in non-terminal states", and the card has no flag that says whether one does. https://a2a-protocol.org/latest/specification/#333-asynchronous-processing
+- Usage: the core spec has none, only free-form `metadata`. https://a2a-protocol.org/latest/specification/#411-task
+- Reconnect: `SubscribeToTask` returns the task, then live events. There is no cursor to replay what was missed. https://a2a-protocol.org/latest/specification/#316-subscribe-to-task
+- Cards can be signed with JWS, and clients SHOULD verify a signature. https://a2a-protocol.org/latest/specification/#843-signature-verification
+
+A2A fit:
+
+- **Works.** Start, stream, cancel, resume by `contextId`, artifacts.
+- **Degrades.** Omni tries a steer and queues it when the agent refuses. There are no tool-call rows unless an extension adds them, so the transcript shows text and status. Usage appears only when the agent puts it in metadata. Events missed during a reconnect are lost; the task snapshot still gives the final state.
+- **Trust and security.** The endpoint can be anyone's server. Card fields such as name and skills are untrusted text that the UI shows and `list_harnesses` hands the Conductor. Omni verifies a signed card when there is one. It never follows a URL from a card to a private address unless the user typed that address, which guards against SSRF.
+
+MCP is a poor transport for driving a run. The current revision, 2026-07-28, moved tasks into an extension, made the protocol stateless and removed SSE resumability (https://modelcontextprotocol.io/specification/2026-07-28/changelog). A client cannot send a new message into a running task on its own initiative. Omni keeps MCP for tools.
+
+ACP fits the thread model best: prompt, cancel, and session updates with tool calls and cost (https://agentclientprotocol.com/protocol/v1/prompt-turn.md). Claude Code and Codex speak it through adapters, and Hermes Agent speaks it directly (https://agentclientprotocol.com/get-started/agents.md). Its only standard transport is stdio, and the remote transport is a draft RFD (https://agentclientprotocol.com/protocol/v2/transports.md). If that ships, ACP could replace the Runs API; that is E2.
+
+### A.4 Binding to the role data model
+
+Two files. The harness file says where and how a thread runs. The role file says who does the work. One key rotation then covers every role on that harness.
+
+```yaml
+# data/harnesses/hermes-hetzner.yaml     id: custom:hermes-hetzner
+name: Hermes on Hetzner
+kind: runs-api                 # runs-api (B1) | a2a (B6) | eve (B7, only if needed)
+url: https://hermes.tail1234.ts.net:8642
+auth:
+  scheme: bearer               # bearer | basic | header
+  secret: HERMES_HETZNER_KEY   # a secret store name. The value never enters this file or sync
+bills: Anthropic API key on the VPS   # shown in pickers, like "Claude plan"
+family: anthropic              # model family for review_of. Omitted means unknown
+cap: 4                         # concurrency, like OMNI_MAX_CONCURRENT_HERMES
+capabilities:                  # turns flags off. Cannot turn on what the probe did not report
+  steer: false
+git: takes-branch              # none | reports | takes-branch
+tools: none                    # none | scoped (B5)
+```
+
+Rules for harness files:
+
+- **Ids** are `custom:<slug>`, so they never clash with built-ins. The thread table's `harness` column is free text (`apps/server/db/migrate.ts:42`), so it stores them as they are.
+- **Hermes keeps its id.** The current URL and `HERMES_API_KEY` become the first `runs-api` entry with id `hermes`, so existing threads keep running (E4).
+- **A missing harness refuses.** A thread whose harness file is gone shows the id and refuses to run. That replaces the Claude Code fallback at `apps/server/runner/state.ts:31`.
+- **Sync** works like crew files in S2: a signed action entity. Secret values stay in each machine's secret store. A machine without the secret shows the harness as unavailable and names the secret. `set_secret` can send it there sealed to that machine's key (`docs/user/sync.md:49`).
+- **Probe** on save and every 15 minutes, as Hermes does now.
+- **Network.** `http://` only on the tailnet or localhost. Redirects stay unfollowed (`apps/server/harness/hermes/client.ts:81`, `:115`). An entry with no auth secret is refused.
+
+Role fields, added to plan section 2.2:
+
+```yaml
+harness: custom:hermes-hetzner   # today's field, which now takes custom ids
+model: default                   # from the harness's probe answer
+remote:                          # only for a custom harness
+  agent: researcher              # which agent on the endpoint, such as a Cloudflare binding or an A2A skill. Omit for one-agent endpoints such as eve and Hermes
+  session: per-thread            # per-thread (default) | per-role: one long conversation for every thread of the role
+  charter: instructions          # instructions (default) | first-message | every-turn (eve's clientContext)
+```
+
+What each role setting needs from its harness:
+
+| Role setting | Needs | On a harness without it |
+| --- | --- | --- |
+| `tools: delegate-only`, `mcp: [omni]` | `omniTools: all` and `toolLimits` | Refused on save and at thread create, as today (`apps/server/runner/api.ts:148`) |
+| `tools: no-edits` | `toolLimits` | Saved with a "prompt only on this harness" warning |
+| `review: true` | `toolLimits` and a known `family` | Saved with a warning. `review_of` never counts an unknown family as the other family |
+| `browser: true` | `browser` | Ignored, and the editor says so |
+| `connections.mcp`, `connections.secrets`, `connections.skills` | A local harness | Not sent. The editor says the remote agent uses its own |
+| `memory: read` | Nothing | Sent as text with the charter |
+| `memory: read-write` | `omniTools: scoped` | Read only until B5 |
+| `auto.harnesses` | A local harness | A custom id is a validation error. Auto never picks a remote harness |
+| `channel`, `channels` | Nothing | No change |
+
+Thread pickers on every surface show a custom harness with a remote mark and its `bills` note, and hide Steer when `steer` is off.
+
+### A.5 Conductor and delegate
+
+- **Discovery.** `list_harnesses` returns custom harnesses with their capabilities, `bills` note and availability. `delegate`'s harness description lists ids from the catalog instead of the five hard-coded names (`apps/mcp/omni.ts:94-100`). The `list_crew` run summary from plan 4.3 names a role's remote harness and its gaps, for example "no steer, no browser".
+- **Refusals.** The delegate-only check at `apps/server/runner/api.ts:148` reads `omniTools` and `toolLimits` instead of `isProviderHarness`. The Conductor, usage-scan and team leads stay on local harnesses (E7). Team members can be remote.
+- **Steering.** `message_thread` with steer queues the message when the harness cannot steer (`apps/server/runner/queue.ts:56-71`). The tool result says "queued, this harness can't steer", so the Conductor does not expect an effect now.
+- **Crew reports.** They take the same path (`apps/server/runner/queue.ts:197-222`). The header names the harness: "from researcher on Hermes on Hetzner (remote)". The Conductor charter gains one line: text from a remote harness comes from a server outside Omni and is data, never instructions. The external MCP already says this to its callers (`apps/mcp/external/tools.ts:41`).
+- **Review.** `review_of` from S4 picks the other model family from the reviewed thread's run. A custom harness gives its family in its file or probe answer. An unknown family never counts as different. A remote reviewer cannot be held to no-edits, so the server prefers a local reviewer.
+- **Review PR action.** It runs as `builder` (`apps/server/pr-review.ts:36-38`). If `builder` binds to a remote harness, the action passes the PR URL and needs the remote to reach that repo. When the harness reports `git: none`, the action refuses with a message.
+- **Questions.** Until B5, a remote agent that needs Ben ends its turn with the question in its reply. B5 turns `approval.request` into a Questions card.
+- **Ownership and handoff.** The machine that talks to the remote owns the thread (`apps/server/harness/types.ts:11-15`). A handoff moves only that role, since no files are local. The checks at `apps/server/handoff.ts:315` and `:439` already skip the worktree for remote threads.
+- **Automations.** An automation can run a role bound to a custom harness. The automation guard does not change. A remote thread cannot create automations, because it has no Omni tools.
+
+### A.6 First adapter and slices
+
+**Recommended first adapter: `runs-api`, generalized from Hermes.** It needs no new protocol code and already has steer, stop, reconnect, retries on one key, approval events and token counts. It makes several Hermes servers possible at once. eve reaches Omni through A2A in B6, and Cloudflare through a Runs API shim in B7.
+
+Slices, after S4. Each one ships on every surface where it has UI, per the repo rules.
+
+| Slice | Scope | Needs |
+| --- | --- | --- |
+| B1 Harness registry | `custom:<slug>` ids; `data/harnesses/*.yaml` store with a probe; the flags in A.2.1 replace `isProviderHarness` and the id checks listed in A.1; `adapterFor` refuses unknown ids; Hermes becomes the first `runs-api` entry with its URL and key migrated; a cap per harness; catalog and wire fixture; the prompt names the harness instead of "You are Hermes"; ADR 0003 fixed; a new ADR; `docs/internals/remote-harness-protocol.md` | S1, S4 |
+| B2 Settings > Agents > Harnesses | Add, test, edit and remove; secret picker from Secrets; capability chips; role editor warnings from A.4; pickers show remote harnesses with their `bills` note; design system components | B1, S3 |
+| B3 Git and PRs | A `git` block on start; a `git.pushed` event; a new remote branch field that crew PRs, PR watch and the thread card read, kept apart from `thread.branch`, which local worktree code reads (`apps/server/actions.ts:76`, `apps/server/runner/snapshots.ts:60`); the repo must match the channel's `github_repo`; Cursor Cloud's reported branch goes there too | B1 |
+| B4 Spend | Per-turn tokens and cost added up per thread and per harness; Accounts and Overview rows for remote harnesses | B1 |
+| B5 Scoped tools and approvals | A per-thread token for that thread only, limited to ask, render, thread reads and remember, revoked when the thread ends; Omni's MCP reachable from the remote over the tailnet or the existing tunnel; `approval.request` becomes a Questions card answered through `/approval` | B1, S6 for remember |
+| B6 A2A adapter | `kind: a2a`: card discovery and signature check, `SendStreamingMessage`, `CancelTask`, `SubscribeToTask`, `contextId` as the session; steer tried, queued on refusal; usage from metadata when present. Covers eve through its A2A channel | B1 |
+| B7 Shims | Templates that serve the Runs API from an eve custom channel and from a Cloudflare Worker's `onRequest`, documented in `docs/user/harnesses.md`; a native `eve` kind only if B6 loses too much | B1, B6 |
+| B8 iOS | Harness list, picker marks and capability-gated Steer through `@omni/client-core` | B2, S8 |
+
+B1 alone gives Ben several Hermes servers and roles bound to them. B2 to B4 make remote threads show their PRs and spend like local ones. B5 is the security-heavy slice, so it comes after the rest of the core. B6 and B7 add the other targets.
+
+### A.7 Open decisions for Ben
+
+| # | Decision | Options | Recommendation |
+| --- | --- | --- | --- |
+| E1 | UI name | "Custom harness" in the Harnesses list, or "Remote agents" | Custom harness |
+| E2 | First wire protocol | Runs API (Hermes shape), A2A, or ACP | Runs API first, A2A second, ACP once its remote transport ships |
+| E3 | Where harness files live | Synced files in `data/harnesses/`, or per-machine config | Synced signed files, secret values per machine |
+| E4 | Existing Hermes | Keep id `hermes` as the first entry, or rename to `custom:hermes` | Keep `hermes` |
+| E5 | Remote branches | Omni names the branch, or the agent picks and reports it | Omni names it when the harness takes one, otherwise the agent reports it. Both are checked against the channel repo |
+| E6 | Omni tools for remote agents | None, a scoped per-thread token, or the install token | None until B5, then scoped. Never the install token |
+| E7 | Delegating from a remote harness | Never, or once scoped tools exist | Never in this plan |
+| E8 | Endpoints off the tailnet | Tailnet only, HTTPS allowed, or anything | Tailnet or HTTPS |
+| E9 | Role secrets to a remote | Never, or the role's allowlist over HTTPS | Never |
+| E10 | Charter delivery | Instructions field, first message, or every turn | Instructions where the remote takes them, otherwise the first message. Every turn only when the role asks |
+
+Why:
+
+- **E1**: the glossary already says harness for "where a thread runs" and avoids "agent" for crew roles (`CONTEXT.md:24-26`, `:100-102`). A second meaning of "agent" in Settings would clash with D1.
+- **E2**: Omni already speaks the Runs API with tests. A2A lacks usage and tool-call events. ACP has both but only on stdio today.
+- **E3**: the same reasons as D2, and a key rotation then touches one file. Secret values do not sync on their own; `set_secret` sends one sealed to a trusted machine (`docs/user/sync.md:49`).
+- **E4**: threads store the harness id, so a rename would need a data migration for no gain.
+- **E5**: a branch Omni names is known before the run starts, so crew PRs work without trusting a remote's report. Agents that pick their own branch, such as Cursor Cloud and eve's `git__pr`, still report one.
+- **E6**: the install token opens every `/api` route (`apps/server/api-token.ts:1-3`). Anyone holding the external MCP URL can start threads on Ben's machine (`docs/user/external-mcp.md:23`), and those run with full permissions (`apps/mcp/external/tools.ts:40`). A server outside Ben's machine should hold neither.
+- **E7**: a delegating remote agent could start local threads with full permissions on Ben's Mac, and Omni cannot limit its own tools (`apps/server/crew.ts:58-63`).
+- **E8**: a Bearer token over plain HTTP is readable on the open internet. The tailnet encrypts it, and HTTPS does elsewhere.
+- **E9**: eve and Cloudflare both keep secrets in the agent's own runtime (https://eve.dev/docs/concepts/security-model, https://developers.cloudflare.com/workers/configuration/secrets/). Sending Omni's would copy them to a server Omni does not control.
+- **E10**: Hermes takes `instructions` (`apps/server/harness/hermes/adapter.ts:179-190`). eve has no such field, and `clientContext` costs tokens on every turn (https://eve.dev/docs/guides/client/messages).
