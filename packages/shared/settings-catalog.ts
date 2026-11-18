@@ -104,6 +104,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'setup', section: 'general', title: 'Run setup again', keywords: ['onboarding', 'wizard', 'harness check', 'first run'] },
   { id: 'theme', section: 'appearance', title: 'Theme', keywords: ['dark', 'light', 'system', 'mode', 'colors'] },
   { id: 'layout', section: 'appearance', title: 'Classic sidebar', keywords: ['beta', 'layout', 'rail', 'sidebar', 'channel rail', 'classic', 'new ui', 'redesign', 'color', 'colour', 'grayscale', 'greyscale'] },
+  { id: 'technical', section: 'appearance', title: 'Show technical details', keywords: ['technical', 'developer', 'engineering', 'plain', 'simple', 'pull requests', 'branches', 'worktrees', 'tokens', 'context', 'harness', 'effort', 'status', 'advanced'] },
   { id: 'inbox-key', section: 'appearance', title: 'Press I for the Inbox', keywords: ['keyboard', 'shortcut', 'key', 'inbox', 'i key', 'quick command'] },
   { id: 'zoom', section: 'appearance', title: 'Text size and zoom', keywords: ['zoom', 'scale', 'font size', 'text size', 'bigger', 'smaller'] },
   { id: 'notify', section: 'notifications', title: 'Notify on this device', keywords: ['alerts', 'finished', 'failed', 'desktop', 'permission', 'needs you', 'native', 'macos'] },

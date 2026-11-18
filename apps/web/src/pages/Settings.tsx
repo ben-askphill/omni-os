@@ -10,6 +10,7 @@ import { useTheme } from '../components/theme.tsx';
 import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
+import { saveDisplay, useDisplay } from '../display.ts';
 import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
@@ -735,6 +736,27 @@ function PronounsField({
   );
 }
 
+/** Show technical details (packages/shared/display.ts): kept by the server, so it follows you to every machine. */
+function TechnicalCard() {
+  const { technical } = useDisplay();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card entry="technical" title="Detail">
+      <SwitchRow
+        title="Show technical details"
+        origin={<Origin of="machine" label="Every machine" />}
+        detail="Status names like Steering and Checks failing, the AI app and effort by their own names, and pull requests, branches, token counts and the context ring in every channel. Off, a channel with a repo still shows its code detail."
+        checked={technical}
+        onChange={(on) => {
+          setError(null);
+          saveDisplay({ technical: on }).catch((e: unknown) => setError(errorText(e)));
+        }}
+      />
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Card>
+  );
+}
+
 function AppearanceCard() {
   const [theme, setTheme] = useTheme();
   const layout = useLayout();
@@ -785,6 +807,7 @@ function AppearanceCard() {
           />
         )}
       </Card>
+      <TechnicalCard />
       <Card entry="inbox-key" title="Keyboard">
         <SwitchRow
           title="Press I for the Inbox"

@@ -73,6 +73,12 @@ describe('threadRow', () => {
     expect(threadRow(stub({ id: 'd', status: 'failed' }), NOW)).toMatchObject({ statusLabel: 'Failed' });
   });
 
+  it('names a running or limited thread in plain words with Show technical details off', () => {
+    expect(threadRow(stub({ id: 'a', status: 'running' }), NOW, false)).toMatchObject({ statusLabel: 'Working' });
+    expect(threadRow(stub({ id: 'b', status: 'queued' }), NOW, false)).toMatchObject({ statusLabel: 'Working' });
+    expect(threadRow(stub({ id: 'd', status: 'failed' }), NOW, false)).toMatchObject({ statusLabel: 'Failed' });
+  });
+
   it('falls back to Untitled for a blank title', () => {
     expect(threadRow(stub({ id: 'e', title: '  ' }), NOW).title).toBe('  ');
     expect(threadRow(stub({ id: 'f', title: '' }), NOW).title).toBe('Untitled');

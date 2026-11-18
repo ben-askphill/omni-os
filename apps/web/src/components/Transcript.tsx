@@ -180,15 +180,16 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
  * How a turn ended, as a quiet divider: one glyph and one sentence-case line, the phone's Outcome words. `limit` is the
  * thread's limit line (limits.ts `limitLabel`) on the turn the usage limit stopped.
  */
-function ResultLine({ p, limit }: { p: ResultP; limit?: string | null }) {
+function ResultLine({ p, limit, code = true }: { p: ResultP; limit?: string | null; code?: boolean }) {
   const took = p.duration_ms != null ? duration(p.duration_ms) : null;
   const bad = !p.ok && !p.stopped;
   const glyph = limit ? 'limited' : p.ok ? 'done' : p.stopped ? 'settled' : 'failed';
   const [word, after] = p.ok ? ['Done', 'Done in'] : p.stopped ? ['Stopped', 'Stopped after'] : ['Failed', 'Failed after'];
   const bits = [limit ?? (took ? `${after} ${took}` : word)];
-  if (p.turns) bits.push(plural(p.turns, 'turn'));
-  if (p.model) bits.push(p.model);
-  if (p.input_tokens != null) bits.push(`${p.input_tokens} in / ${p.output_tokens ?? 0} out`);
+  // Turns, model and tokens tell a reader outside a code project nothing: Show technical details brings them back.
+  if (code && p.turns) bits.push(plural(p.turns, 'turn'));
+  if (code && p.model) bits.push(p.model);
+  if (code && p.input_tokens != null) bits.push(`${p.input_tokens} in / ${p.output_tokens ?? 0} out`);
   if (bad && !limit && p.subtype && p.subtype !== 'success') bits.push(p.subtype.replace(/_/g, ' '));
   return (
     <div className="flex items-center gap-3 py-1 font-num text-[12px] font-medium text-fg-3">
@@ -346,6 +347,8 @@ interface ItemRowProps {
   plan?: FoldPlan;
   /** The thread's limit line, on the last result when the usage limit stopped that turn. */
   limit?: string | null;
+  /** On a result: it names its turns, model and tokens (Show technical details, or a repo channel). */
+  code?: boolean;
 }
 
 /**
@@ -354,7 +357,7 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, isLast, team, brief, reports, byId, artifacts, pages, plan, limit }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, isLast, team, brief, reports, byId, artifacts, pages, plan, limit, code }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -394,7 +397,7 @@ const ItemRow = memo(
           return plan ? [...out, <PlanCard key="plan" todos={plan.todos} threadId={threadId} />] : out;
         }
         case 'result':
-          return <ResultLine key={it.key} p={it.p} limit={limit} />;
+          return <ResultLine key={it.key} p={it.p} limit={limit} code={code !== false} />;
         case 'error':
           return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
         case 'report':
@@ -441,8 +444,11 @@ export const Transcript = memo(function Transcript({
   delegated = false,
   limit = null,
   elsewhere = false,
+  code = true,
 }: {
   threadId: string;
+  /** Results name their turns, model and tokens: Show technical details is on, or the channel has a repo. */
+  code?: boolean;
   /** Every row held, anchors included. */
   events: EventRow[];
   running: boolean;
@@ -517,6 +523,7 @@ export const Transcript = memo(function Transcript({
               pages={pages.get(it.key)}
               plan={plan?.after === it.key ? plan : undefined}
               limit={idx === lastIdx && it.type === 'result' ? limit : undefined}
+              code={it.type === 'result' ? code : undefined}
             />,
           ])}
           {edgeRow(-1)}

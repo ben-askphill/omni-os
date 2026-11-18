@@ -212,6 +212,27 @@
       ]
     },
     {
+      "id": "technical",
+      "section": "appearance",
+      "title": "Show technical details",
+      "keywords": [
+        "technical",
+        "developer",
+        "engineering",
+        "plain",
+        "simple",
+        "pull requests",
+        "branches",
+        "worktrees",
+        "tokens",
+        "context",
+        "harness",
+        "effort",
+        "status",
+        "advanced"
+      ]
+    },
+    {
       "id": "inbox-key",
       "section": "appearance",
       "title": "Press I for the Inbox",

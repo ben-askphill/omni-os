@@ -19,7 +19,7 @@ import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { StepChip } from '../components/thread/StepChip';
 import { ThreadTitle } from '../components/thread/ThreadTitle';
 import { useCrew } from '../newthread/hooks';
-import { useChannels, useThreadLive, useThreadView } from '../live/react';
+import { useChannels, useTechnical, useThreadLive, useThreadView } from '../live/react';
 import { useRemote } from '../live/use-remote';
 import { useThreadMachine } from '../machine/hooks';
 import type { RootScreenProps } from '../navigation/types';
@@ -67,6 +67,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const title = thread?.title || 'Thread';
   const hasThread = thread !== null;
   const status = thread?.status;
+  const technical = useTechnical();
   const channelName = listed?.name ?? view?.channel?.name ?? null;
   const crew = useCrew();
   const roleName = thread && headerShowsRole(thread) ? crewRoleName(thread.role, crew ?? []) : null;
@@ -83,7 +84,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
         <ThreadTitle
           title={title}
           status={status}
-          statusLabel={threadStatusLabel(status)}
+          statusLabel={threadStatusLabel(status, technical)}
           channel={channelName}
           role={roleName}
           device={device}
@@ -92,7 +93,7 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
       ),
       headerRight: hasThread ? () => <HeaderButton label="Thread menu" icon="ellipsis" onPress={() => openMenu('menu')} /> : undefined,
     });
-  }, [navigation, title, status, channelName, roleName, device, canPick, hasThread, openMenu]);
+  }, [navigation, title, status, technical, channelName, roleName, device, canPick, hasThread, openMenu]);
 
   // A machine can fall asleep while the thread stays open: read the list again each time the menu opens.
   const { reload: reloadMachines } = machine;

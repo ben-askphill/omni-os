@@ -14,6 +14,8 @@ A thread shows as running everywhere while a thread it delegated (a team lead an
 
 Every thread carries one mark, on desktop web, phone web and the desktop app. The native iOS app keeps its own glyphs.
 
+With **Show technical details** off (Settings > Appearance), each mark keeps its shape and color but is named with one of five words: **Working**, **Needs you**, **Done**, **Failed** or **Stopped**. A mark that says more than its word keeps its own name as the detail, in its tooltip and screen reader label ("Needs you: Usage limit"). The table below gives each mark's own name, which is what it reads with the switch on. The iOS app names its statuses the same way.
+
 - **Shape says who has the ball.** A circle is the agent, a square is a system outside Omni (checks, a usage limit), a diamond is you, a cross or triangle is broken.
 - **Color repeats it**: blue, amber, vermilion and red, with volt for done and grey for quiet states. No state depends on color alone.
 - **Fill says how far along**: hollow, half, filled.
@@ -92,7 +94,7 @@ On desktop web and in the desktop app, use the check on a Needs you row or an In
 | Queue for after this turn | Omni holds it and runs it as a new turn once the current one ends |
 | Interrupt and send (Cmd/Ctrl+Shift+Enter) | Stops the current step, then runs the message |
 
-Cmd/Ctrl+Enter adds a newline. Pending messages show under the live output and enter the transcript at the point the agent read them. A queued message has **Steer now**, which sends it into the running turn instead of waiting for the turn to end. Cursor Agent and Cursor Cloud cannot steer, so they lack it. While a turn runs and the reply box is empty, the send button turns into **Stop**. Stop (or Esc) stops the turn but keeps the process and its context. Steers already sent still run, and Omni records queued ones as "Not sent". Omni kills a CLI that does not stop within `OMNI_INTERRUPT_GRACE_MS`. Only turns in progress count toward `OMNI_MAX_CONCURRENT`; warm idle processes do not.
+With Show technical details off the three modes read **Add to this**, **Send when it finishes** and **Stop and send**. Cmd/Ctrl+Enter adds a newline. Pending messages show under the live output and enter the transcript at the point the agent read them. A queued message has **Steer now**, which sends it into the running turn instead of waiting for the turn to end. Cursor Agent and Cursor Cloud cannot steer, so they lack it. While a turn runs and the reply box is empty, the send button turns into **Stop**. Stop (or Esc) stops the turn but keeps the process and its context. Steers already sent still run, and Omni records queued ones as "Not sent". Omni kills a CLI that does not stop within `OMNI_INTERRUPT_GRACE_MS`. Only turns in progress count toward `OMNI_MAX_CONCURRENT`; warm idle processes do not.
 
 On Cursor Agent and Cursor Cloud, messages sent during a turn wait for the next turn. A model, effort or harness switch picked during a turn also makes messages wait for that switch, even on a harness that can steer. See [Switching mid-thread](harnesses.md#switching-mid-thread).
 

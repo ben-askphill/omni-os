@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
+import { markLabel } from '@omni/shared/display.ts';
+import { useTechnical } from '../../display.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { ranOnLine } from '@omni/shared/ran-on.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { BackgroundTask, Thread } from '../../api.ts';
 import { useInbox } from '../../app/useInbox.ts';
 import { useDoneKey } from '../../inbox-key.ts';
-import { MARK, blockerMark, markOf, threadPhase, type RowStatus } from '@omni/shared/status.ts';
+import { blockerMark, markOf, threadPhase, type RowStatus } from '@omni/shared/status.ts';
 import type { InboxThread } from '../../inbox.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { href } from '../../router.ts';
@@ -172,6 +174,7 @@ function InboxCard({
   onNavigate?: () => void;
 }) {
   const { setPinned } = useApp();
+  const technical = useTechnical();
   const markDone = useMarkDone();
   const now = useNow(60_000);
   const tree = useJobTree(t, 'inbox');
@@ -182,7 +185,8 @@ function InboxCard({
   // What holds it up names its kind: a question, the crew's question, a held message, a failed setup.
   const blocker = useNeedOf(t.id)?.blockers[0];
   const mark = status ? (blocker ? blockerMark(blocker) : markOf(status.glyph, phase)) : null;
-  const said = mark && (blocker || phase) ? MARK[mark].label : status?.label;
+  // With Show technical details off, every mark reads one of the five plain words.
+  const said = mark && (blocker || phase || !technical) ? markLabel(mark, technical) : status?.label;
   const channelName = channel?.id === 'conductor' ? 'Conductor' : (channel?.name ?? t.channel_id);
   // The machine it runs on or last ran on, with the run's time while it runs; the branch only without a machine.
   const where = ranOnLine(t, now);

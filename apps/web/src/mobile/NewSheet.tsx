@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { term } from '@omni/shared/display.ts';
+import { useTechnical } from '../display.ts';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { useBasePick, useBaseRows } from '../components/BasePicker.tsx';
@@ -50,6 +52,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const [text, setText] = useState(first ?? '');
   // As the target channel sees them: Cursor Cloud needs its GitHub repo.
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(target));
+  const technical = useTechnical();
   // A pick holds for the target it was made for; another target starts on its own defaults, as on the desktop.
   const [picked, setPicked] = useState<{ target: string; choice: ModelChoice; effort: string } | null>(null);
   const [picking, setPicking] = useState(false);
@@ -142,12 +145,12 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
 
   return (
     <>
-      <MoSheet onClose={close} label={conductor ? 'New delegation' : 'New thread'}>
+      <MoSheet onClose={close} label={conductor ? term('newDelegation', technical) : 'New thread'}>
         <div className="flex shrink-0 items-center px-3 pt-1.5 pb-2">
           <button type="button" onClick={close} className="w-[60px] px-1.5 py-2 text-left text-[15px]">
             Cancel
           </button>
-          <span className="flex-1 text-center text-[15px] font-medium">{conductor ? 'New delegation' : 'New thread'}</span>
+          <span className="flex-1 text-center text-[15px] font-medium">{conductor ? term('newDelegation', technical) : 'New thread'}</span>
           <span className="w-[60px]" />
         </div>
         <div ref={strip} className="mo-scroll flex shrink-0 gap-2 overflow-x-auto px-4 pb-3">
@@ -251,7 +254,9 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
           {toGrok
             ? GROK_BOT_NOTE
             : ch
-              ? `Runs in #${ch.name} with its repo, store and browser profile.`
+              ? technical
+                ? `Runs in #${ch.name} with its repo, store and browser profile.`
+                : `In #${ch.name}.`
               : 'The Conductor picks the crew and reports back here. Activity shows you when something needs you.'}
         </p>
       </MoSheet>

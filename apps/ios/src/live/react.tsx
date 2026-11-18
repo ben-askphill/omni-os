@@ -59,6 +59,11 @@ export function useStore<T>(store: Store<T>): T {
   return useSyncExternalStore(store.subscribe, store.get, store.get);
 }
 
+/** Whether status words and run controls read technical: Show technical details, on until a server says otherwise. */
+export function useTechnical(): boolean {
+  return useStore(useLiveHub().display)?.technical ?? true;
+}
+
 export function useChannels() {
   return useStore(useLiveHub().channels);
 }
