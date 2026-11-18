@@ -1,12 +1,13 @@
 // /api/crew: the crew roles, and their edits from the clients (crew-store.ts).
-// Writes come from Ben's own clients only, for now. An agent thread names itself on every call (CALLER_HEADER), and a
-// role is a prompt every later thread of it runs with, so an agent's write is refused until the Conductor's crew
-// tools and their guard exist (plan slices S2 and S7).
+// An agent thread names itself on every call (CALLER_HEADER), and a role is a prompt every later thread of it runs
+// with, so an agent's write goes through the crew guard (crew-guard.ts): only the Conductor saves or resets a role,
+// never its powers, and only after Ben answered in its thread. Ben's own clients name no thread.
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { CALLER_HEADER } from './automation-guard.ts';
+import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { listCrew } from './crew.ts';
-import { crewDetail, crewRunProblem, crewSave, deleteCrew, resetCrew, saveCrew, setCrewHidden, type CrewSaveContext } from './crew-store.ts';
+import { crewDetail, crewRunProblem, crewSave, deleteCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
 import { channels } from './db.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 
@@ -31,6 +32,8 @@ crewApi.get('/crew/:id', (c) => {
 const context = (): CrewSaveContext => ({ catalog: getCatalog(), channelExists: (id) => !!channels.get(id) });
 
 crewApi.post('/crew', async (c) => {
+  const refused = guard(c, 'save');
+  if (refused) return refused;
   const body = await c.req.json().catch(() => null);
   const id = z.object({ id: z.string() }).safeParse(body);
   if (!id.success) return c.json({ error: 'Give the role an id.' }, 400);
@@ -41,30 +44,35 @@ crewApi.post('/crew', async (c) => {
 crewApi.put('/crew/:id', async (c) => write(c, (save) => saveCrew(c.req.param('id'), save, context()), await c.req.json().catch(() => null)));
 
 crewApi.delete('/crew/:id', (c) =>
-  guard(c) ??
+  guard(c, 'delete') ??
   run(c, () => {
     deleteCrew(c.req.param('id'));
     return { ok: true };
   }),
 );
 
-crewApi.post('/crew/:id/reset', (c) => guard(c) ?? run(c, () => resetCrew(c.req.param('id'))));
+crewApi.post('/crew/:id/reset', (c) => guard(c, 'reset', undefined, c.req.param('id')) ?? run(c, () => resetCrew(c.req.param('id'))));
 
 crewApi.post('/crew/:id/hidden', async (c) => {
+  const refused = guard(c, 'hide');
+  if (refused) return refused;
   const parsed = z.object({ hidden: z.boolean() }).strict().safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: 'Send { hidden: true } or { hidden: false }.' }, 400);
-  return guard(c) ?? run(c, () => setCrewHidden(c.req.param('id'), parsed.data.hidden));
+  return run(c, () => setCrewHidden(c.req.param('id'), parsed.data.hidden));
 });
 
-/** A 403 for an agent thread's write. Ben's own clients name no thread. */
-function guard(c: Context) {
-  return c.req.header(CALLER_HEADER) ? c.json({ error: 'Crew roles are changed by the user in Settings, not by an agent thread.' }, 403) : null;
+/** A 403 for an agent thread's write the crew guard refuses. Ben's own clients name no thread. */
+function guard(c: Context, write: CrewWrite, save?: CrewSave, id?: string) {
+  const refusal = crewRefusal(c.req.header(CALLER_HEADER), write, save, id);
+  return refusal ? c.json({ error: refusal }, 403) : null;
 }
 
-function write(c: Context, save: (body: z.infer<typeof crewSave>) => unknown, body: unknown, ok: 200 | 201 = 200) {
+function write(c: Context, save: (body: CrewSave) => unknown, body: unknown, ok: 200 | 201 = 200) {
+  const refused = guard(c, 'save');
+  if (refused) return refused;
   const parsed = crewSave.safeParse(body);
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid crew role' }, 400);
-  return guard(c) ?? run(c, () => save(parsed.data), ok);
+  return guard(c, 'save', parsed.data) ?? run(c, () => save(parsed.data), ok);
 }
 
 /** A refused write's message and status (crew-store.ts sets one), else a 500. */

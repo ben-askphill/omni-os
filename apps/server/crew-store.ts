@@ -7,12 +7,11 @@
 // outside agent, say) survives an edit from this one. `harness` is checked against this machine's harness catalog,
 // never against a fixed list of ids.
 
-import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
-import { paths } from './config.ts';
-import { charterHash, crewFiles, UNHIDEABLE, crewTexts, getCrew, mergeCrew, parseCrewFile, splitCrewFile, type CrewRole } from './crew.ts';
+import { publishFeed } from './bus.ts';
+import { charterHash, CREW_ID, crewTexts, getCrew, mergeCrew, parseCrewFile, removeOwnCrew, splitCrewFile, UNHIDEABLE, writeOwnCrew, type CrewRole } from './crew.ts';
+import { record } from './db/sync.ts';
 import { validateRun, type Catalog } from './harness/catalog.ts';
 import { asksAuto } from './harness/auto.ts';
 import { validateDefaults } from './harness/resolve.ts';
@@ -20,8 +19,7 @@ import { updateUserConfig } from './user-config.ts';
 
 const refused = (message: string, status: 400 | 404 | 409 = 400) => Object.assign(new Error(message), { status });
 
-/** A role's id, and its file's name in data/crew/: lowercase words and dashes, like an automation's. Never changes. */
-export const CREW_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+export { CREW_ID };
 
 /** Built-ins Omni itself relies on. Only ever an overlay on the shipped file: no role of the user's own takes the id. */
 export const RESERVED_CREW = ['conductor', 'reviewer', 'usage-scan'] as const;
@@ -84,13 +82,11 @@ export function crewDetail(id: string): CrewDetail | null {
   return { role, shipped, own, shippedHash: shipped === null ? null : charterHash(splitCrewFile(shipped).body) };
 }
 
-const ownFile = (id: string) => join(paths.personalCrew, `${id}.md`);
-
+/** Write the user's file and send it to the other machines (sync/handlers/crew-file.ts). */
 function writeOwn(id: string, text: string) {
-  mkdirSync(paths.personalCrew, { recursive: true });
-  const tmp = join(paths.personalCrew, `.${id}.md.tmp`);
-  writeFileSync(tmp, text);
-  renameSync(tmp, ownFile(id));
+  writeOwnCrew(id, text);
+  record('crew_file', id);
+  publishFeed({ type: 'crew' });
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
@@ -206,9 +202,11 @@ export function resetCrew(id: string): CrewDetail {
   return crewDetail(id)!;
 }
 
+/** Remove the user's file, here and on the other machines. */
 function removeOwn(id: string) {
-  const file = crewFiles(paths.personalCrew).get(id);
-  if (file) rmSync(file);
+  if (!removeOwnCrew(id)) return;
+  record('crew_file', id, 'delete');
+  publishFeed({ type: 'crew' });
 }
 
 /** Hide a built-in on this machine, or show it again. */
@@ -217,5 +215,6 @@ export function setCrewHidden(id: string, hidden: boolean): CrewDetail {
   if (shipped === null) throw refused(own === null ? `No crew role "${id}".` : 'Only a built-in role is hidden. Delete a role of your own instead.', own === null ? 404 : 409);
   if (hidden && UNHIDEABLE.has(id)) throw refused(`${getCrew(id)?.name ?? id} cannot be hidden: Omni relies on it.`, 409);
   updateUserConfig({ crew: { [id]: hidden ? { hidden: true } : null } });
+  publishFeed({ type: 'crew' });
   return crewDetail(id)!;
 }

@@ -23,6 +23,7 @@ const LABEL: Record<BackfillCount['entity'], string> = {
   assignment: 'which machine runs each thread',
   review_note: 'review notes on Changes diffs',
   automation_file: 'automation files you edited in Omni',
+  crew_file: 'crew roles you edited in Omni',
   mcp_client: 'MCP clients and which you approved',
   kv: 'settings (kv)',
 };

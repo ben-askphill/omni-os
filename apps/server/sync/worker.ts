@@ -10,6 +10,7 @@ import { signChange, unsigned } from './signing.ts';
 import { signingKey } from './sign-key.ts';
 import { keyring } from './keyring.ts';
 import './handlers/index.ts';
+import { seedCrewFiles } from './handlers/crew-file.ts';
 
 // The sync loop: push the outbox in batches, then pull what other machines pushed since the cursor and apply it.
 // On start, every 60s, soon after a local write, when the relay's WebSocket says another machine pushed or its link comes
@@ -129,6 +130,7 @@ export function createSyncWorker(opts: SyncWorkerOptions): SyncWorker {
   const { transport } = opts;
   const copiedFrom = outbox.machineId();
   const machineId = outbox.arm(opts.machineId, hardwareId());
+  seedCrewFiles();
   if (copiedFrom && copiedFrom !== machineId)
     console.warn(`[sync] this data folder was copied from another machine (sync id ${copiedFrom}): this machine is now ${machineId} and pulls the history again`);
   // Made or read now, so the first push does not wait on the secret store.

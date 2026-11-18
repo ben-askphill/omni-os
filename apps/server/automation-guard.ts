@@ -9,12 +9,20 @@
 // path agents are told to use, not a determined one: every thread can read the install token (sandbox.ts), so a shell
 // command that calls the API without the header, or posts a message as Ben, is not stopped. Closing that needs tokens
 // scoped to one thread.
+import type { Context } from 'hono';
 import { db } from './db.ts';
 import { ancestry, automationOf } from './lineage.ts';
 import { userName } from './profile.ts';
 import { SCAN_ROLE } from './usage-scan/asks.ts';
 
 export const CALLER_HEADER = 'x-omni-thread';
+
+/**
+ * Who a message an API call posts is from: an agent thread's call (one that names its thread, as Omni's MCP servers do)
+ * is the Conductor's, never Ben's, whatever it says. The guards read Ben's messages in a thread as his answer
+ * (benAnswered below, crew-guard.ts), so every route that posts a message on Ben's behalf takes its sender from here.
+ */
+export const senderOf = (c: Context, from: 'ben' | 'conductor' = 'ben'): 'ben' | 'conductor' => (c.req.header(CALLER_HEADER) ? 'conductor' : from);
 
 export type AutomationWrite = 'create' | 'edit' | 'enable' | 'run' | 'scan' | 'disable' | 'delete';
 
@@ -44,8 +52,11 @@ export function lineage(threadId: string): Lineage {
   return { automation: automationOf(line), scan: line.find((t) => t.role === SCAN_ROLE)?.id ?? null };
 }
 
-/** Ben answered in the scan's thread: a message of his after Omni's report, or an answer to a question the lead asked. */
-function answered(threadId: string): boolean {
+/**
+ * Ben answered in this thread: a message of his after its first one (Omni's report in a scan, his own request in the
+ * Conductor), or an answer to a question the thread asked. The crew guard (crew-guard.ts) asks the same.
+ */
+export function benAnswered(threadId: string): boolean {
   return !!db
     .prepare(
       `SELECT 1 FROM events WHERE thread_id = ? AND (kind = 'question_answer'
@@ -62,6 +73,6 @@ export function automationRefusal(caller: string | null | undefined, write: Auto
   if (l.automation && !STOPS.has(write)) return `This thread runs under the automation "${l.automation}", and threads an automation started cannot ${WHAT[write]}. Ask ${userName()} to do it.`;
   if (!l.scan) return null;
   if (write !== 'create') return `A usage scan only suggests new automations; it cannot ${WHAT[write]}.`;
-  if (!answered(l.scan)) return `Not yet: a usage scan saves automations only after ${userName()} says which ones in its thread.`;
+  if (!benAnswered(l.scan)) return `Not yet: a usage scan saves automations only after ${userName()} says which ones in its thread.`;
   return null;
 }

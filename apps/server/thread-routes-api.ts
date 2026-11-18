@@ -11,6 +11,7 @@ import { readOpenItems } from '@omni/shared/open-items.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
 import { getCrew } from './crew.ts';
+import { senderOf as sender } from './automation-guard.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
 import { bus } from './bus.ts';
@@ -260,7 +261,7 @@ threadActionsApi.get('/:id/base', (c) => {
 threadActionsApi.post('/:id/messages', async (c) => {
   const id = c.req.param('id');
   const { data, files } = await readBody(c);
-  const { prompt, from, mode, request_id, context: raw, wake_cold, if_away } = z
+  const { prompt, from: asked, mode, request_id, context: raw, wake_cold, if_away } = z
     .object({
       prompt: z.string(),
       from: z.enum(['ben', 'conductor']).default('ben'),
@@ -277,6 +278,7 @@ threadActionsApi.post('/:id/messages', async (c) => {
       if_away: z.enum(['ask', 'send']).default('send'),
     })
     .parse(data);
+  const from = sender(c, asked);
   const target = threads.get(id);
   if (!target) return c.json({ error: 'not found' }, 404);
   if (from === 'conductor' && !wake_cold) {
@@ -477,7 +479,7 @@ threadActionsApi.post('/:id/published/comments', async (c) => {
   const id = c.req.param('id');
   const { url } = z.object({ url: z.string().refine(isArtifactUrl, 'not a claude.ai artifact url') }).parse(await c.req.json());
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  return c.json(await postMessage(id, commentsPrompt(url), { mode: 'queue' }));
+  return c.json(await postMessage(id, commentsPrompt(url), { mode: 'queue', from: sender(c) }));
 });
 
 /**
@@ -514,7 +516,7 @@ threadActionsApi.post('/:id/compact', async (c) => {
   const blocked = compactBlocked(t);
   if (blocked) return c.json({ error: blocked }, 409);
   const extra = t.harness === 'claude-code' ? focus?.replace(/\s+/g, ' ').trim() : '';
-  return c.json(await postMessage(id, extra ? `/compact ${extra}` : '/compact', { mode: 'queue' }));
+  return c.json(await postMessage(id, extra ? `/compact ${extra}` : '/compact', { mode: 'queue', from: sender(c) }));
 });
 
 /** Serves a file Ben attached, by its name inside the thread's uploads folder. */

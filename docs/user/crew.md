@@ -49,7 +49,19 @@ The clients edit roles through the API, the same files underneath:
 | `POST /api/crew/:id/reset` | Drop your edit of a built-in |
 | `POST /api/crew/:id/hidden` | `{ hidden }` for a built-in |
 
-A save is refused when its run defaults, default channel or MCP servers are unknown here, or when it would give the conductor or usage-scan working tools. An agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) is refused: roles are a prompt every later thread of them runs with, so for now only you change them.
+A save is refused when its run defaults, default channel or MCP servers are unknown here, or when it would give the conductor or usage-scan working tools.
+
+A role is a prompt every later thread of it runs with, so an agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) goes through the crew guard (`apps/server/crew-guard.ts`) and gets a 403 unless all of these hold:
+
+- It is a save or a reset. Deleting, hiding and showing a role stay yours, in Settings. A reset that would change the role's powers (your edit gave the built-in the conductor tools, say) is refused: reset it yourself.
+- The thread runs as the Conductor. No other role writes roles, even one you gave the `omni` MCP server, and usage-scan never does.
+- The save leaves powers alone: no `mcp`, `delegate_only` or `delegatable`, and no whole-file `markdown`. Those are yours to set.
+- No automation started the thread or any thread above it.
+- You answered in that thread after its first message, or answered a question it asked. The guard cannot read whether you agreed: it holds the Conductor to proposing an edit and waiting for you. An agent's own call never counts as your answer: a message an agent thread sends (`x-omni-thread`), including through `check_artifact_comments` or a compact, is recorded as the Conductor's, and an agent thread cannot answer a question card. The same holds for review notes an agent thread sends, and for messages a thread carries when it moves to another machine, which keep their sender.
+
+Like the automation guard, it holds the path agents are told to use. A shell command that calls the API without the header is not stopped.
+
+Your edits sync to your other Macs as `crew_file`, a signed action that applies only from a trusted machine ([Sync](sync.md)). Hiding stays per Mac.
 
 The frontmatter sets each role's model and, for conductor and inbox, its default channel. The conductor defaults to `model: auto`, so the Overview and Conductor composers start on Auto; a saved #conductor channel default still wins (see [Auto](harnesses.md#auto)). The other roles also default to `model: auto`, so each delegated brief gets the model it needs. Pin a model in a role's frontmatter to opt it out.
 

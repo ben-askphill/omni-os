@@ -10,8 +10,8 @@ import type { Change, RemoteChange } from './transport.ts';
 
 // Whether a pulled change may apply, by its signature (PRD #667, S9, S3). sync/apply.ts asks before a handler runs.
 // - Action entities make a machine do something: run a message (remote_command), take a thread (assignment), update
-//   itself (update.ask.*), run the automations (automations.owner, automation_file), store a secret (secretdrop.*, secretack.*),
-//   let an assistant into /mcp (mcp_client). They apply only with a valid signature from the machine they name, and only
+//   itself (update.ask.*), run the automations (automations.owner, automation_file), run a crew role's prompt (crew_file),
+//   store a secret (secretdrop.*, secretack.*), let an assistant into /mcp (mcp_client). They apply only with a valid signature from the machine they name, and only
 //   from the machine whose part they are.
 // - Everything else is logged when unsigned or invalid and still applied, so a Mac on an older build keeps syncing
 //   while the others update. The `syncSignatures` setting turns that strict, or relaxes actions to log only.
@@ -42,9 +42,12 @@ const SECRET_ACK = 'secretack.';
 
 /** True for a change that makes a machine act. */
 export function isActionChange(c: Pick<Change, 'entity' | 'entity_id'>): boolean {
-  // An automation file is a prompt a machine runs on its schedule, on the machine it names. An approved MCP client may
-  // start threads on every machine.
-  if (c.entity === 'remote_command' || c.entity === 'assignment' || c.entity === 'automation_file' || c.entity === 'mcp_client') return true;
+  // An automation file is a prompt a machine runs on its schedule, on the machine it names. A crew file is a prompt
+  // every later thread of that role runs with, with full permissions. An approved MCP client may start threads on every
+  // machine.
+  if (c.entity === 'remote_command' || c.entity === 'assignment' || c.entity === 'automation_file' || c.entity === 'crew_file' || c.entity === 'mcp_client') {
+    return true;
+  }
   if (c.entity !== 'kv') return false;
   const k = c.entity_id;
   return k === OWNER_KEY || k.startsWith(ASK_PREFIX) || k.startsWith(SECRET_DROP) || k.startsWith(SECRET_ACK);
