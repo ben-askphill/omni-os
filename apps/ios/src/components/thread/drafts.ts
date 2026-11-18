@@ -1,60 +1,62 @@
 import { useEffect, useSyncExternalStore, type RefObject } from 'react';
 
 import { createStore } from '../../live/store';
+import type { ThreadKey } from '../../live/thread-key';
 
 /**
- * What Ben has typed in each thread's composer. It lives at module level, so a draft survives leaving the thread and
- * coming back, and so a failed message's Edit can put its text back from outside the composer.
+ * What Ben has typed in each thread's composer, per server and thread (live/thread-key.ts). It lives at module level,
+ * so a draft survives leaving the thread and coming back, and so a failed message's Edit can put its text back from
+ * outside the composer. A draft for one server's thread never shows on another server's thread with the same id.
  */
 const drafts = createStore<Readonly<Record<string, string>>>({});
 
-export function getDraft(threadId: string): string {
-  return drafts.get()[threadId] ?? '';
+export function getDraft(key: ThreadKey): string {
+  return drafts.get()[key] ?? '';
 }
 
-export function setDraft(threadId: string, text: string): void {
+export function setDraft(key: ThreadKey, text: string): void {
   drafts.set((all) => {
-    if ((all[threadId] ?? '') === text) return all;
-    const { [threadId]: _gone, ...rest } = all;
-    return text ? { ...rest, [threadId]: text } : rest;
+    if ((all[key] ?? '') === text) return all;
+    const { [key]: _gone, ...rest } = all;
+    return text ? { ...rest, [key]: text } : rest;
   });
 }
 
 /** Puts text back in front of whatever has been typed since, so neither is lost. */
-export function restoreDraft(threadId: string, text: string): void {
-  const typed = getDraft(threadId);
-  setDraft(threadId, typed.trim() ? `${text}\n\n${typed}` : text);
+export function restoreDraft(key: ThreadKey, text: string): void {
+  const typed = getDraft(key);
+  setDraft(key, typed.trim() ? `${text}\n\n${typed}` : text);
 }
 
-const focusers = new Map<string, Set<() => void>>();
+const focusers = new Map<ThreadKey, Set<() => void>>();
 
 /** Asks the thread's mounted composer to take focus. Nothing happens when it is not on screen. */
-export function requestFocus(threadId: string): void {
-  for (const focus of focusers.get(threadId) ?? []) focus();
+export function requestFocus(key: ThreadKey): void {
+  for (const focus of focusers.get(key) ?? []) focus();
 }
 
 /** Calls `focus` on each `requestFocus` for the thread, until the returned function is called. */
-export function onFocusRequest(threadId: string, focus: () => void): () => void {
-  const set = focusers.get(threadId) ?? new Set<() => void>();
+export function onFocusRequest(key: ThreadKey, focus: () => void): () => void {
+  const set = focusers.get(key) ?? new Set<() => void>();
   set.add(focus);
-  focusers.set(threadId, set);
+  focusers.set(key, set);
   return () => {
     set.delete(focus);
-    if (set.size === 0) focusers.delete(threadId);
+    if (set.size === 0) focusers.delete(key);
   };
 }
 
 /** Hands the composer's box to `requestFocus` while it is mounted. */
-export function useFocusRequests(threadId: string, input: RefObject<{ focus(): void } | null>): void {
-  useEffect(() => onFocusRequest(threadId, () => input.current?.focus()), [threadId, input]);
+export function useFocusRequests(key: ThreadKey, input: RefObject<{ focus(): void } | null>): void {
+  useEffect(() => onFocusRequest(key, () => input.current?.focus()), [key, input]);
 }
 
 /** Moves a message back into the box to be reworded, and puts the cursor there. */
-export function editInComposer(threadId: string, text: string): void {
-  restoreDraft(threadId, text);
-  requestFocus(threadId);
+export function editInComposer(key: ThreadKey, text: string): void {
+  restoreDraft(key, text);
+  requestFocus(key);
 }
 
-export function useDraft(threadId: string): string {
-  return useSyncExternalStore(drafts.subscribe, () => getDraft(threadId));
+export function useDraft(key: ThreadKey): string {
+  return useSyncExternalStore(drafts.subscribe, () => getDraft(key));
 }
