@@ -30,6 +30,9 @@ describe('config fields on the phone', () => {
       ['Workspace folder', false, '~/Omni'],
       ['Repos folder', false, '~/code'],
       ['GitHub owner', true, 'askphill'],
+    ]);
+    expect(configRows('extras', state()).map((r) => [r.label, r.editable, r.shown])).toEqual([
+      ['Hermes URL', true, 'Not set'],
       ['Central brain folder', false, '~/central-brain'],
     ]);
   });

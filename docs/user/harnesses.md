@@ -23,7 +23,7 @@ A harness is the agent CLI a thread runs on. Pick one per channel (its default) 
 
 Omni asks each harness which models it has, so a model that ships in a new CLI release shows up without an Omni update: Claude Code's `initialize` answer (nothing goes to the API), Codex's `model/list`, `cursor-agent --list-models` and Cursor's `/v1/models`. Claude Code keeps Omni's bundled list first and adds whatever else it reports. Hermes has one model.
 
-- Omni asks at start and every 15 minutes. A picker that opens on a list older than 5 minutes asks again in the background, so the next open has the new models. **Check for new models** in Settings > Harnesses & models asks at once.
+- Omni asks at start and every 15 minutes. A picker that opens on a list older than 5 minutes asks again in the background, so the next open has the new models. **Check for new models** in Settings > Models asks at once.
 - What Claude Code last reported is kept in `data/claude-models.json`, so a restart starts from it. When Claude Code does not answer, the last list stays.
 - **Models in the picker**, in the same section, chooses per harness which models the pickers list (desktop, phone and iOS). By default each harness shows the newest model of each family and its default: when Opus 5.6 ships it shows and Opus 5.5 drops out. **All** shows every model. A switch on a model wins over the rule, and **Reset** clears them. The choice syncs to your other machines.
 - A hidden model still runs. A thread, crew role, channel default or automation that names one keeps it, the picker still shows it while it is the one picked, and Auto picks from every model. The Conductor's `list_harnesses` marks it `hidden`.

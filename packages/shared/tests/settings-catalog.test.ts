@@ -26,7 +26,23 @@ describe('settings catalog', () => {
     for (const f of SETTING_FIELDS) if (f.page) expect(settingsSectionNamed(f.page)).toBe(f.page);
   });
 
+  it('groups sections as Assistant, Spaces, Devices, Developer and Extras', () => {
+    expect(SETTINGS_GROUPS.map((g) => g.title)).toEqual(['', 'Assistant', 'Spaces', 'Devices', 'Developer', 'Extras', '']);
+    const group = (id: string) => SETTINGS_SECTION_DEFS.filter((s) => s.group === id).map((s) => s.id);
+    expect(group('assistant')).toEqual(['models', 'crew', 'accounts', 'threads']);
+    expect(group('spaces')).toEqual(['channels', 'workspace']);
+    expect(group('developer')).toEqual(['worktrees', 'secrets']);
+  });
+
+  it('keeps Wispr Flow, Grok Bot, Hermes and the central brain under Extras', () => {
+    const where = (id: string) => SETTINGS_ENTRIES.find((e) => e.id === id)?.section;
+    expect(['wispr-flow', 'grok-bot', 'hermes', 'brain'].map(where)).toEqual(['extras', 'extras', 'extras', 'extras']);
+    expect(searchSettings('wispr', 'web')[0]?.id).toBe('wispr-flow');
+    expect(searchSettings('hermes', 'web')[0]?.id).toBe('hermes');
+  });
+
   it('opens old names on the section that holds them now', () => {
+    expect(settingsSectionNamed('integrations')).toBe('extras');
     expect(settingsSectionNamed('storage')).toBe('worktrees');
     expect(settingsSectionNamed('profile')).toBe('general');
     expect(settingsSectionNamed('sync')).toBe('sync');
@@ -46,9 +62,9 @@ describe('settings catalog', () => {
   });
 
   it('lists the desktop app\'s section only in the desktop app', () => {
-    const ids = (desktopApp: boolean) => sectionsIn('app', { desktopApp }).map((s) => s.id);
-    expect(ids(false)).toEqual(['about']);
-    expect(ids(true)).toEqual(['desktop', 'about']);
+    const ids = (desktopApp: boolean) => sectionsIn('devices', { desktopApp }).map((s) => s.id);
+    expect(ids(false)).toEqual(['machines', 'sync', 'access']);
+    expect(ids(true)).toEqual(['machines', 'sync', 'access', 'desktop']);
     expect(sectionShows('desktop', false)).toBe(false);
     expect(sectionShows('desktop', true)).toBe(true);
     expect(sectionShows('general', false)).toBe(true);
@@ -67,7 +83,7 @@ describe('settings catalog', () => {
   });
 
   it('finds Quick Prompt only in the desktop app', () => {
-    expect(searchSettings('quick prompt', 'web')).toEqual([]);
-    expect(searchSettings('quick prompt', 'desktop').map((e) => e.id)).toEqual(['desktop-quick-prompt']);
+    expect(searchSettings('quick prompt', 'web').map((e) => e.id)).toEqual(['wispr-flow']);
+    expect(searchSettings('quick prompt', 'desktop').map((e) => e.id)).toEqual(['desktop-quick-prompt', 'wispr-flow']);
   });
 });
