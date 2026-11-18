@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { AUTO, AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
-import { Avatar, Button, ErrorNote, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, FolderInput, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { CHANNEL_GLYPHS, CONDUCTOR_CHANNEL, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
@@ -329,7 +329,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
       <Card title="Code">
         <Field label="Repo path" htmlFor="ch-repo" hint="Absolute path to a local git repo. Omni reads its GitHub repo from it, and it enables per-thread worktrees and the PRs tab.">
-          <input id="ch-repo" className="field font-mono !text-[13px]" value={f.repo_path} onChange={(e) => set('repo_path', e.target.value)} placeholder="~/code/acme-theme" spellCheck={false} />
+          <FolderInput id="ch-repo" dialogTitle="Repo folder" value={f.repo_path} onChange={(v) => set('repo_path', v)} placeholder="~/code/acme-theme" spellCheck={false} />
         </Field>
       </Card>
 
@@ -403,7 +403,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         {!hasRepo &&
           (showBase ? (
             <Field label="Base directory" htmlFor="ch-base" hint="Where threads run when there is no repo. Empty uses your workspace folder (Settings), so its CLAUDE.md and skills load.">
-              <input id="ch-base" className="field font-mono !text-[13px]" value={f.base_dir} onChange={(e) => set('base_dir', e.target.value)} placeholder="~/Omni" spellCheck={false} />
+              <FolderInput id="ch-base" dialogTitle="Base directory" value={f.base_dir} onChange={(v) => set('base_dir', v)} placeholder="~/Omni" spellCheck={false} />
             </Field>
           ) : (
             <AutoValue label="Base directory" value="Your workspace folder" note="No repo, so threads run there" onEdit={() => setEditing((e) => ({ ...e, base: true }))} />

@@ -157,6 +157,12 @@ export type DesktopUpdateView =
   /** `downloadUrl`: the page with the latest build, to get it by hand while the app cannot update itself. */
   | { state: 'error'; message: string; downloadUrl?: string };
 
+/** What the folder dialog shows: its title, and the folder it opens in (`~` for home; a missing one falls back to home). */
+export interface FolderPickRequest {
+  title?: string;
+  defaultPath?: string;
+}
+
 export interface DesktopServerInfo {
   port: number;
   dataDir: string;
@@ -212,6 +218,11 @@ export interface DesktopBridge {
    * app builds lack it.
    */
   routeLinks?(decide: (url: string) => boolean): () => void;
+  /**
+   * Opens the system's folder dialog over this window and resolves to the chosen folder's absolute path, or null when
+   * it was cancelled. The app's server runs on this machine, so the path is one it can use. Older app builds lack it.
+   */
+  pickFolder?(request?: FolderPickRequest): Promise<string | null>;
   settings: {
     get(): Promise<DesktopSettings>;
     set(patch: DesktopSettingsPatch): Promise<DesktopSettings>;

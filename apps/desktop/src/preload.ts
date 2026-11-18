@@ -40,6 +40,7 @@ const bridge: DesktopBridge = {
       send('omni:links:routing', false);
     };
   },
+  pickFolder: (request) => invoke('omni:pick-folder', request ?? {}),
   settings: {
     get: () => invoke('omni:settings:get'),
     set: (patch) => invoke('omni:settings:set', patch),

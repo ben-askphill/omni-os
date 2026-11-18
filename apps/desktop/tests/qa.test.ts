@@ -18,6 +18,10 @@ describe('parseStep', () => {
     expect(parseStep({ expectExternal: 'claude.ai/artifact/' })).toEqual({ kind: 'expectExternal', text: 'claude.ai/artifact/', timeoutMs: 10_000 });
     expect(parseStep({ expectExternal: { text: 'claude.ai', timeout: 3 } })).toEqual({ kind: 'expectExternal', text: 'claude.ai', timeoutMs: 3_000 });
     expect(parseStep({ expectExternal: {} })).toHaveProperty('error');
+    expect(parseStep({ folderDialog: '/tmp/acme' })).toEqual({ kind: 'folderDialog', path: '/tmp/acme' });
+    expect(parseStep({ folderDialog: null })).toEqual({ kind: 'folderDialog', path: null });
+    expect(parseStep({ folderDialog: '~/code' })).toHaveProperty('error');
+    expect(parseStep({ folderDialog: '' })).toHaveProperty('error');
   });
 
   it('reads waits as ms or a selector', () => {
