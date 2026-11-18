@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { type ThreadLinks } from '@omni/shared/continue-flow.ts';
 import { useApi, type BackgroundTask, type Channel, type HarnessWithRunning, type Thread } from '../../../api.ts';
 import { threadRunLabels } from '@omni/shared/thread-run.ts';
-import { HarnessMark } from '../../brand.tsx';
+import { CrewMark, HarnessMark, isCrewRole } from '../../brand.tsx';
 import { Chip, CopyButton, Icon, StatusDot } from '../../ui.tsx';
 import { duration, fullDate, plural } from '../../../format.ts';
 import { href } from '../../../router.ts';
@@ -81,6 +81,7 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
 export function DetailsTab({
   thread,
   channel,
+  roleName = null,
   parent,
   children,
   init,
@@ -100,6 +101,8 @@ export function DetailsTab({
 }: {
   thread: Thread;
   channel: Channel | undefined;
+  /** The display name of its crew role (crewRoleName). Null on a thread not started as one, which has no Role row. */
+  roleName?: string | null;
   parent: Thread | null;
   children: Thread[];
   init: InitP | null;
@@ -147,7 +150,14 @@ export function DetailsTab({
             #{channel?.name ?? thread.channel_id}
           </a>
         </Row>
-        <Row k="Role">{thread.role ?? <span className="text-fg-3">none</span>}</Row>
+        {roleName && thread.role && (
+          <Row k="Role">
+            <span className="inline-flex items-center gap-[var(--sp-2)]" data-role={thread.role}>
+              {isCrewRole(thread.role) && <CrewMark role={thread.role} size={14} className="text-fg-2" />}
+              {roleName}
+            </span>
+          </Row>
+        )}
         <Row k="Harness">
           <HarnessMark harness={thread.harness} withLabel />
         </Row>
