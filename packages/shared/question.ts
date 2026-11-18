@@ -1,5 +1,7 @@
 // Questions an agent asks the user with Omni's ask_user_question tool (crates/omni-mcp), the same shape as Claude
 // Code's AskUserQuestion. Pure: the server parses a call and an answer with these, and formats what the agent gets back.
+// An approval (packages/shared/access.ts) is a question Omni asks itself, before a tool runs, with `approval` set.
+import { approvalGrant, approvalTitle, type ApprovalRequest } from './access.ts';
 
 export interface QuestionOption {
   /** 1 to 5 words, shown bold. */
@@ -127,6 +129,8 @@ export const isQuestionTool = (name: string) => /^mcp__omni[-_]ask__ask_user_que
 export interface QuestionPayload {
   id: string;
   questions: Question[];
+  /** Set when Omni asks whether a tool may run (apps/server/access.ts): the card is an approval card. */
+  approval?: ApprovalRequest;
 }
 
 export interface AnswerPayload {
@@ -145,6 +149,21 @@ export interface ThreadQuestion {
   questions: Question[];
   state: QuestionState;
   answers: Answer[] | null;
+  approval?: ApprovalRequest;
+}
+
+/** Whether an approval's answer lets the tool run: Allow or Allow in this thread. A typed note or a skip refuses. */
+export const approves = (answers: Answer[] | null): boolean => approvalGrant(answers?.[0] ?? null) !== null;
+
+/**
+ * What the agent reads when an approval's answer comes after its tool call ended (a restart): the call was refused
+ * then, so it says what the user decided and that the call may be made again.
+ */
+export function approvalResultText(a: ApprovalRequest, answers: Answer[] | null): string {
+  const what = `${approvalTitle(a)} (${a.summary})`;
+  if (approves(answers)) return `Earlier you asked to ${what} and the call was stopped before the user answered. The user has now allowed it: make the call again if it is still needed.`;
+  const note = answers?.[0]?.other;
+  return `Earlier you asked to ${what}. The user did not allow it${note ? `, and said: "${note}"` : ''}. Do not try it another way; go on without it or ask what to do.`;
 }
 
 /**
@@ -171,7 +190,7 @@ export function questionsIn(events: readonly EventLike[]): ThreadQuestion[] {
   for (const e of events) {
     if (e.kind === QUESTION_EVENT) {
       const p = payloadOf<QuestionPayload>(e);
-      if (!out.has(p.id)) out.set(p.id, { id: p.id, event_id: e.id, questions: p.questions, state: 'pending', answers: null });
+      if (!out.has(p.id)) out.set(p.id, { id: p.id, event_id: e.id, questions: p.questions, state: 'pending', answers: null, ...(p.approval && { approval: p.approval }) });
     } else if (e.kind === ANSWER_EVENT) {
       const p = payloadOf<AnswerPayload>(e);
       const q = out.get(p.id);

@@ -75,7 +75,10 @@
     "prompt_fix_conflicts": null,
     "prompt_fix_checks": null,
     "scan_opt_out": 0,
+    "access_level": null,
+    "connector_access": null,
     "design_system_size": 0,
+    "access_default": "full",
     "avatar_bg": null,
     "avatar_bg_manual": 0
   },

@@ -50,6 +50,11 @@
 //                     its tool_result once it returns), and wait as long as MCP_TOOL_TIMEOUT allows (else the SDK's 60s).
 //                     Interruptible like TOOL. Messages sent meanwhile join after its result; the answer quotes the result
 //   ASK_ONE           ASK with only the first of those questions
+//   WRITE:<path>      a Write tool call that writes "written by fake-claude" to that path (relative to the cwd)
+//   CMD:<command>     a Bash tool call that runs that command in the cwd; underscores in it are spaces
+//                     With --permission-prompt-tool stdio, each WRITE, CMD and TOOL call first sends a can_use_tool
+//                     control request, as the real CLI does when a hook or the permission mode asks, and runs only
+//                     when Omni answers allow; a deny becomes an error tool_result with Omni's message
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen,
@@ -87,8 +92,8 @@
 // list again, their prompts included, as system/commands_changed.
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve as resolvePath } from 'node:path';
 
 const VERSION = '2.1.278';
 /**
@@ -341,6 +346,31 @@ const toolResult = (id, text, isError) =>
     tool_use_result: isError ? `Error: ${text}` : { stdout: text, stderr: '', interrupted: false, isImage: false },
   });
 
+// ---------- permission requests (--permission-prompt-tool stdio) ----------
+
+/** Omni answers whether a tool may run: each can_use_tool request waits here for its control_response. */
+const permits = new Map();
+const askPermission = () => process.argv.includes('--permission-prompt-tool');
+
+/** Ask before a tool runs. Resolves to { behavior: 'allow' } or { behavior: 'deny', message }. */
+function canUseTool(name, input, toolUseId) {
+  if (!askPermission()) return Promise.resolve({ behavior: 'allow' });
+  const id = randomUUID();
+  return new Promise((resolve) => {
+    permits.set(id, resolve);
+    writeRaw({ type: 'control_request', request_id: id, request: { subtype: 'can_use_tool', tool_name: name, display_name: name, input, tool_use_id: toolUseId } });
+  });
+}
+
+/** Omni's answer to one of our can_use_tool requests. */
+function onPermit(msg) {
+  const r = msg.response;
+  const done = permits.get(r?.request_id);
+  if (!done) return;
+  permits.delete(r.request_id);
+  done(r.subtype === 'success' ? (r.response ?? { behavior: 'deny', message: 'no answer' }) : { behavior: 'deny', message: r.error ?? 'error' });
+}
+
 /** RICH: one scripted step after another, each after a model call, until interrupted. Resolves to the steps taken. */
 async function richCalls(t) {
   const cwd = process.cwd();
@@ -500,6 +530,8 @@ async function runTurn() {
   const publishes = [];
   const renders = [];
   const scripts = [];
+  /** WRITE and CMD: tool calls that change something, each asked for first under --permission-prompt-tool. */
+  const actions = [];
   let steps = 0;
 
   emit({
@@ -539,6 +571,8 @@ async function runTurn() {
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
       for (const x of m.text.matchAll(/RENDER:(\S+)/g)) renders.push(x[1].replace(/-/g, ' '));
       for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
+      for (const x of m.text.matchAll(/WRITE:(\S+)/g)) actions.push({ name: 'Write', input: { file_path: resolvePath(process.cwd(), x[1]), content: 'written by fake-claude' } });
+      for (const x of m.text.matchAll(/CMD:(\S+)/g)) actions.push({ name: 'Bash', input: { command: x[1].replace(/_/g, ' '), description: 'Fake command' } });
     }
     return true;
   };
@@ -650,6 +684,31 @@ async function runTurn() {
   for (;;) {
     // One model call: either a tool call or the final answer.
     if (!(await pause(t, LATENCY))) break;
+    if (actions.length) {
+      const a = actions.shift();
+      const toolId = `toolu_fake_${++seq}`;
+      steps++;
+      assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: toolId, name: a.name, input: a.input }]);
+      const permit = await canUseTool(a.name, a.input, toolId);
+      if (dead) return;
+      if (permit.behavior !== 'allow') {
+        toolResult(toolId, permit.message ?? 'Permission denied', true);
+      } else if (a.name === 'Write') {
+        writeFileSync(a.input.file_path, a.input.content);
+        toolResult(toolId, `File created successfully at: ${a.input.file_path}`, false);
+      } else {
+        let out = '';
+        try {
+          out = execFileSync('sh', ['-c', a.input.command], { cwd: process.cwd(), encoding: 'utf8' });
+        } catch (e) {
+          out = String(e.message);
+        }
+        toolResult(toolId, out, false);
+      }
+      seen.push(permit.behavior === 'allow' ? `${a.name} ran` : `${a.name} refused: ${permit.message ?? ''}`);
+      if (!take()) return;
+      continue;
+    }
     if (tools.length) {
       const ms = tools.shift();
       const msgId = `msg_fake_${++seq}`;
@@ -657,7 +716,16 @@ async function runTurn() {
       steps++;
       assistant(msgId, [{ type: 'thinking', thinking: '', signature: 'sig' }]);
       emit({ type: 'system', subtype: 'thinking_tokens', tokens: 42 });
-      assistant(msgId, [{ type: 'tool_use', id: toolId, name: 'Bash', input: { command: `sleep ${ms / 1000}`, description: 'Fake tool' } }]);
+      const input = { command: `sleep ${ms / 1000}`, description: 'Fake tool' };
+      assistant(msgId, [{ type: 'tool_use', id: toolId, name: 'Bash', input }]);
+      const permit = await canUseTool('Bash', input, toolId);
+      if (dead) return;
+      if (permit.behavior !== 'allow') {
+        toolResult(toolId, permit.message ?? 'Permission denied', true);
+        seen.push(`Bash refused: ${permit.message ?? ''}`);
+        if (!take()) return;
+        continue;
+      }
       if (steps === 1) {
         emit({
           type: 'rate_limit_event',
@@ -889,6 +957,7 @@ function onLine(line) {
     queue.push({ uuid: msg.uuid ?? randomUUID(), content, text: textOf(content) });
     startTurn();
   } else if (msg.type === 'control_request') onControl(msg);
+  else if (msg.type === 'control_response') onPermit(msg);
 }
 
 // ---------- Omni's claude.ai Artifacts listing ----------

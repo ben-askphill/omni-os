@@ -1,5 +1,6 @@
 // Start a thread's process, including its browser profile and MCP config.
 import { config } from '../config.ts';
+import { gateFor } from './approvals.ts';
 import { channels, messageRequests, threads, type Thread } from '../db.ts';
 import { getCrew } from '../crew.ts';
 import { worktreeProblem, writeDesignSystem, writeMcpConfig } from '../sandbox.ts';
@@ -155,6 +156,7 @@ async function spawnLive(live: Live, thread: Thread) {
 
   const run = takeHandover(live, thread);
   thread = run.thread;
+  const permission = gateFor(thread, channel, role, addEvent);
   const ctx: AdapterContext = {
     thread,
     channel,
@@ -167,6 +169,7 @@ async function spawnLive(live: Live, thread: Thread) {
     omniUrl: omniUrl(),
     resume: run.resume,
     handoverPending: !!threads.sessionState(thread.id).handover,
+    permission,
   };
   live.attach(
     adapterFor(thread.harness).spawn(ctx, {
@@ -196,7 +199,10 @@ async function spawnLive(live: Live, thread: Thread) {
         live.failedToSpawn();
         addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
       },
-      exit: (code, signal) => onExit(live, code, signal),
+      exit: (code, signal) => {
+        permission?.end();
+        onExit(live, code, signal);
+      },
     }),
   );
 

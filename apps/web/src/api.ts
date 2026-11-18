@@ -33,7 +33,8 @@ export type CommandList = HarnessCommands & { recent?: string[] };
 // ---------- response shapes ----------
 
 /** A channel as the API sends it: the design system's file stays on the server, only its name and size come. */
-export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: number };
+/** `access_default`: what a channel with no access_level runs at on the machine that answered (access-default.ts). */
+export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: number; access_default?: string };
 
 /**
  * A thread as the API sends it. `delegating`: a thread it delegated, at any depth, still runs or queues

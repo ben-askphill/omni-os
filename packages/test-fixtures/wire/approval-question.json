@@ -1,0 +1,7 @@
+{
+  "id": 237,
+  "thread_id": "00000000-0000-4000-8000-000000000084",
+  "kind": "question",
+  "payload": "{\"id\":\"00000000-0000-4000-8000-000000000085\",\"questions\":[{\"question\":\"Run a command: touch approved.txt\",\"header\":\"Ask first\",\"options\":[{\"label\":\"Allow\",\"description\":\"Run it this once.\"},{\"label\":\"Allow in this thread\",\"description\":\"Run this tool without asking for the rest of this thread.\"},{\"label\":\"Don’t allow\",\"description\":\"Stop it. The agent hears you said no.\"}],\"multiSelect\":false}],\"approval\":{\"tool\":\"Bash\",\"level\":\"ask\",\"summary\":\"touch approved.txt\",\"detail\":\"touch approved.txt\"}}",
+  "created_at": "2026-01-05T09:00:00.000Z"
+}

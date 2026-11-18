@@ -178,6 +178,10 @@ const NAMES = [
   'pr-auto-merge-off.json',
   // A question a delegated thread asked, as the thread that delegated it lists it.
   'crew-questions.json',
+  // Ask first (ADR 0015): the approval card's question event in the thread, and the answer that allows it.
+  'approval-question.json',
+  'approval-answer-request.json',
+  'approval-answer.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -315,6 +319,8 @@ async function boot(): Promise<number> {
       OMNI_PORT: '0',
       OMNI_HOST: '127.0.0.1',
       OMNI_CLAUDE_BIN: FAKE_CLAUDE,
+      // A fresh data dir would settle a new install's "Ask first" (access-default.ts); these servers run as before levels.
+      OMNI_ACCESS_DEFAULT: 'full',
       OMNI_CODEX_BIN: join(tmp, 'no-codex'),
       OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
       // Never Cursor's real dashboard: its plan usage would end up in the recorded feed.
@@ -969,6 +975,19 @@ async function scenario() {
   await call('POST', `/threads/${asker.id}/questions`, { questions: [digestQuestion] });
   const asked = keep('crew-questions.json', await get(`/threads/${conductor.id}/crew-questions`)) as { items: { thread_id: string }[] };
   expect(asked.items.map((q) => q.thread_id)).toEqual([asker.id]);
+
+  // Ask first (ADR 0015): a command waits on an approval card, a question event with `approval`, until Ben allows it.
+  await call('PATCH', '/channels/acme', { access_level: 'ask' });
+  const gated = (await call('POST', '/threads', { channel: 'acme', prompt: 'CMD:touch_approved.txt', title: 'Tidy the build' })) as Thread;
+  type QuestionEvent = { kind: string; payload: unknown };
+  const approvalOf = (e: QuestionEvent) => (typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload) as { id: string; approval?: unknown };
+  const card = await eventually(async () => ((await detail(gated.id)).events as QuestionEvent[]).find((e) => e.kind === 'question' && approvalOf(e).approval), 'the approval card');
+  keep('approval-question.json', card);
+  expect(approvalOf(card).approval).toMatchObject({ tool: 'Bash', summary: 'touch approved.txt', level: 'ask' });
+  const allowBody = request('approval-answer-request.json', { answers: [{ selected: ['Allow'], other: null }] });
+  keep('approval-answer.json', await call('POST', `/threads/${gated.id}/questions/${approvalOf(card).id}/answer`, allowBody));
+  await eventually(async () => (await detail(gated.id)).thread.status === 'done', 'the approved thread to finish');
+  await call('PATCH', '/channels/acme', { access_level: null });
 }
 
 /** A request body a client sends: the recorded one, so the server must still take it. */

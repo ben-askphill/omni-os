@@ -201,6 +201,11 @@ export interface McpInput {
   /** The channel browser Omni runs, when it is up. The MCP attaches to it instead of launching its own. */
   cdpEndpoint?: string | null;
   omniUrl: string;
+  /**
+   * Leave the browser out: the harness cannot ask before each MCP call (Codex, Cursor) and the browser is below full
+   * access here, so nothing would stop a click or a form (access.ts browserHeld). Claude Code asks per call, so it keeps it.
+   */
+  noBrowser?: boolean;
 }
 
 let playwrightMcp: { bin: string; version: string } | undefined;
@@ -266,7 +271,7 @@ export function buildMcpConfig(input: McpInput) {
   helper(RENDER_SERVER, 'render');
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
-  if (config.browser && !input.role?.delegateOnly) {
+  if (config.browser && !input.role?.delegateOnly && !input.noBrowser) {
     const args = [playwrightMcpBin(), '--output-dir', browserOutDir(input.threadId)];
     // Chrome locks a profile dir, so only one live thread per channel gets the persistent logins.
     if (input.cdpEndpoint && !input.browserBusy) args.push('--cdp-endpoint', input.cdpEndpoint);
@@ -329,7 +334,7 @@ export const CURSOR_DELEGATE_ONLY_DENY = ['Shell(*)', 'Write(**)'];
  * are. Cursor reads its permissions only from there or from the repo's `.cursor/cli.json`, and Omni writes neither
  * the repo nor ~/.cursor. Rewritten every spawn, so a change to the user's config reaches the next turn.
  */
-export function writeCursorDenyConfig(dir: string, userDir: string): string {
+export function writeCursorDenyConfig(dir: string, userDir: string, extra: readonly string[] = CURSOR_DELEGATE_ONLY_DENY): string {
   mkdirSync(dir, { recursive: true });
   for (const name of existsSync(userDir) ? readdirSync(userDir) : []) {
     if (name === 'cli-config.json') continue;
@@ -346,7 +351,7 @@ export function writeCursorDenyConfig(dir: string, userDir: string): string {
   } catch {
     // No config of the user's yet: the deny list alone.
   }
-  const deny = [...new Set([...(cfg.permissions?.deny ?? []), ...CURSOR_DELEGATE_ONLY_DENY])];
+  const deny = [...new Set([...(cfg.permissions?.deny ?? []), ...extra])];
   writeFileSync(join(dir, 'cli-config.json'), JSON.stringify({ ...cfg, permissions: { allow: cfg.permissions?.allow ?? [], deny } }, null, 2));
   return dir;
 }

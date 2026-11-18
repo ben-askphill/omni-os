@@ -1,6 +1,7 @@
 // How a Codex session starts: its process environment, the initialize handshake, and the
 // thread/start or thread/resume request with the per-thread config.
 import { apiToken } from '../../api-token.ts';
+import { browserHeld, codexPolicy } from '../../access.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { ASK_SERVER, ASK_TIMEOUT_SEC, buildMcpConfig } from '../../sandbox.ts';
 import { harnessEnv } from '../env-guard.ts';
@@ -65,13 +66,17 @@ export function sessionParams(ctx: AdapterContext) {
     browserBusy: ctx.browserBusy,
     cdpEndpoint: ctx.cdpEndpoint,
     omniUrl: ctx.omniUrl,
+    noBrowser: browserHeld(ctx.permission?.access),
   });
+  const policy = ctx.permission ? codexPolicy(ctx.permission.access) : null;
   return {
     model: thread.model || undefined,
     cwd: thread.cwd,
-    approvalPolicy: 'never',
+    // Below full access, the channel's level (apps/server/access.ts): read only is Codex's read-only sandbox, Ask first
+    // its workspace sandbox with every other action asked for and judged (codex/adapter.ts).
+    approvalPolicy: policy?.approvalPolicy ?? 'never',
     // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off.
-    sandbox: ctx.role?.delegateOnly ? 'read-only' : 'danger-full-access',
+    sandbox: ctx.role?.delegateOnly ? 'read-only' : (policy?.sandbox ?? 'danger-full-access'),
     developerInstructions: ctx.systemPrompt,
     config: threadConfig(mcp.mcpServers),
   };

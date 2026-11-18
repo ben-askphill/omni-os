@@ -16,6 +16,7 @@ import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { pageColumn } from '../components/ui/feedback.tsx';
 import { Advanced, Card } from './settings-parts.tsx';
+import { AccessCard } from './ChannelAccess.tsx';
 
 /** Settings' channel scope still imports the card by this name. */
 
@@ -221,8 +222,10 @@ function DesignSystemPicker({ channel, onChange }: { channel: Channel; onChange:
 }
 
 export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
-  const { reloadChannels } = useApp();
-  const [f, setF] = useState<ChannelForm>(() => channelForm(existing));
+  const { reloadChannels, channels } = useApp();
+  // A new channel starts at this computer's default level (any channel record carries it).
+  const machineDefault = existing?.access_default ?? channels[0]?.access_default;
+  const [f, setF] = useState<ChannelForm>(() => channelForm(existing, machineDefault));
   const [idTouched, setIdTouched] = useState(!!existing);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -334,6 +337,21 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Field label="Notes" htmlFor="ch-notes" hint="Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.">
           <textarea id="ch-notes" className="field min-h-[84px] resize-y" value={f.notes} onChange={(e) => set('notes', e.target.value)} />
         </Field>
+      </Card>
+
+      <Card title="Access" subtitle="How much agents in this channel may do before they ask you. Omni enforces it on every harness.">
+        <AccessCard
+          channelId={existing?.id}
+          level={f.access}
+          set={f.accessSet}
+          machineDefault={machineDefault}
+          connectors={f.connectors}
+          onLevel={(l) => {
+            setSaved(false);
+            setF((prev) => ({ ...prev, access: l, accessSet: true }));
+          }}
+          onConnectors={(c) => set('connectors', c)}
+        />
       </Card>
 
       <Card title="Code">

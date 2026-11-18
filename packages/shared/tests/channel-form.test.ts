@@ -46,7 +46,19 @@ describe('channel form', () => {
       prompt_fix_conflicts: null,
       prompt_fix_checks: null,
       scan_opt_out: 0,
+      connector_access: {},
     });
+  });
+
+  it('sends a level only once one is set, so a channel without one keeps following the machine default', () => {
+    const unset = channelForm(acme, 'ask');
+    expect(unset).toMatchObject({ access: 'ask', accessSet: false, connectors: {} });
+    expect(channelBody(unset, { system: false, github: false })).not.toHaveProperty('access_level');
+    const set = channelForm({ ...acme, access_level: 'read', connector_access: '{"gmail":"off","nope":"full","slack":"loud"}' });
+    expect(set).toMatchObject({ access: 'read', accessSet: true, connectors: { gmail: 'off' } });
+    expect(channelBody(set, { system: false, github: false })).toMatchObject({ access_level: 'read', connector_access: { gmail: 'off' } });
+    // A record from before levels, with no default given, reads as full access.
+    expect(channelForm(acme).access).toBe('full');
   });
 
   it('keeps a channel out of usage scans once it opted out, and reads an older server as opted in', () => {
