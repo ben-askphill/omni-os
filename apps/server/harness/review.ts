@@ -1,11 +1,12 @@
 // A review on the other model family: the rule the Conductor's charter carried as prose, as code (plan section 5).
 // A thread made as a review role with `review_of: <thread id>` runs on the family that thread did not run on: GPT on
 // Codex for work Claude wrote, Claude Code's top model for work any other model wrote. A run on the same family, or a
-// thread whose run does not say its family (Cursor's own `auto`), is refused, never guessed.
+// thread whose run does not say its family (Cursor's own `auto`), is refused, never guessed. So is a review whose
+// pinned model this machine's catalog does not have: Omni never reviews on another model in its place.
 
 import type { Thread } from '../db.ts';
 import { userName } from '../profile.ts';
-import { GPT_REVIEW_EFFORT, nearestEffort, TIERS } from './auto.ts';
+import { GPT_REVIEW_EFFORT, TIERS } from './auto.ts';
 import { getHarness, unavailableError, type Catalog } from './catalog.ts';
 import { HARNESS_META, isHarnessId, type HarnessId } from './types.ts';
 
@@ -40,8 +41,8 @@ const runName = (r: RunAsked) => [r.harness && isHarnessId(r.harness) ? HARNESS_
 
 /**
  * The run a review of `reviewed` takes. A run the delegation names is kept when it is on the other family; with none
- * named, the other family's pick. Refused, with why, on the same family, on a run that does not say its family, and
- * when the other family's harness is not available here.
+ * named, the other family's pinned run (REVIEW_RUNS). Refused, with why, on the same family, on a run that does not say
+ * its family, and when the pinned run is not available here.
  */
 export function reviewRun(asked: RunAsked, reviewed: Pick<Thread, 'id' | 'harness' | 'model'>, cat: Catalog): { run: RunAsked } | { refused: string } {
   const wrote = modelFamily(reviewed);
@@ -54,20 +55,29 @@ export function reviewRun(asked: RunAsked, reviewed: Pick<Thread, 'id' | 'harnes
     if (!family) return { refused: `${runName(asked) || 'Auto'} does not say its model family. Name a model of the other family, or leave the run off and Omni picks it.` };
     return { run: asked };
   }
-  return pick(wrote === 'claude' ? 'other' : 'claude', asked.effort, cat);
+  return pick(wrote === 'claude' ? 'other' : 'claude', cat);
 }
 
-/** The other family's run: Codex's default model at the GPT review effort, or Claude Code's top tier. */
-function pick(family: ModelFamily, effort: string | null | undefined, cat: Catalog): { run: RunAsked } | { refused: string } {
-  const harness: HarnessId = family === 'other' ? 'codex' : 'claude-code';
-  const want = effort || (family === 'other' ? GPT_REVIEW_EFFORT : TIERS.max.effort);
-  const h = getHarness(cat, harness);
-  if (!h?.available) {
-    const where = family === 'other' ? 'GPT, on Codex' : 'Claude, on Claude Code';
-    return { refused: `This review runs on ${where}, and ${unavailableError(HARNESS_META[harness].name, h?.fix)} Ask ${userName()} how to review it.` };
-  }
-  const m = family === 'other' ? (h.models.find((x) => x.default) ?? h.models[0]) : (h.models.find((x) => x.id === TIERS.max.claudeModel) ?? h.models.find((x) => x.default) ?? h.models[0]);
-  // No model list for the harness yet: name the harness and let the resolver pass it through.
-  if (!m) return { run: { harness, effort: want } };
-  return { run: { harness, model: m.id, effort: nearestEffort(m, want) } };
+/**
+ * The run each family's review takes, pinned: GPT-6.1 Sol at high on Codex for work Claude wrote, Claude Code's top
+ * model at its top effort for the rest. Never the harness's configured default or the nearest model or effort: a
+ * review on a run other than this one is refused, so the Conductor asks.
+ */
+export const REVIEW_RUNS: Record<ModelFamily, { harness: HarnessId; model: string; effort: string }> = {
+  other: { harness: 'codex', model: 'gpt-6.1-sol', effort: GPT_REVIEW_EFFORT },
+  claude: { harness: 'claude-code', model: TIERS.max.claudeModel, effort: TIERS.max.effort },
+};
+
+function pick(family: ModelFamily, cat: Catalog): { run: RunAsked } | { refused: string } {
+  const want = REVIEW_RUNS[family];
+  const h = getHarness(cat, want.harness);
+  const name = HARNESS_META[want.harness].name;
+  const ask = `Ask ${userName()} how to review it.`;
+  if (!h?.available) return { refused: `This review runs on ${family === 'other' ? 'GPT, on Codex' : 'Claude, on Claude Code'}, and ${unavailableError(name, h?.fix)} ${ask}` };
+  // No model list for the harness yet: the pinned run goes as it is, and the harness says if it lacks the model.
+  if (!h.models.length) return { run: { ...want } };
+  const m = h.models.find((x) => x.id === want.model);
+  if (!m) return { refused: `This review runs on ${want.model} at ${want.effort}, and ${name} here does not offer ${want.model}. Omni does not review on another model in its place. ${ask}` };
+  if (m.efforts.length && !m.efforts.includes(want.effort)) return { refused: `This review runs on ${want.model} at ${want.effort}, and ${name} here does not offer ${want.effort} for it. ${ask}` };
+  return { run: { harness: want.harness, model: m.id, effort: m.efforts.length ? want.effort : '' } };
 }

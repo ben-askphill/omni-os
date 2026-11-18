@@ -97,8 +97,9 @@ The frontmatter sets each role's model and, for conductor and inbox, its default
 
 The conductor does not review a PR by itself. When a builder reports one, it relays the PR and you say whether you want it reviewed. When you ask, it delegates to `reviewer` with `review_of: <builder thread id>` and no run, and Omni picks the other model family from that thread's run (`apps/server/harness/review.ts`):
 
-- Work Claude wrote (Claude Code, Hermes, or a `claude-*` model on Cursor) is reviewed on Codex, on its default model, at `high`. The Conductor's brief then follows `/code-review:code-review` from the `gpt-review` skill where the machine has it in `~/.agents/skills`, else the reviewer charter's own steps.
+- Work Claude wrote (Claude Code, Hermes, or a `claude-*` model on Cursor) is reviewed on Codex, on `gpt-6.1-sol` at `high`. The Conductor's brief then follows `/code-review:code-review` from the `gpt-review` skill where the machine has it in `~/.agents/skills`, else the reviewer charter's own steps.
 - Work any other model wrote (GPT, Composer, Grok, Gemini) is reviewed on Claude Code, on `claude-opus-5-5` at `xhigh`.
+- Those runs are pinned. When this machine's catalog lacks the model, or the model lacks the effort, the review is refused (409): Omni never runs it on Codex's default or the nearest model or effort instead.
 - A run the delegation names is kept when it is on the other family. The same family is refused, and so is a thread whose run does not say its family (Cursor's own `auto`, a runtime Omni does not know), or a review whose harness is not available here. The Conductor then asks you.
 - `review_of` needs a review role. It is on `POST /api/threads` and on the Conductor's `delegate` tool.
 

@@ -15,7 +15,7 @@ const { app } = await import('../app.ts');
 const { paths } = await import('../config.ts');
 const { getCrew } = await import('../crew.ts');
 const { getCatalog } = await import('../harness/catalog-service.ts');
-const { modelFamily, reviewRun } = await import('../harness/review.ts');
+const { modelFamily, REVIEW_RUNS, reviewRun } = await import('../harness/review.ts');
 const { requestPRReview } = await import('../pr-review.ts');
 
 const shipped = mkdtempSync(join(tmpdir(), 'omni-caps-shipped-'));
@@ -114,20 +114,45 @@ describe('the review capability', () => {
   });
 });
 
-describe('review_of', () => {
-  const codexDefault = () => {
-    const h = getCatalog().harnesses.find((x) => x.id === 'codex')!;
-    return (h.models.find((m) => m.default) ?? h.models[0]).id;
-  };
+/** GPT-6.1 Sol, which the fake Codex does not list: a test that reviews on it adds it to the catalog for its run. */
+const sol = { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' };
+async function withSol<T>(fn: () => Promise<T>): Promise<T> {
+  const codex = getCatalog().harnesses.find((h) => h.id === 'codex')!;
+  codex.models.push(sol);
+  try {
+    return await fn();
+  } finally {
+    codex.models.splice(codex.models.indexOf(sol), 1);
+  }
+}
 
-  it('reviews work Claude wrote on GPT, and work any other model wrote on Claude at the top tier', async () => {
+describe('review_of', () => {
+  it('reviews work Claude wrote on GPT-6.1 Sol at high, and work any other model wrote on Claude at the top tier', async () => {
+    expect(REVIEW_RUNS.other).toEqual({ harness: 'codex', model: 'gpt-6.1-sol', effort: 'high' });
     const byClaude = await H.runner.createThread({ channel: 'scratch', prompt: 'build it', role: 'builder', harness: 'claude-code', model: 'sonnet' });
-    const review = await H.runner.createThread({ channel: 'scratch', prompt: 'review it', role: 'reviewer', review_of: byClaude.id, source: 'conductor' });
-    expect([review.harness, review.model, review.effort]).toEqual(['codex', codexDefault(), 'high']);
+    const review = await withSol(() => H.runner.createThread({ channel: 'scratch', prompt: 'review it', role: 'reviewer', review_of: byClaude.id, source: 'conductor' }));
+    expect([review.harness, review.model, review.effort]).toEqual(['codex', 'gpt-6.1-sol', 'high']);
 
     const byGpt = await H.runner.createThread({ channel: 'scratch', prompt: 'build it', role: 'builder', harness: 'codex', model: 'gpt-5.6-terra' });
     const back = await H.runner.createThread({ channel: 'scratch', prompt: 'review it', role: 'reviewer', review_of: byGpt.id, source: 'conductor' });
     expect([back.harness, back.model, back.effort]).toEqual(['claude-code', 'claude-opus-5-5', 'xhigh']);
+  });
+
+  it("refuses a review when Codex here has no GPT-6.1 Sol, rather than run it on Codex's default model", async () => {
+    const byClaude = await H.runner.createThread({ channel: 'scratch', prompt: 'build it', role: 'builder', harness: 'claude-code', model: 'sonnet' });
+    expect(getCatalog().harnesses.find((h) => h.id === 'codex')?.models.some((m) => m.default)).toBe(true);
+    await expect(H.runner.createThread({ channel: 'scratch', prompt: 'review it', role: 'reviewer', review_of: byClaude.id, source: 'conductor' })).rejects.toMatchObject({
+      status: 409,
+      message: 'This review runs on gpt-6.1-sol at high, and Codex here does not offer gpt-6.1-sol. Omni does not review on another model in its place. Ask the user how to review it.',
+    });
+    // An effort the delegation names does not move the pinned run either.
+    await expect(H.runner.createThread({ channel: 'scratch', prompt: 'review it', role: 'reviewer', review_of: byClaude.id, effort: 'low', source: 'conductor' })).rejects.toMatchObject({ status: 409 });
+    // Sol listed without high is refused too, never run at its nearest effort.
+    const cat = getCatalog();
+    const noHigh = { ...cat, harnesses: cat.harnesses.map((h) => (h.id === 'codex' ? { ...h, models: [...h.models, { ...sol, efforts: ['low', 'medium', 'xhigh'] }] } : h)) };
+    expect(reviewRun({}, { id: 't3', harness: 'claude-code', model: 'sonnet' }, noHigh)).toEqual({
+      refused: 'This review runs on gpt-6.1-sol at high, and Codex here does not offer high for it. Ask the user how to review it.',
+    });
   });
 
   it('keeps a run on the other family, and refuses the same family, a role that does not review and a thread that is not there', async () => {
@@ -149,9 +174,9 @@ describe('review_of', () => {
 
   it('comes through the thread API as the delegate tool sends it', async () => {
     const byClaude = await H.runner.createThread({ channel: 'scratch', prompt: 'build it', role: 'builder' });
-    const res = await send('POST', '/threads', { channel: 'scratch', role: 'reviewer', prompt: 'review it', review_of: byClaude.id, source: 'conductor' });
+    const res = await withSol(() => send('POST', '/threads', { channel: 'scratch', role: 'reviewer', prompt: 'review it', review_of: byClaude.id, source: 'conductor' }));
     expect(res.status).toBe(200);
-    expect((await json(res)).harness).toBe('codex');
+    expect(await json(res)).toMatchObject({ harness: 'codex', model: 'gpt-6.1-sol', effort: 'high' });
   });
 });
 
