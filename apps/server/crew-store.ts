@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import YAML, { Document, isMap } from 'yaml';
 import { z } from 'zod';
 import { paths } from './config.ts';
-import { charterHash, crewFiles, crewTexts, getCrew, mergeCrew, parseCrewFile, splitCrewFile, type CrewRole } from './crew.ts';
+import { charterHash, crewFiles, UNHIDEABLE, crewTexts, getCrew, mergeCrew, parseCrewFile, splitCrewFile, type CrewRole } from './crew.ts';
 import { validateRun, type Catalog } from './harness/catalog.ts';
 import { asksAuto } from './harness/auto.ts';
 import { validateDefaults } from './harness/resolve.ts';
@@ -26,8 +26,6 @@ export const CREW_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 /** Built-ins Omni itself relies on. Only ever an overlay on the shipped file: no role of the user's own takes the id. */
 export const RESERVED_CREW = ['conductor', 'reviewer', 'usage-scan'] as const;
 
-/** Built-ins that cannot be hidden: the Conductor is the front agent, and Omni starts a usage scan as usage-scan. */
-const UNHIDEABLE = new Set(['conductor', 'usage-scan']);
 
 /** The routers. A save that gives one working tools, or takes its omni tools away, is refused. */
 const ROUTERS = new Set(['conductor', 'usage-scan']);

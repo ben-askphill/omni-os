@@ -48,6 +48,12 @@ export interface CrewRole {
   error?: string;
 }
 
+/**
+ * Built-ins that are never hidden, whatever the user config says: the Conductor is the front agent, and Omni starts a
+ * usage scan as usage-scan. crew-store.ts refuses to hide them; this covers a config written by hand.
+ */
+export const UNHIDEABLE = new Set(['conductor', 'usage-scan']);
+
 /** A crew file split into its frontmatter and body. `meta` is {} when the frontmatter does not parse. */
 export interface CrewSource {
   meta: Record<string, unknown>;
@@ -137,7 +143,7 @@ function readRole(id: string, shipped: string | null, own: string | null): CrewR
   else if (shipped !== null) role = { ...parseCrewFile(id, shipped), kind: 'shipped' };
   else if (own !== null) role = parseCrewFile(id, own);
   else return null;
-  role.hidden = role.kind !== 'own' && userConfig().crew?.[id]?.hidden === true;
+  role.hidden = role.kind !== 'own' && !UNHIDEABLE.has(id) && userConfig().crew?.[id]?.hidden === true;
   return role;
 }
 

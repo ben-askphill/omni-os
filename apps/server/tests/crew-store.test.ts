@@ -15,6 +15,7 @@ const { paths } = await import('../config.ts');
 const { charterHash, crewForNewThread, getCrew, listCrew } = await import('../crew.ts');
 const { crewRunProblem } = await import('../crew-store.ts');
 const { channels } = await import('../db.ts');
+const { updateUserConfig } = await import('../user-config.ts');
 
 const shipped = mkdtempSync(join(tmpdir(), 'omni-crew-shipped-'));
 paths.crew = shipped;
@@ -143,6 +144,12 @@ describe('hiding a built-in', () => {
   it('never hides the Conductor or usage-scan', async () => {
     expect((await send('POST', '/crew/conductor/hidden', { hidden: true })).status).toBe(409);
     expect((await send('POST', '/crew/usage-scan/hidden', { hidden: true })).status).toBe(409);
+    // Not through the settings save either, nor a config file written by hand.
+    await send('PUT', '/setup', { crew: { builder: { hidden: true } } });
+    expect(getCrew('builder')?.hidden).toBe(false);
+    updateUserConfig({ crew: { conductor: { hidden: true } } });
+    expect(getCrew('conductor')?.hidden).toBe(false);
+    updateUserConfig({ crew: { conductor: null } });
   });
 });
 
