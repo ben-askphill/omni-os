@@ -48,16 +48,23 @@ cwd_of() { if command -v lsof >/dev/null; then lsof -a -p "$1" -d cwd -Fn 2>/dev
 
 [ "$SERVER_PORT" != 4747 ] || die "refusing port 4747, that is the live server"
 # The state dir holds the PID files, the logs, the API token and bin/, which goes first on the server's PATH, and by
-# default it sits in a shared temp dir. Every command refuses one that is a link, another user's, or writable by
-# others, before reading anything in it; up makes it with mode 0700 (scripts/qa-private-dir.mjs).
-private_dir() { node "$ROOT/scripts/qa-private-dir.mjs" "$@" "$DIR" || exit 1; }
-private_dir
+# default it sits in a shared temp dir. Before a command reads anything there, scripts/qa-private-dir.mjs checks it
+# is this user's alone, in folders no one else can swap it out of, and DIR becomes the real path it checked. It returns
+# 1 when the dir does not exist (--create, which up runs first, makes it with mode 0700), and exits on anything unsafe.
+private_dir() {
+  local rc=0 path
+  path="$(node "$ROOT/scripts/qa-private-dir.mjs" "$@" "$DIR")" || rc=$?
+  [ "$rc" = 0 ] || [ "$rc" = 3 ] || exit 1
+  DIR="$path"
+  [ "$rc" = 0 ]
+}
 
 up() {
   local seed=3
   [ "${1:-}" = "--seed" ] && seed="${2:?--seed needs a number}"
+  # Made and checked before anything in it is read, so a dir someone else made in the meantime is refused.
+  private_dir --create || die "could not make $DIR"
   alive server && { echo "already up"; status; return; }
-  private_dir --create
   # No automations dir: Omni ships none, so the stack lists none, as a fresh install does.
   mkdir -p "$DIR/data" "$DIR/brain"
   STARTING=1
@@ -159,8 +166,10 @@ case "${1:-}" in
   down)
     # Without a port, down would pick the default stack, which may be another thread's.
     [ -n "${QA_SERVER_PORT:-}" ] || { echo "qa-stack: down needs QA_SERVER_PORT, the port you started the stack on" >&2; exit 2; }
+    # A dir that is not there has nothing to stop, and one made after the check is never read.
+    private_dir || { echo "down, nothing at $DIR"; exit 0; }
     down ;;
-  status) status ;;
-  logs) tail -n 50 -f "$DIR/server.log" "$DIR/web.log" ;;
+  status) private_dir || { echo "no stack at $DIR"; exit 0; }; status ;;
+  logs) private_dir || die "no stack at $DIR"; tail -n 50 -f "$DIR/server.log" "$DIR/web.log" ;;
   *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

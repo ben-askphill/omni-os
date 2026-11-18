@@ -23,7 +23,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { privateDirProblem } from './qa-private-dir.mjs';
+import { checkPrivateDir } from './qa-private-dir.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SEARCHABLE = new Set(['user', 'assistant_text', 'crew_report', 'error']);
@@ -48,10 +48,12 @@ const die = (msg) => {
 
 const origin = (opts.api ?? `http://127.0.0.1:${opts.port}`).replace(/\/+$/, '').replace(/\/api$/, '');
 if (new URL(origin).port === '4747') die('refusing port 4747, that is the live server');
-const stateDir = resolve(opts.dir ?? join(process.env.TMPDIR ?? tmpdir(), `omni-qa-${opts.port}`));
-// The token and the database are read from here, so the dir must be this user's alone, as qa-stack.sh checks it.
-const unsafe = privateDirProblem(stateDir);
-if (unsafe) die(unsafe);
+// The token and the database are read from here, so the dir must be this user's alone, as qa-stack.sh checks it, and
+// what is read is the real path that was checked.
+const checked = checkPrivateDir(opts.dir ?? join(process.env.TMPDIR ?? tmpdir(), `omni-qa-${opts.port}`));
+if (checked.problem) die(checked.problem);
+if (checked.missing) die(`no stack at ${checked.path}; is it up (QA_SERVER_PORT=${opts.port} scripts/qa-stack.sh up) and --dir its state dir?`);
+const stateDir = checked.path;
 const dataDir = join(stateDir, 'data');
 const dbPath = join(dataDir, 'omni.db');
 if (resolve(dataDir) === join(ROOT, 'data')) die('refusing the repo data dir, that is the live install');

@@ -40,7 +40,7 @@ scripts/qa-stack.sh up               # server on :4757, Web UI on :4768, own dat
 QA_SERVER_PORT=4757 scripts/qa-stack.sh down
 ```
 
-The stack keeps its PID files, logs, API token and fake CLIs in `$TMPDIR/omni-qa-<port>` (`QA_DIR` moves it). `up` makes that dir with mode 0700, and every command refuses one that is a symlink, belongs to another user or that others can write.
+The stack keeps its PID files, logs, API token and fake CLIs in `$TMPDIR/omni-qa-<port>` (`QA_DIR` moves it). `up` makes that dir with mode 0700 before it reads anything there. Every command refuses a dir that is a symlink, belongs to another user, that others can write, or that sits in a folder another user could move it out of, and works on its real path from then on. `status`, `down` and the rest stop when the dir does not exist.
 
 Threads in the stack run on `packages/test-fixtures/fake-claude.mjs`, so prompts like `RICH` or `TOOL:2000` drive a turn without spending a plan. The desktop app's QA harness attaches the app to the same stack: see "QA harness" in [apps/desktop/README.md](apps/desktop/README.md#qa-harness).
 
