@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { MemoryTransport } from '../sync/transport.ts';
@@ -10,20 +10,30 @@ import { MemoryTransport } from '../sync/transport.ts';
 // file list names, and never one a link leads to outside that folder (security audit: "Codex sync trusts remote
 // filenames when choosing local files to upload").
 
-/** One open or read of `path` runs `before` first and `after` once it returns: a swap in the gap between finding a session file and reading it. */
-const race = vi.hoisted(() => ({ path: null as string | null, before: () => {}, after: () => {}, noProc: false }));
+/**
+ * The next call of one of `fns` on one of `paths` runs `before` first and `after` once it returns: a swap in a gap
+ * between two steps of a session push.
+ */
+interface Hook {
+  fns: string[];
+  paths: string[];
+  before: () => void;
+  after: () => void;
+}
+const race = vi.hoisted(() => ({ hooks: [] as Hook[], noProc: false }));
 
 vi.mock('node:fs', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs')>();
-  const around = <F extends (...args: any[]) => any>(fn: F) =>
+  const around = <F extends (...args: any[]) => any>(name: string, fn: F) =>
     ((p: unknown, ...rest: unknown[]) => {
-      if (race.path === null || p !== race.path) return fn(p, ...rest);
-      race.path = null;
-      race.before();
+      const i = race.hooks.findIndex((h) => h.fns.includes(name) && h.paths.includes(p as string));
+      if (i < 0) return fn(p, ...rest);
+      const [hook] = race.hooks.splice(i, 1);
+      hook.before();
       try {
         return fn(p, ...rest);
       } finally {
-        race.after();
+        hook.after();
       }
     }) as F;
   // As on macOS, which has no /proc to name an open file's path.
@@ -31,9 +41,11 @@ vi.mock('node:fs', async (importOriginal) => {
     if (race.noProc && typeof p === 'string' && p.startsWith('/proc/')) throw Object.assign(new Error(`ENOENT: ${p}`), { code: 'ENOENT' });
     return (fs.readlinkSync as (...args: unknown[]) => unknown)(p, ...rest);
   }) as typeof fs.readlinkSync;
-  const openSync = around(fs.openSync);
-  const readFileSync = around(fs.readFileSync);
-  return { ...fs, openSync, readFileSync, readlinkSync, default: { ...fs, openSync, readFileSync, readlinkSync } };
+  const openSync = around('openSync', fs.openSync);
+  const readFileSync = around('readFileSync', fs.readFileSync);
+  const lstatSync = around('lstatSync', fs.lstatSync);
+  const wrapped = { openSync, readFileSync, lstatSync, readlinkSync };
+  return { ...fs, ...wrapped, default: { ...fs, ...wrapped } };
 });
 
 const relay = new MemoryTransport();
@@ -82,7 +94,7 @@ beforeAll(async () => {
 });
 
 afterEach(() => {
-  race.path = null;
+  race.hooks.length = 0;
   race.noProc = false;
 });
 
@@ -141,6 +153,21 @@ describe('a session file behind a link', () => {
     expect(stored(`sessions/claude-code/${sid}.jsonl`)).toBeNull();
   });
 
+  // Root reads any folder, so the folder below would not stop it.
+  it.skipIf(process.getuid?.() === 0)('fails a handoff upload when the Codex sessions folder cannot be read', async () => {
+    const sid = '01a0bc16-4ca5-79c3-805a-d8efb930a006';
+    a.put(`codex-6/sessions/2026/11/18/rollout-2026-11-18T14-00-00-${sid}.jsonl`, 'turn\n');
+    const year = join(a.root, 'codex-6', 'sessions', '2026');
+    chmodSync(year, 0o000);
+    try {
+      const t = thread('l6', join(a.home, 'w'), { harness: 'codex', session_id: sid });
+      await expect(a.files.pushSession(t, { ...a.codex('codex-6'), strict: true })).rejects.toThrow(/EACCES/);
+    } finally {
+      chmodSync(year, 0o755);
+    }
+    expect(stored(`sessions/codex/${sid}.jsonl`)).toBeNull();
+  });
+
   it('leaves a Codex rollout in a folder linked from outside the sessions folder', async () => {
     const sid = '01a0bc16-4ca5-79c3-805a-d8efb930a004';
     a.put(`outside/11/18/rollout-2026-11-18T12-00-00-${sid}.jsonl`, 'private\n');
@@ -190,26 +217,32 @@ describe('a session file that is not a plain file', () => {
   });
 });
 
-describe('a session folder swapped for a link while the file opens', () => {
-  const swap = (cwd: string, sid: string) => {
-    const dir = join(a.home, '.claude', 'projects', a.files.claudeProjectDir(cwd));
-    const path = a.put(`home/.claude/projects/${a.files.claudeProjectDir(cwd)}/${sid}.jsonl`, 'turn 1\n');
+describe('a session folder swapped for a link during the push', () => {
+  /** A Claude Code session, a decoy outside its folder, and the swaps that put a link to the decoy in the folder's place and back. */
+  const setup = (cwd: string, sid: string) => {
+    const name = a.files.claudeProjectDir(cwd);
+    const dir = join(a.home, '.claude', 'projects', name);
+    const path = a.put(`home/.claude/projects/${name}/${sid}.jsonl`, 'turn 1\n');
     a.put(`decoy-${sid}/${sid}.jsonl`, 'private key');
-    race.path = path;
-    race.before = () => {
-      renameSync(dir, `${dir}.real`);
-      symlinkSync(join(a.root, `decoy-${sid}`), dir);
-    };
-    race.after = () => {
-      unlinkSync(dir);
-      renameSync(`${dir}.real`, dir);
+    return {
+      // The push may use the path as given or with its folders resolved (on macOS, /var is a link to /private/var).
+      paths: [path, join(realpathSync(a.home), '.claude', 'projects', name, `${sid}.jsonl`)],
+      before: () => {
+        renameSync(dir, `${dir}.real`);
+        symlinkSync(join(a.root, `decoy-${sid}`), dir);
+      },
+      after: () => {
+        unlinkSync(dir);
+        renameSync(`${dir}.real`, dir);
+      },
     };
   };
+  const swapAt = (fns: string[], s: ReturnType<typeof setup>) => race.hooks.push({ fns, ...s });
 
   it('checks the file it opened, not the path, and uploads nothing from outside', async () => {
     const sid = 'c0ffee00-0000-4000-8000-00000000a003';
     const cwd = join(a.home, 'swap');
-    swap(cwd, sid);
+    swapAt(['openSync', 'readFileSync'], setup(cwd, sid));
     expect(await a.files.pushSession(thread('s1', cwd, { session_id: sid }), a.opts)).toBe(0);
     expect(stored(`sessions/claude-code/${sid}.jsonl`)).toBeNull();
     // The real session goes up with the next push.
@@ -217,13 +250,24 @@ describe('a session folder swapped for a link while the file opens', () => {
     expect(stored(`sessions/claude-code/${sid}.jsonl`)).toBe('turn 1\n');
   });
 
-  it('does the same where the system cannot name an open file\'s path, as on macOS', async () => {
+  it('does the same where the system cannot name an open file\'s path', async () => {
     const sid = 'c0ffee00-0000-4000-8000-00000000a004';
-    const cwd = join(a.home, 'swap-mac');
+    const cwd = join(a.home, 'swap-no-proc');
     race.noProc = true;
-    swap(cwd, sid);
+    swapAt(['openSync', 'readFileSync'], setup(cwd, sid));
     expect(await a.files.pushSession(thread('s2', cwd, { session_id: sid }), a.opts)).toBe(0);
     expect(stored(`sessions/claude-code/${sid}.jsonl`)).toBeNull();
     expect(await a.files.pushSession(thread('s2', cwd, { session_id: sid }), a.opts)).toBe(1);
+  });
+
+  // Linux catches this through /proc, macOS in the open itself. A path check after the open alone would not.
+  it('is not fooled by a second swap between its checks', async () => {
+    const sid = 'c0ffee00-0000-4000-8000-00000000a007';
+    const cwd = join(a.home, 'swap-twice');
+    const s = setup(cwd, sid);
+    swapAt(['openSync', 'readFileSync'], s);
+    swapAt(['lstatSync'], s);
+    expect(await a.files.pushSession(thread('s3', cwd, { session_id: sid }), a.opts)).toBe(0);
+    expect(stored(`sessions/claude-code/${sid}.jsonl`)).toBeNull();
   });
 });

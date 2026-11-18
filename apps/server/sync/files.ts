@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync,
-  statSync, utimesSync, writeFileSync, type Dirent, type Stats,
+  statSync, utimesSync, writeFileSync, type Stats,
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, relative, sep } from 'node:path';
@@ -546,18 +546,16 @@ function localSessionFiles(t: Thread, root: string, synced: string[] = []): stri
     .sort();
 }
 
-/** The first Codex rollout under root whose name ends in suffix. A linked folder is not walked into. */
+/**
+ * The first Codex rollout under root whose name ends in suffix. A linked folder is not walked into. A folder it cannot
+ * read throws, so a handoff fails rather than move the thread without its session.
+ */
 function findRollout(root: string, suffix: string): string | null {
+  if (!existsSync(root)) return null;
   const dirs = [''];
   while (dirs.length) {
     const dir = dirs.shift()!;
-    let entries: Dirent[];
-    try {
-      entries = readdirSync(join(root, dir), { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const e of entries) {
+    for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
       const rel = dir ? `${dir}/${e.name}` : e.name;
       if (e.isDirectory()) dirs.push(rel);
       else if (e.isFile() && e.name.startsWith('rollout-') && e.name.endsWith(suffix)) return rel;
@@ -577,25 +575,30 @@ interface OpenFile {
   st: Stats;
 }
 
+/** macOS 11 and later: open fails when any part of the path is a link (<sys/fcntl.h>). Linux's open has no such flag. */
+const O_NOFOLLOW_ANY = (constants as Record<string, number | undefined>).O_NOFOLLOW_ANY ?? (process.platform === 'darwin' ? 0x20000000 : 0);
+
 /**
  * Open a session file to upload, only when it is a regular file in root and nothing between the harness's folder and
- * the file is a link. The checks run on the open file after it opened (its inode against the one at the expected
- * path, and on Linux the path the kernel holds for it), so a folder swapped for a link in between cannot redirect the
- * read. A hard link is not detected. Null when the file is not one to send. The caller closes it.
+ * the file is a link, so a folder swapped for a link cannot redirect the read. On macOS the open itself refuses a
+ * link anywhere in the path; on Linux the path the kernel holds for the open file must be the expected one. Both
+ * also compare the open file's inode with the one at the expected path. A hard link is not detected. Null when the
+ * file is not one to send. The caller closes it.
  */
 function openSessionFile(base: string, root: string, rel: string): OpenFile | null {
   if (!safeRel(rel)) return null;
+  let want: string;
   let fd: number;
   try {
-    // No link as the last part of the path, and no wait on a named pipe.
-    fd = openSync(join(root, rel), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    // The harness's folder as it really is, then real folders only.
+    want = join(realpathSync(base), relative(base, root), rel);
+    // No link as the last part of the path (on macOS, in any part), and no wait on a named pipe.
+    fd = openSync(want, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK | O_NOFOLLOW_ANY);
   } catch {
     return null;
   }
   try {
     const st = fstatSync(fd);
-    // The harness's folder as it really is, then real folders only.
-    const want = join(realpathSync(base), relative(base, root), rel);
     if (st.isFile() && kernelPathIs(fd, want) && realpathSync(want) === want) {
       const at = lstatSync(want);
       if (at.dev === st.dev && at.ino === st.ino) return { fd, st };
@@ -607,7 +610,7 @@ function openSessionFile(base: string, root: string, rel: string): OpenFile | nu
   return null;
 }
 
-/** On Linux, whether the open file is at `want`. Elsewhere (macOS has no /proc) true: the inode check stands alone. */
+/** On Linux, whether the open file is at `want`. Elsewhere true: macOS has no /proc, and its open refused links already. */
 function kernelPathIs(fd: number, want: string): boolean {
   let held: string;
   try {
