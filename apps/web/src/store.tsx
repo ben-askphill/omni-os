@@ -306,6 +306,8 @@ export function useMediaQuery(q: string) {
   return m;
 }
 
+// In px on purpose: the browser's font size setting scales the rem type tokens but leaves this switch where it is.
+// Tailwind's own sm:/md:/lg: are rem, so they do move with that setting (md: is 960px at a 20px default).
 export const useIsMobile = () => !useMediaQuery('(min-width: 768px)');
 
 /** Re-render every `ms` so relative times stay fresh. */

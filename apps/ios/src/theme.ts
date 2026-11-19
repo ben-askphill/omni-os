@@ -118,7 +118,10 @@ export const radius = {
   pill: 999,
 } as const;
 
-/** Type sizes from the Claude Design system (tokens/type.css; web: --fs-*). */
+/**
+ * Type sizes from the Claude Design system (tokens/type.css; web: --fs-*), in points. The web holds the same scale in
+ * rem (these values over 16) to follow the browser's font size; React Native already scales points with iOS text size.
+ */
 export const fontSize = {
   label: 10.5,
   meta: 11,
