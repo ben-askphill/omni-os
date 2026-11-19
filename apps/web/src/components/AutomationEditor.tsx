@@ -7,6 +7,7 @@ import { blankDraft, CRON_PRESETS, draftOf, draftProblem, EVENTS, fieldsOf, isPr
 import { describeEvent } from '../format.ts';
 import { useApp, useHereName } from '../store.tsx';
 import { Button, ChipSet, ErrorNote, IDENTIFIER, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from './ui.tsx';
+import { TimezoneInput } from './onboarding-parts.tsx';
 
 // The Automations page's editor: every field of an automation's YAML, and the YAML itself. Saving writes the file
 // (apps/server/automation-files.ts); a shipped automation becomes your own copy in data/automations/ and Reset drops it.
@@ -200,7 +201,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
                     ))}
                   </div>
                   <Field id="auto-tz" label="Timezone" hint={`Leave empty for yours (${tz}).`}>
-                    <input id="auto-tz" {...IDENTIFIER} className="field field-mono" value={draft.timezone} onChange={(e) => set('timezone', e.target.value)} placeholder={tz} />
+                    <TimezoneInput id="auto-tz" value={draft.timezone} onChange={(v) => set('timezone', v)} placeholder={tz} />
                   </Field>
                   <SwitchRow label="Catch up" hint="Run a missed slot once Omni is back, when the machine slept through it." checked={draft.catchup} onChange={(v) => set('catchup', v)} />
                 </>

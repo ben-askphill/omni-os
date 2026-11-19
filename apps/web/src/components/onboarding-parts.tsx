@@ -670,7 +670,8 @@ export function browserTimezone() {
   }
 }
 
-export function TimezoneInput({ id, value, onChange, describedBy }: { id: string; value: string; onChange: (v: string) => void; describedBy?: string }) {
+/** An IANA timezone, typed or picked from the browser's list. */
+export function TimezoneInput({ id, value, onChange, describedBy, placeholder = 'Europe/Amsterdam' }: { id: string; value: string; onChange: (v: string) => void; describedBy?: string; placeholder?: string }) {
   const zones = useMemo(() => {
     try {
       return (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
@@ -680,7 +681,7 @@ export function TimezoneInput({ id, value, onChange, describedBy }: { id: string
   }, []);
   return (
     <>
-      <input id={id} aria-describedby={describedBy} className="field w-full" list={`${id}-zones`} value={value} placeholder="Europe/Amsterdam" spellCheck={false} onChange={(e) => onChange(e.target.value)} />
+      <input id={id} aria-describedby={describedBy} className="field w-full" list={`${id}-zones`} value={value} placeholder={placeholder} spellCheck={false} onChange={(e) => onChange(e.target.value)} />
       <datalist id={`${id}-zones`}>
         {zones.map((z) => (
           <option key={z} value={z} />
