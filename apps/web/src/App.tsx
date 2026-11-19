@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEven
 import { ContextMenuHost } from './components/ContextMenu.tsx';
 import { ContinueSheetHost } from './components/ContinueSheet.tsx';
 import { AskSheetHost } from './components/AskCard.tsx';
-import { Onboarding } from './components/Onboarding.tsx';
+import { Onboarding } from './lazy.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { BrowserNotifier } from './components/BrowserNotifier.tsx';
@@ -130,7 +130,8 @@ function Shell() {
     return () => setInboxUp(false);
   }, [inboxUp]);
   // The desktop app puts its macOS traffic lights where this layout leaves room for them (apps/desktop windows.ts).
-  // The rail also swaps the type faces (index.css :root[data-layout]); the phone layout keeps Apple's.
+  // The rail also swaps the type faces (index.css :root[data-layout]); the phone layout keeps Apple's. index.html's
+  // head script sets the same value before the first paint (tests/head-script.test.ts), so this only follows changes.
   useEffect(() => {
     desktop?.setLayout?.(layout);
     document.documentElement.dataset.layout = layout;

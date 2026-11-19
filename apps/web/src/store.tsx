@@ -306,9 +306,14 @@ export function useMediaQuery(q: string) {
   return m;
 }
 
-// In px on purpose: the browser's font size setting scales the rem type tokens but leaves this switch where it is.
-// Tailwind's own sm:/md:/lg: are rem, so they do move with that setting (md: is 960px at a 20px default).
-export const useIsMobile = () => !useMediaQuery('(min-width: 768px)');
+/**
+ * Where the desktop shell starts. Below it the phone layout (apps/web/src/mobile) takes over. index.html's head script asks the same.
+ * In px on purpose: the browser's font size setting scales the rem type tokens but leaves this switch where it is.
+ * Tailwind's own sm:/md:/lg: are rem, so they do move with that setting (md: is 960px at a 20px default).
+ */
+export const DESKTOP_QUERY = '(min-width: 768px)';
+
+export const useIsMobile = () => !useMediaQuery(DESKTOP_QUERY);
 
 /** Re-render every `ms` so relative times stay fresh. */
 export function useNow(ms = 30_000) {

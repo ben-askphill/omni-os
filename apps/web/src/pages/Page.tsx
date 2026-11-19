@@ -1,13 +1,11 @@
 import { Empty, LinkButton } from '../components/ui.tsx';
+import { AutomationsPage, NewChannelPage, SettingsPage } from '../lazy.tsx';
 import { href, type Route } from '../router.ts';
 import { AllPRsPage } from './AllPRs.tsx';
 import { ArtifactsPage } from './Artifacts.tsx';
-import { AutomationsPage } from './Automations.tsx';
 import { ChannelPage } from './Channel.tsx';
-import { NewChannelPage } from './ChannelSettings.tsx';
 import { HomePage } from './Home.tsx';
 import { SearchPage } from './Search.tsx';
-import { SettingsPage } from './Settings.tsx';
 import { ThreadPage } from './Thread.tsx';
 
 /** The desktop page for a route. The phone shows the ones it has no screen of its own for. */

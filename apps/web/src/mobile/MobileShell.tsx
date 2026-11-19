@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { BrowserNotifier } from '../components/BrowserNotifier.tsx';
 import { useDesktopLayoutActions } from '../components/DesktopHooks.tsx';
 import { ContextMenuHost } from '../components/ContextMenu.tsx';
-import { Onboarding } from '../components/Onboarding.tsx';
+import { Onboarding } from '../lazy.tsx';
 import { ThreadNotifier } from '../components/Toaster.tsx';
 import { FolderDeleteDialog } from '../folders.tsx';
 import { useInboxKey } from '../inbox-key.ts';

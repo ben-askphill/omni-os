@@ -1,4 +1,6 @@
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
+import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
+import { ChannelLearnings } from '../components/ChannelLearnings.tsx';
 import { autoAvatarColor } from '@omni/shared/avatar-color.ts';
 import { claudeModelId } from '@omni/shared/claude-aliases.ts';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -548,6 +550,25 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
       {archiveError && <ErrorNote>{archiveError}</ErrorNote>}
 
     </form>
+  );
+}
+
+/** A channel page's Settings tab: the channel's form, its learnings and its actions. */
+export function ChannelSettingsTab({ channel }: { channel: Channel }) {
+  return (
+    <div className={`${pageColumn('measure')} space-y-4 pt-6 pb-16`}>
+      <ChannelSettingsForm existing={channel} />
+      <Card
+        entry="learnings"
+        title="Recent learnings"
+        subtitle="Lessons every thread in this channel gets, and no other channel's. Agents propose them; nothing applies until you approve it."
+      >
+        <ChannelLearnings channel={channel.id} />
+      </Card>
+      <Card title="Actions">
+        <ChannelActionsEditor channelId={channel.id} />
+      </Card>
+    </div>
   );
 }
 
