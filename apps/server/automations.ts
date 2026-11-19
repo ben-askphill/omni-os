@@ -9,7 +9,7 @@ import { publishFeed } from './bus.ts';
 import { createThread } from './runner.ts';
 import { runsHere } from './sync/owner.ts';
 import { parseTrigger, type EventTrigger } from './automation-events.ts';
-import { fillPlaceholders, NEEDS_CHECKOUT, omniCheckout, updateUserConfig, userConfig } from './user-config.ts';
+import { fillPlaceholders, fillShellPlaceholders, NEEDS_CHECKOUT, omniCheckout, shellPlaceholderEnv, updateUserConfig, userConfig } from './user-config.ts';
 import { parsePrecheck, runPrecheck, type Precheck } from './automation-precheck.ts';
 import { commandsFolder } from './sandbox.ts';
 import { DRY_RUN_TITLE, withRunRules } from './automation-rules.ts';
@@ -90,7 +90,7 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
   if (!yamlError && !a.error && y.precheck !== undefined) {
     const p = parsePrecheck(y.precheck);
     if (typeof p === 'string') a.error = p;
-    else (rawPrecheck = p.command), (a.precheck = { ...p, command: fillPlaceholders(p.command) });
+    else (rawPrecheck = p.command), (a.precheck = { ...p, command: fillShellPlaceholders(p.command) });
   }
   if (!yamlError && !a.error && y.connectors !== undefined && y.connectors !== null) {
     const ids = parseConnectorList(y.connectors);
@@ -252,7 +252,7 @@ async function runScheduled(a: Automation, trigger: 'cron' | 'catchup') {
   starting.add(a.id);
   try {
     if (a.precheck) {
-      const reason = await runPrecheck(a.precheck, precheckDir(a));
+      const reason = await runPrecheck(a.precheck, precheckDir(a), shellPlaceholderEnv(a.precheck.command));
       if (reason) return recordSkip(a, trigger, reason);
     }
     const signedOut = await signInGap(a);

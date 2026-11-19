@@ -24,6 +24,8 @@ import {
   fallbacks,
   isOnboarded,
   omniRepo,
+  placeholderFieldsIn,
+  placeholderRefusal,
   resolved,
   tildify,
   updateUserConfig,
@@ -150,6 +152,8 @@ setupApi.post('/claude/login/cancel', async (c) => {
 setupApi.put('/', async (c) => {
   const parsed = patchInput.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid settings' }, 400);
+  const held = threadCredential(c) ? placeholderFieldsIn(parsed.data) : [];
+  if (held.length) return c.json({ error: placeholderRefusal(held) }, 403);
   updateUserConfig({ ...parsed.data, onboardedAt: undefined });
   return c.json(setupState());
 });

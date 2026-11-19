@@ -2,7 +2,8 @@
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { deleteAutomation, lastRuns, loadAutomations, runAutomation } from './automations.ts';
-import { automationRefusal, callerOf, lineage, type AutomationWrite } from './automation-guard.ts';
+import { automationRefusal, callerOf, lineage, threadCredential, type AutomationWrite } from './automation-guard.ts';
+import { placeholderFieldsIn, placeholderRefusal } from './user-config.ts';
 import { automationFields, createAutomation, definitionOf, resetAutomation, saveAutomation, setAutomationEnabled, sourceKind } from './automation-files.ts';
 import { ownerOf } from './sync/owner.ts';
 import { shellAllowed } from './request-guard.ts';
@@ -114,6 +115,9 @@ metaApi.put('/profile', async (c) => {
   // The first issue's text, so a client can show "Enter a name." as it is.
   const parsed = profileInput.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid profile' }, 400);
+  // A thread's own token may not change what {{user}} or {{timezone}} reads (user-config.ts placeholderFieldsIn).
+  const held = threadCredential(c) ? placeholderFieldsIn({ user: parsed.data }) : [];
+  if (held.length) return c.json({ error: placeholderRefusal(held) }, 403);
   return c.json(setProfile(parsed.data));
 });
 
