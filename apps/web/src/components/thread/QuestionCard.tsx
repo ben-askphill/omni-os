@@ -46,16 +46,17 @@ export function typingElsewhere(active: Element | null, card: Element | null): b
 export function QuestionCard({ threadId, q, touch }: { threadId: string; q: ThreadQuestion; touch?: boolean }) {
   // What Ben sent, until the stream brings the answer event.
   const [sent, setSent] = useState<Settled | null>(null);
-  if (q.state !== 'pending') return <Summary questions={q.questions} state={q.state} answers={q.answers} />;
-  if (sent) return <Summary questions={q.questions} {...sent} />;
+  const caption = q.approval ? 'Ask first' : undefined;
+  if (q.state !== 'pending') return <Summary questions={q.questions} state={q.state} answers={q.answers} caption={caption} />;
+  if (sent) return <Summary questions={q.questions} {...sent} caption={caption} />;
   return <Asking threadId={threadId} q={q} touch={touch} onSent={setSent} />;
 }
 
-function Summary({ questions, state, answers }: { questions: Question[] } & Settled) {
+function Summary({ questions, state, answers, caption }: { questions: Question[]; caption?: string } & Settled) {
   return (
-    <section aria-label="Question" className="w-full rounded-[22px] bg-surface px-4 pt-3 pb-3.5">
+    <section aria-label={caption ?? 'Question'} className="w-full rounded-[22px] bg-surface px-4 pt-3 pb-3.5">
       <div className="mb-2 flex items-center gap-2">
-        <span className="caption">{questions.length > 1 ? 'Questions' : 'Question'}</span>
+        <span className="caption">{caption ?? (questions.length > 1 ? 'Questions' : 'Question')}</span>
         <span className="ml-auto text-[12px] text-fg-3">{STATE_LABEL[state]}</span>
       </div>
       <dl className="flex flex-col gap-2.5">
@@ -71,7 +72,9 @@ function Summary({ questions, state, answers }: { questions: Question[] } & Sett
 }
 
 function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQuestion; touch?: boolean; onSent: (s: Settled) => void }) {
-  const { questions } = q;
+  const { questions, approval } = q;
+  // An approval's full command or arguments, when the title's one line does not already say it all.
+  const detail = approval?.detail && approval.detail !== approval.summary ? approval.detail : null;
   const [draft, setDraft] = useState<Draft>(() => newDraft(questions));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +148,7 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
   const nav = touch ? 'h-11 w-11' : '';
   return (
     <div className="flex w-full flex-col items-start gap-2">
-      <section ref={card} aria-label="Question from the agent" onKeyDown={onKey} className="pop-in w-full overflow-hidden rounded-[22px] bg-surface">
+      <section ref={card} aria-label={approval ? 'Approval the agent is waiting for' : 'Question from the agent'} onKeyDown={onKey} className="pop-in w-full overflow-hidden rounded-[22px] bg-surface">
         <div className="flex items-start gap-2 bg-surface-2 px-4 py-3">
           <div className="min-w-0 flex-1 py-1">
             {shown.header && (
@@ -156,6 +159,9 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
             <h3 id={`q-${q.id}-${draft.page}`} className="text-[14px] leading-snug font-semibold text-pretty">
               {shown.question}
             </h3>
+            {detail && (
+              <pre className="scroll-thin mt-2 max-h-40 overflow-auto rounded-xl bg-bg px-3 py-2 font-mono text-[12px] leading-[17px] whitespace-pre-wrap break-words text-fg-2">{detail}</pre>
+            )}
           </div>
           {questions.length > 1 && (
             <div className="-mr-2 flex shrink-0 items-center">
@@ -201,9 +207,12 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
           )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-line px-3 py-2.5">
-          <Button size={touch ? 'lg' : 'sm'} variant="secondary" disabled={busy} onClick={() => advance(true)}>
-            Skip
-          </Button>
+          {/* An approval offers Don’t allow among its choices, so it has no Skip. */}
+          {!approval && (
+            <Button size={touch ? 'lg' : 'sm'} variant="secondary" disabled={busy} onClick={() => advance(true)}>
+              Skip
+            </Button>
+          )}
           <Button size={touch ? 'lg' : 'sm'} variant="primary" disabled={!ready} busy={busy} onClick={() => advance(false)} aria-keyshortcuts="Meta+Enter">
             {last ? 'Send' : 'Next'}
             {!touch && <kbd className="font-sans text-[11px] opacity-60">⌘↵</kbd>}

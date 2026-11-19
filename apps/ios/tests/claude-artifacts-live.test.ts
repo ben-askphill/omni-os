@@ -37,7 +37,7 @@ function fakeTransport() {
 }
 
 const frame = (value: unknown) => ({ event: 'message', data: JSON.stringify(value) });
-const session = (): OmniSession => ({ serverUrl: BASE, token: async () => 'secret-token', refreshAuth: async () => false });
+const session = (): OmniSession => ({ serverUrl: BASE, serverId: 'mac', token: async () => 'secret-token', refreshAuth: async () => false });
 const settle = (ms = 0) => vi.advanceTimersByTimeAsync(ms);
 
 beforeEach(() => {

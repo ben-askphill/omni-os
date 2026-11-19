@@ -3,6 +3,7 @@ import type { Channel, HarnessInfo, OmniApi } from '@omni/client-core';
 import { portLabel, SETUP_MODE_LABEL } from '@omni/shared/channel-actions.ts';
 import { CHANNEL_GLYPHS, glyphIcon } from '@omni/shared/channel-icon.ts';
 import { channelBody, channelForm, channelFormProblem, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelKind } from '@omni/shared/channel-form.ts';
+import { ACCESS_CONNECTORS, ACCESS_LEVELS, CONNECTOR_LEVELS, accessLabel, accessLevelOf, type ConnectorLevel } from '@omni/shared/access.ts';
 import { bytes } from '@omni/shared/format.ts';
 import { PR_STEPS, STEP_LABEL, STEP_PROMPTS } from '@omni/shared/thread-glance.ts';
 import { StackActions, useFocusEffect } from '@react-navigation/native';
@@ -12,13 +13,13 @@ import { ActivityIndicator, Alert, Keyboard, Pressable, ScrollView, StyleSheet, 
 import { ChannelAvatar } from '../components/ChannelAvatar';
 import { HeaderButton } from '../components/HeaderButton';
 import { RunOptions } from '../components/thread/RunOptions';
-import { useChannels, useLiveHub } from '../live/react';
+import { useChannels, useLiveHub, useStore } from '../live/react';
 import { useRemote } from '../live/use-remote';
 import type { RootScreenProps } from '../navigation/types';
 import { draftSheetModel } from '../newthread/draft';
 import { pickDesignSystem } from '../settings/design-system';
 import { canArchive, channelTitle, formDirty, iconParts, lastEmoji, runFromPick, runLabel, saveBody, shownRun } from '../settings/channel-settings-model';
-import { Footnote, Group, InputRow, SettingsPage, SwitchRow } from '../settings/parts';
+import { ChoiceRow, Footnote, Group, InputRow, SettingsPage, SwitchRow } from '../settings/parts';
 import { fontSize, minTarget, space, useOmniTheme, weight } from '../theme';
 import { Callout } from '../ui/Callout';
 import { ListRow } from '../ui/GroupedList';
@@ -39,7 +40,8 @@ export function ChannelSettingsScreen({ route, navigation }: RootScreenProps<'Ch
   const { channels } = useChannels();
   const channel = id ? (channels?.find((c) => c.id === id) ?? null) : null;
   if (id && !channel) return <Missing loading={channels === null} />;
-  return <ChannelSettingsForm key={id ?? 'new'} channel={channel} navigation={navigation} />;
+  // A new channel starts at the computer's default level, which every channel record carries.
+  return <ChannelSettingsForm key={id ?? 'new'} channel={channel} machineDefault={channel?.access_default ?? channels?.[0]?.access_default} navigation={navigation} />;
 }
 
 function Missing({ loading }: { loading: boolean }) {
@@ -51,11 +53,14 @@ function Missing({ loading }: { loading: boolean }) {
   );
 }
 
-function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null; navigation: RootScreenProps<'ChannelSettings'>['navigation'] }) {
+function ChannelSettingsForm({ channel, machineDefault, navigation }: { channel: Channel | null; machineDefault?: string; navigation: RootScreenProps<'ChannelSettings'>['navigation'] }) {
   const hub = useLiveHub();
+  // The Shopify pack (Settings > Extras). An older server has no switch and keeps the store fields.
+  const shopify = useStore(hub.display)?.shopify ?? true;
   const { colors } = useOmniTheme();
   const harnesses = useRemote(loadHarnesses);
-  const [form, setForm] = useState<ChannelForm>(() => channelForm(channel ?? undefined));
+  const [form, setForm] = useState<ChannelForm>(() => channelForm(channel ?? undefined, machineDefault));
+  const [connector, setConnector] = useState<string | null>(null);
   const [idTouched, setIdTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,6 +185,30 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
       </Group>
       <IconPicker icon={form.icon} conductor={channel?.id === 'conductor'} onChange={(v) => { set('icon', v); if (!form.avatar_bg_manual) set('avatar_bg', autoAvatarColor(v) ?? ''); }} />
 
+      <Group
+        title="Access"
+        footer={`${form.accessSet ? '' : `Not set, so it runs at this computer’s default: ${accessLabel(accessLevelOf(machineDefault))}. `}Omni enforces it on every harness. Always allowed tools are removed on the computer.`}
+      >
+        {ACCESS_LEVELS.map((l, i) => (
+          <ChoiceRow
+            key={l.id}
+            first={i === 0}
+            title={l.label}
+            detail={l.description}
+            selected={form.access === l.id}
+            onPress={() => {
+              set('access', l.id);
+              set('accessSet', true);
+            }}
+          />
+        ))}
+      </Group>
+      <Group title="Connectors" footer="An account or the browser can have its own level.">
+        {ACCESS_CONNECTORS.map((c, i) => (
+          <ListRow key={c.id} first={i === 0} title={c.label} value={form.connectors[c.id] ? accessLabel(form.connectors[c.id]) : 'Same as channel'} chevron onPress={() => setConnector(c.id)} />
+        ))}
+      </Group>
+
       <Group footer="Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.">
         <InputRow first label="Notes" value={form.notes} multiline autoCapitalize="sentences" onChangeText={(t) => set('notes', t)} />
       </Group>
@@ -211,10 +240,12 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
         </Group>
       ) : null}
 
+      {shopify ? (
       <Group title="Store">
         <InputRow first label="Store domain" value={form.store_domain} code keyboardType="url" placeholder="acme.myshopify.com" onChangeText={(t) => set('store_domain', t)} />
         <InputRow label="Client portal slug" value={form.portal_slug} code placeholder="acme" hint="The company's slug in your client portal, for client context." onChangeText={(t) => set('portal_slug', t)} />
       </Group>
+      ) : null}
 
       {channel ? <ActionsGroup channel={channel} navigation={navigation} /> : null}
 
@@ -229,6 +260,30 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
           <ListRow first icon="archive" tone="destructive" title="Archive channel" onPress={confirmArchive} />
         </Group>
       ) : null}
+
+      <Sheet visible={connector !== null} title={ACCESS_CONNECTORS.find((c) => c.id === connector)?.label ?? 'Connector'} onClose={() => setConnector(null)}>
+        <ScrollView contentContainerStyle={styles.sheet}>
+          <Group>
+            {[{ id: null, label: 'Same as channel', description: `Follows the channel: ${accessLabel(form.access)}` }, ...CONNECTOR_LEVELS].map((l, i) => (
+              <ChoiceRow
+                key={l.id ?? 'follow'}
+                first={i === 0}
+                title={l.label}
+                detail={l.description}
+                selected={(connector ? (form.connectors[connector] ?? null) : null) === l.id}
+                onPress={() => {
+                  if (!connector) return;
+                  const next = { ...form.connectors };
+                  if (l.id === null) delete next[connector];
+                  else next[connector] = l.id as ConnectorLevel;
+                  set('connectors', next);
+                  setConnector(null);
+                }}
+              />
+            ))}
+          </Group>
+        </ScrollView>
+      </Sheet>
 
       <Sheet visible={picking} title="Default model" onClose={() => setPicking(false)}>
         <ScrollView contentContainerStyle={styles.sheet}>

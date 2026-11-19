@@ -7,7 +7,7 @@ import { ListHeading } from '../components/ListHeading';
 import { SearchHitRow } from '../components/SearchHitRow';
 import { ThreadRowView } from '../components/ThreadRowView';
 import { threadRow } from '../live/channel-model';
-import { useActivity, useChannels } from '../live/react';
+import { useActivity, useChannels, useTechnical } from '../live/react';
 import { useMinuteClock } from '../live/use-minute-clock';
 import type { RootScreenProps } from '../navigation/types';
 import { hitRows, matchChannels, noMatchMessage, recentThreads, searchQuery } from '../search/search-model';
@@ -23,10 +23,11 @@ export function SearchScreen({ navigation }: RootScreenProps<'Search'>) {
   const query = searchQuery(text);
   const search = useThreadSearch(query);
   const now = useMinuteClock();
+  const technical = useTechnical();
 
   const channelMatches = useMemo(() => matchChannels(channels, query), [channels, query]);
-  const hits = useMemo(() => (search.kind === 'done' ? hitRows(search.hits, channels, now) : []), [search, channels, now]);
-  const latest = useMemo(() => (query ? [] : recentThreads(recent).map((t) => ({ ...threadRow(t, now), channel: channelName(channels, t.channel_id) }))), [query, recent, channels, now]);
+  const hits = useMemo(() => (search.kind === 'done' ? hitRows(search.hits, channels, now, technical) : []), [search, channels, now, technical]);
+  const latest = useMemo(() => (query ? [] : recentThreads(recent).map((t) => ({ ...threadRow(t, now, technical), channel: channelName(channels, t.channel_id) }))), [query, recent, channels, now, technical]);
 
   const openThread = (id: string) => navigation.navigate('Thread', { id });
   const status = statusLine(query, search.kind, hits.length, channelMatches.length, search.kind === 'error' ? search.message : null);

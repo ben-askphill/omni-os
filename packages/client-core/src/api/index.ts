@@ -22,6 +22,7 @@ import { recoveryApi } from './recovery.ts';
 import { searchApi } from './search.ts';
 import { settingsApi } from './settings.ts';
 import { tasksApi } from './tasks.ts';
+import { templatesApi } from './templates.ts';
 import { threadsApi } from './threads.ts';
 
 export * from './account.ts';
@@ -46,6 +47,7 @@ export * from './recovery.ts';
 export * from './search.ts';
 export * from './settings.ts';
 export * from './tasks.ts';
+export * from './templates.ts';
 export * from './threads.ts';
 
 export type OmniApi = ReturnType<typeof createOmniApi>;
@@ -74,5 +76,6 @@ export function createOmniApi(http: HttpClient) {
     ...changesApi(http),
     ...pullsApi(http),
     ...tasksApi(http),
+    ...templatesApi(http),
   };
 }

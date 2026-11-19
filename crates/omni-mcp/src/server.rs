@@ -12,12 +12,13 @@ use tokio::sync::watch;
 
 use crate::protocol::{self, IdKey, Message};
 use crate::zod::{self, Field, Schema};
-use crate::{ask, render, threads};
+use crate::{ask, render, steps, threads};
 
 #[derive(Clone, Copy)]
 pub enum Kind {
     Ask,
     Render,
+    Steps,
     Threads,
 }
 
@@ -67,6 +68,7 @@ impl Server {
         let (name, mut tool) = match kind {
             Kind::Ask => ("omni-ask", ask::tool()),
             Kind::Render => ("omni-render", render::tool()),
+            Kind::Steps => ("omni-steps", steps::tool()),
             Kind::Threads => ("omni-threads", threads::tool()),
         };
         let input = Schema::Object(std::mem::take(&mut tool.input));
@@ -167,6 +169,7 @@ impl Server {
             match self.kind {
                 Kind::Ask => ask::run(&self.api, &arguments).await,
                 Kind::Render => render::run(&self.api, &arguments).await,
+                Kind::Steps => steps::run(&arguments),
                 Kind::Threads => threads::run(&self.api, &arguments).await,
             }
         };

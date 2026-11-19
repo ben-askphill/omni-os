@@ -11,7 +11,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { cookieName, sessionCookieName, tokenMatches } from './api-token.ts';
 import { nonceLive } from './desktop-pairing.ts';
-import { decideRequest, type Credential, type RouteClass } from './request-trust.ts';
+import { decideRequest, mayUseShell, type Credential, type RouteClass } from './request-trust.ts';
 import { config } from './config.ts';
 import { resolved } from './user-config.ts';
 
@@ -207,6 +207,19 @@ export function clientKey(c: Context): string {
 /** A thread's terminal: opening, typing into or watching its shell (terminal-api.ts). */
 const TERMINAL_PATH = /^\/api\/threads\/[^/]+\/terminal(?:\/|$)/;
 
+/**
+ * The channel action routes that put a command in a login shell (actions-api.ts): adding or changing one (which also
+ * makes it the setup or teardown step), running one and retrying a run. Reading, stopping a run and removing an
+ * action do not. tests/actions-credentials.test.ts fails when actions-api.ts gains a route this list leaves out.
+ */
+const ACTION_SHELL_ROUTES: readonly (readonly [string, RegExp])[] = [
+  ['POST', /^\/api\/channels\/[^/]+\/actions\/?$/],
+  ['PATCH', /^\/api\/channels\/[^/]+\/actions\/[^/]+\/?$/],
+  ['POST', /^\/api\/threads\/[^/]+\/actions\/[^/]+\/run\/?$/],
+  ['POST', /^\/api\/threads\/[^/]+\/action-runs\/[^/]+\/retry\/?$/],
+];
+const isActionShellRoute = (c: Context) => ACTION_SHELL_ROUTES.some(([m, p]) => c.req.method === m && p.test(c.req.path));
+
 /** The desktop app's main process asks this for a one-time nonce (desktop-pairing.ts). It checks its own secret. */
 export const DESKTOP_NONCE_PATH = '/api/auth/desktop-nonce';
 
@@ -218,12 +231,22 @@ export const useLegacyUpgrade = (fn: typeof legacyUpgrade) => {
 
 const routeClass = (c: Context): RouteClass => {
   if (c.req.method === 'GET' && c.req.path === DESKTOP_PAIR_PATH) return 'pairing';
-  if (TERMINAL_PATH.test(c.req.path)) return 'terminal';
+  if (TERMINAL_PATH.test(c.req.path) || isActionShellRoute(c)) return 'shell';
   return c.req.method === 'GET' || c.req.method === 'HEAD' ? 'read' : 'act';
 };
 
 const credentialOf = (auth: OmniAuth): Credential =>
   auth.via === 'token' ? 'token' : auth.via === 'session' ? (auth.method === 'token' ? 'session-token' : 'session') : 'none';
+
+/**
+ * Whether the request requestGuard let through may reach a shell (request-trust.ts mayUseShell), for a route whose
+ * shell depends on state its path does not show: Retry setup and the routes that fall through to it. A request that
+ * never passed the guard has no credential and may not.
+ */
+export const shellAllowed = (c: Context) => {
+  const auth = c.get('omniAuth');
+  return !!auth && mayUseShell(credentialOf(auth));
+};
 
 /**
  * Lets through what Omni's own clients send and refuses what a browser sends on another site's behalf, as
@@ -236,7 +259,8 @@ const credentialOf = (auth: OmniAuth): Credential =>
  *   browser's cookie, except on the proof route, a GitHub webhook post (its own signature), the desktop app's nonce
  *   and pairing routes from this machine, the Google sign-in routes, redeeming an app pairing code, and Omni
  *   Connect's signed routes (CONNECT_OPEN_ROUTES);
- * - the terminal, for anything but the token or a session paired with it;
+ * - a shell (the terminal, or adding, changing, running or retrying a channel action), for anything but the token or
+ *   a session paired with it;
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set.
  * A raw-token cookie an older build set still works once, and is swapped for a session cookie once the request is let through.

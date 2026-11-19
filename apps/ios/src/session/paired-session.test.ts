@@ -10,6 +10,8 @@ describe('pairedSession', () => {
     const session = pairedSession(server, { getToken: async () => token, confirmSignedIn: async () => true });
 
     expect(session.serverUrl).toBe(server.origin);
+    // What the phone keeps per thread is filed under this, so it never crosses to another server's same thread id.
+    expect(session.serverId).toBe(server.id);
     expect(await session.token()).toBe('one');
     token = 'two';
     expect(await session.token()).toBe('two');

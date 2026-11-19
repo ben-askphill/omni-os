@@ -1,8 +1,10 @@
 // A thread as the phone lists it: in a channel and in search. Pure.
 import { relTime } from '@omni/shared/format.ts';
+import { glyphLabel, markLabel } from '@omni/shared/display.ts';
+import { technicalNow } from '../display.ts';
 import type { Thread, ThreadStub } from '../api.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
-import { PHASE, STATUS, threadGlyph, threadPhase, type Phase } from '@omni/shared/status.ts';
+import { threadGlyph, threadPhase, type Glyph, type Phase } from '@omni/shared/status.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
 import { ownedByOther } from '@omni/shared/thread-owner.ts';
 
@@ -38,11 +40,14 @@ export type ListedThread = ThreadStub & Partial<Pick<Thread, 'role' | 'updated_a
 /** "3m", "2h", "now": a list's time column, without the "ago". */
 export const shortTime = (iso: string, now: number) => relTime(iso, now).replace(/ ago$/, '').replace(/^just now$/, 'now');
 
+/** A row's status words: the phase or status label, or one of the five plain words with Show technical details off. */
+const said = (glyph: Glyph, phase: Phase | null) => (phase ? markLabel(phase, technicalNow()) : glyphLabel(glyph, technicalNow()));
+
 /** `user`: the user's own name, so a thread someone else owns says "for <name>" on its second line. */
 export function rowOf(t: ListedThread, channel: ChannelInfo | undefined, now: number, user?: string | null): RowItem {
   const glyph = threadGlyph(t);
   const phase = glyph === 'running' || glyph === 'queued' ? threadPhase(t) : null;
-  const state = glyph === 'done' || glyph === 'idle' ? null : t.status === 'running' ? runningLabel(t, phase ? PHASE[phase].label : STATUS[glyph].label) : phase ? PHASE[phase].label : STATUS[glyph].label;
+  const state = glyph === 'done' || glyph === 'idle' ? null : t.status === 'running' ? runningLabel(t, said(glyph, phase)) : said(glyph, phase);
   const owner = ownedByOther(t.owner, user) ? `for ${t.owner}` : null;
   return {
     id: t.id,

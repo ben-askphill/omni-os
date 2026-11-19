@@ -39,7 +39,9 @@
     "goal_status": null,
     "goal_checks": 0,
     "continued_from": null,
-    "owner": null,
+    "quick": 0,
+    "workspace": "worktree",
+    "promoted_to": null,
     "created_at": "2026-01-05T09:00:00.000Z",
     "updated_at": "2026-01-05T09:00:00.000Z"
   },

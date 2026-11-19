@@ -4,6 +4,13 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { LineSplitter } from '../../stream.ts';
 import type { RpcNotification } from './protocol.ts';
 
+/** A request the server sends the client, with the id its answer must carry. */
+export interface RpcServerRequest {
+  id: number | string;
+  method: string;
+  params: unknown;
+}
+
 /**
  * How long a request may wait for its answer. Codex answers each one at once and reports a turn's
  * progress as notifications, so a request still open after this is talking to a wedged process.
@@ -28,6 +35,8 @@ export interface CodexClientOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   onNotification?: (n: RpcNotification) => void;
+  /** A request from the server, such as an approval: answer it with respond(id, result). Unanswered without one. */
+  onRequest?: (r: RpcServerRequest) => void;
   onExit?: (code: number | null, signal: NodeJS.Signals | null) => void;
   onStderr?: (chunk: string) => void;
   /** Default deadline for every request. REQUEST_TIMEOUT_MS unless set. */
@@ -42,6 +51,7 @@ export class CodexClient {
     onOverflow: (chars) => console.error(`[codex] dropped an app-server message of at least ${chars} characters`),
   });
   private readonly timeoutMs: number;
+  private readonly onRequest?: (r: RpcServerRequest) => void;
 
   constructor(opts: CodexClientOptions) {
     this.timeoutMs = opts.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
@@ -51,6 +61,7 @@ export class CodexClient {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.child.stdout!.setEncoding('utf8');
+    this.onRequest = opts.onRequest;
     this.child.stdout!.on('data', (d: string) => this.splitter.push(d).forEach((l) => this.onLine(l, opts.onNotification)));
     if (opts.onStderr) {
       this.child.stderr!.setEncoding('utf8');
@@ -65,7 +76,7 @@ export class CodexClient {
   }
 
   private onLine(line: string, onNote?: (n: RpcNotification) => void) {
-    let msg: { id?: number; result?: unknown; error?: { message?: string }; method?: string; params?: unknown };
+    let msg: { id?: number | string; result?: unknown; error?: { message?: string }; method?: string; params?: unknown };
     try {
       msg = JSON.parse(line);
     } catch {
@@ -78,6 +89,8 @@ export class CodexClient {
       this.pending.delete(msg.id);
       if (msg.error) p.reject(new Error(msg.error.message ?? 'codex error'));
       else p.resolve(msg.result);
+    } else if (typeof msg.method === 'string' && msg.id !== undefined && this.onRequest) {
+      this.onRequest({ id: msg.id, method: msg.method, params: msg.params });
     } else if (typeof msg.method === 'string') {
       onNote?.({ method: msg.method, params: msg.params });
     }
@@ -120,6 +133,11 @@ export class CodexClient {
 
   notify(method: string, params?: unknown) {
     this.write({ method, params });
+  }
+
+  /** Answer a server request. False if the pipe is gone. */
+  respond(id: number | string, result: unknown): boolean {
+    return this.write({ id, result });
   }
 
   private write(obj: unknown): boolean {

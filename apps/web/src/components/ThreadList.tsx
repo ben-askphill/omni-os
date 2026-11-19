@@ -21,8 +21,9 @@ export function useLiveThreads(path: string, accept: (t: Thread) => boolean, lim
     if (e.type !== 'thread' || !acceptCb(e.thread)) return;
     setData((prev) => {
       const list = (prev ?? []).filter((t) => t.id !== e.thread.id);
-      // A thread archived or restored moves between the active list and the archived one.
-      if (!!e.thread.archived === archived) list.push(e.thread);
+      // A thread archived or restored moves between the active list and the archived one. A quick ask lists only
+      // under Recent asks (packages/shared/quick-ask.ts).
+      if (!!e.thread.archived === archived && !e.thread.quick) list.push(e.thread);
       list.sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0));
       return list.slice(0, limit);
     });

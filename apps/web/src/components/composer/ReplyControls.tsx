@@ -1,4 +1,6 @@
 import { MOD } from './controls.tsx';
+import { term, type Term } from '@omni/shared/display.ts';
+import { useTechnical } from '../../display.ts';
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../../api.ts';
 import { Icon, Kbd, Loader, type IconName } from '../ui.tsx';
@@ -9,10 +11,11 @@ import type { Run } from '@omni/shared/run-switch.ts';
 
 
 
-const SEND_OPTIONS: { mode: SendMode; label: string; hint: string; icon: IconName; keys?: string[] }[] = [
-  { mode: 'steer', label: 'Steer now', hint: 'The agent reads it at its next step', icon: 'send', keys: ['Enter'] },
-  { mode: 'queue', label: 'Queue for after this turn', hint: 'Runs when the current turn ends', icon: 'clock' },
-  { mode: 'interrupt', label: 'Interrupt and send', hint: 'Stops the current step, then runs this', icon: 'stop', keys: [MOD, 'Shift', 'Enter'] },
+/** Each way to send to a busy thread. Its name is a Term: plain words unless Show technical details is on. */
+const SEND_OPTIONS: { mode: SendMode; label: Term; hint: string; icon: IconName; keys?: string[] }[] = [
+  { mode: 'steer', label: 'steerNow', hint: 'The agent reads it at its next step', icon: 'send', keys: ['Enter'] },
+  { mode: 'queue', label: 'queueAfter', hint: 'Runs when the current turn ends', icon: 'clock' },
+  { mode: 'interrupt', label: 'interrupt', hint: 'Stops the current step, then runs this', icon: 'stop', keys: [MOD, 'Shift', 'Enter'] },
 ];
 
 const halfCls = 'inline-flex h-[34px] items-center bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out select-none active:scale-[.92] disabled:opacity-25';
@@ -20,6 +23,7 @@ const halfCls = 'inline-flex h-[34px] items-center bg-fg text-on-ink transition-
 /** Split button for a busy thread: Steer (or Queue when the harness can't steer), plus a menu. */
 export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: boolean; busy: boolean; canSteer?: boolean; onSend: (mode: SendMode) => void }) {
   const [open, setOpen] = useState(false);
+  const technical = useTechnical();
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
@@ -69,7 +73,7 @@ export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disab
     <div ref={wrap} className="relative flex">
       <button type="button" onClick={() => onSend(primary)} disabled={disabled || busy} className={`${halfCls} gap-1.5 rounded-l-full pr-2.5 pl-3.5 text-[13px] font-medium whitespace-nowrap`}>
         {busy ? <Loader size={16} /> : <Icon name={canSteer ? 'send' : 'clock'} size={16} strokeWidth={2} />}
-        {canSteer ? 'Steer' : 'Queue'}
+        {term(canSteer ? 'steer' : 'queue', technical)}
       </button>
       <button
         ref={trigger}
@@ -114,7 +118,7 @@ export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disab
               <Icon name={o.icon} size={14} className="mt-[3px] text-fg-3" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 text-[13px] text-fg">{o.label}</span>
+                  <span className="min-w-0 flex-1 text-[13px] text-fg">{term(o.label, technical)}</span>
                   {o.keys && (
                     <span className="hidden shrink-0 items-center gap-0.5 sm:flex">
                       {o.keys.map((key) => (

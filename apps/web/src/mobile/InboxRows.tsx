@@ -110,6 +110,11 @@ export function MoInboxRow({
             <span className="min-w-0 flex-1 truncate text-[15px] leading-[1.3] text-fg">{title}</span>
             <span className="shrink-0 text-[12px] leading-none text-fg-3 tabular-nums">{status ? status.label : shortTime(t.updated_at ?? t.created_at, now)}</span>
           </span>
+          {t.step && (
+            <span className="truncate text-[13px] leading-[1.35] text-fg-2" data-step>
+              {t.step}
+            </span>
+          )}
           <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
             {pinned && <Icon name="pin" size={12} className="shrink-0" />}
             {tree && <ChannelRollup threads={tree.threads} own={t.channel_id} size={16} className="-mr-0.5" />}

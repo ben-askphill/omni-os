@@ -10,7 +10,8 @@ import { useTheme } from '../components/theme.tsx';
 import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
-import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented } from '../components/ui.tsx';
+import { saveDisplay, useDisplay } from '../display.ts';
+import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
@@ -21,12 +22,14 @@ import { ConnectSection } from './Connect.tsx';
 import { IosPairingSection } from './IosPairing.tsx';
 import { MachinesSection, RunOnCard } from './Machines.tsx';
 import { SecretsSection } from './Secrets.tsx';
-import { AppServerRows, DesktopSection, ZoomRow } from './SettingsDesktop.tsx';
+import { AppServerRows, DesktopSection, WisprFlowCard, ZoomRow } from './SettingsDesktop.tsx';
 import { NotificationsCard } from './SettingsNotifications.tsx';
 import { ModelsSection } from './SettingsAgents.tsx';
 import { CrewSection } from './SettingsCrew.tsx';
 import { AccountsSection } from './SettingsAccounts.tsx';
 import { StorageSection } from './Storage.tsx';
+import { useTemplates } from '../templates.tsx';
+import { sortTemplates } from '@omni/shared/templates.ts';
 import { PathMapEditor, SyncSection } from './Sync.tsx';
 import {
   Advanced,
@@ -105,7 +108,7 @@ function SectionBody({ section }: { section: SettingsSection }) {
     case 'notifications':
       return <NotificationsCard scoped={channel?.id} />;
     case 'models':
-      return <ModelsSection hermes={<ConfigSection part="models" />} />;
+      return <ModelsSection />;
     case 'crew':
       return <CrewSection />;
     case 'accounts':
@@ -140,6 +143,8 @@ function SectionBody({ section }: { section: SettingsSection }) {
       );
     case 'desktop':
       return desktop ? <DesktopSection bridge={desktop} /> : null;
+    case 'extras':
+      return <ExtrasSection />;
     case 'about':
       return <AboutSection />;
   }
@@ -202,13 +207,79 @@ function ConfigSection({ part, children }: { part: SettingPage; children?: React
       {error && <ErrorNote>{error}</ErrorNote>}
       {state ? <ConfigForm part={part} state={state} onSaved={setState} /> : !error && <Loading />}
       {children}
-      {part !== 'access' && part !== 'models' && <ConfigNote path={state?.path} />}
+      {part !== 'access' && <ConfigNote path={state?.path} />}
     </>
   );
 }
 
 function WorkspaceSection() {
-  return <ConfigSection part="workspace" />;
+  return (
+    <ConfigSection part="workspace">
+      <LinkLine href={href.settingsSection('extras', 'brain')}>The notes folder is in Extras</LinkLine>
+    </ConfigSection>
+  );
+}
+
+/** The optional add-ons, each off until set up: Wispr Flow, Grok Bot, then Hermes and the notes folder's form. */
+function ExtrasSection() {
+  return (
+    <>
+      {desktop?.platform === 'darwin' ? (
+        <WisprFlowCard bridge={desktop} />
+      ) : (
+        <Card entry="wispr-flow" title="Wispr Flow" subtitle="Say what you need instead of typing it: Wispr Flow dictates into the Quick Prompt. Its switch is here in Omni's Mac app." />
+      )}
+      <GrokBotCard />
+      <ShopifyCard />
+      <ConfigSection part="extras" />
+    </>
+  );
+}
+
+/** The Shopify pack: the Store card and Portal slug on a channel, its store link, and their lines in a thread's instructions. */
+function ShopifyCard() {
+  const { shopify } = useDisplay();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card entry="shopify" title="Shopify">
+      <SwitchRow
+        title="Shopify add-on"
+        origin={<Origin of="machine" label="Every machine" />}
+        detail="A store domain and client portal slug on each channel's settings, the store link on its page, and both in its threads' instructions. Off, Omni keeps any you set but shows and sends none."
+        checked={shopify}
+        onChange={(on) => {
+          setError(null);
+          saveDisplay({ shopify: on }).catch((e: unknown) => setError(errorText(e)));
+        }}
+      />
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Card>
+  );
+}
+
+/** Send to Grok Bot: on once this server has the webhook's secrets (apps/server/grokbot.ts). */
+function GrokBotCard() {
+  const { status } = useApp();
+  const on = !!status?.grokBot;
+  return (
+    <Card
+      entry="grok-bot"
+      title="Grok Bot"
+      subtitle="Hands a thread or a request to your Grok Bot: Send to Grok Bot in a thread's menu, or Grok Bot in the new thread's machine picker."
+      actions={
+        <span className="inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">
+          <StatusDot status={on ? 'done' : 'idle'} size={7} />
+          {on ? 'On' : 'Off'}
+        </span>
+      }
+    >
+      <FootNote>
+        {on ? 'It posts to the webhook in the global secret ' : 'To turn it on, add the global secrets '}
+        <code>GROKBOT_WEBHOOK_URL</code> and <code>GROKBOT_WEBHOOK_AUTH</code>.
+      </FootNote>
+      <LinkLine href={href.settingsSection('secrets')}>Secrets</LinkLine>
+    </Card>
+  );
 }
 
 function WorktreesSection() {
@@ -217,6 +288,44 @@ function WorktreesSection() {
       <StorageSection />
       <ServerOptions section="worktrees" />
     </>
+  );
+}
+
+/** Settings > Threads: the templates the `/` menu and the New box offer, and where their files live. */
+function TemplatesCard() {
+  const { data, error, reload } = useTemplates();
+  return (
+    <Card entry="templates" title="Templates" subtitle="Ready-made jobs in the / menu and under a new thread's box. Type / and a template's name, then what it is about.">
+      {error ? (
+        <ErrorNote onRetry={reload}>{error}</ErrorNote>
+      ) : !data ? (
+        <Loading />
+      ) : (
+        <div className="space-y-3">
+          {sortTemplates(data.templates).map((t) => (
+            <SettingRow
+              key={t.id}
+              label={t.name}
+              hint={t.description}
+              origin={
+                <code className="text-[12px] text-fg-3">
+                  /{t.id}
+                  {t.argumentHint ? ` ${t.argumentHint}` : ''}
+                </code>
+              }
+            />
+          ))}
+          {data.hidden > 0 && (
+            <FootNote>
+              {data.hidden} Shopify template{data.hidden === 1 ? '' : 's'} show{data.hidden === 1 ? 's' : ''} once the Shopify add-on is on.
+            </FootNote>
+          )}
+          <FootNote>
+            Add your own as Markdown files in <code>data/templates/</code>. A file with the same name as a shipped one replaces it.
+          </FootNote>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -230,6 +339,7 @@ function ThreadsSection() {
         <span id={settingAnchor('thread-features')} />
         <ServerOptions section="threads" />
       </div>
+      <TemplatesCard />
       <div id={settingAnchor('automations')} className="scroll-mt-6">
         <LinkLine href={href.automations()}>Automations have their own page</LinkLine>
       </div>
@@ -500,7 +610,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
   return (
     <form onSubmit={saveAll} className="space-y-5">
       <Card entry={FORM_ENTRY[part]} title={page.title} subtitle={page.note}>
-        {part === 'workspace' && <span id={settingAnchor('brain')} className="block scroll-mt-6" />}
+        {part === 'extras' && <span id={settingAnchor('brain')} className="block scroll-mt-6" />}
         {rows(fields.filter((f) => !f.advanced))}
         {error && <ErrorNote>{error}</ErrorNote>}
         {editable.length > 0 &&
@@ -526,7 +636,7 @@ function ConfigForm({ part, state, onSaved }: { part: SettingPage; state: SetupS
 }
 
 /** The search entry each form answers to. */
-const FORM_ENTRY: Record<SettingPage, string> = { general: 'you', workspace: 'folders', models: 'hermes', access: 'network' };
+const FORM_ENTRY: Record<SettingPage, string> = { general: 'you', workspace: 'folders', extras: 'hermes', access: 'network' };
 
 const formValues = (fields: readonly SettingField[], c: UserConfig): Record<string, string> =>
   Object.fromEntries(fields.map((f) => [settingId(f), (c[f.section] as Record<string, string | undefined>)[f.key] ?? f.default]));
@@ -690,6 +800,27 @@ function PronounsField({
   );
 }
 
+/** Show technical details (packages/shared/display.ts): kept by the server, so it follows you to every machine. */
+function TechnicalCard() {
+  const { technical } = useDisplay();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card entry="technical" title="Detail">
+      <SwitchRow
+        title="Show technical details"
+        origin={<Origin of="machine" label="Every machine" />}
+        detail="Status names like Steering and Checks failing, the AI app and effort by their own names, and pull requests, branches, token counts and the context ring in every channel. Off, a channel with a repo still shows its code detail."
+        checked={technical}
+        onChange={(on) => {
+          setError(null);
+          saveDisplay({ technical: on }).catch((e: unknown) => setError(errorText(e)));
+        }}
+      />
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Card>
+  );
+}
+
 function AppearanceCard() {
   const [theme, setTheme] = useTheme();
   const layout = useLayout();
@@ -740,6 +871,7 @@ function AppearanceCard() {
           />
         )}
       </Card>
+      <TechnicalCard />
       <Card entry="inbox-key" title="Keyboard">
         <SwitchRow
           title="Press I for the Inbox"

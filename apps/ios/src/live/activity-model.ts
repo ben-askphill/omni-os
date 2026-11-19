@@ -10,7 +10,7 @@ import { shortAgo } from './channel-model';
 import { agentsByThread, jobTree, treeSource, type JobTree } from './thread-tree';
 
 /** Any thread the inbox can list: a full row from the recent list, or the stub the pinned and channel lists send. */
-type InboxThread = ThreadStub & Partial<Pick<Thread, 'role' | 'branch' | 'archived'>> & { delegating?: boolean };
+type InboxThread = ThreadStub & Partial<Pick<Thread, 'role' | 'branch' | 'archived' | 'step'>> & { delegating?: boolean };
 
 /** What a row says on its right in place of the time, as the web and Home say it. */
 export type InboxStatus = RowStatus;
@@ -30,6 +30,8 @@ export interface InboxRow {
   branch: string | null;
   /** Someone else accountable for it (thread-owner.ts), shown as "for <name>" after the channel; null for the user's own. */
   owner: string | null;
+  /** The step a running thread is on ("Step 2 of 3 · Read the reviews"), as phone web's row shows it. */
+  step: string | null;
   pinned: boolean;
   /** Work in progress recedes, so what waits on Ben stands out. */
   receded: boolean;
@@ -130,6 +132,7 @@ export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }
       time: shortAgo(at(t), now),
       branch: t.branch ?? null,
       owner: t.owner ?? null,
+      step: t.step ?? null,
       pinned: !!t.pinned_at,
       receded: status?.glyph === 'running',
       canMarkDone: canMarkDone(t.status),

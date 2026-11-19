@@ -25,7 +25,7 @@ const until = async (ok: () => Promise<boolean>) => {
 describe('GET /api/setup/claude', () => {
   it('ready with the account, signed out, or missing with the installer', async () => {
     rmSync(auth, { force: true });
-    expect((await send('GET', '/api/setup/claude')).body).toEqual({ state: 'ready', email: 'dev@example.com', plan: 'max' });
+    expect((await send('GET', '/api/setup/claude')).body).toEqual({ state: 'ready', email: 'dev@example.com', plan: 'Max' });
     signOut();
     expect((await send('GET', '/api/setup/claude')).body).toEqual({ state: 'signed-out' });
     expect(await claudeSetup(join(dir, 'no-claude'))).toEqual({ state: 'missing', install: CLAUDE_INSTALL });
@@ -45,7 +45,7 @@ describe('sign in by pasting the code', () => {
     // The old flow is gone: its code cannot finish the new sign-in.
     expect((await send('POST', '/api/setup/claude/login/code', { flow: start.body.flow, code: 'abc' })).body).toMatchObject({ state: 'failed' });
     const good = await send('POST', '/api/setup/claude/login/code', { flow: again.body.flow, code: ' abc#state ' });
-    expect(good.body).toEqual({ state: 'done', setup: { state: 'ready', email: 'new@example.com', plan: 'pro' } });
+    expect(good.body).toEqual({ state: 'done', setup: { state: 'ready', email: 'new@example.com', plan: 'Pro' } });
   });
 
   it('refuses an empty code, and Cancel stops a sign-in', async () => {

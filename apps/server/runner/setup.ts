@@ -1,6 +1,10 @@
-// A worktree thread's preparation: its worktree is made and checked before any harness runs, and a failure waits
-// for Retry with the first prompt and its files saved. Nothing runs in the channel's own checkout instead.
-import { channels, continuations, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+// A thread's preparation before any harness runs: the sign-in check for the connectors its brief or role needs
+// (connectors.ts), then, for a worktree thread, its worktree made and checked. A failure waits for Retry with the
+// first prompt and its files saved; a signed-out connector waits as `signin` for Try again or Start anyway. Nothing
+// runs in the channel's own checkout instead.
+import { channelActions, channels, continuations, kv, messageRequests, outbox, requestFingerprint, threads, type Thread } from '../db.ts';
+import { isProviderHarness } from '../harness/types.ts';
+import { SHELL_REFUSAL } from '../request-trust.ts';
 import { ensureRepo } from '../repo-clone.ts';
 import { prepareWorktree } from '../sandbox.ts';
 import { followBranch } from '../branch-follow.ts';
@@ -11,6 +15,10 @@ import { channelExtras } from '../worktree-include.ts';
 import { userName } from '../user-config.ts';
 import { carryInto } from '../continue-carry.ts';
 import { notifyEnded } from '../push-sender.ts';
+import { about } from '../about.ts';
+import { getCrew } from '../crew.ts';
+import { neededConnectors, signInMessage } from '../connectors.ts';
+import { checkSignIn } from '../sign-in-check.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import type { Attachment } from '../uploads.ts';
 import { reportToParent, settleTeam } from './queue.ts';
@@ -40,6 +48,26 @@ export function saveStart(thread: Thread, prompt: string, attachments: Attachmen
   });
 }
 
+/**
+ * The connectors a thread's start needs: its role's `connectors:` and the ones its first prompt names. Only Claude
+ * Code reports their sign-ins, so a thread on another harness needs none here.
+ */
+export function connectorsFor(
+  t: Pick<Thread, 'id' | 'harness' | 'role'>,
+  prompt = messageRequests.byRequestId(t.id, START_REQUEST)?.prompt ?? '',
+  declared = kv.get<string[] | null>(declaredKey(t.id)) ?? undefined,
+): string[] {
+  if (t.harness !== 'claude-code') return [];
+  return neededConnectors(prompt, declared, getCrew(t.role)?.connectors);
+}
+
+/** A thread's own `connectors:` (its automation's), kept for Try again. Per machine, as the check is. */
+const declaredKey = (id: string) => `sync.thread-connectors.${id}`;
+export const declareConnectors = (id: string, ids: string[]) => kv.set(declaredKey(id), ids);
+
+/** Threads the user told to start without the sign-in check (Start anyway), until their next preparation. */
+const signInWaived = new Set<string>();
+
 /** A lead that has not run waits for its team, shown as running. */
 const waitingLead = (t: Thread) => !t.has_run && threads.team(t.id).length > 0;
 
@@ -57,9 +85,10 @@ export const bindResume = (fn: (threadId: string) => Promise<unknown>) => {
 /**
  * Make the thread's worktree and check it, then send what waited for it. Marks the thread preparing before it
  * returns. On failure the thread shows why and its first prompt waits, recovered, for Retry; a child reports the
- * failure to its parent. Never runs twice at once for one thread.
+ * failure to its parent. Never runs twice at once for one thread. `retry` is Ben's Retry setup and who pressed it:
+ * the setup step is looked up again after the checkout, so a caller without a shell is held there too.
  */
-export function setUpThread(threadId: string): Promise<Thread | undefined> {
+export function setUpThread(threadId: string, retry?: SetupRetryBy): Promise<Thread | undefined> {
   const running = preparing.get(threadId);
   if (running) return running;
   const t = threads.get(threadId);
@@ -68,7 +97,7 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
   threads.update(threadId, { setup: 'preparing', setup_error: null, status, updated_at: t.updated_at });
   beginAttempt(threadId);
   emitThread(threadId);
-  const job = prepare(t)
+  const job = prepare(t, !retry || !!retry.shell)
     .catch((err) => {
       console.error(`[setup] ${threadId}:`, err);
       return threads.get(threadId);
@@ -81,37 +110,27 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
   return job;
 }
 
-async function prepare(t: Thread): Promise<Thread | undefined> {
-  // A worktree its agent moved to another branch keeps that branch: only a detached HEAD or the default branch is
-  // switched back (sandbox.ts prepareWorktree).
-  if (await followBranch(t.id).catch(() => false)) t = threads.get(t.id) ?? t;
-  try {
-    if (!t.branch) throw new Error('The thread has no branch to check out.');
-    const branch = t.branch;
-    // A channel repo that is not on this machine is cloned first, and may land at a new path here (repo-clone.ts).
-    // Stop ends the wait at once; the clone itself finishes for the next try.
-    await ensureRepo(t.channel_id, attemptSignal(t.id));
-    if (stopRequested(t.id)) throw new Error(STOPPED);
-    const repo = channels.get(t.channel_id)?.repo_path ?? null;
-    // A continued thread's branch starts at its source's HEAD, with the source's changes laid in (continue-carry.ts),
-    // so only a new thread's branch is cut from the base Ben picked.
-    const base = continuations.get(t.id) ? undefined : () => baseFor(t.id, repo!);
-    await withWorkspace(t.cwd, async () => {
-      await carryInto(t);
-      await prepareWorktree(repo, t.cwd, branch, base, channelExtras(channels.get(t.channel_id)));
-    });
-    // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
-    await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));
-  } catch (err) {
-    if (stopRequested(t.id)) failSetup(t.id, STOPPED, true);
-    else failSetup(t.id, (err as Error).message);
-    return threads.get(t.id);
+async function prepare(t: Thread, shell: boolean): Promise<Thread | undefined> {
+  // First, as it is the cheapest: a job whose connector is signed out never makes a worktree or starts a harness.
+  const waived = signInWaived.delete(t.id);
+  const needs = waived ? [] : connectorsFor(t);
+  if (needs.length) {
+    const check = await checkSignIn(needs, t.cwd);
+    if (stopRequested(t.id)) {
+      failSetup(t.id, STOPPED, true);
+      return threads.get(t.id);
+    }
+    if (check.signedOut.length) {
+      holdForSignIn(t.id, signInMessage(check.signedOut, about.name));
+      return threads.get(t.id);
+    }
   }
-  // The channel's setup action, in the verified checkout: a blocking one holds the agent until it succeeds.
-  const held = await runSetupAction(t);
-  if (held) {
-    failSetup(t.id, held.reason, held.stopped);
-    return threads.get(t.id);
+  // A thread with a branch has a worktree to make: a worktree channel's, or a continued thread's off a shared
+  // checkout (continue.ts). One held only for its sign-in check has none.
+  if (t.branch) {
+    const failed = await prepareWorktreeOf(t, shell);
+    if (failed) return threads.get(t.id);
+    t = threads.get(t.id) ?? t;
   }
   threads.update(t.id, { setup: null, setup_error: null, updated_at: t.updated_at });
   emitThread(t.id);
@@ -136,6 +155,56 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
   return threads.get(t.id);
 }
 
+/** Make and check a worktree thread's worktree, then run the channel's setup action. True when it failed or stopped. */
+async function prepareWorktreeOf(t: Thread, shell: boolean): Promise<boolean> {
+  // A worktree its agent moved to another branch keeps that branch: only a detached HEAD or the default branch is
+  // switched back (sandbox.ts prepareWorktree).
+  if (await followBranch(t.id).catch(() => false)) t = threads.get(t.id) ?? t;
+  try {
+    if (!t.branch) throw new Error('The thread has no branch to check out.');
+    const branch = t.branch;
+    // A channel repo that is not on this machine is cloned first, and may land at a new path here (repo-clone.ts).
+    // Stop ends the wait at once; the clone itself finishes for the next try.
+    await ensureRepo(t.channel_id, attemptSignal(t.id));
+    if (stopRequested(t.id)) throw new Error(STOPPED);
+    const repo = channels.get(t.channel_id)?.repo_path ?? null;
+    // A continued thread's branch starts at its source's HEAD, with the source's changes laid in (continue-carry.ts),
+    // so only a new thread's branch is cut from the base Ben picked.
+    const base = continuations.get(t.id) ? undefined : () => baseFor(t.id, repo!);
+    await withWorkspace(t.cwd, async () => {
+      await carryInto(t);
+      await prepareWorktree(repo, t.cwd, branch, base, channelExtras(channels.get(t.channel_id)));
+    });
+    // The commit the branch starts from, for the Changes panel. Recorded before anything runs there.
+    await recordStartBase(t.id, repo!, t.cwd).catch((err) => console.error(`[setup] ${t.id}: could not record the base commit:`, (err as Error).message));
+  } catch (err) {
+    if (stopRequested(t.id)) failSetup(t.id, STOPPED, true);
+    else failSetup(t.id, (err as Error).message);
+    return true;
+  }
+  // The channel's setup action, in the verified checkout: a blocking one holds the agent until it succeeds.
+  const held = await runSetupAction(t, shell);
+  if (held) {
+    failSetup(t.id, held.reason, held.stopped);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * A connector the job needs is signed out: the thread stops before any harness runs, says which one and how to sign
+ * in, and keeps its first prompt for Try again. Not a failure, so an automation's run never counts towards turning it
+ * off. A delegated thread tells its parent, and one Ben did not start by hand alerts, since nobody is watching it.
+ */
+export function holdForSignIn(threadId: string, message: string) {
+  threads.update(threadId, { setup: 'signin', setup_error: message, status: 'stopped' });
+  for (const r of messageRequests.unstarted(threadId)) messageRequests.park(r.id);
+  emitThread(threadId);
+  const t = threads.get(threadId);
+  if (t && t.source !== 'manual') notifyEnded(threadId, 'failed', message);
+  if (t?.parent_id) reportToParent(threadId, 'stopped', message);
+}
+
 /** The thread could not be prepared, or Ben stopped it first: why, on the thread, with its first prompt kept for Retry. */
 export function failSetup(threadId: string, reason: string, stopped = false) {
   threads.update(threadId, { setup: 'failed', setup_error: reason, status: stopped ? 'stopped' : 'failed' });
@@ -149,12 +218,29 @@ export function failSetup(threadId: string, reason: string, stopped = false) {
 }
 
 /**
- * Ben's Retry. Idempotent: a thread that is ready is left as it is, one being prepared keeps that preparation, and
- * the same thread, branch and session are used again, so a retry never makes a second of either.
+ * What the caller of Retry setup may do: `shell` when its request may reach a shell (request-guard.ts shellAllowed).
+ * `skipSignIn` is Start anyway on a thread held for a sign-in: it starts without the check this once.
  */
-export function retrySetup(threadId: string): Thread {
+export interface SetupRetryBy {
+  shell?: boolean;
+  skipSignIn?: boolean;
+}
+
+/**
+ * Ben's Retry. Idempotent: a thread that is ready is left as it is, one being prepared keeps that preparation, and
+ * the same thread, branch and session are used again, so a retry never makes a second of either. A failed thread
+ * whose channel has a setup step reruns that command in a login shell, so only a caller that may reach a shell
+ * retries it (request-trust.ts); without one the retry only checks the branch out again, which anyone may.
+ */
+export function retrySetup(threadId: string, by: SetupRetryBy = {}): Thread {
   const t = threads.get(threadId);
   if (!t) throw refusal('thread not found', 404);
-  if (t.setup === 'failed') void setUpThread(threadId);
+  if (t.setup !== 'failed' && t.setup !== 'signin') return t;
+  // Only a preparation that makes a worktree runs the setup step (prepareWorktreeOf): a failed one, or a sign-in hold
+  // on a thread with a branch.
+  const runsSetupStep = t.setup === 'failed' || !!t.branch;
+  if (runsSetupStep && !by.shell && !isProviderHarness(t.harness) && channelActions.setupFor(t.channel_id)) throw refusal(`Forbidden: ${SHELL_REFUSAL}`, 403);
+  if (t.setup === 'signin' && by.skipSignIn) signInWaived.add(threadId);
+  void setUpThread(threadId, by);
   return threads.get(threadId)!;
 }

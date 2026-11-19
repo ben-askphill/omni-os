@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { builderArgs } from '../scripts/dist.ts';
-import { personalTermProblems } from '../scripts/personal-terms.ts';
+import { personalTermProblems, SHIPPED_SOURCES } from '../scripts/personal-terms.ts';
 import { NATIVE_BINARIES, NATIVE_DIR, rustTriple, stagedNativeProblems, stageNative } from '../scripts/native.ts';
 import { NATIVE_CLI } from '../src/cli-shim.ts';
 import {
@@ -139,6 +139,13 @@ describe('stage.ts and the server bundle', () => {
   // Shipped charters reach every install. They once named one person's company, clients and tools.
   it('ships crew charters that name no one in particular', () => {
     expect(personalCrewProblems(join(import.meta.dirname, '../../../crew'))).toEqual([]);
+  });
+
+  // Templates ship the same way: the whole-build guard reads templates/ too, so anything about one person's company
+  // lives in data/templates/.
+  it('ships templates under the same guard as the rest of the build', () => {
+    expect(SHIPPED_DIRS).toContain('templates');
+    expect(SHIPPED_SOURCES).toContain('templates');
   });
 
   // The rest of the default build too: the server, Conductor MCP, Web UI, desktop and shared text, mods included.

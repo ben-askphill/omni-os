@@ -7,10 +7,12 @@ import { assignments } from './assignments.ts';
 export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'imported';
 /** `team`: a member of a team, run under its lead thread and listed only there. */
 /** A worktree thread's preparation: `preparing` until its worktree is made and checked, `failed` (with why) until Ben retries. */
-export type ThreadSetup = 'preparing' | 'failed';
+/** `signin`: a connector the job needs is signed out (runner/setup.ts holdForSignIn); `setup_error` says which. */
+export type ThreadSetup = 'preparing' | 'failed' | 'signin';
 /** A turn stopped at the harness's usage limit: `limited` until Ben acts, `scheduled` to resume at the reset time. */
 export type ThreadLimit = 'limited' | 'scheduled';
 export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';
+export type ThreadWorkspace = 'none' | 'read' | 'worktree';
 
 export interface Thread {
   id: string;
@@ -86,6 +88,12 @@ export interface Thread {
   goal_checks: number;
   /** The thread this one continues on another harness (apps/server/continue.ts), null for most. Not a crew parent. Synced. */
   continued_from: string | null;
+  /** 1 while it is a quick ask (packages/shared/quick-ask.ts): no charter, worktree, folder or task id, and out of every list but Recent asks. Synced. */
+  quick: number;
+  /** What its agent may touch: `none`, `read` or `worktree`. Null for a thread from before quick asks: the channel's folder, as always. Synced. */
+  workspace: ThreadWorkspace | null;
+  /** The task thread a quick ask turned into, with the answer carried over. Synced. */
+  promoted_to: string | null;
   /**
    * The person accountable for the thread, as a name; null is the install's own user. Separate from the agent doing
    * the work (`role` on `harness`), as an issue's assignee is from its delegate. A delegated thread starts with its
@@ -185,7 +193,7 @@ export function stampEdits(id: string, fields: readonly EditedField[], where = '
 
 /** The columns clients read, without sync's run_machine, the limit stop's id and owner, or the session state. */
 export const THREAD_COLUMNS =
-  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, open_items, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, owner, created_at, updated_at';
+  'id, channel_id, title, status, role, model, harness, effort, auto_reason, queued_harness, queued_model, queued_effort, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, last_text, suggestion, next_title, next_prompt, open_items, archived, folder_id, pinned_at, done_at, setup, setup_error, resume_blocked, limit_state, limit_resets_at, limit_elsewhere, goal_objective, goal_status, goal_checks, continued_from, quick, workspace, promoted_to, owner, created_at, updated_at';
 
 /**
  * The machine whose status write this is: this one while it is running or queued here and sync is set up, else nobody.
@@ -206,7 +214,7 @@ export const threads = {
   /** A channel's threads, without team members: those are listed under their lead. */
   byChannel: (channelId: string, limit = 200, archived = false) =>
     db
-      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND archived = ? ORDER BY updated_at DESC LIMIT ?`)
+      .prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND quick = 0 AND archived = ? ORDER BY updated_at DESC LIMIT ?`)
       .all(channelId, archived ? 1 : 0, limit) as unknown as Thread[],
   /**
    * One page of a channel's threads, newest first, after `after` (the last row of the page before). The clients page
@@ -216,13 +224,13 @@ export const threads = {
     const after = opts.after ?? null;
     return db
       .prepare(
-        `SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND archived = ?
+        `SELECT ${THREAD_COLUMNS} FROM threads WHERE channel_id = ? AND source != 'team' AND quick = 0 AND archived = ?
          AND (? IS NULL OR updated_at < ? OR (updated_at = ? AND id < ?)) ORDER BY updated_at DESC, id DESC LIMIT ?`,
       )
       .all(channelId, opts.archived ? 1 : 0, after?.updated_at ?? null, after?.updated_at ?? null, after?.updated_at ?? null, after?.id ?? null, opts.limit) as unknown as Thread[];
   },
   recent: (limit = 50) =>
-    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
+    db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 AND quick = 0 ORDER BY updated_at DESC LIMIT ?`).all(limit) as unknown as Thread[],
   children: (parentId: string) =>
     db.prepare(`SELECT ${THREAD_COLUMNS} FROM threads WHERE parent_id = ? ORDER BY created_at`).all(parentId) as unknown as Thread[],
   /** The threads working on a branch, newest first. Omni names branches per thread, so it is one in practice. */
@@ -313,7 +321,7 @@ export const threads = {
   recentPerChannel: (perChannel = 5) =>
     db
       .prepare(
-        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC, created_at DESC, id) AS n FROM threads WHERE source != 'team' AND archived = 0) WHERE n <= ?`,
+        `SELECT ${THREAD_COLUMNS} FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY updated_at DESC, created_at DESC, id) AS n FROM threads WHERE source != 'team' AND quick = 0 AND archived = 0) WHERE n <= ?`,
       )
       .all(perChannel) as unknown as Thread[],
   /** Threads in a folder of their own channel, newest first, without archived ones and team members. */
@@ -321,7 +329,7 @@ export const threads = {
     db
       .prepare(
         `SELECT ${THREAD_COLUMNS.split(', ').map((c) => `t.${c}`).join(', ')} FROM threads t JOIN folders f ON f.id = t.folder_id AND f.channel_id = t.channel_id
-         WHERE t.archived = 0 AND t.source != 'team' ${channelId ? 'AND t.channel_id = ?' : ''} ORDER BY t.updated_at DESC`,
+         WHERE t.archived = 0 AND t.source != 'team' AND t.quick = 0 ${channelId ? 'AND t.channel_id = ?' : ''} ORDER BY t.updated_at DESC`,
       )
       .all(...(channelId ? [channelId] : [])) as unknown as Thread[],
   /** Pinned threads, the latest pin first, without archived ones or those of an archived channel. */
@@ -355,7 +363,7 @@ export const threads = {
   runMachine: (id: string) =>
     (db.prepare('SELECT run_machine FROM threads WHERE id = ?').get(id) as { run_machine: string | null } | undefined)?.run_machine ?? null,
   list(filter: { channel?: string; status?: string; limit?: number }) {
-    const where: string[] = ['archived = 0'];
+    const where: string[] = ['archived = 0', 'quick = 0'];
     const args: (string | number)[] = [];
     if (filter.channel) (where.push('channel_id = ?'), args.push(filter.channel));
     if (filter.status) (where.push('status = ?'), args.push(filter.status));
@@ -364,23 +372,43 @@ export const threads = {
       .prepare(`SELECT ${THREAD_COLUMNS} FROM threads ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY updated_at DESC LIMIT ?`)
       .all(...args) as unknown as Thread[];
   },
+  /**
+   * Quick asks from the last `days` days, newest first: Recent asks. One that turned into a task or was kept stays listed
+   * with it, so the ask is still found where it was made.
+   */
+  recentAsks: (days = 7, limit = 50) =>
+    db
+      .prepare(
+        `SELECT ${THREAD_COLUMNS} FROM threads WHERE archived = 0 AND (quick = 1 OR promoted_to IS NOT NULL) AND created_at >= ?
+         ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(new Date(Date.now() - days * 86_400_000).toISOString(), limit) as unknown as Thread[],
+  /** Kept as a thread (`keep`) or turned into one (`promoted_to`): out of Recent asks' quick state, into the lists. */
+  setQuick(id: string, patch: { quick: 0 | 1; promoted_to?: string | null }) {
+    const sets = ['quick = ?', 'updated_at = ?'];
+    const vals: (string | number | null)[] = [patch.quick, now()];
+    if (patch.promoted_to !== undefined) (sets.push('promoted_to = ?'), vals.push(patch.promoted_to));
+    const changed = db.prepare(`UPDATE threads SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id).changes > 0;
+    if (changed) record('thread', id);
+    return changed;
+  },
   create(
     t: Omit<
       Thread,
-      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'open_items' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from' | 'owner'
+      'created_at' | 'updated_at' | 'has_run' | 'last_text' | 'suggestion' | 'next_title' | 'next_prompt' | 'open_items' | 'harness' | 'effort' | 'auto_reason' | 'queued_harness' | 'queued_model' | 'queued_effort' | 'archived' | 'folder_id' | 'pinned_at' | 'done_at' | 'setup' | 'setup_error' | 'resume_blocked' | 'limit_state' | 'limit_resets_at' | 'limit_elsewhere' | 'goal_objective' | 'goal_status' | 'goal_checks' | 'continued_from' | 'quick' | 'workspace' | 'promoted_to' | 'owner'
     > & {
       has_run?: number; created_at?: string; harness?: string; effort?: string; auto_reason?: string | null; folder_id?: string | null; setup?: ThreadSetup | null;
-      owner?: string | null;
+      quick?: number; workspace?: ThreadWorkspace | null; owner?: string | null;
     },
   ) {
     const ts = t.created_at ?? now();
     return tx(() => {
       db.prepare(
-        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, auto_reason, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, folder_id, setup, owner, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO threads (id, channel_id, title, status, role, model, harness, effort, auto_reason, session_id, has_run, cwd, branch, parent_id, task_id, source, automation, run_machine, folder_id, setup, quick, workspace, owner, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         t.id, t.channel_id, t.title, t.status, t.role, t.model, t.harness ?? 'claude-code', t.effort ?? '', t.auto_reason ?? null, t.session_id, t.has_run ?? 0, t.cwd,
-        t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, t.setup ?? null, t.owner ?? null, ts, ts,
+        t.branch, t.parent_id, t.task_id, t.source, t.automation, runMachine(t.status), t.folder_id ?? null, t.setup ?? null, t.quick ?? 0, t.workspace ?? null, t.owner ?? null, ts, ts,
       );
       record('thread', t.id);
       if (runMachine(t.status)) assignments.claim(t.id);

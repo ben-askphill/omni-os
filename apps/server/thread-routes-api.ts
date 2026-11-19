@@ -1,6 +1,8 @@
 // /api/threads: list, create, detail, messages, uploads, stop, and the live stream.
 // Split into two apps so app.ts can keep mounting threadsApi and terminalApi between them.
 // Hono keeps the first registered match, so that order is the one the handlers already won with.
+import { keepQuickAsk, QuickAskRefusal, startQuickAsk, taskFromQuickAsk } from './quick-ask.ts';
+import { RECENT_ASKS_DAYS } from '@omni/shared/quick-ask.ts';
 import { Hono, type Context } from 'hono';
 import { sessionSSE } from './sse.ts';
 import { existsSync, readFileSync } from 'node:fs';
@@ -64,6 +66,7 @@ import { basePick, baseView } from './worktree-base.ts';
 import { checkUploads, imageMime, removeUploads, safeName, saveUploads } from './uploads.ts';
 import { stepOf, stepPrompts } from '@omni/shared/thread-glance.ts';
 import { fixChecksPrompt } from './fix-checks.ts';
+import { shellAllowed } from './request-guard.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
 export const threadRoutesApi = new Hono();
@@ -85,6 +88,8 @@ const createSchema = z.object({
   task_id: z.string().nullish(),
   /** A review: the thread whose work it reviews. The run goes to the other model family (harness/review.ts). */
   review_of: z.string().max(100).nullish(),
+  /** A delegation whose report wakes its delegate-only parent, which will act on it (runner/queue.ts showsInPlace). */
+  follow_up: z.boolean().optional(),
   source: z.enum(['manual', 'conductor', 'capture']).default('manual'),
   /** A sidebar folder of the channel, by id or name. A name no folder has makes one. */
   folder: z.string().max(200).nullish(),
@@ -98,6 +103,26 @@ const createSchema = z.object({
    * stampNewThreadReferences. No other kind: the rest point into the thread they are written in.
    */
   context: z.unknown().optional(),
+  /** A quick ask (packages/shared/quick-ask.ts): answered in place, out of the lists but Recent asks. */
+  quick: z.boolean().optional(),
+});
+
+/** Recent asks: the quick asks of the last week, kept or turned into a task ones included (RECENT_ASKS_DAYS). */
+threadRoutesApi.get('/asks', (c) => c.json(allWithDelegating(threads.recentAsks(RECENT_ASKS_DAYS))));
+
+/**
+ * A quick ask becomes a thread: `keep` makes it an ordinary one where it is, `task` starts a task thread from its
+ * answer (`request`: what the task should do; left out, the last question). Returns the ask and the task.
+ */
+threadRoutesApi.post('/:id/promote', async (c) => {
+  const body = z.object({ to: z.enum(['task', 'keep']), request: z.string().max(20_000).optional() }).parse(await c.req.json().catch(() => ({})));
+  try {
+    if (body.to === 'keep') return c.json({ ask: keepQuickAsk(c.req.param('id')) });
+    return c.json(await taskFromQuickAsk(c.req.param('id'), { request: body.request }));
+  } catch (err) {
+    if (err instanceof QuickAskRefusal) return c.json({ error: err.message }, err.status);
+    throw err;
+  }
 });
 
 threadRoutesApi.get('/', (c) =>
@@ -131,8 +156,9 @@ threadRoutesApi.post('/', async (c) => {
   const stamped = stampNewThreadReferences(body.channel || getCrew(body.role)?.channel || 'inbox', parsed.value);
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const input = { ...body, files, ...(stamped.value.length && { context: stamped.value }) };
-  if (!id) return c.json(await createThread(input));
-  const first = creating.get(id) ?? createThread(input);
+  const make = body.quick ? startQuickAsk : createThread;
+  if (!id) return c.json(await make(input));
+  const first = creating.get(id) ?? make(input);
   creating.set(id, first);
   try {
     return c.json(await first);
@@ -246,6 +272,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
     // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
     ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),
+    // It waits for a sign-in to an account it needs (runner/setup.ts holdForSignIn): which, and how to sign in.
+    ...(t.setup === 'signin' && { waits_for_sign_in: t.setup_error }),
     // What its last turn left open for the user (packages/shared/open-items.ts). Only while some are.
     ...(t.open_items && { open_items: readOpenItems(t.open_items) }),
     // Whether its session is still in the prompt cache: a parent messages a warm one and continues a cold one in a new session.
@@ -322,18 +350,20 @@ threadActionsApi.post('/:id/requests/resume', async (c) => {
   const id = c.req.param('id');
   const { ids } = z.object({ ids: z.array(z.string().min(1)).max(200).optional() }).parse(await c.req.json().catch(() => ({})));
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  await resumeRequests(id, ids);
+  await resumeRequests(id, ids, { shell: shellAllowed(c) });
   return c.json(afterRecovery(id));
 });
 
 /**
- * Retry a worktree that could not be prepared: the same thread, branch and session, and its first prompt once the
- * worktree is ready. Safe to send twice; a thread that is ready or already being prepared is left as it is.
+ * Retry a worktree that could not be prepared, or a thread that waits for a sign-in: the same thread, branch and
+ * session, and its first prompt once it is ready. `skip_signin` is Start anyway: the thread starts without the sign-in
+ * check this once. Safe to send twice; a thread that is ready or already being prepared is left as it is.
  */
-threadActionsApi.post('/:id/setup/retry', (c) => {
+threadActionsApi.post('/:id/setup/retry', async (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  retrySetup(id);
+  const { skip_signin } = z.object({ skip_signin: z.boolean().optional() }).parse(await c.req.json().catch(() => ({})));
+  retrySetup(id, { shell: shellAllowed(c), skipSignIn: skip_signin });
   return c.json(afterRecovery(id));
 });
 
@@ -343,11 +373,11 @@ threadActionsApi.post('/:id/setup/retry', (c) => {
  * Each sends the messages waiting for Resume; with none, Ben's next message goes the chosen way. A 409 while it runs.
  */
 threadActionsApi.post('/:id/session/retry', async (c) => {
-  await retryResume(c.req.param('id'));
+  await retryResume(c.req.param('id'), { shell: shellAllowed(c) });
   return c.json(afterRecovery(c.req.param('id')));
 });
 threadActionsApi.post('/:id/session/fresh', async (c) => {
-  await startFresh(c.req.param('id'));
+  await startFresh(c.req.param('id'), { shell: shellAllowed(c) });
   return c.json(afterRecovery(c.req.param('id')));
 });
 
@@ -424,22 +454,6 @@ threadActionsApi.patch('/:id/requests/:rid', async (c) => {
     removeUploads(added);
     throw err;
   }
-});
-
-/** Update a plan step's status. */
-threadActionsApi.patch('/:id/plan/steps/:index', async (c) => {
-  const threadId = c.req.param('id');
-  const index = Number(c.req.param('index'));
-  const body = await c.req.json().catch(() => ({}));
-  const { status } = z.object({ status: z.enum(['pending', 'in_progress', 'completed']) }).parse(body);
-
-  if (!threads.get(threadId)) return c.json({ error: 'not found' }, 404);
-  if (isNaN(index) || index < 0) return c.json({ error: 'invalid step index' }, 400);
-
-  // Add a plan_step_update event to record the status change
-  events.add(threadId, 'plan_step_update', { index, status });
-
-  return c.json(afterRecovery(threadId));
 });
 
 /** Take unsent messages out of the queue. The transcript never shows them; GET /requests keeps the record. */

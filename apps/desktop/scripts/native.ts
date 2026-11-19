@@ -22,7 +22,7 @@ const TARGET_DIR = join(DESKTOP, 'build', 'cache', 'cargo-target');
  * `--version`), and what an app without it lacks.
  */
 export const NATIVE_BINARIES = [
-  { crate: 'omni-mcp', file: 'omni-mcp', without: 'its threads get no ask_user_question, html_render or read_referenced_thread' },
+  { crate: 'omni-mcp', file: 'omni-mcp', without: 'its threads get no ask_user_question, html_render, set_steps or read_referenced_thread' },
   { crate: 'omni-cli', file: 'omni', without: 'it writes no omni command' },
 ] as const;
 export type NativeBinary = (typeof NATIVE_BINARIES)[number];

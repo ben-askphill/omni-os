@@ -6,6 +6,8 @@ import { channels, events, threads } from './db.ts';
 import { isHarnessId, type HarnessId } from './harness/types.ts';
 import { threadCommands } from './runner.ts';
 import { commandsFolder } from './sandbox.ts';
+import { withTemplates } from '@omni/shared/templates.ts';
+import { listTemplates } from './templates.ts';
 
 export const commandsApi = new Hono();
 
@@ -16,6 +18,7 @@ export const commandsApi = new Hono();
  * `?harness=<id>&channel=<id>`: the new-thread composer's list, for the folder a thread started in
  * that channel reads its commands from.
  * `recent` names the commands Ben used last on that harness; the menu shows the ones this list has.
+ * Both lists end with the templates on offer (templates.ts), which Omni expands on every harness.
  */
 commandsApi.get('/', async (c) => {
   const wait = c.req.query('wait') === '1';
@@ -27,11 +30,11 @@ commandsApi.get('/', async (c) => {
     if (!channel) return c.json({ error: 'not found' }, 404);
     // With no repo, base dir or brain, a thread runs in a new folder of its own, which has no project commands.
     const list = await listCommands(harness, commandsFolder(channel) ?? paths.threads, { wait });
-    return c.json({ ...list, recent: events.recentCommands(harness) });
+    return c.json({ ...list, commands: withTemplates(list.commands, listTemplates()), recent: events.recentCommands(harness) });
   }
   const t = id ? threads.get(id) : undefined;
   if (!t) return c.json({ error: 'not found' }, 404);
   const harness = t.harness as HarnessId;
   const list = threadCommands(t.id) ?? (await listCommands(harness, t.cwd, { wait }));
-  return c.json({ ...list, recent: events.recentCommands(harness) });
+  return c.json({ ...list, commands: withTemplates(list.commands, listTemplates()), recent: events.recentCommands(harness) });
 });

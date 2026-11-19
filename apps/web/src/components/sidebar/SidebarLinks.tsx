@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
 import { href, useRoute } from '../../router.ts';
 import { NavLink } from './SidebarRows.tsx';
+import { usePRsShown } from '../../display.ts';
+import { useApp } from '../../store.tsx';
 
 /** The rail's Workspace group: Artifacts, Pull requests, Automations and Settings. */
 export function WorkspaceLinks({ onNavigate }: { onNavigate?: () => void }) {
   const route = useRoute();
+  const prs = usePRsShown(useApp().channels);
   return (
     <div>
       <div className="caption px-3 pt-1 pb-2">Workspace</div>
@@ -12,9 +15,11 @@ export function WorkspaceLinks({ onNavigate }: { onNavigate?: () => void }) {
         <NavLink to={href.artifacts()} icon="layers" active={route.name === 'artifacts'} onNavigate={onNavigate}>
           Artifacts
         </NavLink>
-        <NavLink to={href.pullRequests()} icon="pr" active={route.name === 'prs'} onNavigate={onNavigate}>
-          Pull requests
-        </NavLink>
+        {prs && (
+          <NavLink to={href.pullRequests()} icon="pr" active={route.name === 'prs'} onNavigate={onNavigate}>
+            Pull requests
+          </NavLink>
+        )}
         <NavLink to={href.automations()} icon="zap" active={route.name === 'automations'} onNavigate={onNavigate}>
           Automations
         </NavLink>

@@ -84,6 +84,48 @@ describe('crew reports', () => {
     expect(reports(parent.id)[0].state).toBe('discarded');
   });
 
+  // The Conductor's quick path: a report to a delegate-only parent shows in place and starts no relay turn there.
+  const conductor = (prompt: string) => H.start(prompt, { channel: 'conductor', role: 'conductor' });
+
+  it('shows a report to an idle Conductor in place, with no relay turn, and hands it to the harness with the next message', T, async () => {
+    const parent = await conductor('route this');
+    await H.untilResults(parent.id, 1);
+    const child = await H.start('quiet child', { parent_id: parent.id, source: 'conductor', role: 'researcher' });
+    await H.untilResults(child.id, 1);
+
+    const [saved] = await H.until('report shown', () => (reports(parent.id)[0]?.state === 'shown' ? reports(parent.id) : null));
+    expect(saved.event_id).toBe(H.byKind(parent.id, 'crew_report')[0].id);
+    expect(H.byKind(parent.id, 'crew_report')[0].p).toMatchObject({ thread_id: child.id, status: 'done', text: 'ack: quiet child', shown: true });
+    expect(H.runner.pendingFor(parent.id)).toEqual([]);
+    expect(H.byKind(parent.id, 'result')).toHaveLength(1);
+    expect(H.claudeTexts(parent.id)).toHaveLength(1);
+
+    H.runner.sendMessage(parent.id, 'what did it find?');
+    await H.untilResults(parent.id, 2);
+    const last = H.claudeTexts(parent.id).at(-1)!;
+    expect(last).toContain(`[crew report] task ${child.task_id} from researcher`);
+    expect(last).toContain('ack: quiet child');
+    expect(last.endsWith('what did it find?')).toBe(true);
+    // The transcript keeps Ben's own words, and the report is read once.
+    expect(H.texts(parent.id, 'user').at(-1)).toBe('what did it find?');
+    expect(reports(parent.id)[0]).toMatchObject({ state: 'delivered', event_id: saved.event_id });
+    expect(H.byKind(parent.id, 'crew_report')).toHaveLength(1);
+
+    H.runner.sendMessage(parent.id, 'thanks');
+    await H.untilResults(parent.id, 3);
+    expect(H.claudeTexts(parent.id).at(-1)).not.toContain('[crew report]');
+  });
+
+  it('wakes the Conductor when the delegation asked for follow_up', T, async () => {
+    const parent = await conductor('chain two steps');
+    await H.untilResults(parent.id, 1);
+    const child = await H.start('step one', { parent_id: parent.id, source: 'conductor', role: 'researcher', follow_up: true });
+    await H.untilResults(child.id, 1);
+    await H.untilResults(parent.id, 2);
+    expect(reports(parent.id)[0]).toMatchObject({ state: 'delivered' });
+    expect(H.claudeTexts(parent.id).at(-1)).toContain('Relay what matters');
+  });
+
   it('a team lead still waits for every member, and its go is saved once', T, async () => {
     const conductor = await H.start('conductor');
     await H.untilResults(conductor.id, 1);

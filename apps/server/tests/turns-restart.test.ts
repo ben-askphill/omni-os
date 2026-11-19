@@ -40,6 +40,8 @@ function boot(data: string) {
       OMNI_PORT: '0',
       OMNI_HOST: '127.0.0.1',
       OMNI_CLAUDE_BIN: FAKE_CLAUDE,
+      // A fresh data dir would settle a new install's "Ask first" (access-default.ts); these servers run as before levels.
+      OMNI_ACCESS_DEFAULT: 'full',
       OMNI_CODEX_BIN: join(tmp, 'no-codex'),
       OMNI_CURSOR_BIN: join(tmp, 'no-cursor-agent'),
       OMNI_BROWSER: '0',

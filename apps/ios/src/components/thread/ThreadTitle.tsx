@@ -17,6 +17,8 @@ interface ThreadTitleProps {
   /** The display name of the crew role the thread runs as (crewRoleName), null on a thread not started as one. */
   role?: string | null;
   device: string | null;
+  /** The account the thread's harness runs as ("dev@example.com · Max"), after the machine. */
+  account?: string | null;
   /** Opens the Runs on page. Without it the machine name is plain text: there is nothing to pick. */
   onOpenMachine?: () => void;
 }
@@ -25,7 +27,7 @@ interface ThreadTitleProps {
  * The open thread's navigation bar title, left-aligned: the title on one line, and under it the status dot and word,
  * the channel, the crew role it runs as and the machine the thread runs on. They replace the status and chips rows under the bar.
  */
-export function ThreadTitle({ title, status, statusLabel, channel, role = null, device, onOpenMachine }: ThreadTitleProps) {
+export function ThreadTitle({ title, status, statusLabel, channel, role = null, device, account = null, onOpenMachine }: ThreadTitleProps) {
   const { colors } = useOmniTheme();
   const { width } = useWindowDimensions();
   const live = status === 'running';
@@ -62,7 +64,7 @@ export function ThreadTitle({ title, status, statusLabel, channel, role = null, 
         {device ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Runs on ${device}`}
+            accessibilityLabel={account ? `Runs on ${device} as ${account}` : `Runs on ${device}`}
             accessibilityHint={onOpenMachine ? 'Opens the list of machines' : undefined}
             disabled={!onOpenMachine}
             hitSlop={{ top: 12, bottom: 12, left: 4, right: 8 }}
@@ -71,7 +73,7 @@ export function ThreadTitle({ title, status, statusLabel, channel, role = null, 
           >
             <Icon name="machine" size={12} strokeWidth={2} color={colors.fg3} />
             <Text numberOfLines={1} style={[styles.sub, { color: colors.fg3 }]}>
-              {device}
+              {account ? `${device} · ${account}` : device}
             </Text>
           </Pressable>
         ) : null}

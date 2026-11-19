@@ -403,9 +403,13 @@ export function registerExternalTools(server: McpServer, call: Call) {
   );
 }
 
+// No tool takes a list or a map, so a call carries a few dozen elements at most. The SDK counts array elements and
+// object members in a call's arguments and refuses one over this before validating it.
+const MAX_TOOL_INPUT_ELEMENTS = 1_000;
+
 /** A server with every external tool, over `call`. */
 export function createExternalServer(call: Call) {
-  const server = new McpServer({ name: 'omni', version: '0.1.0' }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: 'omni', version: '0.1.0' }, { instructions: INSTRUCTIONS, maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS });
   registerExternalTools(server, call);
   return server;
 }

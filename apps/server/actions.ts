@@ -76,6 +76,7 @@ export function blockedReason(t: Thread): string | null {
   if (isProviderHarness(t.harness)) return 'This thread runs off this machine, so its actions have no checkout here to run in.';
   if (t.setup === 'preparing') return "The thread's worktree is still being prepared.";
   if (t.setup === 'failed') return `The thread's worktree could not be prepared: ${t.setup_error ?? 'unknown error'}`;
+  if (t.setup === 'signin' && t.branch) return "The thread's worktree is not made yet: the thread waits for a sign-in.";
   return null;
 }
 

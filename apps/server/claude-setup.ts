@@ -4,18 +4,19 @@
 // the code that page shows: the user opens the page, pastes the code, and Omni hands it to the CLI. Claude Code keeps
 // the login itself, as it does from a terminal; Omni never sees the token. `claude auth status --json` says whether it
 // worked. One install and one sign-in at a time.
-import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { ClaudeLoginStart, ClaudeSetup, ClaudeStep } from '@omni/shared/claude-setup.ts';
 import { config } from './config.ts';
-import { loadCatalog } from './harness/catalog-service.ts';
+import { parseClaudeStatus } from './harness/accounts-parse.ts';
+import { claudeProbeOf } from './harness/catalog.ts';
+import { claudeAuthStatus, loadCatalog } from './harness/catalog-service.ts';
 import { harnessEnv } from './harness/env-guard.ts';
 
 /** Claude Code's own installer. `OMNI_CLAUDE_INSTALL` names another command, for tests and QA stacks. */
 export const CLAUDE_INSTALL = 'curl -fsSL https://claude.ai/install.sh | bash';
 const installCommand = () => process.env.OMNI_CLAUDE_INSTALL || CLAUDE_INSTALL;
 
-const STATUS_MS = 8_000;
 /** How long sign-in waits for the CLI to print its page, and for it to finish once it has the code. */
 const URL_MS = 20_000;
 const CODE_MS = 30_000;
@@ -28,25 +29,20 @@ const TAIL = 1200;
 
 const tail = (s: string) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').trim().slice(-TAIL);
 
-type AuthStatus = { loggedIn?: unknown; email?: unknown; subscriptionType?: unknown };
-
-/** Whether Claude Code is installed and signed in here, from `claude auth status --json`. */
-export function claudeSetup(bin = config.claudeBin): Promise<ClaudeSetup> {
-  return new Promise((resolve) => {
-    execFile(bin, ['auth', 'status', '--json'], { env: harnessEnv('claude-code', {}), timeout: STATUS_MS, maxBuffer: 256 * 1024, killSignal: 'SIGKILL' }, (err, stdout) => {
-      const code = (err as NodeJS.ErrnoException | null)?.code;
-      if (code === 'ENOENT' || code === 'EACCES') return resolve({ state: 'missing', install: installCommand() });
-      let j: AuthStatus | null = null;
-      try {
-        j = JSON.parse(stdout) as AuthStatus;
-      } catch {
-        // An older CLI without `auth status`, or one that did not answer: Omni cannot tell, so it does not ask.
-      }
-      if (!j || typeof j.loggedIn !== 'boolean') return resolve({ state: 'unknown' });
-      if (!j.loggedIn) return resolve({ state: 'signed-out' });
-      resolve({ state: 'ready', ...(typeof j.email === 'string' && { email: j.email }), ...(typeof j.subscriptionType === 'string' && { plan: j.subscriptionType }) });
-    });
-  });
+/**
+ * Whether Claude Code is installed and signed in here. The same reading as the harness catalog and Settings > Accounts:
+ * one `claude auth status --json` (catalog-service.ts), signed out by catalog.ts claudeProbeOf, who and which plan by
+ * accounts-parse.ts parseClaudeStatus.
+ */
+export async function claudeSetup(bin = config.claudeBin): Promise<ClaudeSetup> {
+  const out = await claudeAuthStatus(bin);
+  const probe = claudeProbeOf(out);
+  if (probe.missing) return { state: 'missing', install: installCommand() };
+  if (!probe.available) return { state: 'signed-out' };
+  const a = out.stdout ? parseClaudeStatus(out.stdout) : null;
+  // An older CLI without `auth status`, or one that did not answer or say as whom: Omni cannot tell, so it does not ask.
+  if (a?.state !== 'signed-in') return { state: 'unknown' };
+  return { state: 'ready', ...(a.label && { email: a.label }), ...(a.plan && { plan: a.plan }) };
 }
 
 /** Read the harness catalog again, so pickers and the Harnesses step see the new state. */

@@ -16,6 +16,7 @@ import { HeaderActions } from './HeaderActions.tsx';
 import { rowOf, type RowItem } from './rows.ts';
 import { useShell } from './shell.tsx';
 import { isWorking } from '@omni/shared/delegate-count.ts';
+import { useDisplay } from '../display.ts';
 
 const GROUPS: { label: string; kinds: string[] }[] = [
   { label: 'Clients', kinds: ['client'] },
@@ -47,6 +48,8 @@ function Counts({ needs, running }: { needs: number; running: number }) {
 export function ChannelsScreen() {
   const shell = useShell();
   const { channels, needsYou, channel } = useApp();
+  // The store domain is the Shopify pack's: without it a channel's line names its GitHub repo only.
+  const { shopify } = useDisplay();
   const listed = channels.filter((c) => !c.archived && c.id !== 'conductor');
   const conductor = channel('conductor');
   const running = channels.reduce((n, c) => n + (c.running || 0), 0);
@@ -87,7 +90,7 @@ export function ChannelsScreen() {
                     key={c.id}
                     icon={<Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} size={30} />}
                     label={`#${c.name}`}
-                    sub={c.store_domain || c.github_repo || undefined}
+                    sub={(shopify && c.store_domain) || c.github_repo || undefined}
                     right={<Counts needs={needsIn(c.id)} running={c.running} />}
                     onClick={() => shell.open(href.channel(c.id))}
                     last={i === list.length - 1}
@@ -133,6 +136,7 @@ interface FolderRows {
 export function ChannelScreen({ id }: { id: string }) {
   const shell = useShell();
   const { channel, channelsLoaded, needsYou, profile } = useApp();
+  const { shopify } = useDisplay();
   const folders = useFolders();
   const ch: ChannelWithRunning | undefined = channel(id);
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
@@ -219,7 +223,7 @@ export function ChannelScreen({ id }: { id: string }) {
       <MoHeader
         onBack={shell.back}
         title={name}
-        sub={[KIND_LABEL[ch?.kind ?? ''], ch?.store_domain, ch?.github_repo].filter(Boolean).join(' · ') || undefined}
+        sub={[KIND_LABEL[ch?.kind ?? ''], shopify && ch?.store_domain, ch?.github_repo].filter(Boolean).join(' · ') || undefined}
         right={<MoRound icon="more" label="Channel settings" onClick={() => shell.open(href.settings(id))} />}
       />
       <MoScroll>

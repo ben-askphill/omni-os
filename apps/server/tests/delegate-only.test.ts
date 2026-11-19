@@ -23,25 +23,31 @@ describe('a delegate-only role', () => {
     expect(args[args.indexOf('--disallowedTools') + 1]).toBe('AskUserQuestion');
   });
 
-  it('is told to delegate first, and gets no browser or artifact instructions', async () => {
+  it('answers quick asks itself, delegates real work, and gets no browser or artifact instructions', async () => {
     const t = await r.start('THINK:1');
     await r.untilResults(t.id, 1);
     const thread = r.thread(t.id);
     const channel = r.db.channels.get('scratch')!;
     const conductor = buildSystemPrompt(thread, channel, getCrew('conductor'));
-    expect(conductor).toContain('You route work; you never do it.');
+    expect(conductor).toContain('Answer quick asks yourself, in this thread, and start no thread for them');
+    expect(conductor).toContain('Delegate with Omni\'s delegate tool, before anything else, when the work writes or edits files');
+    expect(conductor).toContain('no brief, no folder question');
+    // A report shows in place and wakes it only with follow_up.
+    expect(conductor).toContain('a report wakes you only when you passed follow_up: true');
+    expect(conductor).not.toContain('however small');
     expect(conductor).not.toContain('## Browser');
     expect(conductor).not.toContain('## Artifacts');
     expect(conductor).not.toContain('when the user asks you to hand work');
 
     const builder = buildSystemPrompt(thread, channel, getCrew('builder'));
     expect(builder).toContain('## Artifacts');
-    expect(builder).not.toContain('You route work');
+    expect(builder).not.toContain('Answer quick asks yourself');
+    expect(builder).not.toContain('follow_up');
 
     // A usage scan's lead has the omni tools to save what Ben picks, but does its own analysis: no delegation rules.
     const scan = buildSystemPrompt(thread, channel, getCrew('usage-scan'));
     expect(scan).not.toContain('## Thread delegation');
-    expect(scan).not.toContain('You route work');
+    expect(scan).not.toContain('Answer quick asks yourself');
     expect(scan).toContain('never call delegate or delegate_team');
     expect(scan).not.toContain('## Browser');
   });

@@ -7,6 +7,7 @@ import { useApp, useNow } from '../store.tsx';
 import { MoEmpty, MoGroup, MoListRow, MoRows, MoSheet } from './parts.tsx';
 import { rowOf, shortTime, type RowItem } from './rows.ts';
 import { useShell } from './shell.tsx';
+import { useDisplay } from '../display.ts';
 
 const notTeam = (t: Thread) => t.source !== 'team' && !t.archived;
 
@@ -23,6 +24,7 @@ function useDebounced<T>(value: T, ms: number) {
 export function SearchSheet() {
   const shell = useShell();
   const { channels, channel } = useApp();
+  const { shopify } = useDisplay();
   const [q, setQ] = useState('');
   const query = useDebounced(q.trim(), 200);
   const recent = useLiveThreads('/recent?limit=30', notTeam, 30);
@@ -90,7 +92,7 @@ export function SearchSheet() {
                 key={c.id}
                 icon={<Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} omni={c.id === 'conductor'} size={28} />}
                 label={c.id === 'conductor' ? 'Conductor' : `#${c.name}`}
-                sub={c.store_domain || c.github_repo || undefined}
+                sub={(shopify && c.store_domain) || c.github_repo || undefined}
                 onClick={() => shell.open(href.channel(c.id))}
                 last={i === matched.length - 1}
               />

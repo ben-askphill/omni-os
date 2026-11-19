@@ -37,6 +37,9 @@ const TABS: { id: PanelTab; icon: IconName; name: string; title: string }[] = [
   { id: 'actions', icon: 'play', name: 'Actions', title: 'Actions' },
 ];
 
+/** The tabs a thread outside a code project leaves out while Show technical details is off. */
+const CODE_TABS: ReadonlySet<PanelTab> = new Set<PanelTab>(['prs', 'changes', 'terminal', 'actions']);
+
 /**
  * The thread's inspector: a tab strip over Details, PRs, Artifacts, Changes, Browser, Terminal and Actions. Details
  * leads with the branch card and PRs follows, the two Ben reaches for most.
@@ -48,13 +51,16 @@ export function ThreadPanel({
   crewArtifacts,
   selectedArtifact,
   onSelect,
-  tab,
+  tab: picked,
   onTab,
   onClose,
   details,
   prs,
+  code = true,
 }: {
   thread: Thread;
+  /** Show technical details is on, or the channel has a repo: the PRs, Changes and Terminal tabs show. */
+  code?: boolean;
   files: Artifact[];
   shots: ComponentProps<typeof BrowserTab>['shots'];
   /** The files and screenshots of the threads it delegated to, listed under its own. */
@@ -68,6 +74,14 @@ export function ThreadPanel({
   prs: Omit<PRs, 'thread'>;
 }) {
   const { agents } = details;
+  const fileCount = files.length + crewArtifacts.files.length;
+  const shotCount = shots.length + crewArtifacts.shots.length;
+  // Outside a code project with the switch off, a tab shows only with something in it: no code tabs, and Artifacts and
+  // Browser once there is a file or a screenshot. Web is the user's own browser, so it stays.
+  const shows = (t: PanelTab) =>
+    (desktop || t !== 'web') && (code || (!CODE_TABS.has(t) && (t !== 'artifacts' || fileCount > 0) && (t !== 'browser' || shotCount > 0)));
+  // A tab this thread does not show (a remembered PRs tab in a channel without a repo) opens Details.
+  const tab = shows(picked) ? picked : 'details';
   // The channel whose Web tab was opened. It stays mounted while another tab shows: the page, a form half filled in
   // and a sign-in midway live only in it.
   const [webFor, setWebFor] = useState<string | null>(null);
@@ -77,8 +91,6 @@ export function ThreadPanel({
   const crew = prs.data?.crew ?? [];
   // The thread's own PR leads. A thread without one shows what its delegated threads opened.
   const crewSum = crew.length ? crewLine(crew) : null;
-  const fileCount = files.length + crewArtifacts.files.length;
-  const shotCount = shots.length + crewArtifacts.shots.length;
   const prTab = pr && line ? { title: `PRs: #${pr.number}, ${line.text}`, tone: line.tone } : crewSum ? { title: `PRs: ${plural(crew.length, 'PR')} from delegated threads, ${crewSum.text}`, tone: crewSum.tone } : null;
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -89,7 +101,7 @@ export function ThreadPanel({
             className="inspector-tabs"
             value={tab}
             onChange={onTab}
-            options={TABS.filter((t) => desktop || t.id !== 'web').map((t) => ({
+            options={TABS.filter((t) => shows(t.id)).map((t) => ({
               ...t,
               label: t.id === tab ? t.name : undefined,
               title: t.id === 'prs' && prTab ? prTab.title : t.title,

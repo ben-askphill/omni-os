@@ -1,5 +1,5 @@
 import { Fragment, memo, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api, type Artifact, type EventRow, type Thread } from '../api.ts';
+import type { Artifact, EventRow, Thread } from '../api.ts';
 import { duration, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -12,7 +12,7 @@ import { PRWakeList } from './thread/PRWatch.tsx';
 import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
-import { CheckItem, copyText, Icon, Loader, StatusDot, StatusPill, Ticks } from './ui.tsx';
+import { copyText, Icon, Loader, StatusDot, StatusPill } from './ui.tsx';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
@@ -23,13 +23,15 @@ import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
-import { buildItems, buildTasks, keepSame, same, type FoldPlan, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type Todo, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
-import { delegations, mergeTasks, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
+import { buildItems, buildTasks, keepSame, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
+import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
+import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
 import { clock, toDate } from '@omni/shared/format.ts';
 import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 
-import { AgentRow, countCalls, flatten, TaskCtx, ToolGroup } from './thread/ToolRows.tsx';
+import { AgentRow, flatten, TaskCtx } from './thread/ToolRows.tsx';
+import { StepsCard } from './thread/StepsCard.tsx';
 import { Attachments } from './thread/Attachments.tsx';
 import { QueuedMessages, SendingMessages } from './thread/PendingMessages.tsx';
 
@@ -180,15 +182,16 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
  * How a turn ended, as a quiet divider: one glyph and one sentence-case line, the phone's Outcome words. `limit` is the
  * thread's limit line (limits.ts `limitLabel`) on the turn the usage limit stopped.
  */
-function ResultLine({ p, limit }: { p: ResultP; limit?: string | null }) {
+function ResultLine({ p, limit, code = true }: { p: ResultP; limit?: string | null; code?: boolean }) {
   const took = p.duration_ms != null ? duration(p.duration_ms) : null;
   const bad = !p.ok && !p.stopped;
   const glyph = limit ? 'limited' : p.ok ? 'done' : p.stopped ? 'settled' : 'failed';
   const [word, after] = p.ok ? ['Done', 'Done in'] : p.stopped ? ['Stopped', 'Stopped after'] : ['Failed', 'Failed after'];
   const bits = [limit ?? (took ? `${after} ${took}` : word)];
-  if (p.turns) bits.push(plural(p.turns, 'turn'));
-  if (p.model) bits.push(p.model);
-  if (p.input_tokens != null) bits.push(`${p.input_tokens} in / ${p.output_tokens ?? 0} out`);
+  // Turns, model and tokens tell a reader outside a code project nothing: Show technical details brings them back.
+  if (code && p.turns) bits.push(plural(p.turns, 'turn'));
+  if (code && p.model) bits.push(p.model);
+  if (code && p.input_tokens != null) bits.push(`${p.input_tokens} in / ${p.output_tokens ?? 0} out`);
   if (bad && !limit && p.subtype && p.subtype !== 'success') bits.push(p.subtype.replace(/_/g, ' '));
   return (
     <div className="flex items-center gap-3 py-1 font-num text-[12px] font-medium text-fg-3">
@@ -282,48 +285,6 @@ function ReportCard({ p }: { p: ReportP }) {
   );
 }
 
-/** The latest TodoWrite as a live checklist (Bencho "chk"). */
-function PlanCard({ todos, threadId }: { todos: Todo[]; threadId: string }) {
-  const [updating, setUpdating] = useState<number | null>(null);
-  const done = todos.filter((t) => t.status === 'completed').length;
-  const active = todos.find((t) => t.status === 'in_progress');
-
-  const toggleTodo = async (index: number) => {
-    const todo = todos[index];
-    if (!todo || updating !== null) return;
-
-    const newStatus =
-      todo.status === 'completed' ? 'pending' : todo.status === 'pending' ? 'in_progress' : 'completed';
-
-    setUpdating(index);
-    try {
-      await api.patch(`/threads/${encodeURIComponent(threadId)}/plan/steps/${index}`, { status: newStatus });
-    } catch (err) {
-      console.error('Failed to update plan step:', err);
-    } finally {
-      setUpdating(null);
-    }
-  };
-
-  return (
-    <section aria-label="Plan" className="rounded-[20px] px-4 pt-3.5 pb-3 shadow-[inset_0_0_0_1px_var(--line)]">
-      <div className="mb-2.5 flex items-center gap-3">
-        <span className="caption">Plan</span>
-        <Ticks value={todos.length ? done / todos.length : 0} count={Math.max(1, todos.length)} height={6} tone={!active && done === todos.length ? 'muted' : undefined} className="max-w-40 flex-1" label="Plan progress" />
-        <span className="ml-auto font-num text-[11px] text-fg-3 tabular-nums">
-          {done}/{todos.length}
-        </span>
-      </div>
-      {todos.map((t, k) => (
-        <CheckItem key={k} state={t.status ?? 'pending'} onClick={() => toggleTodo(k)}>
-          {t.status === 'in_progress' && t.activeForm ? t.activeForm : t.content}
-        </CheckItem>
-      ))}
-      {!active && done === todos.length && todos.length > 0 && <div className="mt-1.5 text-[12px] text-fg-3">All done</div>}
-    </section>
-  );
-}
-
 // ---------- transcript ----------
 
 interface ItemRowProps {
@@ -331,8 +292,6 @@ interface ItemRowProps {
   threadId: string;
   cwd?: string | null;
   running: boolean;
-  /** The newest item that is not a mod line. */
-  isLast: boolean;
   /** The team card's members, on the first item when it is the thread's first message. */
   team?: Branch[];
   /** The first item is the brief the delegating thread sent: it folds. */
@@ -342,19 +301,25 @@ interface ItemRowProps {
   artifacts: Artifact[];
   /** The published pages whose card goes under this group. */
   pages?: Published[];
-  /** The plan, on the group of the latest TodoWrite. */
-  plan?: FoldPlan;
+  /** A finished turn's steps, folded, on its first group of calls. */
+  steps?: StepsView;
   /** The thread's limit line, on the last result when the usage limit stopped that turn. */
   limit?: string | null;
+  /** On a result: it names its turns, model and tokens (Show technical details, or a repo channel). */
+  code?: boolean;
+  /** Reports shown in place from the threads on this group's delegation cards, by thread (`shownAnswers`). */
+  answers?: Record<string, ReportP>;
+  /** A report row whose answer shows on its thread's delegation card instead. */
+  onCard?: boolean;
 }
 
 /**
  * One item and the cards that go with it. Unchanged items keep their object across folds (`keepSame`), so a row
- * whose props are the same skips rendering when the stream brings new rows (#411). `pages` and `plan` are rebuilt
+ * whose props are the same skips rendering when the stream brings new rows (#411). `pages` and `steps` are rebuilt
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, isLast, team, brief, reports, byId, artifacts, pages, plan, limit }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -370,7 +335,7 @@ const ItemRow = memo(
             </div>
           );
         case 'tools': {
-          const { agents, rest, agentsFirst } = splitGroup(it.calls);
+          const { agents } = splitGroup(it.calls);
           const cards = [
             // Pages html_render showed, right under the call, before the reply.
             ...flatten(it.calls).flatMap((c) => {
@@ -379,26 +344,23 @@ const ItemRow = memo(
               return a ? [<HtmlRender key={`r${c.id}`} a={a} title={r.title} />] : [];
             }),
             ...delegations(it.calls).map((d) => (
-              <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
+              <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} answers={answers} />
             )),
             ...(pages ?? []).map((p) => <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />),
           ];
-          const group = rest.length ? (
-            <ToolGroup key={it.key} calls={rest} total={rest.length + rest.reduce((n, c) => n + countCalls(c), 0)} cwd={cwd} running={running} isLast={isLast} />
-          ) : null;
+          // The calls themselves live under the turn's steps (StepsCard), not here: a group shows what it made.
           const subagents = agents.length ? (
             <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
           ) : null;
-          const out = [...(agentsFirst ? [subagents, group] : [group, subagents]), ...cards].filter(Boolean);
-          // One keyed plan card that follows the latest TodoWrite, so ticks animate instead of remounting.
-          return plan ? [...out, <PlanCard key="plan" todos={plan.todos} threadId={threadId} />] : out;
+          const out = [subagents, ...cards].filter(Boolean);
+          return steps ? [<StepsCard key="steps" v={steps} cwd={cwd} byId={byId} />, ...out] : out;
         }
         case 'result':
-          return <ResultLine key={it.key} p={it.p} limit={limit} />;
+          return <ResultLine key={it.key} p={it.p} limit={limit} code={code !== false} />;
         case 'error':
           return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
         case 'report':
-          return <ReportCard key={it.key} p={it.p} />;
+          return onCard ? null : <ReportCard key={it.key} p={it.p} />;
         case 'mod':
           return <ModLog key={it.key} lines={it.lines} />;
         case 'cloud':
@@ -421,7 +383,7 @@ const ItemRow = memo(
   },
   (a, b) => {
     for (const k of Object.keys(b) as (keyof ItemRowProps)[]) {
-      if (k === 'pages' || k === 'plan' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
+      if (k === 'pages' || k === 'steps' || k === 'answers' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
     }
     return Object.keys(a).length === Object.keys(b).length;
   },
@@ -441,8 +403,11 @@ export const Transcript = memo(function Transcript({
   delegated = false,
   limit = null,
   elsewhere = false,
+  code = true,
 }: {
   threadId: string;
+  /** Results name their turns, model and tokens: Show technical details is on, or the channel has a repo. */
+  code?: boolean;
   /** Every row held, anchors included. */
   events: EventRow[];
   running: boolean;
@@ -468,15 +433,15 @@ export const Transcript = memo(function Transcript({
   const spans = history?.history.spans;
   // The last fold's items, whose unchanged ones the next fold keeps (`keepSame`).
   const held = useRef<Item[]>([]);
-  const { items, plan } = useMemo(() => {
-    const built = buildItems(events, spans);
-    held.current = keepSame(held.current, built.items);
-    return { items: held.current, plan: built.plan };
+  const items = useMemo(() => {
+    held.current = keepSame(held.current, buildItems(events, spans).items);
+    return held.current;
   }, [events, spans]);
   const edges = useMemo(() => (spans ? historyEdges({ spans }, items.map((it) => it.key)) : null), [spans, items]);
   // The first item is the thread's first message only when the start is held.
   const fromStart = !spans || atStart({ spans });
   const pages = useMemo(() => publishedByGroup(items), [items]);
+  const answers = useMemo(() => shownAnswers(items), [items]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
   const tasks = useMemo(() => mergeTasks(stored, live, threadId, { feedLive, here: !elsewhere }), [stored, live, feedLive, threadId, elsewhere]);
@@ -489,6 +454,23 @@ export const Transcript = memo(function Transcript({
   const last = items[lastIdx];
   // The turn is waiting on Ben's answer, not working: the card under it says so.
   const asking = last?.type === 'question' && last.q.state === 'pending';
+
+  // Each turn's steps: a finished turn's fold onto its first group of calls, the running one's sit under the transcript.
+  const { folded, liveSteps } = useMemo(() => {
+    const turns = turnsOf(items);
+    const folded = new Map<number, StepsView>();
+    let liveSteps: StepsView | null = null;
+    turns.forEach((turn, k) => {
+      const v = turnSteps(turn, { live: running && k === turns.length - 1, asking, status: latestStatus });
+      if (!showsSteps(v)) return;
+      if (v.live) liveSteps = v;
+      else {
+        const first = turn.find((it) => it.type === 'tools');
+        if (first) folded.set(first.key, v);
+      }
+    });
+    return { folded, liveSteps: liveSteps as StepsView | null };
+  }, [items, running, asking, latestStatus]);
 
   const edgeRow = (key: number) => {
     const edge = edges?.get(key);
@@ -508,18 +490,21 @@ export const Transcript = memo(function Transcript({
               threadId={threadId}
               cwd={cwd}
               running={running}
-              isLast={idx === lastIdx}
               team={idx === 0 && fromStart && team?.length ? team : undefined}
               brief={idx === 0 && fromStart && delegated}
               reports={reports}
               byId={byId}
               artifacts={artifacts}
               pages={pages.get(it.key)}
-              plan={plan?.after === it.key ? plan : undefined}
+              steps={folded.get(it.key)}
               limit={idx === lastIdx && it.type === 'result' ? limit : undefined}
+              code={it.type === 'result' ? code : undefined}
+              answers={it.type === 'tools' ? answersFor(it.calls, answers) : undefined}
+              onCard={it.type === 'report' && it.p.shown && answers.has(it.p.thread_id)}
             />,
           ])}
           {edgeRow(-1)}
+          {liveSteps && <StepsCard key="live-steps" v={liveSteps} cwd={cwd} byId={byId} />}
           {running && !asking && <ThinkingLine label={latestStatus ?? (phase === 'starting' ? PHASE.starting.label : 'Thinking')} since={since} phase={phase} />}
         </div>
       </TaskCtx.Provider>

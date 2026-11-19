@@ -4,7 +4,7 @@
 // - A harness that is down is probed again on demand (freshCatalog, at most every 10 seconds), so a `codex login` or
 //   the Mac joining the tailnet shows in the picker without a restart.
 // - A picker opening on a catalog older than ON_DEMAND_MS probes everything again in the background (refreshStale), as
-//   T3 Code's picker asks for newly released models on every open. Settings > Harnesses & models can ask at once.
+//   T3 Code's picker asks for newly released models on every open. Settings > Models can ask at once.
 // - What Claude Code last reported is kept on disk, so a restart starts from it, not from the bundled list alone.
 // The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';
@@ -35,6 +35,7 @@ import { refreshCursorUsage } from '../cursor-usage.ts';
 import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
 import {
   claudeHarness,
+  claudeProbeOf,
   codexHarness,
   cursorHarness,
   hermesHarness,
@@ -49,6 +50,7 @@ import {
   CODEX_NOT_FOUND,
   codexFix,
   type Catalog,
+  type ClaudeProbe,
   type ClaudeReportedModel,
   type CodexProbe,
   type CursorProbe,
@@ -101,8 +103,33 @@ export async function probeClaudeModels(): Promise<ClaudeReportedModel[] | null>
   return init ? parseClaudeReported(init.models) : null;
 }
 
+/** How long `claude auth status` may take. It reads local credentials and makes no model call. */
+const CLAUDE_AUTH_MS = 8_000;
+
+/**
+ * `claude auth status --json`, run with the environment a thread's Claude Code gets: its stdout (null when it did not
+ * answer), or `missing` when there is no claude to run. It exits non-zero when signed out, and its stdout still
+ * answers. The catalog probe and the first run's Claude Code step (claude-setup.ts) both read it.
+ */
+export function claudeAuthStatus(bin = config.claudeBin): Promise<{ stdout: string | null; missing: boolean }> {
+  return new Promise((resolve) => {
+    execFile(bin, ['auth', 'status', '--json'], { env: harnessEnv('claude-code', {}), timeout: CLAUDE_AUTH_MS, maxBuffer: 256 * 1024, killSignal: 'SIGKILL' }, (err, stdout) => {
+      const code = (err as NodeJS.ErrnoException | null)?.code;
+      resolve({ stdout: stdout?.trim() ? stdout : null, missing: code === 'ENOENT' || code === 'EACCES' });
+    });
+  });
+}
+
+/** Whether Claude Code is installed and signed in, the way Codex and Cursor are probed. */
+export const probeClaudeAuth = async (bin = config.claudeBin): Promise<ClaudeProbe> => claudeProbeOf(await claudeAuthStatus(bin));
+
+/** The last probe, so a catalog rebuilt without probing keeps it. Available until the first answer. */
+let claudeAuth: ClaudeProbe = { available: true };
+
 /** Claude Code with what it reports now, or with what it reported last when it does not answer. */
 async function probeClaudeHarness(cap: number): Promise<HarnessInfo> {
+  claudeAuth = await probeClaudeAuth().catch((): ClaudeProbe => ({ available: true }));
+  if (!claudeAuth.available) return claudeHarness(cap, config.defaultModel, lastClaudeModels(), claudeAuth);
   const reported = await probeClaudeModels().catch(() => null);
   if (reported) {
     claudeReported = reported;
@@ -112,7 +139,7 @@ async function probeClaudeHarness(cap: number): Promise<HarnessInfo> {
       // A read-only data dir only costs the head start after a restart.
     }
   }
-  return claudeHarness(cap, config.defaultModel, lastClaudeModels());
+  return claudeHarness(cap, config.defaultModel, lastClaudeModels(), claudeAuth);
 }
 
 /**
@@ -339,7 +366,7 @@ export function getCatalog(): Catalog {
   const c = caps();
   return {
     harnesses: [
-      claudeHarness(c['claude-code'], config.defaultModel, lastClaudeModels()),
+      claudeHarness(c['claude-code'], config.defaultModel, lastClaudeModels(), claudeAuth),
       codexHarness({ available: false, models: [] }, c.codex),
       cursorHarness({ available: false, models: [] }, c.cursor),
       hermesHarness({ available: false }, c.hermes),

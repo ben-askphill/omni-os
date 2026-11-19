@@ -33,7 +33,20 @@ pub fn proof_for(token: &str, port: u16, nonce: &str) -> String {
     hmac::sign(&key, format!("omni-proof:{port}:{nonce}").as_bytes()).as_ref().iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// Whether the server at the address is this install's. Through a tunnel or proxy the server signs its own port, not
+/// the one in OMNI_URL: only a local proof is checked.
 pub fn probe(conn: &Connection) -> Probe {
+    ask(conn, (!conn.remote).then_some(conn.port))
+}
+
+/// Whether the server at OMNI_URL on another machine is this install after all, reached through `tailscale serve` or
+/// a tunnel: it signs the port it listens on, the install's own.
+pub fn probe_install(conn: &Connection) -> Probe {
+    ask(conn, Some(conn.install_port))
+}
+
+/// The probe, with the proof checked against `port` when there is one.
+fn ask(conn: &Connection, port: Option<u16>) -> Probe {
     let nonce = sys::uuid().replace('-', "");
     let url = format!("{}/api/auth/proof?nonce={nonce}", conn.base_url);
     let answer = match http::send(&url, &[("accept", "*/*".to_string())], None, Duration::from_millis(PROBE_MS)) {
@@ -47,9 +60,8 @@ pub fn probe(conn: &Connection) -> Probe {
     let Some(proof) = proof.filter(|_| answer.status == 200) else {
         return Probe::NotOmni { detail: format!("it answered {}, not an Omni proof", answer.status) };
     };
-    // Through a tunnel or proxy the server signs its own port, not the one in OMNI_URL: only a local proof can be checked.
-    match conn.token() {
-        Some(token) if !conn.remote => Probe::Omni { mine: Some(proof == proof_for(&token, conn.port, &nonce)) },
+    match (conn.token(), port) {
+        (Some(token), Some(port)) => Probe::Omni { mine: Some(proof == proof_for(&token, port, &nonce)) },
         _ => Probe::Omni { mine: None },
     }
 }

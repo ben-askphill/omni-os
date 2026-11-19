@@ -38,6 +38,7 @@ const { startEventWatch } = await import('./automation-watch.ts');
 const { startTriggerDeliveries } = await import('./automation-triggers.ts');
 const { startDraftExpiry } = await import('./automation-drafts.ts');
 const { watchDelegating } = await import('./delegating.ts');
+const { watchSteps } = await import('./step-line.ts');
 const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { flushSync, startSync } = await import('./sync/worker.ts');
@@ -53,6 +54,8 @@ const { onRestart, RESTART_EXIT_CODE, startUpdateCheck } = await import('./updat
 
 // An install from before data/omni.config.json keeps its old settings and skips onboarding.
 migrateLegacyConfig();
+// A channel with no access level of its own: full access on an install with history, Ask first on a fresh one.
+(await import('./access-default.ts')).settleInstallDefault();
 
 const onBindError = (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') console.error(`[omni] port ${config.port} on ${config.host} is in use. Stopped before touching any thread.`);
@@ -93,6 +96,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startDraftExpiry();
   // A parent shows running while a thread it delegated works: sent again on the feed when that changes.
   watchDelegating();
+  watchSteps();
   startPRWatch();
   startCatalogRefresh();
   // With this Mac's retention policy on (Settings > Worktrees), removes idle worktrees that hold nothing unsaved, now and daily.

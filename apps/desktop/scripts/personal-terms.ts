@@ -1,4 +1,4 @@
-// Keeps one person's names out of what every install ships: the crew charters and mods (as text), and the text in
+// Keeps one person's names out of what every install ships: the crew charters, job templates and mods (as text), and the text in
 // the server, Conductor MCP, Web UI, desktop and shared sources as esbuild emits them: types and the comments on them
 // drop out, other comments stay, as they do in the server bundle. stage.ts runs it before a release, and
 // tests/stage.test.ts runs it over the repo.
@@ -18,7 +18,7 @@ export const PERSONAL_TERMS = [
 ] as const;
 
 /** The source folders whose text goes into the default build, from the repo root. */
-export const SHIPPED_SOURCES = ['apps/server', 'apps/mcp', 'apps/web/src', 'apps/desktop/src', 'packages/shared', 'crew', 'mods'] as const;
+export const SHIPPED_SOURCES = ['apps/server', 'apps/mcp', 'apps/web/src', 'apps/desktop/src', 'packages/shared', 'crew', 'templates', 'mods'] as const;
 
 /**
  * Hits that are a third party's product name, not anyone's own: `file:term`. Link previews name the service a

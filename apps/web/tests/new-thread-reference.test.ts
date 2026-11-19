@@ -69,6 +69,15 @@ beforeEach(() => {
         return Response.json(rows.filter((r) => `${r.title} ${r.channel_name}`.toLowerCase().includes((q.get('q') ?? '').toLowerCase())));
       }
       if (url.startsWith('/api/harnesses')) return Response.json(harnesses);
+      // The quick ask the sheet asked, answered.
+      if (url.startsWith('/api/threads/created'))
+        return Response.json({
+          thread: { id: 'created', channel_id: 'shop', status: 'done', quick: 1, promoted_to: null },
+          events: [
+            { id: 1, kind: 'user', payload: JSON.stringify({ text: 'what is the cart total?' }) },
+            { id: 2, kind: 'assistant_text', payload: JSON.stringify({ text: 'It is 42 euro.' }) },
+          ],
+        });
       if (url.startsWith('/api/channels/')) return Response.json({ available: false, reason: 'No repository.' });
       if (url.startsWith('/api/commands')) return Response.json({ status: 'ready', commands: [] });
       return Response.json({ error: 'not here' }, { status: 404 });
@@ -108,7 +117,11 @@ const sent = () => {
 };
 
 describe.each([false, true])('referencing a thread from the new-thread composer, phone=%s', (phone) => {
-  const mount = () => act(async () => root.render(phone ? createElement(NewSheet, { channel: 'shop' }) : createElement(NewThreadComposer, { channelId: 'shop' })));
+  const mount = async () => {
+    await act(async () => root.render(phone ? createElement(NewSheet, { channel: 'shop' }) : createElement(NewThreadComposer, { channelId: 'shop' })));
+    // The sheet opens on Ask; this starts a thread.
+    if (phone) await click([...host.querySelectorAll('button')].find((b) => b.textContent === 'Task') ?? null);
+  };
   const draft = phone ? NEW_SHEET_DRAFT : 'new:shop';
   const start = () => click(phone ? button('Send') : byText('Start'));
 
@@ -197,6 +210,22 @@ describe('the Home composer, whose channel can change after a pick', () => {
 });
 
 describe('the phone New sheet', () => {
+  it('asks by default: a quick ask with the reference, answered in the sheet with a follow-up box', async () => {
+    vi.stubGlobal('EventSource', class { close() {} addEventListener() {} });
+    await act(async () => root.render(createElement(NewSheet, { channel: 'shop' })));
+    await click(button('Reference a thread'));
+    await settle();
+    await click(rows()[0]);
+    await type(host.querySelector('textarea')!, 'what is the cart total?');
+    await click(button('Send'));
+    await settle();
+    expect(sent()).toMatchObject({ channel: 'shop', prompt: 'what is the cart total?', quick: true, context: [expect.objectContaining({ kind: 'thread_reference' })] });
+    expect(shell.open).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('It is 42 euro.');
+    expect(host.querySelector('textarea[aria-label="Follow-up"]')).toBeTruthy();
+    for (const label of ['Copy', 'Keep as thread', 'Make it a task']) expect(byText(label)).toBeTruthy();
+  });
+
   it('starts with no chips and drops them when it closes', async () => {
     await act(async () => root.render(createElement(NewSheet, { channel: 'shop' })));
     await click(button('Reference a thread'));

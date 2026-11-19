@@ -7,6 +7,7 @@ import { useChannels } from './app/useChannels.ts';
 import { useNeedsYou } from './app/useNeedsYou.ts';
 import { useStatusAndProfile } from './app/useStatusAndProfile.ts';
 import { createSyncNudge } from './sync-nudge.ts';
+import { loadDisplay } from './display.ts';
 import { secretStoreLabel, type SecretStoreKind } from '@omni/shared/secret-store.ts';
 import { monograms } from '@omni/shared/monogram.ts';
 import { Monograms } from './components/ui/primitives.tsx';
@@ -94,6 +95,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reloadCrew();
     reloadTasks();
     reloadNeedsYou();
+    void loadDisplay();
   }, [reloadChannels, reloadStatus, reloadCrew, reloadTasks, reloadNeedsYou]);
 
   // Thread events arrive in bursts; refresh running counts at most every ~0.5s.
@@ -130,6 +132,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setMods(e.mods);
         } else if (e.type === 'needs_you') {
           needsYouChanged();
+        } else if (e.type === 'display') {
+          void loadDisplay();
         } else if (e.type === 'crew') {
           // A role saved in Settings, by the Conductor or on another machine: the pickers list the new set.
           reloadCrew();

@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync,
+  statSync, utimesSync, writeFileSync, type Stats,
+} from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, join, sep } from 'node:path';
+import { basename, dirname, join, relative, sep } from 'node:path';
 import { threadDir, uploadsDir } from '../config.ts';
 import { bus, publishThread } from '../bus.ts';
 import { db, events, kv, threads, type Thread } from '../db.ts';
@@ -143,19 +146,19 @@ interface Snapshot extends FileEntry {
   body: Uint8Array;
 }
 
+const snapshotOf = (st: Stats, body: Buffer): Snapshot => ({ body, sha: sha256(body), size: body.length, mtime: Math.trunc(st.mtimeMs) });
+
 function snapshot(path: string): Snapshot {
   const st = statSync(path);
-  const body = readFileSync(path);
-  return { body, sha: sha256(body), size: body.length, mtime: Math.trunc(st.mtimeMs) };
+  return snapshotOf(st, readFileSync(path));
 }
 
-/** The file's sha, from the state when it has not changed since: no read. Otherwise a snapshot of it. */
-function hashOf(state: LocalState, key: string, path: string): FileEntry | Snapshot {
-  const st = statSync(path);
+/** The sha of the file st describes, from the state when it has not changed since: no read. Otherwise `read`'s snapshot of it. */
+function hashOf(state: LocalState, key: string, st: Stats, read: () => Snapshot): FileEntry | Snapshot {
   const mtime = Math.trunc(st.mtimeMs);
   const known = state[key];
   if (known && known.size === st.size && known.mtime === mtime) return { sha: known.sha, size: st.size, mtime };
-  return snapshot(path);
+  return read();
 }
 
 /**
@@ -255,7 +258,7 @@ function localVersions(threadId: string, state: LocalState, result?: FilesResult
       if (result) result.skipped++;
       continue;
     }
-    out.set(rel, hashOf(state, `f:${rel}`, path));
+    out.set(rel, hashOf(state, `f:${rel}`, statSync(path), () => snapshot(path)));
   }
   return out;
 }
@@ -495,6 +498,13 @@ const hasSession = (t: Thread) =>
   safeSegment(t.session_id) &&
   (t.harness === 'claude-code' || ((t.harness === 'codex' || t.harness === 'cursor') && t.session_id !== t.id));
 
+/** The folder a harness keeps all its sessions under, on this machine. It may be a link (a CODEX_HOME on another disk); nothing below it may. */
+function sessionBase(t: Thread, home: string, env: NodeJS.ProcessEnv): string {
+  if (t.harness === 'claude-code') return join(home, '.claude', 'projects');
+  if (t.harness === 'codex') return join(codexHome(home, env), 'sessions');
+  return join(cursorDir(home, env), 'chats');
+}
+
 /**
  * The folder a harness keeps this thread's session in, on this machine:
  * - Claude Code: ~/.claude/projects/<cwd with non-alphanumerics as "-">, holding "<session>.jsonl".
@@ -503,9 +513,10 @@ const hasSession = (t: Thread) =>
  */
 export function sessionRoot(t: Thread, home = homedir(), env: NodeJS.ProcessEnv = process.env): string | null {
   if (!hasSession(t)) return null;
-  if (t.harness === 'claude-code') return join(home, '.claude', 'projects', claudeProjectDir(t.cwd));
-  if (t.harness === 'codex') return join(codexHome(home, env), 'sessions');
-  return join(cursorDir(home, env), 'chats', createHash('md5').update(t.cwd).digest('hex'), t.session_id);
+  const base = sessionBase(t, home, env);
+  if (t.harness === 'claude-code') return join(base, claudeProjectDir(t.cwd));
+  if (t.harness === 'codex') return base;
+  return join(base, createHash('md5').update(t.cwd).digest('hex'), t.session_id);
 }
 
 /** Whether a session file path from another machine is one this harness would write for this session. */
@@ -516,24 +527,104 @@ function sessionRel(t: Thread, rel: string) {
   return !rel.includes('/') && !rel.endsWith('-shm');
 }
 
-/** The session's files on this machine, relative to its root. */
-function localSessionFiles(t: Thread, root: string, known: SessionEntry | undefined): string[] {
+/**
+ * The session's files on this machine, relative to its root, as found here: never taken from the relay's file list,
+ * which any relay writer can fill. `synced` is what this machine recorded syncing before, a shortcut past the walk.
+ */
+function localSessionFiles(t: Thread, root: string, synced: string[] = []): string[] {
   if (t.harness === 'claude-code') return existsSync(join(root, `${t.session_id}.jsonl`)) ? [`${t.session_id}.jsonl`] : [];
   if (t.harness === 'codex') {
-    const hint = Object.keys(known?.files ?? {}).find((rel) => existsSync(join(root, rel)));
+    const hint = synced.find((rel) => sessionRel(t, rel) && existsSync(join(root, rel)));
     if (hint) return [hint];
-    if (!existsSync(root)) return [];
-    const suffix = `-${t.session_id}.jsonl`;
-    const hit = readdirSync(root, { recursive: true, withFileTypes: true }).find(
-      (e) => e.isFile() && e.name.startsWith('rollout-') && e.name.endsWith(suffix),
-    );
-    return hit ? [join(hit.parentPath, hit.name).slice(root.length + 1).split(sep).join('/')] : [];
+    const hit = findRollout(root, `-${t.session_id}.jsonl`);
+    return hit ? [hit] : [];
   }
   if (!existsSync(root)) return [];
   return readdirSync(root, { withFileTypes: true })
     .filter((e) => e.isFile() && !e.name.startsWith('.') && !e.name.endsWith('-shm'))
     .map((e) => e.name)
     .sort();
+}
+
+/**
+ * The first Codex rollout under root whose name ends in suffix. A linked folder is not walked into. A folder it cannot
+ * read throws, so a handoff fails rather than move the thread without its session.
+ */
+function findRollout(root: string, suffix: string): string | null {
+  if (!existsSync(root)) return null;
+  const dirs = [''];
+  while (dirs.length) {
+    const dir = dirs.shift()!;
+    for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
+      const rel = dir ? `${dir}/${e.name}` : e.name;
+      if (e.isDirectory()) dirs.push(rel);
+      else if (e.isFile() && e.name.startsWith('rollout-') && e.name.endsWith(suffix)) return rel;
+    }
+  }
+  return null;
+}
+
+/** The session files this machine recorded syncing, from its own state, never from the relay. */
+function syncedSessionFiles(state: LocalState, key: string): string[] {
+  const prefix = `s:${key}:`;
+  return Object.keys(state).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length));
+}
+
+interface OpenFile {
+  fd: number;
+  st: Stats;
+}
+
+/** macOS 11 and later: open fails when any part of the path is a link (<sys/fcntl.h>). Linux's open has no such flag. */
+const O_NOFOLLOW_ANY = (constants as Record<string, number | undefined>).O_NOFOLLOW_ANY ?? (process.platform === 'darwin' ? 0x20000000 : 0);
+
+/**
+ * How a session file opens: read only, no wait on a named pipe, and no link as the last part of the path (on macOS, in
+ * any part). macOS fails the open with EINVAL when O_NOFOLLOW and O_NOFOLLOW_ANY come together, so it gets only the
+ * second, which covers the last part too.
+ */
+const SESSION_OPEN = constants.O_RDONLY | constants.O_NONBLOCK | (O_NOFOLLOW_ANY || constants.O_NOFOLLOW);
+
+/**
+ * Open a session file to upload, only when it is a regular file in root and nothing between the harness's folder and
+ * the file is a link, so a folder swapped for a link cannot redirect the read. On macOS the open itself refuses a
+ * link anywhere in the path; on Linux the path the kernel holds for the open file must be the expected one. Both
+ * also compare the open file's inode with the one at the expected path. A hard link is not detected. Null when the
+ * file is not one to send. The caller closes it.
+ */
+function openSessionFile(base: string, root: string, rel: string): OpenFile | null {
+  if (!safeRel(rel)) return null;
+  let want: string;
+  let fd: number;
+  try {
+    // The harness's folder as it really is, then real folders only.
+    want = join(realpathSync(base), relative(base, root), rel);
+    fd = openSync(want, SESSION_OPEN);
+  } catch {
+    return null;
+  }
+  try {
+    const st = fstatSync(fd);
+    if (st.isFile() && kernelPathIs(fd, want) && realpathSync(want) === want) {
+      const at = lstatSync(want);
+      if (at.dev === st.dev && at.ino === st.ino) return { fd, st };
+    }
+  } catch {
+    // Gone or unreadable since the open: nothing to send.
+  }
+  closeSync(fd);
+  return null;
+}
+
+/** On Linux, whether the open file is at `want`. Elsewhere true: macOS has no /proc, and its open refused links already. */
+function kernelPathIs(fd: number, want: string): boolean {
+  let held: string;
+  try {
+    held = readlinkSync(`/proc/self/fd/${fd}`);
+  } catch {
+    return true;
+  }
+  return held === want;
 }
 
 /** Where a session file is kept in Storage: "sessions/<harness>/<session>.jsonl", or a folder for Cursor's chat. */
@@ -543,35 +634,49 @@ export const sessionObject = (harness: string, sessionId: string, rel: string) =
 const sessionKey = (t: Thread) => `${t.harness}:${t.session_id}`;
 
 /**
- * Upload the thread's session file when it changed. Returns the number of files uploaded. One over the size cap stays
- * on this Mac, or with `strict` fails the upload: a handoff cannot leave the session behind.
+ * Upload the thread's session file when it changed. Returns the number of files uploaded. One over the size cap, or
+ * one that is not a plain file inside the harness's folder, stays on this Mac, or with `strict` fails the upload: a
+ * handoff cannot leave the session behind.
  */
 export async function pushSession(t: Thread, opts: FileSyncOptions & { strict?: boolean }): Promise<number> {
-  const root = sessionRoot(t, opts.home, opts.env);
+  const home = opts.home ?? homedir();
+  const env = opts.env ?? process.env;
+  const root = sessionRoot(t, home, env);
   if (!root) return 0;
+  const base = sessionBase(t, home, env);
   const state = readState(t.id);
   const manifest = await readManifest(opts.transport, t.id);
   const key = sessionKey(t);
   const entry: SessionEntry = manifest.sessions[key] ?? { harness: t.harness, id: t.session_id, files: {} };
-  const rels = localSessionFiles(t, root, entry);
+  const rels = localSessionFiles(t, root, syncedSessionFiles(state, key));
   let uploaded = 0;
   for (const rel of rels) {
-    const path = join(root, rel);
-    const size = statSync(path).size;
-    if (size > MAX_FILE_BYTES) {
-      if (opts.strict) throw new Error(`the session is ${Math.ceil(size / 1024 / 1024)} MB, over the ${MAX_FILE_BYTES / 1024 / 1024} MB sync can carry`);
+    // Hashed and uploaded from this one open file, never from the path again.
+    const file = openSessionFile(base, root, rel);
+    if (!file) {
+      if (opts.strict) throw new Error(`the ${t.harness} session file ${rel} is not a plain file in its session folder, so sync cannot carry it`);
       continue;
     }
-    const skey = `s:${key}:${rel}`;
-    let f = hashOf(state, skey, path);
-    if (entry.files[rel]?.sha !== f.sha) {
-      const snap = 'body' in f ? f : snapshot(path);
-      f = snap;
-      await opts.transport.putObject(sessionObject(t.harness, t.session_id, rel), snap.body);
-      entry.files[rel] = entryOf(f);
-      uploaded++;
+    try {
+      const { size } = file.st;
+      if (size > MAX_FILE_BYTES) {
+        if (opts.strict) throw new Error(`the session is ${Math.ceil(size / 1024 / 1024)} MB, over the ${MAX_FILE_BYTES / 1024 / 1024} MB sync can carry`);
+        continue;
+      }
+      const skey = `s:${key}:${rel}`;
+      const read = () => snapshotOf(file.st, readFileSync(file.fd));
+      let f = hashOf(state, skey, file.st, read);
+      if (entry.files[rel]?.sha !== f.sha) {
+        const snap = 'body' in f ? f : read();
+        f = snap;
+        await opts.transport.putObject(sessionObject(t.harness, t.session_id, rel), snap.body);
+        entry.files[rel] = entryOf(f);
+        uploaded++;
+      }
+      rememberIf(state, skey, join(root, rel), f);
+    } finally {
+      closeSync(file.fd);
     }
-    rememberIf(state, skey, path, f);
   }
   if (uploaded) {
     // Only this session's entry, merged onto whatever the manifest holds when it is written.
