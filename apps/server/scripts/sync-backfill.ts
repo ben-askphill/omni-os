@@ -24,6 +24,7 @@ const LABEL: Record<BackfillCount['entity'], string> = {
   review_note: 'review notes on Changes diffs',
   automation_file: 'automation files you edited in Omni',
   crew_file: 'crew roles you edited in Omni',
+  harness_file: 'custom harnesses you added in Omni',
   mcp_client: 'MCP clients and which you approved',
   memory: 'channel learnings',
   kv: 'settings (kv)',

@@ -145,7 +145,7 @@ describe('Hermes normalizer', () => {
   it('names a queued run', () => {
     expect(applyHermesEvent(emptyHermesNorm(), { event: 'run.queued' }).records[0]).toMatchObject({
       kind: 'status',
-      payload: { text: 'Queued on Hermes' },
+      payload: { text: 'Queued on its server' },
     });
   });
 });

@@ -13,6 +13,7 @@ import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificati
 import { desktop } from '../desktop.ts';
 import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
 import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, Icon, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
+import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
 export const STEPS = ['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Routines', 'Done'] as const;
@@ -146,7 +147,7 @@ async function loadRows(): Promise<HarnessRows> {
     api.get<ClaudeSetup>('/setup/claude').catch(() => null),
   ]);
   // Hermes and Cursor Cloud run off this Mac: listed once they work, never as something to install.
-  return { harnesses: harnesses.filter((h) => (h.id !== 'hermes' && h.id !== 'cursor-cloud') || h.available), accounts, github, claude };
+  return { harnesses: harnesses.filter((h) => !isRemoteHarnessId(h.id) || h.available), accounts, github, claude };
 }
 
 /**

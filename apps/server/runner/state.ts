@@ -10,13 +10,16 @@ import { contextAttachments, harnessText } from '../message-context/project.ts';
 import type { CommandList } from '../commands.ts';
 import type { Live } from './controller.ts';
 import { handOverWith } from './switch.ts';
-import { CAPABILITIES, type HarnessId } from '../harness/types.ts';
+import { CAPABILITIES, type AnyHarnessId } from '../harness/types.ts';
 import type { CommandUse, HarnessAdapter, OutgoingMessage } from '../harness/adapter.ts';
 import { claudeAdapter } from '../harness/claude/adapter.ts';
 import { codexAdapter } from '../harness/codex/adapter.ts';
 import { cursorAdapter } from '../harness/cursor/adapter.ts';
-import { hermesAdapter } from '../harness/hermes/adapter.ts';
+import { hermesAdapter, runsApiAdapter } from '../harness/hermes/adapter.ts';
 import { cursorCloudAdapter } from '../harness/cursor-cloud/adapter.ts';
+import { customHarness, customHarnesses } from '../harness/custom.ts';
+import { harnessName, missingHarness } from '../harness/registry.ts';
+import { detachedSession } from '../harness/session.ts';
 
 /** Where a thread's MCP servers reach this server: the port it bound, which differs from the configured one when that is 0. */
 export const omniUrl = () => `http://127.0.0.1:${about.port}`;
@@ -28,8 +31,44 @@ const ADAPTERS: Record<string, HarnessAdapter> = {
   hermes: hermesAdapter,
   'cursor-cloud': cursorCloudAdapter,
 };
-export const adapterFor = (harness: string): HarnessAdapter => ADAPTERS[harness] ?? claudeAdapter;
-const capsOf = (harness: string) => CAPABILITIES[harness as HarnessId] ?? CAPABILITIES['claude-code'];
+/**
+ * A harness this machine does not have: a custom harness whose file is gone or not synced here yet, or an id no build
+ * knows. Its session runs nothing: every message gets the reason and the turn fails. spawn.ts refuses such a thread
+ * before this, so it is the last guard, never a fallback onto another harness.
+ */
+function missingAdapter(harness: string): HarnessAdapter {
+  const reason = missingHarness(harness) ?? `No harness ${harness} on this machine.`;
+  return {
+    id: harness as AnyHarnessId,
+    capabilities: NO_CAPS,
+    freshSessionId: (t) => t.id,
+    spawn(_ctx, cb) {
+      const session = detachedSession(cb, {
+        send(m) {
+          cb.record({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
+          cb.record({ kind: 'error', payload: { text: reason } });
+          cb.record({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } });
+          session.end('terminate');
+          return true;
+        },
+        interrupt: () => true,
+      });
+      return session;
+    },
+  };
+}
+
+/** What a missing harness can do: nothing that would start work. */
+const NO_CAPS = { ...CAPABILITIES.hermes, steer: false, interrupt: false };
+
+/** The adapter a thread's harness runs on. A custom harness runs on the Runs API adapter; an unknown id refuses. */
+export function adapterFor(harness: string): HarnessAdapter {
+  const builtIn = ADAPTERS[harness];
+  if (builtIn) return builtIn;
+  const custom = customHarness(harness);
+  return custom ? runsApiAdapter(custom.id, custom.capabilities) : missingAdapter(harness);
+}
+const capsOf = (harness: string) => CAPABILITIES[harness as keyof typeof CAPABILITIES] ?? customHarness(harness)?.capabilities ?? NO_CAPS;
 export const harnessSteers = (threadId: string) => capsOf(threads.get(threadId)?.harness ?? 'claude-code').steer;
 /** What a send or Stop during a live turn can do on the thread's harness (delivery.ts). */
 export const deliveryCaps = (threadId: string) => {
@@ -45,13 +84,14 @@ const CAPS: Record<string, number> = {
   hermes: config.maxConcurrentHermes,
   'cursor-cloud': config.maxConcurrentCursorCloud,
 };
-export const capFor = (harness: string) => CAPS[harness] ?? config.maxConcurrent;
-/** Every harness's cap, as this machine announces them to the others (sync/devices.ts). */
-export const slotCaps = (): Record<string, number> => ({ ...CAPS });
+/** A custom harness's cap is in its file. An id with no harness here takes the smallest, though it never starts. */
+export const capFor = (harness: string) => CAPS[harness] ?? customHarness(harness)?.cap ?? 1;
+/** Every harness's cap, custom ones included, as this machine announces them to the others (sync/devices.ts). */
+export const slotCaps = (): Record<string, number> => ({ ...CAPS, ...Object.fromEntries(customHarnesses().map((h) => [h.id, h.cap])) });
 
 /** The CLI name a harness shows in errors and the resume command. */
 const CLI_LABEL: Record<string, string> = { 'claude-code': 'claude', codex: 'codex', cursor: 'cursor-agent', hermes: 'Hermes', 'cursor-cloud': 'Cursor Cloud' };
-export const cliLabel = (harness: string) => CLI_LABEL[harness] ?? harness;
+export const cliLabel = (harness: string) => CLI_LABEL[harness] ?? harnessName(harness);
 
 // ---------- state ----------
 
@@ -204,7 +244,7 @@ export const runningByHarness = (): Record<string, number> => {
 export function slotsByHarness(): Record<string, { running: number; cap: number }> {
   const running = runningByHarness();
   const out: Record<string, { running: number; cap: number }> = {};
-  for (const h of Object.keys(CAPS)) out[h] = { running: running[h] ?? 0, cap: capFor(h) };
+  for (const [h, cap] of Object.entries(slotCaps())) out[h] = { running: running[h] ?? 0, cap };
   return out;
 }
 

@@ -6,6 +6,8 @@
 // - A picker opening on a catalog older than ON_DEMAND_MS probes everything again in the background (refreshStale), as
 //   T3 Code's picker asks for newly released models on every open. Settings > Models can ask at once.
 // - What Claude Code last reported is kept on disk, so a restart starts from it, not from the bundled list alone.
+// - Custom harnesses (custom.ts) are listed from their files on every read, so a new, changed or deleted file shows at
+//   once. Only their probe answers are kept here, by URL and secret name, so a changed address is checked again.
 // The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -25,17 +27,20 @@ import type {
 } from './codex/protocol.ts';
 import { cursorBin } from './cursor/bin.ts';
 import { parseCursorModels, rememberCursorWindows } from './cursor/models.ts';
-import { probeHermes } from './hermes/client.ts';
+import { probeHermes, probeRunsApi } from './hermes/client.ts';
+import { customHarnesses, type CustomHarness } from './custom.ts';
 import { CursorCloudClient, CursorCloudError } from './cursor-cloud/client.ts';
 import { harnessEnv } from './env-guard.ts';
 import { globalSecret, hasSecret } from '../secrets.ts';
 import { channels } from '../db.ts';
 import { recordUsage } from '../usage.ts';
 import { refreshCursorUsage } from '../cursor-usage.ts';
-import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
+import { type HarnessId, type HarnessInfo } from './types.ts';
 import {
   claudeHarness,
   claudeProbeOf,
+  customHarnessInfo,
+  UNCHECKED_FIX,
   codexHarness,
   cursorHarness,
   hermesHarness,
@@ -56,6 +61,7 @@ import {
   type CursorProbe,
   type HermesProbe,
   type CursorCloudProbe,
+  type CustomProbe,
 } from './catalog.ts';
 
 type Probe = CodexProbe & { rateLimits?: RateLimits };
@@ -295,14 +301,54 @@ async function probeCursorHarness(cap: number): Promise<HarnessInfo> {
 /** GET /v1/capabilities with the stored bearer token. Missing key or any failure is unavailable. */
 export async function probeHermesHarness(cap: number): Promise<HarnessInfo> {
   const unavailable: HermesProbe = { available: false };
+  const url = config.hermesUrl;
   try {
     const key = await globalSecret('HERMES_API_KEY');
-    if (!key || !config.hermesUrl) return hermesHarness(unavailable, cap);
-    const ok = await probeHermes(config.hermesUrl, key);
-    return hermesHarness({ available: ok }, cap);
+    if (!key || !url) return hermesHarness(unavailable, cap, url);
+    const ok = await probeHermes(url, key);
+    return hermesHarness({ available: ok }, cap, url);
   } catch {
-    return hermesHarness(unavailable, cap);
+    return hermesHarness(unavailable, cap, url);
   }
+}
+
+/** The probe answers for custom harnesses, by id, URL and secret name: a changed file is checked again. */
+const customProbes = new Map<string, CustomProbe>();
+const probeKey = (h: CustomHarness) => `${h.id}\n${h.url}\n${h.secret}`;
+
+/**
+ * GET /v1/capabilities on a custom harness's server with the key from this machine's secret store. The key is the
+ * global secret the file names: a harness is not per channel. Each failure says what to fix.
+ */
+export async function probeCustomHarness(h: CustomHarness): Promise<CustomProbe> {
+  if (h.error) return { available: false, fix: h.error };
+  const key = await globalSecret(h.secret).catch(() => null);
+  if (!key) return { available: false, fix: `Key not on this machine: set ${h.secret} in Secrets to the server's key` };
+  const probe = await probeRunsApi(h.url, key);
+  if (probe.state === 'ok') return { available: true };
+  if (probe.state === 'rejected') return { available: false, fix: `${h.host} refused the key in ${h.secret}. Replace it in Secrets` };
+  if (probe.state === 'status') return { available: false, fix: `${h.host} answered HTTP ${probe.status} to GET /v1/capabilities. Check the URL points at a Runs API server` };
+  return { available: false, fix: `Could not reach ${h.host}. Check the URL, and that this machine can reach it (on the tailnet, or over HTTPS)` };
+}
+
+/** Probe one custom harness now, outside any running load: a save checks the harness it wrote. Null when it has no file. */
+export async function checkCustomHarness(id: string): Promise<HarnessInfo | null> {
+  const h = customHarnesses().find((x) => x.id === id);
+  if (!h) return null;
+  const probe = await probeCustomHarness(h);
+  customProbes.set(probeKey(h), probe);
+  return customHarnessInfo(h, probe);
+}
+
+/** Every custom harness on this machine, with its last probe answer. */
+const customEntries = (): HarnessInfo[] => customHarnesses().map((h) => customHarnessInfo(h, customProbes.get(probeKey(h)) ?? { available: false, fix: UNCHECKED_FIX }));
+
+/** Probe the custom harnesses `only` names (all by default), and forget answers for files that are gone or changed. */
+async function probeCustoms(only?: readonly string[]) {
+  const files = customHarnesses();
+  const live = new Set(files.map(probeKey));
+  for (const k of customProbes.keys()) if (!live.has(k)) customProbes.delete(k);
+  await Promise.all(files.filter((h) => !only || only.includes(h.id)).map(async (h) => customProbes.set(probeKey(h), await probeCustomHarness(h))));
 }
 
 /**
@@ -336,43 +382,43 @@ export function channelCatalog(cat: Catalog, channelId: string | null | undefine
 }
 
 /**
- * Probe the harnesses in `only` (all by default) and keep the others as they are. A call while
- * a load is running joins that load.
+ * Probe the harnesses in `only` (all by default, custom ones included) and keep the others as they are. A call while
+ * a load is running joins that load, so a probe it did not ask for may not run: call again after it settles.
  */
-export function loadCatalog(only: HarnessId[] = HARNESS_IDS): Promise<Catalog> {
+export function loadCatalog(only?: readonly string[]): Promise<Catalog> {
   loading ??= (async () => {
     const c = caps();
+    const asks = (id: HarnessId) => !only || only.includes(id);
     const keep = (id: HarnessId) => getHarness(getCatalog(), id)!;
     const [claude, codex, cursor, hermes, cursorCloud] = await Promise.all([
-      only.includes('claude-code') ? probeClaudeHarness(c['claude-code']) : keep('claude-code'),
-      only.includes('codex') ? probeCodexHarness(c.codex) : keep('codex'),
-      only.includes('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
-      only.includes('hermes') ? probeHermesHarness(c.hermes) : keep('hermes'),
-      only.includes('cursor-cloud') ? probeCursorCloudHarness(c['cursor-cloud']) : keep('cursor-cloud'),
+      asks('claude-code') ? probeClaudeHarness(c['claude-code']) : keep('claude-code'),
+      asks('codex') ? probeCodexHarness(c.codex) : keep('codex'),
+      asks('cursor') ? probeCursorHarness(c.cursor) : keep('cursor'),
+      asks('hermes') ? probeHermesHarness(c.hermes) : keep('hermes'),
+      asks('cursor-cloud') ? probeCursorCloudHarness(c['cursor-cloud']) : keep('cursor-cloud'),
+      probeCustoms(only),
     ]);
     current = { harnesses: [claude, codex, cursor, hermes, cursorCloud] };
     checkedAt = Date.now();
-    if (only.length === HARNESS_IDS.length) fullAt = checkedAt;
-    return current;
+    if (!only) fullAt = checkedAt;
+    return getCatalog();
   })().finally(() => {
     loading = null;
   });
   return loading;
 }
 
-/** The current catalog, or a best-effort default (Claude only) before the first load. */
+/** The current catalog, or a best-effort default (Claude only) before the first load. Custom harnesses come last. */
 export function getCatalog(): Catalog {
-  if (current) return current;
   const c = caps();
-  return {
-    harnesses: [
-      claudeHarness(c['claude-code'], config.defaultModel, lastClaudeModels(), claudeAuth),
-      codexHarness({ available: false, models: [] }, c.codex),
-      cursorHarness({ available: false, models: [] }, c.cursor),
-      hermesHarness({ available: false }, c.hermes),
-      cursorCloudHarness({ available: false }, c['cursor-cloud']),
-    ],
-  };
+  const builtIns = current?.harnesses ?? [
+    claudeHarness(c['claude-code'], config.defaultModel, lastClaudeModels(), claudeAuth),
+    codexHarness({ available: false, models: [] }, c.codex),
+    cursorHarness({ available: false, models: [] }, c.cursor),
+    hermesHarness({ available: false }, c.hermes, config.hermesUrl),
+    cursorCloudHarness({ available: false }, c['cursor-cloud']),
+  ];
+  return { harnesses: [...builtIns, ...customEntries()] };
 }
 
 /**

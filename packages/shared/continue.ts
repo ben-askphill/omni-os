@@ -2,6 +2,7 @@
 // first Session reads a Carryover ahead of Ben's first message. Server and web share these shapes, and the fixtures in
 // apps/server/tests/wire-fixtures.test.ts record their JSON.
 // "Carryover" is the word #187 uses for the same packet when an imported transcript is continued.
+import { isCustomHarnessId } from './custom-harness.ts';
 import type { RunName } from './run-switch.ts';
 
 /** What a Carryover may take, in characters. Ben's own message comes after it and is never cut. */
@@ -175,6 +176,7 @@ export interface ContinueLink {
 /** Why a harness cannot take a continued thread, or null when it can. */
 export function continueRefusal(harness: string): string | null {
   if (harness === 'hermes') return "Hermes runs on its own server, so this thread's files cannot move there.";
+  if (isCustomHarnessId(harness)) return "A custom harness runs on its own server, so this thread's files cannot move there.";
   if (harness === 'cursor-cloud') return "Cursor Cloud works on its own clone of the repo, so it cannot start from this thread's checkout.";
   return null;
 }
@@ -182,6 +184,7 @@ export function continueRefusal(harness: string): string | null {
 /** Why a thread on this harness cannot be continued, or null when it can. */
 export function continueSourceRefusal(harness: string): string | null {
   if (harness === 'hermes') return 'This thread runs on the Hermes server, so its files are not on this machine to continue from.';
+  if (isCustomHarnessId(harness)) return "This thread runs on a custom harness's own server, so its files are not on this machine to continue from.";
   if (harness === 'cursor-cloud') return "This thread runs on Cursor's machines, so its files are not on this machine to continue from.";
   return null;
 }

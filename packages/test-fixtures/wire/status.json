@@ -33,6 +33,10 @@
     "cursor-cloud": {
       "running": 0,
       "cap": 4
+    },
+    "custom:fixture-agent": {
+      "running": 0,
+      "cap": 4
     }
   },
   "running": 1,

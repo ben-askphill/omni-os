@@ -3,11 +3,12 @@
 // on the server's answers. The shapes are packages/shared/worktree-base.ts.
 import { HEAD_PICK, pickLabel, type BaseOptions, type BasePick, type ThreadBaseView } from '@omni/shared/worktree-base.ts';
 import { shortSha } from '@omni/shared/changes-view.ts';
+import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 
 export { HEAD_PICK };
 
-/** Harnesses that run on a remote provider get no worktree, so there is no base to pick. Mirrors isProviderHarness in apps/server/harness/types.ts. */
-export const isProviderHarness = (harness: string | null | undefined) => harness === 'hermes' || harness === 'cursor-cloud';
+/** Harnesses that run on a remote provider (Hermes, Cursor Cloud, a custom harness) get no worktree, so there is no base to pick. */
+export const isProviderHarness = isRemoteHarnessId;
 
 /** One row of the picker. `key` is what the picker holds; `pick` is what the request sends. */
 export interface BaseOption {

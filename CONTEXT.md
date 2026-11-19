@@ -98,7 +98,10 @@ _Avoid_: Request (a message), delivery state (a request's state)
 ### Harnesses
 
 **Harness**:
-The agent a thread runs in, together with what it bills: Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan), Hermes (Anthropic API on the user's server, not their Claude, ChatGPT or Cursor plan) or Cursor Cloud (a Cursor cloud agent on Cursor's machines, Cursor plan).
+The agent a thread runs in, together with what it bills: Claude Code (Claude plan), Codex (ChatGPT plan), Cursor Agent (Cursor plan), Hermes (Anthropic API on the user's server, not their Claude, ChatGPT or Cursor plan), Cursor Cloud (a Cursor cloud agent on Cursor's machines, Cursor plan) or a **Custom harness**.
+
+**Custom harness**:
+A remote agent the user registered, on a server of their own, that Omni reaches over the Runs API as it does Hermes: one file in `data/harnesses/`, id `custom:<slug>`, its key in a secret only its HTTP client reads. A crew role binds to one by id.
 _Avoid_: Provider, engine, backend, runtime
 
 **Account**:

@@ -5,12 +5,12 @@ import { db, now, tx } from './connection.ts';
  * What the sync relay carries. Events, artifacts, automation runs, completions and trigger deliveries are keyed by their uid, a
  * result_read, a limit_stop and an assignment by their thread's id, a remote_command by its command id, the rest by id or key.
  * A review_note is keyed by its id, an automation_file (a YAML in data/automations/) by its automation id, a crew_file
- * (a role or an overlay in data/crew/) by its role id, an mcp_client (an OAuth client that reached /mcp, mcp-clients.ts)
+ * (a role or an overlay in data/crew/) by its role id, a harness_file (a custom harness in data/harnesses/) by its slug, an mcp_client (an OAuth client that reached /mcp, mcp-clients.ts)
  * by its client id.
  */
 export type SyncEntity =
   | 'channel' | 'folder' | 'thread' | 'event' | 'artifact' | 'automation_run' | 'kv' | 'completion' | 'result_read' | 'limit_stop'
-  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file' | 'crew_file' | 'mcp_client' | 'memory';
+  | 'trigger_delivery' | 'remote_command' | 'assignment' | 'review_note' | 'automation_file' | 'crew_file' | 'harness_file' | 'mcp_client' | 'memory';
 export type SyncOp = 'upsert' | 'delete';
 
 export interface OutboxRow {
@@ -28,7 +28,7 @@ export interface OutboxRow {
  * the newest result read, whenever the write was (db/repos/needs-you.ts). A limit_stop is a thread's limit stop
  * alone, apart from the row, so a write to either never undoes the other.
  */
-const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note', 'automation_file', 'crew_file', 'memory']);
+const LWW = new Set<SyncEntity>(['channel', 'folder', 'thread', 'kv', 'artifact', 'limit_stop', 'review_note', 'automation_file', 'crew_file', 'harness_file', 'memory']);
 /** kv keys that stay on this machine: the sync cursor, machine id, switches and path map. */
 export const localKey = (key: string) => key.startsWith('sync.');
 
@@ -150,8 +150,8 @@ export const outbox = {
         // The phone alert sender id (push-sender.ts pushSenderId) is that Mac's too: sharing it, either Mac would settle
         // the other's alerts. This one makes its own on its next alert.
         db.exec(`DELETE FROM kv WHERE key = 'sync.push_sender'`);
-        // Its crew files go out again as this machine's (seedOnce).
-        db.exec(`DELETE FROM kv WHERE key = 'sync.crew_files_seeded'`);
+        // Its crew and harness files go out again as this machine's (seedOnce).
+        db.exec(`DELETE FROM kv WHERE key IN ('sync.crew_files_seeded', 'sync.harness_files_seeded')`);
       }
       // A thread mid-run as sync is set up is this machine's run, and its row should say so.
       db.prepare(`UPDATE threads SET run_machine = ? WHERE status IN ('running','queued') AND run_machine IS NULL`).run(id);

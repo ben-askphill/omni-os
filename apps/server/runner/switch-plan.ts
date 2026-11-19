@@ -1,6 +1,7 @@
 // What switching a thread's run does to its sessions. Pure, so every path is tested without a process (switch.ts applies it).
 import { sameRun, type Run, type RunName, type SwitchMode } from '@omni/shared/run-switch.ts';
 import type { PendingHandover, Sessions } from '../db.ts';
+import { isCustomHarnessId } from '@omni/shared/custom-harness.ts';
 
 /** The run state of a thread, as the switch reads it. */
 export interface RunState extends Run {
@@ -19,6 +20,9 @@ export type SwitchPlan =
 export const HERMES_REFUSAL =
   "Hermes runs on its own server without this thread's worktree. Start a new thread to move work to or from Hermes.";
 
+export const CUSTOM_REFUSAL =
+  "A custom harness runs on its own server without this thread's worktree. Start a new thread to move work to or from it.";
+
 /** A cloud agent keeps the model it was created with (a run cannot change it) and has no worktree on this Mac. */
 export const CURSOR_CLOUD_REFUSAL =
   "A Cursor cloud agent keeps its model and works on its own clone of the repo. Start a new thread to change the model or move work to or from Cursor Cloud.";
@@ -33,6 +37,7 @@ export function planSwitch(t: RunState, to: Run, from: RunName, lastEventId: num
   if (t.harness === 'cursor-cloud' || to.harness === 'cursor-cloud') return { kind: 'reject', error: CURSOR_CLOUD_REFUSAL };
   if (t.harness === to.harness) return { kind: 'settings', ...same };
   if (t.harness === 'hermes' || to.harness === 'hermes') return { kind: 'reject', error: HERMES_REFUSAL };
+  if (isCustomHarnessId(t.harness) || isCustomHarnessId(to.harness)) return { kind: 'reject', error: CUSTOM_REFUSAL };
   // Nothing ran yet, so there is nothing to hand over. A session id the old harness noted belongs to it: the thread id
   // is "no session yet" to every harness.
   if (!t.has_run && !t.handover) return { kind: 'settings', ...same, session_id: t.id };

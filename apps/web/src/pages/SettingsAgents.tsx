@@ -48,8 +48,13 @@ function HarnessesCard({ channel }: { channel?: string }) {
                   <HarnessLogo harness={h.id} size={14} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-medium">{h.name}</div>
-                  <p className="mt-0.5 text-[12.5px] text-fg-3">
+                  <div className="text-[13px] font-medium break-words">{h.name}</div>
+                  {h.remote?.custom && (
+                    <p className="mt-0.5 text-[12.5px] break-words text-fg-2">
+                      Custom harness{h.remote.host && ` on ${h.remote.host}`} · key in <code className="text-[11.5px]">{h.remote.secret}</code>
+                    </p>
+                  )}
+                  <p className="mt-0.5 text-[12.5px] break-words text-fg-3">
                     {h.plan} · {h.models.length} {h.models.length === 1 ? 'model' : 'models'}
                     {def && ` · default ${def.label}`} · {h.running} of {h.cap} running
                   </p>

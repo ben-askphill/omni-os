@@ -65,6 +65,7 @@
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen,
 //                                 MCP_TOOL_TIMEOUT)
+//   FAKE_CLAUDE_WATCH_ENV=<a,b>   log which of these variable names the process got (watched_env), for env leak tests
 //   FAKE_CLAUDE_LATENCY_MS=<ms>   simulated model call latency per step (default 20)
 //   FAKE_CLAUDE_MCP_LIST=<file>   what `claude mcp list` prints (sign-in check), else $HOME/.fake-claude-mcp-list.txt
 //   FAKE_CLAUDE_RESUME_FLUSH=1    on --resume, emit a zero-turn success result at startup like the real CLI can
@@ -1164,6 +1165,8 @@ async function main() {
         pid: process.pid, time: Date.now(), cwd: process.cwd(), args: process.argv.slice(2), mode,
         session_id: sessionId, resume: resumed, model, effort: opts['--effort'] ?? null, unknown, thread_id: process.env.OMNI_THREAD_ID ?? null,
         api_auth: ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'].filter((k) => k in process.env),
+        // The names FAKE_CLAUDE_WATCH_ENV lists (comma-separated) that this process got, never their values.
+        watched_env: (process.env.FAKE_CLAUDE_WATCH_ENV ?? '').split(',').filter((k) => k && k in process.env),
         entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT ?? null, mcp_tool_timeout: process.env.MCP_TOOL_TIMEOUT ?? null,
         // The credential Omni handed this process (thread-tokens.ts), for the tests that check it is never the install's.
         omni_token: process.env.OMNI_TOKEN ?? null, omni_token_file: process.env.OMNI_TOKEN_FILE ?? null,

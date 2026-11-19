@@ -2,7 +2,7 @@
 
 Hermes Agent is an always-on process on a Linux server. It already has a checkout, tools and a long-lived conversation. Omni reaches it through the Hermes API server (HTTP, `Authorization: Bearer`) over Tailscale. The server listens on its tailnet address and is not public. The base URL is config (`OMNI_HERMES_URL`, no default; unset means Hermes is off); the Mac must be on the tailnet. The bearer token is the secret-store secret `HERMES_API_KEY`. It is not stored in the database, an env file or a log.
 
-The runner still wants a child process per thread, for queueing, steer, interrupt and keepalive. Hermes has no local CLI, so the adapter holds a dummy process open (the same shape Cursor uses for one process per turn) and does the real work with HTTP. A stable session id, `omni-<thread id>`, is what continues the conversation: Hermes keeps the context, and a second run on that id sees the first.
+The runner keeps queueing, steer, interrupt and keepalive per thread. Hermes has no local CLI, so its session has no process (`detachedSession` in `apps/server/harness/session.ts`): it does the work with HTTP and ends on the first `end`, which stops the remote run. A stable session id, `omni-<thread id>`, is what continues the conversation: Hermes keeps the context, and a second run on that id sees the first.
 
 ## Consequences
 
@@ -12,3 +12,4 @@ The runner still wants a child process per thread, for queueing, steer, interrup
 - Every create sends `Idempotency-Key` (the message uuid) so a retry cannot start a second run. On HTTP 429, the server's own concurrency cap, Omni backs off and retries with the same key.
 - The plan meter stays empty. Token counts and the serving model come back on the run's result. This bills the Anthropic API, not Ben's Claude, ChatGPT or Cursor plan.
 - Availability is `GET /v1/capabilities` returning 200. No key, a 401 or an unreachable URL all look the same in the picker: set `HERMES_API_KEY` in Secrets and set `OMNI_HERMES_URL` and connect this Mac to Tailscale.
+- Amended by [ADR 0017](0017-custom-harnesses.md): the same adapter runs any number of custom harnesses, the HTTP shape is documented as the [Runs API](../internals/remote-harness-protocol.md), and `HERMES_API_KEY` no longer reaches any local thread's environment.

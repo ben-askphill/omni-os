@@ -24,6 +24,7 @@ import { markLabel, term } from '@omni/shared/display.ts';
 import { useTechnical } from '../../display.ts';
 import { isWorking } from '@omni/shared/delegate-count.ts';
 import { runElapsed } from '@omni/shared/ran-on.ts';
+import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 
 function QuickRow({
   icon,
@@ -131,7 +132,7 @@ export function ThreadQuickCard({
   className?: string;
 }) {
   const cloud = thread.harness === 'cursor-cloud';
-  const remote = thread.harness === 'hermes' || cloud;
+  const remote = isRemoteHarnessId(thread.harness);
   const cloudUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
   const model = thread.model || init?.model;
   const now = useNow(60_000);

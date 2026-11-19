@@ -66,12 +66,14 @@ export const sleep = (ms: number, signal?: AbortSignal) =>
     );
   });
 
+/** What GET /v1/capabilities said: up, the key refused (401 or 403), another status, or no answer at all. */
+export type RunsApiProbe = { state: 'ok' } | { state: 'rejected' } | { state: 'status'; status: number } | { state: 'unreachable' };
+
 /**
- * Reachable and authenticated. 401 (missing or wrong key) and any network error are unavailable.
- * Redirects are not followed: a 3xx must not carry the bearer token to another host.
+ * GET /v1/capabilities with the bearer key. Only a 200 is up. Redirects are not followed: a 3xx must not carry the
+ * bearer token to another host. The body is not read yet (docs/internals/remote-harness-protocol.md).
  */
-export async function probeHermes(baseUrl: string, apiKey: string, timeoutMs = 5000): Promise<boolean> {
-  if (!apiKey) return false;
+export async function probeRunsApi(baseUrl: string, apiKey: string, timeoutMs = 5000): Promise<RunsApiProbe> {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
@@ -81,12 +83,20 @@ export async function probeHermes(baseUrl: string, apiKey: string, timeoutMs = 5
       redirect: 'manual',
     });
     await res.body?.cancel().catch(() => {});
-    return res.status === 200;
+    if (res.status === 200) return { state: 'ok' };
+    if (res.status === 401 || res.status === 403) return { state: 'rejected' };
+    return { state: 'status', status: res.status };
   } catch {
-    return false;
+    return { state: 'unreachable' };
   } finally {
     clearTimeout(t);
   }
+}
+
+/** Reachable and authenticated. No key, a 401 and any network error are unavailable. */
+export async function probeHermes(baseUrl: string, apiKey: string, timeoutMs = 5000): Promise<boolean> {
+  if (!apiKey) return false;
+  return (await probeRunsApi(baseUrl, apiKey, timeoutMs)).state === 'ok';
 }
 
 export class HermesClient {

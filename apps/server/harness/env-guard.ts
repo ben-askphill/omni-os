@@ -1,8 +1,8 @@
 // Builds each harness's process environment from Omni's own environment plus the
 // channel and global secrets, then strips the variables that would switch that
 // harness off its subscription onto API billing. The guard wins: a secret whose
-// name is on the strip list never reaches that harness. The Grok Bot webhook and the
-// desktop app's pairing secret are stripped for every harness too. Pure, so it is testable.
+// name is on the strip list never reaches that harness. The Grok Bot webhook, the desktop
+// app's pairing secret and Hermes's key are stripped for every harness too. Pure, so it is testable.
 import type { HarnessId } from './types.ts';
 
 /**
@@ -17,10 +17,16 @@ export const STRIPPED_VARS: Record<HarnessId, string[]> = {
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_BASE_URL'],
   cursor: ['CURSOR_API_KEY', 'CURSOR_AUTH_TOKEN'],
   // The bearer token is sent on the HTTP client, never inherited by the holder process.
-  hermes: ['HERMES_API_KEY'],
+  hermes: [],
   // Cursor Cloud's key goes on its API client's Authorization header only. The holder process never sees it.
   'cursor-cloud': ['CURSOR_API_KEY', 'CURSOR_AUTH_TOKEN'],
 };
+
+/**
+ * Hermes's bearer key. Like every remote harness's key it goes to its own HTTP client only, so no local harness gets
+ * it, even from the server's environment. Custom harnesses' keys are left out where secrets are read (secrets.ts).
+ */
+export const HERMES_KEY = 'HERMES_API_KEY';
 
 /** The Grok Bot webhook. The server reads these. A harness process and a thread's terminal do not. */
 export const GROKBOT_WEBHOOK_URL = 'GROKBOT_WEBHOOK_URL';
@@ -44,8 +50,8 @@ export const SERVER_CREDENTIAL_VARS = ['OMNI_TOKEN', 'OMNI_TOKEN_FILE', 'OMNI_MC
  * The environment a harness process gets. `base` is Omni's own environment
  * (defaults to process.env). `secrets` are the channel and global secret values.
  * Secrets override the base, then the harness's stripped variables are removed
- * whatever their source. The Grok Bot webhook is removed for every harness, and so
- * are the server's own credentials, unless `extra` sets them for the thread.
+ * whatever their source. The Grok Bot webhook and Hermes's key are removed for every
+ * harness, and so are the server's own credentials, unless `extra` sets them for the thread.
  */
 export function harnessEnv(
   harness: HarnessId,
@@ -56,6 +62,7 @@ export function harnessEnv(
   const env: NodeJS.ProcessEnv = { ...base, ...secrets, ...extra };
   for (const name of STRIPPED_VARS[harness]) delete env[name];
   for (const name of SERVER_ONLY_VARS) delete env[name];
+  delete env[HERMES_KEY];
   for (const name of SERVER_CREDENTIAL_VARS) if (!(name in extra)) delete env[name];
   return env;
 }

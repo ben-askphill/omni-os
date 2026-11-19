@@ -1,35 +1,22 @@
 import { db } from './db.ts';
-import { SERVER_ONLY_VARS } from './harness/env-guard.ts';
-import { WEBHOOK_SECRET_PREFIX } from './github-webhook.ts';
+import { harnessKeyNames } from './harness/custom.ts';
+import { NAME_RE, omniCredential, SCOPE_RE } from './secret-names.ts';
 import { secretStore } from './secret-store.ts';
+
+export { APNS_KEY_SECRET, CONNECT_SECRET_NAMES, LEGACY_SYNC_SECRETS, NAME_RE, omniCredential, SCOPE_RE, SEAL_SECRET_NAME, SIGN_SECRET_NAME, SYNC_SECRETS } from './secret-names.ts';
 
 // Secret values live only in the platform's secret store (secret-store.ts): the macOS Keychain, service "omni-os",
 // on a Mac. The DB keeps names and scopes so the UI can list them without reading values.
 
-/** Omni's own sync credentials (apps/server/sync/worker.ts). Global, and never handed to an agent's environment. */
-export const SYNC_SECRETS = { url: 'OMNI_RELAY_URL', token: 'OMNI_RELAY_TOKEN' } as const;
-/** The Supabase relay's, from before the Cloudflare one (ADR 0008). Still kept from threads until a new sign-in removes them. */
-export const LEGACY_SYNC_SECRETS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_REFRESH_TOKEN'] as const;
-/** Omni Connect's machine key and tunnel token (apps/server/connect/service.ts). Global, and never handed to an agent. */
-export const CONNECT_SECRET_NAMES = ['OMNI_CONNECT_KEY', 'OMNI_CONNECT_TUNNEL_TOKEN'] as const;
-/** This machine's key for secrets other machines send it (secret-drop.ts). Global, and never handed to an agent. */
-export const SEAL_SECRET_NAME = 'OMNI_SEAL_KEY';
-/** This machine's key for signing the sync changes it pushes (sync/sign-key.ts). Global, and never handed to an agent. */
-export const SIGN_SECRET_NAME = 'OMNI_SIGN_KEY';
-/** The APNs signing key push-sender.ts reads. Global, and never handed to an agent. */
-export const APNS_KEY_SECRET = 'APNS_AUTH_KEY';
-const PRIVATE = new Set<string>([...Object.values(SYNC_SECRETS), ...LEGACY_SYNC_SECRETS, ...CONNECT_SECRET_NAMES, SEAL_SECRET_NAME, SIGN_SECRET_NAME, APNS_KEY_SECRET]);
-const SERVER_ONLY = new Set<string>(SERVER_ONLY_VARS);
-
-/** False for Omni's sync, Connect and seal credentials (global only), the Grok Bot webhook and webhook signing secrets (any scope). */
-export function secretReachesThread(scope: string, name: string): boolean {
-  if (SERVER_ONLY.has(name) || name.startsWith(WEBHOOK_SECRET_PREFIX)) return false;
-  if (scope === 'global' && PRIVATE.has(name)) return false;
-  return true;
+/**
+ * Whether a secret may go into a thread's environment, a terminal or a channel action. Not Omni's own credentials, and
+ * not a remote harness's key (Hermes's or a custom harness's, harness/custom.ts), in any scope: that key goes only to
+ * its harness's HTTP client (runner/spawn.ts harnessKey), so a local agent cannot call the server with it.
+ * `keys` is the set of harness key names, for a caller that checks many secrets at once.
+ */
+export function secretReachesThread(scope: string, name: string, keys: ReadonlySet<string> = harnessKeyNames()): boolean {
+  return !omniCredential(scope, name) && !keys.has(name);
 }
-
-export const NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
-export const SCOPE_RE = /^(global|channel:[a-z0-9-]+)$/;
 
 const account = (scope: string, name: string) => `${scope}/${name}`;
 
@@ -102,18 +89,30 @@ export async function secretValues(): Promise<string[]> {
   return out;
 }
 
-/** Global secrets, overridden by channel-scoped ones with the same name. Sync credentials and the Grok Bot webhook stay out. */
+/** Global secrets, overridden by channel-scoped ones with the same name. Omni's own credentials and harness keys stay out. */
 export async function secretsEnv(channelId: string): Promise<Record<string, string>> {
   const rows = db
     .prepare(`SELECT scope, name FROM secrets WHERE scope = 'global' OR scope = ? ORDER BY scope = 'global' DESC`)
     .all(`channel:${channelId}`) as { scope: string; name: string }[];
   const env: Record<string, string> = {};
+  const keys = harnessKeyNames();
   for (const r of rows) {
-    if (!secretReachesThread(r.scope, r.name)) continue;
+    if (!secretReachesThread(r.scope, r.name, keys)) continue;
     const v = await readSecret(r.scope, r.name);
     if (v != null) env[r.name] = v;
   }
   return env;
+}
+
+/**
+ * A remote harness's key, for its HTTP client only: the channel's secret of that name, else the global one. Never put
+ * it in an environment. Null when neither is set on this machine.
+ */
+export async function harnessKey(channelId: string, name: string): Promise<string | null> {
+  if (!NAME_RE.test(name) || omniCredential('global', name)) return null;
+  for (const scope of [`channel:${channelId}`, 'global']) if (hasSecret(scope, name)) return readSecret(scope, name);
+  // A key in the secret store with no row in Secrets counts too, as the catalog probe reads it.
+  return readSecret('global', name);
 }
 
 /**
@@ -123,10 +122,11 @@ export async function secretsEnv(channelId: string): Promise<Record<string, stri
 export async function namedSecrets(channelId: string, names: string[]): Promise<{ env: Record<string, string>; missing: string[] }> {
   const env: Record<string, string> = {};
   const missing: string[] = [];
+  const keys = harnessKeyNames();
   for (const name of names) {
     let value: string | null = null;
     for (const scope of [`channel:${channelId}`, 'global']) {
-      if (value == null && secretReachesThread(scope, name) && hasSecret(scope, name)) value = await readSecret(scope, name);
+      if (value == null && secretReachesThread(scope, name, keys) && hasSecret(scope, name)) value = await readSecret(scope, name);
     }
     if (value == null) missing.push(name);
     else env[name] = value;

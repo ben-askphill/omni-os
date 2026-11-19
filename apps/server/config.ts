@@ -121,6 +121,8 @@ export const paths = {
   crew: join(ROOT, 'crew'),
   /** The user's own charters: a file here replaces the shared one in crew/ with the same name. Never in git. */
   personalCrew: join(DATA, 'crew'),
+  /** The user's custom harnesses, one YAML file each (harness/custom.ts). Synced; their keys are not. */
+  harnesses: join(DATA, 'harnesses'),
   /**
    * Shared automations. Omni ships none, so a fresh install lists none (apps/server/tests/automations.test.ts and
    * apps/desktop/tests/stage.test.ts check it). OMNI_AUTOMATIONS_DIR points tests at their own.

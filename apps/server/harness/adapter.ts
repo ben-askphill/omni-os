@@ -9,7 +9,7 @@ import type { CrewRole } from '../crew.ts';
 import type { ContextUsage, CursorTurnUsage } from '@omni/shared/context-meter.ts';
 import type { ContextHint, Record as StreamRecord, Usage } from '../stream.ts';
 import type { Attachment } from '../uploads.ts';
-import type { HarnessCapabilities, HarnessId } from './types.ts';
+import type { AnyHarnessId, HarnessCapabilities } from './types.ts';
 
 /** Everything an adapter needs to start a thread's process. */
 export interface AdapterContext {
@@ -20,8 +20,13 @@ export interface AdapterContext {
   systemPrompt: string;
   /** Per-thread MCP config file, when one was written. */
   mcpFile: string | null;
-  /** Channel and global secret values. */
+  /** Channel and global secret values. Empty for a Runs API harness, which gets none of them (ADR 0017). */
   secretEnv: Record<string, string>;
+  /**
+   * A remote harness's own key, for its HTTP client only, never an environment: Hermes's HERMES_API_KEY or the secret
+   * a custom harness's file names (runner/spawn.ts). Unset when this machine has none, or for a local harness.
+   */
+  harnessKey?: string;
   /** Another thread already holds the channel's browser profile. */
   browserBusy: boolean;
   /** The channel browser Omni runs, for the browser MCP to attach to. */
@@ -131,7 +136,7 @@ export interface HarnessSession {
 }
 
 export interface HarnessAdapter {
-  readonly id: HarnessId;
+  readonly id: AnyHarnessId;
   readonly capabilities: HarnessCapabilities;
   spawn(ctx: AdapterContext, cb: AdapterCallbacks): HarnessSession;
   /** Whether a resume is warranted from on-disk session state, given the thread has not "run" in this process yet. */

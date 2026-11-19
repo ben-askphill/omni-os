@@ -16,7 +16,8 @@ import { expandTemplate, leadTemplate } from '@omni/shared/templates.ts';
 import { listTemplates } from '../templates.ts';
 import { withMentions } from '../mentions.ts';
 import { fileKind, safeName, saveUploads, type Attachment } from '../uploads.ts';
-import { isProviderHarness, providerWhere, type HarnessId } from '../harness/types.ts';
+import { isProviderHarness, type HarnessId } from '../harness/types.ts';
+import { capabilitiesOf, providerWhere } from '../harness/registry.ts';
 import type { Catalog, Resolved } from '../harness/catalog.ts';
 import { profileTask, routeTask } from '../harness/auto.ts';
 import { usageByHarness } from '../usage.ts';
@@ -213,7 +214,8 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
   const picked = auto ?? (run as Resolved);
   const { harness, model } = picked;
   const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));
-  if (role?.delegateOnly && isProviderHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
+  // A harness Omni cannot hold to tool limits (a remote one runs its own tools) cannot run a delegate-only role.
+  if (role?.delegateOnly && !capabilitiesOf(harness)?.toolLimits) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
   // Below full access a harness Omni cannot hold to the level is refused (access.ts, ADR 0015).
   const unenforced = harnessRefusal(harness, channelAccess(channel, role?.access));
   if (unenforced) throw refusal(unenforced, 400);

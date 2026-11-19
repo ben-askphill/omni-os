@@ -1,7 +1,8 @@
 // The model catalog: per harness, the models with their efforts and defaults, plus
 // availability and the fix command when a harness can't be used. The pure assembly
 // and resolution live here; live probing of the CLIs is injected so this is testable.
-import type { HarnessId, HarnessInfo, ModelEntry } from './types.ts';
+import type { AnyHarnessId, HarnessId, HarnessInfo, ModelEntry, RemoteTarget } from './types.ts';
+import type { CustomHarness } from './custom.ts';
 import { CAPABILITIES, HARNESS_META, HARNESS_IDS } from './types.ts';
 import { CLAUDE_ALIASES } from '@omni/shared/claude-aliases.ts';
 import { parseClaudeStatus } from './accounts-parse.ts';
@@ -234,15 +235,57 @@ export interface HermesProbe {
   available: boolean;
 }
 
-export function hermesHarness(probe: HermesProbe, cap: number): HarnessInfo {
+/** A URL's host and port, or empty when it does not parse. */
+export const hostOf = (url: string | undefined) => {
+  try {
+    return url ? new URL(url).host : '';
+  } catch {
+    return '';
+  }
+};
+
+/** `url`: the Hermes URL from Settings, for the Harnesses list's host. */
+export function hermesHarness(probe: HermesProbe, cap: number, url?: string): HarnessInfo {
+  const remote: RemoteTarget = { custom: false, kind: 'runs-api', host: hostOf(url), secret: 'HERMES_API_KEY' };
   const base: Omit<HarnessInfo, 'models' | 'available' | 'fix'> = {
     id: 'hermes',
     ...HARNESS_META.hermes,
     capabilities: CAPABILITIES.hermes,
     cap,
+    remote,
   };
   if (!probe.available) return { ...base, available: false, fix: HERMES_FIX, models: [] };
   return { ...base, available: true, models: hermesModels() };
+}
+
+// ---------- custom harnesses ----------
+
+/** The one model a custom harness offers. Its server picks the model, as Hermes's does. */
+export const CUSTOM_MODEL = 'default';
+
+/** What the probe of a custom harness found. `fix` says how to make it usable when it is not. */
+export interface CustomProbe {
+  available: boolean;
+  fix?: string;
+}
+
+/** How to read a probe that has not run yet. */
+export const UNCHECKED_FIX = 'Omni has not checked this harness yet';
+
+/** A custom harness (custom.ts) as the catalog lists it. A file with an error is unavailable, and its error is the fix. */
+export function customHarnessInfo(h: CustomHarness, probe: CustomProbe): HarnessInfo {
+  const base: Omit<HarnessInfo, 'models' | 'available' | 'fix'> = {
+    id: h.id,
+    name: h.name,
+    plan: h.bills,
+    capabilities: h.capabilities,
+    cap: h.cap,
+    remote: { custom: true, kind: h.kind, host: h.host, secret: h.secret },
+  };
+  if (h.error) return { ...base, available: false, fix: h.error, models: [] };
+  if (!probe.available) return { ...base, available: false, fix: probe.fix ?? UNCHECKED_FIX, models: [] };
+  const note = `Runs on ${h.host}. ${h.bills}.`;
+  return { ...base, available: true, models: [{ id: CUSTOM_MODEL, label: `${h.name} default`, note, efforts: [], defaultEffort: '', default: true }] };
 }
 
 // ---------- Cursor Cloud ----------
@@ -308,10 +351,10 @@ export interface Catalog {
   harnesses: HarnessInfo[];
 }
 
-export const getHarness = (cat: Catalog, id: HarnessId) => cat.harnesses.find((h) => h.id === id);
+export const getHarness = (cat: Catalog, id: string) => cat.harnesses.find((h) => h.id === id);
 
 /** Resolve a model id or Claude alias to the catalog model for a harness, or null. */
-export function resolveModel(cat: Catalog, harness: HarnessId, model: string): ModelEntry | null {
+export function resolveModel(cat: Catalog, harness: string, model: string): ModelEntry | null {
   const h = getHarness(cat, harness);
   if (!h) return null;
   const id = harness === 'claude-code' ? CLAUDE_ALIASES[model] ?? model : model;
@@ -324,7 +367,7 @@ export interface ResolveError {
 }
 export interface Resolved {
   ok: true;
-  harness: HarnessId;
+  harness: AnyHarnessId;
   model: string;
   effort: string;
 }
@@ -336,7 +379,7 @@ export interface Resolved {
  */
 export function validateRun(
   cat: Catalog,
-  harness: HarnessId,
+  harness: AnyHarnessId,
   model: string,
   effort: string,
 ): Resolved | ResolveError {

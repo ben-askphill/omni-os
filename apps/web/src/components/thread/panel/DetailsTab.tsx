@@ -15,6 +15,7 @@ import { useShowsCode, useTechnical } from '../../../display.ts';
 import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
 import { CAPTION, CARD_PAD, ROW_X, ROW_X_BLEED } from './inset.ts';
+import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 
 export interface InitP {
   model?: string;
@@ -133,7 +134,7 @@ export function DetailsTab({
   const technical = useTechnical();
   const cwd = init?.cwd || thread.cwd;
   const cloud = thread.harness === 'cursor-cloud';
-  const remote = thread.harness === 'hermes' || cloud;
+  const remote = isRemoteHarnessId(thread.harness);
   const agentUrl = cloud ? cloudAgentUrl(thread.session_id) : null;
   const resumeCmd: Record<string, string> = {
     'claude-code': `claude --resume ${thread.session_id}`,
