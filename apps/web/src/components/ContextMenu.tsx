@@ -6,6 +6,7 @@ import { canMarkDone } from '../needs-you.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { openContinue } from './ContinueSheet.tsx';
+import { openAsk } from './AskCard.tsx';
 import { useThreadMenuActions } from './useThreadMenuActions.ts';
 import { ThreadReferencePanel } from './ThreadReference.tsx';
 import { threadTarget } from '../message-context/thread-picker.ts';
@@ -152,6 +153,7 @@ function Menu({ open, onClose, closing, el }: { open: Open; onClose: () => void;
     // The Fork modal hands the focus back to whatever had it as it opened, so close first.
     fork: () => (done(), row && openContinue(row)),
     reference: () => setReferencing(true),
+    ask: () => (row && openAsk(row), onClose()),
     grok: () => void sendGrok(),
   };
   // The desktop app opens a thread in a window of its own.

@@ -9,7 +9,7 @@ describe('the thread action menu', () => {
     expect(THREAD_ACTIONS.length).toBeLessThanOrEqual(10);
     expect(menu().map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
       ['Organize', ['Pin thread', 'Mark as done', 'Rename thread', 'Move to folder', 'Archive thread']],
-      ['Continue', ['Fork thread', 'Reference a thread']],
+      ['Continue', ['Fork thread', 'Reference a thread', 'Ask a crew role…']],
       ['Send to', ['Send to Grok Bot']],
     ]);
   });
@@ -52,6 +52,6 @@ describe('the thread action menu', () => {
 
   it('gives every action its own key', () => {
     const keys = menu({ done: true }).flatMap((g) => g.items.map((i) => i.key));
-    expect(keys).toEqual(['P', 'D', 'R', 'M', 'E', 'F', '@', 'G']);
+    expect(keys).toEqual(['P', 'D', 'R', 'M', 'E', 'F', '@', 'A', 'G']);
   });
 });

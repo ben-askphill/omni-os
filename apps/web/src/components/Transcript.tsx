@@ -4,6 +4,8 @@ import { duration, plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { DelegationCard } from './Delegation.tsx';
+import { AskItem } from './AskCard.tsx';
+import { RemoteMark } from './ConnectAgent.tsx';
 import { Folded } from './Folded.tsx';
 import { HtmlRender } from './HtmlRender.tsx';
 import { PublishedCard } from './Published.tsx';
@@ -264,6 +266,7 @@ function ReportCard({ p }: { p: ReportP }) {
           <Icon name="inbox" size={14} />
         </span>
         <span className="font-medium">Report from {p.role ?? 'crew'}</span>
+        {p.remote && <RemoteMark host={p.harness_name ?? p.harness} />}
         {p.dropped && (
           <span className="text-[11.5px] font-medium text-fg-3" title={p.undelivered ?? 'The run ended before the agent read this report'}>
             Not delivered
@@ -385,6 +388,8 @@ const ItemRow = memo(
           return <SwitchLine key={it.key} it={it} running={running} />;
         case 'question':
           return <QuestionCard key={it.key} threadId={threadId} q={it.q} />;
+        case 'ask':
+          return <AskItem key={it.key} p={it.p} byId={byId} reports={reports} answer={answers?.[it.p.thread_id]} />;
         default:
           return null;
       }
@@ -515,7 +520,7 @@ export const Transcript = memo(function Transcript({
               steps={folded.get(it.key)}
               limit={idx === lastIdx && it.type === 'result' ? limit : undefined}
               code={it.type === 'result' ? code : undefined}
-              answers={it.type === 'tools' ? answersFor(it.calls, answers) : undefined}
+              answers={it.type === 'tools' ? answersFor(it.calls, answers) : it.type === 'ask' && answers.has(it.p.thread_id) ? { [it.p.thread_id]: answers.get(it.p.thread_id)! } : undefined}
               onCard={it.type === 'report' && it.p.shown && answers.has(it.p.thread_id)}
               defer={defers(idx, items.length, LIVE_ROWS)}
             />,

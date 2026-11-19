@@ -15,6 +15,7 @@ import { href } from '../router.ts';
 import { needsCard } from './activity.ts';
 import { NeedsActions } from './NeedsCard.tsx';
 import { MoAvatar, MoDiff, MoStripes } from './parts.tsx';
+import { RemoteMark } from '../components/ConnectAgent.tsx';
 import { useShell } from './shell.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../forwarded.ts';
 import type { NowDoing, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
@@ -216,7 +217,8 @@ function KidPill({ k }: { k: Thread }) {
 
 /** The threads a Conductor turn delegated, each opening its thread, with Needs you's answer under one that waits. */
 /** `answers`: reports shown in place (ReportP `shown`), by the thread that sent them, each under its row. */
-export function Delegation({ kids, answers }: { kids: Thread[]; answers?: Record<string, ReportP> }) {
+/** `asked`: who the turn's Asks went to, when every row is an Ask's thread: the card names them, as the desktop's does. */
+export function Delegation({ kids, answers, asked }: { kids: Thread[]; answers?: Record<string, ReportP>; asked?: { name: string; remote: string | null } }) {
   const shell = useShell();
   const { needsYou, channel } = useApp();
   const now = useNow(60_000);
@@ -224,8 +226,9 @@ export function Delegation({ kids, answers }: { kids: Thread[]; answers?: Record
   return (
     <div className="flex flex-col gap-0.5 rounded-[20px] bg-surface px-2 pt-3 pb-2">
       <div className="flex items-center gap-2 px-2 pb-1.5 text-[13px] leading-none font-medium">
-        <Icon name="delegate" size={15} />
-        Delegated {plural(kids.length, 'task')}
+        <Icon name={asked ? 'message' : 'delegate'} size={15} />
+        {asked ? `Asked ${asked.name}` : `Delegated ${plural(kids.length, 'task')}`}
+        {asked?.remote != null && <RemoteMark host={asked.remote || undefined} />}
       </div>
       {kids.map((k) => {
         const item = waiting.get(k.id);
@@ -259,12 +262,14 @@ export function Delegation({ kids, answers }: { kids: Thread[]; answers?: Record
   );
 }
 
-export function Report({ role, taskId, text, dropped, undelivered }: { role?: string | null; taskId?: string | null; text: string; dropped?: boolean; undelivered?: string }) {
+/** `remote`: the server the child ran on, outside Omni, when it did. */
+export function Report({ role, taskId, text, dropped, undelivered, remote }: { role?: string | null; taskId?: string | null; text: string; dropped?: boolean; undelivered?: string; remote?: string }) {
   return (
     <div className={`flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5 ${dropped ? 'opacity-60' : ''}`}>
       <div className="flex items-center gap-2 text-[13px] leading-none font-medium">
         <MoAvatar role={role} size={26} />
         Report from {role || 'the crew'}
+        {remote !== undefined && <RemoteMark host={remote || undefined} />}
         {dropped && (
           <span className="text-[11.5px] font-normal text-fg-3" title={undelivered ?? 'The run ended before the agent read this report'}>
             Not delivered

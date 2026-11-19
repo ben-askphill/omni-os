@@ -51,6 +51,13 @@ export const events = {
     });
     return { id, thread_id: threadId, kind, payload: json, created_at: ts };
   },
+  /** The `ask` event in `parentId` that started `childId` (ask.ts), as stored, or null when that child was no Ask. */
+  askFor: (parentId: string, childId: string) =>
+    (
+      db
+        .prepare(`SELECT payload FROM events WHERE thread_id = ? AND kind = 'ask' AND json_extract(payload, '$.thread_id') = ? ORDER BY id DESC LIMIT 1`)
+        .get(parentId, childId) as { payload: string } | undefined
+    )?.payload ?? null,
   /** The thread's newest event id, 0 for none: where a run stood when it ended. */
   lastId: (threadId: string) => Number((db.prepare('SELECT MAX(id) AS id FROM events WHERE thread_id = ?').get(threadId) as { id: number | null }).id ?? 0),
   since: (threadId: string, afterId = 0) =>

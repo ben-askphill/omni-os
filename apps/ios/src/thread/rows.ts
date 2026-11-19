@@ -75,6 +75,8 @@ export const ITEM_ROWS: Record<Item['type'], readonly RowKind[]> = {
   cloud: ['cloud'],
   switch: ['switch'],
   question: ['question'],
+  // No row of its own: an Ask's thread is one of the turn's children (thread-view.ts), on the turn's delegation card.
+  ask: [],
 };
 
 /** The Conductor channel's saved look, as the thread list reads it. */

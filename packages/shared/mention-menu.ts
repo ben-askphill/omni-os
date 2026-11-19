@@ -1,7 +1,8 @@
 // The composer's `@` menu as pure functions: the file being typed at the caret, and what picking a
 // row does to the text. Which files exist is the server's to say (apps/server/mentions.ts). In a thread that can
 // delegate, the synced machines come first (apps/server/machine-pick.ts): picking one also adds a machine_mention
-// record to the message (message-context-machine.ts).
+// record to the message (message-context-machine.ts). At the start of a message the menu also lists the crew roles
+// Ben can ask (ask.ts): picking one makes the message an Ask.
 import type { Reachability } from './handoff.ts';
 
 /** The `@name` being typed, with the caret in it. `end` is where the name ends. */
@@ -20,7 +21,10 @@ export interface FileMention {
   name: string;
   /** Where it lives, shown quiet: the thread, or the folder inside the repo. For a machine, whether it is up. */
   detail: string;
-  kind: 'artifact' | 'file' | 'machine';
+  /** `role`: a crew role to ask, listed by the client (ask.ts roleRows), never by the server. */
+  kind: 'artifact' | 'file' | 'role' | 'machine';
+  /** A role on a server outside Omni. */
+  remote?: boolean;
   /** A machine row's machine. */
   machine?: MentionedMachine;
 }
@@ -32,6 +36,9 @@ export interface MentionedMachine {
   reachability: Reachability;
   lastSeen: string | null;
 }
+
+/** Whether the `@` being typed starts the message, where a role can be asked (ask.ts askOf). */
+export const startsMessage = (text: string, at: FileQuery) => !text.slice(0, at.start).trim();
 
 const TYPING = /(?<![\w@/.-])@([A-Za-z0-9._\-/]*)$/;
 const NAME_REST = /^[A-Za-z0-9._\-/]*/;

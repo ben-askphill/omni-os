@@ -1,3 +1,4 @@
+import type { AskP } from './ask.ts';
 import type { HandoverP, SwitchP } from './run-switch.ts';
 import { isQuestionTool, QUESTION_EVENT, questionsIn, type ThreadQuestion } from './question.ts';
 import type { PRWakeItem } from './pr-watch.ts';
@@ -90,10 +91,18 @@ export interface ReportP {
   /** Why the machine running the parent did not take it, when `dropped` is from there. */
   undelivered?: string;
   /**
-   * It started no turn: the Conductor's report shown in place (apps/server/runner/queue.ts fileReport). Clients put it on
-   * the delegation card of the turn that delegated the thread (thread-view.ts `answers`).
+   * It started no turn: the Conductor's report shown in place (apps/server/runner/queue.ts fileReport), or an Ask's
+   * sent with "Just show it". Clients put it on the delegation card of the turn that delegated the thread, or on the
+   * Ask's card (thread-view.ts `answers`).
    */
   shown?: boolean;
+  /** The child ran on a server outside Omni: this is its harness, by id and name. */
+  remote?: boolean;
+  harness?: string;
+  harness_name?: string;
+  /** An Ask Ben sent from this thread (ask.ts); `quiet` when he picked "Just show it". */
+  ask?: boolean;
+  quiet?: boolean;
 }
 
 /** Where a Cursor cloud agent's run stands: the server's CloudAgentState (apps/server/stream.ts). */
@@ -157,6 +166,8 @@ export type Item =
   | { type: 'result'; key: number; p: ResultP }
   | { type: 'error'; key: number; p: TextP }
   | { type: 'report'; key: number; at: string; p: ReportP }
+  /** An Ask Ben sent from this thread to a crew role (ask.ts): his question, shown with the Ask's live state. */
+  | { type: 'ask'; key: number; at: string; p: AskP }
   /** Mod log lines in a row. They do not end a group of calls, so a busy hook does not split it. */
   | { type: 'mod'; key: number; lines: ModLine[] }
   /** One Cursor cloud agent run, where its first row was, showing its newest state. */
@@ -343,6 +354,13 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
         group = null;
         items.push({ type: 'report', key: e.id, at: e.created_at, p: payload<ReportP>(e) });
         break;
+      case 'ask': {
+        const p = payload<Partial<AskP>>(e);
+        if (!str(p.thread_id) || !str(p.question)) break;
+        group = null;
+        items.push({ type: 'ask', key: e.id, at: e.created_at, p: p as AskP });
+        break;
+      }
       case 'cloud_agent': {
         const p = payload<Partial<CloudAgentP>>(e);
         if (!str(p.agent_id) || !str(p.url) || !str(p.status)) break;

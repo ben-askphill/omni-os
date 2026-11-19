@@ -413,7 +413,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
       {/* Id, GitHub repo and base directory fill themselves in; each shows as a field only when Omni could not work
           it out or you choose to change it, and a failure opens the fold (#405). */}
-      <Advanced summary="Id, GitHub repo, worktrees, the browser window and usage scans" open={idFailed || githubFailed || !!(fieldError('id') || fieldError('worktree_include') || fieldError('worktree_shared'))}>
+      <Advanced summary="Id, GitHub repo, worktrees, the browser window, usage scans and excerpts for remote agents" open={idFailed || githubFailed || !!(fieldError('id') || fieldError('worktree_include') || fieldError('worktree_shared'))}>
         {showId ? (
           <Field label="Id" htmlFor="ch-id" hint="Lowercase slug, used in URLs and by the Conductor. Cannot change later." error={fieldError('id')}>
             <input
@@ -520,6 +520,13 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             <div className="text-[12px] text-fg-3">Scan my usage on the Automations page skips this channel’s threads, so none of their text reaches a model.</div>
           </div>
           <Toggle checked={f.scanOptOut} onChange={(v) => set('scanOptOut', v)} label="Leave out of usage scans" />
+        </div>
+        <div className="flex items-start justify-between gap-4 rounded-[18px] bg-surface px-4 py-3">
+          <div>
+            <div className="text-[13px] font-medium text-fg">No thread excerpts to remote agents</div>
+            <div className="text-[12px] text-fg-3">An Ask from this channel to an agent on another server sends only your question: no excerpt of the thread, not even its title or this channel's name. Asks to local roles still carry the excerpt.</div>
+          </div>
+          <Toggle checked={f.remoteExcerptsOff} onChange={(v) => set('remoteExcerptsOff', v)} label="No thread excerpts to remote agents" />
         </div>
       </Advanced>
 

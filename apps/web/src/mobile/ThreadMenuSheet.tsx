@@ -12,6 +12,7 @@ import { useFolders } from '../folders.tsx';
 import { href } from '../router.ts';
 import { useApp, useNow } from '../store.tsx';
 import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
+import { AskSheet } from '../components/AskCard.tsx';
 import { threadTarget } from '../message-context/thread-picker.ts';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
@@ -34,7 +35,7 @@ function MoSubagentRow({ t, last, onJump }: { t: BackgroundTask; last: boolean; 
 }
 
 /** Actions that open another sheet carry a chevron; the rest act and close. */
-const OPENS = new Set<ThreadActionId>(['rename', 'move', 'fork', 'reference']);
+const OPENS = new Set<ThreadActionId>(['rename', 'move', 'fork', 'reference', 'ask']);
 
 const SHEET_TITLE = 'px-5 pt-2.5 pb-2 text-[15px] leading-[1.3] font-medium';
 
@@ -180,7 +181,7 @@ function MoveSheet({ thread, onClose }: { thread: Thread; onClose: () => void })
   );
 }
 
-type Mode = 'rename' | 'move' | 'reference';
+type Mode = 'rename' | 'move' | 'reference' | 'ask';
 
 /**
  * `pr`: the branch PR's label and status line, null before it has one. Details leads and PR follows, the order of the
@@ -209,6 +210,8 @@ export function MenuSheet({
   const { go, pin, done, sendGrok, archive, grokBusy, grokError } = useThreadActions(thread, onClose);
   if (mode === 'rename') return <RenameSheet thread={thread} onClose={onClose} />;
   if (mode === 'move') return <MoveSheet thread={thread} onClose={onClose} />;
+  // The Ask sheet is the desktop one: its Modal is a bottom sheet at phone width.
+  if (mode === 'ask') return <AskSheet thread={thread} open onClose={onClose} />;
   if (mode === 'reference') {
     return (
       <MoSheet onClose={onClose} label="Reference a thread" full>
@@ -235,6 +238,7 @@ export function MenuSheet({
     archive: () => void archive(),
     fork: () => (onClose(), shell.sheet({ name: 'continue', source: thread })),
     reference: () => setMode('reference'),
+    ask: () => setMode('ask'),
     grok: () => void sendGrok(),
   };
   return (

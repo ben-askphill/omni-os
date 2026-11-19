@@ -126,6 +126,8 @@ export function delegations(calls: ToolCall[]): Delegation[] {
 export function shownAnswers(items: readonly Item[]): Map<string, ReportP> {
   const onCards = new Set<string>();
   for (const it of items) {
+    // An Ask's card holds its answer after "Just show it".
+    if (it.type === 'ask') onCards.add(it.p.thread_id);
     if (it.type !== 'tools') continue;
     for (const d of delegations(it.calls)) {
       if (d.lead) onCards.add(d.lead.id);

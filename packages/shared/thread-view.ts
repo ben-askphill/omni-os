@@ -1,6 +1,7 @@
 // A thread folded per turn: what Ben asked, what came back, what it cost and what it made. The phone's thread screen
 // and the iOS app draw it. Pure, on top of the transcript fold (transcript-fold.ts), so it reads the same events the
 // desktop transcript does.
+import type { AskP } from './ask.ts';
 import type { ThreadQuestion } from './question.ts';
 import type { Clipped, Span } from './history.ts';
 import { cloudStatus } from './cloud-agent.ts';
@@ -55,6 +56,8 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   artifacts: A[];
   /** Threads delegated during the turn. */
   children: C[];
+  /** Asks Ben sent from this thread during the turn (ask.ts): each Ask's thread is among `children`. */
+  asks: AskP[];
   /** Reports shown in place (ReportP `shown`) from this turn's children, by the child's id: each shows on its card. */
   answers: Record<string, ReportP>;
   result: ResultP | null;
@@ -151,7 +154,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   // Until the first switch, the thread ran where that switch moved it from.
   let harness = items.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
   const start = (key: number, at: string): TurnView<A, C> => {
-    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
+    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
     turns.push(t);
     return t;
   };
@@ -181,6 +184,9 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
     } else if (it.type === 'question') {
       cur ??= start(it.key, it.at);
       cur.questions.push(it.q);
+    } else if (it.type === 'ask') {
+      cur ??= start(it.key, it.at);
+      cur.asks.push(it.p);
     } else if (it.type === 'result') {
       if (cur) cur.result = it.p;
     } else if (it.type === 'error') {

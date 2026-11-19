@@ -148,6 +148,16 @@ describe('channels', () => {
     for (const m of [a, b]) expect(m.db.channels.get('volero')).toMatchObject({ notes: 'old Mac again', prompt_open_pr: 'Use the pr-writer skill and the repo template.' });
   });
 
+  it('syncs the No thread excerpts switch, and lands a new channel from an older Mac with it off', async () => {
+    a.db.channels.update('volero', { remote_excerpts_off: 1 });
+    await exchange();
+    expect(b.db.channels.get('volero')!.remote_excerpts_off).toBe(1);
+    // An older build knows no such column: its new channel still lands, and the switch stays off.
+    await relay.push([{ machine_id: 'mac-old', entity: 'channel', entity_id: 'old-mac-new', op: 'upsert', ts: new Date(Date.now() + 3000).toISOString(), data: { id: 'old-mac-new', name: 'From an old Mac' } }]);
+    await exchange();
+    for (const m of [a, b]) expect(m.db.channels.get('old-mac-new')).toMatchObject({ name: 'From an old Mac', remote_excerpts_off: 0 });
+  });
+
   it('a color a Mac on an older build dropped reaches it once it updates', async () => {
     a.db.channels.create({ id: 'tinted', name: 'Tinted' });
     a.db.channels.create({ id: 'plain', name: 'Plain' });

@@ -2,7 +2,7 @@
 // thread sheet and the iOS app's thread menu all render.
 import { continueSourceRefusal } from './continue.ts';
 
-export type ThreadActionId = 'pin' | 'done' | 'rename' | 'move' | 'archive' | 'fork' | 'reference' | 'grok';
+export type ThreadActionId = 'pin' | 'done' | 'rename' | 'move' | 'archive' | 'fork' | 'reference' | 'ask' | 'grok';
 export type ThreadActionGroupId = 'organize' | 'continue' | 'send';
 /** Names every client's icon set has. */
 export type ThreadActionIcon = 'pin' | 'check' | 'pencil' | 'folder' | 'archive' | 'branch' | 'message' | 'grok';
@@ -81,6 +81,8 @@ export const THREAD_ACTIONS: readonly Spec[] = [
     key: 'F',
   },
   { id: 'reference', group: 'continue', icon: 'message', when: (f) => f.row && !f.archived, label: () => 'Reference a thread', hint: 'Attach another thread, not its messages', key: '@' },
+  // Ask from a thread (ask.ts): a crew role answers here, from a thread of its own.
+  { id: 'ask', group: 'continue', icon: 'message', when: (f) => f.row && !f.archived, label: () => 'Ask a crew role…', hint: 'Another agent answers here, from a thread of its own', key: 'A' },
   { id: 'grok', group: 'send', icon: 'grok', when: (f) => f.grokBot, label: () => 'Send to Grok Bot', hint: "This thread's text", key: 'G' },
 ];
 
