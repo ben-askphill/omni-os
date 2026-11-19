@@ -315,25 +315,92 @@ export function omniRepo(): string | null {
 }
 
 /**
- * Fill `{{placeholders}}` in a crew charter or an automation prompt, so the shared files in the repo name nobody:
- * {{user}}, {{workspace}}, {{reposDir}}, {{githubOwner}}, {{omniRoot}}, {{omniRepo}}, {{centralBrain}}, {{timezone}}.
- * An unknown placeholder stays as written.
+ * The `{{placeholders}}` a crew charter, an automation prompt or a precheck can use, so the shared files in the repo
+ * name nobody: {{user}}, {{workspace}}, {{reposDir}}, {{githubOwner}}, {{omniRoot}}, {{omniRepo}}, {{centralBrain}},
+ * {{timezone}}. A folder is shown with ~ for a reader, absolute for a shell.
  */
-export function fillPlaceholders(text: string) {
-  const values: Record<string, () => string> = {
+function placeholderValues(forShell: boolean): Record<string, () => string> {
+  const path = (p: string) => (forShell ? p : tildify(p));
+  return {
     user: userName,
-    workspace: () => tildify(resolved.workspaceRoot()),
-    reposDir: () => tildify(resolved.reposDir()),
+    workspace: () => path(resolved.workspaceRoot()),
+    reposDir: () => path(resolved.reposDir()),
     githubOwner: () => resolved.githubOwner() || '<your GitHub owner>',
     omniRoot: () => {
       const checkout = omniCheckout();
-      return checkout ? tildify(checkout) : '<your Omni checkout>';
+      return checkout ? path(checkout) : '<your Omni checkout>';
     },
     omniRepo: () => omniRepo() ?? '<your Omni repo>',
-    centralBrain: () => tildify(resolved.centralBrainDir()) || '<your notes folder>',
+    centralBrain: () => path(resolved.centralBrainDir()) || '<your notes folder>',
     timezone: resolved.timezone,
   };
-  return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (all, key: string) => (values[key] ? values[key]() : all));
+}
+
+/**
+ * The profile and setup fields a placeholder above reads ({{user}} is user.name). A thread's own token may not change
+ * them (setup-api.ts, meta-api.ts): a precheck takes their values as data, but the agent the precheck gate keeps out
+ * of a shell should not pick what a precheck it cannot write reads.
+ */
+const PLACEHOLDER_SOURCES = { user: ['name', 'timezone'], workspace: ['root', 'reposDir', 'githubOwner'], integrations: ['centralBrainDir'] } as const;
+
+/** The placeholder-backed fields a profile or setup patch changes, as `section.field`. One sent as it is saved is not. */
+export function placeholderFieldsIn(patch: { [K in keyof typeof PLACEHOLDER_SOURCES]?: object }): string[] {
+  const saved = userConfig();
+  return Object.entries(PLACEHOLDER_SOURCES).flatMap(([section, fields]) => {
+    const key = section as keyof typeof PLACEHOLDER_SOURCES;
+    const set = patch[key] as Record<string, unknown> | undefined;
+    const now = saved[key] as Record<string, unknown>;
+    return set ? fields.filter((f) => set[f] !== undefined && set[f] !== now[f]).map((f) => `${section}.${f}`) : [];
+  });
+}
+
+/** Why a thread's own token was refused a placeholder-backed field. */
+export const placeholderRefusal = (fields: string[]) =>
+  `A thread may not change ${fields.join(', ')}: a {{placeholder}} in an automation's precheck reads it. Change it in Settings.`;
+
+const PLACEHOLDER = /\{\{\s*(\w+)\s*\}\}/g;
+const PLACEHOLDER_KEYS = Object.keys(placeholderValues(false));
+const isPlaceholder = (key: string) => PLACEHOLDER_KEYS.includes(key);
+
+/** Fill `{{placeholders}}` in a crew charter or an automation prompt. An unknown placeholder stays as written. */
+export function fillPlaceholders(text: string) {
+  const values = placeholderValues(false);
+  return text.replace(PLACEHOLDER, (all, key: string) => (isPlaceholder(key) ? values[key]() : all));
+}
+
+/** The variable a shell command reads a placeholder's value from: {{githubOwner}} is OMNI_PLACEHOLDER_GITHUBOWNER. */
+const placeholderVar = (key: string) => `OMNI_PLACEHOLDER_${key.toUpperCase()}`;
+const PLACEHOLDER_VAR = /\bOMNI_PLACEHOLDER_([A-Z]+)\b/g;
+
+/**
+ * Fill `{{placeholders}}` in a shell command (an automation's precheck). The values come from the profile and setup,
+ * which any signed-in device may change, so none is pasted into the command: each placeholder becomes a plain
+ * reference to a variable that shellPlaceholderEnv() sets, the same text wherever it sits. The shell expands it as
+ * data, in double quotes as one word, outside quotes split on spaces in sh and bash (zsh does not split it). In single
+ * quotes it stays a reference, so text handed to another shell on this machine (`sh -c '…'`) carries the name and that
+ * shell reads the value from the environment, never as code. ssh, `sudo`, `su -c` and `env -i` do not pass the
+ * variable on, so there it reads as empty. A double-quoted `sh -c "…"`, `eval` or `$(( ))` expands it first and
+ * then runs it, as a pasted value did: the precheck's author (the install token) has to avoid those, and the docs say so.
+ * `${VAR}` where a letter, `:` or `[` follows (zsh reads `$VAR:h` as a modifier and `$VAR[1]` as a subscript), else
+ * `$VAR`, which fish also reads.
+ */
+export function fillShellPlaceholders(command: string) {
+  return command.replace(PLACEHOLDER, (all, key: string, at: number) => {
+    if (!isPlaceholder(key)) return all;
+    const name = placeholderVar(key);
+    return /[\w:[]/.test(command[at + all.length] ?? '') ? `\${${name}}` : `$${name}`;
+  });
+}
+
+/** The variables a command filled by fillShellPlaceholders() refers to, with this install's values now. */
+export function shellPlaceholderEnv(command: string): Record<string, string> {
+  const values = placeholderValues(true);
+  const env: Record<string, string> = {};
+  for (const [, upper] of command.matchAll(PLACEHOLDER_VAR)) {
+    const key = PLACEHOLDER_KEYS.find((k) => k.toUpperCase() === upper);
+    if (key) env[placeholderVar(key)] = values[key]();
+  }
+  return env;
 }
 
 /** Make the workspace folder when onboarding picked one that does not exist yet. */
