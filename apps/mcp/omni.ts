@@ -621,7 +621,7 @@ server.registerTool(
   {
     description:
       'Status, last reply, artifacts, running subagents and the harness, model and effort of a thread, and `session`: whether its session is still warm in the prompt cache, ' +
-      'its last model activity and the minutes since. `open_items`, when present, lists what its last turn left for the user to resolve ' +
+      'its last model activity and the minutes since. `waits_for_sign_in`, when present, says which account it needs signed in before it starts. `open_items`, when present, lists what its last turn left for the user to resolve ' +
       '(questions, decisions with options, blockers). Reading it never wakes the thread.',
     inputSchema: { thread_id: z.string() },
   },
@@ -717,6 +717,7 @@ server.registerTool(
       `Create or change an automation, only when ${USER} asks. Writes its YAML in data/automations/ (a shipped one becomes ${USER}'s own copy, comments kept) and syncs it to the other machines. ` +
       'Pass fields (all of them: start from get_automation) or yaml (the whole file). Without id it creates one, its id made from the name. ' +
       'fields.machine picks the synced machine that runs it: an id or name from list_devices, here, or empty to follow set_automations_machine. Set cron or on, not both. ' +
+      'connectors: [slack, calendar] in the yaml names the accounts it reads (gmail, calendar, slack, notion, drive, granola): while one is signed out, the first run waits for a sign-in and later ones are skipped. ' +
       'A thread an automation started (or one below it) cannot create, change, turn on or run automations; Omni refuses it.',
     inputSchema: {
       id: z.string().trim().min(1).max(64).optional(),

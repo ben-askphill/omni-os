@@ -44,9 +44,10 @@ export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
     }
     const route = ROUTE[a.kind]!(a);
     try {
-      const res = await api.post<Recovered>(`/threads/${encodeURIComponent(card.id)}/${route}`, {});
+      const signin = card.thread.setup === 'signin';
+      const res = await api.post<Recovered>(`/threads/${encodeURIComponent(card.id)}/${route}`, a.kind === 'retry' && a.skipSignIn ? { skip_signin: true } : {});
       onRecovered?.(res);
-      shell.toast(DONE[a.kind] ?? a.label);
+      shell.toast(a.kind === 'retry' && signin ? (a.skipSignIn ? 'Starting without the sign-in check' : 'Checking the sign-in again') : (DONE[a.kind] ?? a.label));
     } catch (e) {
       shell.toast(errorText(e));
     } finally {

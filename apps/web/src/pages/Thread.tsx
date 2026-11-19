@@ -1,4 +1,5 @@
 import { turnPhase } from '@omni/shared/status.ts';
+import { useThreadAccount } from '../accounts.ts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, type HarnessWithRunning } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
@@ -165,6 +166,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   const offered = useMemo(() => prOffered(events, !slotBusy && !queued.length, prs?.pr), [events, slotBusy, queued, prs?.pr]);
 
   useThreadPresence(id, thread);
+  const account = useThreadAccount(id);
   useThreadInterruptKey({ slotBusy, interrupting, interrupt });
 
   if (notFound) {
@@ -205,6 +207,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
           modLines={modLines}
           delegated={known}
           roleName={roleName}
+          account={account}
           actions={{
             thread,
             meter: (

@@ -73,6 +73,18 @@ catchup_max_age: 6h     # seconds, or 45s, 90m, 6h, 2d
 - `catchup_max_age` caps a catch-up: when the missed slot is older than this, Omni skips it instead of starting a stale run after the Mac wakes. A missed slot within the age still runs once.
 - A skipped run makes no thread and nothing in the Inbox. It shows in the automation's run history as Skipped with its reason (the precheck's exit code and last line of stderr, the timeout, or the missed slot's time) on desktop web, phone web, the desktop app and iOS, and it counts as that slot's run, so a catch-up does not try it again.
 
+## Sign-in check
+
+A thread whose brief or role needs an account (Gmail, Google Calendar, Slack, Notion, Google Drive, Granola) checks that it is signed in on this machine before any harness starts. Only Claude Code reports its connectors' sign-ins: the check reads the newest session's server list and, when that is old or says signed out, `claude mcp list`. A signed-out account holds the thread as **Sign in needed** with the account, the machine and how to sign in. Nothing runs and nothing is spent. Try again checks again; Start anyway starts it without the check. An account whose state Omni cannot read never holds a thread.
+
+An automation names the accounts it reads with `connectors:`:
+
+```yaml
+connectors: [slack, calendar]   # gmail, calendar, slack, notion, drive, granola
+```
+
+A role names them the same way in its frontmatter. A brief that names one ("check my Slack") counts too. For a scheduled run, the first run that finds one signed out makes its thread, which waits as Sign in needed and alerts. Later runs with the same accounts signed out are skipped, with the reason in the run history and no new thread, until a run finds them signed in again. Run now and event runs always make their thread, which waits the same way.
+
 ## Choose a machine
 
 In Automations, "Run automations on" picks this machine or another synced machine for every scheduled and event-triggered automation that does not name its own. The choice reaches the other machines through sync.

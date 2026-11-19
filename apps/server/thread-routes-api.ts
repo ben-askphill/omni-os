@@ -246,6 +246,8 @@ threadRoutesApi.get('/:id/summary', (c) => {
     artifacts: artifacts.byThread(t.id).map((a) => a.name),
     // Why this machine did not resume it (runner/spawn.ts), for recover_thread_session. Only while it holds.
     ...(t.resume_blocked && { resume_blocked: t.resume_blocked }),
+    // It waits for a sign-in to an account it needs (runner/setup.ts holdForSignIn): which, and how to sign in.
+    ...(t.setup === 'signin' && { waits_for_sign_in: t.setup_error }),
     // What its last turn left open for the user (packages/shared/open-items.ts). Only while some are.
     ...(t.open_items && { open_items: readOpenItems(t.open_items) }),
     // Whether its session is still in the prompt cache: a parent messages a warm one and continues a cold one in a new session.
@@ -327,13 +329,15 @@ threadActionsApi.post('/:id/requests/resume', async (c) => {
 });
 
 /**
- * Retry a worktree that could not be prepared: the same thread, branch and session, and its first prompt once the
- * worktree is ready. Safe to send twice; a thread that is ready or already being prepared is left as it is.
+ * Retry a worktree that could not be prepared, or a thread that waits for a sign-in: the same thread, branch and
+ * session, and its first prompt once it is ready. `skip_signin` is Start anyway: the thread starts without the sign-in
+ * check this once. Safe to send twice; a thread that is ready or already being prepared is left as it is.
  */
-threadActionsApi.post('/:id/setup/retry', (c) => {
+threadActionsApi.post('/:id/setup/retry', async (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
-  retrySetup(id, { shell: shellAllowed(c) });
+  const { skip_signin } = z.object({ skip_signin: z.boolean().optional() }).parse(await c.req.json().catch(() => ({})));
+  retrySetup(id, { shell: shellAllowed(c), skipSignIn: skip_signin });
   return c.json(afterRecovery(id));
 });
 
