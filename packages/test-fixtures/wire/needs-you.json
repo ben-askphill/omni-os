@@ -44,6 +44,7 @@
         "quick": 0,
         "workspace": null,
         "promoted_to": null,
+        "owner": null,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z"
       },
@@ -107,6 +108,7 @@
         "quick": 0,
         "workspace": null,
         "promoted_to": null,
+        "owner": null,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z"
       },
@@ -172,6 +174,7 @@
         "quick": 0,
         "workspace": "worktree",
         "promoted_to": null,
+        "owner": null,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z"
       },
@@ -239,6 +242,7 @@
         "quick": 0,
         "workspace": null,
         "promoted_to": null,
+        "owner": null,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z"
       },
@@ -301,6 +305,7 @@
         "quick": 0,
         "workspace": null,
         "promoted_to": null,
+        "owner": null,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z"
       },
@@ -357,6 +362,7 @@
         "quick": 0,
         "workspace": null,
         "promoted_to": null,
+        "owner": null,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z"
       },
@@ -413,6 +419,7 @@
         "quick": 0,
         "workspace": null,
         "promoted_to": null,
+        "owner": null,
         "created_at": "2026-01-05T09:00:00.000Z",
         "updated_at": "2026-01-05T09:00:00.000Z"
       },
