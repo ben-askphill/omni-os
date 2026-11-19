@@ -32,6 +32,17 @@ describe('automation draft', () => {
     expect(fieldsOf({ ...blankDraft(), name: 'x', prompt: 'y', model: 'opus', effort: 'high' })).toMatchObject({ harness: '', model: '', effort: '' });
   });
 
+  it('quiet, approve and its expiry round-trip, and an expiry is not sent without approval', () => {
+    const d = draftOf({ ...base, cron: '0 10 * * 1-5', quiet: true, approve: true, expires: '8h' }, null, null);
+    expect(d).toMatchObject({ quiet: true, approve: true, expires: '8h' });
+    expect(fieldsOf(d)).toMatchObject({ quiet: true, approve: true, expires: '8h' });
+    expect(fieldsOf({ ...d, approve: false })).toMatchObject({ approve: false, expires: '' });
+    expect(draftOf({ ...base, cron: '0 8 * * *' }, null, null)).toMatchObject({ quiet: false, approve: false, expires: '' });
+    expect(draftProblem({ ...d, expires: 'soon' })).toMatch(/duration like 90m, 8h or 2d/);
+    expect(draftProblem({ ...d, expires: '28800' })).toBeNull();
+    expect(draftProblem({ ...d, approve: false, expires: 'soon' })).toBeNull();
+  });
+
   it('says what is missing before saving', () => {
     expect(draftProblem(blankDraft())).toMatch(/name/);
     expect(draftProblem({ ...blankDraft(), name: 'x', prompt: 'y', cron: '0 8 *' })).toMatch(/five cron fields/);

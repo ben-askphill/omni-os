@@ -400,6 +400,20 @@ describe('the first run for someone new', () => {
     expect(prompt).toContain('- Tools Ada uses: Email, Calendar, Notion. Reach for these first when they are connected.');
   });
 
+  it('makes the starter routines turned on, each on, in General, as Admin, with its quiet and approval settings', async () => {
+    const done = await json(await send('POST', '/api/setup/complete', { starters: ['morning-plan', 'follow-ups'] }));
+    expect(done.starters).toEqual(['morning-plan', 'follow-ups']);
+    const a = loadAutomations().filter((x) => x.id === 'morning-plan' || x.id === 'follow-ups' || x.id === 'weekly-review');
+    expect(a.map((x) => [x.id, x.enabled, x.channel, x.role, x.cron, !!x.quiet, !!x.approve, x.expiresAfter ?? null])).toEqual([
+      ['follow-ups', true, 'inbox', 'inbox', '0 10 * * 1-5', true, true, 28_800],
+      ['morning-plan', true, 'inbox', 'inbox', '30 8 * * 1-5', true, false, null],
+    ]);
+    // Again: they exist, so nothing new. An unknown id is refused.
+    expect((await json(await send('POST', '/api/setup/complete', { starters: ['morning-plan'] }))).starters).toEqual([]);
+    expect((await send('POST', '/api/setup/complete', { starters: ['mine'] })).status).toBe(400);
+    for (const id of ['morning-plan', 'follow-ups']) rmSync(join(paths.personalAutomations, `${id}.yaml`));
+  });
+
   it('runs the first question in General with no charter, and no question starts no thread', async () => {
     const done = await json(await send('POST', '/api/setup/complete', { ask: 'What is a good name for a bakery?' }));
     const t = r.db.threads.get(done.threadId)!;

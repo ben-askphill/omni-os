@@ -107,17 +107,21 @@ export async function probeClaudeModels(): Promise<ClaudeReportedModel[] | null>
 const CLAUDE_AUTH_MS = 8_000;
 
 /**
- * Whether Claude Code is installed and signed in, from `claude auth status --json`, the way Codex and Cursor are
- * probed. It exits non-zero when signed out, and its stdout still answers.
+ * `claude auth status --json`, run with the environment a thread's Claude Code gets: its stdout (null when it did not
+ * answer), or `missing` when there is no claude to run. It exits non-zero when signed out, and its stdout still
+ * answers. The catalog probe and the first run's Claude Code step (claude-setup.ts) both read it.
  */
-export function probeClaudeAuth(bin = config.claudeBin): Promise<ClaudeProbe> {
+export function claudeAuthStatus(bin = config.claudeBin): Promise<{ stdout: string | null; missing: boolean }> {
   return new Promise((resolve) => {
     execFile(bin, ['auth', 'status', '--json'], { env: harnessEnv('claude-code', {}), timeout: CLAUDE_AUTH_MS, maxBuffer: 256 * 1024, killSignal: 'SIGKILL' }, (err, stdout) => {
       const code = (err as NodeJS.ErrnoException | null)?.code;
-      resolve(claudeProbeOf({ stdout: stdout?.trim() ? stdout : null, missing: code === 'ENOENT' || code === 'EACCES' }));
+      resolve({ stdout: stdout?.trim() ? stdout : null, missing: code === 'ENOENT' || code === 'EACCES' });
     });
   });
 }
+
+/** Whether Claude Code is installed and signed in, the way Codex and Cursor are probed. */
+export const probeClaudeAuth = async (bin = config.claudeBin): Promise<ClaudeProbe> => claudeProbeOf(await claudeAuthStatus(bin));
 
 /** The last probe, so a catalog rebuilt without probing keeps it. Available until the first answer. */
 let claudeAuth: ClaudeProbe = { available: true };

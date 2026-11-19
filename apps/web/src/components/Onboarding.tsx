@@ -3,13 +3,29 @@ import { githubLine, type GithubCheck } from '@omni/shared/github-check.ts';
 import { HARNESS_CHECK_LABEL } from '@omni/shared/harness-check.ts';
 import { toolsAddOn } from '@omni/shared/onboarding.ts';
 import { NAME_MAX } from '@omni/shared/settings.ts';
+import { STARTER_AUTOMATIONS } from '@omni/shared/starter-automations.ts';
 import { api, errorText, type SetupState, type UserConfigPatch } from '../api.ts';
 import { desktop } from '../desktop.ts';
 import { useLayout } from '../layout-pref.ts';
 import { navigate, href } from '../router.ts';
 import { useApp, useIsMobile } from '../store.tsx';
 import { OmniMark } from './brand.tsx';
-import { FilesScreen, HarnessScreen, NotificationsScreen, PronounsInput, Row, STEPS, Screen, Steps, Summary, TimezoneInput, WorkScreen, browserTimezone, createChannel } from './onboarding-parts.tsx';
+import {
+  FilesScreen,
+  HarnessScreen,
+  NotificationsScreen,
+  PronounsInput,
+  RoutinesScreen,
+  Row,
+  STEPS,
+  Screen,
+  Steps,
+  Summary,
+  TimezoneInput,
+  WorkScreen,
+  browserTimezone,
+  createChannel,
+} from './onboarding-parts.tsx';
 import { Button, ErrorNote, FolderInput } from './ui.tsx';
 import { ModalFooter, SCRIM } from './ui/modal.tsx';
 
@@ -113,6 +129,8 @@ function Wizard() {
   /** The code add-on (repo folders, a GitHub owner): null until the user turns it on or off here. */
   const [codeChoice, setCodeChoice] = useState<boolean | null>(null);
   const [ask, setAsk] = useState('');
+  /** The starter routines turned on in the Routines step; made when setup finishes. */
+  const [starters, setStarters] = useState<string[]>([]);
   const [channelName, setChannelName] = useState('');
   const [channelRepo, setChannelRepo] = useState('');
   const [channelStore, setChannelStore] = useState('');
@@ -164,7 +182,7 @@ function Wizard() {
   // Each step saves what it asked, so a closed tab keeps the answers. The last one marks onboarding done.
   const save = async () => setState(await api.put<SetupState>('/setup', patch()));
 
-  const finish = async (body: UserConfigPatch & { ask?: string }) => {
+  const finish = async (body: UserConfigPatch & { ask?: string; starters?: string[] }) => {
     const done = await api.post<SetupState>('/setup/complete', body);
     await reloadProfile();
     reloadChannels();
@@ -185,7 +203,7 @@ function Wizard() {
         setCreatedChannel(await createChannel(channelName, code ? channelRepo : '', store ? channelStore : ''));
         reloadChannels();
       }
-      if (step === DONE) return await finish({ ...patch(), ask: rerun ? undefined : ask.trim() || undefined });
+      if (step === DONE) return await finish({ ...patch(), ask: rerun ? undefined : ask.trim() || undefined, ...(starters.length > 0 && { starters }) });
       setStep((s) => s + 1);
     } catch (err) {
       setError(errorText(err));
@@ -277,6 +295,7 @@ function Wizard() {
             </Screen>
           )}
           {state && step === STEP.Notifications && <NotificationsScreen />}
+          {state && step === STEP.Routines && <RoutinesScreen value={starters} onChange={setStarters} />}
           {state && step === DONE && (
             <Screen
               caption="Done"
@@ -315,6 +334,7 @@ function Wizard() {
                 {code && <Summary k="GitHub" v={files.githubOwner || 'not set'} mono />}
                 {code && github && <Summary k="GitHub CLI" v={githubLine(github) ?? HARNESS_CHECK_LABEL[github.state]} />}
                 {createdChannel && <Summary k="Channel" v={`#${createdChannel}`} />}
+                {starters.length > 0 && <Summary k="Routines" v={STARTER_AUTOMATIONS.filter((s) => starters.includes(s.id)).map((s) => s.name).join(', ')} />}
               </dl>
               <SavedNote path={state.path} install={state.install} />
               {!rerun && <DoneTips tips={doneTips(state.install, phone ? 'phone' : layout)} />}

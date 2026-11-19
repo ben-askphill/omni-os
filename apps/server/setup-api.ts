@@ -9,7 +9,10 @@ import { serverOptions } from './server-options.ts';
 import { getCrew } from './crew.ts';
 import { cancelGithubLogin, GhLoginError, githubAuth, pollGithubLogin, startGithubLogin } from './github-auth.ts';
 import { channels, threads } from './db.ts';
+import { createAutomation } from './automation-files.ts';
+import { cancelLogin, claudeSetup, installStep, startInstall, startLogin, submitCode } from './claude-setup.ts';
 import { createThread } from './runner.ts';
+import { STARTER_AUTOMATIONS, STARTER_ROLE, starterAutomation } from '@omni/shared/starter-automations.ts';
 import { prepareWorkdir } from './sandbox.ts';
 import { addEvent, emitThread } from './runner/state.ts';
 import {
@@ -110,6 +113,39 @@ setupApi.post('/github/login/cancel', async (c) => {
   }
 });
 
+// ---------- Claude Code: install and sign in without a terminal (claude-setup.ts) ----------
+
+setupApi.get('/claude', async (c) => c.json(await claudeSetup()));
+
+setupApi.post('/claude/install', (c) => c.json(startInstall()));
+
+setupApi.get('/claude/install/:flow', (c) => {
+  const step = installStep(c.req.param('flow'));
+  return step ? c.json(step) : c.json({ error: 'No such install' }, 404);
+});
+
+setupApi.post('/claude/login', async (c) => {
+  try {
+    return c.json(await startLogin());
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 502);
+  }
+});
+
+const ClaudeCode = z.object({ flow: z.string().min(1).max(100), code: z.string().trim().min(1, 'Paste the code the page shows').max(2000) });
+
+setupApi.post('/claude/login/code', async (c) => {
+  const body = ClaudeCode.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'Send {flow, code}' }, 400);
+  return c.json(await submitCode(body.data.flow, body.data.code));
+});
+
+setupApi.post('/claude/login/cancel', async (c) => {
+  const flow = z.object({ flow: z.string().min(1).max(100) }).safeParse(await c.req.json().catch(() => null));
+  if (flow.success) cancelLogin(flow.data.flow);
+  return c.json({ ok: true });
+});
+
 setupApi.put('/', async (c) => {
   const parsed = patchInput.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid settings' }, 400);
@@ -119,31 +155,59 @@ setupApi.put('/', async (c) => {
 
 /**
  * Finish onboarding: save what the last screen sent, make the workspace folder, and on the first run only, leave a
- * welcome message in a new #conductor thread. A first question (`ask`) starts a thread in General and answers its id,
- * so the page opens on the answer. Running setup again from Settings ends here too, without a second welcome.
+ * welcome message in a new #conductor thread. The starter routines turned on (`starters`) become the user's own
+ * automations. A first question (`ask`) starts a thread in General and answers its id, so the page opens on the answer.
+ * Running setup again from Settings ends here too, without a second welcome.
  */
 setupApi.post('/complete', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) ?? {};
   const extras = completeExtras.safeParse(body);
   if (!extras.success) return c.json({ error: extras.error.issues[0]?.message ?? 'Invalid setup' }, 400);
-  const { ask = '', ...config } = body as Record<string, unknown>;
+  const { ask = '', starters = [], ...config } = body as Record<string, unknown>;
   const parsed = patchInput.safeParse(config);
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid settings' }, 400);
   const first = !isOnboarded();
   updateUserConfig({ ...parsed.data, onboardedAt: new Date().toISOString() });
   ensureWorkspace();
   const welcome = first ? await welcomeThread() : null;
+  const made = addStarters(starters as string[]);
   // The first question runs as a plain thread in the general channel: no charter, no worktree, answered in place.
   const question = (ask as string).trim();
   const asked = question && channels.get(GENERAL) ? await createThread({ channel: GENERAL, prompt: question, source: 'manual' }) : null;
-  return c.json({ ...setupState(), threadId: asked?.id ?? welcome?.id ?? null });
+  return c.json({ ...setupState(), threadId: asked?.id ?? welcome?.id ?? null, starters: made });
 });
 
 /** The channel for quick asks that belong to no project. Seeded as General (db/repos/channels.ts). */
 const GENERAL = 'inbox';
 
-/** What the last screen sends beside the config: a first question. */
-const completeExtras = z.object({ ask: z.string().max(20_000).optional() }).passthrough();
+/** What the last screens send beside the config: the starter routines turned on, and a first question. */
+const completeExtras = z
+  .object({
+    starters: z.array(z.string().refine((id) => !!starterAutomation(id), 'Unknown starter routine')).max(STARTER_AUTOMATIONS.length).optional(),
+    ask: z.string().max(20_000).optional(),
+  })
+  .passthrough();
+
+/**
+ * Each starter routine turned on, as the user's own automation, on, in General. One that exists already (turned on
+ * in an earlier run of setup, or made by hand) is left as it is. Answers the ids it made.
+ */
+function addStarters(ids: string[]): string[] {
+  const made: string[] = [];
+  for (const id of new Set(ids)) {
+    const s = starterAutomation(id)!;
+    try {
+      createAutomation(
+        { name: s.name, enabled: true, cron: s.cron, channel: GENERAL, role: STARTER_ROLE, quiet: s.quiet, approve: !!s.approve, expires: s.approve?.expires, prompt: s.prompt },
+        s.id,
+      );
+      made.push(s.id);
+    } catch (err) {
+      if ((err as { status?: number }).status !== 409) throw err;
+    }
+  }
+  return made;
+}
 
 /** Where crew charters live on this install, for the welcome message. */
 export interface CrewPlace {

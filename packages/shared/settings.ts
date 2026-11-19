@@ -313,6 +313,8 @@ export interface SetupState {
   env: Record<string, string>;
   /** POST /api/setup/complete only: the thread to open, the first question's (in General) or else the welcome's in #conductor. */
   threadId?: string | null;
+  /** POST /api/setup/complete only: the starter routines it made (packages/shared/starter-automations.ts). */
+  starters?: string[];
 }
 
 /** A field's id in SetupState.env and in a client's form: `section.key`. */

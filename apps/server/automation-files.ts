@@ -40,13 +40,19 @@ export const automationFields = z
     harness: optText(80),
     model: optText(120),
     effort: optText(40),
+    /** Post nothing when there is nothing to report (automation-quiet.ts). */
+    quiet: z.boolean().optional(),
+    /** Ask on the question card before acting outside Omni (automation-rules.ts). */
+    approve: z.boolean().optional(),
+    /** How long an unanswered approval waits before it expires, like 8h. Needs `approve`. */
+    expires: optText(20),
     prompt: z.string().max(100_000),
   })
   .strict();
 export type AutomationFields = z.infer<typeof automationFields>;
 
 /** The order keys go in a new file, and where a key new to an old file is placed: before the next one here that it has. */
-const ORDER = ['name', 'enabled', 'cron', 'on', 'timezone', 'catchup', 'channel', 'machine', 'role', 'harness', 'model', 'effort', 'prompt'] as const;
+const ORDER = ['name', 'enabled', 'cron', 'on', 'timezone', 'catchup', 'channel', 'machine', 'role', 'harness', 'model', 'effort', 'quiet', 'approve', 'expires', 'prompt'] as const;
 
 export interface AutomationDefinition {
   id: string;
@@ -109,6 +115,9 @@ export function definitionOf(id: string): AutomationDefinition | null {
       harness: str(y.harness),
       model: str(y.model),
       effort: str(y.effort),
+      quiet: y.quiet === true,
+      approve: y.approve === true,
+      expires: str(y.expires),
       prompt: str(y.prompt).replace(/\n+$/, ''),
     },
   };
@@ -152,7 +161,7 @@ function setKey(doc: Document, key: (typeof ORDER)[number], value: unknown) {
     const s = new Scalar(value.endsWith('\n') ? value : `${value}\n`);
     s.type = Scalar.BLOCK_LITERAL;
     node = s;
-  } else if (key === 'cron' || key === 'machine' || key === 'name') {
+  } else if (key === 'cron' || key === 'machine' || key === 'name' || key === 'expires') {
     // A cron of `*/5 * * * *` reads as an alias unquoted; a name or machine can look like a number or a bool.
     const s = new Scalar(String(value));
     s.type = key === 'cron' ? Scalar.QUOTE_DOUBLE : Scalar.PLAIN;
@@ -193,6 +202,10 @@ function render(base: string | null, f: AutomationFields): string {
   const written = str(doc.get('machine')).trim();
   setKey(doc, 'machine', !f.machine ? undefined : f.machine === written ? written : machineValue(f.machine));
   for (const k of ['role', 'harness', 'model', 'effort'] as const) setKey(doc, k, f[k]);
+  setKey(doc, 'quiet', f.quiet ? true : undefined);
+  setKey(doc, 'approve', f.approve ? true : undefined);
+  // An expiry means nothing without approval.
+  setKey(doc, 'expires', f.approve ? f.expires : undefined);
   setKey(doc, 'prompt', f.prompt.trim() ? f.prompt : undefined);
   return doc.toString({ lineWidth: 0 });
 }
