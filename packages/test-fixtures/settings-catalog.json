@@ -5,16 +5,24 @@
       "title": ""
     },
     {
-      "id": "agents",
-      "title": "Agents"
+      "id": "assistant",
+      "title": "Assistant"
     },
     {
-      "id": "code",
-      "title": "Code"
+      "id": "spaces",
+      "title": "Spaces"
     },
     {
-      "id": "connections",
-      "title": "Connections"
+      "id": "devices",
+      "title": "Devices"
+    },
+    {
+      "id": "developer",
+      "title": "Developer"
+    },
+    {
+      "id": "extras",
+      "title": "Extras"
     },
     {
       "id": "app",
@@ -46,90 +54,97 @@
     },
     {
       "id": "models",
-      "group": "agents",
-      "title": "Harnesses & models",
+      "group": "assistant",
+      "title": "Models",
       "icon": "layers",
       "blurb": "Which agents can run, their models, and the model a new thread starts on.",
       "scoped": true
     },
     {
       "id": "crew",
-      "group": "agents",
+      "group": "assistant",
       "title": "Crew",
       "icon": "delegate",
       "blurb": "The roles threads run as: their charters, run defaults and powers."
     },
     {
       "id": "accounts",
-      "group": "agents",
+      "group": "assistant",
       "title": "Accounts",
       "icon": "user",
-      "blurb": "Which account each harness is signed in to, on each of your machines."
+      "blurb": "Which account each agent is signed in to, on each of your machines."
     },
     {
       "id": "threads",
-      "group": "agents",
+      "group": "assistant",
       "title": "Threads",
       "icon": "message",
       "blurb": "Where new threads run and how they recover from a usage limit."
     },
     {
       "id": "channels",
-      "group": "code",
+      "group": "spaces",
       "title": "Channels",
       "icon": "hash",
-      "blurb": "Each channel’s name, default model, repo, notes and actions.",
+      "blurb": "Each channel’s name, default model, folder or repo, notes and actions.",
       "scoped": true
     },
     {
       "id": "workspace",
-      "group": "code",
+      "group": "spaces",
       "title": "Workspace",
       "icon": "folder",
       "blurb": "Where your work lives on this machine."
     },
     {
-      "id": "worktrees",
-      "group": "code",
-      "title": "Worktrees",
-      "icon": "branch",
-      "blurb": "The checkouts Omni makes for threads, and cleaning them up."
-    },
-    {
       "id": "machines",
-      "group": "connections",
+      "group": "devices",
       "title": "Machines",
       "icon": "monitor",
       "blurb": "Your machines, their connections and their updates."
     },
     {
       "id": "sync",
-      "group": "connections",
+      "group": "devices",
       "title": "Sync",
       "icon": "refresh",
       "blurb": "Your history across machines, through your own Cloudflare relay."
     },
     {
       "id": "access",
-      "group": "connections",
+      "group": "devices",
       "title": "Sharing & access",
       "icon": "lock",
-      "blurb": "Who and what can reach this Omni."
+      "blurb": "Who and what can reach this Omni: your phone, signed-in devices and connected apps."
+    },
+    {
+      "id": "desktop",
+      "group": "devices",
+      "title": "Desktop app",
+      "icon": "monitor",
+      "blurb": "Quick Prompt and how this app starts.",
+      "desktopApp": true
+    },
+    {
+      "id": "worktrees",
+      "group": "developer",
+      "title": "Worktrees",
+      "icon": "branch",
+      "blurb": "The checkouts Omni makes for threads, and cleaning them up."
     },
     {
       "id": "secrets",
-      "group": "connections",
+      "group": "developer",
       "title": "Secrets",
       "icon": "key",
       "blurb": "API keys and tokens for threads, kept outside the database."
     },
     {
-      "id": "desktop",
-      "group": "app",
-      "title": "Desktop app",
-      "icon": "monitor",
-      "blurb": "Quick Prompt and how this app starts.",
-      "desktopApp": true
+      "id": "extras",
+      "group": "extras",
+      "title": "Extras",
+      "icon": "plug",
+      "blurb": "Optional add-ons: Wispr Flow, Grok Bot, Hermes and the central brain."
     },
     {
       "id": "about",
@@ -320,17 +335,6 @@
         "cap",
         "parallel",
         "limit"
-      ]
-    },
-    {
-      "id": "hermes",
-      "section": "models",
-      "title": "Hermes URL",
-      "keywords": [
-        "hermes",
-        "tailnet",
-        "HERMES_API_KEY",
-        "integrations"
       ]
     },
     {
@@ -531,17 +535,6 @@
         "CLAUDE.md",
         "skills",
         "base directory"
-      ]
-    },
-    {
-      "id": "brain",
-      "section": "workspace",
-      "title": "Central brain folder",
-      "keywords": [
-        "notes",
-        "brain-export",
-        "export",
-        "digests"
       ]
     },
     {
@@ -752,8 +745,56 @@
         "env",
         "keychain",
         "password",
-        "credentials",
-        "grok bot"
+        "credentials"
+      ]
+    },
+    {
+      "id": "wispr-flow",
+      "section": "extras",
+      "title": "Dictate with Wispr Flow",
+      "keywords": [
+        "wispr flow",
+        "dictate",
+        "dictation",
+        "voice",
+        "speak",
+        "talk",
+        "quick prompt"
+      ]
+    },
+    {
+      "id": "grok-bot",
+      "section": "extras",
+      "title": "Grok Bot",
+      "keywords": [
+        "grok",
+        "grok bot",
+        "webhook",
+        "GROKBOT_WEBHOOK_URL",
+        "send to grok bot"
+      ]
+    },
+    {
+      "id": "hermes",
+      "section": "extras",
+      "title": "Hermes URL",
+      "keywords": [
+        "hermes",
+        "tailnet",
+        "HERMES_API_KEY",
+        "integrations"
+      ]
+    },
+    {
+      "id": "brain",
+      "section": "extras",
+      "title": "Central brain folder",
+      "keywords": [
+        "notes",
+        "brain-export",
+        "export",
+        "digests",
+        "knowledge base"
       ]
     },
     {
@@ -765,9 +806,7 @@
         "shortcut",
         "keyboard",
         "global",
-        "launcher",
-        "wispr flow",
-        "dictate"
+        "launcher"
       ],
       "surfaces": [
         "desktop"
@@ -852,7 +891,7 @@
     "server": "machines",
     "connection": "machines",
     "storage": "worktrees",
-    "integrations": "models"
+    "integrations": "extras"
   },
   "searches": [
     {
@@ -885,8 +924,7 @@
         "channel-model",
         "model-options",
         "harnesses",
-        "concurrency",
-        "hermes"
+        "concurrency"
       ]
     },
     {
