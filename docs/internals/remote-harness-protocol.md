@@ -49,6 +49,32 @@ Each event has `event`, `run_id` and a `seq` that only grows within a run. `apps
 - No Omni MCP tools, browser, worktree, artifacts folder or design-system file. The prompt says so and tells it to work on its own clone.
 - No delegate-only role (the Conductor) and no level below Full access: Omni cannot take its tools away.
 
+## Pairing
+
+How a server hands Omni its key without anyone pasting it ([Connect an agent](../plans/2026-11-18-connect-an-agent.md), decision F2). The agent's owner makes a one-time code where only they can see it (the server's terminal, a platform's logs). Omni's server redeems it, server to server, and puts the key straight into its secret store. The agent never calls Omni, so only Omni-to-agent reachability is needed, which runs need anyway. Both calls are optional: a server without them is connected with a key from Secrets.
+
+| Call | Request | Answer |
+| --- | --- | --- |
+| `POST /v1/omni/pair` | `{ code, client_id, client_name }`, no `Authorization` | 200 `{ protocol, key, key_id?, url?, name?, kind?, shared_key?, revoke? }`; 404 for a code that is unknown, used or expired (the same answer for all three); 429 after repeated misses from one address |
+| `POST /v1/omni/revoke` | `{ key_id }`, with the key as the bearer | 204, after which the key no longer works. Only when the pair answer said `revoke: true` |
+
+- **The code** has at least 128 bits, works once, lives at most 10 minutes and is held only as a hash, compared in constant time. Omni sends it as typed: the server ignores case, dashes and spaces.
+- **`client_id`** is the machine's id and **`client_name`** "Omni on <machine>", so the agent can list who paired.
+- **The answer**: `key` is the bearer key for every Runs API call. `url` is where runs go when that is not the address Omni paired at; Omni takes it only on the pairing address's own host. `name` is shown with the host, never alone. `shared_key: true` says every machine that pairs gets this same key (so it cannot be revoked for one alone, and a second machine gets it sent sealed instead of pairing again, decision F7). `revoke: true` says `/v1/omni/revoke` works.
+- **Omni's side** follows the transport rules above: https, or plain http only to this machine or the tailnet; no redirects; the pairing address and `url` on the host Ben typed or the link named.
+
+### The pairing link
+
+`omni://connect-agent?url=<runs url>&code=<code>[&pair=<pairing address>][&name=<name>]`, with each value percent-encoded. `pair` is left out when the server pairs at `url` itself. The desktop app opens it as the page `#/connect-agent?...`, which opens Connect an agent with the fields filled in; a browser or phone takes the same link pasted into the sheet. Opening a link never connects anything: Ben presses Connect.
+
+### Hermes: the pairing helper
+
+Hermes's API server has no pairing route and takes one key per profile (`API_SERVER_KEY`), so `scripts/omni-pair.sh` answers the pairing call for it. Run on the Hermes host, it reads `$HERMES_HOME/.env` (default `~/.hermes/.env`; `--profile <name>` reads `~/.hermes/profiles/<name>/.env`), makes `API_SERVER_KEY` when there is none, and listens on the API server's port plus one for at most 10 minutes and one redeem. It prints the link, a terminal QR code when `qrencode` is installed, and the address and code to type. Its answer carries the profile's key with `shared_key: true` and `revoke: false`. Flags are at the top of the script; `--json` prints one line for scripts. Install it pinned to a release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ben-askphill/omni-os/<release tag>/scripts/omni-pair.sh | sh
+```
+
 ## Later additions
 
-Each is optional, so a server that does not serve it keeps working. Planned in [Addendum A of the crew plan](../plans/2026-11-18-user-defined-crew.md): a capabilities body on `GET /v1/capabilities` (protocol version, flags, models, model family), a `git` block on `POST /v1/runs` and a `git.pushed` event (B3), `usage.cost_usd` on the terminal event (B4), answers through `/approval` (B5), and the pairing calls `POST /v1/omni/pair` and `/v1/omni/revoke` ([Connect an agent](../plans/2026-11-18-connect-an-agent.md), C0).
+Each is optional, so a server that does not serve it keeps working. Planned in [Addendum A of the crew plan](../plans/2026-11-18-user-defined-crew.md): a capabilities body on `GET /v1/capabilities` (protocol version, flags, models, model family), a `git` block on `POST /v1/runs` and a `git.pushed` event (B3), `usage.cost_usd` on the terminal event (B4), and answers through `/approval` (B5).
