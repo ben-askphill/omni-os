@@ -12,6 +12,8 @@ import type { BasePick } from '@omni/shared/worktree-base.ts';
 import { prepareTurn, turnBlocked } from '../sync/guard.ts';
 import { parseSlash, resolveSlash, slashRecord, type SlashCommand, type SlashRecord } from '@omni/shared/slash.ts';
 import { listCommands, peekCommands } from '../commands.ts';
+import { expandTemplate, leadTemplate } from '@omni/shared/templates.ts';
+import { listTemplates } from '../templates.ts';
 import { withMentions } from '../mentions.ts';
 import { fileKind, safeName, saveUploads, type Attachment } from '../uploads.ts';
 import { isProviderHarness, providerWhere, type HarnessId } from '../harness/types.ts';
@@ -67,6 +69,15 @@ async function warmCommands(harness: string, cwd: string, prompt: string, thread
 function slashFor(prompt: string, commands: () => SlashCommand[]): { text: string; slash?: SlashRecord; commands?: CommandUse[] } {
   if (!namesCommand(prompt)) return { text: prompt };
   const list = commands();
+  // A template the harness has no command for: its instructions go in its place (started by its skill when the
+  // harness lists it), and the user event keeps the text as typed, with the template as its pill.
+  const tpl = leadTemplate(prompt, listTemplates(), list);
+  if (tpl) {
+    const inner = slashFor(expandTemplate(tpl.template, tpl.args, list), () => list);
+    const { template: t, start, end } = tpl;
+    const pill = { name: t.id, source: 'template' as const, description: t.description, ...(t.argumentHint && { argumentHint: t.argumentHint }), start, end };
+    return { text: inner.text, slash: { command: pill }, ...(inner.commands && { commands: inner.commands }) };
+  }
   // A harness runs a command only at the very start of its text. So a harness command goes there,
   // and an Omni command, which runs only from a thread's reply box, goes after a space as text.
   const r = resolveSlash(prompt, list);

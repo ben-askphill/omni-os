@@ -30,7 +30,7 @@ export const EXTERNALS = ['node-pty', '@playwright/mcp'] as const;
  * Copied as they are, beside the bundles. No automations: a fresh install starts with none, and the user's own live
  * in their data dir. tests/stage.test.ts keeps it that way.
  */
-export const SHIPPED_DIRS = ['crew', 'mods', 'prototypes/activity-monitor'] as const;
+export const SHIPPED_DIRS = ['crew', 'templates', 'mods', 'prototypes/activity-monitor'] as const;
 
 /** Each shipped charter line that names one of PERSONAL_TERMS, as `crew/<file>:<line>: <term>`. */
 export function personalCrewProblems(crewDir: string): string[] {

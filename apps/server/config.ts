@@ -126,6 +126,10 @@ export const paths = {
    * apps/desktop/tests/stage.test.ts check it). OMNI_AUTOMATIONS_DIR points tests at their own.
    */
   automations: env.OMNI_AUTOMATIONS_DIR ? resolve(ROOT, env.OMNI_AUTOMATIONS_DIR) : join(ROOT, 'automations'),
+  /** Shipped templates (apps/server/templates.ts). OMNI_TEMPLATES_DIR points tests at their own. */
+  templates: env.OMNI_TEMPLATES_DIR ? resolve(ROOT, env.OMNI_TEMPLATES_DIR) : join(ROOT, 'templates'),
+  /** The user's own templates: a file here replaces the shipped one with the same name. */
+  personalTemplates: join(DATA, 'templates'),
   /** The user's own automations, beside the shared ones in automations/. Same id here wins. */
   personalAutomations: join(DATA, 'automations'),
   /** Who the user is and where their work lives (apps/server/user-config.ts). */

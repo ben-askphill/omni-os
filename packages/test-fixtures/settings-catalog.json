@@ -474,6 +474,27 @@
       ]
     },
     {
+      "id": "templates",
+      "section": "threads",
+      "title": "Templates",
+      "keywords": [
+        "template",
+        "templates",
+        "skills",
+        "cro",
+        "audit",
+        "agenda",
+        "meeting",
+        "recall",
+        "proposal",
+        "ticket",
+        "adr",
+        "decision",
+        "client question",
+        "data/templates"
+      ]
+    },
+    {
       "id": "automations",
       "section": "threads",
       "title": "Automations",

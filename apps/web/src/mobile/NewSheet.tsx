@@ -31,6 +31,8 @@ import { ModelSheet, runLabel } from './ModelSheet.tsx';
 import { RunOnChip, RunOnSheet } from './RunOnSheet.tsx';
 import { MoRound, MoSheet } from './parts.tsx';
 import { useShell } from './shell.tsx';
+import { TemplateChips, useTemplates } from '../templates.tsx';
+import { templateDraft, type Template } from '@omni/shared/templates.ts';
 
 /** The sheet's draft-context list: its reference chips, gone with its text when the sheet closes. */
 export const NEW_SHEET_DRAFT = 'new:sheet';
@@ -53,6 +55,15 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const [target, setTarget] = useState(initial ?? 'conductor');
   // An open item's New thread starts with its prompt (components/thread/OpenItemsCard.tsx).
   const [text, setText] = useState(first ?? '');
+  const templates = useTemplates();
+  const box = useRef<HTMLTextAreaElement>(null);
+  // A template chip puts `/<name> ` in the box and hands the keyboard back, ready for what the job is about.
+  const pickTemplate = (t: Template) => {
+    const draft = templateDraft(t);
+    setText(draft);
+    box.current?.focus();
+    requestAnimationFrame(() => box.current?.setSelectionRange(draft.length, draft.length));
+  };
   // As the target channel sees them: Cursor Cloud needs its GitHub repo.
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(target));
   const technical = useTechnical();
@@ -223,6 +234,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
           <ContextChips records={refs} onRemove={(id) => removeDraftContext(NEW_SHEET_DRAFT, id)} className="px-1" />
           <AttachmentStrip files={att.files} onRemove={att.remove} />
           <textarea
+            ref={box}
             autoFocus
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -293,6 +305,9 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
             )}
           </div>
         </div>
+        {!text.trim() && !toGrok && templates.data && (
+          <TemplateChips templates={templates.data.templates} onPick={pickTemplate} touch className="px-4 pt-3" />
+        )}
         {grokBlock && <ErrorNote className="mx-3 mt-2">{grokBlock}</ErrorNote>}
         {switched?.notice && onMachine && (
           <div className="mt-2 px-1">

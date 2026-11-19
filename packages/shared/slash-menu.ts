@@ -37,6 +37,7 @@ export interface MenuSection {
 }
 
 const GROUPS: [CommandSource, string][] = [
+  ['template', 'Templates'],
   ['project', 'Project'],
   ['personal', 'Personal'],
   ['plugin', 'Plugins'],
@@ -47,6 +48,7 @@ const GROUPS: [CommandSource, string][] = [
 
 /** The tag a row shows for where its command comes from. */
 export const SOURCE_TAG: Record<CommandSource, string> = {
+  template: 'template',
   project: 'project',
   personal: 'personal',
   plugin: 'plugin',

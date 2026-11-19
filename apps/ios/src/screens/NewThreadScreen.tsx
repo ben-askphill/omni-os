@@ -31,7 +31,8 @@ import {
   type DraftPick,
   type Target,
 } from '../newthread/draft';
-import { useCrew, useStartThread } from '../newthread/hooks';
+import { useCrew, useStartThread, useTemplates } from '../newthread/hooks';
+import { sortTemplates, templateDraft } from '@omni/shared/templates.ts';
 import { chipHeight, chipSlop, fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { useHarnessCatalog } from '../thread/hooks';
 import { Button } from '../ui/Button';
@@ -49,6 +50,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
   const { colors } = useOmniTheme();
   const { channels } = useChannels();
   const crew = useCrew();
+  const templates = useTemplates();
   const [target, setTarget] = useState(route.params?.channel ?? CONDUCTOR);
   // An open item's + starts with its prompt (components/thread/OpenItemsCard.tsx).
   const [text, setText] = useState(route.params?.prompt ?? '');
@@ -172,6 +174,26 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
           style={[styles.input, { color: colors.fg, backgroundColor: colors.surface }]}
           textAlignVertical="top"
         />
+        {!text.trim() && templates.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templates} keyboardShouldPersistTaps="handled" accessibilityLabel="Templates">
+            {sortTemplates(templates).map((t) => (
+              <Pressable
+                key={t.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Template: ${t.name}`}
+                accessibilityHint={t.description}
+                disabled={starting}
+                hitSlop={chipSlop}
+                onPress={() => setText(templateDraft(t))}
+                style={({ pressed }) => [styles.chip, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
+              >
+                <Text numberOfLines={1} style={[styles.chipLabel, { color: colors.fg2 }]}>
+                  {t.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
         {files.length > 0 ? (
           <View style={styles.notice}>
             <AttachmentChips files={files} onRemove={starting ? undefined : (id) => removeStagedFile(scope, id)} />
@@ -331,6 +353,10 @@ const styles = StyleSheet.create({
     lineHeight: Math.round(fontSize.input * lineHeight.body),
   },
   notice: {
+    paddingHorizontal: space.s8,
+  },
+  templates: {
+    gap: space.s4,
     paddingHorizontal: space.s8,
   },
   runRow: {
