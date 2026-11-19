@@ -3,6 +3,7 @@ import { api } from '../api.ts';
 import { fileQuery, pickFile, type FileMention } from '@omni/shared/mention-menu.ts';
 import { Icon } from './ui.tsx';
 import { optionId } from './SlashMenu.tsx';
+import { isImeEnter } from '../ime.ts';
 
 
 /**
@@ -74,7 +75,7 @@ export function useFileMenu({
 
   /** Arrow keys, Enter, Tab and Esc drive the menu while it is open. True when the key was used. */
   const onKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (!open || e.nativeEvent.isComposing || e.keyCode === 229) return false;
+    if (!open || isImeEnter(e)) return false;
     const n = rows.length;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       moveTo((active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n);

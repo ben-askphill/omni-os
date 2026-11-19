@@ -3,6 +3,7 @@ import { searchSettings, sectionDef, sectionsIn, SETTINGS_GROUPS, type SettingsS
 import { desktop } from '../desktop.ts';
 import { href, navigate } from '../router.ts';
 import { Icon, type IconName } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 
 // Settings' nav on a desktop: a search box over the groups of sections (@omni/shared/settings-catalog.ts), the same
 // groups and order as the phone's Settings screen. Typing lists the settings that
@@ -24,7 +25,7 @@ export function SettingsNav({ section }: { section: SettingsSectionId }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && hits[0]) open(hits[0].section, hits[0].id);
+            if (e.key === 'Enter' && !isImeEnter(e) && hits[0]) open(hits[0].section, hits[0].id);
             if (e.key === 'Escape') setQ('');
           }}
           placeholder="Search settings"

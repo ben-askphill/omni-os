@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { DesktopBridge } from '@omni/shared/desktop-bridge.ts';
 import { api, errorText, type ChannelWithRunning, type Thread } from '../api.ts';
-import { useAutosize } from '../components/composer/controls.tsx';
 import { pickerOptions } from '../components/composer/pickerOptions.tsx';
 import { Button, Icon, Loader, Picker } from '../components/ui.tsx';
 import { KbdFooter } from '../components/ui/overlay.tsx';
@@ -47,7 +46,6 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
   const closing = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Counts showings. Hiding bumps it too, so an open that resolves after the panel hid starts nothing.
   const shown = useRef(0);
-  useAutosize(field, text, 16 * 1.5 * 10);
 
   const setText = useCallback((v: string) => {
     if (v !== live.current.text) live.current.lastEdit = Date.now();
@@ -271,7 +269,7 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
             autoFocus
             aria-label="Prompt"
             placeholder="Ask anything, or describe a task"
-            className="block w-full resize-none bg-transparent text-[length:var(--fs-input)] leading-[1.5] text-fg outline-none placeholder:text-fg-4"
+            className="block field-sizing-content max-h-[240px] w-full resize-none bg-transparent text-[length:var(--fs-input)] leading-[1.5] text-fg outline-none placeholder:text-fg-4"
           />
           <StatusLine phase={phase} listening={listening} onOpen={(id) => done(href.thread(id))} />
           {phase.kind === 'editing' && !text && asks.length > 0 && <RecentAsks asks={asks} onPick={(id) => setPhase({ kind: 'answering', id })} />}

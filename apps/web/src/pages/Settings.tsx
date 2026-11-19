@@ -51,6 +51,7 @@ import {
   SwitchRow,
   useScopedChannel,
 } from './settings-parts.tsx';
+import { isImeEnter } from '../ime.ts';
 
 // Settings: a searchable nav of grouped sections beside one section at a time (@omni/shared/settings-catalog.ts),
 // the same sections in the same order as the phone's Settings screen. A scoped section shows the channel picker: This
@@ -744,7 +745,7 @@ function ConfigField({
 
 /** Return saves a field that saves as you go; on a form with Save changes, Return submits it. */
 const commitOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
-  if (e.key === 'Enter' && !e.currentTarget.form?.querySelector('[type=submit]')) e.currentTarget.blur();
+  if (e.key === 'Enter' && !isImeEnter(e) && !e.currentTarget.form?.querySelector('[type=submit]')) e.currentTarget.blur();
 };
 
 const SERVER_TZ = '';

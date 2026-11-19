@@ -11,6 +11,7 @@ import { useSending } from '../../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../../pending-edits.ts';
 import { ContextChips, hasContext } from '../../message-context/ContextChips.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../../forwarded.ts';
+import { isImeEnter } from '../../ime.ts';
 
 /** A message that waits for the thread's worktree (SetupCard). */
 
@@ -201,7 +202,7 @@ function EditBox({ draft: d, label, actions: a }: { draft: EditDraft; label: str
           disabled={saving}
           onChange={(e) => a.change(d.uuid, (x) => ({ ...x, prompt: e.target.value }))}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeEnter(e)) {
               e.preventDefault();
               void a.save(d);
             } else if (e.key === 'Escape') a.close(d.uuid);

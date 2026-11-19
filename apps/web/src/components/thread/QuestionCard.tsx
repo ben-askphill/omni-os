@@ -15,6 +15,7 @@ import {
 } from '@omni/shared/question.ts';
 import { api, ApiError, errorText } from '../../api.ts';
 import { Button, Chip, ErrorNote, Icon, IconButton, StatusPill } from '../ui.tsx';
+import { isImeEnter } from '../../ime.ts';
 
 /** The status a thread shows while a question waits on Ben, in its header and under the card. */
 
@@ -129,7 +130,7 @@ function Asking({ threadId, q, touch, onSent }: { threadId: string; q: ThreadQue
 
   const onKey = (e: KeyboardEvent) => {
     const inField = e.target === otherField.current;
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || inField)) {
+    if (e.key === 'Enter' && !isImeEnter(e) && (e.metaKey || e.ctrlKey || inField)) {
       e.preventDefault();
       advance(false);
     } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !inField && questions.length > 1) {

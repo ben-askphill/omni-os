@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
+import { useAutosize } from '../components/composer/controls.tsx';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
 import { LivesOnNote, sendRefusal, type SendRefusal } from '../components/thread/LivesOn.tsx';
 import type { Takeover } from '@omni/shared/handoff.ts';
@@ -86,12 +87,7 @@ export function MoComposer({
     if (!takeover) setAway((a) => (a?.livesOn ? null : a));
   }, [takeover]);
 
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
-  }, [text]);
+  useAutosize(ref, text);
 
   const busyThread = thread.status === 'running' || thread.status === 'queued';
   // A switch queued behind the turn: the message waits for it too (apps/server/runner/queue.ts), so it queues.
@@ -216,7 +212,7 @@ export function MoComposer({
             enterKeyHint="send"
             placeholder={hint}
             aria-label={hint}
-            className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-3"
+            className="field-sizing-content max-h-[132px] min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-3"
           />
           {stop && !canSend && !att.files.length && !mic.on ? (
             <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />

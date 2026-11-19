@@ -13,6 +13,7 @@ import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificati
 import { desktop } from '../desktop.ts';
 import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
 import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, IDENTIFIER, Icon, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
 export const STEPS = ['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Routines', 'Done'] as const;
@@ -393,7 +394,7 @@ function ClaudeSignIn({ onDone }: { onDone: () => void }) {
           enterKeyHint="done"
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            if (e.key !== 'Enter' || isImeEnter(e)) return;
             e.preventDefault();
             void finish();
           }}
