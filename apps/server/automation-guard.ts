@@ -108,8 +108,8 @@ export function lineageRefusal(c: Context, from: string, strict: boolean): strin
   const caller = threadCredential(c);
   if (!caller || atOrBelow(from, caller)) return null;
   if (!strict) {
+    if (!unattended(caller)) return null;
     const mine = lineage(caller);
-    if (!mine.automation && !mine.scan) return null;
     const theirs = lineage(from);
     if (theirs.automation === mine.automation && theirs.scan === mine.scan) return null;
   }

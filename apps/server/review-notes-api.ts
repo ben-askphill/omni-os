@@ -97,6 +97,10 @@ reviewNotesApi.post('/:id/review-notes/send', async (c) => {
   if (target && new_delegate) return c.json({ error: 'Pick a delegate or a new one, not both.' }, 400);
   const to = target && target !== id ? delegatesOf(id).find((t) => t.id === target) : from;
   if (!to) return c.json({ error: 'Notes go to this thread or a thread it delegated to.' }, 400);
+  // Under an automation or a usage scan, a thread sends notes only to a thread under the same one, as for /messages,
+  // and a new delegate files under this thread.
+  const outside = lineageRefusal(c, to.id, false);
+  if (outside) return c.json({ error: outside }, 403);
   // A retry of a new-delegate send whose answer was lost: the thread it made, with the notes it already carried.
   const made = new_delegate && request_id ? threads.get(request_id) : null;
   if (made) return made.parent_id === id ? c.json({ target: made.id, sent: [], created: true } satisfies ReviewNotesSent) : c.json({ error: `Thread id ${made.id} was already used.` }, 409);
@@ -109,8 +113,6 @@ reviewNotesApi.post('/:id/review-notes/send', async (c) => {
     return c.json({ error: 'These notes are too long for one message. Resolve or delete some, then send again.' }, 400);
   }
   if (new_delegate) {
-    const no = lineageRefusal(c, id, false);
-    if (no) return c.json({ error: no }, 403);
     const thread = await createThread({
       ...(request_id && UUID.test(request_id) && { id: request_id }),
       channel: from.channel_id,

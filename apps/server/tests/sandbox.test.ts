@@ -200,7 +200,7 @@ describe('buildMcpConfig: omni-steps', () => {
       expect(cfg.mcpServers['omni-steps']).toEqual({
         command: MCP,
         args: ['steps'],
-        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
+        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.threads, THREAD, 'token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
     }
   });

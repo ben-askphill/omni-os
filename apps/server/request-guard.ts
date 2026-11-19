@@ -290,8 +290,9 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   const given = bearer(c);
   let auth: OmniAuth = { via: 'none' };
   let legacy = false;
-  const thread = tokenMatches(given) ? null : threadTokenCheck(given ?? '');
-  if (tokenMatches(given)) auth = { via: 'token' };
+  const install = tokenMatches(given);
+  const thread = install ? null : threadTokenCheck(given ?? '');
+  if (install) auth = { via: 'token' };
   else if (thread) {
     // Threads reach the server on loopback (runner/state.ts omniUrl): a copy that left the machine counts for nothing.
     if (!directFromThisMac(c)) return refuse("a thread's token works only from this machine", 401);

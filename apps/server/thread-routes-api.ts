@@ -15,6 +15,7 @@ import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
 import { getCrew } from './crew.ts';
 import { lineageRefusal, senderOf as sender, threadCredential } from './automation-guard.ts';
+import { userName } from './profile.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
 import { bus } from './bus.ts';
@@ -69,6 +70,9 @@ import { fixChecksPrompt } from './fix-checks.ts';
 import { shellAllowed } from './request-guard.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
+/** A thread under an automation or a usage scan acts only on threads under the same one (automation-guard.ts lineageRefusal). */
+const OUTSIDE_LINEAGE = 'A thread under an automation or a usage scan acts only on threads under the same one.';
+
 export const threadRoutesApi = new Hono();
 
 /** Messages, uploads, stop, and the event stream. Registered after PATCH and the terminal routes. */
@@ -116,6 +120,8 @@ threadRoutesApi.get('/asks', (c) => c.json(allWithDelegating(threads.recentAsks(
  */
 threadRoutesApi.post('/:id/promote', async (c) => {
   const body = z.object({ to: z.enum(['task', 'keep']), request: z.string().max(20_000).optional() }).parse(await c.req.json().catch(() => ({})));
+  // The task starts with no parent, so a thread could shed its lineage through it: Ben turns an ask into a task.
+  if (body.to === 'task' && threadCredential(c)) return c.json({ error: `Only ${userName()} turns a quick ask into a task.` }, 403);
   try {
     if (body.to === 'keep') return c.json({ ask: keepQuickAsk(c.req.param('id')) });
     return c.json(await taskFromQuickAsk(c.req.param('id'), { request: body.request }));
@@ -331,7 +337,7 @@ threadActionsApi.post('/:id/messages', async (c) => {
   const target = threads.get(id);
   if (!target) return c.json({ error: 'not found' }, 404);
   // Under an automation or a usage scan, a thread steers only threads in its own lineage, as with review notes.
-  if (lineageRefusal(c, id, false)) return c.json({ error: 'A thread under an automation or a usage scan messages only threads under the same one.' }, 403);
+  if (lineageRefusal(c, id, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
   if (from === 'conductor' && !wake_cold) {
     const warmth = sessionWarmth(target);
     if (!warmth.warm) return c.json({ error: coldRefusal(target, warmth), session: warmth }, 409);
@@ -364,6 +370,15 @@ const afterRecovery = (id: string) => ({ thread: threads.get(id), pending: pendi
  * Resume messages a restart parked, in the order they came. No ids: every recovered one. An uncertain one (it may
  * have reached the harness before the restart) is only sent again when named.
  */
+/**
+ * A thread's queue of unsent messages is Ben's to manage: a message he queued is his answer once it is delivered, so a
+ * thread's own token never edits, cancels, reorders, steers, resumes or drops one (automation-guard.ts senderOf).
+ */
+threadActionsApi.use('/:id/requests/*', async (c, next) => {
+  if (c.req.method !== 'GET' && threadCredential(c)) return c.json({ error: `Only ${userName()} changes a thread's queued messages.` }, 403);
+  await next();
+});
+
 threadActionsApi.post('/:id/requests/resume', async (c) => {
   const id = c.req.param('id');
   const { ids } = z.object({ ids: z.array(z.string().min(1)).max(200).optional() }).parse(await c.req.json().catch(() => ({})));
@@ -516,6 +531,7 @@ threadActionsApi.post('/:id/published/comments', async (c) => {
   const id = c.req.param('id');
   const { url } = z.object({ url: z.string().refine(isArtifactUrl, 'not a claude.ai artifact url') }).parse(await c.req.json());
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  if (lineageRefusal(c, id, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
   return c.json(await postMessage(id, commentsPrompt(url), { mode: 'queue', from: sender(c) }));
 });
 
@@ -550,6 +566,7 @@ threadActionsApi.post('/:id/compact', async (c) => {
   const { focus } = z.object({ focus: z.string().max(2000).optional() }).parse(await c.req.json().catch(() => ({})));
   const t = threads.get(id);
   if (!t) return c.json({ error: 'not found' }, 404);
+  if (lineageRefusal(c, id, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
   const blocked = compactBlocked(t);
   if (blocked) return c.json({ error: blocked }, 409);
   const extra = t.harness === 'claude-code' ? focus?.replace(/\s+/g, ' ').trim() : '';

@@ -161,6 +161,18 @@ describe('a thread under an automation, with no header', () => {
     const interactive = await spawned();
     expect((await call('POST', `/threads/${elsewhere.id}/messages`, { token: interactive.token, body: { prompt: 'a note', mode: 'queue' } })).status).toBe(200);
   });
+
+  it('cannot compact, send review notes or relay page comments to a thread outside its own lineage', async () => {
+    const elsewhere = await spawned();
+    const run = await spawned();
+    underAutomation(run.id);
+    const token = run.token;
+    expect((await call('POST', `/threads/${elsewhere.id}/compact`, { token, body: {} })).status).toBe(403);
+    expect((await call('POST', `/threads/${elsewhere.id}/review-notes/send`, { token, body: {} })).status).toBe(403);
+    const url = 'https://claude.ai/artifact/A7GPvongi9iKS4c7s4Fjs2';
+    expect((await call('POST', `/threads/${elsewhere.id}/published/comments`, { token, body: { url } })).status).toBe(403);
+    expect((await call('POST', `/threads/${run.id}/published/comments`, { token, body: { url } })).status).toBe(200);
+  });
 });
 
 describe('any thread token', () => {
@@ -239,6 +251,25 @@ describe('any thread token', () => {
     const action = made.body.id ?? made.body.action?.id;
     expect((await call('PATCH', `/channels/scratch/actions/${action}`, { token, body: { command: 'echo bye' } })).status).toBe(403);
     expect((await call('POST', `/threads/${id}/actions/${action}/run`, { token })).status).toBe(403);
+  });
+
+  it("cannot change another thread's queued messages, which are Ben's", async () => {
+    const target = await spawned();
+    const { token } = await spawned();
+    expect((await call('PATCH', `/threads/${target.id}/requests/r1`, { token, body: { prompt: 'yes, save it' } })).status).toBe(403);
+    for (const op of ['cancel', 'reorder', 'steer', 'discard', 'resume']) {
+      expect((await call('POST', `/threads/${target.id}/requests/${op}`, { token, body: { ids: [] } })).status, op).toBe(403);
+    }
+    expect((await call('GET', `/threads/${target.id}/requests`, { token })).status).toBe(200);
+    // Ben's own call gets past the guard (empty ids are a 400 of their own).
+    expect((await call('POST', `/threads/${target.id}/requests/cancel`, { body: { ids: [] } })).status).not.toBe(403);
+  });
+
+  it('turns no quick ask into a task, approves no MCP client and finishes no setup', async () => {
+    const { id, token } = await spawned();
+    expect((await call('POST', `/threads/${id}/promote`, { token, body: { to: 'task', request: 'go' } })).status).toBe(403);
+    expect((await call('POST', '/mcp/clients/grok-bot/approve', { token })).status).toBe(403);
+    expect((await call('POST', '/setup/complete', { token, body: { ask: 'start something' } })).status).toBe(403);
   });
 
   it('keeps working when Ben rotates the install token', async () => {
