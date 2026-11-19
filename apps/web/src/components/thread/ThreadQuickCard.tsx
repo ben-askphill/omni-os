@@ -1,11 +1,14 @@
 import type { TurnPhase } from '@omni/shared/status.ts';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { connectorsUsed, type ConnectorUse } from '@omni/shared/connectors.ts';
+import { buildItems, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
+import { ConnectorMark } from '../ConnectorMark.tsx';
 import type { Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { HarnessLogo, HarnessMark, harnessLabel } from '../brand.tsx';
 import { useThreadAccount } from '../../accounts.ts';
 import { threadAccountLine } from '@omni/shared/harness-accounts.ts';
-import { Chip, copyText, Icon, IconButton, IconLink, statusLabel, StatusDot, ThreadDot, type ChipTone, type IconName } from '../ui.tsx';
+import { Chip, copyText, Icon, IconButton, IconLink, Loader, statusLabel, StatusDot, ThreadDot, type ChipTone, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
@@ -96,9 +99,12 @@ export function ThreadQuickCard({
   turn,
   reconnecting = false,
   code = true,
+  connectors = [],
   className = '',
 }: {
   thread: Thread;
+  /** The outside connectors its loaded turns called (useThreadConnectors), listed under Connectors. */
+  connectors?: ConnectorUse[];
   /**
    * Show technical details is on, or the channel has a repo: the card lists the branch and its Pull requests section
    * even while it has none. Outside a repo with the switch off, it lists PRs only when the thread's crew opened some.
@@ -223,7 +229,41 @@ export function ThreadQuickCard({
         </QuickRow>
       </div>
       <Lineage parent={parent} delegated={delegated} onOpenThread={onOpenThread} />
+      <Connectors used={connectors} live={slotBusy} />
       {(code || (prs && cardPRs(thread, prs).length > 0)) && <PullRequests thread={thread} prs={prs} step={step} onOpen={onOpen} onOpenPR={onOpenPR} />}
+    </section>
+  );
+}
+
+/** The outside connectors a thread's loaded turns called, in first-use order: one pass over the events, kept until they change. */
+export function useThreadConnectors(events: TranscriptEvent[]): ConnectorUse[] {
+  return useMemo(() => connectorsUsed(buildItems(events).items.flatMap((it) => (it.type === 'tools' ? it.calls : []))), [events]);
+}
+
+/**
+ * The apps the thread reached through a connector, like the Context list in Claude's apps: each one's tile and name, and
+ * "Connector" on the right, or a loader while one of its calls runs. Absent while it used none.
+ */
+function Connectors({ used, live }: { used: ConnectorUse[]; live: boolean }) {
+  if (!used.length) return null;
+  return (
+    <section aria-label="Connectors" className={DIVIDER}>
+      <div className={`flex items-center ${CAPTION} text-[11px] text-fg-3`}>Connectors</div>
+      {used.map((u) => (
+        <QuickRow key={u.connector.id}>
+          <ConnectorMark connector={u.connector} size={20} />
+          <span className="min-w-0 flex-1 truncate">{u.connector.name}</span>
+          {live && u.running > 0 ? (
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-[11.5px] text-fg-3">
+              In use <Loader size={11} />
+            </span>
+          ) : (
+            <span className="shrink-0 text-[11.5px] text-fg-3" title={`${plural(u.calls, 'call')}${u.failed ? `, ${u.failed} failed` : ''}`}>
+              Connector
+            </span>
+          )}
+        </QuickRow>
+      ))}
     </section>
   );
 }

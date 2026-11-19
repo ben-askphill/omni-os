@@ -37,7 +37,7 @@ import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from '@omni/shared/thread-view.ts';
 import { crewLine, prLine, prOffered, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
-import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
+import { ThreadQuickCard, useThreadConnectors } from '../components/thread/ThreadQuickCard.tsx';
 import { ProgressCard, useProgressPanel } from '../components/thread/ProgressCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
@@ -68,6 +68,7 @@ export function ThreadScreen() {
   const status = useMemo(() => (thread?.status === 'running' ? statusLabel(events) : null), [events, thread?.status]);
   const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
   const progress = useProgressPanel(events, thread?.status === 'running', view?.asking ?? false);
+  const connectors = useThreadConnectors(events);
   const changes = useBranchChanges(thread, slotBusy);
   const [pr] = useThreadPR(thread, slotBusy, true);
   // The channel's own step prompts (Channel Settings), else the built-in ones.
@@ -225,6 +226,7 @@ export function ThreadScreen() {
                   setQuick(false);
                   shell.open(href.thread(t));
                 }}
+                connectors={connectors}
                 className="shrink-0"
               />
               <ProgressCard threadId={thread.id} panel={progress} className="shrink-0" />

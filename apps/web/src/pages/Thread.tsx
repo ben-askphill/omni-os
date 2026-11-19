@@ -25,7 +25,7 @@ import { ContextMeter } from '../components/thread/ContextMeter.tsx';
 import { useShowsCode } from '../display.ts';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
-import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
+import { ThreadQuickCard, useThreadConnectors } from '../components/thread/ThreadQuickCard.tsx';
 import { ProgressCard, useProgressPanel } from '../components/thread/ProgressCard.tsx';
 import type { PanelTab } from './useThreadSession.ts';
 import { AGENTS_CARD_ID } from '../components/thread/panel/AgentsSection.tsx';
@@ -115,6 +115,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   const members = useMemo(() => teamOf(children), [children]);
   const reports = useMemo(() => reportNotes(queued), [queued]);
   const asking = useMemo(() => isAsking(events), [events]);
+  const connectors = useThreadConnectors(events);
   // What the running turn is doing, for the header pill's dot and the quick card's.
   const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
   const agents = useMemo(() => runningSubagents(tasks, id), [tasks, id]);
@@ -339,6 +340,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 asking={asking}
                 turn={turn}
                 reconnecting={reconnecting}
+                connectors={connectors}
                 className="shrink-0"
               />
               <ProgressCard threadId={thread.id} panel={progress} className="shrink-0" />
