@@ -26,6 +26,7 @@ import {
   type UploadTransport,
 } from '@omni/client-core';
 import type { ClaudeArtifactsSchedule } from '@omni/shared/claude-artifacts.ts';
+import { parseDisplay, type DisplayPrefs } from '@omni/shared/display.ts';
 import type { HandoffView } from '@omni/shared/handoff.ts';
 import { earlierCursor, type HistoryPage } from '@omni/shared/history.ts';
 import { latestOnly } from '@omni/shared/latest.ts';
@@ -47,6 +48,7 @@ import { linkOf, type Link } from './connection';
 import { createClaudeArtifactsLive, type ClaudeArtifactsLiveState } from './claude-artifacts';
 import { createLibraryLive, type LibraryState } from './library';
 import type { OmniSession } from './session';
+import { threadKey } from './thread-key';
 import { createStore, type Store } from './store';
 import { gatedFetch } from './yield-gate';
 import { emptyThreadView, reduceThread, withChanges, withDetail, type ThreadChanges, type ThreadDetail, type ThreadView } from './thread-reducer';
@@ -102,6 +104,8 @@ export interface ThreadLive {
 }
 
 export interface LiveHub {
+  /** The session's `serverId`: what the composer's stores file a thread under, with its id (live/thread-key.ts). */
+  readonly serverId: string;
   readonly channels: Store<ChannelsState>;
   /** The header's link state, reduced from the feed and the open thread. */
   readonly link: Store<Link>;
@@ -112,6 +116,10 @@ export interface LiveHub {
   readonly library: Store<LibraryState>;
   /** Ben's claude.ai Artifacts, for the Library's claude.ai switch. Loads once the switch is first shown. */
   readonly claudeArtifacts: Store<ClaudeArtifactsLiveState>;
+  /** Show technical details and the Shopify add-on (GET /api/display). Null until the server answers, or from a server without them. */
+  readonly display: Store<DisplayPrefs | null>;
+  /** Sets a display switch for every client. Resolves to the failure's message, or null. */
+  setDisplay(patch: Partial<DisplayPrefs>): Promise<string | null>;
   refreshChannels(): Promise<void>;
   /** Runs one API call with the session's credentials, retried once after a 401. Rejects with 'Not paired' without a server. */
   request<T>(call: (api: OmniApi) => Promise<T>): Promise<T>;
@@ -208,6 +216,29 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   const activity = createActivityLive({ api: background, withAuth, now });
   const library = createLibraryLive({ api: background, withAuth, now });
   const claudeArtifacts = createClaudeArtifactsLive({ api: background, withAuth });
+  const display = createStore<DisplayPrefs | null>(null);
+
+  /** The display switches again: on open, on a feed reconnect and when the feed says they changed. An older server has none. */
+  async function refreshDisplay() {
+    if (!background) return;
+    try {
+      display.set(parseDisplay(await withAuth(() => background.display())));
+    } catch {
+      /* an older server: keep what it had, the technical words */
+    }
+  }
+
+  async function setDisplay(patch: Partial<DisplayPrefs>): Promise<string | null> {
+    const before = display.get();
+    if (before) display.set({ ...before, ...patch });
+    try {
+      display.set(parseDisplay(await withAuth(() => requireApi().setDisplay(patch))));
+      return null;
+    } catch (e) {
+      display.set(before);
+      return e instanceof Error && e.message ? e.message : 'Could not save';
+    }
+  }
 
   function requireApi(): OmniApi {
     if (!api) throw new Error('Not paired');
@@ -225,7 +256,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     run: withAuth,
     catalog: catalog.store.get,
     newId: newRequestId,
-    landed: (threadId, item) => settleDraftContext(threadId, item.context.map((c) => c.id)),
+    // Under this hub's server: the same thread id on another paired server is another thread with its own draft.
+    landed: (threadId, item) => settleDraftContext(threadKey(session.serverId, threadId), item.context.map((c) => c.id)),
   });
 
   let uploadLimit: Promise<number> | null = null;
@@ -387,6 +419,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         if (isListChange(message) || taskHostsChanged(message)) scheduleRefresh({ channels: true, needsYou: thread, pinned: thread });
         if (isRecord(message) && message.type === NEEDS_YOU) void refreshNeedsYou();
         if (isRecord(message) && message.type === 'tasks' && Array.isArray(message.tasks)) setTasks(message.tasks);
+        if (isRecord(message) && message.type === 'display') void refreshDisplay();
         activity.applyFeed(message);
         library.applyFeed(message);
         claudeArtifacts.applyFeed(message);
@@ -402,6 +435,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
         void activity.refresh();
         void library.refresh();
         void claudeArtifacts.reload();
+        void refreshDisplay();
       },
       onState: (state) => {
         // The feed is connected, so the server is up: a list that never loaded asks again now.
@@ -615,10 +649,12 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     void refreshTasks();
     void activity.refresh();
     void library.refresh();
+    void refreshDisplay();
   }
   recomputeLink();
 
   return {
+    serverId: session.serverId,
     channels,
     link,
     needsYou,
@@ -626,6 +662,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     activity: activity.state,
     library: library.state,
     claudeArtifacts: claudeArtifacts.state,
+    display,
+    setDisplay,
     refreshChannels,
     request: (call) => withAuth(() => call(requireApi())),
     uploadLimitMb,

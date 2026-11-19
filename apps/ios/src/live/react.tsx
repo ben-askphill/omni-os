@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, us
 import { AppState } from 'react-native';
 import EventSource from 'react-native-sse';
 
-import { clearArtifactCache } from '../artifacts/files';
+import { startArtifactSession } from '../artifacts/files';
 import { shownResult } from '../needs/inbox';
 import type { ActionsLive, ActionsView } from './actions';
 import { foregroundOf } from './app-state';
@@ -17,6 +17,7 @@ import { createLiveHub, type LiveHub, type ThreadLive, type ThreadView } from '.
 import type { Link } from './connection';
 import type { OmniSession } from './session';
 import { createStore, type Store } from './store';
+import { threadKey, type ThreadKey } from './thread-key';
 
 const HubContext = createContext<LiveHub | null>(null);
 
@@ -28,8 +29,9 @@ export function LiveProvider({ session, children }: { session: OmniSession; chil
   const [hub, setHub] = useState<LiveHub | null>(null);
 
   useEffect(() => {
-    clearArtifactCache();
     const next = createLiveHub({ session, transport: eventSourceTransport(EventSource), upload: xhrUploadTransport() });
+    // Before any viewer can ask: the last session's files go, and its downloads still on the way are refused.
+    startArtifactSession(next);
     setHub(next);
     const appState = AppState.addEventListener('change', (state) => {
       const foreground = foregroundOf(state);
@@ -55,8 +57,21 @@ export function useLiveHub(): LiveHub {
   return hub;
 }
 
+/**
+ * The key the composer's stores file this thread under: the thread on the server this hub talks to. A cloned install
+ * keeps its thread ids, so the bare id would hand one server's draft and files to the other (live/thread-key.ts).
+ */
+export function useThreadKey(threadId: string): ThreadKey {
+  return threadKey(useLiveHub().serverId, threadId);
+}
+
 export function useStore<T>(store: Store<T>): T {
   return useSyncExternalStore(store.subscribe, store.get, store.get);
+}
+
+/** Whether status words and run controls read technical: Show technical details, on until a server says otherwise. */
+export function useTechnical(): boolean {
+  return useStore(useLiveHub().display)?.technical ?? true;
 }
 
 export function useChannels() {

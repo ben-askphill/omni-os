@@ -95,7 +95,7 @@ export const keyring = {
     return changed;
   },
 
-  /** Pin the keys a machine's record carries now. Ben confirms them in Sync settings. False when nothing waits. */
+  /** Pin the keys a machine's record carries now. The user confirms them in Sync settings. False when nothing waits. */
   confirm(machine: string, now = new Date().toISOString()): boolean {
     const r = rowOf(machine);
     if (!r || (!r.seen_sign_key && !r.seen_seal_key)) return false;
@@ -108,7 +108,7 @@ export const keyring = {
 
   /**
    * Whether a machine may make this one act (its commands, assignments, update asks, owner claims and secrets). Trust
-   * holds for one signing key: the first one pinned, or the one Ben confirmed. A key pinned later does not inherit it.
+   * holds for one signing key: the first one pinned, or the one the user confirmed. A key pinned later does not inherit it.
    */
   trusted(machine: string): boolean {
     const r = db.prepare('SELECT sign_key FROM sync_trusted WHERE machine_id = ?').get(machine) as { sign_key: string } | undefined;
@@ -129,7 +129,7 @@ export const keyring = {
     );
   },
 
-  /** Forget a machine's pins and trust, for tests and a machine Ben removed. */
+  /** Forget a machine's pins and trust, for tests and a machine the user removed. */
   forget(machine: string) {
     db.prepare('DELETE FROM sync_keys WHERE machine_id = ?').run(machine);
     db.prepare('DELETE FROM sync_trusted WHERE machine_id = ?').run(machine);

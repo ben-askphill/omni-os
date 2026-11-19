@@ -34,6 +34,7 @@
 //   MODS              before the answer, what a mod's hooks send (Claude Code 2.1.287+): a ui_status, a ui_log, a
 //                     ui_toast, and a ui_render with no text that Omni ignores
 //   MOD_CLEAR         before the answer, a ui_status with null text, which clears that mod's status
+//   NEEDS_TASK:<title>  answer as a quick ask does when the work needs a task: `TASK: <title>` (dashes are spaces), then why
 //   RUN:<path>        before the answer, run that shell script in the cwd, like a Bash call that edits files or runs git
 //   PUBLISH:<path>    an Artifact tool call that publishes that file, answered "Published <path> at <url>" like the real CLI
 //   RENDER:<title>    before the answer, show inline-page.html (an interactive chart) with Omni's html_render, as the real
@@ -50,11 +51,20 @@
 //                     its tool_result once it returns), and wait as long as MCP_TOOL_TIMEOUT allows (else the SDK's 60s).
 //                     Interruptible like TOOL. Messages sent meanwhile join after its result; the answer quotes the result
 //   ASK_ONE           ASK with only the first of those questions
+//   WRITE:<path>      a Write tool call that writes "written by fake-claude" to that path (relative to the cwd)
+//   CMD:<command>     a Bash tool call that runs that command in the cwd; underscores in it are spaces
+//                     With --permission-prompt-tool stdio, each WRITE, CMD and TOOL call first sends a can_use_tool
+//                     control request, as the real CLI does when a hook or the permission mode asks, and runs only
+//                     when Omni answers allow; a deny becomes an error tool_result with Omni's message
+//   STEPS:<ms>        before the answer, post a three-step plan with Omni's set_steps as the real CLI calls an MCP tool:
+//                     start the omni-steps server from --mcp-config, then run one call per step, each taking <ms>, and
+//                     move the marker on as each step starts and once all are done. Interruptible like TOOL
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen,
 //                                 MCP_TOOL_TIMEOUT)
 //   FAKE_CLAUDE_LATENCY_MS=<ms>   simulated model call latency per step (default 20)
+//   FAKE_CLAUDE_MCP_LIST=<file>   what `claude mcp list` prints (sign-in check), else $HOME/.fake-claude-mcp-list.txt
 //   FAKE_CLAUDE_RESUME_FLUSH=1    on --resume, emit a zero-turn success result at startup like the real CLI can
 //   FAKE_CLAUDE_STARTUP_MS=<ms>   stream mode: read no stdin until then, like the real CLI connecting its MCP servers
 //   FAKE_CLAUDE_TURN_GAP_MS=<ms>  pause between a result and the next queued turn (the real CLI takes about 200ms);
@@ -86,8 +96,8 @@
 // list again, their prompts included, as system/commands_changed.
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve as resolvePath } from 'node:path';
 
 const VERSION = '2.1.278';
 /**
@@ -211,6 +221,16 @@ if (process.argv[2] === 'auth' && process.argv[3] === 'status') {
   process.exit(JSON.parse(status).loggedIn ? 0 : 1);
 }
 
+// `claude mcp list`: each MCP server and whether it is connected, for the sign-in check (apps/server/sign-in-check.ts).
+// FAKE_CLAUDE_MCP_LIST names a text file to print, else $HOME/.fake-claude-mcp-list.txt, else one connected server. Read
+// on every call, so a QA stack can sign a connector out and back in while the server runs.
+if (process.argv[2] === 'mcp' && process.argv[3] === 'list') {
+  const file = process.env.FAKE_CLAUDE_MCP_LIST || join(process.env.HOME ?? '', '.fake-claude-mcp-list.txt');
+  const listed = file && existsSync(file) ? readFileSync(file, 'utf8').trim() : 'omni: node omni.js - \u2714 Connected';
+  process.stdout.write(`Checking MCP server health\u2026\n\n${listed}\n`);
+  process.exit(/Failed/.test(listed) ? 1 : 0);
+}
+
 const { opts, unknown, positional } = parseArgs(process.argv.slice(2));
 const print = !!(opts['-p'] || opts['--print']);
 const resumeArg = opts['-r'] ?? opts['--resume'];
@@ -329,6 +349,31 @@ const toolResult = (id, text, isError) =>
     timestamp: now(),
     tool_use_result: isError ? `Error: ${text}` : { stdout: text, stderr: '', interrupted: false, isImage: false },
   });
+
+// ---------- permission requests (--permission-prompt-tool stdio) ----------
+
+/** Omni answers whether a tool may run: each can_use_tool request waits here for its control_response. */
+const permits = new Map();
+const askPermission = () => process.argv.includes('--permission-prompt-tool');
+
+/** Ask before a tool runs. Resolves to { behavior: 'allow' } or { behavior: 'deny', message }. */
+function canUseTool(name, input, toolUseId) {
+  if (!askPermission()) return Promise.resolve({ behavior: 'allow' });
+  const id = randomUUID();
+  return new Promise((resolve) => {
+    permits.set(id, resolve);
+    writeRaw({ type: 'control_request', request_id: id, request: { subtype: 'can_use_tool', tool_name: name, display_name: name, input, tool_use_id: toolUseId } });
+  });
+}
+
+/** Omni's answer to one of our can_use_tool requests. */
+function onPermit(msg) {
+  const r = msg.response;
+  const done = permits.get(r?.request_id);
+  if (!done) return;
+  permits.delete(r.request_id);
+  done(r.subtype === 'success' ? (r.response ?? { behavior: 'deny', message: 'no answer' }) : { behavior: 'deny', message: r.error ?? 'error' });
+}
 
 /** RICH: one scripted step after another, each after a model call, until interrupted. Resolves to the steps taken. */
 async function richCalls(t) {
@@ -452,6 +497,58 @@ async function renderPage(title) {
   }
 }
 
+/** STEPS: the plan, the call each step makes, and what each call is. */
+const STEP_PLAN = ['Find candidate apps', 'Read the reviews', 'Compare prices'];
+const STEP_CALLS = [
+  ['WebSearch', { query: 'shopify review apps' }],
+  ['WebFetch', { url: 'https://apps.shopify.com/judgeme' }],
+  ['Read', { file_path: 'prices.csv' }],
+];
+
+/**
+ * STEPS: set_steps through the omni-steps server Omni configured, like html_render above, with one call per step
+ * between the moves. Resolves to the calls made, set_steps included; stops early once interrupted.
+ */
+async function postSteps(t, ms) {
+  const server = mcpEntry('omni-steps');
+  let client = null;
+  let made = 0;
+  try {
+    if (server) {
+      const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+      const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+      client = new Client({ name: 'claude-code', version: VERSION });
+      await client.connect(new StdioClientTransport({ command: server.command, args: server.args ?? [], env: { ...process.env, ...server.env }, stderr: 'ignore' }));
+    }
+    for (let k = 0; k <= STEP_PLAN.length; k++) {
+      const id = `toolu_fake_${++seq}`;
+      const input = { steps: STEP_PLAN, current: k };
+      assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id, name: 'mcp__omni-steps__set_steps', input }]);
+      made++;
+      if (client) {
+        const res = await client.callTool({ name: 'set_steps', arguments: input });
+        toolResult(id, res.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n'), !!res.isError);
+      } else toolResult(id, 'No such tool available: mcp__omni-steps__set_steps', true);
+      if (k === STEP_PLAN.length) break;
+      const [name, args] = STEP_CALLS[k];
+      const call = `toolu_fake_${++seq}`;
+      assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: call, name, input: args }]);
+      made++;
+      if (!(await pause(t, ms))) {
+        toolResult(call, REJECTED, true);
+        marker('[Request interrupted by user for tool use]');
+        return made;
+      }
+      toolResult(call, 'ok', false);
+    }
+  } catch (err) {
+    marker(`fake-claude: set_steps failed: ${err.message}`);
+  } finally {
+    await client?.close().catch(() => {});
+  }
+  return made;
+}
+
 const marker = (text) =>
   emit({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] }, parent_tool_use_id: null, timestamp: now() });
 
@@ -481,6 +578,7 @@ async function runTurn() {
   const tools = [];
   let think = 0;
   let rich = false;
+  let needsTask = null;
   let mods = false;
   let modClear = false;
   let limit = null;
@@ -489,6 +587,9 @@ async function runTurn() {
   const publishes = [];
   const renders = [];
   const scripts = [];
+  /** WRITE and CMD: tool calls that change something, each asked for first under --permission-prompt-tool. */
+  const actions = [];
+  let stepMs = null;
   let steps = 0;
 
   emit({
@@ -528,6 +629,11 @@ async function runTurn() {
       for (const x of m.text.matchAll(/PUBLISH:(\S+)/g)) publishes.push(x[1]);
       for (const x of m.text.matchAll(/RENDER:(\S+)/g)) renders.push(x[1].replace(/-/g, ' '));
       for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
+      for (const x of m.text.matchAll(/WRITE:(\S+)/g)) actions.push({ name: 'Write', input: { file_path: resolvePath(process.cwd(), x[1]), content: 'written by fake-claude' } });
+      for (const x of m.text.matchAll(/CMD:(\S+)/g)) actions.push({ name: 'Bash', input: { command: x[1].replace(/_/g, ' '), description: 'Fake command' } });
+      for (const x of m.text.matchAll(/NEEDS_TASK:(\S+)/g)) needsTask = x[1].replace(/-/g, ' ');
+      const plan = m.text.match(/STEPS:(\d+)/);
+      if (plan) stepMs = Number(plan[1]);
     }
     return true;
   };
@@ -618,6 +724,11 @@ async function runTurn() {
     steps++;
     await renderPage(title);
   }
+  if (stepMs !== null) {
+    steps += await postSteps(t, stepMs);
+    stepMs = null;
+    if (dead) return;
+  }
   for (const file of publishes.splice(0)) {
     const toolId = `toolu_fake_${++seq}`;
     steps++;
@@ -639,6 +750,31 @@ async function runTurn() {
   for (;;) {
     // One model call: either a tool call or the final answer.
     if (!(await pause(t, LATENCY))) break;
+    if (actions.length) {
+      const a = actions.shift();
+      const toolId = `toolu_fake_${++seq}`;
+      steps++;
+      assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: toolId, name: a.name, input: a.input }]);
+      const permit = await canUseTool(a.name, a.input, toolId);
+      if (dead) return;
+      if (permit.behavior !== 'allow') {
+        toolResult(toolId, permit.message ?? 'Permission denied', true);
+      } else if (a.name === 'Write') {
+        writeFileSync(a.input.file_path, a.input.content);
+        toolResult(toolId, `File created successfully at: ${a.input.file_path}`, false);
+      } else {
+        let out = '';
+        try {
+          out = execFileSync('sh', ['-c', a.input.command], { cwd: process.cwd(), encoding: 'utf8' });
+        } catch (e) {
+          out = String(e.message);
+        }
+        toolResult(toolId, out, false);
+      }
+      seen.push(permit.behavior === 'allow' ? `${a.name} ran` : `${a.name} refused: ${permit.message ?? ''}`);
+      if (!take()) return;
+      continue;
+    }
     if (tools.length) {
       const ms = tools.shift();
       const msgId = `msg_fake_${++seq}`;
@@ -646,7 +782,16 @@ async function runTurn() {
       steps++;
       assistant(msgId, [{ type: 'thinking', thinking: '', signature: 'sig' }]);
       emit({ type: 'system', subtype: 'thinking_tokens', tokens: 42 });
-      assistant(msgId, [{ type: 'tool_use', id: toolId, name: 'Bash', input: { command: `sleep ${ms / 1000}`, description: 'Fake tool' } }]);
+      const input = { command: `sleep ${ms / 1000}`, description: 'Fake tool' };
+      assistant(msgId, [{ type: 'tool_use', id: toolId, name: 'Bash', input }]);
+      const permit = await canUseTool('Bash', input, toolId);
+      if (dead) return;
+      if (permit.behavior !== 'allow') {
+        toolResult(toolId, permit.message ?? 'Permission denied', true);
+        seen.push(`Bash refused: ${permit.message ?? ''}`);
+        if (!take()) return;
+        continue;
+      }
       if (steps === 1) {
         emit({
           type: 'rate_limit_event',
@@ -670,7 +815,7 @@ async function runTurn() {
     }
     if (think && !(await pause(t, think))) break;
     steps++;
-    finalText = `ack: ${[...seen, ...answers].join(' | ')}`;
+    finalText = needsTask ? `TASK: ${needsTask}\nIt has to change files, which a quick ask cannot do.` : `ack: ${[...seen, ...answers].join(' | ')}`;
     assistant(`msg_fake_${++seq}`, [{ type: 'text', text: finalText }]);
     if (goal && goalMisses > 0) {
       // The goal hook blocks the stop: its reason goes in as a synthetic message and the model goes on.
@@ -878,6 +1023,7 @@ function onLine(line) {
     queue.push({ uuid: msg.uuid ?? randomUUID(), content, text: textOf(content) });
     startTurn();
   } else if (msg.type === 'control_request') onControl(msg);
+  else if (msg.type === 'control_response') onPermit(msg);
 }
 
 // ---------- Omni's claude.ai Artifacts listing ----------

@@ -22,6 +22,8 @@ export interface NeedsYouBlocker {
   kind: 'question' | 'setup' | 'recovered' | 'uncertain' | 'limited' | 'child_failed';
   detail: string | null;
   count: number;
+  /** setup: the thread waits for a sign-in to a connector (`detail` says which and how), not a worktree that failed. */
+  signin?: true;
   /** question and child_failed: the threads under this one that asked or failed, newest first. */
   from?: string[];
   /** child_failed: each failed thread's unread result, in `from`'s order. Opening that thread reads it. */

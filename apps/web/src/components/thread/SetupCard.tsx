@@ -4,7 +4,7 @@ import { api, errorText, type PendingMsg, type Thread } from '../../api.ts';
 import { runSummary, setupPolls, setupSteps, stripRun, useThreadActions } from '../../channel-actions.ts';
 import { isProviderHarness } from '../../worktree-base.ts';
 import { useBranchingFrom } from '../BasePicker.tsx';
-import { Button, ErrorNote, Icon, Loader, StatusDot } from '../ui.tsx';
+import { Button, ErrorNote, Icon, Loader, StatusDot, type IconName } from '../ui.tsx';
 import { RunOutput } from './panel/ActionsTab.tsx';
 
 type Props = { thread: Thread; onRetried: (t: Thread, pending: PendingMsg[]) => void; mobile?: boolean };
@@ -35,6 +35,7 @@ function SetupView({ thread, onRetried, mobile }: Props) {
 
   if (thread.setup === 'preparing') return <Preparing thread={thread} data={data} mobile={mobile} />;
   if (thread.setup === 'failed') return <Failed thread={thread} data={data} onRetried={onRetried} mobile={mobile} />;
+  if (thread.setup === 'signin') return <SignIn thread={thread} onRetried={onRetried} mobile={mobile} />;
   const run = stripRun(data);
   if (!run) return null;
   return (
@@ -72,8 +73,8 @@ function Preparing({ thread, data, mobile }: { thread: Thread; data: ThreadActio
       thread={thread}
       mobile={mobile}
       failed={false}
-      title="Preparing worktree"
-      text="Nothing runs before the agent starts. Your message and files wait below."
+      title={thread.branch ? 'Preparing worktree' : 'Checking sign-ins'}
+      text={thread.branch ? 'Nothing runs before the agent starts. Your message and files wait below.' : 'Omni checks the accounts this job needs before it starts. Your message waits below.'}
       button={
         <Button size="sm" icon="stop" busy={stopping} onClick={() => void stopIt()} className="shrink-0">
           {stopping ? 'Stopping' : 'Stop'}
@@ -81,7 +82,7 @@ function Preparing({ thread, data, mobile }: { thread: Thread; data: ThreadActio
       }
       error={error}
     >
-      <ol aria-label="Steps" className="mt-2.5 space-y-1.5">
+      {thread.branch && <ol aria-label="Steps" className="mt-2.5 space-y-1.5">
         {steps.map((s) => (
           <li key={s.id} aria-current={s.state === 'active' ? 'step' : undefined} className="flex min-w-0 items-baseline gap-2 text-[12.5px] leading-snug">
             <StatusDot status={s.state === 'done' ? 'done' : s.state === 'active' ? 'running' : 'idle'} size={7} className="shrink-0 -translate-y-px" />
@@ -91,7 +92,7 @@ function Preparing({ thread, data, mobile }: { thread: Thread; data: ThreadActio
             </span>
           </li>
         ))}
-      </ol>
+      </ol>}
       {run?.state === 'running' && <RunOutput run={run} className="mt-2.5" height="max-h-44" />}
     </Frame>
   );
@@ -137,10 +138,86 @@ function Failed({ thread, data, onRetried, mobile }: { thread: Thread; data: Thr
   );
 }
 
+/** Text with its web links clickable: a sign-in message names claude.ai's connector page in full. */
+function Linked({ text }: { text: string }) {
+  const parts = text.split(/(https:\/\/[^\s,]+[^\s,.])/);
+  return (
+    <>
+      {parts.map((p, i) =>
+        i % 2 ? (
+          <a key={i} href={p} target="_blank" rel="noreferrer" className="font-medium text-fg underline decoration-line underline-offset-2 hover:decoration-fg-3">
+            {p.replace(/^https:\/\//, '')}
+          </a>
+        ) : (
+          p
+        ),
+      )}
+    </>
+  );
+}
+
+/**
+ * The sign-in check held the thread (apps/server/runner/setup.ts holdForSignIn): an account its brief or role needs is
+ * signed out on this machine, so nothing ran and nothing was spent. Try again checks again; Start anyway skips the
+ * check this once, for a job that does not really need that account.
+ */
+function SignIn({ thread, onRetried, mobile }: { thread: Thread; onRetried: Props['onRetried']; mobile?: boolean }) {
+  const [busy, setBusy] = useState<'again' | 'anyway' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const go = async (which: 'again' | 'anyway') => {
+    setBusy(which);
+    setError(null);
+    try {
+      const res = await api.post<{ thread: Thread; pending: PendingMsg[] }>(
+        `/threads/${encodeURIComponent(thread.id)}/setup/retry`,
+        which === 'anyway' ? { skip_signin: true } : {},
+      );
+      onRetried(res.thread, res.pending);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const buttons = (
+    <div className={`flex shrink-0 gap-1.5 ${mobile ? 'justify-end' : ''}`}>
+      <Button size={mobile ? 'md' : 'sm'} busy={busy === 'anyway'} disabled={!!busy} onClick={() => void go('anyway')}>
+        Start anyway
+      </Button>
+      <Button size={mobile ? 'md' : 'sm'} variant="primary" icon="refresh" busy={busy === 'again'} disabled={!!busy} onClick={() => void go('again')}>
+        Try again
+      </Button>
+    </div>
+  );
+
+  return (
+    <Frame
+      thread={thread}
+      mobile={mobile}
+      failed
+      icon="key"
+      title="Sign in needed"
+      text="This job has not started. Your message is kept and sends once you sign in."
+      button={mobile ? null : buttons}
+      error={error}
+    >
+      {thread.setup_error && (
+        <p className="mt-2 rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12.5px] leading-[1.5] break-words text-fg-2">
+          <Linked text={thread.setup_error} />
+        </p>
+      )}
+      {mobile && <div className="mt-2.5">{buttons}</div>}
+    </Frame>
+  );
+}
+
 function Frame({
   thread,
   mobile,
   failed,
+  icon = 'alert',
   title,
   text,
   button,
@@ -150,6 +227,7 @@ function Frame({
   thread: Thread;
   mobile?: boolean;
   failed: boolean;
+  icon?: IconName;
   title: string;
   text: string;
   button: ReactNode;
@@ -165,7 +243,7 @@ function Frame({
     >
       <div className={`flex items-start gap-3 ${mobile ? 'p-3.5' : 'px-4 py-3'}`}>
         <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full ${failed ? 'bg-needs/12 text-needs' : 'bg-surface-2 text-fg-3'}`}>
-          {failed ? <Icon name="alert" size={15} /> : <Loader size={14} />}
+          {failed ? <Icon name={icon} size={15} /> : <Loader size={14} />}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">

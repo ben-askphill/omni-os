@@ -4,6 +4,8 @@ import type { Thread } from '../../api.ts';
 import { MARK, PHASE, STATUS, markOf, threadGlyph, threadMark, threadPhase, type Glyph, type Mark, type MarkContext, type Phase, type TurnPhase } from '@omni/shared/status.ts';
 import { limitLabel } from '../../limits.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
+import { PLAIN_MARK } from '@omni/shared/display.ts';
+import { technicalNow } from '../../display.ts';
 
 export interface ThreadPill {
   glyph: Glyph;
@@ -26,13 +28,25 @@ export interface ThreadSeen {
   need?: MarkContext['need'];
   /** The pull request on its branch: a finished thread with one open reads Ready for review. */
   pr?: MarkContext['pr'];
+  /** Show technical details: the mark's own label. Off, one of the five plain words. Unset: the switch now. */
+  technical?: boolean;
 }
 
-/** The header's pill. Lost stream first, then a pending question, then what holds it up, then the thread's own state with its limit's time. */
-export function threadPill(
-  thread: Pick<Thread, 'status' | 'delegating' | 'limit_state' | 'limit_resets_at'> & Partial<Pick<Thread, 'goal_objective' | 'goal_status' | 'setup'>>,
-  seen: ThreadSeen = {},
-): ThreadPill {
+type PillThread = Pick<Thread, 'status' | 'delegating' | 'limit_state' | 'limit_resets_at'> & Partial<Pick<Thread, 'goal_objective' | 'goal_status' | 'setup'>>;
+
+/**
+ * The header's pill. Lost stream first, then a pending question, then what holds it up, then the thread's own state
+ * with its limit's time. With Show technical details off it reads one of the five plain words, keeping the limit's time.
+ */
+export function threadPill(thread: PillThread, seen: ThreadSeen = {}): ThreadPill {
+  const pill = ownPill(thread, seen);
+  if (seen.technical ?? technicalNow()) return pill;
+  if (pill.label === 'Reconnecting…' || pill.label === 'Goal') return pill;
+  const word = PLAIN_MARK[pill.mark];
+  return { ...pill, label: pill.label.startsWith('Limited · ') ? `${word} · ${pill.label.slice('Limited · '.length)}` : word };
+}
+
+function ownPill(thread: PillThread, seen: ThreadSeen): ThreadPill {
   if (seen.reconnecting) return { glyph: 'settled', label: 'Reconnecting…', mark: 'stopped' };
   if (seen.asking) return { glyph: 'needs', label: MARK.question.label, mark: 'question' };
   const glyph = threadGlyph(thread);

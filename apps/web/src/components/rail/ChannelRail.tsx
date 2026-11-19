@@ -14,6 +14,7 @@ import { ChannelMark, Icon, Monograms, StatusDot, type IconName } from '../ui.ts
 import { focusFirstItem, MenuGroups, moveFocus, useMenuDismiss, useMenuPlacement, type MenuItem } from '../ContextMenuParts.tsx';
 import { MENU_SURFACE } from '../ui/overlay.tsx';
 import { useScrollFade } from './useScrollFade.ts';
+import { usePRsShown } from '../../display.ts';
 
 /**
  * The channel rail ("D · Ink rail"): 72px of dark chrome, 98px in the macOS desktop app to hold the traffic lights.
@@ -109,9 +110,11 @@ export const MORE_PAGES = [
  * disc, so Tab carries on from the disc.
  */
 function MoreMenu({ selection }: { selection: RailSelection }) {
+  const { channels } = useApp();
+  const pages = useMorePages(channels);
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const current = MORE_PAGES.find((p) => p.kind === selection.kind);
+  const current = pages.find((p) => p.kind === selection.kind);
   const open = () => {
     const r = button.current?.getBoundingClientRect();
     if (r) setAt({ x: r.right + 8, y: r.top });
@@ -127,7 +130,7 @@ function MoreMenu({ selection }: { selection: RailSelection }) {
         ref={button}
         type="button"
         aria-label={label}
-        title="Pull requests, Library and Automations"
+        title={pages.map((p) => p.label).join(', ').replace(/, ([^,]*)$/, ' and $1')}
         aria-haspopup="menu"
         aria-expanded={!!at}
         aria-current={current ? 'page' : undefined}
@@ -141,18 +144,34 @@ function MoreMenu({ selection }: { selection: RailSelection }) {
       >
         <Disc selected={!!current} icon="more" quiet />
       </button>
-      {at && createPortal(<MorePopup at={at} anchor={button} onClose={close} />, document.body)}
+      {at && createPortal(<MorePopup pages={pages} at={at} anchor={button} onClose={close} />, document.body)}
     </>
   );
 }
 
-function MorePopup({ at, anchor, onClose }: { at: { x: number; y: number }; anchor: RefObject<HTMLButtonElement | null>; onClose: (refocus: boolean) => void }) {
+/** The More pages this install shows: Pull requests only with Show technical details on or a channel with a repo. */
+function useMorePages(channels: readonly { repo_path?: string | null }[]) {
+  const prs = usePRsShown(channels);
+  return prs ? MORE_PAGES : MORE_PAGES.filter((p) => p.kind !== 'prs');
+}
+
+function MorePopup({
+  pages,
+  at,
+  anchor,
+  onClose,
+}: {
+  pages: readonly (typeof MORE_PAGES)[number][];
+  at: { x: number; y: number };
+  anchor: RefObject<HTMLButtonElement | null>;
+  onClose: (refocus: boolean) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const pos = useMenuPlacement(ref, at.x, at.y);
   const dismiss = useCallback(() => onClose(ref.current?.contains(document.activeElement) ?? false), [onClose]);
   useMenuDismiss(ref, dismiss, anchor);
   useEffect(() => focusFirstItem(ref), []);
-  const items: MenuItem[] = MORE_PAGES.map((p) => ({
+  const items: MenuItem[] = pages.map((p) => ({
     label: p.label,
     icon: p.icon,
     run: () => (onClose(false), navigate(p.to)),

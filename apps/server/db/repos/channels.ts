@@ -1,4 +1,5 @@
 import { resolveAvatarColor } from '@omni/shared/avatar-color.ts';
+import { installDefault } from '../../access-default.ts';
 import { db, tx } from '../connection.ts';
 import { record } from '../sync.ts';
 
@@ -34,6 +35,10 @@ export interface Channel {
   prompt_fix_checks: string | null;
   /** 1 leaves the channel's threads out of usage scans (usage-scan/asks.ts). */
   scan_opt_out: number;
+  /** What agents here may do without a yes (packages/shared/access.ts): read, ask or full. Null is full access. */
+  access_level: string | null;
+  /** JSON map of MCP server name to level, for connectors that differ from the channel. Null sets none. */
+  connector_access: string | null;
   /** A standalone HTML file the channel's threads follow for the pages they write. Kept out of the API: see publicChannel. */
   design_system: string | null;
   design_system_name: string | null;
@@ -41,12 +46,16 @@ export interface Channel {
   created_at: string;
 }
 
-/** The two system channels every install needs. Raw SQL, so seeding does not queue an outbox row. */
+/**
+ * The two system channels every install needs. Raw SQL, so seeding does not queue an outbox row. Only a new database
+ * gets these names: an install that has them already keeps its own. `inbox` keeps its id (roles, automations and
+ * links name it) and shows as General, so it does not read like the Inbox list.
+ */
 export function seedSystemChannels() {
   db.prepare(
     `INSERT OR IGNORE INTO channels (id, name, kind, use_worktree, notes) VALUES
      ('conductor', 'Conductor', 'system', 0, 'Front agent. Delegates to crew threads in other channels.'),
-     ('inbox', 'Inbox', 'internal', 0, 'Default channel for quick asks, research and ops.')`,
+     ('inbox', 'General', 'internal', 0, 'Quick questions and everyday work that belong to no project.')`,
   ).run();
 }
 
@@ -61,8 +70,9 @@ export const channels = {
     return tx(() => {
       db.prepare(
         `INSERT INTO channels (id, name, kind, repo_path, github_repo, use_worktree, base_dir, store_domain, portal_slug, browser_headless, notes, icon, avatar_bg, avatar_bg_manual,
-           default_harness, default_model, default_effort, worktree_include, worktree_shared, prompt_open_pr, prompt_fix_conflicts, prompt_fix_checks, scan_opt_out)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           default_harness, default_model, default_effort, worktree_include, worktree_shared, prompt_open_pr, prompt_fix_conflicts, prompt_fix_checks, scan_opt_out,
+           access_level, connector_access)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         c.id,
         c.name,
@@ -87,6 +97,8 @@ export const channels = {
         c.prompt_fix_conflicts ?? null,
         c.prompt_fix_checks ?? null,
         c.scan_opt_out ?? 0,
+        c.access_level ?? null,
+        c.connector_access ?? null,
       );
       record('channel', c.id);
       return channels.get(c.id)!;
@@ -98,7 +110,7 @@ export const channels = {
       'name', 'kind', 'repo_path', 'github_repo', 'use_worktree', 'base_dir',
       'store_domain', 'portal_slug', 'browser_headless', 'notes', 'icon', 'avatar_bg', 'avatar_bg_manual', 'design_system', 'design_system_name', 'archived',
       'default_harness', 'default_model', 'default_effort', 'worktree_include', 'worktree_shared',
-      'prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks', 'scan_opt_out',
+      'prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks', 'scan_opt_out', 'access_level', 'connector_access',
     ] as const;
     const keys = allowed.filter((k) => k in patch);
     if (keys.length) {
@@ -123,5 +135,6 @@ export const channels = {
 
 /** The channel as the API sends it: the design system's name and size, never the file, which can be large. */
 export function publicChannel<T extends Channel>({ design_system, ...rest }: T) {
-  return { ...rest, design_system_size: design_system ? Buffer.byteLength(design_system) : 0 };
+  // access_default: what a channel with no access_level runs at on this machine (access-default.ts).
+  return { ...rest, design_system_size: design_system ? Buffer.byteLength(design_system) : 0, access_default: installDefault() };
 }

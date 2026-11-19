@@ -1,9 +1,12 @@
 // createThread, sendMessage, and postMessage. Slash commands are resolved here, then delivered.
 import { randomUUID } from 'node:crypto';
+import { channelAccess, harnessRefusal } from '../access.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
-import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
+import { channels, folders, messageRequests, outbox, reportFollowUps, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource, type ThreadWorkspace } from '../db.ts';
 import { crewForNewThread, listCrew, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
+import { threadDir } from '../config.ts';
+import { quickAskRemoteRefusal } from '@omni/shared/quick-ask.ts';
 import { checkBase } from '../worktree-base.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
 import { prepareTurn, turnBlocked } from '../sync/guard.ts';
@@ -24,7 +27,7 @@ import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
-import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
+import { bindResume, connectorsFor, declareConnectors, retrySetup, saveStart, setUpThread, START_REQUEST, type SetupRetryBy } from './setup.ts';
 import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
@@ -105,6 +108,8 @@ export interface CreateThreadInput {
   task_id?: string | null;
   source?: ThreadSource;
   automation?: string | null;
+  /** Connectors the job reads besides the ones its brief and role name: an automation's `connectors:` (setup.ts). */
+  connectors?: string[];
   /** A sidebar folder of the channel to file the thread in, by id or name. A name no folder has makes one. */
   folder?: string | null;
   /**
@@ -112,6 +117,11 @@ export interface CreateThreadInput {
    * thread's (harness/review.ts), and one on the same family is refused.
    */
   review_of?: string | null;
+  /**
+   * A delegation whose report wakes a delegate-only parent, because it will act on it. Without it, the report shows in
+   * that parent's transcript and starts no turn there (runner/queue.ts showsInPlace).
+   */
+  follow_up?: boolean;
   /** The base a new worktree thread's branch is cut from (worktree-base.ts). None, or a thread with no worktree: the repo's HEAD. */
   base?: BasePick | null;
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
@@ -126,6 +136,11 @@ export interface CreateThreadInput {
    * another machine is made here and sent there with its first prompt; nothing runs here.
    */
   device?: string | null;
+  /**
+   * A quick ask (packages/shared/quick-ask.ts): no charter, worktree, folder or task id, on Claude Code with read-only
+   * tools, out of every list but Recent asks. Role, folder, parent and task id are ignored. It runs here.
+   */
+  quick?: boolean;
 }
 
 /**
@@ -157,7 +172,13 @@ function askedRun(input: CreateThreadInput, role: CrewRole | undefined) {
   return r.run;
 }
 
-async function openThread(input: CreateThreadInput, status: Thread['status'] = 'queued', elsewhere = false) {
+async function openThread(given: CreateThreadInput, status: Thread['status'] = 'queued', elsewhere = false) {
+  // A quick ask has no charter, folder, parent or task id, runs here, and is on Auto unless a run was asked for.
+  const input: CreateThreadInput = given.quick
+    ? { ...given, role: null, folder: null, parent_id: null, task_id: null, review_of: null, base: null, device: null, ...(!given.harness && !given.model && { model: 'auto' }) }
+    : given;
+  // Refused before the catalog, which may not know the harness at all here.
+  if (input.quick && input.harness && isProviderHarness(input.harness)) throw refusal(quickAskRemoteRefusal(providerWhere(input.harness)), 409);
   const role = roleFor(input.role, input.source);
   const asked = askedRun(input, role);
   const channelId = input.channel || role?.channel || 'inbox';
@@ -189,6 +210,11 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const { harness, model } = picked;
   const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));
   if (role?.delegateOnly && isProviderHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
+  // Below full access a harness Omni cannot hold to the level is refused (access.ts, ADR 0015).
+  const unenforced = harnessRefusal(harness, channelAccess(channel, role?.access));
+  if (unenforced) throw refusal(unenforced, 400);
+  // Its tools are taken away on this machine (harness adapters), which Hermes and Cursor Cloud do not run on.
+  if (input.quick && isProviderHarness(harness)) throw refusal(quickAskRemoteRefusal(providerWhere(harness)), 409);
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
 
@@ -196,7 +222,8 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const remote = isProviderHarness(harness);
   // Refused before anything is made, so a ref that names nothing leaves the draft where it was typed.
   const base = await checkBase(channel, input.base, { remote });
-  const wd = await prepareWorkdir(channel, id, { remote });
+  const wd = await prepareWorkdir(channel, id, { remote, quick: input.quick });
+  const workspace: ThreadWorkspace | null = input.quick ? (wd.cwd === threadDir(id) ? 'none' : 'read') : wd.branch ? 'worktree' : null;
   const thread = threads.create({
     id,
     channel_id: channel.id,
@@ -216,17 +243,22 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
     source: input.source ?? 'manual',
     automation: input.automation ?? null,
     folder_id: filedIn?.id ?? null,
-    // A thread for another machine has its worktree made there (handoff.ts take).
-    setup: !elsewhere && needsWorktree(channel, { remote }) ? 'preparing' : null,
+    // A thread for another machine has its worktree made there (handoff.ts take). A new thread whose brief or role
+    // needs a connector checks its sign-in first, as a worktree thread's preparation does (setup.ts).
+    setup: !elsewhere && (needsWorktree(channel, { remote, workspace }) || (status === 'queued' && connectorsFor({ id, harness, role: role?.id ?? null }, input.prompt, input.connectors).length > 0)) ? 'preparing' : null,
+    quick: input.quick ? 1 : 0,
+    workspace,
   });
+  if (input.connectors?.length) declareConnectors(id, input.connectors);
   if (base) threadBasePicks.set(id, base);
+  if (input.follow_up && input.parent_id) reportFollowUps.set(id);
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }
 
 export async function createThread(input: CreateThreadInput): Promise<Thread> {
   // Team members stay with their lead, which runs once with all their replies. A delegated thread may go: its report
   // comes back to the parent (run-on.ts).
-  const route = input.source === 'team' ? null : await runnerPorts().routing.targetFor(input.device);
+  const route = input.source === 'team' || input.quick ? null : await runnerPorts().routing.targetFor(input.device);
   const context = input.context?.length ? input.context : undefined;
   if (route && context) throw refusal(`A first message with attachments from Omni runs here, not on ${route.to.name}.`, 409);
   if (route) {
@@ -252,7 +284,8 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const saved = await saveUploads(thread.id, input.files ?? []);
   const attachments = saved.length ? saved : undefined;
   if (thread.setup) {
-    // A worktree thread: its prompt and files are saved first, and sent once the worktree is made and checked.
+    // A worktree thread, or one whose connectors are checked first: its prompt and files are saved first, and sent
+    // once the sign-in check passes and the worktree is made and checked.
     saveStart(thread, input.prompt, attachments, context);
     if (!input.title) void generateTitle(thread.id, input.prompt);
     void setUpThread(thread.id);
@@ -554,11 +587,11 @@ function goalSend(thread: Thread, prompt: string, files: number): { stops: boole
  * uncertain one may already have reached the harness, so it goes only when named. Each goes through the runner
  * like a new message, so the harness's concurrency cap holds. Only the Mac that accepted a request resumes it.
  */
-export async function resumeRequests(threadId: string, ids?: string[]): Promise<Thread> {
+export async function resumeRequests(threadId: string, ids?: string[], by: SetupRetryBy = {}): Promise<Thread> {
   const thread = threads.get(threadId);
   if (!thread) throw refusal('thread not found', 404);
   // What waits on a worktree goes once it is made: Resume there is Retry, and while it is made, nothing more.
-  if (thread.setup) return retrySetup(threadId);
+  if (thread.setup) return retrySetup(threadId, by);
   const parked = messageRequests.parked(threadId);
   const chosen = ids ? parked.filter((r) => ids.includes(r.id)) : parked.filter((r) => r.state === 'recovered');
   if (ids && chosen.length !== new Set(ids).size) throw refusal('Some of these messages are no longer waiting to be resumed.', 409);

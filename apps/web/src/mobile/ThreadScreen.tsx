@@ -1,4 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
+import { glyphLabel, showsCode } from '@omni/shared/display.ts';
+import { useDisplay } from '../display.ts';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
 import { CrewQuestions } from '../components/thread/CrewQuestions.tsx';
@@ -22,6 +24,7 @@ import { plural } from '../format.ts';
 import { reasonOf } from '../needs-you.ts';
 import { href, type ThreadView } from '../router.ts';
 import { useApp, useHereName, useNow } from '../store.tsx';
+import { useThreadAccount } from '../accounts.ts';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsCardView } from './NeedsCard.tsx';
@@ -37,7 +40,7 @@ import { crewLine, prLine, prOffered, stepPrompts, stepUnderway } from '@omni/sh
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
-import { STATUS, asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
+import { asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
@@ -47,8 +50,11 @@ export function ThreadScreen() {
   const { thread, parent, children, events, history, revealTarget, clearReveal, files, shots, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover, init, warm, crew: crewArtifacts } = s;
   const { needsYou, channel, crew: roles } = useApp();
   const hereName = useHereName();
+  // The account its harness runs as, after the harness in the header's line.
+  const ran = useThreadAccount(thread?.id);
   // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
   const [quick, setQuick] = useState(false);
+  const display = useDisplay();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
   const [machineSheet, setMachineSheet] = useState(false);
@@ -93,6 +99,8 @@ export function ThreadScreen() {
   }
 
   const ch = channel(thread.channel_id);
+  // Show technical details, or a channel with a repo: PR and change chips, branch and session in the quick card.
+  const code = showsCode(display, ch);
   const conductor = thread.channel_id === 'conductor' || thread.role === 'conductor';
   const crew = children.filter((c) => c.source !== 'team');
   const item = needsYou?.items.find((i) => i.thread.id === thread.id);
@@ -116,23 +124,26 @@ export function ThreadScreen() {
   const openChip: ComposerChip = { label: 'Open PR', icon: 'pr', onClick: () => void openPR() };
   // The agent just asked whether to open a PR: answering yes sits next to the Machine chip.
   const offered = prOffered(events, !slotBusy && !queued.length, pr?.pr);
-  if (offered) chips.push(openChip);
+  if (code && offered) chips.push(openChip);
   if (report) chips.push({ label: 'Open report', icon: 'file', onClick: () => viewer(report) });
-  if (pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
-  else if (changes?.files.length) {
+  // Outside a code project with the switch off: no PR or change chips.
+  if (code && pr?.pr) chips.push({ label: `Review #${pr.pr.number}`, icon: 'pr', diff: [pr.pr.additions, pr.pr.deletions], onClick: () => shell.open(href.threadView(thread.id, 'pr')) });
+  else if (code && changes?.files.length) {
     chips.push({ label: slotBusy ? 'Changes so far' : 'Review changes', icon: 'diff', diff: [changes.add, changes.del], onClick: () => shell.open(href.threadView(thread.id, 'changes')) });
     if (!slotBusy && !offered) chips.push(openChip);
   }
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
 
-  const sub = conductor ? `Conductor · ${plural(crew.length, 'crew thread')}` : [`#${ch?.name ?? thread.channel_id}`, crewRoleName(thread.role, roles), harnessLabel(thread.harness)].filter(Boolean).join(' · ');
+  const sub = conductor
+    ? `Conductor · ${plural(crew.length, 'crew thread')}`
+    : [`#${ch?.name ?? thread.channel_id}`, crewRoleName(thread.role, roles), ran ? `${harnessLabel(thread.harness)} as ${ran.label}` : harnessLabel(thread.harness)].filter(Boolean).join(' · ');
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
   const reconnecting = !s.live && ready;
   const own = threadPill(thread, { asking: view.asking, reconnecting, now, turn, need: item, pr: pr?.pr });
-  const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: STATUS[needs].label, mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
+  const pill = needs && own.glyph !== needs && !reconnecting && !view.asking ? { glyph: needs, label: glyphLabel(needs, display.technical), mark: needs === 'needs' ? ('crew_question' as const) : markOf(needs) } : own;
   const conductorChannel = conductor ? channel(CONDUCTOR_CHANNEL) : undefined;
   const ctx: TurnCtx = { thread, view, history, conductor, conductorChannel, crew, ch, changes, pr, now, shell, status, turn };
 
@@ -175,18 +186,20 @@ export function ThreadScreen() {
         right={
           <>
             <StatusPill mark={pill.mark} label={pill.label} />
-            <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
+            {/* The quick card lists the branch, worktree and PRs: only in a code project, or with Show technical details. */}
+            {code && <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />}
             <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
           </>
         }
       />
       <div className="relative min-h-0 flex-1">
-        {quick && (
+        {quick && code && (
           <>
             <button type="button" aria-label="Close quick actions" tabIndex={-1} className="absolute inset-0 z-10 cursor-default" onClick={() => setQuick(false)} />
             <div className="pop-in absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)]">
               <ThreadQuickCard
                 thread={thread}
+                code={code}
                 init={init}
                 warm={warm}
                 slotBusy={slotBusy}
@@ -246,7 +259,7 @@ export function ThreadScreen() {
                   setQueued(pending);
                 }}
               />
-              {/* A question's card above is where Ben answers it, and the setup card is where he retries setup. */}
+              {/* A question's card above is where the user answers it, and the setup card is where they retry setup. */}
               {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} onRecovered={(r) => {
                     applyThread(r.thread, true);
                     setQueued(r.pending);
@@ -282,6 +295,7 @@ export function ThreadScreen() {
       {menu && (
         <MenuSheet
           thread={thread}
+          code={code}
           pr={pr?.pr ? { label: `PR #${pr.pr.number}`, line: prLine(pr.pr).text } : pr?.crew.length ? { label: 'PRs from delegated threads', line: crewLine(pr.crew).text } : null}
           changes={changes?.files.length ? `${plural(changes.files.length, 'file')} · +${changes.add} −${changes.del}` : null}
           onClose={() => setMenu(false)}

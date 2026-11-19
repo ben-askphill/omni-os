@@ -10,7 +10,7 @@
 #   scripts/qa-stack.sh logs            tail the server and vite logs
 #
 # QA_SERVER_PORT (default 4757) and QA_WEB_PORT (default 4768) move the ports, QA_DIR the state dir
-# (default $TMPDIR/omni-qa-<server port>). QA_NO_WEB=1 starts no vite, for a client that only needs the API
+# (default $TMPDIR/omni-qa-<server port>, mode 0700; a link, another user's dir or one others can write is refused). QA_NO_WEB=1 starts no vite, for a client that only needs the API
 # (scripts/qa-handoff-stack.sh runs two servers that way). QA_CLAUDE_BIN, QA_CODEX_BIN and QA_CURSOR_BIN swap a fake CLI for a real one
 # (a live turn spends that plan). QA_SUGGESTIONS=1 turns on the Haiku sidecars (reply suggestion, follow-up thread, open items), answered by the fake CLI. QA_BROWSER=1 turns the channel browser on, so a thread's Browser tab launches a real
 # headless Chrome on the stack's own profile dir. Otherwise threads run on fake-claude, so a prompt with directives such as
@@ -20,6 +20,8 @@
 # The update check is off and no supervisor restarts the server, whatever the calling shell says (an agent's shell
 # carries the live server's OMNI_SUPERVISOR). QA_UPDATE_CHECK=1 turns the check on; QA_SUPERVISOR=qa lets Update run,
 # and then the server exits after it with nothing to start it again.
+# Channels with no access level run at full access, as before levels; QA_ACCESS_DEFAULT=ask (or read) runs the stack as a
+# fresh install does (apps/server/access-default.ts).
 # The stack has its own API token in its data dir: curl it with -H "Authorization: Bearer $(cat <data>/data/api-token)",
 # and open the printed web URLs, which pair the browser.
 set -euo pipefail
@@ -47,10 +49,24 @@ api() { local p="$1"; shift; curl -fsS -H "Authorization: Bearer $(tok)" "$@" "$
 cwd_of() { if command -v lsof >/dev/null; then lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; else readlink "/proc/$1/cwd" 2>/dev/null; fi; }
 
 [ "$SERVER_PORT" != 4747 ] || die "refusing port 4747, that is the live server"
+# The state dir holds the PID files, the logs, the API token and bin/, which goes first on the server's PATH, and by
+# default it sits in a shared temp dir. Before a command reads anything there, scripts/qa-private-dir.mjs checks it
+# is this user's alone, in folders no one else can swap it out of, and DIR becomes the real path it checked. It returns
+# 1 when the dir does not exist (--create, which up runs first, makes it with mode 0700), and exits on anything unsafe.
+private_dir() {
+  local rc=0 path
+  path="$(node "$ROOT/scripts/qa-private-dir.mjs" "$@" "$DIR")" || rc=$?
+  [ "$rc" = 0 ] || [ "$rc" = 3 ] || exit 1
+  [ -n "$path" ] || { echo "qa state dir: the check printed no path for $DIR" >&2; exit 1; }
+  DIR="$path"
+  [ "$rc" = 0 ]
+}
 
 up() {
   local seed=3
   [ "${1:-}" = "--seed" ] && seed="${2:?--seed needs a number}"
+  # Made and checked before anything in it is read, so a dir someone else made in the meantime is refused.
+  private_dir --create || die "could not make $DIR"
   alive server && { echo "already up"; status; return; }
   # No automations dir: Omni ships none, so the stack lists none, as a fresh install does.
   mkdir -p "$DIR/data" "$DIR/brain"
@@ -78,7 +94,7 @@ SH
   # OMNI_TOKEN cleared: an agent's shell carries the live server's, and this stack makes its own.
   OMNI_TOKEN= OMNI_PORT="$SERVER_PORT" OMNI_DATA_DIR="$DIR/data" OMNI_BRAIN_DIR="$DIR/brain" \
     OMNI_CLAUDE_BIN="${QA_CLAUDE_BIN:-$fx/fake-claude.mjs}" OMNI_CODEX_BIN="${QA_CODEX_BIN:-$fx/fake-codex.mjs}" OMNI_CURSOR_BIN="${QA_CURSOR_BIN:-$fx/fake-cursor.mjs}" \
-    OMNI_BROWSER="${QA_BROWSER:-0}" OMNI_SUGGESTIONS="${QA_SUGGESTIONS:-0}" OMNI_UPDATE_CHECK="${QA_UPDATE_CHECK:-0}" OMNI_SUPERVISOR="${QA_SUPERVISOR:-}" OMNI_CAFFEINATE=0 OMNI_CLAUDE_LOGIN_SYNC=0 OMNI_HERMES_URL= \
+    OMNI_BROWSER="${QA_BROWSER:-0}" OMNI_SUGGESTIONS="${QA_SUGGESTIONS:-0}" OMNI_UPDATE_CHECK="${QA_UPDATE_CHECK:-0}" OMNI_SUPERVISOR="${QA_SUPERVISOR:-}" OMNI_CAFFEINATE=0 OMNI_CLAUDE_LOGIN_SYNC=0 OMNI_ACCESS_DEFAULT="${QA_ACCESS_DEFAULT:-full}" OMNI_HERMES_URL= \
     OMNI_CURSOR_API_URL="$cursor_api" OMNI_CURSOR_CLOUD_POLL_MS=1500 PATH="$DIR/bin:$PATH" \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     detach npx tsx apps/server/index.ts >"$DIR/server.log" 2>&1 &
@@ -153,8 +169,10 @@ case "${1:-}" in
   down)
     # Without a port, down would pick the default stack, which may be another thread's.
     [ -n "${QA_SERVER_PORT:-}" ] || { echo "qa-stack: down needs QA_SERVER_PORT, the port you started the stack on" >&2; exit 2; }
+    # A dir that is not there has nothing to stop, and one made after the check is never read.
+    private_dir || { echo "down, nothing at $DIR"; exit 0; }
     down ;;
-  status) status ;;
-  logs) tail -n 50 -f "$DIR/server.log" "$DIR/web.log" ;;
+  status) private_dir || { echo "no stack at $DIR"; exit 0; }; status ;;
+  logs) private_dir || die "no stack at $DIR"; tail -n 50 -f "$DIR/server.log" "$DIR/web.log" ;;
   *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

@@ -6,7 +6,7 @@
 // machine, and the /connect page that signs in once and opens any of them.
 import { conditionalPut, conditionOf, KeyLock } from './objects.ts';
 import { DurableObject } from 'cloudflare:workers';
-import { allowedUsers, CLIENT_PREFIX, newToken, RelayError, tokenUser, verifyIdToken, type ClerkTrust } from './auth.ts';
+import { allowedUsers, CLIENT_PREFIX, newToken, RelayError, sha256, tokenUser, verifyIdToken, type ClerkTrust } from './auth.ts';
 import { CloudflareApi } from './cloudflare.ts';
 import { CLIENT_DAYS, ConnectStore, notConfigured } from './connect.ts';
 import { connectPage, errorPage, PAGE_HEADERS } from './page.ts';
@@ -345,7 +345,10 @@ export class Relay extends DurableObject<Env> {
         return new Response(null, { status: 101, webSocket: client, headers: { 'sec-websocket-protocol': 'omni-relay' } });
       }
 
-      if (path === '/v1/connect/machine' && req.method === 'PUT') return json(await this.connectFor(user).register(await req.json().catch(() => null), tokenId));
+      if (path === '/v1/connect/machine' && req.method === 'PUT') {
+        const caller = { tokenId, tokenHash: await sha256(req.headers.get('x-omni-token') ?? ''), machine: store.tokenMachine(tokenId) };
+        return json(await this.connectFor(user).register(await req.json().catch(() => null), caller));
+      }
       if (path === '/v1/connect/machine' && req.method === 'DELETE') {
         await this.connectFor(user).remove(url.searchParams.get('machine') ?? '', tokenId);
         return json({ ok: true });

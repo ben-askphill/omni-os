@@ -6,6 +6,7 @@ import { Icon } from '../../ui/Icon';
 
 import { chipHeight, chipSlop, fontSize, radius, space, useOmniTheme, weight } from '../../theme';
 import { nextTurnLabel, runChipLabel, type RunThread } from '../../thread/run-model';
+import { useTechnical } from '../../live/react';
 
 interface RunChipProps {
   thread: RunThread;
@@ -20,7 +21,8 @@ interface RunChipProps {
  */
 export function ModelButton({ thread, harnesses, onPress }: RunChipProps) {
   const { colors } = useOmniTheme();
-  const label = runChipLabel(thread, harnesses);
+  const technical = useTechnical();
+  const label = runChipLabel(thread, harnesses, technical);
   return (
     <Pressable
       accessibilityRole="button"

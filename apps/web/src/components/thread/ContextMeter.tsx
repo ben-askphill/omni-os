@@ -82,13 +82,27 @@ const SOURCE_NOTE: Record<ContextUsage['source'], string> = {
 };
 
 /** The thread's billed cost for the hover, once Cursor has reported it. */
+/** How full the window is, in percent, before a quiet ring shows: it matters only near the limit. */
+const QUIET_FROM = 70;
+
 const costTip = (s: ThreadSpend | null | undefined) => (s?.cents != null ? ` Cost so far: ${formatCents(s.cents)}.` : '');
 
 /**
  * The context meter next to the send button: a ring that fills as the thread's window does, with used,
  * window and percent on hover. Clicking it opens what fills the window and a Compact action.
  */
-export function ContextMeter({ thread, pushed, onCompacted }: { thread: Thread; pushed: ContextUsage | null; onCompacted?: (t: Thread) => void }) {
+export function ContextMeter({
+  thread,
+  pushed,
+  onCompacted,
+  quiet = false,
+}: {
+  thread: Thread;
+  pushed: ContextUsage | null;
+  onCompacted?: (t: Thread) => void;
+  /** Show technical details is off outside a repo channel: the ring shows only once the window is filling (QUIET_FROM). */
+  quiet?: boolean;
+}) {
   const [view, setView] = useState<ContextView | null>(null);
   const [open, setOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -120,6 +134,7 @@ export function ContextMeter({ thread, pushed, onCompacted }: { thread: Thread; 
   if (!metered) return null;
   const context = newest(view?.context, pushed);
   const percent = context ? contextPercent(context.used, context.max) : null;
+  if (quiet && (percent == null || percent < QUIET_FROM)) return null;
   const level = contextLevel(percent);
   const approx = contextApprox(context) ? '~' : '';
   const tip = context ? `Context: ${contextSummary(context)}.${costTip(context.spend)} Click for details.` : 'Context: no reading yet. Click for details.';

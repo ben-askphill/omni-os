@@ -31,6 +31,12 @@ export interface Channel {
   prompt_fix_checks?: string | null;
   design_system_name: string | null;
   design_system_size: number;
+  /** What agents may do without a yes (@omni/shared/access.ts), null while the channel runs at the machine's default. Missing from an older server. */
+  access_level?: string | null;
+  /** The connectors' own levels, as stored JSON. */
+  connector_access?: string | null;
+  /** What a channel with no access_level runs at on the machine that answered. */
+  access_default?: string;
   archived: number;
   created_at: string;
 }

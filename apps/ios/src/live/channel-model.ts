@@ -1,5 +1,5 @@
 import type { ChannelWithRunning, NeedsYou, ThreadStub } from '@omni/client-core';
-import { statusLabel } from '@omni/shared/status.ts';
+import { statusWord } from '@omni/shared/display.ts';
 
 type ConductorHandoff = NonNullable<ChannelWithRunning['handoffs']>[number];
 
@@ -93,13 +93,14 @@ export function shortAgo(iso: string, now: number): string {
   return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-export function threadRow(t: ThreadStub, now: number): ThreadRow {
+/** `technical`: Show technical details. Off, the status reads as one of five plain words (Working, Needs you, ...). */
+export function threadRow(t: ThreadStub, now: number, technical = true): ThreadRow {
   return {
     id: t.id,
     title: t.title || 'Untitled',
     status: t.status,
     busy: t.status === 'running' || t.status === 'queued',
-    statusLabel: t.status === 'done' || t.status === 'imported' ? null : statusLabel(t.status),
+    statusLabel: t.status === 'done' || t.status === 'imported' ? null : statusWord(t.status, technical),
     ago: shortAgo(t.updated_at ?? t.created_at, now),
     pinned: !!t.pinned_at,
     target: targetOfStub(t),
@@ -156,6 +157,7 @@ export function channelThreads(
   now: number,
   channelName: (id: string) => string = (id) => id,
   threads?: readonly ThreadStub[],
+  technical = true,
 ): ChannelThreads {
   const handoffs = (channel.id === 'conductor' ? channel.handoffs ?? [] : []).filter((g) => g.children.length > 0);
   const groups = new Map(handoffs.map((g) => [g.parent.id, handoffGroup(g, channelName)]));
@@ -168,7 +170,7 @@ export function channelThreads(
     });
   const rowOf = (t: ThreadStub): ThreadRow => {
     const handoff = groups.get(t.id);
-    return handoff ? { ...threadRow(t, now), handoff } : threadRow(t, now);
+    return handoff ? { ...threadRow(t, now, technical), handoff } : threadRow(t, now, technical);
   };
 
   // A folder this channel no longer has, say one just deleted, leaves its threads ungrouped rather than hidden.

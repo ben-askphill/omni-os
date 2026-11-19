@@ -6,13 +6,16 @@ import { pickerOptions } from '../components/composer/pickerOptions.tsx';
 import { Button, Icon, Loader, Picker } from '../components/ui.tsx';
 import { KbdFooter } from '../components/ui/overlay.tsx';
 import { StaticMark } from '../components/brand.tsx';
+import { QuickAnswer } from '../components/QuickAnswer.tsx';
 import { href } from '../router.ts';
 import {
   canSend,
   CONDUCTOR,
   dictationSettled,
+  quickPromptAsk,
   quickPromptHints,
   quickPromptKey,
+  type QuickPromptKey,
   quickPromptThread,
   reopened,
   sentLabel,
@@ -21,7 +24,8 @@ import {
 
 // The desktop app's Quick Prompt panel (#/quick-prompt), in a frameless, transparent window that floats over other
 // apps (apps/desktop/src/quick-prompt.ts): where the prompt goes, the field, and a line that says what is happening.
-// Return starts a thread without bringing Omni forward; Cmd-Return opens it.
+// Return asks: the answer comes in the panel, with a follow-up box (components/QuickAnswer.tsx). Shift-Return starts a
+// task thread without bringing Omni forward; Cmd-Return starts it and opens it. Recent asks sit under the field.
 
 const SENT_LINGER_MS = 1400;
 const MENU_SHADOW = 16;
@@ -34,6 +38,7 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
   const [listening, setListeningState] = useState(false);
   const [wispr, setWispr] = useState(false);
   const [channels, setChannels] = useState<ChannelWithRunning[]>([]);
+  const [asks, setAsks] = useState<Thread[]>([]);
   const root = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   // Read from timers and bridge events, which outlive a render.
@@ -77,6 +82,10 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
     api
       .get<ChannelWithRunning[]>('/channels')
       .then(setChannels)
+      .catch(() => {});
+    api
+      .get<Thread[]>('/threads/asks')
+      .then(setAsks)
       .catch(() => {});
     const [settings, status] = await Promise.all([bridge.settings.get(), bridge.quickPrompt.status()]);
     setWispr(status.wispr);
@@ -178,11 +187,13 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
       tick();
     });
 
-  const submit = async (open: boolean) => {
+  const submit = async (key: QuickPromptKey) => {
     if (live.current.listening) {
       setListening(false);
       if (!(await awaitDictation())) return;
     }
+    if (key === 'ask') return ask();
+    const open = key === 'task-open';
     const body = quickPromptThread(live.current.text, live.current.channel);
     if (!body || !canSend(live.current.text, live.current.phase)) return;
     setPhase({ kind: 'sending' });
@@ -197,12 +208,26 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
     }
   };
 
+  /** A quick ask: answered right here, and kept under Recent asks. */
+  const ask = async () => {
+    const body = quickPromptAsk(live.current.text, live.current.channel);
+    if (!body || !canSend(live.current.text, live.current.phase)) return;
+    setPhase({ kind: 'sending' });
+    try {
+      const thread = await api.post<Thread>('/threads', body);
+      setText('');
+      setPhase({ kind: 'answering', id: thread.id });
+    } catch (err) {
+      setPhase({ kind: 'failed', message: errorText(err) });
+    }
+  };
+
   const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     const { key, metaKey, ctrlKey, shiftKey, altKey, keyCode } = e;
     const action = quickPromptKey({ key, metaKey, ctrlKey, shiftKey, altKey, keyCode, isComposing: e.nativeEvent.isComposing });
     if (!action) return;
     e.preventDefault();
-    void submit(action === 'send-open');
+    void submit(action);
   };
 
   const listed = channels.filter((c) => !c.archived);
@@ -233,6 +258,10 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
               </button>
             )}
           </div>
+          {phase.kind === 'answering' ? (
+            <QuickAnswer key={phase.id} id={phase.id} onOpen={(id) => done(href.thread(id))} />
+          ) : (
+          <>
           <textarea
             ref={field}
             value={text}
@@ -241,13 +270,31 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
             rows={1}
             autoFocus
             aria-label="Prompt"
-            placeholder={channel === CONDUCTOR ? 'Ask the Conductor anything' : 'Describe the task'}
+            placeholder="Ask anything, or describe a task"
             className="block w-full resize-none bg-transparent text-[length:var(--fs-input)] leading-[1.5] text-fg outline-none placeholder:text-fg-4"
           />
           <StatusLine phase={phase} listening={listening} onOpen={(id) => done(href.thread(id))} />
+          {phase.kind === 'editing' && !text && asks.length > 0 && <RecentAsks asks={asks} onPick={(id) => setPhase({ kind: 'answering', id })} />}
+          </>
+          )}
         </div>
         <KbdFooter className="!flex px-[18px]" hints={quickPromptHints(mac)} />
       </div>
+    </div>
+  );
+}
+
+/** The last few quick asks, newest first: one opens its answer in the panel. */
+function RecentAsks({ asks, onPick }: { asks: Thread[]; onPick: (id: string) => void }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="pb-1 text-[11.5px] font-medium text-fg-3">Recent asks</div>
+      {asks.slice(0, 4).map((t) => (
+        <button key={t.id} type="button" onClick={() => onPick(t.id)} className="hov press -mx-2 flex min-w-0 items-center gap-2 rounded-[var(--r-lg)] px-2 py-1 text-left text-[13px] text-fg-2 hover:text-fg">
+          <Icon name="message" size={13} className="shrink-0 text-fg-3" />
+          <span className="min-w-0 truncate">{t.title || 'Untitled'}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -261,7 +308,7 @@ function StatusLine({ phase, listening, onOpen }: { phase: QuickPromptPhase; lis
           <Icon name="mic" size={13} className="text-needs" />
           <span>Listening. Speak, then press Return to send.</span>
         </>
-      ) : phase.kind === 'editing' ? null : phase.kind === 'finishing' ? (
+      ) : phase.kind === 'editing' || phase.kind === 'answering' ? null : phase.kind === 'finishing' ? (
         <>
           <Loader size={13} />
           <span>Waiting for Wispr Flow…</span>

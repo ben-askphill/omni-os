@@ -88,6 +88,13 @@ fn server_check(p: &Probe, conn: &Connection) -> Check {
 
 fn token_check(conn: &Connection, p: &Probe) -> Check {
     let place = describe_source(&conn.token_source);
+    if conn.token_stays_here() {
+        return check(
+            "token",
+            Level::Fail,
+            format!("{place} is this machine's own, so it is not sent to {}. Put that machine's token in OMNI_TOKEN.", conn.base_url),
+        );
+    }
     match &conn.token_source {
         TokenSource::None => return check("token", Level::Fail, format!("none found. {place}.")),
         TokenSource::File { path, .. } => {
@@ -371,6 +378,22 @@ pub fn doctor_command(argv: &[String]) -> Result<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn says_this_machine_token_is_not_sent_to_another_machine() {
+        let vars = |name: &str| match name {
+            "OMNI_URL" => Some("https://omni.example.test".to_string()),
+            "OMNI_INSTALL_DATA_DIR" => Some("/nowhere/data".to_string()),
+            _ => None,
+        };
+        let conn = Connection::from_vars(vars).expect("a connection");
+        let got = token_check(&conn, &Probe::Omni { mine: None });
+        assert_eq!(got.level, Level::Fail);
+        assert_eq!(
+            got.detail,
+            "/nowhere/data/api-token (the install) is this machine's own, so it is not sent to https://omni.example.test. Put that machine's token in OMNI_TOKEN."
+        );
+    }
 
     fn ran(code: Option<i32>, stdout: &str, stderr: &str) -> RunResult {
         RunResult { code, stdout: stdout.to_string(), stderr: stderr.to_string(), missing: false }

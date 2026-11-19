@@ -6,6 +6,7 @@ import {
   attemptFor,
   createFailure,
   createRequest,
+  quickRequest,
   draftChipLabel,
   draftSheetModel,
   newThreadId,
@@ -75,6 +76,12 @@ describe('the request', () => {
 
   it('starts a Conductor thread as the Conductor role', () => {
     expect(createRequest(inputs())).toMatchObject({ channel: 'conductor', prompt: 'Fix the build', role: 'conductor' });
+  });
+
+  it('asks a quick ask with no role or machine, in the channel it was asked in', () => {
+    expect(quickRequest(inputs())).toEqual({ channel: 'conductor', prompt: 'Fix the build', quick: true });
+    expect(quickRequest(inputs({ target: 'acme', runOn: { pick: 'mac-b', devices: [device()] } as DraftInputs['runOn'] }))).toEqual({ channel: 'acme', prompt: 'Fix the build', quick: true });
+    expect(quickRequest(inputs({ text: ' ' }))).toBeNull();
   });
 
   it('leaves the role out when the server has no such role', () => {

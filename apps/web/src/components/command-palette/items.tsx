@@ -6,6 +6,7 @@ import { desktop } from '../../desktop.ts';
 import { href, navigate, startNewThread, type Route } from '../../router.ts';
 import { setTheme } from '../theme.tsx';
 import { Avatar, Icon, StatusDot, type IconName } from '../ui.tsx';
+import { prsShown, readDisplay } from '../../display.ts';
 
 export interface Item {
   id: string;
@@ -61,7 +62,7 @@ export function paletteItems(q: string, channels: ChannelWithRunning[], recent: 
     { id: 'p:home', group: 'Go to', label: 'Overview', sub: 'Counts, machines and usage', lead: lead('home'), run: () => go(href.home()) },
     { id: 'p:artifacts', group: 'Go to', label: 'Artifacts', lead: lead('layers'), run: () => go(href.artifacts()) },
     { id: 'p:claude-artifacts', group: 'Go to', label: 'claude.ai artifacts', sub: 'Your Artifacts on claude.ai', lead: lead('globe'), run: () => go(href.claudeArtifacts()) },
-    { id: 'p:prs', group: 'Go to', label: 'Pull requests', lead: lead('pr'), run: () => go(href.pullRequests()) },
+    ...(prsShown(readDisplay(), channels) ? [{ id: 'p:prs', group: 'Go to', label: 'Pull requests', lead: lead('pr'), run: () => go(href.pullRequests()) } satisfies Item] : []),
     { id: 'p:automations', group: 'Go to', label: 'Automations', lead: lead('zap'), run: () => go(href.automations()) },
     { id: 'p:settings', group: 'Go to', label: 'Settings', sub: 'General: you and setup', lead: lead('sliders'), run: () => go(href.settingsPage()) },
     // Every other Settings section by name, as the Settings nav lists them.
@@ -78,7 +79,7 @@ export function paletteItems(q: string, channels: ChannelWithRunning[], recent: 
       id: `c:${c.id}`,
       group: 'Channels',
       label: c.id === 'conductor' ? 'Conductor' : `#${c.name}`,
-      sub: c.store_domain ?? c.github_repo ?? undefined,
+      sub: (readDisplay().shopify ? c.store_domain : null) ?? c.github_repo ?? undefined,
       lead: <Avatar name={c.name} channelIcon={c.icon} avatarBg={c.avatar_bg} omni={c.id === 'conductor'} size={28} />,
       right: c.running ? <span className="font-num text-[11px] text-live-text">{c.running} running</span> : undefined,
       run: () => go(href.channel(c.id)),

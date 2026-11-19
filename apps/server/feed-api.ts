@@ -7,6 +7,7 @@ import { config } from './config.ts';
 import { diskView, refreshDisk } from './disk-space.ts';
 import { completions, needsYou, resultReads, search, threads, type Thread } from './db.ts';
 import { allWithDelegating, withDelegating } from './delegating.ts';
+import { stepField } from './step-line.ts';
 import { handoffView } from './handoff/records.ts';
 import { grokBotConfigured } from './grokbot.ts';
 import { fromThisMac } from './request-guard.ts';
@@ -90,7 +91,11 @@ feedApi.get('/search', (c) => c.json(search(c.req.query('q') ?? '')));
  * Needs you: unread results and blockers across every thread that is not archived, newest first. `channel` keeps
  * one channel's, `thread` one thread's.
  */
-feedApi.get('/needs-you', (c) => c.json(needsYou(c.req.query('channel') || undefined, c.req.query('thread') || undefined)));
+// A running thread carries the step it is on (step-line.ts), which a question's notification names.
+feedApi.get('/needs-you', (c) => {
+  const list = needsYou(c.req.query('channel') || undefined, c.req.query('thread') || undefined);
+  return c.json({ ...list, items: list.items.map((i) => ({ ...i, thread: { ...i.thread, ...stepField(i.thread) } })) });
+});
 
 /**
  * Ben saw a result: `{ uid }`, the result's uid as Needs you sent it. Only that result and older ones count as read,

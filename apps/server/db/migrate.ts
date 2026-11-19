@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS sync_deferred (
 -- Messages accepted through the API (db/repos/requests.ts), saved before the client hears so. Local, not synced.
 CREATE TABLE IF NOT EXISTS message_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
-  -- Queue order, seq until Ben reorders.
+  -- Queue order, seq until the user reorders.
   pos INTEGER,
   id TEXT NOT NULL UNIQUE,
   thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS completions (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS completions_thread ON completions(thread_id, seq);
--- The newest result Ben has seen per thread, by its (n, uid): read state, kept apart from the thread row so reading
+-- The newest result the user has seen per thread, by its (n, uid): read state, kept apart from the thread row so reading
 -- never moves updated_at, status or its folder. Only ever moves forward, here and when the other Mac's arrives.
 CREATE TABLE IF NOT EXISTS result_reads (
   thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS thread_bases (
 
 -- A saved before/after snapshot of a worktree thread's checkout for each turn (server/turns.ts), so the turn's diff
 -- stays readable after later edits and restarts. The snapshots are commits under hidden refs named by the turn's id
--- (refs/omni/turns/<thread>/<id>/before and /after), never on Ben's branch or index. completion_uid is the Result the
+-- (refs/omni/turns/<thread>/<id>/before and /after), never on the user's branch or index. completion_uid is the Result the
 -- turn ended with, when it left one. Local, not synced: the refs live in this Mac's repo.
 CREATE TABLE IF NOT EXISTS turn_snapshots (
   id TEXT PRIMARY KEY,
@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS pr_watches (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS pr_watches_due ON pr_watches(next_poll_at) WHERE state = 'watching';
--- Ben's claude.ai Artifacts as the claude CLI lists them (claude-artifacts.ts): a cache of the last good listing, keyed
+-- The user's claude.ai Artifacts as the claude CLI lists them (claude-artifacts.ts): a cache of the last good listing, keyed
 -- by the page's uuid. Machine-local, not synced: each Mac lists the same account itself. gone_at hides a page a
 -- complete listing no longer had. The meta table holds the run state and the schedule.
 CREATE TABLE IF NOT EXISTS claude_artifacts (
@@ -355,6 +355,10 @@ export function migrate() {
   for (const col of ['prompt_open_pr', 'prompt_fix_conflicts', 'prompt_fix_checks']) ensureColumn('channels', col, 'TEXT');
   // 1 keeps the channel's threads out of usage scans (usage-scan/asks.ts): a client channel with data that should not reach a model.
   ensureColumn('channels', 'scan_opt_out', 'INTEGER NOT NULL DEFAULT 0');
+  // What the channel's agents may do without a yes, and its connectors' own levels (apps/server/access.ts, ADR 0015).
+  // Null is full access, so every channel made before levels runs as it did.
+  ensureColumn('channels', 'access_level', 'TEXT');
+  ensureColumn('channels', 'connector_access', 'TEXT');
   // The claude.ai page an artifact was published as (packages/shared/published.ts), and what the publish said it was.
   ensureColumn('artifacts', 'url', 'TEXT');
   ensureColumn('artifacts', 'description', 'TEXT');
@@ -419,6 +423,11 @@ export function migrate() {
       SELECT 'completion', uid, 'upsert', created_at FROM completions
       WHERE seq = last_insert_rowid() AND EXISTS (SELECT 1 FROM kv WHERE key = 'sync.machine_id');
     END`);
+  // Delegations whose report wakes their delegate-only parent, because it said it will act on it (follow_up on
+  // delegate, db/repos/report-follow-ups.ts). Local, not synced: the parent delegated from this Mac.
+  db.exec(`CREATE TABLE IF NOT EXISTS report_follow_ups (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE
+  )`);
   // #212: what Ben chose as a new worktree thread's base, until it is resolved to a commit in thread_bases. Local, not synced.
   db.exec(`CREATE TABLE IF NOT EXISTS thread_base_picks (
     thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
@@ -471,6 +480,12 @@ export function migrate() {
   // tree, the ref that holds them) and the client's request id, so a retried start gets the same thread back.
   // Local, not synced: the refs are this Mac's.
   ensureColumn('threads', 'continued_from', 'TEXT');
+  // A quick ask (packages/shared/quick-ask.ts): 1 while it answers in place, out of every list but Recent asks. `workspace`
+  // is what its agent may touch: none (its own folder), read (the channel's folder, read-only tools) or worktree; null is a
+  // thread from before, in the channel's folder as it always was. `promoted_to` names the task thread it turned into.
+  ensureColumn('threads', 'quick', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('threads', 'workspace', 'TEXT');
+  ensureColumn('threads', 'promoted_to', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS threads_continued_from ON threads(continued_from) WHERE continued_from IS NOT NULL');
   db.exec(`CREATE TABLE IF NOT EXISTS thread_continuations (
     thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
