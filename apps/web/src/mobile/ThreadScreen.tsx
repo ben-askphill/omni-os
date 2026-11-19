@@ -38,6 +38,7 @@ import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from '@omni/shared/thread-view.ts';
 import { crewLine, prLine, prOffered, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
+import { ProgressCard, useProgressPanel } from '../components/thread/ProgressCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
@@ -65,6 +66,7 @@ export function ThreadScreen() {
   const edges = useMemo(() => historyEdges({ spans }, view?.turns.map((t) => t.key) ?? []), [spans, view]);
   const status = useMemo(() => (thread?.status === 'running' ? statusLabel(events) : null), [events, thread?.status]);
   const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
+  const progress = useProgressPanel(events, thread?.status === 'running', view?.asking ?? false);
   const changes = useBranchChanges(thread, slotBusy);
   const [pr] = useThreadPR(thread, slotBusy, true);
   // The channel's own step prompts (Channel Settings), else the built-in ones.
@@ -196,7 +198,7 @@ export function ThreadScreen() {
         {quick && (
           <>
             <button type="button" aria-label="Close quick actions" tabIndex={-1} className="absolute inset-0 z-10 cursor-default" onClick={() => setQuick(false)} />
-            <div className="pop-in absolute top-2 right-2 z-20 max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] overflow-y-auto">
+            <div className="pop-in absolute top-2 right-2 z-20 flex max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] flex-col gap-[var(--sp-4)] overflow-y-auto">
               <ThreadQuickCard
                 thread={thread}
                 code={code}
@@ -222,7 +224,9 @@ export function ThreadScreen() {
                   setQuick(false);
                   shell.open(href.thread(t));
                 }}
+                className="shrink-0"
               />
+              <ProgressCard threadId={thread.id} panel={progress} className="shrink-0" />
             </div>
           </>
         )}
