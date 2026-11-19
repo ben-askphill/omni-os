@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import type { Context } from 'hono';
 import { startRunner } from './runner-boot.ts';
 
 // An automation's precheck is a command a login shell runs before each scheduled run, so writing a new one or changing
@@ -22,6 +24,7 @@ const automations = await import('../automations.ts');
 const { personalFile } = await import('../automation-store.ts');
 const { cookieName, sessionCookieName } = await import('../api-token.ts');
 const auth = await import('../google-auth.ts');
+const { docUrl } = await import('../browser-session.ts');
 const { mintThreadToken } = await import('../thread-tokens.ts');
 
 const launched = () => (existsSync(LAUNCHES) ? readFileSync(LAUNCHES, 'utf8').split('\n').filter(Boolean) : []);
@@ -37,6 +40,22 @@ const threadToken = mintThreadToken('precheck-thread').token;
 
 const cookie = (token: string) => ({ authorization: '', cookie: `${sessionCookieName()}=${token}` });
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+
+// A browser paired with the token over plain HTTP keeps its cookie on its own /api/k/<key> path (#827). There it is
+// the paired browser; sent anywhere else it is no credential, and the signed address a document load on that path is
+// sent to opens one URL for reading only, so neither writes a precheck.
+const keyedPath = (s: { id: string }) => {
+  const path = `/api/k/${randomBytes(16).toString('hex')}`;
+  auth.setCookiePath(s.id, path);
+  return path;
+};
+const keyed = auth.createSession('Firefox', 'browser', '', 'token');
+const keyedBase = keyedPath(keyed);
+const docSigned = auth.createSession('Safari', 'browser', '', 'token');
+keyedPath(docSigned);
+const signed = (url: string) => docUrl({ req: { url: `http://localhost${url}` } } as unknown as Context, docSigned.id);
+
+type Caller = { headers: Record<string, string>; shell: boolean; base?: string; sign?: (url: string) => string; unauthenticated?: true };
 const CREDENTIALS = {
   'install token': { headers: bearer(process.env.OMNI_TOKEN!), shell: true },
   'browser paired with the token': { headers: cookie(auth.createSession('Chrome', 'browser', '', 'token').token), shell: true },
@@ -45,24 +64,29 @@ const CREDENTIALS = {
   'Google app session': { headers: bearer(auth.createSession('iPhone', 'app', 'user_ben', 'google').token), shell: false },
   "a thread's own token": { headers: bearer(threadToken), shell: false },
   'paired app (pairing code)': { headers: bearer(auth.createSession('iPhone', 'app', '', 'pairing').token), shell: false },
-  'no credential': { headers: { authorization: '' }, shell: false },
-} satisfies Record<string, { headers: Record<string, string>; shell: boolean }>;
+  'browser paired with the token, on its keyed cookie path': { headers: cookie(keyed.token), shell: true, base: keyedBase },
+  'that keyed cookie sent off its path': { headers: cookie(keyed.token), shell: false, unauthenticated: true },
+  "a signed document address (omni_doc)": { headers: { authorization: '' }, shell: false, sign: signed, unauthenticated: true },
+  'no credential': { headers: { authorization: '' }, shell: false, unauthenticated: true },
+} satisfies Record<string, Caller>;
 type Who = keyof typeof CREDENTIALS;
 const WHO = Object.keys(CREDENTIALS) as Who[];
-const SIGNED_IN = WHO.filter((w) => w !== 'no credential');
+const SIGNED_IN = WHO.filter((w) => !(CREDENTIALS[w] as Caller).unauthenticated);
 const TOKEN: Who = 'install token';
 
 const call = async <T = any>(who: Who, method: string, path: string, body?: unknown) => {
-  const res = await app.request(`/api${path}`, {
+  const caller: Caller = CREDENTIALS[who];
+  const url = `${caller.base ?? '/api'}${path}`;
+  const res = await app.request(caller.sign ? caller.sign(url) : url, {
     method,
-    headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...CREDENTIALS[who].headers },
+    headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...caller.headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: res.status, body: (await res.json()) as T };
 };
 
 function expectRefused(who: Who, res: { status: number; body: unknown }) {
-  if (who === 'no credential') return expect(res.status).toBe(401);
+  if ((CREDENTIALS[who] as Caller).unauthenticated) return expect(res.status, JSON.stringify(res.body)).toBe(401);
   expect(res.status, JSON.stringify(res.body)).toBe(403);
   expect((res.body as { error?: string }).error).toMatch(/install's token or a browser paired with it/);
 }
@@ -258,6 +282,14 @@ describe('creating an automation', () => {
       expect(res.status).toBe(400);
       expect(existsSync(personalFile(id))).toBe(false);
     });
+});
+
+describe('the keyed cookie path rows', () => {
+  it('are live credentials where they apply, so their 401 on a write is the rule and not a broken fixture', async () => {
+    expect((await call('a signed document address (omni_doc)', 'GET', '/automations')).status).toBe(200);
+    expect((await call('browser paired with the token, on its keyed cookie path', 'GET', '/automations')).status).toBe(200);
+    expect((await call('that keyed cookie sent off its path', 'GET', '/automations')).status).toBe(401);
+  });
 });
 
 describe('every route that writes an automation', () => {
