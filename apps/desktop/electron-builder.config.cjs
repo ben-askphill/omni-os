@@ -25,9 +25,10 @@ const notarize = Boolean(
 // Keychain auto-discovery finds only a "Developer ID Application" identity. scripts/build-desktop.sh names an
 // "Apple Development" one here instead, so a local build keeps one signature from build to build, and macOS keeps
 // its permissions. electron-builder still lays out every file's entitlements; only the identity changes.
-// That build and the release workflow's (CSC_LINK) sign through scripts/mac-sign.cjs, which waits out Apple's
-// timestamp server when it stops answering. Any other build keeps electron-builder's own signing: with a `sign`
-// hook set, electron-builder no longer reports a missing identity and builds unsigned without a word.
+// That build and one with CSC_LINK set sign through scripts/mac-sign.cjs, which waits out Apple's timestamp server
+// when it stops answering. Any other build keeps electron-builder's own signing: with a `sign` hook set,
+// electron-builder no longer reports a missing identity and builds unsigned without a word. The release workflow
+// builds unsigned (mac.identity=null) and signs in a job of its own with scripts/mac-release-sign.ts.
 const localIdentity = env.OMNI_MAC_IDENTITY || null;
 const { signMac } = require('./scripts/mac-sign.cjs');
 const signing = localIdentity
@@ -88,8 +89,8 @@ module.exports = {
   },
   // The static AppImage runtime, so a host with only FUSE 3 runs it without libfuse2.
   toolsets: { appimage: '1.0.3' },
-  // Writes app-update.yml into the app, which is what turns its updater on (src/updates.ts). dist.ts uploads only with
-// --publish, which only the release workflow passes (RELEASE.md).
+  // Writes app-update.yml into the app, which is what turns its updater on (src/updates.ts). Nothing here uploads: the
+  // release workflow's publish job does (RELEASE.md).
   // OMNI_UPDATE_URL points a build at a plain HTTP folder instead, to try an update end to end against a local one.
   publish: env.OMNI_UPDATE_URL
     ? [{ provider: 'generic', url: env.OMNI_UPDATE_URL }]

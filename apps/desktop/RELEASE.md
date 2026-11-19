@@ -1,6 +1,6 @@
 # Release the desktop app
 
-A release is one GitHub Actions run: `.github/workflows/desktop-release.yml`. It sets the new version, builds the Mac app signed with your Developer ID and notarized by Apple, builds the Linux AppImage, and publishes them as a GitHub release. Every installed copy checks the latest published release at launch and every 4 hours, downloads it in the background and installs it on quit (see [Updates](README.md#updates)).
+A release is one GitHub Actions run: `.github/workflows/desktop-release.yml`. It builds the Mac app and the Linux AppImage at the new version, signs the Mac app with your Developer ID and has Apple notarize it, then sets the version on `main` and publishes both as a GitHub release. Every installed copy checks the latest published release at launch and every 4 hours, downloads it in the background and installs it on quit (see [Updates](README.md#updates)).
 
 ## One-time setup
 
@@ -31,20 +31,55 @@ gh workflow run desktop-release.yml -f bump=patch     # or minor, major, or an e
 gh run watch "$(gh run list -w desktop-release.yml -L 1 --json databaseId --jq '.[0].databaseId')"
 ```
 
-Or open the Actions tab, choose **Desktop release** and **Run workflow**. A run takes about 20 minutes, most of it Apple's notarization.
+Or open the Actions tab, choose **Desktop release** and **Run workflow**. Most of a run is the Mac build and Apple's notarization.
 
-| Job | Does |
-| --- | --- |
-| Version and draft release | Sets `apps/desktop/package.json` to the new version (`scripts/version.ts`), commits it to `main`, tags `v<version>` and drafts the release with notes generated from the merged PRs |
-| Mac | Builds the universal app on a macOS runner with the Rust `omni-mcp` and `omni` binaries for both arches, signs it with the Developer ID, notarizes and staples it, uploads the DMG, the zip and `latest-mac.yml`, then checks the signature, Gatekeeper's verdict and the staple |
-| Linux | Builds the x64 AppImage, with node-pty compiled for glibc 2.28 in docker and the Rust `omni-mcp` and `omni` binaries linked statically (the job installs `musl-tools` for `omni`'s C code), and uploads it with `latest-linux.yml` |
-| Publish | Checks that both feeds and all three downloads are attached, that every file a feed names is there and that the Mac feed points at the zip, then publishes the release as the latest |
+| Job | Holds | Does |
+| --- | --- | --- |
+| Version | a read-only token | Works out the new version from `main` (`scripts/version.ts`) and stops if its tag exists. Pushes nothing |
+| Mac build | a read-only token | Sets the version, installs with `npm ci --ignore-scripts`, builds the universal app unsigned with the Rust `omni-mcp` and `omni` binaries for both arches, and hands the app on with its checksum |
+| Mac sign and notarize | the signing and notarization secrets, a read-only token | Checks the build's tarball against its checksum and that it holds only `Omni.app`, unpacks it, loads the Developer ID into a keychain of its own, signs every Mach-O file and bundle with `scripts/mac-release-sign.ts` on plain Node, notarizes and staples, then checks the signature, Gatekeeper's verdict and the staple |
+| Mac DMG, zip and update feed | a read-only token | Packs the signed app into the DMG, the zip and `latest-mac.yml` with electron-builder (`dist.ts --prepackaged`), which changes nothing inside it, then checks the app in both |
+| Linux | a read-only token | Builds the x64 AppImage with `npm ci --ignore-scripts` and `npm rebuild node-pty`, node-pty compiled for glibc 2.28 in docker and the Rust binaries linked statically (the job installs `musl-tools` for `omni`'s C code), and hands it on with `latest-linux.yml` |
+| Publish | a token that can write | Checks each tarball against its build's checksum and that it holds exactly the release's files, checks the feeds against the files, commits the version to `main`, tags `v<version>`, drafts the release with notes generated from the merged PRs, uploads, checks the attached feeds again and publishes the release as the latest |
 
-Installed apps see a release only once it is published, so a failed run never offers a half-built update. When a build job fails for a cause outside the code, such as a secret or the runner, fix it and choose **Re-run failed jobs** on the same run. The version, tag and draft stay, and the uploads replace what the failed attempt left. The build jobs check out the tag, so a fix merged to `main` never reaches a re-run. For a cause in the code, and to abandon a release, delete the draft and its tag (`gh release delete v<version> --cleanup-tag`) and run the workflow again with the next version.
+No dependency's code runs where a credential is. The build jobs run npm code with no secret, no token in `.git/config` and read-only access, and no dependency's install script runs in them: node-pty's is the only one a build needs, on Linux, and the job runs it by name. The sign job and Publish run Apple's tools, `git`, `gh` and the repo's own scripts that import nothing but Node's built-ins, and no npm code. Publish is the only job that can write, and it holds no signing secret. `tests/release-workflow.test.ts` fails on a change to the workflow that breaks any of this (`scripts/release-policy.ts` lists the rules).
 
-Signing asks Apple's timestamp server about every file, and that server sometimes stops answering for minutes. codesign then fails with "A timestamp was expected but was not found" (or "The timestamp service is not available"), on whatever file comes first. The Mac job waits it out for about 18 minutes before it fails (`scripts/mac-sign.cjs`). If it still fails on that error, it is Apple's side: choose **Re-run failed jobs** later.
+### Modes
 
-Any agent with `gh` can start a release the same way. Starting one is a deploy to every installed copy, so an agent asks first.
+The `mode` input picks how far a run goes. It is `release` unless you pass another, as in `gh workflow run desktop-release.yml -f bump=patch -f mode=sign-only`.
+
+| Mode | Runs | Leaves |
+| --- | --- | --- |
+| `release` | Every job | The published release, the version commit on `main` and the tag |
+| `draft` | Every job | The release as a draft with every file, the version commit and the tag. Publish it with `gh release edit v<version> --draft=false --latest`, or delete it |
+| `sign-only` | Both builds, signing and notarization, the DMG and zip | Nothing pushed. The signed DMG, zip and feed are the run's `omni-mac-release.tar` artifact |
+| `build-only` | Both builds, without the signing secrets | Nothing pushed. The unsigned app is the `omni-mac-unsigned.tar.gz` artifact and the AppImage is in `omni-linux-release.tar` |
+
+Each job hands the next one tarball, uploaded as it is, so an artifact downloads as that file: `gh run download <run id> -n omni-mac-release.tar`, then `tar -xf omni-mac-release.tar`.
+
+### When a run fails
+
+Installed apps see a release only once it is published, so a failed run never offers a half-built update. Nothing is pushed before the Publish job, so a run that fails earlier leaves no tag, no version commit and no draft: run it again with the same bump.
+
+When a job fails for a cause outside the code, such as a secret, the runner or Apple's timestamp server, choose **Re-run failed jobs** on the same run. The jobs after it run again from what the earlier jobs made, so a sign job re-run signs the same build. A Publish re-run finds the tag it pushed and the draft it made, and uploads again. A fix merged to `main` never reaches a re-run. For a cause in the code, start a new run once the fix is on `main`. To abandon a draft, delete it and its tag (`gh release delete v<version> --cleanup-tag`). Its version commit stays on `main`, so the next run takes the version after it.
+
+Publish commits the version on top of the commit the builds built and tags that commit. When `main` moved during the run, `main` gets the same version commit on top of its own head instead, and the tag stays on what was built.
+
+Signing asks Apple's timestamp server about every file, and that server sometimes stops answering for minutes. codesign then fails with "A timestamp was expected but was not found" (or "The timestamp service is not available"), on whatever file comes first. The sign job waits it out on that file for about 18 minutes before it fails (`scripts/codesign-retry.cjs`). If it still fails on that error, it is Apple's side: choose **Re-run failed jobs** later.
+
+Any agent with `gh` can start a release the same way. Starting one is a deploy to every installed copy, so an agent asks first. A `sign-only` run deploys nothing but uses the signing secrets, so an agent asks before that too.
+
+### Check a new signing setup
+
+Until 0.1.36, electron-builder signed and notarized the app inside the Mac build. Now the build is unsigned and the sign job signs it with Apple's tools. Check that before the first release made this way reaches installed copies, in three runs:
+
+1. **Build only.** `gh workflow run desktop-release.yml -f bump=patch -f mode=build-only`. Both builds pass with install scripts off, and the sign job is skipped, so no job reads a signing secret.
+2. **Sign only.** `-f mode=sign-only`. The sign job passes its own checks: the signature, Gatekeeper's verdict and the staple. Then download and unpack `omni-mac-release.tar`, open the DMG on the Mac and, in Finder, drag Omni into `~/OmniUpdateTest` (step 2 of the first update test below). Before you open it:
+   - `spctl --assess --type execute --verbose=2 ~/OmniUpdateTest/Omni.app` says accepted, source=Notarized Developer ID
+   - `codesign -d --entitlements - ~/OmniUpdateTest/Omni.app` lists allow-jit, allow-unsigned-executable-memory and disable-library-validation
+
+   Open it on its own port and data (step 3 below). It starts, the server answers and a terminal opens in a thread, which needs node-pty's signed `spawn-helper` under the hardened runtime. Nothing was pushed.
+3. **Draft.** `-f mode=draft`. Publish commits the version, tags it and drafts the release with all seven files. Compare its assets with the last release's (`gh release view v<version> --json assets`), then publish it with `gh release edit v<version> --draft=false --latest` and run Test A of the first update test with the copy from step 2.
 
 ## Versions
 

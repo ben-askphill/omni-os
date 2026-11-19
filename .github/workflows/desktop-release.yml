@@ -1,7 +1,14 @@
-# Releases the desktop app: bumps apps/desktop's version on main, tags v<version>, builds the signed and notarized
-# universal Mac app and the Linux AppImage, uploads both with their update feeds to a draft GitHub release, and
-# publishes it once every build is up. Installed apps update from the latest published release (src/updates.ts).
+# Releases the desktop app: builds the universal Mac app and the Linux AppImage at the new version, signs and notarizes
+# the Mac app, then bumps apps/desktop's version on main, tags v<version> and publishes both with their update feeds as
+# a GitHub release. Installed apps update from the latest published release (src/updates.ts).
 # Run it from the Actions tab or `gh workflow run desktop-release.yml -f bump=minor`. See apps/desktop/RELEASE.md.
+#
+# No dependency's code runs where a credential is. The build jobs run npm code with no secret, no token and read-only
+# access. The sign job holds the Developer ID and Apple's notarization key and runs only Apple's tools and the repo's
+# own dependency-free script. The publish job is the only one that can write, and it runs no npm code either.
+# Jobs hand each other one tarball each, uploaded as it is (archive: false). A job with a credential downloads it packed
+# (skip-decompress) and checks its checksum and its names before it unpacks it.
+# apps/desktop/tests/release-workflow.test.ts holds this file to that (scripts/release-policy.ts).
 name: Desktop release
 
 on:
@@ -11,26 +18,33 @@ on:
         description: patch, minor, major, or an exact version such as 0.2.0
         required: true
         default: patch
+      mode:
+        description: release publishes it. draft attaches every file but leaves the release a draft. sign-only signs and notarizes, then stops before anything is pushed. build-only builds unsigned, without the signing secrets.
+        type: choice
+        options: [release, draft, sign-only, build-only]
+        default: release
 
 concurrency:
   group: desktop-release
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   prepare:
-    name: Version and draft release
+    name: Version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -44,50 +58,109 @@ jobs:
             echo "::error::$tag already exists. Release a higher version."
             exit 1
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - name: Commit and tag
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898+github-actions[bot]@users.noreply.github.com'
-          if ! git diff --quiet; then
-            git commit -am "Release the desktop app $VERSION"
-          fi
-          git tag -a "$TAG" -m "Omni $VERSION"
-          git push --atomic origin HEAD:main "$TAG"
-      - name: Draft the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: gh release create "$TAG" --draft --verify-tag --generate-notes --title "Omni $VERSION"
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "sha=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
 
-  mac:
-    name: Mac (universal, signed and notarized)
+  mac-build:
+    name: Mac build (universal, unsigned)
     needs: prepare
     runs-on: macos-15
+    outputs:
+      sha256: ${{ steps.pack.outputs.sha256 }}
     env:
-      CSC_LINK: ${{ secrets.MAC_CERTIFICATE_P12 }}
-      CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
-      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.tag }}
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Set the version
+        run: node apps/desktop/scripts/version.ts "$VERSION"
+      # No dependency's install script runs, and the Mac build needs none: node-pty ships its Mac prebuilds, and
+      # Electron fetches its binary the first time stage.ts starts it.
+      - run: npm ci --include=dev --ignore-scripts
+      # identity=null builds it unsigned. The zip target is what has electron-builder write app-update.yml into the app.
+      - name: Build
+        working-directory: apps/desktop
+        run: npx --no-install tsx scripts/dist.ts --platform mac --arch universal --native required -- -c.mac.identity=null -c.mac.target=zip
+      # A tarball keeps the bundle's links and modes. COPYFILE_DISABLE and --no-mac-metadata keep extended attributes and
+      # ._ files out of it.
+      - name: Pack the app
+        id: pack
+        run: |
+          tarball="$RUNNER_TEMP/omni-mac-unsigned.tar.gz"
+          COPYFILE_DISABLE=1 tar --no-mac-metadata -czf "$tarball" -C apps/desktop/release/mac-universal Omni.app
+          echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ runner.temp }}/omni-mac-unsigned.tar.gz
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+          # A re-run uploads again under the same name.
+          overwrite: true
+
+  mac-sign:
+    name: Mac sign and notarize
+    needs: [prepare, mac-build]
+    if: inputs.mode != 'build-only'
+    runs-on: macos-15
+    outputs:
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      # The build ran package code, so its tarball stays packed until its checksum checks out and every name in it is
+      # inside Omni.app. macOS tar then refuses .., absolute paths and writing through a link it made, and the signing
+      # script refuses a link that leads out of the app. This runs before the checkout, which starts from an empty folder.
+      - uses: actions/download-artifact@v8
+        with:
+          name: omni-mac-unsigned.tar.gz
+          path: ${{ runner.temp }}/in
+          skip-decompress: true
+      - name: Unpack the build
+        env:
+          SHA256: ${{ needs.mac-build.outputs.sha256 }}
+        run: |
+          cd "$RUNNER_TEMP/in"
+          echo "$SHA256  omni-mac-unsigned.tar.gz" | shasum -a 256 -c
+          names="$(tar -tzf omni-mac-unsigned.tar.gz)"
+          if grep -vE '^Omni\.app(/|$)' <<<"$names" >/dev/null || grep -E '(^|/)\.\.(/|$)' <<<"$names" >/dev/null; then
+            echo '::error::The build holds something outside Omni.app'
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/app"
+          tar -xzf omni-mac-unsigned.tar.gz -C "$RUNNER_TEMP/app"
+          app="$RUNNER_TEMP/app/Omni.app"
+          [[ -d "$app" && ! -L "$app" ]] || { echo '::error::Omni.app in the build is not a folder'; exit 1; }
+          echo "APP=$app" >> "$GITHUB_ENV"
+      # The repo at the commit the build job built, for the signing script, the entitlements and Apple's certificates.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
       - name: Check the signing secrets
+        env:
+          MAC_CERTIFICATE_P12: ${{ secrets.MAC_CERTIFICATE_P12 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           missing=()
-          [[ -n "$CSC_LINK" ]] || missing+=(MAC_CERTIFICATE_P12)
-          [[ -n "$CSC_KEY_PASSWORD" ]] || missing+=(MAC_CERTIFICATE_PASSWORD)
+          [[ -n "$MAC_CERTIFICATE_P12" ]] || missing+=(MAC_CERTIFICATE_P12)
+          [[ -n "$MAC_CERTIFICATE_PASSWORD" ]] || missing+=(MAC_CERTIFICATE_PASSWORD)
           if [[ -z "$APPLE_API_KEY_P8$APPLE_ID" ]]; then
             missing+=("APPLE_API_KEY_P8, APPLE_API_KEY_ID and APPLE_API_ISSUER (or APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID)")
           elif [[ -n "$APPLE_API_KEY_P8" ]]; then
@@ -102,64 +175,333 @@ jobs:
             echo "Run scripts/desktop-release-secrets.sh on the Mac that holds the Developer ID (apps/desktop/RELEASE.md)."
             exit 1
           fi
-      - name: Write the notarization key
-        if: env.APPLE_API_KEY_P8 != ''
+      # A keychain of its own for the Developer ID, with Apple's Developer ID intermediates so codesign can build the
+      # chain, as electron-builder set one up before.
+      - name: Load the Developer ID
+        env:
+          MAC_CERTIFICATE_P12: ${{ secrets.MAC_CERTIFICATE_P12 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
         run: |
-          key="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
-          printf '%s\n' "$APPLE_API_KEY_P8" > "$key"
-          echo "APPLE_API_KEY=$key" >> "$GITHUB_ENV"
-          # With the key in place, the Apple ID set stays out of electron-builder's way.
-          echo "APPLE_ID=" >> "$GITHUB_ENV"
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --include=dev
-      - name: Build, sign, notarize and upload
-        working-directory: apps/desktop
-        run: npx tsx scripts/dist.ts --platform mac --arch universal --native required --publish
+          keychain="$RUNNER_TEMP/omni-signing.keychain-db"
+          p12="$RUNNER_TEMP/developer-id.p12"
+          trap 'rm -f "$p12"' EXIT
+          password="$(openssl rand -base64 32)"
+          echo "::add-mask::$password"
+          security create-keychain -p "$password" "$keychain"
+          echo "KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$MAC_CERTIFICATE_P12" | base64 --decode > "$p12"
+          security import "$p12" -k "$keychain" -P "$MAC_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          for ca in apps/desktop/resources/developer-id-ca/*.cer; do
+            security import "$ca" -k "$keychain"
+          done
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          # shellcheck disable=SC2046 # one keychain path per word
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity="$(security find-identity -v -p codesigning "$keychain" | awk '/"Developer ID Application: / { print $2; exit }')"
+          if [[ -z "$identity" ]]; then
+            echo '::error::MAC_CERTIFICATE_P12 holds no valid Developer ID Application identity'
+            security find-identity -p codesigning "$keychain"
+            exit 1
+          fi
+          echo "IDENTITY=$identity" >> "$GITHUB_ENV"
+      - name: Sign
+        run: node apps/desktop/scripts/mac-release-sign.ts --identity "$IDENTITY" --keychain "$KEYCHAIN" --entitlements apps/desktop/resources/entitlements.mac.plist "$APP"
+      - name: Notarize and staple
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          trap 'rm -f "$RUNNER_TEMP"/AuthKey_*.p8 "$RUNNER_TEMP/notarize.zip"' EXIT
+          # With a key, the Apple ID set stays unused, as electron-builder chose before.
+          if [[ -n "$APPLE_API_KEY_P8" ]]; then
+            key="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+            printf '%s\n' "$APPLE_API_KEY_P8" > "$key"
+            auth=(--key "$key" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER")
+          else
+            auth=(--apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID")
+          fi
+          zip="$RUNNER_TEMP/notarize.zip"
+          result="$RUNNER_TEMP/notarize.json"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$zip"
+          xcrun notarytool submit "$zip" "${auth[@]}" --wait --output-format json > "$result" || true
+          # One JSON line: {"id": "...", "status": "Accepted", "message": "..."}
+          field() { sed -nE "s/.*\"$1\" *: *\"([^\"]*)\".*/\1/p" "$result" | head -n 1; }
+          status="$(field status)"
+          if [[ "$status" != Accepted ]]; then
+            echo "::error::Apple's notarization says: ${status:-no answer}"
+            cat "$result"
+            id="$(field id)"
+            if [[ -n "$id" ]]; then xcrun notarytool log "$id" "${auth[@]}"; fi
+            exit 1
+          fi
+          xcrun stapler staple "$APP"
       - name: Check the signature and notarization
-        working-directory: apps/desktop/release
         run: |
-          app=mac-universal/Omni.app
-          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign --verify --deep --strict --verbose=2 "$APP"
           # Authority lines appear from verbosity 2 up; plain -dv leaves them out.
-          codesign -dvv "$app" 2>&1 | grep -q 'Authority=Developer ID Application' || { echo '::error::Omni.app is not signed with a Developer ID'; exit 1; }
-          spctl --assess --type execute --verbose=2 "$app"
-          xcrun stapler validate "$app"
+          codesign -dvv "$APP" 2>&1 | grep -q 'Authority=Developer ID Application' || { echo '::error::Omni.app is not signed with a Developer ID'; exit 1; }
+          spctl --assess --type execute --verbose=2 "$APP"
+          xcrun stapler validate "$APP"
+      # The signatures and the stapled ticket are inside the bundle's files, so the tarball needs no extended attributes.
+      - name: Pack the signed app
+        id: pack
+        run: |
+          tarball="$RUNNER_TEMP/omni-mac-signed.tar.gz"
+          COPYFILE_DISABLE=1 tar --no-mac-metadata -czf "$tarball" -C "$RUNNER_TEMP/app" Omni.app
+          echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ runner.temp }}/omni-mac-signed.tar.gz
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+          # A re-run uploads again under the same name.
+          overwrite: true
+      - name: Remove the keychain
+        if: always() && env.KEYCHAIN != ''
+        run: security delete-keychain "$KEYCHAIN"
 
-  linux:
-    name: Linux (AppImage)
-    needs: prepare
-    runs-on: ubuntu-latest
+  mac-package:
+    name: Mac DMG, zip and update feed
+    needs: [prepare, mac-sign]
+    runs-on: macos-15
+    outputs:
+      sha256: ${{ steps.collect.outputs.sha256 }}
     env:
-      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.tag }}
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --include=dev
+      - name: Set the version
+        run: node apps/desktop/scripts/version.ts "$VERSION"
+      - run: npm ci --include=dev --ignore-scripts
+      - uses: actions/download-artifact@v8
+        with:
+          name: omni-mac-signed.tar.gz
+          path: ${{ runner.temp }}/in
+          skip-decompress: true
+      - name: Unpack the signed app
+        env:
+          SHA256: ${{ needs.mac-sign.outputs.sha256 }}
+        run: |
+          cd "$RUNNER_TEMP/in"
+          echo "$SHA256  omni-mac-signed.tar.gz" | shasum -a 256 -c
+          mkdir -p "$RUNNER_TEMP/signed"
+          tar -xzf omni-mac-signed.tar.gz -C "$RUNNER_TEMP/signed"
+      # electron-builder packs the signed app as it is: no build, no signing, nothing changed inside it.
+      - name: Pack the DMG, the zip and latest-mac.yml
+        working-directory: apps/desktop
+        run: npx --no-install tsx scripts/dist.ts --platform mac --arch universal --prepackaged "$RUNNER_TEMP/signed/Omni.app"
+      - name: Check the app in the zip and the DMG
+        working-directory: apps/desktop/release
+        run: |
+          check() {
+            codesign --verify --deep --strict --verbose=2 "$1"
+            spctl --assess --type execute --verbose=2 "$1"
+            xcrun stapler validate "$1"
+          }
+          ditto -x -k "Omni-$VERSION-mac-universal.zip" "$RUNNER_TEMP/from-zip"
+          check "$RUNNER_TEMP/from-zip/Omni.app"
+          mkdir -p "$RUNNER_TEMP/dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" "Omni-$VERSION-mac-universal.dmg"
+          check "$RUNNER_TEMP/dmg/Omni.app"
+          hdiutil detach "$RUNNER_TEMP/dmg"
+      - name: Collect the release files
+        id: collect
+        working-directory: apps/desktop/release
+        run: |
+          tarball="$RUNNER_TEMP/omni-mac-release.tar"
+          COPYFILE_DISABLE=1 tar --no-mac-metadata -cf "$tarball" "Omni-$VERSION-mac-universal.dmg" "Omni-$VERSION-mac-universal.dmg.blockmap" \
+            "Omni-$VERSION-mac-universal.zip" "Omni-$VERSION-mac-universal.zip.blockmap" latest-mac.yml
+          tar -tvf "$tarball"
+          echo "sha256=$(shasum -a 256 "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ runner.temp }}/omni-mac-release.tar
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+          # A re-run uploads again under the same name.
+          overwrite: true
+
+  linux-build:
+    name: Linux (AppImage)
+    needs: prepare
+    runs-on: ubuntu-latest
+    outputs:
+      sha256: ${{ steps.collect.outputs.sha256 }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Set the version
+        run: node apps/desktop/scripts/version.ts "$VERSION"
+      - run: npm ci --include=dev --ignore-scripts
+      # node-pty's install script is the one this build runs. stage.ts reads the addon it compiles, then compiles it
+      # again for glibc 2.28 in docker.
+      - run: npm rebuild node-pty
       # The omni command's TLS library (ring) compiles C, and the static build needs musl's own compiler wrapper.
       - name: Install musl-gcc
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       # stage.ts compiles node-pty for glibc 2.28 in docker, which the runner has, and the Rust binaries with the
       # runner's rustup, which installs the toolchain rust-toolchain.toml pins.
-      - name: Build and upload
+      - name: Build
         working-directory: apps/desktop
-        run: npx tsx scripts/dist.ts --platform linux --arch x64 --native required --publish
+        run: npx --no-install tsx scripts/dist.ts --platform linux --arch x64 --native required
+      - name: Collect the release files
+        id: collect
+        working-directory: apps/desktop/release
+        run: |
+          tarball="$RUNNER_TEMP/omni-linux-release.tar"
+          tar -cf "$tarball" "Omni-$VERSION-linux-x86_64.AppImage" latest-linux.yml
+          tar -tvf "$tarball"
+          echo "sha256=$(sha256sum "$tarball" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ runner.temp }}/omni-linux-release.tar
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+          # A re-run uploads again under the same name.
+          overwrite: true
 
   publish:
     name: Publish the release
-    needs: [prepare, mac, linux]
+    needs: [prepare, mac-package, linux-build]
+    if: inputs.mode == 'release' || inputs.mode == 'draft'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.prepare.outputs.version }}
       TAG: ${{ needs.prepare.outputs.tag }}
+      SHA: ${{ needs.prepare.outputs.sha }}
     steps:
+      # Each tarball stays packed until its checksum checks out and it holds exactly the release's files for its
+      # platform, as plain files. This runs before the checkout puts the write token in .git/config.
+      - uses: actions/download-artifact@v8
+        with:
+          name: omni-mac-release.tar
+          path: ${{ runner.temp }}/mac
+          skip-decompress: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: omni-linux-release.tar
+          path: ${{ runner.temp }}/linux
+          skip-decompress: true
+      - name: Unpack the release files
+        env:
+          MAC_SHA256: ${{ needs.mac-package.outputs.sha256 }}
+          LINUX_SHA256: ${{ needs.linux-build.outputs.sha256 }}
+        run: |
+          assets="$RUNNER_TEMP/assets"
+          echo "ASSETS=$assets" >> "$GITHUB_ENV"
+          mkdir -p "$assets"
+          # take <tarball> <its sha256> <every file it must hold>
+          take() {
+            local tarball="$1" sum="$2" listing names
+            shift 2
+            echo "$sum  $tarball" | sha256sum -c
+            listing="$(tar -tvf "$tarball")"
+            names="$(tar -tf "$tarball" | LC_ALL=C sort)"
+            if [[ "$names" != "$(printf '%s\n' "$@" | LC_ALL=C sort)" ]] || grep -v '^-' <<<"$listing" >/dev/null; then
+              echo "::error::$(basename "$tarball") does not hold exactly $*, as plain files"
+              echo "$listing"
+              exit 1
+            fi
+            tar -xf "$tarball" -C "$assets" --keep-old-files --no-same-owner
+          }
+          take "$RUNNER_TEMP/mac/omni-mac-release.tar" "$MAC_SHA256" "Omni-$VERSION-mac-universal.dmg" "Omni-$VERSION-mac-universal.dmg.blockmap" \
+            "Omni-$VERSION-mac-universal.zip" "Omni-$VERSION-mac-universal.zip.blockmap" latest-mac.yml
+          take "$RUNNER_TEMP/linux/omni-linux-release.tar" "$LINUX_SHA256" "Omni-$VERSION-linux-x86_64.AppImage" latest-linux.yml
+          ls -l "$assets"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the update feeds
+        working-directory: ${{ runner.temp }}/assets
+        run: |
+          names="$(ls -1)"
+          for want in latest-mac.yml latest-linux.yml '\.dmg$' '-mac-universal\.zip$' '\.AppImage$'; do
+            grep -Eq -- "$want" <<<"$names" || { echo "::error::The release has no file matching $want"; exit 1; }
+          done
+          # The updater downloads what each feed names, by name. Squirrel.Mac installs only from the zip.
+          for feed in latest-mac.yml latest-linux.yml; do
+            for file in $(sed -nE 's/^ *(- )?(url|path): *//p' "$feed" | tr -d "'\""); do
+              [[ -f "$file" ]] || { echo "::error::$feed names $file, which the release does not have"; exit 1; }
+            done
+          done
+          grep -Eq '^path: .*\.zip$' latest-mac.yml || { echo '::error::latest-mac.yml does not point at the zip, which Squirrel.Mac installs from'; exit 1; }
+      # The version bump goes on top of the commit that was built, and the tag on that. When main moved during the
+      # run, main gets the same bump on top of its own head instead. A re-run finds the tag pushed and goes on.
+      - name: Commit the version and tag it
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898+github-actions[bot]@users.noreply.github.com'
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            tagged="$(git rev-parse "$TAG^{commit}")"
+            if [[ "$tagged" != "$SHA" && "$(git rev-parse "$tagged^")" != "$SHA" ]]; then
+              echo "::error::$TAG exists and was not made from $SHA, the commit this run built"
+              exit 1
+            fi
+            echo "$TAG is pushed already, by an earlier attempt of this run"
+            exit 0
+          fi
+          bump() {
+            node apps/desktop/scripts/version.ts "$VERSION" >/dev/null
+            if ! git diff --quiet; then git commit -qam "Release the desktop app $VERSION"; fi
+          }
+          bump
+          git tag -a "$TAG" -m "Omni $VERSION"
+          built="$(git rev-parse HEAD)"
+          for attempt in 1 2 3; do
+            git fetch -q origin main
+            if [[ "$(git rev-parse origin/main)" == "$SHA" ]]; then
+              main="$built"
+            else
+              git checkout -q --detach origin/main
+              bump
+              main="$(git rev-parse HEAD)"
+              git checkout -q --detach "$built"
+            fi
+            if git push --atomic origin "$main:refs/heads/main" "refs/tags/$TAG"; then exit 0; fi
+            echo "main moved while pushing (attempt $attempt)"
+          done
+          echo "::error::Could not push $TAG and the version bump to main"
+          exit 1
+      - name: Upload to the draft release
+        run: |
+          draft="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || echo none)"
+          case "$draft" in
+            none) gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag --generate-notes --title "Omni $VERSION" ;;
+            true) echo "Uploading to the draft an earlier attempt made" ;;
+            *) echo "::error::$TAG is published already"; exit 1 ;;
+          esac
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber "$ASSETS"/*
       - name: Check the update feeds are attached
         run: |
           assets="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
@@ -167,7 +509,6 @@ jobs:
           for want in latest-mac.yml latest-linux.yml '\.dmg$' '-mac-universal\.zip$' '\.AppImage$'; do
             grep -Eq -- "$want" <<<"$assets" || { echo "::error::The release has no asset matching $want"; exit 1; }
           done
-          # The updater downloads what each feed names, by name. Squirrel.Mac installs only from the zip.
           feeds="$RUNNER_TEMP/feeds"
           gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p 'latest-*.yml' -D "$feeds" --clobber
           for feed in latest-mac.yml latest-linux.yml; do
@@ -176,4 +517,9 @@ jobs:
             done
           done
           grep -Eq '^path: .*\.zip$' "$feeds/latest-mac.yml" || { echo '::error::latest-mac.yml does not point at the zip, which Squirrel.Mac installs from'; exit 1; }
-      - run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false --latest
+      - name: Publish
+        if: inputs.mode == 'release'
+        run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false --latest
+      - name: Leave it a draft
+        if: inputs.mode == 'draft'
+        run: echo "::notice::$TAG is a draft with every file attached. Publish it with gh release edit $TAG -R $GITHUB_REPOSITORY --draft=false --latest"

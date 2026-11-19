@@ -1,11 +1,12 @@
 // Builds the desktop app for one platform and arch: dist/ (build.ts), build/omni (stage.ts), then electron-builder
-// with electron-builder.config.cjs. Artifacts land in release/.
+// with electron-builder.config.cjs. Artifacts land in release/. It never uploads: the release workflow's publish job
+// does (.github/workflows/desktop-release.yml).
 //
-//   tsx scripts/dist.ts [--platform mac|linux] [--arch arm64|x64|universal] [--dir] [--publish] [--skip-web] [--host-glibc] [--native required|off] [-- builder args]
+//   tsx scripts/dist.ts [--platform mac|linux] [--arch arm64|x64|universal] [--dir] [--prepackaged <app>] [--skip-web] [--host-glibc] [--native required|off] [-- builder args]
 //
 //   --dir         the unpacked app only (release/mac-<arch>/Omni.app, release/linux-unpacked), no DMG or AppImage
-//   --publish     upload the artifacts and the update feed to the draft GitHub release v<version> (needs GH_TOKEN).
-//                 Only the release workflow passes it (.github/workflows/desktop-release.yml)
+//   --prepackaged packs an app built and signed before into the DMG, zip, AppImage and update feed, and builds
+//                 nothing. The release workflow packs its signed Mac app this way
 //   --skip-web    use apps/web/dist as it is
 //   --host-glibc  a Linux build that only has to run on this machine (stage.ts)
 //   --native      required (the default) or off: whether the Rust binaries go in (stage.ts)
@@ -26,7 +27,7 @@ export function builderArgs(input: {
   platform: 'darwin' | 'linux';
   arch: 'x64' | 'arm64' | 'universal';
   dir: boolean;
-  publish?: boolean;
+  prepackaged?: string;
   extra?: string[];
 }): string[] {
   return [
@@ -35,9 +36,10 @@ export function builderArgs(input: {
     input.platform === 'darwin' ? '--mac' : '--linux',
     `--${input.arch}`,
     ...(input.dir ? ['--dir'] : []),
+    ...(input.prepackaged ? ['--prepackaged', input.prepackaged] : []),
     ...(input.extra ?? []),
     '--publish',
-    input.publish ? 'always' : 'never',
+    'never',
   ];
 }
 
@@ -46,13 +48,18 @@ async function main(argv: string[]): Promise<void> {
   const own = split < 0 ? argv : argv.slice(0, split);
   const extra = split < 0 ? [] : argv.slice(split + 1);
   const dir = own.includes('--dir');
-  const publish = own.includes('--publish');
-  if (dir && publish) {
-    console.error('dist: --dir builds no DMG, zip or AppImage to publish');
+  const at = own.indexOf('--prepackaged');
+  const prepackaged = at < 0 ? undefined : own[at + 1];
+  if (at >= 0 && (!prepackaged || prepackaged.startsWith('-'))) {
+    console.error('dist: --prepackaged needs the path of the app');
+    process.exit(2);
+  }
+  if (dir && prepackaged) {
+    console.error('dist: --dir builds the app that --prepackaged takes as built');
     process.exit(2);
   }
   const parsed = parseStageArgs(
-    own.filter((arg) => arg !== '--dir' && arg !== '--publish'),
+    own.filter((arg, i) => arg !== '--dir' && (at < 0 || (i !== at && i !== at + 1))),
     process,
   );
   if ('error' in parsed) {
@@ -64,12 +71,14 @@ async function main(argv: string[]): Promise<void> {
     console.error('dist: a Mac build needs a Mac (codesign, hdiutil and lipo)');
     process.exit(2);
   }
-  console.log('==> Building dist/');
-  run('npx', ['--no-install', 'tsx', 'scripts/build.ts']);
-  await stage(parsed);
+  if (!prepackaged) {
+    console.log('==> Building dist/');
+    run('npx', ['--no-install', 'tsx', 'scripts/build.ts']);
+    await stage(parsed);
+  }
   console.log('==> Packaging with electron-builder');
   const arch = target.arches.length > 1 ? 'universal' : target.arches[0];
-  run('npx', ['--no-install', 'electron-builder', ...builderArgs({ platform: target.platform, arch, dir, publish, extra })]);
+  run('npx', ['--no-install', 'electron-builder', ...builderArgs({ platform: target.platform, arch, dir, prepackaged: prepackaged && resolve(prepackaged), extra })]);
   console.log(`==> Done: ${join(DESKTOP, 'release')}`);
 }
 

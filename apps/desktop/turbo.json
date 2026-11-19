@@ -3,7 +3,7 @@
   "tags": ["app", "desktop"],
   "tasks": {
     "test": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/package-lock.json"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.github/workflows/desktop-release.yml", "$TURBO_ROOT$/package-lock.json"]
     }
   }
 }
