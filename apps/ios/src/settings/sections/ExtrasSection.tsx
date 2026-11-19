@@ -28,7 +28,7 @@ export function ExtrasSection() {
         <ListRow first title="Send to Grok Bot" value={grok} />
       </Group>
       {display ? (
-        <Group title="Shopify" footer={shopError ?? "A store domain and Ask Phill Portal slug on each channel's settings, the store link on its page, and both in its threads' instructions. Every device."}>
+        <Group title="Shopify" footer={shopError ?? "A store domain and client portal slug on each channel's settings, the store link on its page, and both in its threads' instructions. Every device."}>
           <SwitchRow first title="Shopify add-on" value={display.shopify} onValueChange={(on) => void hub.setDisplay({ shopify: on }).then(setShopError)} />
         </Group>
       ) : null}

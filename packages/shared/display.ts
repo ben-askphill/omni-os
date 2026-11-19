@@ -5,7 +5,7 @@
 // names for the run controls, and no pull requests, branches, worktrees, token counts or context ring outside a
 // channel with a repo. A channel with a repo always shows its code detail; the status words and control names follow
 // the switch everywhere.
-// `shopify`: Settings > General > Shopify add-on. The Store card (store domain, Ask Phill Portal slug) on a channel's
+// `shopify`: Settings > General > Shopify add-on. The Store card (store domain, client portal slug) on a channel's
 // settings, the store link on its page and the store field in setup.
 
 import { MARK, STATUS, glyphFor, type Glyph, type Mark } from './status.ts';

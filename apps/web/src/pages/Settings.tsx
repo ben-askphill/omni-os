@@ -242,7 +242,7 @@ function ShopifyCard() {
       <SwitchRow
         title="Shopify add-on"
         origin={<Origin of="machine" label="Every machine" />}
-        detail="A store domain and Ask Phill Portal slug on each channel's settings, the store link on its page, and both in its threads' instructions. Off, Omni keeps any you set but shows and sends none."
+        detail="A store domain and client portal slug on each channel's settings, the store link on its page, and both in its threads' instructions. Off, Omni keeps any you set but shows and sends none."
         checked={shopify}
         onChange={(on) => {
           setError(null);

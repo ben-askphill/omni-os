@@ -61,17 +61,17 @@ describe('display switches', () => {
     f.stop();
   });
 
-  it("gives the agent the channel's store and Portal lines only while the Shopify pack is on", async () => {
+  it("gives the agent the channel's store and portal lines only while the Shopify pack is on", async () => {
     db.channels.update('shop', { store_domain: 'acme.myshopify.com', portal_slug: 'acme' });
     const t = await r.start('hello');
     const shop = db.channels.get('shop')!;
     await put({ shopify: true });
     const on = buildSystemPrompt(r.thread(t.id), shop);
     expect(on).toContain('- Shopify store: acme.myshopify.com');
-    expect(on).toContain('- Ask Phill Portal company slug: acme');
+    expect(on).toContain('- Client portal slug: acme');
     await put({ shopify: false });
     const off = buildSystemPrompt(r.thread(t.id), shop);
     expect(off).not.toContain('Shopify store');
-    expect(off).not.toContain('Portal company slug');
+    expect(off).not.toContain('portal slug');
   });
 });
