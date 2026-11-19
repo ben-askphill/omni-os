@@ -4,14 +4,14 @@ import { db, memories } from '../../db.ts';
 import { claim, registerHandler } from '../apply.ts';
 
 // Memory facts (db/repos/memories.ts): last writer wins on the whole row, keyed by the fact's id. An approved fact is a
-// prompt every later thread in its channel runs with, so it is a signed action entity (sync/verify.ts): only a trusted
+// prompt every later thread in its channel, or of its role, runs with, so it is a signed action entity (sync/verify.ts): only a trusted
 // machine's applies. A row that does not parse is dropped, never written.
 
 const isTime = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v));
 const strOrNull = (v: unknown) => (typeof v === 'string' && v ? v : null);
 
-/** The channel each applied change touched, for notify: a deleted fact's row is gone by then. */
-const channelOf = new Map<string, string | null>();
+/** The channel and role each applied change touched, for notify: a deleted fact's row is gone by then. */
+const touched = new Map<string, { channel_id: string | null; role: string | null }>();
 
 registerHandler('memory', {
   serialize(id) {
@@ -23,7 +23,7 @@ registerHandler('memory', {
       const here = memories.get(id);
       if (!claim(change) || !here) return false;
       db.prepare('DELETE FROM memories WHERE id = ?').run(id);
-      channelOf.set(id, here.channel_id);
+      touched.set(id, { channel_id: here.channel_id, role: here.role });
       return true;
     }
     const d = (change.data ?? {}) as Partial<Record<keyof Memory, unknown>>;
@@ -48,12 +48,12 @@ registerHandler('memory', {
       isTime(d.updated_at) ? d.updated_at : created,
       d.status === 'approved' && isTime(d.approved_at) ? d.approved_at : d.status === 'approved' ? created : null,
     );
-    channelOf.set(id, strOrNull(d.channel_id));
+    touched.set(id, { channel_id: strOrNull(d.channel_id), role: strOrNull(d.role) });
     return true;
   },
   notify(change) {
-    const channel = channelOf.get(change.entity_id) ?? null;
-    channelOf.delete(change.entity_id);
-    publishFeed({ type: 'memory', channel_id: channel });
+    const was = touched.get(change.entity_id) ?? { channel_id: null, role: null };
+    touched.delete(change.entity_id);
+    publishFeed({ type: 'memory', ...was });
   },
 });

@@ -1,12 +1,14 @@
 // The Omni mobile design system's parts (ui_kits/omni-mobile/MobileParts.jsx), on the Web UI's own components.
 // Metrics are the design's, in CSS pixels on a 390-wide phone.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { createPortal } from 'react-dom';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
 import { Folded } from '../components/Folded.tsx';
 import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
 import type { Mark, Phase } from '@omni/shared/status.ts';
 import type { RowItem } from './rows.ts';
+import { LayerShownCtx, SheetHostCtx } from './sheet-stack.ts';
 
 /** Safe-area insets: a home-screen app draws under the status bar and the home indicator. */
 export const SAFE_TOP = 'env(safe-area-inset-top)';
@@ -22,6 +24,9 @@ export function MoRound({
   quiet,
   disabled,
   children,
+  expanded,
+  controls,
+  buttonRef,
 }: {
   icon?: IconName;
   label: string;
@@ -31,12 +36,19 @@ export function MoRound({
   quiet?: boolean;
   disabled?: boolean;
   children?: ReactNode;
+  /** A button that shows and hides a popup: whether it shows, and its id. */
+  expanded?: boolean;
+  controls?: string;
+  buttonRef?: Ref<HTMLButtonElement>;
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       aria-label={label}
       title={label}
+      aria-expanded={expanded}
+      aria-controls={expanded ? controls : undefined}
       onClick={onClick}
       disabled={disabled}
       className={`mo-press grid shrink-0 place-items-center rounded-full disabled:opacity-40 ${ink ? 'bg-fg text-on-ink' : quiet ? 'bg-transparent text-fg' : 'bg-surface-2 text-fg'}`}
@@ -254,14 +266,40 @@ export function MoStripes({ label, className = '' }: { label: string; className?
   );
 }
 
-export function MoToast({ text }: { text: string }) {
-  return (
+/** The phone's toast: one note over the tab bar. An error one stays, with a button to dismiss it. */
+export interface MoToastNote {
+  text: string;
+  key: number;
+  error?: boolean;
+}
+
+/**
+ * Where the phone's toasts show, mounted with the shell so a screen reader is already watching it when a note comes
+ * in: a polite region for notes and an assertive one for errors. Long text wraps.
+ */
+export function MoToastRegion({ note, onDismiss }: { note: MoToastNote | null; onDismiss: () => void }) {
+  const pill = (n: MoToastNote) => (
     <div
-      role="status"
-      className="pointer-events-none absolute left-1/2 z-[60] -translate-x-1/2 rounded-full bg-fg px-[18px] py-[11px] text-[13.5px] leading-none font-medium whitespace-nowrap text-on-ink shadow-[var(--shadow-menu)]"
-      style={{ bottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 78px)', animation: 'mo-toast 320ms var(--ease-spring)' }}
+      key={n.key}
+      className={`flex max-w-full items-center gap-1 rounded-[22px] bg-fg py-[9px] text-[13.5px] leading-[1.35] font-medium text-pretty break-words text-on-ink shadow-[var(--shadow-menu)] ${n.error ? 'pointer-events-auto pr-1.5 pl-[18px]' : 'px-[18px]'}`}
+      style={{ animation: 'mo-toast 320ms var(--ease-spring)' }}
     >
-      {text}
+      <span className="min-w-0 py-0.5">{n.text}</span>
+      {n.error && (
+        <button type="button" onClick={onDismiss} aria-label="Dismiss" className="press -my-1 grid size-8 shrink-0 place-items-center rounded-full">
+          <Icon name="x" size={14} />
+        </button>
+      )}
+    </div>
+  );
+  return (
+    <div className="pointer-events-none absolute inset-x-4 z-[60] flex flex-col items-center" style={{ bottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 78px)' }}>
+      <div role="status" className="contents">
+        {note && !note.error && pill(note)}
+      </div>
+      <div role="alert" className="contents">
+        {note?.error && pill(note)}
+      </div>
     </div>
   );
 }
@@ -269,20 +307,50 @@ export function MoToast({ text }: { text: string }) {
 /**
  * A bottom sheet: a scrim and a panel that rises from the bottom. The scrim, Escape, or dragging the grabber down
  * closes it. `full` holds it open to just under the status bar, for lists that scroll.
+ *
+ * In the phone shell it renders over every screen and the tab bar, and acts as a modal: what is behind it, a sheet
+ * under it included, goes inert, and the focus moves in (to a field that took it, a `data-autofocus` control, or the
+ * sheet itself) and goes back to what opened it on close. A sheet opened from a screen that another one has since
+ * covered hides with that screen and shows again with it. It stays out of the top layer: iOS keeps the top layer
+ * under the keyboard, and the shell sizes itself from the visual viewport for that.
  */
 export function MoSheet({ onClose, children, full, label }: { onClose: () => void; children: ReactNode; full?: boolean; label: string }) {
   const [drag, setDrag] = useState(0);
   const start = useRef<number | null>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  const host = useContext(SheetHostCtx);
+  const shown = useContext(LayerShownCtx);
+  const shownNow = useRef(shown);
+  shownNow.current = shown;
+  const ref = useRef<HTMLDivElement>(null);
+  // Read on the first render, before a field inside takes the focus.
+  const [trigger] = useState(() => (typeof document === 'undefined' ? null : document.activeElement));
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close.current();
+    // Only the top sheet: one Escape closes one sheet.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && (!host || host.stack.top() === ref.current) && close.current();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [host]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !shown) return;
+    host?.stack.open(el);
+    if (!el.contains(document.activeElement)) (el.querySelector<HTMLElement>('[data-autofocus]') ?? el).focus({ preventScroll: true });
+    return () => {
+      const held = el.contains(document.activeElement);
+      host?.stack.close(el);
+      // Once it is gone: StrictMode runs this effect twice, and the second run keeps the focus where the first left it.
+      // Closed, not hidden under a screen pushed over its own: that screen takes the focus.
+      queueMicrotask(() => {
+        const back = !el.isConnected && held && shownNow.current && trigger instanceof HTMLElement && trigger.isConnected && !trigger.closest('[inert]');
+        if (back) trigger.focus({ preventScroll: true });
+      });
+    };
+  }, [host, shown, trigger]);
   const top = `calc(${SAFE_TOP} + 56px)`;
-  return (
-    <div className="absolute inset-0 z-40" role="dialog" aria-modal="true" aria-label={label}>
+  const sheet = (
+    <div ref={ref} className="absolute inset-0 z-40 outline-none" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} hidden={!shown}>
       <div className="absolute inset-0 bg-[var(--scrim)]" style={{ animation: 'mo-fade 240ms var(--ease-out)' }} onClick={onClose} />
       <div
         className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-[28px] bg-bg shadow-[var(--shadow-menu)]"
@@ -318,4 +386,5 @@ export function MoSheet({ onClose, children, full, label }: { onClose: () => voi
       </div>
     </div>
   );
+  return host ? createPortal(sheet, host.el) : sheet;
 }

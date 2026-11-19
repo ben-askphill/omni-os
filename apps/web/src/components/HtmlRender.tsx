@@ -22,7 +22,7 @@ export function HtmlRender({ a, title, onOpen }: { a: Artifact; title: string; o
   const folds = fit > FOLDED_HEIGHT;
   return (
     <div className="group/render relative" data-render={title}>
-      <RenderFrame a={a} title={title} onHeight={setHeight} className="transition-[height] duration-200" style={{ height: folds && !unfolded ? FOLDED_HEIGHT : fit }} />
+      <RenderFrame a={a} title={title} onHeight={setHeight} className="transition-[height] duration-200 motion-reduce:transition-none" style={{ height: folds && !unfolded ? FOLDED_HEIGHT : fit }} />
       <div className="absolute top-2 right-2 opacity-0 transition-opacity group-hover/render:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
         <IconButton icon="maximize" label="Full screen" size={14} onClick={onOpen ?? (() => setFull(true))} className="bg-elev shadow-[var(--shadow-card)]" />
       </div>

@@ -52,9 +52,11 @@ p { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--fg-2); whi
 .log { width: 100%; margin-top: 24px; min-height: 72px; flex: 0 1 auto; display: flex; flex-direction: column; text-align: left; }
 main > .log { flex-shrink: 1; }
 .caption { font-size: 12px; color: var(--fg-3); margin: 0 0 6px 4px; }
+/* Reversed, the log opens scrolled to its last line with no script. The auto margin keeps a short log at the top. */
 pre { margin: 0; min-height: 48px; max-height: 220px; flex: 0 1 auto; overflow: auto; background: var(--surface);
   border-radius: 14px; padding: 12px 14px; font: 11.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+  color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; display: flex; flex-direction: column-reverse; }
+pre > span { margin-bottom: auto; }
 nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 24px; }
 a { display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 999px; text-decoration: none;
   font-weight: 500; font-size: 13px; }
@@ -85,17 +87,16 @@ export function screenHtml(view: ScreenView): string {
     body = `<main><div class="spinner"></div><p class="progress">Starting the server on port ${view.port}</p></main>`;
   } else {
     const log = view.logTail.trim()
-      ? `<section class="log"><div class="caption">Last lines of the server log</div><pre id="tail">${escapeHtml(view.logTail.trim())}</pre></section>`
+      ? `<section class="log"><div class="caption">Last lines of the server log</div><pre><span>${escapeHtml(view.logTail.trim())}</span></pre></section>`
       : '';
     const buttons = [button('try-again', 'Try again', 'primary'), view.logExists ? button('open-log', 'Show server log', 'secondary') : '', button('quit', 'Quit', 'ghost')];
     body = `<main>${ALERT_ICON}<h1>Server problem</h1><p>${escapeHtml(view.message)}</p>${log}<nav>${buttons.join('')}</nav></main>`;
   }
-  // The log scrolls from the bottom. The CSP allows only this one inline script.
-  const script = `<script>const t=document.getElementById('tail');if(t)t.scrollTop=t.scrollHeight;</script>`;
+  // No script at all: default-src 'none' leaves the page its inline styles and nothing else.
   return (
     `<!doctype html><html><head><meta charset="utf-8">` +
-    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">` +
-    `<title>Omni</title><style>${STYLE}</style></head><body>${body}${script}</body></html>`
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">` +
+    `<title>Omni</title><style>${STYLE}</style></head><body>${body}</body></html>`
   );
 }
 

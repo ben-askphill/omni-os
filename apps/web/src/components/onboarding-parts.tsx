@@ -12,7 +12,8 @@ import { api, errorText, type HarnessWithRunning } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { desktop } from '../desktop.ts';
 import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
-import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, Icon, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
+import { Button, ChipSet, CopyButton, ErrorNote, fieldHintId, FolderInput, Icon, IDENTIFIER, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
@@ -28,6 +29,7 @@ export function WorkScreen({ work, tools, onWork, onTools }: { work: string; too
       <Row label="Your work" htmlFor="ob-work" hint="Optional. Change it any time in Settings > General.">
         <textarea
           id="ob-work"
+          aria-describedby={fieldHintId('ob-work')}
           className="field min-h-[72px] w-full resize-y"
           value={work}
           maxLength={300}
@@ -42,7 +44,7 @@ export function WorkScreen({ work, tools, onWork, onTools }: { work: string; too
         <ChipSet label="Tools you use" options={ONBOARDING_TOOLS.map((t) => ({ id: t.id, label: t.label }))} value={picked} onChange={pick} />
       </div>
       <Row label="Others" htmlFor="ob-tools-other" hint="Comma separated.">
-        <input id="ob-tools-other" className="field w-full" value={otherTools(tools)} placeholder="Xero, HubSpot" onChange={(e) => onTools(withOtherTools(tools, e.target.value))} />
+        <input id="ob-tools-other" aria-describedby={fieldHintId('ob-tools-other')} className="field w-full" value={otherTools(tools)} placeholder="Xero, HubSpot" onChange={(e) => onTools(withOtherTools(tools, e.target.value))} />
       </Row>
     </Screen>
   );
@@ -75,7 +77,7 @@ export function FilesScreen({
   return (
     <Screen caption="Files" title="Where should Omni keep your files?" body="Agents work in this folder and save what they make there. Omni makes it if it is missing.">
       <Row label="Folder" htmlFor="ob-root">
-        <FolderInput id="ob-root" dialogTitle="Where Omni keeps your files" value={value.root} placeholder={fallbacks.workspaceRoot} spellCheck={false} onChange={(root) => onChange({ root })} />
+        <FolderInput id="ob-root" dialogTitle="Where Omni keeps your files" value={value.root} placeholder={fallbacks.workspaceRoot} onChange={(root) => onChange({ root })} />
       </Row>
       <div className="flex items-start gap-4 rounded-[16px] bg-surface p-3.5" data-addon="code">
         <div className="min-w-0 flex-1">
@@ -87,10 +89,10 @@ export function FilesScreen({
       {code && (
         <>
           <Row label="Repos folder" htmlFor="ob-repos" hint="Where your git checkouts live. Used to suggest repo paths for projects.">
-            <FolderInput id="ob-repos" dialogTitle="Repos folder" value={value.reposDir} placeholder={fallbacks.reposDir} spellCheck={false} onChange={(reposDir) => onChange({ reposDir })} />
+            <FolderInput id="ob-repos" aria-describedby={fieldHintId('ob-repos')} dialogTitle="Repos folder" value={value.reposDir} placeholder={fallbacks.reposDir} onChange={(reposDir) => onChange({ reposDir })} />
           </Row>
           <Row label="GitHub owner" htmlFor="ob-gh" hint="Optional. Your GitHub user or org, for your repos.">
-            <input id="ob-gh" className="field w-full font-mono !text-[13px]" value={value.githubOwner} placeholder="octocat" spellCheck={false} autoCapitalize="off" onChange={(e) => onChange({ githubOwner: e.target.value })} />
+            <input id="ob-gh" aria-describedby={fieldHintId('ob-gh')} {...IDENTIFIER} className="field field-mono w-full" value={value.githubOwner} placeholder="octocat" onChange={(e) => onChange({ githubOwner: e.target.value })} />
           </Row>
         </>
       )}
@@ -385,16 +387,16 @@ function ClaudeSignIn({ onDone }: { onDone: () => void }) {
       {/* Not a form: the wizard around it is one, and Enter here finishes the sign-in, not the step. */}
       <div className="space-y-2">
         <input
-          className="field w-full font-mono !text-[13px]"
+          {...IDENTIFIER}
+          className="field field-mono w-full"
           value={code}
           placeholder="Paste the code"
           aria-label="Code from the Claude page"
-          spellCheck={false}
-          autoCapitalize="off"
-          autoComplete="off"
+          autoComplete="one-time-code"
+          enterKeyHint="done"
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            if (e.key !== 'Enter' || isImeEnter(e)) return;
             e.preventDefault();
             void finish();
           }}
@@ -623,7 +625,9 @@ export function Steps({ step }: { step: number }) {
   return (
     <ol className="flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}>
       {STEPS.map((s, i) => (
-        <li key={s} title={s} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-6 bg-fg' : i < step ? 'w-1.5 bg-fg-2' : 'w-1.5 bg-fg-4'}`} />
+        <li key={s} title={s} aria-current={i === step ? 'step' : undefined} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-6 bg-fg' : i < step ? 'w-1.5 bg-fg-2' : 'w-1.5 bg-fg-4'}`}>
+          <span className="sr-only">{s}</span>
+        </li>
       ))}
     </ol>
   );
@@ -670,7 +674,8 @@ export function browserTimezone() {
   }
 }
 
-export function TimezoneInput({ id, value, onChange, describedBy }: { id: string; value: string; onChange: (v: string) => void; describedBy?: string }) {
+/** An IANA timezone, typed or picked from the browser's list. */
+export function TimezoneInput({ id, value, onChange, describedBy, placeholder = 'Europe/Amsterdam' }: { id: string; value: string; onChange: (v: string) => void; describedBy?: string; placeholder?: string }) {
   const zones = useMemo(() => {
     try {
       return (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
@@ -680,7 +685,7 @@ export function TimezoneInput({ id, value, onChange, describedBy }: { id: string
   }, []);
   return (
     <>
-      <input id={id} aria-describedby={describedBy} className="field w-full" list={`${id}-zones`} value={value} placeholder="Europe/Amsterdam" spellCheck={false} onChange={(e) => onChange(e.target.value)} />
+      <input id={id} aria-describedby={describedBy} className="field w-full" list={`${id}-zones`} value={value} placeholder={placeholder} spellCheck={false} onChange={(e) => onChange(e.target.value)} />
       <datalist id={`${id}-zones`}>
         {zones.map((z) => (
           <option key={z} value={z} />

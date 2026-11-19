@@ -3,6 +3,7 @@ import { searchSettings, sectionDef, sectionsIn, SETTINGS_GROUPS, type SettingsS
 import { desktop } from '../desktop.ts';
 import { href, navigate } from '../router.ts';
 import { Icon, type IconName } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 
 // Settings' nav on a desktop: a search box over the groups of sections (@omni/shared/settings-catalog.ts), the same
 // groups and order as the phone's Settings screen. Typing lists the settings that
@@ -17,14 +18,14 @@ export function SettingsNav({ section }: { section: SettingsSectionId }) {
   };
   return (
     <nav aria-label="Settings sections" className="space-y-4">
-      <label className="flex h-9 items-center gap-2 rounded-full bg-surface px-3 text-fg-3 focus-within:shadow-[inset_0_0_0_1px_var(--line-strong)]">
+      <label className="flex h-9 items-center gap-2 rounded-full bg-surface px-3 text-fg-3 focus-ring-within focus-within:shadow-[inset_0_0_0_1px_var(--line-strong)]">
         <Icon name="search" size={14} />
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && hits[0]) open(hits[0].section, hits[0].id);
+            if (e.key === 'Enter' && !isImeEnter(e) && hits[0]) open(hits[0].section, hits[0].id);
             if (e.key === 'Escape') setQ('');
           }}
           placeholder="Search settings"

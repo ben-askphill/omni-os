@@ -154,12 +154,23 @@ const orNull = (s: string) => (s.trim() ? s.trim() : null);
 /** A store domain as typed, without a scheme or a path: "https://acme.myshopify.com/admin" is acme.myshopify.com. */
 export const storeDomain = (raw: string) => orNull(raw)?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') ?? null;
 
-/** Why the form cannot be sent, or null. */
+/** The form's fields a problem can belong to, in the order the form shows them. */
+type ProblemField = 'name' | 'avatar_bg' | 'id' | 'worktree_include' | 'worktree_shared';
+
+/** Why each field cannot be sent, in the form's order; null for a field that is fine. */
+export function channelFormProblems(f: ChannelForm, isNew: boolean): Record<ProblemField, string | null> {
+  return {
+    name: f.name.trim() ? null : 'Give the channel a name.',
+    avatar_bg: f.avatar_bg && !/^#[0-9a-f]{6}$/i.test(f.avatar_bg) ? 'Use a six-digit hex color for the avatar background.' : null,
+    id: isNew && !CHANNEL_ID.test(f.id) ? 'The id needs 2 to 40 lowercase letters, digits or dashes.' : null,
+    worktree_include: worktreeListProblem(f.worktree_include),
+    worktree_shared: worktreeListProblem(f.worktree_shared, { shared: true }),
+  };
+}
+
+/** Why the form cannot be sent, or null: the first of channelFormProblems. */
 export function channelFormProblem(f: ChannelForm, isNew: boolean): string | null {
-  if (f.avatar_bg && !/^#[0-9a-f]{6}$/i.test(f.avatar_bg)) return 'Use a six-digit hex color for the avatar background.';
-  if (!f.name.trim()) return 'Give the channel a name.';
-  if (isNew && !CHANNEL_ID.test(f.id)) return 'The id needs 2 to 40 lowercase letters, digits or dashes.';
-  return worktreeListProblem(f.worktree_include) ?? worktreeListProblem(f.worktree_shared, { shared: true });
+  return Object.values(channelFormProblems(f, isNew)).find(Boolean) ?? null;
 }
 
 /**

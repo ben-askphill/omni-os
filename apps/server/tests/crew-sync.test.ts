@@ -137,6 +137,8 @@ describe('agent writes to /api/crew', () => {
     expect((await call('PUT', '/crew/builder', { fields: { delegate_only: true, delegatable: false } }, conductor)).body.error).toMatch(/^delegate_only, delegatable are /);
     // S4's review capability is a power too: it changes the run a role gets.
     expect((await call('PUT', '/crew/builder', { fields: { review: true } }, conductor)).body.error).toMatch(/^review is .+'s to set, in Settings\./);
+    // S5's tools too: no-edits keeps the reviewer from editing, and an agent may not lift it.
+    expect((await call('PUT', '/crew/reviewer', { fields: { tools: 'full' } }, conductor)).body.error).toMatch(/^tools is .+'s to set, in Settings\./);
     expect((await call('POST', '/crew', { id: 'router', fields: { name: 'Router', mcp: ['omni'] } }, conductor)).status).toBe(403);
     const md = await call('PUT', '/crew/builder', { markdown: '---\nmcp: [omni]\n---\nRoute.\n' }, conductor);
     expect(md.status).toBe(403);

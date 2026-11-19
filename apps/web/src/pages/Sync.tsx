@@ -3,7 +3,7 @@ import { machineLabel } from '@omni/shared/handoff.ts';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type SyncSignedIn, type SyncStatus } from '../api.ts';
 import { DeviceCodeSignIn, type FlowStart } from '../components/GoogleSignIn.tsx';
-import { Button, CopyButton, ErrorNote, FolderInput, Icon, InlineConfirm, Label, Loading, StatusDot } from '../components/ui.tsx';
+import { Button, CopyButton, ErrorNote, FolderInput, IDENTIFIER, Icon, InlineConfirm, Label, Loading, StatusDot } from '../components/ui.tsx';
 import { plural } from '../format.ts';
 import { href } from '../router.ts';
 import { useHereName, useSecretStoreLabel } from '../store.tsx';
@@ -233,11 +233,13 @@ function SignInForm({ again, legacy, onDone }: { again: boolean; legacy: boolean
         <Label htmlFor="sync-url">Relay URL</Label>
         <input
           id="sync-url"
-          className="field font-mono !text-[13px]"
+          {...IDENTIFIER}
+          className="field field-mono"
+          type="url"
+          inputMode="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://omni-relay.<you>.workers.dev"
-          spellCheck={false}
           autoComplete="off"
         />
       </div>
@@ -309,18 +311,17 @@ export function PathMapEditor() {
             <ul className="space-y-2">
               {rows.map((r, i) => (
                 <li key={i} className="flex items-center gap-2">
-                  <input aria-label="Path on the other machine" className="field min-w-0 flex-1 font-mono !text-[12.5px]" value={r.from} onChange={(e) => edit(i, { from: e.target.value })} placeholder="~/work" spellCheck={false} />
+                  <input aria-label="Path on the other machine" {...IDENTIFIER} className="field field-mono field-xs min-w-0 flex-1" value={r.from} onChange={(e) => edit(i, { from: e.target.value })} placeholder="~/work" />
                   <Icon name="arrowRight" size={14} className="shrink-0 text-fg-3" />
                   <FolderInput
                     aria-label="Path on this machine"
                     dialogTitle="Folder on this machine"
                     compact
-                    className="min-w-0 flex-1 !text-[12.5px]"
+                    className="field-xs min-w-0 flex-1"
                     wrapperClassName="flex-1"
                     value={r.to}
                     onChange={(to) => edit(i, { to })}
                     placeholder="~/code"
-                    spellCheck={false}
                   />
                   <Button variant="ghost" size="sm" icon="trash" aria-label="Remove mapping" onClick={() => (setSaved(false), setRows(rows.filter((_, j) => j !== i)))} />
                 </li>

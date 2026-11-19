@@ -1,5 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { readPref, writePref } from './store.tsx';
+import { layerOpen } from './components/ui/dismiss-stack.ts';
 
 /** True when a plain `key` keypress is a shortcut: no modifiers, no field or terminal focused, no layer open. */
 export function isPlainKey(e: KeyboardEvent, key: string): boolean {
@@ -7,7 +8,7 @@ export function isPlainKey(e: KeyboardEvent, key: string): boolean {
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
   const el = e.target instanceof HTMLElement ? e.target : null;
   if (el && (el.isContentEditable || el.matches('input, textarea, select') || el.closest('.xterm, [contenteditable]'))) return false;
-  if (document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return false;
+  if (layerOpen()) return false;
   return true;
 }
 

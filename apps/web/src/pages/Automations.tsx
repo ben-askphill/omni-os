@@ -187,9 +187,10 @@ function WebhookPanel({ id, webhook, onChanged }: { id: string; webhook: NonNull
           <form onSubmit={save} className="fade-in flex flex-wrap items-center gap-2">
             <input
               type="password"
-              autoComplete="off"
+              // A value to store, not a login: browsers ignore autocomplete="off" on a password field (Secrets.tsx).
+              autoComplete="new-password"
               aria-label="Signing secret"
-              className="field min-w-0 flex-1 basis-48 font-mono !text-[13px]"
+              className="field field-mono min-w-0 flex-1 basis-48"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="Paste the secret from GitHub"

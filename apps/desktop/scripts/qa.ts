@@ -48,6 +48,8 @@ export type QAStep =
   | { kind: 'window'; target: WindowTarget; timeoutMs: number }
   | { kind: 'openWindow'; route: string; timeoutMs: number }
   | { kind: 'appearance'; appearance: Appearance }
+  /** prefers-reduced-motion for every window from now on, as the OS's Reduce motion setting would. */
+  | { kind: 'motion'; motion: 'reduce' | 'no-preference' }
   | { kind: 'zoom'; factor: number }
   | { kind: 'size'; size: Size }
   | { kind: 'screenshot'; name: string }
@@ -136,7 +138,7 @@ export function swiftUICondition(value: string): string | null {
 
 const STEP_KEYS = [
   'route', 'click', 'fill', 'type', 'press', 'wait', 'sleep', 'expect', 'expectExternal', 'folderDialog', 'command', 'menu', 'window', 'openWindow',
-  'openThread', 'appearance', 'zoom', 'size', 'screenshot', 'snapshot', 'quit',
+  'openThread', 'appearance', 'motion', 'zoom', 'size', 'screenshot', 'snapshot', 'quit',
 ] as const;
 
 /** One step of a script. Each step is an object with one action key, as in the SwiftUI app's harness. */
@@ -236,6 +238,8 @@ export function parseStep(raw: unknown): Result<QAStep> {
       const appearance = parseAppearance(value);
       return appearance ? { kind: 'appearance', appearance } : { error: 'appearance is light or dark' };
     }
+    case 'motion':
+      return value === 'reduce' || value === 'no-preference' ? { kind: 'motion', motion: value } : { error: 'motion is reduce or no-preference' };
     case 'zoom': {
       const factor = parseZoom(value);
       return factor !== null ? { kind: 'zoom', factor } : { error: 'zoom is a factor such as 1.2' };
@@ -460,6 +464,8 @@ interface Report {
     folderDialogs: string[];
   };
   pageErrors: string[];
+  /** The console's Content-Security-Policy messages, report-only ones included, so a policy change shows what it trips. */
+  cspViolations: string[];
 }
 
 const DESKTOP = resolve(import.meta.dirname, '..');
@@ -481,7 +487,7 @@ function bail(out: string | null, report: Report, message: string, code: number)
 }
 
 async function main(argv: readonly string[]): Promise<number> {
-  const report: Report = { ok: true, error: null, app: { executable: null, packaged: false }, port: null, dataDir: null, steps: [], facts: { route: null, windows: [], external: [], folderDialogs: [] }, pageErrors: [] };
+  const report: Report = { ok: true, error: null, app: { executable: null, packaged: false }, port: null, dataDir: null, steps: [], facts: { route: null, windows: [], external: [], folderDialogs: [] }, pageErrors: [], cspViolations: [] };
   const args = parseArgs(argv);
   if (isError(args)) bail(null, report, args.error, 2);
   const out = resolve(args.out);
@@ -545,14 +551,19 @@ async function main(argv: readonly string[]): Promise<number> {
     if (watched.has(page)) return;
     watched.add(page);
     page.on('pageerror', (err) => report.pageErrors.length < 50 && report.pageErrors.push(`${page.url()}: ${err.message}`));
+    page.on('console', (m) => {
+      if (/Content Security Policy/.test(m.text()) && report.cspViolations.length < 50) report.cspViolations.push(`${page.url()}: ${m.text()}`);
+    });
   };
   app.on('window', watch);
 
   const browserWindow = (page: Page) => app.browserWindow(page);
   let appearance = script.appearance;
+  let motion: 'reduce' | 'no-preference' | null = null;
   const style = async (page: Page) => {
     watch(page);
     if (appearance) await page.emulateMedia({ colorScheme: appearance });
+    if (motion) await page.emulateMedia({ reducedMotion: motion });
   };
 
   let current: Page | null = null;
@@ -787,6 +798,10 @@ async function main(argv: readonly string[]): Promise<number> {
             for (const w of app.windows()) if (!w.isClosed()) await style(w);
             break;
           }
+          case 'motion':
+            motion = step.motion;
+            for (const w of app.windows()) if (!w.isClosed()) await style(w);
+            break;
           case 'zoom':
             await setZoom(app, page, step.factor);
             break;

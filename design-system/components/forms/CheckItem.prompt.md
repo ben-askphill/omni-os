@@ -5,4 +5,4 @@ Animated plan checklist row and Bencho tick meter.
 <Ticks value={0.71} count={24} />
 ```
 
-CheckItem states pending | in_progress | completed. Ticks tone="needs" past a threshold.
+CheckItem states pending | in_progress | completed. A list item inside a <ul>, its state said in words, never a button. Ticks tone="needs" past a threshold.

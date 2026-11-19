@@ -1,7 +1,7 @@
-import { useState, type MouseEvent } from 'react';
+import { useId, useState, type MouseEvent } from 'react';
 import { AVATAR_SWATCHES, svgColors } from '@omni/shared/avatar-color.ts';
 import { parseChannelIcon, svgDataUrl } from '@omni/shared/channel-icon.ts';
-import { Avatar, Button, ErrorNote } from './ui.tsx';
+import { Avatar, Button, ErrorNote, FieldError, fieldErrorId, useFieldErrors } from './ui.tsx';
 
 const SWATCH_NAMES: Record<string, string> = {
   '#e8d9f5': 'Lavender',
@@ -24,6 +24,10 @@ export function AvatarColorPicker({ icon, name, omni, value, manual, onChange, o
   const [hex, setHex] = useState(current);
   const [previous, setPrevious] = useState(current);
   if (previous !== current) { setPrevious(current); setHex(current); }
+  const hexId = `${useId()}-hex`;
+  // Shown once the field is left, not on every keystroke of a color being typed.
+  const problems = useFieldErrors({ [hexId]: hex && !/^#[\da-f]{6}$/i.test(hex) ? 'Use # and six hex digits, like #e8d9f5.' : null });
+  const hexError = problems.error(hexId);
   const sample = async (event: MouseEvent<HTMLImageElement>) => {
     const img = event.currentTarget;
     const bounds = img.getBoundingClientRect();
@@ -50,10 +54,11 @@ export function AvatarColorPicker({ icon, name, omni, value, manual, onChange, o
     <div className="flex flex-wrap items-center gap-3">
       <Avatar name={name} omni={omni} channelIcon={icon} avatarBg={value} size={56} />
       <input type="color" aria-label="Avatar background color" value={current || '#e8d9f5'} onChange={(e) => onChange(e.target.value)} className="h-9 w-10 cursor-pointer rounded-lg" />
-      <input aria-label="Avatar background hex" className="field !w-28 font-mono" placeholder="#e8d9f5" value={hex} maxLength={7} onChange={(e) => { setHex(e.target.value); if (/^#[\da-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} aria-invalid={!!hex && !/^#[\da-f]{6}$/i.test(hex)} />
+      <input id={hexId} aria-label="Avatar background hex" className="field field-mono !w-28" placeholder="#e8d9f5" value={hex} maxLength={7} spellCheck={false} autoCapitalize="none" autoCorrect="off" onChange={(e) => { setHex(e.target.value); if (/^#[\da-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} onBlur={problems.onBlur} aria-invalid={problems.invalid(hexId)} aria-describedby={hexError ? fieldErrorId(hexId) : undefined} />
       <Button type="button" onClick={onAuto} disabled={!manual} title={manual ? undefined : 'Already automatic'}>Reset to auto</Button>
       <span className="text-xs text-fg-3">{manual ? 'Custom color' : 'Automatic'}</span>
     </div>
+    {hexError && <FieldError id={fieldErrorId(hexId)}>{hexError}</FieldError>}
     <div className="flex flex-wrap gap-2" role="group" aria-label="Background swatches">
       {swatches.map((color) => {
         const name = SWATCH_NAMES[color] ?? `From the SVG, ${color}`;

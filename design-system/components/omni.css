@@ -105,6 +105,8 @@ button.om-tid{background:none;border:0;padding:0;cursor:pointer}
 .om-seg-item{position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;height:var(--h-seg);padding:0 14px;border:0;border-radius:var(--r-pill);background:transparent;font:400 var(--fs-ui)/1 var(--font-sans);color:var(--fg-3);white-space:nowrap;cursor:pointer;transition:color .26s var(--ease-stretch)}
 .om-seg-item:hover{color:var(--fg-2)}
 .om-seg-item[data-active="true"]{color:var(--fg)}
+/* Forced colors drops the thumb: outline the selected item so the choice still shows. */
+@media (forced-colors:active){.om-seg-item[data-active="true"],[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:-2px}}
 .om-seg[data-size="sm"] .om-seg-item{height:var(--h-seg-sm);padding:0 11px;font-size:var(--fs-small)}
 .om-seg[data-size="sm"][data-icons] .om-seg-item{padding:0 8px}
 .om-seg-item .om-count{font:400 var(--fs-meta)/1 var(--font-num);color:var(--fg-4)}
@@ -153,6 +155,10 @@ button.om-tid{background:none;border:0;padding:0;cursor:pointer}
 .om-pik-card{position:absolute;z-index:30;width:min(300px,calc(100vw - 32px));padding:6px;border-radius:var(--r-2xl);background:var(--elev);box-shadow:var(--shadow-menu);animation:om-pik .34s var(--ease-settle)}
 .om-pik-card[data-up]{bottom:calc(100% + 8px);transform-origin:0 100%}
 .om-pik-card:not([data-up]){top:calc(100% + 8px)}
+/* Exits (apps/web ui/use-exit.ts): a list, a menu or a modal on its way out plays one short exit, then goes. None with Reduce motion on. Closing, it takes no presses. */
+[data-closing]{pointer-events:none}
+@media (prefers-reduced-motion:no-preference){.om-pik-card[data-closing],.om-stack__menu[data-closing]{animation:om-exit-pop .14s var(--ease-out) forwards}}
+@keyframes om-exit-pop{to{opacity:0;transform:translateY(-2px) scale(.97)}}
 .om-pik-row{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;padding:6px 8px;border:0;border-radius:16px;background:transparent;text-align:left;cursor:pointer;transition:background-color .14s}
 .om-pik-row[data-cursor="true"]{background:var(--wash)}
 .om-pik-row .t{display:flex;flex-direction:column;min-width:0;flex:1}
@@ -162,7 +168,8 @@ button.om-tid{background:none;border:0;padding:0;cursor:pointer}
 .om-pik-row[aria-selected="true"] .om-pik-mark{background:var(--fg);box-shadow:inset 0 0 0 1.5px var(--fg)}
 
 /* ---------- Checklist (Bencho "chk") ---------- */
-.om-chk{display:flex;align-items:flex-start;gap:10px;padding:3px 0}
+.om-chk{display:flex;align-items:flex-start;gap:10px;padding:3px 0;list-style:none}
+.om-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .om-chk-box{position:relative;display:grid;place-items:center;flex:none;width:18px;height:18px;margin-top:1px;border-radius:var(--r-xs);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--fg) 28%,transparent);overflow:hidden}
 .om-chk-fill{position:absolute;inset:0;background:var(--fg);transform:scale(0);border-radius:inherit;transition:transform .34s var(--ease-spring)}
 .om-chk-tick{position:relative;width:70%;height:70%;fill:none;stroke:var(--on-ink);stroke-width:2.6px;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:20;stroke-dashoffset:20;transition:stroke-dashoffset .28s var(--ease-out) .1s}
@@ -451,3 +458,22 @@ button.om-tid{background:none;border:0;padding:0;cursor:pointer}
 /* ---------- Narrow containers ---------- */
 .om-thread{container-type:inline-size;container-name:om-thread}
 @container om-thread (max-width:560px){.om-bubble{max-width:92%}.om-branch{grid-template-columns:28px minmax(0,1fr)}.om-branch__side{grid-column:2;grid-row:2;padding-top:0}.om-tool__args{display:none}.om-report__end{margin-left:0;width:100%}}
+
+/* ---------- Connectors (apps/web/src/components/ConnectorMark.tsx, ToolRows.tsx ConnectorRow, ThreadQuickCard Connectors) ---------- */
+.om-connector{display:inline-grid;flex:none;place-items:center;width:var(--om-connector-size,20px);height:var(--om-connector-size,20px);border-radius:var(--r-xs);background:var(--surface);box-shadow:inset 0 0 0 1px var(--line-strong);color:var(--fg)}
+.om-connector svg{display:block;width:62%;height:62%}
+.om-connector__letter{font:600 calc(var(--om-connector-size,20px) * .59)/1 var(--font-sans);color:var(--fg)}
+.om-connector__plug{color:var(--fg-2)}
+.om-connector-row{display:inline-flex;align-items:center;gap:10px;max-width:100%;min-width:0;height:36px;padding:0 12px 0 4px;margin-left:-4px;border-radius:999px;font:400 13px/1 var(--font-sans);color:var(--fg-3);background:none;border:0;cursor:pointer}
+.om-connector-row:hover{background:var(--surface-2)}
+.om-connector-row__label{flex:none;font-weight:500;color:var(--fg-2)}
+.om-connector-row__detail{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.om-connector-row__chev{flex:none;width:12px;height:12px;color:var(--fg-3);transition:transform .3s var(--ease-settle)}
+.om-connector-row[aria-expanded="true"] .om-connector-row__chev{transform:rotate(90deg)}
+.om-connector-row__body{margin:4px 0 8px 34px}
+.om-connector-now{display:inline-flex;align-items:center;gap:5px;max-width:100%;min-width:0;vertical-align:top;color:var(--fg-3)}
+.om-connector-now > :last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.om-connectors__cap{padding:8px 12px 4px;font:400 11px/1.2 var(--font-sans);color:var(--fg-3)}
+.om-connectors__row{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:var(--r-sm);font:400 12.5px/1 var(--font-sans);color:var(--fg)}
+.om-connectors__name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.om-connectors__kind{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--fg-3)}

@@ -12,7 +12,7 @@
 <script type="text/babel">
 omReady(({ CheckItem }) => {
 
-function App(){const [ck,setCk]=React.useState(['completed','in_progress','pending']);const next=(i)=>setCk(c=>c.map((v,j)=>j===i?(v==='completed'?'pending':v==='pending'?'in_progress':'completed'):v));return <div style={{width:300}}><CheckItem state={ck[0]} onClick={()=>next(0)}>Find where the drop is</CheckItem><CheckItem state={ck[1]} onClick={()=>next(1)}>Decide on WEEKEND15</CheckItem><CheckItem state={ck[2]} onClick={()=>next(2)}>Merge #812</CheckItem></div>}
+function App(){const [ck,setCk]=React.useState(['completed','in_progress','pending']);const next=(i)=>setCk(c=>c.map((v,j)=>j===i?(v==='completed'?'pending':v==='pending'?'in_progress':'completed'):v));return <div style={{width:300}}><ul aria-label="To-dos" style={{margin:0,padding:0}}><CheckItem state={ck[0]}>Find where the drop is</CheckItem><CheckItem state={ck[1]}>Decide on WEEKEND15</CheckItem><CheckItem state={ck[2]}>Merge #812</CheckItem></ul><button type="button" className="om-btn om-btn--ghost om-btn--sm" style={{marginTop:6}} onClick={()=>[0,1,2].forEach(next)}>Next state</button></div>}
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 });
 </script>

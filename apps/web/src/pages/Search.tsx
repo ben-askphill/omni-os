@@ -35,7 +35,7 @@ export function SearchPage({ q }: { q: string }) {
           <input
             ref={input}
             type="search"
-            className="h-12 w-full rounded-full bg-surface pr-5 pl-11 text-[15px] shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] outline-none placeholder:text-fg-4 focus:bg-bg focus:shadow-[inset_0_0_0_1px_var(--line-strong),0_0_0_5px_var(--wash)] focus-visible:outline-none"
+            className="h-12 w-full rounded-full bg-surface pr-5 pl-11 text-[15px] shadow-[inset_0_0_0_1px_var(--line)] focus-ring transition-[box-shadow,background-color] placeholder:text-fg-4 focus:bg-bg focus:shadow-[inset_0_0_0_1px_var(--line-strong)]"
             placeholder="Search threads"
             value={value}
             onChange={(e) => setValue(e.target.value)}

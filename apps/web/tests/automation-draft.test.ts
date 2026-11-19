@@ -49,4 +49,13 @@ describe('automation draft', () => {
     expect(draftProblem({ ...blankDraft(), name: 'x', prompt: 'y', trigger: 'event', event: 'github_webhook' })).toMatch(/owner\/name/);
     expect(draftProblem({ ...blankDraft(), name: 'x', prompt: 'y' })).toBeNull();
   });
+
+  it('refuses a timezone that is not an IANA name, and takes an empty one as yours', () => {
+    const d = { ...blankDraft(), name: 'x', prompt: 'y' };
+    expect(draftProblem({ ...d, timezone: 'Europe/Amsterdm' })).toMatch(/timezone from the list/);
+    expect(draftProblem({ ...d, timezone: 'Europe/Amsterdam' })).toBeNull();
+    expect(draftProblem({ ...d, timezone: ' ' })).toBeNull();
+    // An event automation has no schedule, so its leftover timezone is never saved.
+    expect(draftProblem({ ...d, trigger: 'event', event: 'pr_opened', timezone: 'nope' })).toBeNull();
+  });
 });

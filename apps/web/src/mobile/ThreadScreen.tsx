@@ -1,4 +1,6 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useId, useMemo, useRef, useState } from 'react';
+import { useDismissLayer } from '../components/ui/dismiss-stack.ts';
+import { useExit } from '../components/ui/use-exit.ts';
 import { glyphLabel, showsCode } from '@omni/shared/display.ts';
 import { useDisplay } from '../display.ts';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
@@ -37,11 +39,13 @@ import { Turn, useBranchChanges, type TurnCtx } from './ThreadTurn.tsx';
 import { useOpenOnNewestTurn } from './useOpenOnNewestTurn.ts';
 import { threadView } from '@omni/shared/thread-view.ts';
 import { crewLine, prLine, prOffered, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
-import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
+import { ThreadQuickCard, useThreadConnectors } from '../components/thread/ThreadQuickCard.tsx';
+import { ProgressCard, useProgressPanel } from '../components/thread/ProgressCard.tsx';
 import type { PanelTab } from '../pages/useThreadSession.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
+import { defers, LIVE_TURNS } from '../transcript/defer.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
 export function ThreadScreen() {
@@ -54,6 +58,19 @@ export function ThreadScreen() {
   const ran = useThreadAccount(thread?.id);
   // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
   const [quick, setQuick] = useState(false);
+  // The quick card: a popup its header button toggles, light dismissed by the dismiss stack (a tap outside it or
+  // Escape). It stays in the pane, not the top layer: the top layer follows the layout viewport, which iOS keeps under
+  // the keyboard, while MobileShell sizes the pane from the visual viewport.
+  const quickId = useId();
+  const quickButton = useRef<HTMLButtonElement>(null);
+  const quickCard = useRef<HTMLDivElement>(null);
+  const quickExit = useExit(quick, quickCard);
+  useDismissLayer(quick, {
+    roots: () => [quickCard.current, quickButton.current],
+    // A phone sheet over it keeps Escape (the sheets keep their own stack, mobile/parts.tsx).
+    escape: () => (document.querySelector('[role="dialog"][aria-modal="true"]') ? false : setQuick(false)),
+    outside: () => setQuick(false),
+  });
   const display = useDisplay();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
@@ -65,6 +82,8 @@ export function ThreadScreen() {
   const edges = useMemo(() => historyEdges({ spans }, view?.turns.map((t) => t.key) ?? []), [spans, view]);
   const status = useMemo(() => (thread?.status === 'running' ? statusLabel(events) : null), [events, thread?.status]);
   const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
+  const progress = useProgressPanel(events, thread?.status === 'running', view?.asking ?? false);
+  const connectors = useThreadConnectors(events);
   const changes = useBranchChanges(thread, slotBusy);
   const [pr] = useThreadPR(thread, slotBusy, true);
   // The channel's own step prompts (Channel Settings), else the built-in ones.
@@ -79,7 +98,7 @@ export function ThreadScreen() {
     setHandoff(a.handoff);
   };
   // The Machine chip: where the thread runs, as a chip that opens the sheet a new thread picks its machine in.
-  const machine = useThreadMachine({ id: thread?.id ?? '', status: thread?.status }, { blocked: s.blocked, handoff, takeover, onChanged: handedOff }, (e) => e && shell.toast(e));
+  const machine = useThreadMachine({ id: thread?.id ?? '', status: thread?.status }, { blocked: s.blocked, handoff, takeover, onChanged: handedOff }, (e) => e && shell.toast(e, 'error'));
 
   if (notFound || (!thread && error)) {
     return (
@@ -114,7 +133,7 @@ export function ThreadScreen() {
       applyThread(await api.post<Thread>(`/threads/${encodeURIComponent(thread.id)}/messages`, { prompt: prompts.open }), true);
       shell.toast(`Asked ${theirs} to open a PR`);
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     }
   };
   const report = latest?.artifacts.find((a) => a.kind === 'html' || a.kind === 'markdown' || a.kind === 'pdf') ?? latest?.artifacts[0];
@@ -187,16 +206,30 @@ export function ThreadScreen() {
           <>
             <StatusPill mark={pill.mark} label={pill.label} />
             {/* The quick card shows in every channel: Show technical details only changes which rows it lists. */}
-            <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
-            <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
+            <MoRound
+              icon="panel"
+              label="Quick actions"
+              ink={quick}
+              expanded={quick}
+              controls={quickId}
+              buttonRef={quickButton}
+              onClick={() => setQuick((v) => !v)}
+            />
+            <MoRound icon="more" label="Thread options" onClick={() => (setQuick(false), setMenu(true))} />
           </>
         }
       />
       <div className="relative min-h-0 flex-1">
-        {quick && (
+        {quickExit.shown && (
           <>
-            <button type="button" aria-label="Close quick actions" tabIndex={-1} className="absolute inset-0 z-10 cursor-default" onClick={() => setQuick(false)} />
-            <div className="pop-in absolute top-2 right-2 z-20 max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] overflow-y-auto">
+            <div
+              ref={quickCard}
+              id={quickId}
+              role="group"
+              aria-label="Quick actions"
+              data-closing={quickExit.closing || undefined}
+              className="menu-pop pop-in absolute top-2 right-2 z-20 flex max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] flex-col gap-[var(--sp-4)] overflow-y-auto"
+            >
               <ThreadQuickCard
                 thread={thread}
                 code={code}
@@ -222,7 +255,10 @@ export function ThreadScreen() {
                   setQuick(false);
                   shell.open(href.thread(t));
                 }}
+                connectors={connectors}
+                className="shrink-0"
               />
+              <ProgressCard threadId={thread.id} panel={progress} className="shrink-0" />
             </div>
           </>
         )}
@@ -236,7 +272,8 @@ export function ThreadScreen() {
                 return (
                   <Fragment key={t.key}>
                     {edge && <HistoryEdgeRow edge={edge} history={history} touch />}
-                    <div data-key={t.key} ref={last ? newest : undefined} className="flex flex-col gap-4">
+                    {/* Older turns skip rendering while out of view (.tx-row); the newest never do. */}
+                    <div data-key={t.key} ref={last ? newest : undefined} className={defers(i, view.turns.length, LIVE_TURNS) ? 'tx-row tx-turn flex flex-col gap-4' : 'flex flex-col gap-4'}>
                       <Turn t={t} first={i === 0} last={last} c={ctx} />
                     </div>
                   </Fragment>

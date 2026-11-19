@@ -20,6 +20,8 @@
 // Directives in a turn's input text:
 //   CMD       run a shell command (a commandExecution item) before the reply. Started with approvalPolicy
 //             "untrusted", it first asks the client (item/commandExecution/requestApproval) and runs only on accept
+//   PATCH     change a file (a fileChange item) before the reply. Started with approvalPolicy "untrusted", it first
+//             asks the client (item/fileChange/requestApproval) and writes codex-patched.txt only on accept
 //   NOISY     run a command that prints 3,000 lines (outputDelta) and stays up FAKE_CODEX_NOISY_MS (700) before it ends
 //   PLAN      update the checklist (turn/plan/updated) before the reply
 //   SLOW      take 400 ms before replying
@@ -280,6 +282,18 @@ async function runTurn(turn, input) {
     } else {
       item(turn, { ...cmd, status: 'declined', aggregatedOutput: null, exitCode: null, durationMs: 0 }, 'completed');
     }
+  }
+  if (said.includes('PATCH')) {
+    const file = join(process.cwd(), 'codex-patched.txt');
+    const change = { type: 'fileChange', id: nextItemId(), status: 'inProgress', changes: [{ path: file, kind: { type: 'add' }, diff: '+patched\n' }] };
+    item(turn, change, 'started');
+    const answer = approvalPolicy === 'untrusted'
+      ? await askClient('item/fileChange/requestApproval', { threadId, turnId: turn.id, itemId: change.id, reason: null, grantRoot: null })
+      : { decision: 'accept' };
+    await delay(5);
+    const ok = answer?.decision === 'accept' || answer?.decision === 'acceptForSession';
+    if (ok) writeFileSync(file, 'patched\n');
+    item(turn, { ...change, status: ok ? 'completed' : 'declined' }, 'completed');
   }
   if (said.includes('NOISY')) {
     // A command that prints a lot while it runs, then stays up for a while: its row opens at once and its output

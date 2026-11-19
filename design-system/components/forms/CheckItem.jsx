@@ -1,16 +1,22 @@
 import React from 'react';
 
-/* Animated checklist row (Bencho "chk"): the box fills, the tick draws, the label is struck through. */
-export function CheckItem({ state = 'pending', children, onClick }) {
+const CHECK_SAID = { pending: 'To do', in_progress: 'In progress', completed: 'Done' };
+
+/* Animated checklist row (Bencho "chk"): the box fills, the tick draws, the label is struck through. A list item, not
+   a control: render rows inside a <ul>. The box is hidden from assistive tech and the state is said in words. */
+export function CheckItem({ state = 'pending', children }) {
   return (
-    <div data-state={state} className="om-chk" onClick={onClick} style={onClick ? { cursor: 'pointer' } : undefined}>
-      <span className="om-chk-box">
+    <li data-state={state} className="om-chk">
+      <span className="om-chk-box" aria-hidden="true">
         <span className="om-chk-fill" />
-        <svg viewBox="0 0 24 24" className="om-chk-tick" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+        <svg viewBox="0 0 24 24" className="om-chk-tick"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
         {state === 'in_progress' && <span className="om-chk-live" />}
       </span>
-      <span className="om-chk-text"><span className="om-chk-say">{children}</span></span>
-    </div>
+      <span className="om-chk-text">
+        <span className="om-sr-only">{CHECK_SAID[state] ?? state}: </span>
+        <span className="om-chk-say">{children}</span>
+      </span>
+    </li>
   );
 }
 

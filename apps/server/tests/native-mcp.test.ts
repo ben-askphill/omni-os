@@ -33,7 +33,7 @@ const script = (name: string, body: string, mode = 0o755) => {
 };
 const GOOD = script('good', 'echo "omni-mcp 9.9.9"');
 const channel = { id: 'c', name: 'C', browser_headless: 1 } as Channel;
-const conductor: CrewRole = { id: 'r', name: 'R', description: '', mcp: ['omni'], delegateOnly: false, delegatable: true, review: false, kind: 'own', hidden: false, charter: 'x' };
+const conductor: CrewRole = { id: 'r', name: 'R', description: '', mcp: ['omni'], tools: 'full', delegateOnly: false, delegatable: true, review: false, memory: 'read-write', memoryWrites: 'review', kind: 'own', hidden: false, charter: 'x' };
 const URL = 'http://127.0.0.1:4747';
 const servers = (role?: CrewRole) => buildMcpConfig({ threadId: 't', channel, role, browserBusy: false, omniUrl: URL }).mcpServers;
 
@@ -84,7 +84,7 @@ describe('what a thread gets', () => {
       expect(got[name]).toMatchObject({ command: GOOD, args: [arg], env: { OMNI_URL: URL, OMNI_THREAD_ID: 't', OMNI_TOKEN_FILE: expect.any(String) } });
     }
     servers();
-    expect(log.mock.calls.filter(([line]) => String(line).startsWith('[mcp]'))).toEqual([[`[mcp] ask, render, steps and threads run on ${GOOD} (9.9.9)`]]);
+    expect(log.mock.calls.filter(([line]) => String(line).startsWith('[mcp]'))).toEqual([[`[mcp] ask, render, steps, threads and memory run on ${GOOD} (9.9.9)`]]);
   });
 
   it('keeps the conductor on its TypeScript server, which has no Rust build yet', () => {
@@ -102,7 +102,7 @@ describe('what a thread gets', () => {
     expect(servers()).toEqual({});
     expect(servers(conductor)).toEqual({ omni: expect.objectContaining({ args: [paths.mcpOmni] }) });
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain('Threads get no ask_user_question, html_render, set_steps or read_referenced_thread. Build it with npm run dev');
+    expect(String(warn.mock.calls[0][0])).toContain('Threads get no ask_user_question, html_render, set_steps, read_referenced_thread or remember. Build it with npm run dev');
     expect(nativeMcpCommand('ask')).toBeNull();
   });
 

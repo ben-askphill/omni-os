@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, errorText, type Thread } from '../../api.ts';
 import { answersMessage, OPEN_ITEM_LABEL, readOpenItems, spawnPrompt, type OpenItem } from '@omni/shared/open-items.ts';
 import { Button, ErrorNote, IconButton } from '../ui.tsx';
+import { isImeEnter } from '../../ime.ts';
 
 type Busy = 'send' | 'dismiss-all' | `dismiss:${number}`;
 
@@ -121,14 +122,14 @@ export function OpenItemsCard({
                 </div>
               )}
               <input
-                className={`field mt-2 !py-[7px] ${mobile ? '!text-[length:var(--fs-input)]' : '!text-[13px]'}`}
+                className={`field mt-2 !py-[7px] ${mobile ? '!text-[length:var(--fs-input)]' : 'field-sm'}`}
                 placeholder={item.kind === 'blocker' ? 'Note, e.g. done' : item.options ? 'Or write your own answer' : 'Your answer'}
                 aria-label={`Answer: ${item.text}`}
                 value={value}
                 disabled={busy === 'send'}
                 onChange={(e) => setAnswer(item, e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && reply) {
+                  if (e.key === 'Enter' && !e.shiftKey && !isImeEnter(e) && reply) {
                     e.preventDefault();
                     void send();
                   }
