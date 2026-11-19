@@ -158,8 +158,8 @@ describe('no spinner says that something runs', () => {
     expect(marks).not.toMatch(/animation|transition|@keyframes/);
     expect(css).toMatch(/\n\s*\.ping \{\s*animation: omni-ping var\(--dur-ping\)/);
     expect(css).toMatch(/\n\s*\.breathe \{\s*animation: omni-breathe /);
-    const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(reduced).toMatch(/\.ping,\s*\.breathe[^{]*\{\s*animation: none !important/);
+    const reduced = css.slice(css.indexOf('/* ---- reduced motion ----'));
+    expect(reduced).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[^@]*\.ping,\s*\.breathe[^{]*\{\s*animation: none;/);
     // Still, the halo is not drawn at all: no disc sits behind a hollow mark.
     expect(marks).toMatch(/\.glyph > \.ping \{[^}]*opacity: 0;/);
   });

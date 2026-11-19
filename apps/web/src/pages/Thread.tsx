@@ -46,6 +46,7 @@ import { useThreadPresence } from './useThreadPresence.ts';
 import { useThreadSession } from './useThreadSession.ts';
 import { useTranscriptScroll } from './useTranscriptScroll.ts';
 import { useReveal } from './useReveal.ts';
+import { scrollBehavior } from '../motion.ts';
 import { tailId } from '@omni/shared/history.ts';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
 
@@ -151,7 +152,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
     if (!toAgents || panelTab !== 'details') return;
     const card = document.getElementById(AGENTS_CARD_ID);
     if (!card) return;
-    card.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    card.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
     setToAgents(false);
   }, [toAgents, panelTab, children, panel.open]);
   // The channel's own step prompts (Channel Settings), from the live channel list so an edit applies without a reload.

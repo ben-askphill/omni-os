@@ -252,7 +252,7 @@ export function QuickPromptPage({ bridge }: { bridge: DesktopBridge }) {
                 }}
                 className={`hov press grid h-7 w-7 place-items-center rounded-full transition-colors ${listening ? 'bg-surface-2 text-needs' : 'text-fg-3 hover:text-fg'}`}
               >
-                <Icon name="mic" size={15} className={listening ? 'animate-pulse' : ''} />
+                <Icon name="mic" size={15} className={listening ? 'motion-safe:animate-pulse' : ''} />
               </button>
             )}
           </div>

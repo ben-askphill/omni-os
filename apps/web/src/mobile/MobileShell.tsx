@@ -16,8 +16,10 @@ import { RENDER, SheetView } from './registry.tsx';
 import { placeEntry, rootTabOf, screenOf, specOf, stackOf, type NavDirection, type Tab } from './screens.ts';
 import { LayerShownCtx, SheetHostCtx, SheetStack } from './sheet-stack.ts';
 import { ShellCtx, TabShownCtx, ThreadScope, type MobileShellApi, type ShellSheet } from './shell.tsx';
+import { useStackTransitions } from './stack-transition.ts';
 
 const TAB_PATH: Record<Tab, string> = { activity: '/', channels: '/channels', library: '/artifacts', prs: '/prs' };
+// The push keyframe's length, where the browser has no view transition types.
 const PUSH_MS = 420;
 
 /** This entry's place in history, numbered the first time the app sees it, and which way the last move went. */
@@ -108,14 +110,19 @@ export function MobileShell() {
 
   const stack = useMemo(() => stackOf(route, hash), [route, hash]);
   const top = stack[stack.length - 1];
+  // A move a view transition played: the browser animates both screens, so none of the timed keyframes below run.
+  const played = useStackTransitions(place.index);
+  const viaTransition = played.current === hash;
 
   // Pushing a screen that is not the old top's child keeps the old top under it while the new one slides in.
   const prevTop = useRef<Layer | undefined>(undefined);
   const [underlay, setUnderlay] = useState<Layer | null>(null);
   useLayoutEffect(() => {
+    // The new hash renders once before its place in history is known: keep the old top until it is.
+    if (place.hash !== hash) return;
     const old = prevTop.current;
     prevTop.current = top;
-    if (place.hash !== hash || place.dir !== 'forward' || !old || !top || stack.some((l) => l.key === old.key)) return;
+    if (viaTransition || place.dir !== 'forward' || !old || !top || stack.some((l) => l.key === old.key)) return;
     setUnderlay(old);
     const t = setTimeout(() => setUnderlay(null), PUSH_MS + 40);
     return () => clearTimeout(t);
@@ -156,7 +163,7 @@ export function MobileShell() {
 
   const api = useMemo<MobileShellApi>(() => ({ back, open: (to) => navigate(to), sheet: setSheet, toast: showToast }), [back, showToast]);
 
-  const pushedIn = place.hash === hash && place.dir === 'forward';
+  const pushedIn = !viaTransition && place.hash === hash && place.dir === 'forward';
   // The top screen whose push is still playing: what it covers stays drawn under it until it lands.
   const [pushing, setPushing] = useState<string | null>(null);
   useLayoutEffect(() => {
@@ -192,7 +199,7 @@ export function MobileShell() {
                   className={layerCls}
                   style={{
                     visibility: shown ? 'visible' : 'hidden',
-                    animation: shown && !covered && place.dir !== 'none' ? 'mo-fade 220ms var(--ease-out)' : 'none',
+                    animation: shown && !covered && place.dir !== 'none' && !viaTransition ? 'mo-fade 220ms var(--ease-out)' : 'none',
                     // A tab in the background, or one a pushed screen has covered, skips layout and paint.
                     ...(!shown || (covered && landed) ? SKIPPED : {}),
                   }}

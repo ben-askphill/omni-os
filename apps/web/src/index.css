@@ -410,11 +410,22 @@
   .hov:disabled::before {
     opacity: 0;
   }
+  /* Reduced motion: the wash fades in at full size. */
+  @media (prefers-reduced-motion: reduce) {
+    .hov::before {
+      transition: opacity 160ms;
+    }
+  }
   .press {
     transition: transform 220ms var(--ease-settle);
   }
   .press:active:not(:disabled) {
     transform: scale(0.96);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .press {
+      transition: none;
+    }
   }
 
   /* ---- status marks (Mark in packages/shared/status.ts, drawn by StatusDot) ----
@@ -777,6 +788,12 @@
       background: GrayText;
     }
   }
+  /* Reduced motion: the knob jumps; the track's colour still fades. */
+  @media (prefers-reduced-motion: reduce) {
+    .tgl-knob {
+      transition: none;
+    }
+  }
 
   /* ---- inline confirm with undo fuse (Bencho "say") ---- */
   .say {
@@ -787,6 +804,11 @@
     background: var(--say-bg, var(--surface-2));
     overflow: hidden;
     transition: width 0.34s var(--ease-spring);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .say {
+      transition: none;
+    }
   }
   .say-row {
     display: inline-flex;
@@ -911,6 +933,12 @@
   .sld-wash[data-spring] {
     transition: width 0.5s var(--ease-settle);
   }
+  @media (prefers-reduced-motion: reduce) {
+    .sld-grip[data-spring],
+    .sld-wash[data-spring] {
+      transition: none;
+    }
+  }
   .sld[data-done] {
     background: var(--fg);
     color: var(--on-ink);
@@ -1022,6 +1050,11 @@
   [aria-expanded="true"] > .pik-chev {
     rotate: 180deg;
   }
+  @media (prefers-reduced-motion: reduce) {
+    .pik-chev {
+      transition: none;
+    }
+  }
 
   /* ---- animated checklist row (Bencho "chk") ---- */
   .chk-box {
@@ -1081,6 +1114,12 @@
   [data-state="in_progress"] > .chk-box {
     box-shadow: inset 0 0 0 1.5px var(--fg);
   }
+  /* Reduced motion: the box fills at once; the tick still draws and the strike still runs. */
+  @media (prefers-reduced-motion: reduce) {
+    .chk-fill {
+      transition: none;
+    }
+  }
 
   /* ---- progress ticks (Bencho "tick") ---- */
   .ticks {
@@ -1101,6 +1140,11 @@
   .ticks > i[data-on] {
     height: 100%;
     background: var(--tick-on, var(--fg));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticks > i {
+      transition: background-color 0.3s;
+    }
   }
 
   /* ---- toast (Bencho "bell") ---- */
@@ -1681,25 +1725,75 @@
   }
 }
 
+/* ---- reduced motion ----
+   Rule by rule, not one switch for everything: movement stops (slides, scale, push, sweeps, loops) while fades,
+   colour changes, the search-hit flash and the undo fuse still play. Each entrance below keeps its name and
+   duration and loses only its movement, so an inline `animation:` (the phone sheets and toast) follows too. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-  }
+  /* Loops that move or pulse: still. The status marks keep their shape and colour. */
   .pulse,
   .ping,
   .breathe,
-  .shimmer-text {
-    animation: none !important;
+  .load-bar,
+  .shimmer-text,
+  .wordmark-write:is(:hover, :focus-visible) .wordmark-line {
+    animation: none;
   }
   .shimmer-text {
     color: var(--fg-3);
     background: none;
     -webkit-background-clip: unset;
     background-clip: unset;
+  }
+  @keyframes omni-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes omni-pop {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes omni-sheet {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes omni-panel {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes omni-rise {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pik-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes toast-out {
+    to {
+      opacity: 0;
+    }
+  }
+  /* The undo fuse counts down by fading out across its full width instead of shrinking. */
+  @keyframes say-burn {
+    from {
+      width: 100%;
+    }
+    to {
+      width: 100%;
+      opacity: 0;
+    }
   }
 }
 
@@ -1727,6 +1821,11 @@ body.col-resizing iframe {
   }
   .mo-press:active:not(:disabled) {
     transform: scale(0.96);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mo-press {
+      transition: none;
+    }
   }
   .mo-row {
     border-radius: 14px;
@@ -1775,6 +1874,139 @@ html:has(.mo-app) body {
   to {
     transform: translate(-50%, 0);
     opacity: 1;
+  }
+}
+/* Reduced motion: a pushed screen, a sheet and the toast fade in where they land (see "reduced motion" above).
+   After the keyframes they replace, since the last @keyframes of a name wins. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes mo-push {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes mo-up {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes mo-toast {
+    from {
+      transform: translate(-50%, 0);
+      opacity: 0;
+    }
+    to {
+      transform: translate(-50%, 0);
+    }
+  }
+}
+
+/* ---- phone stack transitions (mobile/stack-transition.ts) ----
+   Where the browser has view transition types, a push slides the new screen in from the right edge over the old
+   one, which drifts a third to the left; back runs it the other way, the top screen on top as it leaves. The page is
+   one snapshot, so the header and the tab bar move with their screen. Taps go through to the new screen while it
+   plays. Reduced motion keeps the browser's cross-fade, shorter. Other browsers play mo-push (MobileShell.tsx). */
+::view-transition {
+  pointer-events: none;
+}
+html:active-view-transition-type(push, pop)::view-transition-group(root) {
+  animation-duration: 380ms;
+  animation-timing-function: var(--ease-out);
+}
+html:active-view-transition-type(push, pop)::view-transition-old(root),
+html:active-view-transition-type(push, pop)::view-transition-new(root) {
+  animation-timing-function: var(--ease-out);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:active-view-transition-type(push, pop)::view-transition-old(root),
+  html:active-view-transition-type(push, pop)::view-transition-new(root) {
+    mix-blend-mode: normal;
+  }
+  html:active-view-transition-type(push)::view-transition-old(root) {
+    animation-name: mo-vt-under-out;
+  }
+  html:active-view-transition-type(push)::view-transition-new(root) {
+    animation-name: mo-vt-over-in;
+  }
+  html:active-view-transition-type(pop)::view-transition-old(root) {
+    z-index: 1;
+    animation-name: mo-vt-over-out;
+  }
+  html:active-view-transition-type(pop)::view-transition-new(root) {
+    animation-name: mo-vt-under-in;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:active-view-transition-type(push, pop)::view-transition-group(root) {
+    animation-duration: 200ms;
+  }
+}
+@keyframes mo-vt-over-in {
+  from {
+    translate: 100% 0;
+  }
+}
+@keyframes mo-vt-over-out {
+  to {
+    translate: 100% 0;
+  }
+}
+@keyframes mo-vt-under-in {
+  from {
+    translate: -30% 0;
+  }
+}
+@keyframes mo-vt-under-out {
+  to {
+    translate: -30% 0;
+  }
+}
+
+/* ---- scroll fades (useScrollFade.ts: the channel rail, the list panel, the context panel) ----
+   The list fades out at an edge only while more of it sits past that edge. Where CSS has scroll-driven animations,
+   each fade grows over the first --fade-size of scrolling away from its end; elsewhere the hook marks the edges.
+   Keys and find-in-page stop a fade's width short of the edge, so focus never lands inside one. */
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.scroll-fade {
+  --fade-size: 28px;
+  scroll-padding-block: var(--fade-size);
+  mask-image: linear-gradient(to bottom, transparent 0, black var(--fade-start), black calc(100% - var(--fade-end)), transparent 100%);
+}
+.scroll-fade[data-fade-start] {
+  --fade-start: var(--fade-size);
+}
+.scroll-fade[data-fade-end] {
+  --fade-end: var(--fade-size);
+}
+@supports (animation-timeline: scroll()) {
+  .scroll-fade {
+    animation:
+      scroll-fade-start linear both,
+      scroll-fade-end linear both;
+    /* After the shorthand, which the build writes out as 0s: a scroll timeline's length is the scroll range. */
+    animation-duration: auto;
+    animation-timeline: scroll(self block);
+    animation-range:
+      0 var(--fade-size),
+      calc(100% - var(--fade-size)) 100%;
+  }
+}
+@keyframes scroll-fade-start {
+  to {
+    --fade-start: var(--fade-size);
+  }
+}
+@keyframes scroll-fade-end {
+  from {
+    --fade-end: var(--fade-size);
   }
 }
 
@@ -1853,4 +2085,17 @@ html:has(.mo-app) body {
 [data-desktop="darwin"] .mo-app {
   top: 28px;
   max-height: calc(100% - 28px);
+}
+
+/* Reduced motion for Tailwind's transition utilities that move things: the chevrons that turn on open and the
+   onboarding step dots that grow. They take their end state at once; colours still fade. */
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .transition-transform {
+      transition-property: none;
+    }
+    .transition-all {
+      transition-property: color, background-color, border-color, opacity, box-shadow;
+    }
+  }
 }

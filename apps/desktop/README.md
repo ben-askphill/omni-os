@@ -112,6 +112,7 @@ A script is a list of steps, or an object with the run's settings and `steps`:
 | `{"window": "main"}`, `"quick-prompt"`, `"newest"` | Makes that window current, waiting for it to show. Quick Prompt's panel stays loaded while hidden, so this waits until it is on screen |
 | `{"openThread": "<id>"}`, `{"openWindow": "#/settings"}` | Opens the route in a window of its own through the bridge, as Open in new window does, and makes it current |
 | `{"appearance": "dark"}` | Sets `nativeTheme` and the pages' color scheme |
+| `{"motion": "reduce"}` | Emulates the OS's Reduce motion (`prefers-reduced-motion`) in every window from then on; `"no-preference"` turns it off |
 | `{"zoom": 1.2}` | Sets the zoom through the bridge's settings, then on the window |
 | `{"size": [1100, 800]}` | Resizes the current window. A tiling window manager may size it back |
 | `{"snapshot": "home"}`, `{"screenshot": "home"}` | Writes `home.png` of the current window from the window's own capture. Fails when the page drew nothing, or at once when the window is hidden or minimized (Quick Prompt hides itself on Escape and on blur) |

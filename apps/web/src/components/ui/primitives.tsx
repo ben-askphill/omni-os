@@ -34,7 +34,7 @@ const SIZES = {
   lg: 'h-11 px-5 text-[14px] gap-2',
 };
 
-const btnBase = 'press inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-[background-color,color,opacity,transform] duration-200 select-none';
+const btnBase = 'press inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-[background-color,color,opacity,transform] duration-200 select-none motion-reduce:transition-[background-color,color,opacity]';
 
 export function Button({
   variant = 'secondary',

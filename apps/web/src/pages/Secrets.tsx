@@ -4,6 +4,7 @@ import { api, errorText, useApi, type SecretRow } from '../api.ts';
 import { Button, Empty, ErrorNote, Icon, InlineConfirm, Label, Loading, Picker, StatusDot, type PickerOption } from '../components/ui.tsx';
 import { channelAvatar } from '../components/composer/pickerOptions.tsx';
 import { href } from '../router.ts';
+import { scrollBehavior } from '../motion.ts';
 import { useApp, useSecretStoreLabel } from '../store.tsx';
 import { Card, FootNote } from './settings-parts.tsx';
 
@@ -169,7 +170,7 @@ export function SecretsSection() {
                     setName(k.name);
                     setSavedMsg(null);
                     setFormError(null);
-                    nameInput.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    nameInput.current?.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
                   }}
                   className="group flex w-full items-center gap-3 py-2.5 text-left"
                 >

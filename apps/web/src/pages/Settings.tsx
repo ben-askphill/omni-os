@@ -52,6 +52,7 @@ import {
   useScopedChannel,
 } from './settings-parts.tsx';
 import { isImeEnter } from '../ime.ts';
+import { scrollBehavior } from '../motion.ts';
 
 // Settings: a searchable nav of grouped sections beside one section at a time (@omni/shared/settings-catalog.ts),
 // the same sections in the same order as the phone's Settings screen. A scoped section shows the channel picker: This
@@ -160,7 +161,7 @@ function useFocus(section: string, focus: string | undefined) {
       const el = document.getElementById(settingAnchor(focus));
       if (el || ++tries > 20) clearInterval(t);
       if (!el) return;
-      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      el.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
       el.animate([{ boxShadow: '0 0 0 2px var(--live)' }, { boxShadow: '0 0 0 2px transparent' }], { duration: 1600, easing: 'ease-out' });
     }, 100);
     return () => clearInterval(t);

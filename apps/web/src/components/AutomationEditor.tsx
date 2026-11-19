@@ -6,6 +6,7 @@ import { api, errorText, useApi, type AutomationDefinition, type HarnessWithRunn
 import { blankDraft, CRON_PRESETS, draftOf, draftProblem, EVENTS, fieldsOf, isPrEvent, WEBHOOK_EVENTS, type Draft, type EventName } from '../automation-draft.ts';
 import { describeEvent } from '../format.ts';
 import { useApp, useHereName } from '../store.tsx';
+import { scrollBehavior } from '../motion.ts';
 import { Button, ChipSet, ErrorNote, IDENTIFIER, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from './ui.tsx';
 import { TimezoneInput } from './onboarding-parts.tsx';
 
@@ -70,7 +71,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
   const errorRef = useRef<HTMLDivElement>(null);
   // A refusal shows under the last field: bring it into view, past the footer.
   useEffect(() => {
-    if (error) errorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (error) errorRef.current?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
   }, [error]);
 
   // Fill the form once the file and this machine's sync id are in. A file that is not valid YAML opens on the YAML tab.
