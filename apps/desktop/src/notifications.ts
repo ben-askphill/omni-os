@@ -1,5 +1,6 @@
 // Native notifications, raised by the main process so they arrive with every window closed (a Mac keeps the app in
-// the Dock). It reads the server's feed (/api/feed) and Needs you with the install's token, and asks the shared
+// the Dock). It reads the server's feed (/api/feed) and Needs you with the install's token, which goes only to a server
+// that proved it holds it just before (Backend.provenToken), and asks the shared
 // tracker (packages/shared/attention.ts) what is news: a finished or failed thread, a question waiting for an answer,
 // a crew report in the Conductor, a watched PR that needs attention. Clicking one opens its thread in the main window.
 // The page posts none of its own while the bridge says `nativeNotifications`.
@@ -163,7 +164,8 @@ export const reconnectMs = (failures: number) => Math.min(1000 * 2 ** failures, 
 
 export interface FeedDeps {
   url(): string;
-  token(): string | null;
+  /** The token, asked before each connect: null when the server on the port does not prove it is this install. */
+  token(): Promise<string | null>;
   fetch: typeof fetch;
   onOpen(): void;
   onData(data: unknown): void;
@@ -175,11 +177,10 @@ export async function followFeed(deps: FeedDeps, signal: AbortSignal): Promise<v
   let failures = 0;
   while (!signal.aborted) {
     try {
-      const token = deps.token();
-      const res = await deps.fetch(deps.url(), {
-        headers: { accept: 'text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}) },
-        signal,
-      });
+      // A retry may find another program on the port: it gets no request at all.
+      const token = await deps.token();
+      if (!token) throw new Error('the server did not prove it is this install');
+      const res = await deps.fetch(deps.url(), { headers: { accept: 'text/event-stream', authorization: `Bearer ${token}` }, signal });
       if (!res.ok || !res.body) throw new Error(`feed answered ${res.status}`);
       failures = 0;
       deps.onOpen();
@@ -257,7 +258,7 @@ export function installNotifications(ctx: AppContext): void {
     void followFeed(
       {
         url: () => `${backend.origin()}/api/feed`,
-        token: () => backend.token(),
+        token: () => backend.provenToken(),
         fetch,
         onOpen: () => notifier.connected(),
         onData: (d) => notifier.event(d as Parameters<DesktopNotifier['event']>[0]),
