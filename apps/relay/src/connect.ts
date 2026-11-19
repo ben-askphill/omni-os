@@ -285,7 +285,15 @@ export class ConnectStore {
     if (record) {
       dnsRecordId = record.id;
       if (record.content !== target) await cf.pointCname(record.id, target);
-    } else dnsRecordId = await cf.createCname(r.hostname, target);
+    } else {
+      // The recorded record is gone. Forget its id first: a create whose answer is lost then leaves no id, and removal
+      // finds the new CNAME by its target.
+      if (r.dns_record_id) {
+        r.dns_record_id = null;
+        this.sql.exec('UPDATE connect_machines SET dns_record_id = NULL WHERE id = ?', r.id);
+      }
+      dnsRecordId = await cf.createCname(r.hostname, target);
+    }
     r.dns_record_id = dnsRecordId;
     this.sql.exec('UPDATE connect_machines SET dns_record_id = ? WHERE id = ?', dnsRecordId, r.id);
     return { tunnelId, connectorToken: await cf.connectorToken(tunnelId) };

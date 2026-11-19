@@ -505,6 +505,19 @@ describe('ConnectStore.remove', () => {
     expect(store.list()).toMatchObject([{ id: 'mac-1', hostname: r.hostname }]);
   });
 
+  it('turning Connect off after a re-registration lost the answer to its replacement DNS record deletes that record too', async () => {
+    const { cf, store, register } = await setup();
+    await register();
+    cf.records.clear();
+    cf.lostOnce.add('POST /zones/zone/dns_records');
+    await expect(register()).rejects.toMatchObject({ code: 'cloudflare' });
+    expect(cf.records.size).toBe(1);
+    await store.remove('mac-1', 'tok-1');
+    expect(cf.records.size).toBe(0);
+    const r = await register();
+    expect(store.list()).toMatchObject([{ id: 'mac-1', hostname: r.hostname }]);
+  });
+
   it("an old token signing out while the machine registers again under a new one leaves the new registration", async () => {
     const { cf, store, register, machine } = await setup();
     await register();
