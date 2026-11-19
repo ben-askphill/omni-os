@@ -113,8 +113,6 @@ export const TERMS = {
   harness: { technical: 'Harness', plain: 'AI app' },
   harnessAndModel: { technical: 'Harness and model', plain: 'AI app and model' },
   findModel: { technical: 'Find a model or harness', plain: 'Find a model' },
-  effort: { technical: 'Effort', plain: 'Thinking' },
-  effortFor: { technical: 'Effort for', plain: 'Thinking for' },
   steer: { technical: 'Steer', plain: 'Add' },
   steerNow: { technical: 'Steer now', plain: 'Add to this' },
   queue: { technical: 'Queue', plain: 'Send later' },
@@ -129,16 +127,3 @@ export type Term = keyof typeof TERMS;
 
 /** A control's name: the engineering one with the switch on, the plain one without. */
 export const term = (t: Term, technical: boolean): string => TERMS[t][technical ? 'technical' : 'plain'];
-
-/** Effort levels in plain words. A level not listed keeps its own name. */
-const PLAIN_EFFORT: Record<string, string> = {
-  minimal: 'Fastest',
-  low: 'Fast',
-  medium: 'Balanced',
-  high: 'Thorough',
-  xhigh: 'Extra thorough',
-  max: 'Most thorough',
-};
-
-/** An effort level's name: its own with the switch on, a plain word without. */
-export const effortWord = (level: string, technical: boolean): string => (technical ? level : PLAIN_EFFORT[level] ?? level);

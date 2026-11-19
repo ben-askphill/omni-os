@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MARK, STATUS, type Glyph, type Mark } from '../status.ts';
-import { effortWord, glyphLabel, markLabel, parseDisplay, parseDisplayPatch, PLAIN_GLYPH, PLAIN_MARK, plainDetail, showsCode, statusWord, term, TERMS } from '../display.ts';
+import { glyphLabel, markLabel, parseDisplay, parseDisplayPatch, PLAIN_GLYPH, PLAIN_MARK, plainDetail, showsCode, statusWord, term, TERMS } from '../display.ts';
 
 const FIVE = ['Working', 'Needs you', 'Done', 'Failed', 'Stopped'];
 
@@ -38,19 +38,11 @@ describe('the five status words', () => {
 
 describe('run control names', () => {
   it('reads plain off and technical on', () => {
-    expect(term('effort', false)).toBe('Thinking');
-    expect(term('effort', true)).toBe('Effort');
+    expect(term('steer', true)).toBe('Steer');
     expect(term('steerNow', false)).toBe('Add to this');
     expect(term('interrupt', false)).toBe('Stop and send');
     expect(term('newDelegation', false)).toBe('New');
     for (const t of Object.values(TERMS)) expect(t.plain).not.toBe('');
-  });
-
-  it('names effort levels Fast, Balanced and Thorough', () => {
-    expect(['low', 'medium', 'high'].map((l) => effortWord(l, false))).toEqual(['Fast', 'Balanced', 'Thorough']);
-    expect(effortWord('high', true)).toBe('high');
-    // A level a new model brings keeps its own name.
-    expect(effortWord('turbo', false)).toBe('turbo');
   });
 });
 

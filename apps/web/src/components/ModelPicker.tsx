@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { effortWord, term } from '@omni/shared/display.ts';
+import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import type { HarnessWithRunning } from '../api.ts';
 import type { PickerAccounts } from '../accounts.ts';
@@ -140,7 +140,7 @@ export function ModelPicker({
   const buttonLabel = label ?? (auto ? 'Auto' : current.m ? current.m.label : placeholder);
   const levels = effort && !auto ? modelOf(harnesses, value) : null;
   const effortLevel = levels?.efforts.length ? effort!.value || levels.model?.defaultEffort || 'default' : null;
-  const effortShown = effortLevel && effortWord(effortLevel, technical);
+  const effortShown = effortLevel;
 
   return (
     <div ref={wrap} className={`relative ${className}`}>
@@ -154,7 +154,7 @@ export function ModelPicker({
         aria-label={
           auto
             ? 'Model: Auto'
-            : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${effortShown ? `, ${term('effort', technical).toLowerCase()} ${effortShown}` : ''}`
+            : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${effortShown ? `, effort ${effortShown}` : ''}`
         }
         {...pop.triggerProps}
         onClick={(e) => (pop.clickCloses() ? close() : openList(e.detail === 0))}
@@ -245,9 +245,9 @@ export function ModelPicker({
           {levels && levels.efforts.length > 0 && (
             <div className="mt-1 border-t border-line px-2 pt-2 pb-1">
               <div className="caption mb-1.5 px-1">
-                {term('effortFor', technical)} {levels.model?.label ?? 'this model'}
+                Effort for {levels.model?.label ?? 'this model'}
               </div>
-              <div role="radiogroup" aria-label={term('effort', technical)} className="flex flex-wrap gap-1">
+              <div role="radiogroup" aria-label="Effort" className="flex flex-wrap gap-1">
                 {['', ...levels.efforts].map((e) => (
                   <button
                     key={e || 'default'}
@@ -260,7 +260,7 @@ export function ModelPicker({
                     }}
                     className="press h-7 rounded-full px-2.5 text-[12px] text-fg-2 transition-colors hover:bg-surface-3 hover:text-fg aria-checked:bg-fg aria-checked:text-on-ink"
                   >
-                    {e ? effortWord(e, technical) : levels.model?.defaultEffort ? `Default (${effortWord(levels.model.defaultEffort, technical)})` : 'Default'}
+                    {e || (levels.model?.defaultEffort ? `Default (${levels.model.defaultEffort})` : 'Default')}
                   </button>
                 ))}
               </div>

@@ -1,6 +1,4 @@
 import type { HarnessWithRunning } from '../api.ts';
-import { effortWord, term } from '@omni/shared/display.ts';
-import { technicalNow, useTechnical } from '../display.ts';
 import type { PickerAccounts } from '../accounts.ts';
 import { accountLine } from '@omni/shared/harness-accounts.ts';
 import { Icon } from '../components/ui.tsx';
@@ -16,7 +14,7 @@ export function runLabel(harnesses: HarnessWithRunning[] | undefined, choice: Mo
   if (asksAuto(choice)) return 'Auto';
   const { harness, model } = modelOf(harnesses, choice);
   const level = effort || model?.defaultEffort;
-  return [model?.label ?? harness?.name ?? choice.harness, level && effortWord(level, technicalNow())].filter(Boolean).join(' · ');
+  return [model?.label ?? harness?.name ?? choice.harness, level].filter(Boolean).join(' · ');
 }
 
 /**
@@ -44,8 +42,7 @@ export function ModelSheet({
   accounts?: PickerAccounts | null;
 }) {
   const { model, efforts } = modelOf(harnesses, choice);
-  const technical = useTechnical();
-  const title = `Model and ${term('effort', technical).toLowerCase()}`;
+  const title = 'Model and effort';
   return (
     <MoSheet full onClose={onClose} label={title}>
       <div className="flex shrink-0 items-center px-3 pt-1.5 pb-2">
@@ -72,12 +69,12 @@ export function ModelSheet({
           </MoSection>
         )}
         {!asksAuto(choice) && efforts.length > 0 && (
-          <MoSection title={`${term('effortFor', technical)} ${model?.label ?? 'this model'}`}>
+          <MoSection title={`Effort for ${model?.label ?? 'this model'}`}>
             <MoGroup>
               {['', ...efforts].map((e, i, all) => (
                 <MoListRow
                   key={e || 'default'}
-                  label={e ? effortWord(e, technical) : model?.defaultEffort ? `Default (${effortWord(model.defaultEffort, technical)})` : 'Default'}
+                  label={e || (model?.defaultEffort ? `Default (${model.defaultEffort})` : 'Default')}
                   right={<MoRadio on={effort === e} />}
                   onClick={() => onChange(choice, e)}
                   chevron={false}

@@ -10,7 +10,7 @@ import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import type { PanelTab } from '../../../pages/useThreadSession.ts';
 import type { PRNext, PRStep } from '@omni/shared/thread-glance.ts';
 import { AgentsSection } from './AgentsSection.tsx';
-import { effortWord, term } from '@omni/shared/display.ts';
+import { term } from '@omni/shared/display.ts';
 import { useShowsCode, useTechnical } from '../../../display.ts';
 import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
@@ -178,7 +178,7 @@ export function DetailsTab({
           {slug && slug !== run.model && <span className="ml-1.5 font-mono text-[11.5px] text-fg-3">{slug}</span>}
           {thread.model && init?.model && init.model !== thread.model && <span className="ml-1.5 font-mono text-[11.5px] text-fg-3">({init.model})</span>}
         </Row>
-        <Row k={term('effort', technical)}>{effortWord(run.effort, technical)}</Row>
+        <Row k="Effort">{run.effort}</Row>
         {thread.auto_reason && <Row k="Auto">{thread.auto_reason}</Row>}
         {code && <Row k="Source">
           {thread.source}
