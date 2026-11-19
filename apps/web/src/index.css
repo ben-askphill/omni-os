@@ -983,6 +983,41 @@
   .toast[data-leaving] {
     animation: toast-out 0.22s var(--ease-stretch) forwards;
   }
+
+  /* ---- modal: a <dialog> opened with showModal() (ui/modal.tsx, the command menu, setup) ----
+     A sheet on the bottom edge of a phone, in the middle from 640px. These undo the browser's dialog box (border,
+     padding, Canvas colors, its gap to the edges) and leave the width to the caller's utilities. */
+  dialog.modal {
+    margin: auto 0 0;
+    max-width: 100%;
+    max-height: 92vh;
+    padding: 0 0 env(safe-area-inset-bottom);
+    border: 0;
+    border-radius: 28px 28px 0 0;
+    background: var(--elev);
+    color: inherit;
+    box-shadow: var(--shadow-menu);
+    overflow: auto;
+    /* Scrolling inside it stops at its edge instead of moving the page behind. */
+    overscroll-behavior: contain;
+  }
+  @media (min-width: 640px) {
+    dialog.modal {
+      margin: auto;
+      padding-bottom: 0;
+      border-radius: 28px;
+    }
+  }
+  /* The dim under it covers the whole window, the channel rail included. overflow makes it a scroll container, so
+     overscroll-behavior holds a scroll over it too. In the desktop app it lifts the window's drag regions, so a press
+     on the dim closes the modal instead of moving the window. */
+  dialog.modal::backdrop {
+    background: var(--scrim);
+    animation: omni-scrim 0.24s var(--ease-out);
+    overflow: hidden;
+    overscroll-behavior: contain;
+    -webkit-app-region: no-drag;
+  }
 }
 
 /* Markdown rendered from agents. Kept compact and readable. */
@@ -1307,10 +1342,6 @@
   from {
     opacity: 0;
   }
-}
-.scrim {
-  background: var(--scrim);
-  animation: omni-scrim 0.24s var(--ease-out);
 }
 @keyframes omni-panel {
   from {

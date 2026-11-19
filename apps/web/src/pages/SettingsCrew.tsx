@@ -19,7 +19,7 @@ import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { CrewAvatar } from '../components/CrewAvatar.tsx';
 import { RoleMemory } from '../components/RoleMemory.tsx';
-import { Button, Chip, ErrorNote, IDENTIFIER, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from '../components/ui.tsx';
+import { Button, Chip, ErrorNote, IDENTIFIER, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
 import { useApp } from '../store.tsx';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, LockNote } from './settings-parts.tsx';
@@ -135,7 +135,7 @@ function CrewEditor({
   // From the list, which reloads when a lesson is proposed or decided anywhere.
   const waiting = (id && roles?.find((r) => r.id === id)?.memoryWaiting) || 0;
   return (
-    <Modal open={!!target} onClose={onClose} title={title} roomy>
+    <Modal open={!!target} onClose={onClose} title={title} roomy dismiss="confirm">
       {target && <EditorBody key={id ?? '+new'} id={id} waiting={waiting} view={view} setView={setView} onClose={onClose} onOpen={onOpen} onSaved={onSaved} />}
     </Modal>
   );
@@ -216,6 +216,14 @@ function EditorBody({
     setMarkdown(crewMarkdownOf(detail.data));
     setSynced(crewMarkdownOf(detail.data));
   }, [detail.data, draft]);
+
+  // The role as it opened, so a close asks first once the form or its Markdown differs.
+  const snapshot = draft ? JSON.stringify([draft, markdown]) : null;
+  const [pristine, setPristine] = useState<string | null>(null);
+  useEffect(() => {
+    if (pristine === null && snapshot !== null) setPristine(snapshot);
+  }, [pristine, snapshot]);
+  useUnsavedChanges(pristine !== null && snapshot !== pristine);
 
   const set = <K extends keyof CrewDraft>(k: K, v: CrewDraft[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
   const d = detail.data ?? null;

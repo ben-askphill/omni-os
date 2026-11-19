@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { githubLine, type GithubCheck } from '@omni/shared/github-check.ts';
 import { HARNESS_CHECK_LABEL } from '@omni/shared/harness-check.ts';
 import { toolsAddOn } from '@omni/shared/onboarding.ts';
@@ -27,7 +27,8 @@ import {
   createChannel,
 } from './onboarding-parts.tsx';
 import { Button, ErrorNote, FolderInput, IDENTIFIER } from './ui.tsx';
-import { ModalFooter, SCRIM } from './ui/modal.tsx';
+import { ModalFooter } from './ui/modal.tsx';
+import { useModalDialog } from './ui/use-modal-dialog.ts';
 
 export { PronounsInput, TimezoneInput } from './onboarding-parts.tsx';
 
@@ -110,6 +111,9 @@ export function Onboarding() {
 
 function Wizard() {
   const { closeSetup, reloadProfile, reloadChannels } = useApp();
+  // No onDismiss: Escape and the backdrop leave setup open. Skip setup and Cancel are the ways out.
+  const dialog = useRef<HTMLDialogElement>(null);
+  const { ready, dialogProps } = useModalDialog(dialog);
   const phone = useIsMobile();
   const layout = useLayout();
   const [state, setState] = useState<SetupState | null>(null);
@@ -223,140 +227,144 @@ function Wizard() {
   };
 
   return (
-    <div className={`${SCRIM} items-end p-0 sm:items-center sm:p-6`} role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
-      <form
-        onSubmit={next}
-        className="modal-in flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-[var(--r-3xl)] bg-elev shadow-[var(--shadow-menu)] sm:max-h-[min(720px,calc(100dvh-48px))] sm:max-w-lg sm:rounded-[var(--r-3xl)]"
-      >
-        <div className="flex items-center justify-between gap-3 px-6 pt-6 sm:px-8 sm:pt-8">
-          <OmniMark size={32} />
-          <Steps step={step} />
-        </div>
-        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6 sm:px-8">
-          {!state && !error && <p className="py-10 text-center text-[13px] text-fg-3">Loading…</p>}
-          {state && step === 0 && (
-            <Screen caption={rerun ? 'Setup' : 'Welcome to Omni'} title="Who are you?" body="Your name and pronouns are told to every agent, so a thread knows who it works for. Automations use your timezone.">
-              <Row label="Name" htmlFor="ob-name" hint="Agents address you by this name.">
-                <input id="ob-name" className="field w-full" value={name} maxLength={NAME_MAX} autoComplete="name" placeholder="Your name" autoFocus onChange={(e) => setName(e.target.value)} />
-              </Row>
-              <Row label="Email" htmlFor="ob-email" hint="Optional. Agents use it to recognise your own commits, PRs and mail.">
-                <input id="ob-email" className="field w-full" type="email" value={email} autoComplete="email" placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
-              </Row>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Row label="Timezone" htmlFor="ob-tz" hint="Prefilled from this device.">
-                  <TimezoneInput id="ob-tz" value={timezone} onChange={setTimezone} />
+    <dialog
+      ref={dialog}
+      aria-labelledby="onboarding-title"
+      {...dialogProps}
+      className="modal modal-in max-h-[100dvh] w-full overflow-hidden rounded-t-[var(--r-3xl)] p-0 sm:max-h-[min(720px,calc(100dvh-48px))] sm:w-[calc(100%-48px)] sm:max-w-lg sm:rounded-[var(--r-3xl)]"
+    >
+      {ready && (
+        <form onSubmit={next} className="flex max-h-[100dvh] flex-col sm:max-h-[min(720px,calc(100dvh-48px))]">
+          <div className="flex items-center justify-between gap-3 px-6 pt-6 sm:px-8 sm:pt-8">
+            <OmniMark size={32} />
+            <Steps step={step} />
+          </div>
+          <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6 sm:px-8">
+            {!state && !error && <p className="py-10 text-center text-[13px] text-fg-3">Loading…</p>}
+            {state && step === 0 && (
+              <Screen caption={rerun ? 'Setup' : 'Welcome to Omni'} title="Who are you?" body="Your name and pronouns are told to every agent, so a thread knows who it works for. Automations use your timezone.">
+                <Row label="Name" htmlFor="ob-name" hint="Agents address you by this name.">
+                  <input id="ob-name" className="field w-full" value={name} maxLength={NAME_MAX} autoComplete="name" placeholder="Your name" autoFocus onChange={(e) => setName(e.target.value)} />
                 </Row>
-                <Row label="Pronouns" htmlFor="ob-pronouns" hint="Used when agents mention you.">
-                  <PronounsInput id="ob-pronouns" value={pronouns} onChange={setPronouns} />
+                <Row label="Email" htmlFor="ob-email" hint="Optional. Agents use it to recognise your own commits, PRs and mail.">
+                  <input id="ob-email" className="field w-full" type="email" value={email} autoComplete="email" placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
                 </Row>
-              </div>
-            </Screen>
-          )}
-          {state && step === STEP.Work && <WorkScreen work={work} tools={tools} onWork={setWork} onTools={setTools} />}
-          {state && step === STEP.Files && (
-            <FilesScreen value={files} onChange={(v) => setFiles((f) => ({ ...f, ...v }))} code={code} onCode={setCodeChoice} fallbacks={state.fallbacks} />
-          )}
-          {state && step === STEP.Harnesses && <HarnessScreen onGithub={heardGithub} code={code} />}
-          {state && step === STEP.Project && (
-            <Screen
-              caption="First project"
-              title="Add a project or client"
-              body={`Each project gets a channel of its own for its threads, files and notes. Quick questions that belong to no project go to General. ${addChannelHint(phone ? 'phone' : layout)}`}
-            >
-              {createdChannel ? (
-                <p className="rounded-[16px] bg-surface p-4 text-[13px] text-fg-2">
-                  Created <span className="font-medium text-fg">#{createdChannel}</span>.
-                </p>
-              ) : (
-                <>
-                  <Row label="Name" htmlFor="ob-ch-name">
-                    <input id="ob-ch-name" className="field w-full" value={channelName} placeholder="Acme" onChange={(e) => setChannelName(e.target.value)} />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Row label="Timezone" htmlFor="ob-tz" hint="Prefilled from this device.">
+                    <TimezoneInput id="ob-tz" value={timezone} onChange={setTimezone} />
                   </Row>
-                  {code && (
-                    <Row label="Repo folder" htmlFor="ob-ch-repo" hint="Optional. A git checkout on this machine; every thread gets its own copy.">
-                      <FolderInput
-                        id="ob-ch-repo"
-                        dialogTitle="Repo folder"
-                        value={channelRepo}
-                        placeholder={`${state.resolved.reposDir}/acme-site`}
-                        onChange={setChannelRepo}
-                      />
+                  <Row label="Pronouns" htmlFor="ob-pronouns" hint="Used when agents mention you.">
+                    <PronounsInput id="ob-pronouns" value={pronouns} onChange={setPronouns} />
+                  </Row>
+                </div>
+              </Screen>
+            )}
+            {state && step === STEP.Work && <WorkScreen work={work} tools={tools} onWork={setWork} onTools={setTools} />}
+            {state && step === STEP.Files && (
+              <FilesScreen value={files} onChange={(v) => setFiles((f) => ({ ...f, ...v }))} code={code} onCode={setCodeChoice} fallbacks={state.fallbacks} />
+            )}
+            {state && step === STEP.Harnesses && <HarnessScreen onGithub={heardGithub} code={code} />}
+            {state && step === STEP.Project && (
+              <Screen
+                caption="First project"
+                title="Add a project or client"
+                body={`Each project gets a channel of its own for its threads, files and notes. Quick questions that belong to no project go to General. ${addChannelHint(phone ? 'phone' : layout)}`}
+              >
+                {createdChannel ? (
+                  <p className="rounded-[16px] bg-surface p-4 text-[13px] text-fg-2">
+                    Created <span className="font-medium text-fg">#{createdChannel}</span>.
+                  </p>
+                ) : (
+                  <>
+                    <Row label="Name" htmlFor="ob-ch-name">
+                      <input id="ob-ch-name" className="field w-full" value={channelName} placeholder="Acme" onChange={(e) => setChannelName(e.target.value)} />
                     </Row>
-                  )}
-                  {store && (
-                    <Row label="Shopify store" htmlFor="ob-ch-store" hint="Optional. The myshopify domain.">
-                      <input id="ob-ch-store" {...IDENTIFIER} className="field field-mono w-full" inputMode="url" value={channelStore} placeholder="acme.myshopify.com" onChange={(e) => setChannelStore(e.target.value)} />
-                    </Row>
-                  )}
-                </>
-              )}
-            </Screen>
-          )}
-          {state && step === STEP.Notifications && <NotificationsScreen />}
-          {state && step === STEP.Routines && <RoutinesScreen value={starters} onChange={setStarters} />}
-          {state && step === DONE && (
-            <Screen
-              caption="Done"
-              title={`You're set${name.trim() ? `, ${name.trim().split(' ')[0]}` : ''}`}
-              body={
-                rerun
-                  ? 'Save to keep these settings.'
-                  : 'Ask a first question and Omni opens on the answer, in General. Or leave it empty: the Conductor waits in #conductor with a welcome message, and hands bigger work to the right crew role.'
-              }
-            >
-              {!rerun && (
-                <Row label="Your first question" htmlFor="ob-ask" hint="Optional. Anything you would ask a capable assistant.">
-                  <textarea
-                    id="ob-ask"
-                    className="field min-h-[64px] w-full resize-y"
-                    rows={2}
-                    value={ask}
-                    placeholder="What should I check before I sign a lease for an office?"
-                    onChange={(e) => setAsk(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                        e.preventDefault();
-                        e.currentTarget.form?.requestSubmit();
-                      }
-                    }}
-                  />
-                </Row>
-              )}
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-[16px] bg-surface p-4 text-[13px]">
-                <Summary k="Name" v={name.trim()} />
-                <Summary k="Pronouns" v={pronouns} />
-                <Summary k="Timezone" v={timezone || state.resolved.timezone} />
-                {work.trim() && <Summary k="Work" v={work.trim()} />}
-                {tools.trim() && <Summary k="Tools" v={tools.trim()} />}
-                <Summary k="Files" v={files.root || state.fallbacks.workspaceRoot} mono />
-                {code && <Summary k="GitHub" v={files.githubOwner || 'not set'} mono />}
-                {code && github && <Summary k="GitHub CLI" v={githubLine(github) ?? HARNESS_CHECK_LABEL[github.state]} />}
-                {createdChannel && <Summary k="Channel" v={`#${createdChannel}`} />}
-                {starters.length > 0 && <Summary k="Routines" v={STARTER_AUTOMATIONS.filter((s) => starters.includes(s.id)).map((s) => s.name).join(', ')} />}
-              </dl>
-              <SavedNote path={state.path} install={state.install} />
-              {!rerun && <DoneTips tips={doneTips(state.install, phone ? 'phone' : layout)} />}
-            </Screen>
-          )}
-          {error && <ErrorNote className="mt-4">{error}</ErrorNote>}
-        </div>
-        <ModalFooter hint={{ keys: ['↵'], label: step === DONE ? (rerun ? 'save' : ask.trim() ? 'ask' : 'open') : 'continue' }} className="pb-[calc(16px+env(safe-area-inset-bottom))] sm:px-8 sm:pb-5">
-          {step === 0 ? (
-            <Button variant="ghost" onClick={rerun ? closeSetup : skip} disabled={busy}>
-              {rerun ? 'Cancel' : 'Skip setup'}
+                    {code && (
+                      <Row label="Repo folder" htmlFor="ob-ch-repo" hint="Optional. A git checkout on this machine; every thread gets its own copy.">
+                        <FolderInput
+                          id="ob-ch-repo"
+                          dialogTitle="Repo folder"
+                          value={channelRepo}
+                          placeholder={`${state.resolved.reposDir}/acme-site`}
+                          onChange={setChannelRepo}
+                        />
+                      </Row>
+                    )}
+                    {store && (
+                      <Row label="Shopify store" htmlFor="ob-ch-store" hint="Optional. The myshopify domain.">
+                        <input id="ob-ch-store" {...IDENTIFIER} className="field field-mono w-full" inputMode="url" value={channelStore} placeholder="acme.myshopify.com" onChange={(e) => setChannelStore(e.target.value)} />
+                      </Row>
+                    )}
+                  </>
+                )}
+              </Screen>
+            )}
+            {state && step === STEP.Notifications && <NotificationsScreen />}
+            {state && step === STEP.Routines && <RoutinesScreen value={starters} onChange={setStarters} />}
+            {state && step === DONE && (
+              <Screen
+                caption="Done"
+                title={`You're set${name.trim() ? `, ${name.trim().split(' ')[0]}` : ''}`}
+                body={
+                  rerun
+                    ? 'Save to keep these settings.'
+                    : 'Ask a first question and Omni opens on the answer, in General. Or leave it empty: the Conductor waits in #conductor with a welcome message, and hands bigger work to the right crew role.'
+                }
+              >
+                {!rerun && (
+                  <Row label="Your first question" htmlFor="ob-ask" hint="Optional. Anything you would ask a capable assistant.">
+                    <textarea
+                      id="ob-ask"
+                      className="field min-h-[64px] w-full resize-y"
+                      rows={2}
+                      value={ask}
+                      placeholder="What should I check before I sign a lease for an office?"
+                      onChange={(e) => setAsk(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                          e.preventDefault();
+                          e.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                    />
+                  </Row>
+                )}
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-[16px] bg-surface p-4 text-[13px]">
+                  <Summary k="Name" v={name.trim()} />
+                  <Summary k="Pronouns" v={pronouns} />
+                  <Summary k="Timezone" v={timezone || state.resolved.timezone} />
+                  {work.trim() && <Summary k="Work" v={work.trim()} />}
+                  {tools.trim() && <Summary k="Tools" v={tools.trim()} />}
+                  <Summary k="Files" v={files.root || state.fallbacks.workspaceRoot} mono />
+                  {code && <Summary k="GitHub" v={files.githubOwner || 'not set'} mono />}
+                  {code && github && <Summary k="GitHub CLI" v={githubLine(github) ?? HARNESS_CHECK_LABEL[github.state]} />}
+                  {createdChannel && <Summary k="Channel" v={`#${createdChannel}`} />}
+                  {starters.length > 0 && <Summary k="Routines" v={STARTER_AUTOMATIONS.filter((s) => starters.includes(s.id)).map((s) => s.name).join(', ')} />}
+                </dl>
+                <SavedNote path={state.path} install={state.install} />
+                {!rerun && <DoneTips tips={doneTips(state.install, phone ? 'phone' : layout)} />}
+              </Screen>
+            )}
+            {error && <ErrorNote className="mt-4">{error}</ErrorNote>}
+          </div>
+          <ModalFooter hint={{ keys: ['↵'], label: step === DONE ? (rerun ? 'save' : ask.trim() ? 'ask' : 'open') : 'continue' }} className="pb-[calc(16px+env(safe-area-inset-bottom))] sm:px-8 sm:pb-5">
+            {step === 0 ? (
+              <Button variant="ghost" onClick={rerun ? closeSetup : skip} disabled={busy}>
+                {rerun ? 'Cancel' : 'Skip setup'}
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={() => (setError(null), setStep((s) => s - 1))} disabled={busy}>
+                Back
+              </Button>
+            )}
+            {step === STEP.Project && !createdChannel && !channelName.trim() && <span className="text-[12px] text-fg-3">Optional</span>}
+            <Button type="submit" variant="primary" busy={busy} disabled={!state}>
+              {step === DONE ? (rerun ? 'Save' : ask.trim() ? 'Ask' : 'Open Conductor') : step === STEP.Project && !channelName.trim() && !createdChannel ? 'Skip' : 'Continue'}
             </Button>
-          ) : (
-            <Button variant="ghost" onClick={() => (setError(null), setStep((s) => s - 1))} disabled={busy}>
-              Back
-            </Button>
-          )}
-          {step === STEP.Project && !createdChannel && !channelName.trim() && <span className="text-[12px] text-fg-3">Optional</span>}
-          <Button type="submit" variant="primary" busy={busy} disabled={!state}>
-            {step === DONE ? (rerun ? 'Save' : ask.trim() ? 'Ask' : 'Open Conductor') : step === STEP.Project && !channelName.trim() && !createdChannel ? 'Skip' : 'Continue'}
-          </Button>
-        </ModalFooter>
-      </form>
-    </div>
+          </ModalFooter>
+        </form>
+      )}
+    </dialog>
   );
 }
 

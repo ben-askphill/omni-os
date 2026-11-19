@@ -18,7 +18,7 @@ export function useThreadInterruptKey({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.repeat || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-      if (document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return;
+      if (document.querySelector('dialog[open], [aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return;
       // Esc in another field (sidebar search, a form) belongs to that field. The reply composer is the exception.
       const el = e.target instanceof HTMLElement ? e.target : null;
       // A zoomed image preview keeps Esc to zoom back out.

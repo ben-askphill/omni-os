@@ -116,7 +116,7 @@ describe('the Done confirmation, rendered', () => {
     act(() => root.unmount());
     host.remove();
   });
-  const dialog = () => document.querySelector('[role="dialog"]');
+  const dialog = () => document.querySelector('dialog');
   const button = (label: string) => [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!;
 
   it('asks before marking a job done with work still going under it, and marks it only on confirm', async () => {

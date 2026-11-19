@@ -29,7 +29,10 @@ export function useDismissable(
       onDismissRef.current();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onDismissRef.current();
+      if (e.key !== 'Escape') return;
+      // Taken: a modal <dialog> this sits in hears no close request, so it stays open (an inline confirm in a form).
+      e.preventDefault();
+      onDismissRef.current();
     };
     if (outside) document.addEventListener('mousedown', onDown);
     if (escape) window.addEventListener('keydown', onKey);

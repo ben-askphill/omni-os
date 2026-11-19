@@ -6,7 +6,7 @@ import { api, errorText, useApi, type AutomationDefinition, type HarnessWithRunn
 import { blankDraft, CRON_PRESETS, draftOf, draftProblem, EVENTS, fieldsOf, isPrEvent, WEBHOOK_EVENTS, type Draft, type EventName } from '../automation-draft.ts';
 import { describeEvent } from '../format.ts';
 import { useApp, useHereName } from '../store.tsx';
-import { Button, ChipSet, ErrorNote, IDENTIFIER, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from './ui.tsx';
+import { Button, ChipSet, ErrorNote, IDENTIFIER, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from './ui.tsx';
 
 // The Automations page's editor: every field of an automation's YAML, and the YAML itself. Saving writes the file
 // (apps/server/automation-files.ts); a shipped automation becomes your own copy in data/automations/ and Reset drops it.
@@ -46,7 +46,7 @@ export function AutomationEditor({ target, onClose, onSaved }: { target: EditorT
   const open = !!target;
   const title = target?.id ? `Edit “${target.name ?? target.id}”` : 'New automation';
   return (
-    <Modal open={open} onClose={onClose} title={title}>
+    <Modal open={open} onClose={onClose} title={title} dismiss="confirm">
       {target && <EditorBody key={target.id ?? '+new'} id={target.id} onClose={onClose} onSaved={onSaved} />}
     </Modal>
   );
@@ -78,6 +78,14 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
     setDraft(draftOf(def.data.fields, def.data.fields.machine_id, sync.data.machineId ?? null));
     setYaml(def.data.yaml);
   }, [def.data, sync.data, draft]);
+
+  // The form as it opened, so a close asks first once it differs.
+  const snapshot = draft ? JSON.stringify([draft, yaml]) : null;
+  const [pristine, setPristine] = useState<string | null>(null);
+  useEffect(() => {
+    if (pristine === null && snapshot !== null) setPristine(snapshot);
+  }, [pristine, snapshot]);
+  useUnsavedChanges(pristine !== null && snapshot !== pristine);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
 
