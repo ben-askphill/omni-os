@@ -7,7 +7,6 @@
 import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
-import { apiToken } from '../../api-token.ts';
 import { TOOL_FAILURE_POLICY } from '../../tool-failure-policy.ts';
 import { closePipesAfterExit } from '../../child.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
@@ -16,7 +15,7 @@ import { browserHeld } from '../../access.ts';
 import { cursorConfigDir } from './commands.ts';
 import { describeAttachments } from '../../uploads.ts';
 import { LineSplitter } from '../../stream.ts';
-import { harnessEnv } from '../env-guard.ts';
+import { harnessEnv, threadTokenEnv } from '../env-guard.ts';
 import { detachedSession } from '../session.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
@@ -56,7 +55,7 @@ export const cursorAdapter: HarnessAdapter = {
     const bin = cursorBin() ?? 'cursor-agent';
     const env = harnessEnv('cursor', {
       OMNI_URL: ctx.omniUrl,
-      OMNI_TOKEN: apiToken(),
+      ...threadTokenEnv(ctx),
       OMNI_THREAD_ID: thread.id,
       OMNI_THREAD_DIR: threadDir(thread.id),
       OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),

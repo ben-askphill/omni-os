@@ -86,15 +86,15 @@ The locks hold however the file got there. A crew file another machine syncs tha
 
 No role of your own takes one of these ids. Builder has no locks; Review PR runs as it, so while it is hidden Review PR refuses with a note to show it again.
 
-A role is a prompt every later thread of it runs with, so an agent thread's write (one that names its thread in `x-omni-thread`, as Omni's MCP servers do) goes through the crew guard (`apps/server/crew-guard.ts`) and gets a 403 unless all of these hold:
+A role is a prompt every later thread of it runs with, so an agent thread's write (any call with a thread's own token, which every thread and its MCP servers hold, or one that names a thread in `x-omni-thread`) goes through the crew guard (`apps/server/crew-guard.ts`) and gets a 403 unless all of these hold:
 
 - It is a save or a reset. Deleting, hiding and showing a role stay yours, in Settings. A reset that would change the role's powers (your edit gave the built-in the conductor tools, say) is refused: reset it yourself.
 - The thread runs as the Conductor. No other role writes roles, even one you gave the `omni` MCP server, and usage-scan never does.
 - The save leaves powers alone: no `mcp`, `delegate_only`, `delegatable` or `review`, and no whole-file `markdown`. Those are yours to set.
 - No automation started the thread or any thread above it.
-- You answered in that thread after its first message, or answered a question it asked. The guard cannot read whether you agreed: it holds the Conductor to proposing an edit and waiting for you. An agent's own call never counts as your answer: a message an agent thread sends (`x-omni-thread`), including through `check_artifact_comments` or a compact, is recorded as the Conductor's, and an agent thread cannot answer a question card. The same holds for review notes an agent thread sends, and for messages a thread carries when it moves to another machine, which keep their sender.
+- You answered in that thread after its first message, or answered a question it asked. The guard cannot read whether you agreed: it holds the Conductor to proposing an edit and waiting for you. An agent's own call never counts as your answer: a message an agent thread sends, including through `check_artifact_comments` or a compact, is recorded as the Conductor's, and an agent thread cannot answer a question card. The same holds for review notes an agent thread sends, and for messages a thread carries when it moves to another machine, which keep their sender.
 
-Like the automation guard, it holds the path agents are told to use. A shell command that calls the API without the header is not stopped.
+Like the automation guard, it holds every path Omni gives a thread: its MCP servers, the `omni` command and `curl` with `$OMNI_TOKEN` all carry the thread's own token, with or without the header ([ADR 0016](../adr/0016-thread-bound-credentials.md)). A thread that reads `data/api-token` from disk on purpose is not stopped yet; that needs the OS sandbox the ADR leaves for later.
 
 The Conductor writes roles with its own tools, which go through that guard:
 

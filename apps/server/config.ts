@@ -149,6 +149,8 @@ export const paths = {
 for (const p of [paths.data, paths.threads, paths.worktrees, paths.browsers]) mkdirSync(p, { recursive: true });
 
 export const threadDir = (threadId: string) => join(paths.threads, threadId);
+/** The thread's own API token, which its MCP servers read (thread-tokens.ts). Not one of the folders that sync. */
+export const threadTokenPath = (threadId: string) => join(threadDir(threadId), 'token');
 export const artifactsDir = (threadId: string) => join(paths.threads, threadId, 'artifacts');
 /** The channel's design system, written here before each turn. Not in artifacts/, which Omni renders in the thread. */
 export const designSystemFile = (threadId: string) => join(paths.threads, threadId, 'design-system.html');

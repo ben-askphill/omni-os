@@ -8,6 +8,7 @@ import { channels, threads } from './db.ts';
 import { emitThread } from './runner/state.ts';
 import { allPRs, branchPRs, getPR, listPRs, mergePR, rerunFailedChecks, setAutoMerge, threadPRMarks } from './github.ts';
 import { requestPRReview } from './pr-review.ts';
+import { threadCredential, unattended } from './automation-guard.ts';
 import { fetchPRImage, githubImage, proxyPRImages } from './github-images.ts';
 
 export const githubApi = new Hono();
@@ -110,6 +111,9 @@ githubApi.post('/channels/:id/prs/:n/rerun-failed', async (c) => {
 
 // Resolve the PR's origin on the server so every client delegates to the same parent.
 githubApi.post('/channels/:id/prs/:n/review', async (c) => {
+  // The reviewer files under the PR's builder, not the caller: an unattended thread would start a thread outside its lineage.
+  const caller = threadCredential(c);
+  if (caller && unattended(caller)) return c.json({ error: 'A thread under an automation or a usage scan cannot start a PR review.' }, 403);
   const channel = c.req.param('id');
   const number = z.coerce.number().int().positive().parse(c.req.param('n'));
   return c.json(await requestPRReview(channel, repoOf(channel), number));

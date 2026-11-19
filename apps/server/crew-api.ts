@@ -1,10 +1,10 @@
 // /api/crew: the crew roles, and their edits from the clients (crew-store.ts).
-// An agent thread names itself on every call (CALLER_HEADER), and a role is a prompt every later thread of it runs
+// An agent thread is known by its own token (automation-guard.ts callerOf), and a role is a prompt every later thread of it runs
 // with, so an agent's write goes through the crew guard (crew-guard.ts): only the Conductor saves or resets a role,
 // never its powers, and only after Ben answered in its thread. Ben's own clients name no thread.
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { CALLER_HEADER } from './automation-guard.ts';
+import { callerOf } from './automation-guard.ts';
 import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { listCrew } from './crew.ts';
 import { crewDetail, crewRunProblem, crewSave, deleteCrew, draftCrew, duplicateCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
@@ -82,7 +82,7 @@ crewApi.post('/crew/:id/hidden', async (c) => {
 
 /** A 403 for an agent thread's write the crew guard refuses. Ben's own clients name no thread. */
 function guard(c: Context, write: CrewWrite, save?: CrewSave, id?: string) {
-  const refusal = crewRefusal(c.req.header(CALLER_HEADER), write, save, id);
+  const refusal = crewRefusal(callerOf(c), write, save, id);
   return refusal ? c.json({ error: refusal }, 403) : null;
 }
 

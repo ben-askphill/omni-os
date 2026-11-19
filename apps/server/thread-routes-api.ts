@@ -14,7 +14,7 @@ import { readOpenItems } from '@omni/shared/open-items.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
 import { getCrew } from './crew.ts';
-import { senderOf as sender } from './automation-guard.ts';
+import { lineageRefusal, senderOf as sender, threadCredential } from './automation-guard.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
 import { bus } from './bus.ts';
@@ -144,6 +144,8 @@ threadRoutesApi.post('/', async (c) => {
   const { data, files } = await readBody(c);
   // run-on.ts: a synced machine's id, "here", or left out for Settings' default.
   const { context: raw, ...body } = createSchema.parse(data);
+  const filed = fileUnderCaller(c, body);
+  if (filed) return filed;
   checkUploads(files);
   const parsed = parseContexts(raw);
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
@@ -192,10 +194,24 @@ const teamSchema = z.object({
     .min(1),
 });
 
+/**
+ * A thread's own token starts threads under itself: no parent means the caller, and a parent outside its lineage is a
+ * 403 (automation-guard.ts lineageRefusal). Sets `parent_id` on `body`; the 403 when refused.
+ */
+function fileUnderCaller(c: Context, body: { parent_id?: string | null }) {
+  const caller = threadCredential(c);
+  if (!caller) return null;
+  body.parent_id ||= caller;
+  const no = lineageRefusal(c, body.parent_id, true);
+  return no ? c.json({ error: no }, 403) : null;
+}
+
 /** A lead thread in the channel and one member thread per task under it. */
 threadRoutesApi.post('/team', async (c) => {
   const body = teamSchema.safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'invalid team' }, 400);
+  const filed = fileUnderCaller(c, body.data);
+  if (filed) return filed;
   return c.json(await createTeam(body.data));
 });
 

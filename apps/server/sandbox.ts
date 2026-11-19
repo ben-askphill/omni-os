@@ -3,13 +3,12 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSy
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { tokenPath } from './api-token.ts';
 import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
 import { fillWorktree, type WorktreeExtras } from './worktree-include.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
 import { STEPS_SERVER } from '@omni/shared/steps.ts';
-import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
+import { config, paths, threadDir, threadTokenPath, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
 import type { Channel, ThreadWorkspace } from './db.ts';
@@ -267,7 +266,7 @@ interface McpServer {
 /** Per-thread MCP servers, layered on top of the user's normal Claude Code MCP config. Hermes gets none: it runs elsewhere. */
 export function buildMcpConfig(input: McpInput) {
   const servers: Record<string, McpServer> = {};
-  const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
+  const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: threadTokenPath(input.threadId), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
 
   // ask, render, steps and threads run on omni-mcp (native-mcp.ts). An install without a binary that starts leaves them out.
   const helper = (key: string, name: NativeMcpServer): void => {

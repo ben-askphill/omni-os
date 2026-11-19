@@ -28,10 +28,17 @@ export const GROKBOT_WEBHOOK_AUTH = 'GROKBOT_WEBHOOK_AUTH';
 export const SERVER_ONLY_VARS = [GROKBOT_WEBHOOK_URL, GROKBOT_WEBHOOK_AUTH] as const;
 
 /**
+ * The server's own credentials, when its environment sets them (a QA stack, a test, a script): the install token, the
+ * file holding it and the external MCP token. A thread gets its own token instead (thread-tokens.ts), in `extra`.
+ */
+export const SERVER_CREDENTIAL_VARS = ['OMNI_TOKEN', 'OMNI_TOKEN_FILE', 'OMNI_MCP_TOKEN'] as const;
+
+/**
  * The environment a harness process gets. `base` is Omni's own environment
  * (defaults to process.env). `secrets` are the channel and global secret values.
  * Secrets override the base, then the harness's stripped variables are removed
- * whatever their source. The Grok Bot webhook is removed for every harness.
+ * whatever their source. The Grok Bot webhook is removed for every harness, and so
+ * are the server's own credentials, unless `extra` sets them for the thread.
  */
 export function harnessEnv(
   harness: HarnessId,
@@ -42,5 +49,9 @@ export function harnessEnv(
   const env: NodeJS.ProcessEnv = { ...base, ...secrets, ...extra };
   for (const name of STRIPPED_VARS[harness]) delete env[name];
   for (const name of SERVER_ONLY_VARS) delete env[name];
+  for (const name of SERVER_CREDENTIAL_VARS) if (!(name in extra)) delete env[name];
   return env;
 }
+
+/** OMNI_TOKEN for a thread's process: its spawn's own token, never the install's. Nothing when the spawn has none. */
+export const threadTokenEnv = (ctx: { threadToken?: string }): Record<string, string> => (ctx.threadToken ? { OMNI_TOKEN: ctx.threadToken } : {});

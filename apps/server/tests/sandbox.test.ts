@@ -164,7 +164,7 @@ describe('buildMcpConfig: omni-ask', () => {
       expect(cfg.mcpServers['omni-ask']).toEqual({
         command: MCP,
         args: ['ask'],
-        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
+        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.threads, THREAD, 'token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
     }
   });
@@ -187,7 +187,7 @@ describe('buildMcpConfig: omni-render', () => {
       expect(cfg.mcpServers['omni-render']).toEqual({
         command: MCP,
         args: ['render'],
-        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
+        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.threads, THREAD, 'token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
     }
   });
@@ -213,7 +213,7 @@ describe('buildMcpConfig: omni-threads', () => {
       expect(cfg.mcpServers['omni-threads']).toEqual({
         command: MCP,
         args: ['threads'],
-        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
+        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.threads, THREAD, 'token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
       });
     }
     expect(buildMcpConfig({ threadId: THREAD, channel: channel(), role: role(['omni']), browserBusy: false, omniUrl: OMNI_URL }).mcpServers['omni-threads']).toBeUndefined();
@@ -227,7 +227,7 @@ describe('buildMcpConfig: omni conductor server', () => {
       command: paths.mcpRunner,
       args: [paths.mcpOmni],
       // The token file's path, never the token: mcp.json and Cursor's plugin folder hold no secret value.
-      env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
+      env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.threads, THREAD, 'token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
     });
     expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-browser', 'omni-render', 'omni-steps']);
   });

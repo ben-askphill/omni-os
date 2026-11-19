@@ -1271,8 +1271,8 @@ server.registerTool('rotate_install_token', {
   description:
     `Replace this Omni's install token (data/api-token), only when ${USER} asks, for instance after it leaked. ` +
     'Every signed-in device session ends (browsers, phones, the iOS app), so each signs in or pairs again; the desktop app re-pairs by itself. ' +
-    'Omni MCP servers, in threads and the local stdio one other clients start (when it reads its token from the file), read the new token on their next call. A running agent\'s own $OMNI_TOKEN in its shell stays the old one until its agent process starts again. ' +
-    'The server takes this only from the install token or a session paired with it (a Google or app session gets 403), and answers 409 when OMNI_TOKEN in its environment pins the token.',
+    'Threads hold their own tokens, not the install token, so running threads keep working. The local stdio MCP server other clients start reads the new token on its next call. ' +
+    'The server takes this from the install token, a session paired with it, or a thread\'s own token, but not from a thread under an automation or a usage scan (403), nor a Google or app session (403), and answers 409 when OMNI_TOKEN in its environment pins the token.',
   inputSchema: {},
 }, async () => text(await call('/auth/rotate-token', { method: 'POST' })));
 

@@ -6,7 +6,7 @@ import { openNotes, parseNoteBody, parseNoteInput, sendRecords, THREAD_NOTES_MAX
 import { publishFeed } from './bus.ts';
 import { reviewNotes, threads, type Thread } from './db.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
-import { senderOf } from './automation-guard.ts';
+import { lineageRefusal, senderOf } from './automation-guard.ts';
 import { createThread, postMessage } from './runner.ts';
 
 export const reviewNotesApi = new Hono();
@@ -109,6 +109,8 @@ reviewNotesApi.post('/:id/review-notes/send', async (c) => {
     return c.json({ error: 'These notes are too long for one message. Resolve or delete some, then send again.' }, 400);
   }
   if (new_delegate) {
+    const no = lineageRefusal(c, id, false);
+    if (no) return c.json({ error: no }, 403);
     const thread = await createThread({
       ...(request_id && UUID.test(request_id) && { id: request_id }),
       channel: from.channel_id,

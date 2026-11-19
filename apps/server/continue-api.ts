@@ -3,6 +3,7 @@
 // had. And /api/threads/:id/transcript, where a Carryover sends its new session for the history it left out.
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { lineageRefusal } from './automation-guard.ts';
 import { ContinueRefused, historyOf } from './continue.ts';
 import { createTransition, previewTransition } from './transition.ts';
 
@@ -39,6 +40,9 @@ const startSchema = runSchema.extend({
  */
 continueApi.post('/:id/continue', async (c) => {
   const { harness, model, effort, attachments, device, text, request_id, revision } = startSchema.parse(await c.req.json().catch(() => ({})));
+  // The new thread comes from this one, so an unattended thread continues only its own (automation-guard.ts).
+  const no = lineageRefusal(c, c.req.param('id'), false);
+  if (no) return c.json({ error: no }, 403);
   try {
     const t = await createTransition(c.req.param('id'), { kind: 'fork', run: { harness, model, effort }, attachments, device, text, request_id, revision });
     return c.json({ thread: t.fork!.thread, duplicate: !!t.fork!.duplicate });

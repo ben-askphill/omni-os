@@ -1,7 +1,7 @@
 // /api/threads/:id/questions: what ask_user_question (crates/omni-mcp) asks and polls, and what the question card
 // sends. apps/server/runner/questions.ts decides; the shared parsers' messages come back as 400s.
 import { Hono, type Context } from 'hono';
-import { CALLER_HEADER } from './automation-guard.ts';
+import { callerOf, threadCredential } from './automation-guard.ts';
 import { userName } from './profile.ts';
 import { answerQuestion, askQuestion, awaitAnswer, crewQuestions, WAIT_MAX_SEC } from './runner.ts';
 
@@ -14,7 +14,12 @@ async function field(c: Context, name: string): Promise<unknown> {
 }
 
 /** Ask: `{ questions }` in, `{ id }` out. */
-questionsApi.post('/:id/questions', async (c) => c.json(askQuestion(c.req.param('id'), await field(c, 'questions'))));
+questionsApi.post('/:id/questions', async (c) => {
+  // A thread asks on its own card only: Ben's answer on another thread's card would count as his say there.
+  const caller = threadCredential(c);
+  if (caller && caller !== c.req.param('id')) return c.json({ error: 'A thread asks its questions on its own card.' }, 403);
+  return c.json(askQuestion(c.req.param('id'), await field(c, 'questions')));
+});
 
 /** What the threads delegated from this one, at any depth, wait on Ben to answer: `{ items: CrewQuestion[] }`. */
 questionsApi.get('/:id/crew-questions', (c) => c.json({ items: crewQuestions(c.req.param('id')) }));
@@ -28,7 +33,7 @@ questionsApi.get('/:id/questions/:qid', async (c) => {
 /** Answer: `{ answers }` in, one per question (null skips it), `{ state, via }` out. A 409 when it was answered already, a 403 from an agent thread. */
 questionsApi.post('/:id/questions/:qid/answer', async (c) => {
   // Only Ben answers, on the card: an answer is what the automation and crew guards read as his say in a thread.
-  if (c.req.header(CALLER_HEADER)) return c.json({ error: `Only ${userName()} answers a question, on its card.` }, 403);
+  if (callerOf(c)) return c.json({ error: `Only ${userName()} answers a question, on its card.` }, 403);
   const r = await answerQuestion(c.req.param('id'), c.req.param('qid'), await field(c, 'answers'));
   return 'conflict' in r ? c.json({ error: 'These questions were already answered.', state: r.conflict }, 409) : c.json(r);
 });

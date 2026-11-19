@@ -1,11 +1,10 @@
 // How a Codex session starts: its process environment, the initialize handshake, and the
 // thread/start or thread/resume request with the per-thread config.
 import { readsOnly } from '@omni/shared/quick-ask.ts';
-import { apiToken } from '../../api-token.ts';
 import { browserHeld, codexPolicy } from '../../access.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
 import { ASK_SERVER, ASK_TIMEOUT_SEC, buildMcpConfig } from '../../sandbox.ts';
-import { harnessEnv } from '../env-guard.ts';
+import { harnessEnv, threadTokenEnv } from '../env-guard.ts';
 import type { AdapterContext } from '../adapter.ts';
 import type { CodexClient } from './client.ts';
 import type { ThreadStartResponse } from './protocol.ts';
@@ -38,7 +37,7 @@ export function sessionEnv(ctx: AdapterContext) {
   const thread = ctx.thread;
   return harnessEnv('codex', {
     OMNI_URL: ctx.omniUrl,
-    OMNI_TOKEN: apiToken(),
+    ...threadTokenEnv(ctx),
     OMNI_THREAD_ID: thread.id,
     OMNI_THREAD_DIR: threadDir(thread.id),
     OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),

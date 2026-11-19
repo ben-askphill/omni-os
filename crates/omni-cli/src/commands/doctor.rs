@@ -7,7 +7,7 @@ use omni_core::js::{self, JsValue};
 
 use crate::api;
 use crate::args::{self, switch};
-use crate::connection::{Client, Connection, TokenSource, describe_source};
+use crate::connection::{Client, Connection, THREAD_TOKEN_PREFIX, TokenSource, describe_source};
 use crate::disk::{DiskLevel, disk_level, free_size};
 use crate::error::{Error, Result, exit};
 use crate::proof::{PROBE_MS, Probe, probe};
@@ -87,7 +87,11 @@ fn server_check(p: &Probe, conn: &Connection) -> Check {
 }
 
 fn token_check(conn: &Connection, p: &Probe) -> Check {
-    let place = describe_source(&conn.token_source);
+    let threads_own = conn.token().is_some_and(|t| t.starts_with(THREAD_TOKEN_PREFIX));
+    let place = match &conn.token_source {
+        TokenSource::Env if threads_own => "OMNI_TOKEN, this thread's own token".to_string(),
+        source => describe_source(source),
+    };
     if conn.token_stays_here() {
         return check(
             "token",
@@ -96,7 +100,7 @@ fn token_check(conn: &Connection, p: &Probe) -> Check {
         );
     }
     match &conn.token_source {
-        TokenSource::None => return check("token", Level::Fail, format!("none found. {place}.")),
+        TokenSource::None | TokenSource::NoThreadToken => return check("token", Level::Fail, format!("none found. {place}.")),
         TokenSource::File { path, .. } => {
             let Some(st) = sys::stat(path) else {
                 return check("token", Level::Fail, format!("{place} does not exist. The server writes it on its first start."));
@@ -125,6 +129,11 @@ fn token_check(conn: &Connection, p: &Probe) -> Check {
     // The probe above is the proof, so the client does not ask again.
     match Client::new(conn.clone(), mine == Some(true)).get(api::STATUS) {
         Ok(_) => check("token", Level::Ok, format!("{place}, and the server takes it")),
+        Err(e) if e.http_status() == Some(401) && threads_own => check(
+            "token",
+            Level::Fail,
+            format!("{place}: the server refused it. The thread's process it was made for has ended, or the server restarted."),
+        ),
         Err(e) if e.http_status() == Some(401) => {
             check("token", Level::Fail, format!("{place}: the server refused it. It was rotated or belongs to another install."))
         }

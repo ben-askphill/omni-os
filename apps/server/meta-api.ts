@@ -2,7 +2,7 @@
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { deleteAutomation, lastRuns, loadAutomations, runAutomation } from './automations.ts';
-import { automationRefusal, CALLER_HEADER, lineage, type AutomationWrite } from './automation-guard.ts';
+import { automationRefusal, callerOf, lineage, type AutomationWrite } from './automation-guard.ts';
 import { automationFields, createAutomation, definitionOf, resetAutomation, saveAutomation, setAutomationEnabled, sourceKind } from './automation-files.ts';
 import { ownerOf } from './sync/owner.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
@@ -190,7 +190,7 @@ metaApi.post('/automations', async (c) => {
   const no = refusal(c, 'create');
   if (no) return no;
   // What a usage scan saves starts off: Ben turns each one on himself (automation-guard.ts).
-  const caller = c.req.header(CALLER_HEADER);
+  const caller = callerOf(c);
   const fields = caller && lineage(caller).scan ? { ...parsed.data.fields, enabled: false } : parsed.data.fields;
   return edit(c, () => createAutomation(fields, parsed.data.id), 201);
 });
@@ -199,7 +199,7 @@ metaApi.post('/automations/:id/reset', (c) => refusal(c, 'edit') ?? edit(c, () =
 
 /** A 403 when the agent thread making this call may not (automation-guard.ts). Ben's own clients name no thread and pass. */
 function refusal(c: Context, write: AutomationWrite) {
-  const no = automationRefusal(c.req.header(CALLER_HEADER), write);
+  const no = automationRefusal(callerOf(c), write);
   return no ? c.json({ error: no }, 403) : null;
 }
 

@@ -13,7 +13,8 @@ export interface AuthAccount {
   available: boolean;
   issuer: string | null;
   owner: { email: string | null; name: string | null; linkedAt: string } | null;
-  via: 'token' | 'session' | 'none';
+  /** `thread` only for an agent thread's own token, never a client's. */
+  via: 'token' | 'session' | 'thread' | 'none';
   /** How this device's session started; `token` is the desktop window or a browser paired with the install token. Older servers leave it out. */
   sessionMethod?: 'google' | 'pairing' | 'token' | null;
 }
