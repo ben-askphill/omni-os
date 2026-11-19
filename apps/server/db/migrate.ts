@@ -419,6 +419,11 @@ export function migrate() {
       SELECT 'completion', uid, 'upsert', created_at FROM completions
       WHERE seq = last_insert_rowid() AND EXISTS (SELECT 1 FROM kv WHERE key = 'sync.machine_id');
     END`);
+  // Delegations whose report wakes their delegate-only parent, because it said it will act on it (follow_up on
+  // delegate, db/repos/report-follow-ups.ts). Local, not synced: the parent delegated from this Mac.
+  db.exec(`CREATE TABLE IF NOT EXISTS report_follow_ups (
+    thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE
+  )`);
   // #212: what Ben chose as a new worktree thread's base, until it is resolved to a commit in thread_bases. Local, not synced.
   db.exec(`CREATE TABLE IF NOT EXISTS thread_base_picks (
     thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,

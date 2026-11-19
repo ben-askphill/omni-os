@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { agentStatus, mergeTasks, splitGroup } from '../src/transcript/delegation.ts';
-import type { TaskView, ToolCall } from '@omni/shared/transcript-fold.ts';
+import { agentStatus, answersFor, mergeTasks, shownAnswers, splitGroup } from '../src/transcript/delegation.ts';
+import type { Item, ReportP, TaskView, ToolCall } from '@omni/shared/transcript-fold.ts';
 import type { BackgroundTask } from '../src/api.ts';
 
 const call = (id: string, name: string, result?: { text: string; is_error?: boolean }): ToolCall => ({
@@ -82,5 +82,19 @@ describe('sub-agent state from the live task list', () => {
 
   it('leaves stored rows alone until the feed is live', () => {
     expect(mergeTasks(stored(), [], 't1', { feedLive: false, here: true }).get('toolu_a')!.running).toBe(true);
+  });
+});
+
+describe('answers on delegation cards', () => {
+  const report = (thread_id: string, text: string, shown = true): Item => ({ type: 'report', key: text.length, at: '2026-10-04T09:05:00Z', p: { thread_id, text, ...(shown && { shown }) } as ReportP });
+  const calls = [call('d1', 'mcp__omni__delegate', { text: '{"thread_id":"a"}' }), call('d2', 'mcp__omni__delegate', { text: '{"thread_id":"b"}' })];
+  const tools: Item = { type: 'tools', key: 1, calls, total: 2 } as Item;
+
+  it("puts a report shown in place on its thread's card, the latest when it reported twice", () => {
+    const answers = shownAnswers([tools, report('a', 'first'), report('a', 'second one'), report('b', 'relayed', false), report('gone', 'no card here')]);
+    expect([...answers.keys()]).toEqual(['a']);
+    expect(answers.get('a')?.text).toBe('second one');
+    expect(answersFor(calls, answers)).toEqual({ a: expect.objectContaining({ text: 'second one' }) });
+    expect(answersFor([call('r', 'Read', { text: 'x' })], answers)).toBeUndefined();
   });
 });
