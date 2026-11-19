@@ -12,7 +12,7 @@ import { ChannelAvatar } from '../components/ChannelAvatar';
 import { HeaderButton } from '../components/HeaderButton';
 import { MachineSheet } from '../components/thread/MachineSheet';
 import { RunOptions } from '../components/thread/RunOptions';
-import { useChannels } from '../live/react';
+import { useChannels, useThreadKey } from '../live/react';
 import { useMachineFacts } from '../machine/hooks';
 import type { RootScreenProps } from '../navigation/types';
 import {
@@ -38,7 +38,7 @@ import { Sheet } from '../ui/Sheet';
 
 const RUN_ON_NOTE = 'New threads run on the machine Settings names on the computer unless you pick another here. Replies and Stop follow the thread wherever it runs.';
 
-/** The staged-files scope of the one New screen. A thread id never looks like this. */
+/** The staged-files scope of the one New screen, on the server it starts the thread on. A thread id never looks like this. */
 const NEW_SCOPE = 'new-thread';
 
 /** The phone web's New sheet (apps/web/src/mobile/NewSheet.tsx) for iOS. */
@@ -59,14 +59,15 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
   const catalog = useHarnessCatalog(target, true);
   const { state, start, dismiss, progress, cancel } = useStartThread();
   const starting = state.status === 'starting';
-  const files = useStaged(NEW_SCOPE);
+  const scope = useThreadKey(NEW_SCOPE);
+  const files = useStaged(scope);
   const [attachNotice, setAttachNotice] = useState<string | null>(null);
 
   // Files chosen for an earlier New screen are not this one's, and these are not the next one's.
   useEffect(() => {
-    clearStaged(NEW_SCOPE);
-    return () => clearStaged(NEW_SCOPE);
-  }, []);
+    clearStaged(scope);
+    return () => clearStaged(scope);
+  }, [scope]);
 
   const inputs: DraftInputs = {
     target,
@@ -143,13 +144,13 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
         />
         {files.length > 0 ? (
           <View style={styles.notice}>
-            <AttachmentChips files={files} onRemove={starting ? undefined : (id) => removeStagedFile(NEW_SCOPE, id)} />
+            <AttachmentChips files={files} onRemove={starting ? undefined : (id) => removeStagedFile(scope, id)} />
           </View>
         ) : null}
         {attachNotice ? <AttachNotice text={attachNotice} /> : null}
         {starting && files.length > 0 ? <UploadLine progress={progress} onCancel={cancel} /> : null}
         <View style={styles.runRow}>
-          <AttachControl scope={NEW_SCOPE} disabled={starting} onNotice={setAttachNotice} />
+          <AttachControl scope={scope} disabled={starting} onNotice={setAttachNotice} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Where it runs: ${targetLabel}`}

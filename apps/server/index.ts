@@ -37,6 +37,7 @@ const { startClaudeArtifacts } = await import('./claude-artifacts.ts');
 const { startEventWatch } = await import('./automation-watch.ts');
 const { startTriggerDeliveries } = await import('./automation-triggers.ts');
 const { watchDelegating } = await import('./delegating.ts');
+const { watchSteps } = await import('./step-line.ts');
 const { startPRWatch } = await import('./pr-watch/worker.ts');
 const { startCatalogRefresh } = await import('./harness/catalog-service.ts');
 const { flushSync, startSync } = await import('./sync/worker.ts');
@@ -93,6 +94,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   startTriggerDeliveries();
   // A parent shows running while a thread it delegated works: sent again on the feed when that changes.
   watchDelegating();
+  watchSteps();
   startPRWatch();
   startCatalogRefresh();
   // With this Mac's retention policy on (Settings > Worktrees), removes idle worktrees that hold nothing unsaved, now and daily.

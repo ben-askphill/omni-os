@@ -47,6 +47,7 @@ import { linkOf, type Link } from './connection';
 import { createClaudeArtifactsLive, type ClaudeArtifactsLiveState } from './claude-artifacts';
 import { createLibraryLive, type LibraryState } from './library';
 import type { OmniSession } from './session';
+import { threadKey } from './thread-key';
 import { createStore, type Store } from './store';
 import { gatedFetch } from './yield-gate';
 import { emptyThreadView, reduceThread, withChanges, withDetail, type ThreadChanges, type ThreadDetail, type ThreadView } from './thread-reducer';
@@ -102,6 +103,8 @@ export interface ThreadLive {
 }
 
 export interface LiveHub {
+  /** The session's `serverId`: what the composer's stores file a thread under, with its id (live/thread-key.ts). */
+  readonly serverId: string;
   readonly channels: Store<ChannelsState>;
   /** The header's link state, reduced from the feed and the open thread. */
   readonly link: Store<Link>;
@@ -225,7 +228,8 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
     run: withAuth,
     catalog: catalog.store.get,
     newId: newRequestId,
-    landed: (threadId, item) => settleDraftContext(threadId, item.context.map((c) => c.id)),
+    // Under this hub's server: the same thread id on another paired server is another thread with its own draft.
+    landed: (threadId, item) => settleDraftContext(threadKey(session.serverId, threadId), item.context.map((c) => c.id)),
   });
 
   let uploadLimit: Promise<number> | null = null;
@@ -619,6 +623,7 @@ export function createLiveHub(options: LiveHubOptions): LiveHub {
   recomputeLink();
 
   return {
+    serverId: session.serverId,
     channels,
     link,
     needsYou,

@@ -1,0 +1,607 @@
+{
+  "scenarios": [
+    {
+      "name": "protocol: initialize and list the tool",
+      "server": "steps",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "ping"
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-steps",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "set_steps",
+                  "description": "Show Ben the plan for this task as a short list of steps in the thread, and move the marker as you work. Call it before you start anything with more than one stage, with 3 to 6 steps, then again with the same list each time a step starts or finishes. Write each step as a few plain words Ben would use, like \"Find candidate apps\" or \"Compare prices\": no tool names, file paths, commands or code. Skip it for a quick answer.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "steps": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Every step in order, the same list each call unless the plan changed. 3 to 6, each a few plain words."
+                      },
+                      "current": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "The index (from 0) of the step you are on now. The ones before it are done. Pass the number of steps once all are done."
+                      }
+                    },
+                    "required": [
+                      "steps",
+                      "current"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "without OMNI_USER the tool speaks of the user",
+      "server": "steps",
+      "env": {
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list"
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-steps",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "set_steps",
+                  "description": "Show the user the plan for this task as a short list of steps in the thread, and move the marker as you work. Call it before you start anything with more than one stage, with 3 to 6 steps, then again with the same list each time a step starts or finishes. Write each step as a few plain words the user would use, like \"Find candidate apps\" or \"Compare prices\": no tool names, file paths, commands or code. Skip it for a quick answer.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "steps": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Every step in order, the same list each call unless the plan changed. 3 to 6, each a few plain words."
+                      },
+                      "current": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "The index (from 0) of the step you are on now. The ones before it are done. Pass the number of steps once all are done."
+                      }
+                    },
+                    "required": [
+                      "steps",
+                      "current"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "the marker on a step, and every step done",
+      "server": "steps",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [
+                  "Find candidate apps",
+                  "Read each listing",
+                  "Compare prices"
+                ],
+                "current": 0
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [
+                  "Find candidate apps",
+                  "Read each listing",
+                  "Compare prices"
+                ],
+                "current": 1
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [
+                  "  Find candidate apps  ",
+                  "Read each listing",
+                  "Compare prices"
+                ],
+                "current": 3
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-steps",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Showing step 1 of 3, \"Find candidate apps\". Call set_steps again when it changes."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Showing step 2 of 3, \"Read each listing\". Call set_steps again when it changes."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Showing all 3 steps as done."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "arguments it refuses, without a request",
+      "server": "steps",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [],
+                "current": 0
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [
+                  "One",
+                  "Two"
+                ],
+                "current": 3
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [
+                  "One",
+                  "  "
+                ],
+                "current": 0
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [
+                  "One"
+                ],
+                "current": -1
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": "One",
+                "current": 0
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tools/call",
+            "params": {
+              "name": "set_steps",
+              "arguments": {
+                "steps": [
+                  "One"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "tools/call",
+            "params": {
+              "name": "html_render",
+              "arguments": {
+                "steps": [
+                  "One"
+                ],
+                "current": 0
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-steps",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool set_steps: Too small: expected array to have >=1 items at steps"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "current is 3, but there are only 2 steps. Pass 2 once all are done."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Every step needs a title of a few words."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool set_steps: Too small: expected number to be >=0 at current"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 5
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool set_steps: Invalid input: expected array, received string at steps"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 6
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool set_steps: Invalid input: expected number, received undefined at current"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 7
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Tool html_render not found"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 8
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    }
+  ]
+}

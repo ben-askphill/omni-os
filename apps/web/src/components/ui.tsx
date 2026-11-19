@@ -4,6 +4,7 @@ export { Icon, Wordmark, type IconName } from './ui/icons.tsx';
 export { Button, IconButton, IconLink, LinkButton, Chip, ChannelMark, Avatar, Monograms, useMonogram, type ChipTone } from './ui/primitives.tsx';
 export { STATUS, asksForYou, statusLabel, glyphFor, threadGlyph, StatusDot, ThreadDot, DoneMark, StatusPill, threadStatusText, type Glyph } from './ui/status.tsx';
 export { Segmented, Tabs, type SegOption } from './ui/segmented.tsx';
+export { ChipSet } from './ui/chip-set.tsx';
 export { Modal, ConfirmDialog, ModalFooter, SCRIM } from './ui/modal.tsx';
 export { KbdFooter, MENU_SURFACE, MOD_KEY, overlayRow } from './ui/overlay.tsx';
 export { InlineConfirm } from './ui/inline-confirm.tsx';

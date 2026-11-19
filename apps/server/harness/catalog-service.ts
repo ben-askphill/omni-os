@@ -4,7 +4,7 @@
 // - A harness that is down is probed again on demand (freshCatalog, at most every 10 seconds), so a `codex login` or
 //   the Mac joining the tailnet shows in the picker without a restart.
 // - A picker opening on a catalog older than ON_DEMAND_MS probes everything again in the background (refreshStale), as
-//   T3 Code's picker asks for newly released models on every open. Settings > Harnesses & models can ask at once.
+//   T3 Code's picker asks for newly released models on every open. Settings > Models can ask at once.
 // - What Claude Code last reported is kept on disk, so a restart starts from it, not from the bundled list alone.
 // The pure assembly lives in catalog.ts; this file does the I/O.
 import { execFile } from 'node:child_process';

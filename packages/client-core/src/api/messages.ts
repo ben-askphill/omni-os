@@ -14,7 +14,7 @@ export interface Attachment {
 /** How a message reaches a busy thread: read at its next step, run after the turn, or interrupt then run. */
 export type SendMode = 'steer' | 'queue' | 'interrupt';
 
-export type DeliveryState = 'accepted' | 'waiting' | 'held' | 'sent' | 'delivered' | 'dropped' | 'discarded' | 'cancelled' | 'recovered' | 'uncertain';
+export type DeliveryState = 'accepted' | 'waiting' | 'held' | 'sent' | 'delivered' | 'dropped' | 'discarded' | 'cancelled' | 'recovered' | 'uncertain' | 'shown';
 
 /** A message the agent has not read yet. */
 export interface PendingMsg {

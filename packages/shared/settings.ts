@@ -1,7 +1,7 @@
 // The user config's one contract (data/omni.config.json, GET and PUT /api/setup): every field the person sets, with
 // its label, hint, default and checks, and the types the server and the web import. The server builds its schema from
 // SETTING_FIELDS (apps/server/user-config.ts) and checks a save with `settingProblem`; the web's Settings page draws its
-// General, Workspace, Hermes and Network access forms from them (apps/web/src/pages/Settings.tsx).
+// General, Workspace, Extras (Hermes and the notes folder) and Network access forms from them (apps/web/src/pages/Settings.tsx).
 //
 // A new text setting is one entry here and its line in omni.config.example.json.
 
@@ -48,13 +48,13 @@ export interface SettingField {
 }
 
 /** The Settings sections that show config fields (packages/shared/settings-catalog.ts). */
-export type SettingPage = 'general' | 'workspace' | 'models' | 'access';
+export type SettingPage = 'general' | 'workspace' | 'extras' | 'access';
 
 /** How each Settings section frames its fields: the card's title and note, and the Advanced fold's summary and note. */
 export const SETTING_PAGES: Record<SettingPage, { title: string; note?: string; advanced?: { summary: string; note: string } }> = {
   general: { title: 'You' },
   workspace: { title: 'Folders' },
-  models: { title: 'Hermes', note: 'Runs threads through a Hermes server instead of a local CLI. Leave it empty to turn it off.' },
+  extras: { title: 'Hermes and notes folder', note: 'Both are optional. Leave a field empty to turn it off.' },
   access: {
     title: 'Network access',
     note: 'Set only in files on this machine, so no page can open this Omni wider.',
@@ -91,6 +91,28 @@ export const SETTING_FIELDS = [
   },
   { section: 'user', key: 'email', label: 'Email', input: 'email', page: 'general', placeholder: 'you@example.com', autoComplete: 'email', default: '', max: 200 },
   {
+    section: 'user',
+    key: 'work',
+    label: 'What you do',
+    input: 'text',
+    page: 'general',
+    hint: 'A line about your work, told to every agent so its answers fit.',
+    placeholder: 'I run a small design studio',
+    default: '',
+    max: 300,
+  },
+  {
+    section: 'user',
+    key: 'tools',
+    label: 'Tools you use',
+    input: 'text',
+    page: 'general',
+    hint: 'Comma separated. Agents reach for these first when they are connected.',
+    placeholder: 'Email, Calendar, Notion',
+    default: '',
+    max: 300,
+  },
+  {
     section: 'workspace',
     key: 'root',
     label: 'Workspace folder',
@@ -109,8 +131,8 @@ export const SETTING_FIELDS = [
     key: 'hermesUrl',
     label: 'Hermes URL',
     input: 'url',
-    page: 'models',
-    hint: 'A Hermes API server on your tailnet. Its token is the global secret HERMES_API_KEY.',
+    page: 'extras',
+    hint: 'Runs threads through a Hermes API server on your tailnet instead of a local CLI. Its token is the global secret HERMES_API_KEY.',
     placeholder: 'http://100.64.0.1:8642',
     default: '',
     env: { name: 'OMNI_HERMES_URL', emptyWins: true },
@@ -118,11 +140,11 @@ export const SETTING_FIELDS = [
   {
     section: 'integrations',
     key: 'centralBrainDir',
-    label: 'Central brain folder',
+    label: 'Notes folder',
     input: 'folder',
-    page: 'workspace',
+    page: 'extras',
     hint: 'A git repo of notes. `npm run brain-export` writes thread digests into it. Leave it empty to turn that off.',
-    placeholder: '~/central-brain',
+    placeholder: '~/notes',
     default: '',
     max: 1024,
     env: { name: 'OMNI_CENTRAL_BRAIN_DIR' },
@@ -289,7 +311,7 @@ export interface SetupState {
    * in the file is kept but does nothing until the variable goes.
    */
   env: Record<string, string>;
-  /** POST /api/setup/complete only: the #conductor thread holding the welcome message, on the first run. */
+  /** POST /api/setup/complete only: the thread to open, the first question's (in General) or else the welcome's in #conductor. */
   threadId?: string | null;
 }
 

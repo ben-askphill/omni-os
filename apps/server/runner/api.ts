@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { channelAccess, harnessRefusal } from '../access.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
-import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
+import { channels, folders, messageRequests, outbox, reportFollowUps, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
 import { crewForNewThread, listCrew, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { checkBase } from '../worktree-base.ts';
@@ -23,7 +23,7 @@ import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
-import { bindResume, connectorsFor, declareConnectors, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
+import { bindResume, connectorsFor, declareConnectors, retrySetup, saveStart, setUpThread, START_REQUEST, type SetupRetryBy } from './setup.ts';
 import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
@@ -104,6 +104,11 @@ export interface CreateThreadInput {
    * thread's (harness/review.ts), and one on the same family is refused.
    */
   review_of?: string | null;
+  /**
+   * A delegation whose report wakes a delegate-only parent, because it will act on it. Without it, the report shows in
+   * that parent's transcript and starts no turn there (runner/queue.ts showsInPlace).
+   */
+  follow_up?: boolean;
   /** The base a new worktree thread's branch is cut from (worktree-base.ts). None, or a thread with no worktree: the repo's HEAD. */
   base?: BasePick | null;
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
@@ -217,6 +222,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   });
   if (input.connectors?.length) declareConnectors(id, input.connectors);
   if (base) threadBasePicks.set(id, base);
+  if (input.follow_up && input.parent_id) reportFollowUps.set(id);
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
 }
 
@@ -552,11 +558,11 @@ function goalSend(thread: Thread, prompt: string, files: number): { stops: boole
  * uncertain one may already have reached the harness, so it goes only when named. Each goes through the runner
  * like a new message, so the harness's concurrency cap holds. Only the Mac that accepted a request resumes it.
  */
-export async function resumeRequests(threadId: string, ids?: string[]): Promise<Thread> {
+export async function resumeRequests(threadId: string, ids?: string[], by: SetupRetryBy = {}): Promise<Thread> {
   const thread = threads.get(threadId);
   if (!thread) throw refusal('thread not found', 404);
   // What waits on a worktree goes once it is made: Resume there is Retry, and while it is made, nothing more.
-  if (thread.setup) return retrySetup(threadId);
+  if (thread.setup) return retrySetup(threadId, by);
   const parked = messageRequests.parked(threadId);
   const chosen = ids ? parked.filter((r) => ids.includes(r.id)) : parked.filter((r) => r.state === 'recovered');
   if (ids && chosen.length !== new Set(ids).size) throw refusal('Some of these messages are no longer waiting to be resumed.', 409);

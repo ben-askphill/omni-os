@@ -46,12 +46,16 @@ export interface Channel {
   created_at: string;
 }
 
-/** The two system channels every install needs. Raw SQL, so seeding does not queue an outbox row. */
+/**
+ * The two system channels every install needs. Raw SQL, so seeding does not queue an outbox row. Only a new database
+ * gets these names: an install that has them already keeps its own. `inbox` keeps its id (roles, automations and
+ * links name it) and shows as General, so it does not read like the Inbox list.
+ */
 export function seedSystemChannels() {
   db.prepare(
     `INSERT OR IGNORE INTO channels (id, name, kind, use_worktree, notes) VALUES
      ('conductor', 'Conductor', 'system', 0, 'Front agent. Delegates to crew threads in other channels.'),
-     ('inbox', 'Inbox', 'internal', 0, 'Default channel for quick asks, research and ops.')`,
+     ('inbox', 'General', 'internal', 0, 'Quick questions and everyday work that belong to no project.')`,
   ).run();
 }
 

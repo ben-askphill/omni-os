@@ -55,6 +55,9 @@
 //                     With --permission-prompt-tool stdio, each WRITE, CMD and TOOL call first sends a can_use_tool
 //                     control request, as the real CLI does when a hook or the permission mode asks, and runs only
 //                     when Omni answers allow; a deny becomes an error tool_result with Omni's message
+//   STEPS:<ms>        before the answer, post a three-step plan with Omni's set_steps as the real CLI calls an MCP tool:
+//                     start the omni-steps server from --mcp-config, then run one call per step, each taking <ms>, and
+//                     move the marker on as each step starts and once all are done. Interruptible like TOOL
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen,
@@ -493,6 +496,58 @@ async function renderPage(title) {
   }
 }
 
+/** STEPS: the plan, the call each step makes, and what each call is. */
+const STEP_PLAN = ['Find candidate apps', 'Read the reviews', 'Compare prices'];
+const STEP_CALLS = [
+  ['WebSearch', { query: 'shopify review apps' }],
+  ['WebFetch', { url: 'https://apps.shopify.com/judgeme' }],
+  ['Read', { file_path: 'prices.csv' }],
+];
+
+/**
+ * STEPS: set_steps through the omni-steps server Omni configured, like html_render above, with one call per step
+ * between the moves. Resolves to the calls made, set_steps included; stops early once interrupted.
+ */
+async function postSteps(t, ms) {
+  const server = mcpEntry('omni-steps');
+  let client = null;
+  let made = 0;
+  try {
+    if (server) {
+      const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+      const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+      client = new Client({ name: 'claude-code', version: VERSION });
+      await client.connect(new StdioClientTransport({ command: server.command, args: server.args ?? [], env: { ...process.env, ...server.env }, stderr: 'ignore' }));
+    }
+    for (let k = 0; k <= STEP_PLAN.length; k++) {
+      const id = `toolu_fake_${++seq}`;
+      const input = { steps: STEP_PLAN, current: k };
+      assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id, name: 'mcp__omni-steps__set_steps', input }]);
+      made++;
+      if (client) {
+        const res = await client.callTool({ name: 'set_steps', arguments: input });
+        toolResult(id, res.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n'), !!res.isError);
+      } else toolResult(id, 'No such tool available: mcp__omni-steps__set_steps', true);
+      if (k === STEP_PLAN.length) break;
+      const [name, args] = STEP_CALLS[k];
+      const call = `toolu_fake_${++seq}`;
+      assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: call, name, input: args }]);
+      made++;
+      if (!(await pause(t, ms))) {
+        toolResult(call, REJECTED, true);
+        marker('[Request interrupted by user for tool use]');
+        return made;
+      }
+      toolResult(call, 'ok', false);
+    }
+  } catch (err) {
+    marker(`fake-claude: set_steps failed: ${err.message}`);
+  } finally {
+    await client?.close().catch(() => {});
+  }
+  return made;
+}
+
 const marker = (text) =>
   emit({ type: 'user', message: { role: 'user', content: [{ type: 'text', text }] }, parent_tool_use_id: null, timestamp: now() });
 
@@ -532,6 +587,7 @@ async function runTurn() {
   const scripts = [];
   /** WRITE and CMD: tool calls that change something, each asked for first under --permission-prompt-tool. */
   const actions = [];
+  let stepMs = null;
   let steps = 0;
 
   emit({
@@ -573,6 +629,8 @@ async function runTurn() {
       for (const x of m.text.matchAll(/RUN:(\S+)/g)) scripts.push(x[1]);
       for (const x of m.text.matchAll(/WRITE:(\S+)/g)) actions.push({ name: 'Write', input: { file_path: resolvePath(process.cwd(), x[1]), content: 'written by fake-claude' } });
       for (const x of m.text.matchAll(/CMD:(\S+)/g)) actions.push({ name: 'Bash', input: { command: x[1].replace(/_/g, ' '), description: 'Fake command' } });
+      const plan = m.text.match(/STEPS:(\d+)/);
+      if (plan) stepMs = Number(plan[1]);
     }
     return true;
   };
@@ -662,6 +720,11 @@ async function runTurn() {
   for (const title of renders.splice(0)) {
     steps++;
     await renderPage(title);
+  }
+  if (stepMs !== null) {
+    steps += await postSteps(t, stepMs);
+    stepMs = null;
+    if (dead) return;
   }
   for (const file of publishes.splice(0)) {
     const toolId = `toolu_fake_${++seq}`;

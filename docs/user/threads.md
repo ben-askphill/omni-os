@@ -217,6 +217,12 @@ Replies render as Markdown on desktop web, phone web and the desktop app. A `mer
 
 Open a tool row to read its output. Long output starts with a preview, then loads in chunks with Load more. A running Codex command can show its live tail. The other harnesses show output when the call ends. If the harness cut the output before saving it, loading more cannot recover it. The budgets and client rules are in [Thread history](../internals/thread-history.md).
 
+## Steps
+
+An agent on a task with more than one stage posts its plan as 3 to 6 steps in plain words with Omni's `set_steps` tool, then moves the marker as each step starts or finishes. Claude Code, Codex and Cursor threads have it through the `omni-steps` MCP server, and their system prompt asks for it. When the agent posts no list, Omni uses the plan the harness keeps (Claude Code's todo list or its tasks, a Codex plan, Cursor's todos). With neither, Omni groups the turn's calls into plain phases such as "Searching the web" or "Looking through the files", ending in "Writing the answer". Hermes and Cursor Cloud threads have no Omni MCP servers, so they show phases. No step names a tool, a path or a command.
+
+While a thread runs, the step it is on goes out with the thread as one line: "Step 2 of 3 · Read the reviews" for a list, or the phase ("Searching the web"). Every machine reads it from the thread's own events, so a thread that runs on another machine shows the same line. How it is built: `packages/shared/steps.ts` and `apps/server/step-line.ts`.
+
 ## When the agent asks you
 
 An agent can stop and ask you one to four multiple-choice questions with Omni's `ask_user_question` tool. Every Claude Code, Codex and Cursor thread has it through the `omni-ask` MCP server. Hermes and Cursor Cloud threads have no Omni MCP servers, so they don't. Omni turns off Claude Code's own AskUserQuestion, because nothing can answer it in a headless run.

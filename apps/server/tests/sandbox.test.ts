@@ -153,7 +153,7 @@ describe('buildMcpConfig: browser', () => {
   it('adds no browser when OMNI_BROWSER is off', () => {
     config.browser = false;
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), browserBusy: false, omniUrl: OMNI_URL });
-    expect(Object.keys(cfg.mcpServers)).toEqual(['omni-ask', 'omni-render', 'omni-threads']);
+    expect(Object.keys(cfg.mcpServers)).toEqual(['omni-ask', 'omni-render', 'omni-steps', 'omni-threads']);
   });
 });
 
@@ -193,6 +193,19 @@ describe('buildMcpConfig: omni-render', () => {
   });
 });
 
+describe('buildMcpConfig: omni-steps', () => {
+  it('gives every thread set_steps, whatever its role: Claude Code, Codex and Cursor all read this config', () => {
+    for (const r of [undefined, role([]), role(['github']), role(['omni'])]) {
+      const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: r, browserBusy: false, omniUrl: OMNI_URL });
+      expect(cfg.mcpServers['omni-steps']).toEqual({
+        command: MCP,
+        args: ['steps'],
+        env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
+      });
+    }
+  });
+});
+
 describe('buildMcpConfig: omni-threads', () => {
   it('gives every thread without the conductor server read_referenced_thread, which the conductor server has itself', () => {
     for (const r of [undefined, role([]), role(['github'])]) {
@@ -216,7 +229,7 @@ describe('buildMcpConfig: omni conductor server', () => {
       // The token file's path, never the token: mcp.json and Cursor's plugin folder hold no secret value.
       env: { OMNI_URL, OMNI_TOKEN_FILE: join(paths.data, 'api-token'), OMNI_THREAD_ID: THREAD, OMNI_USER: 'the user' },
     });
-    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-browser', 'omni-render']);
+    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-browser', 'omni-render', 'omni-steps']);
   });
 
   it('is absent without a role or when the role lists other servers', () => {
@@ -254,7 +267,7 @@ describe('buildMcpConfig: omni conductor server', () => {
   it('still works with the browser off', () => {
     config.browser = false;
     const cfg = buildMcpConfig({ threadId: THREAD, channel: channel(), role: role(['omni']), browserBusy: true, omniUrl: OMNI_URL });
-    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-render']);
+    expect(Object.keys(cfg.mcpServers).sort()).toEqual(['omni', 'omni-ask', 'omni-render', 'omni-steps']);
   });
 });
 

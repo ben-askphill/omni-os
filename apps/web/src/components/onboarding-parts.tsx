@@ -1,18 +1,99 @@
 // The pieces the onboarding wizard (Onboarding.tsx) is built from: the screen frame, the form row, the step dots, the
-// harness check, and the timezone and pronoun fields Settings reuses.
+// Work and Files questions, the harness check, and the timezone and pronoun fields Settings reuses.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { DesktopBridge } from '@omni/shared/desktop-bridge.ts';
 import { githubLine, type GhLoginStart, type GithubCheck } from '@omni/shared/github-check.ts';
 import { accountsByHarness, machineAccounts, type AccountsView, type HarnessAccountView } from '@omni/shared/harness-accounts.ts';
 import { HARNESS_CHECK_LABEL, harnessAccountLine, harnessCheck, type HarnessCheck } from '@omni/shared/harness-check.ts';
+import { ONBOARDING_TOOLS, otherTools, toolLine, toolList, withOtherTools } from '@omni/shared/onboarding.ts';
 import { api, errorText, type HarnessWithRunning } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { desktop } from '../desktop.ts';
 import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
-import { Button, CopyButton, ErrorNote, Icon, Label, StatusDot, Toggle } from './ui.tsx';
+import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, Icon, Label, StatusDot, Toggle } from './ui.tsx';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
-export const STEPS = ['You', 'Workspace', 'Harnesses', 'Channel', 'Notifications', 'Done'] as const;
+export const STEPS = ['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Done'] as const;
+
+/** The answers the Work step asks for: a line about the user's work, and the tools line (packages/shared/onboarding.ts). */
+export function WorkScreen({ work, tools, onWork, onTools }: { work: string; tools: string; onWork: (v: string) => void; onTools: (v: string) => void }) {
+  const list = toolList(tools).map((t) => t.toLowerCase());
+  const picked = ONBOARDING_TOOLS.filter((t) => list.includes(t.id.toLowerCase())).map((t) => t.id);
+  const pick = (ids: string[]) => onTools(withOtherTools(toolLine(ids), otherTools(tools)));
+  return (
+    <Screen caption="Your work" title="What do you do?" body="A line or two is enough. Every agent reads it, so its answers fit your work and it reaches for your tools first.">
+      <Row label="Your work" htmlFor="ob-work" hint="Optional. Change it any time in Settings > General.">
+        <textarea
+          id="ob-work"
+          className="field min-h-[72px] w-full resize-y"
+          value={work}
+          maxLength={300}
+          rows={3}
+          placeholder="I run a small design studio: client projects, proposals and invoices."
+          autoFocus
+          onChange={(e) => onWork(e.target.value)}
+        />
+      </Row>
+      <div>
+        <Label hint="Pick any. Connect them later; until then an agent says what it would need.">Which tools do you use?</Label>
+        <ChipSet label="Tools you use" options={ONBOARDING_TOOLS.map((t) => ({ id: t.id, label: t.label }))} value={picked} onChange={pick} />
+      </div>
+      <Row label="Others" htmlFor="ob-tools-other" hint="Comma separated.">
+        <input id="ob-tools-other" className="field w-full" value={otherTools(tools)} placeholder="Xero, HubSpot" onChange={(e) => onTools(withOtherTools(tools, e.target.value))} />
+      </Row>
+    </Screen>
+  );
+}
+
+/** What the Files step asks: the workspace folder, then, for someone who works with code, the repo add-on's fields. */
+export interface FilesAnswers {
+  root: string;
+  reposDir: string;
+  githubOwner: string;
+}
+
+/**
+ * Where Omni keeps files: the workspace folder. Repos folder and GitHub owner are an add-on, open when the Work step
+ * picked GitHub, when either is already saved, or when the user turns it on here.
+ */
+export function FilesScreen({
+  value,
+  onChange,
+  code,
+  onCode,
+  fallbacks,
+}: {
+  value: FilesAnswers;
+  onChange: (v: Partial<FilesAnswers>) => void;
+  code: boolean;
+  onCode: (on: boolean) => void;
+  fallbacks: { workspaceRoot: string; reposDir: string };
+}) {
+  return (
+    <Screen caption="Files" title="Where should Omni keep your files?" body="Agents work in this folder and save what they make there. Omni makes it if it is missing.">
+      <Row label="Folder" htmlFor="ob-root">
+        <FolderInput id="ob-root" dialogTitle="Where Omni keeps your files" value={value.root} placeholder={fallbacks.workspaceRoot} spellCheck={false} onChange={(root) => onChange({ root })} />
+      </Row>
+      <div className="flex items-start gap-4 rounded-[16px] bg-surface p-3.5" data-addon="code">
+        <div className="min-w-0 flex-1">
+          <div className="text-[13.5px] font-medium">I work with code</div>
+          <p className="mt-0.5 text-[12.5px] leading-relaxed text-fg-3">Point a project at a git repo and every thread there gets its own copy to work in.</p>
+        </div>
+        <Toggle checked={code} onChange={onCode} label="I work with code" />
+      </div>
+      {code && (
+        <>
+          <Row label="Repos folder" htmlFor="ob-repos" hint="Where your git checkouts live. Used to suggest repo paths for projects.">
+            <FolderInput id="ob-repos" dialogTitle="Repos folder" value={value.reposDir} placeholder={fallbacks.reposDir} spellCheck={false} onChange={(reposDir) => onChange({ reposDir })} />
+          </Row>
+          <Row label="GitHub owner" htmlFor="ob-gh" hint="Optional. Your GitHub user or org, for your repos.">
+            <input id="ob-gh" className="field w-full font-mono !text-[13px]" value={value.githubOwner} placeholder="octocat" spellCheck={false} autoCapitalize="off" onChange={(e) => onChange({ githubOwner: e.target.value })} />
+          </Row>
+        </>
+      )}
+    </Screen>
+  );
+}
 
 export async function createChannel(name: string, repo: string, store: string) {
   const id =
@@ -34,7 +115,7 @@ export async function createChannel(name: string, repo: string, store: string) {
 
 /** What a harness is for, under its row, when that is more than "another place to run threads". */
 const HARNESS_NOTE: Partial<Record<string, string>> = {
-  codex: 'Reviews the pull requests Claude writes. Without it, the Conductor asks you what to do each time.',
+  codex: 'Optional. Reviews a pull request Claude wrote when you ask the Conductor for a review.',
 };
 
 /** The rows the Harnesses step lists: each harness, then the GitHub CLI the PR steps run. */
@@ -63,8 +144,11 @@ async function loadRows(): Promise<HarnessRows> {
   return { harnesses: harnesses.filter((h) => (h.id !== 'hermes' && h.id !== 'cursor-cloud') || h.available), accounts, github };
 }
 
-/** `onGithub` hears the GitHub CLI's state each time it is read, so the Done screen can say whether it was connected. */
-export function HarnessScreen({ onGithub }: { onGithub?: (github: GithubCheck | null) => void }) {
+/**
+ * `onGithub` hears the GitHub CLI's state each time it is read, so the Done screen can say whether it was connected.
+ * `code` false (someone who said they do not work with code) leaves the GitHub CLI row out.
+ */
+export function HarnessScreen({ onGithub, code = true }: { onGithub?: (github: GithubCheck | null) => void; code?: boolean }) {
   const [rows, setRows] = useState<HarnessRows | null>(null);
   const [checking, setChecking] = useState(false);
   const load = async () => {
@@ -80,8 +164,7 @@ export function HarnessScreen({ onGithub }: { onGithub?: (github: GithubCheck | 
   }, []);
   const list = rows?.harnesses;
   const claude = list?.find((h) => h.id === 'claude-code');
-  const codex = list?.find((h) => h.id === 'codex');
-  const github = rows?.github;
+  const github = code ? rows?.github : null;
   const heard = useRef(onGithub);
   heard.current = onGithub;
   useEffect(() => {
@@ -97,7 +180,7 @@ export function HarnessScreen({ onGithub }: { onGithub?: (github: GithubCheck | 
     <Screen
       caption="Harnesses"
       title="The agents Omni can run"
-      body="Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code. Codex reviews the pull requests Claude writes. Cursor Agent is optional."
+      body="Each thread runs on a CLI you are signed in to, billed to that plan. Omni needs Claude Code. Codex and Cursor Agent are optional."
     >
       <ul className="space-y-2">
         {(list ?? []).map((h) => (
@@ -121,9 +204,7 @@ export function HarnessScreen({ onGithub }: { onGithub?: (github: GithubCheck | 
         <span className="text-[12px] text-fg-3">
           {claude && !claude.available
             ? 'Set up Claude Code before your first thread.'
-            : codex && !codex.available
-              ? 'Set up Codex for PR reviews, or the Conductor asks you each time.'
-              : github && github.state !== 'ready'
+            : github && github.state !== 'ready'
                 ? 'Set up the GitHub CLI before you work on pull requests.'
                 : 'You can add the others any time.'}
         </span>

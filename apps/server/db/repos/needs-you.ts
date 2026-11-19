@@ -107,7 +107,7 @@ export const resultReads = {
       | ResultRead
       | undefined,
   /**
-   * Ben saw this result. The watermark moves to it and never back: reading an older one after a newer one is a
+   * The user saw this result. The watermark moves to it and never back: reading an older one after a newer one is a
    * no-op, and a turn that ended after the one shown stays unread. A move goes to the other Mac. Null for a result
    * this Mac does not have.
    */

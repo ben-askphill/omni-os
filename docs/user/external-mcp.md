@@ -234,3 +234,5 @@ A 401 from `/mcp` names the protected resource metadata (`/.well-known/oauth-pro
 Through the tunnel, the `integrations.tailscaleLogin` check that guards `/api` does not apply, since tunnel requests carry no Tailscale login. The ingress rule forwards only `/mcp` and `/.well-known`, and `/api` refuses the tunnel's name even if a rule forwards more. The tools reach `/api` in-process through the usual request guard. `/mcp` and the metadata refuse a `Host` that is neither one of `/api`'s allowed names nor `mcpPublicUrl`'s, and `/mcp` refuses a browser `Origin` from another site. These are the same DNS-rebinding checks that `/api` uses (see [Remote access and security](remote-access.md)).
 
 The server is stateless. Each request gets a fresh MCP server, so a restart drops no session.
+
+A request body over 1 MiB gets a 413 before it is read, and a tool call whose arguments hold more than 1,000 array elements and object members gets an error result. No tool takes a list, so neither limit gets in the way of a real call.

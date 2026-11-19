@@ -43,7 +43,8 @@
     "updated_at": "2026-01-05T09:00:00.000Z",
     "delegating": false,
     "ran_on": null,
-    "run_started_at": "2026-01-05T09:00:00.000Z"
+    "run_started_at": "2026-01-05T09:00:00.000Z",
+    "step": "Running commands"
   },
   "channel": {
     "id": "acme",

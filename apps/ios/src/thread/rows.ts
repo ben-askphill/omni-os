@@ -29,7 +29,8 @@ export type ThreadRow =
   | { kind: 'error'; key: string; text: string }
   | { kind: 'cloud'; key: string; p: CloudAgentP }
   | { kind: 'prose'; key: string; text: string; clipped: number | null }
-  | { kind: 'delegation'; key: string; kids: Thread[] }
+  /** `answers`: reports shown in place from the kids, by thread (TurnView `answers`), each under its kid. */
+  | { kind: 'delegation'; key: string; kids: Thread[]; answers: Record<string, ReportP> }
   | { kind: 'artifact'; key: string; a: Artifact }
   | { kind: 'steps'; key: string; turn: number; steps: number; failed: number; live: boolean; open: boolean }
   | { kind: 'note'; key: string; text: string; clipped: number | null }
@@ -120,7 +121,7 @@ function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, in
     if (view.plan) yield { kind: 'plan', key: `plan${t.key}`, plan: view.plan };
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };
     if (t.prose) yield { kind: 'prose', key: `a${t.key}`, text: t.prose, clipped: t.proseClipped?.key ?? null };
-    if (t.children.length) yield { kind: 'delegation', key: `d${t.key}`, kids: t.children };
+    if (t.children.length) yield { kind: 'delegation', key: `d${t.key}`, kids: t.children, answers: t.answers };
     if (t.steps > 0) yield steps();
   } else {
     const quiet = input.conductor && t.status === 'done';
@@ -129,7 +130,7 @@ function* turnRows(t: IosTurn, i: number, last: boolean, view: IosThreadView, in
     if (t.error) yield { kind: 'error', key: `e${t.key}`, text: t.error };
     if (t.cloud) yield { kind: 'cloud', key: `cl${t.key}`, p: t.cloud };
     if (t.prose) yield { kind: 'prose', key: `a${t.key}`, text: t.prose, clipped: t.proseClipped?.key ?? null };
-    if (t.children.length) yield { kind: 'delegation', key: `d${t.key}`, kids: t.children };
+    if (t.children.length) yield { kind: 'delegation', key: `d${t.key}`, kids: t.children, answers: t.answers };
     for (const a of t.artifacts) yield { kind: 'artifact', key: `f${t.key}.${a.id}`, a };
     if (t.steps > 0) yield steps();
   }

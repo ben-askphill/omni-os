@@ -379,7 +379,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
             <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" spellCheck={false} />
           </Field>
-          <Field label="Portal slug" htmlFor="ch-portal" hint="Ask Phill Portal company slug, for client context.">
+          <Field label="Client portal slug" htmlFor="ch-portal" hint="The company's slug in your client portal, for client context.">
             <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" spellCheck={false} />
           </Field>
         </div>

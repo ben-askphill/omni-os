@@ -150,21 +150,33 @@ export class Backend {
     }
   }
 
+  /**
+   * The install's token, once whatever holds the port proves it holds the same one (GET /api/auth/proof), else null.
+   * Asked before every request that carries it: a server this app attached to can exit and leave its port to another
+   * program for the seconds before `watch` notices, and the feed and Needs you keep calling in that time.
+   */
+  async provenToken(fetchImpl: typeof fetch = fetch): Promise<string | null> {
+    const token = this.token();
+    if (!token) return null;
+    return (await probePort(this.config.port, token, fetchImpl)).kind === 'omni' ? token : null;
+  }
+
   /** The secret the server this launch spawned holds, if it did spawn the one it is on. Never leaves this process. */
   pairSecret(): string | null {
     return this.owned?.pairSecret ?? null;
   }
 
   /** desktop-pair with a fresh nonce, for a window about to pair (pairing.ts). Throws a PairingError when refused. */
-  desktopPairUrl(fetchImpl: typeof fetch = fetch): Promise<string> {
-    return desktopPairUrl({ origin: this.origin(), secret: this.pairSecret(), token: this.token(), fetch: fetchImpl });
+  async desktopPairUrl(fetchImpl: typeof fetch = fetch): Promise<string> {
+    return desktopPairUrl({ origin: this.origin(), secret: this.pairSecret(), token: await this.provenToken(fetchImpl), fetch: fetchImpl });
   }
 
-  /** A call to the server's API from this process, with the install's token. */
+  /** A call to the server's API from this process, with the install's token. Sends nothing to a server that does not prove it is this install. */
   async api<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const token = this.token();
+    const token = await this.provenToken();
+    if (!token) throw new Error(`${init.method ?? 'GET'} ${path}: the server on port ${this.config.port} did not prove it is this install`);
     const headers = new Headers(init.headers);
-    if (token) headers.set('authorization', `Bearer ${token}`);
+    headers.set('authorization', `Bearer ${token}`);
     const res = await fetch(`${this.origin()}${path}`, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`${init.method ?? 'GET'} ${path}: ${res.status}`);
     return (await res.json()) as T;
