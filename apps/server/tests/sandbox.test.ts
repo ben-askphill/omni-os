@@ -57,7 +57,7 @@ const channel = (patch: Partial<Channel> = {}): Channel => ({
   ...patch,
 });
 
-const role = (mcp: string[], delegateOnly = false): CrewRole => ({ id: 'r', name: 'R', description: '', mcp, delegateOnly, delegatable: true, review: false, kind: 'own', hidden: false, charter: 'x' });
+const role = (mcp: string[], delegateOnly = false): CrewRole => ({ id: 'r', name: 'R', description: '', mcp, tools: delegateOnly ? 'delegate-only' : 'full', delegateOnly, delegatable: true, review: false, kind: 'own', hidden: false, charter: 'x' });
 
 const THREAD = 'thread-123';
 const OMNI_URL = 'http://127.0.0.1:4747';

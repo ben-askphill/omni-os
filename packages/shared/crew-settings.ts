@@ -12,6 +12,8 @@ export interface CrewListed {
   effort?: string;
   channel?: string;
   mcp: string[];
+  /** full, no-edits (no file-edit tools, shell kept) or delegate-only. Missing from a server before no-edits: read it with crewTools. */
+  tools?: CrewTools;
   delegateOnly: boolean;
   delegatable: boolean;
   review: boolean;
@@ -22,6 +24,18 @@ export interface CrewListed {
   locks?: CrewLocks;
   error?: string;
 }
+
+export type CrewTools = 'full' | 'no-edits' | 'delegate-only';
+
+/** A role's tools, from a server that sends `tools` or an older one that sends only `delegateOnly`. */
+export const crewTools = (r: Pick<CrewListed, 'tools' | 'delegateOnly'>): CrewTools => r.tools ?? (r.delegateOnly ? 'delegate-only' : 'full');
+
+/**
+ * What no-edits takes away on each harness, for Settings to say. It is not read only: the shell stays everywhere it
+ * can be kept, so a command can still change a file.
+ */
+export const NO_EDITS_NOTE =
+  'Takes the file-edit tools away: Edit, Write and NotebookEdit on Claude Code, file patches on Codex, file writes on Cursor. The shell stays for gh and checks, so this is not read only: a command can still change files. Hermes and Cursor Cloud get it as an instruction only.';
 
 /** A key a save may not change on a built-in Omni relies on. `charter_mode` locked: the charter may only be added to. */
 export type CrewLockedField = 'delegate_only' | 'mcp' | 'delegatable' | 'review' | 'charter_mode';
@@ -112,6 +126,8 @@ export interface CrewDraft {
   effort: string;
   channel: string;
   delegateOnly: boolean;
+  /** No file-edit tools (`tools: no-edits`). Moot while delegateOnly is on, which takes more away. */
+  noEdits: boolean;
   delegatable: boolean;
   conductorTools: boolean;
   review: boolean;
@@ -130,6 +146,7 @@ const fieldsOf = (r: CrewListed) => ({
   effort: r.effort ?? '',
   channel: r.channel ?? '',
   delegateOnly: r.delegateOnly,
+  noEdits: r.tools === 'no-edits',
   delegatable: r.delegatable,
   conductorTools: r.mcp.includes('omni'),
   review: r.review,
@@ -142,7 +159,7 @@ export function crewDraftOf(d: CrewDetailView): CrewDraft {
 
 /** A blank role of the user's own. */
 export function blankCrewDraft(): CrewDraft {
-  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, delegatable: true, conductorTools: false, review: false, charter: '', charterMode: 'replace' };
+  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, noEdits: false, delegatable: true, conductorTools: false, review: false, charter: '', charterMode: 'replace' };
 }
 
 /** Why the form cannot be saved yet, or null. */
@@ -178,7 +195,7 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
     if (k === 'icon' || k === 'bg') continue;
     if (before && same(now[k], before[k])) continue;
     const key = WIRE[k];
-    const value = k === 'conductorTools' ? (now[k] ? ['omni'] : []) : now[k];
+    const value = k === 'conductorTools' ? (now[k] ? ['omni'] : []) : k === 'noEdits' ? (now[k] ? 'no-edits' : 'full') : now[k];
     // Back to the built-in's value: an empty string or null takes the key out of the overlay. A role of the user's own
     // leaves a switch at its default out of the file the same way.
     const unset = builtIn ? same(now[k], builtIn[k]) : k in SWITCH_DEFAULTS && now[k] === SWITCH_DEFAULTS[k as keyof typeof SWITCH_DEFAULTS];
@@ -196,7 +213,7 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
 }
 
 /** What a role is when its file leaves a switch out (apps/server/crew.ts). */
-const SWITCH_DEFAULTS = { delegateOnly: false, delegatable: true, review: false } as const;
+const SWITCH_DEFAULTS = { delegateOnly: false, noEdits: false, delegatable: true, review: false } as const;
 
 const WIRE: Record<FieldKey, string> = {
   name: 'name',
@@ -208,6 +225,7 @@ const WIRE: Record<FieldKey, string> = {
   effort: 'effort',
   channel: 'channel',
   delegateOnly: 'delegate_only',
+  noEdits: 'tools',
   delegatable: 'delegatable',
   conductorTools: 'mcp',
   review: 'review',
@@ -226,6 +244,7 @@ function fromDraft(d: CrewDraft, base: CrewListed | undefined): CrewListed {
     effort: d.effort || undefined,
     channel: d.channel || undefined,
     mcp: d.conductorTools ? ['omni', ...mcp] : mcp,
+    tools: d.delegateOnly ? 'delegate-only' : d.noEdits ? 'no-edits' : 'full',
     delegateOnly: d.delegateOnly,
     delegatable: d.delegatable,
     review: d.review,

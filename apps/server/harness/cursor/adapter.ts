@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { TOOL_FAILURE_POLICY } from '../../tool-failure-policy.ts';
 import { closePipesAfterExit } from '../../child.ts';
 import { artifactsDir, threadDir } from '../../config.ts';
-import { writeCursorDenyConfig, writeCursorPlugin } from '../../sandbox.ts';
+import { CURSOR_NO_EDITS_DENY, writeCursorDenyConfig, writeCursorPlugin } from '../../sandbox.ts';
 import { browserHeld } from '../../access.ts';
 import { cursorConfigDir } from './commands.ts';
 import { describeAttachments } from '../../uploads.ts';
@@ -65,8 +65,11 @@ export const cursorAdapter: HarnessAdapter = {
     // blocks nothing, and without --force it blocks the omni tools too. Deny rules hold under --force and leave MCP alone.
     // Below full access the same deny rules hold: print mode cannot stop to ask, so Ask first runs as read only here
     // (apps/server/access.ts, ADR 0015). A quick ask only reads as well (apps/server/quick-ask.ts).
+    // A no-edits role (the reviewer) only loses file writes: its shell stays, so it is not read only.
     const restricted = !!ctx.permission;
-    if (ctx.role?.delegateOnly || readsOnly(thread) || restricted) env.CURSOR_CONFIG_DIR = writeCursorDenyConfig(join(threadDir(thread.id), 'cursor-config'), cursorConfigDir(env));
+    const configDir = join(threadDir(thread.id), 'cursor-config');
+    if (ctx.role?.delegateOnly || readsOnly(thread) || restricted) env.CURSOR_CONFIG_DIR = writeCursorDenyConfig(configDir, cursorConfigDir(env));
+    else if (ctx.role?.tools === 'no-edits') env.CURSOR_CONFIG_DIR = writeCursorDenyConfig(configDir, cursorConfigDir(env), CURSOR_NO_EDITS_DENY);
     const resume = ctx.resume || thread.session_id !== thread.id;
     let chatId: string | null = resume ? thread.session_id : null;
     const modelId = thread.model ? cursorModelId(thread.model, thread.effort || '') : 'auto';

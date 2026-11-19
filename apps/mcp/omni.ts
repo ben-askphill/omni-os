@@ -78,7 +78,13 @@ server.registerTool(
   'list_crew',
   { description: 'List crew roles you can delegate to, with their charters summarized.' },
   // GET /api/crew leaves hidden roles out. The Conductor and usage-scan are not delegatable, and delegate refuses them.
-  async () => text((await call('/crew')).filter((r: any) => r.delegatable).map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel }))),
+  // `tools: no-edits` (the reviewer): it has no file-edit tools, so send it work that reports rather than changes files.
+  async () =>
+    text(
+      (await call('/crew'))
+        .filter((r: any) => r.delegatable)
+        .map((r: any) => ({ id: r.id, name: r.name, description: r.description, default_channel: r.channel, ...(r.tools === 'no-edits' && { tools: 'no-edits' }) })),
+    ),
 );
 
 server.registerTool(
@@ -149,7 +155,7 @@ const crewRoleView = (d: any) => {
     default_channel: r.channel ?? null,
     ...(r.charterMode && { charter_mode: r.charterMode }),
     ...(r.builtInChanged && { built_in_changed: true }),
-    powers: { mcp: r.mcp, delegate_only: r.delegateOnly, delegatable: r.delegatable, review: r.review },
+    powers: { mcp: r.mcp, delegate_only: r.delegateOnly, tools: r.tools ?? (r.delegateOnly ? 'delegate-only' : 'full'), delegatable: r.delegatable, review: r.review },
     ...(r.locks && { locks: r.locks }),
     ...(r.error && { error: r.error }),
     charters: { built_in: d.charters.builtIn, own: d.charters.own, effective: d.charters.effective },
@@ -178,7 +184,7 @@ server.registerTool(
       `Without create it edits the role; on a built-in it writes ${USER}'s overlay. Only the fields you pass change, and an empty string removes one, so a built-in's value comes back. ` +
       `charter is the whole text of ${USER}'s file for the role: the charter of their own role, or what is added to a built-in's (charter_mode append, the default) or replaces it (replace). ` +
       'Start from get_crew_role\'s charters.own and send all of it. ' +
-      `Powers (mcp, delegate_only, delegatable, review) are ${USER}'s to set in Settings > Crew, and Omni refuses a save that names one. The role syncs to ${USER}'s other machines.`,
+      `Powers (mcp, delegate_only, tools, delegatable, review) are ${USER}'s to set in Settings > Crew, and Omni refuses a save that names one. The role syncs to ${USER}'s other machines.`,
     inputSchema: {
       id: crewId,
       create: z.boolean().optional().describe(`Make a new role of ${USER}'s own. Needs fields.name.`),

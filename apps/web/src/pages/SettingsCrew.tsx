@@ -10,6 +10,7 @@ import {
   crewRunLine,
   crewSaveBody,
   lineDiff,
+  NO_EDITS_NOTE,
   type CrewDetailView,
   type CrewDraft,
 } from '@omni/shared/crew-settings.ts';
@@ -76,6 +77,7 @@ export function CrewSection() {
                       {crewRunLine(r, names)}
                       {r.channel && ` · #${r.channel}`}
                       {r.delegateOnly && ' · routes only'}
+                      {r.tools === 'no-edits' && ' · no file edits'}
                       {r.review && ' · reviews'}
                     </span>
                   </span>
@@ -426,6 +428,13 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
               <Switch label="The Conductor may delegate to it" hint="Off: the Conductor's list and the role pickers leave it out, and delegate refuses it." checked={draft.delegatable} onChange={(v) => set('delegatable', v)} locked={locked.delegatable} />
               <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other roles." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
               <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} locked={locked.delegate_only} />
+              <Switch
+                label="No file edits"
+                hint={NO_EDITS_NOTE}
+                checked={draft.noEdits && !draft.delegateOnly}
+                onChange={(v) => set('noEdits', v)}
+                locked={draft.delegateOnly ? 'Only routes work takes the shell and every edit tool away already.' : undefined}
+              />
               <Switch
                 label="Reviews work"
                 hint="A review on a GPT model runs at high effort, and one the Conductor starts for a thread runs on the other model family from that thread's."

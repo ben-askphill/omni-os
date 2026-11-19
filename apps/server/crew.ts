@@ -25,6 +25,14 @@ import { isAccessLevel, type AccessLevel } from '@omni/shared/access.ts';
 export type CrewKind = 'shipped' | 'edited' | 'own';
 /** How an overlay's body joins the shipped charter. */
 export type CharterMode = 'append' | 'replace';
+/**
+ * The tools a role's threads run with (`tools:`). `full`: everything. `no-edits`: no file-edit tools, with the shell
+ * kept, so it is not read only (NO_EDITS_DENIED and the harness notes there). `delegate-only`: routes work and never
+ * does it (DELEGATE_ONLY_DENIED). `delegate_only: true`, the older key, still reads as delegate-only.
+ */
+export type CrewTools = 'full' | 'no-edits' | 'delegate-only';
+export const CREW_TOOLS: readonly CrewTools[] = ['full', 'no-edits', 'delegate-only'];
+const isCrewTools = (v: unknown): v is CrewTools => CREW_TOOLS.includes(v as CrewTools);
 
 /** A role's own look, as a channel's: an icon (`icon:<name>` from the shared set, or one emoji) and a background. */
 export interface CrewAvatar {
@@ -55,7 +63,9 @@ export interface CrewRole {
    * thread of the role waits at its sign-in check while one is signed out. Unset when the role names none.
    */
   connectors?: string[];
-  /** The role routes work and never does it: no shell, file edits, browser or subagents (DELEGATE_ONLY_DENIED). */
+  /** The tools its threads run with: everything, everything but the file-edit tools, or only what routes work. */
+  tools: CrewTools;
+  /** The role routes work and never does it: no shell, file edits, browser or subagents (DELEGATE_ONLY_DENIED). `tools` is delegate-only. */
   delegateOnly: boolean;
   /** The Conductor may hand work to it: list_crew offers it and `delegate` takes it. False for the Conductor and usage-scan. */
   delegatable: boolean;
@@ -172,7 +182,17 @@ function connectorsOf(raw: unknown): { connectors?: string[] } {
   return Array.isArray(ids) && ids.length ? { connectors: ids } : {};
 }
 
+/**
+ * A role's tools: delegate-only when either key says so (an overlay's `tools: full` never undoes a built-in's
+ * `delegate_only: true`), else what `tools:` names, else full.
+ */
+export function toolsOf(meta: Record<string, unknown>): CrewTools {
+  if (meta.delegate_only === true || meta.tools === 'delegate-only') return 'delegate-only';
+  return isCrewTools(meta.tools) ? meta.tools : 'full';
+}
+
 function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: CrewKind, error?: string): CrewRole {
+  const tools = toolsOf(meta);
   return {
     id,
     name: text(meta.name) ?? id,
@@ -185,7 +205,8 @@ function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: C
     mcp: Array.isArray(meta.mcp) ? meta.mcp.filter((x): x is string => typeof x === 'string') : [],
     ...connectorsOf(meta.connectors),
     ...(isAccessLevel(meta.access) && { access: meta.access }),
-    delegateOnly: meta.delegate_only === true,
+    tools,
+    delegateOnly: tools === 'delegate-only',
     delegatable: meta.delegatable !== false,
     review: meta.review === true,
     charter: fillPlaceholders(body),
@@ -248,7 +269,11 @@ export function lockedOverlay(id: string, shipped: CrewSource, overlay: CrewSour
   const meta = { ...overlay.meta };
   for (const [key] of breaks) {
     if (key === 'charter_mode') meta.charter_mode = 'append';
-    else delete meta[key];
+    else {
+      delete meta[key];
+      // `tools:` can make a role delegate-only too, so the built-in's value holds only with both keys gone.
+      if (key === 'delegate_only') delete meta.tools;
+    }
   }
   return { ...overlay, meta };
 }
@@ -352,6 +377,14 @@ export const DELEGATE_ONLY_DENIED = [
   'Bash', 'Edit', 'Write', 'NotebookEdit', 'Agent', 'Task', 'Workflow', 'Artifact', 'ArtifactData',
   'mcp__omni-browser', 'mcp__plugin_playwright_playwright', 'mcp__plugin_chrome-devtools-mcp_chrome-devtools',
 ];
+
+/**
+ * The Claude Code tools a no-edits role runs without: the ones that write files. Bash stays, for `gh`, git and running
+ * checks, so a command can still change a file: no-edits is not read only. Codex declines its file patches instead
+ * (harness/codex/session-start.ts), Cursor denies `Write(**)` (CURSOR_NO_EDITS_DENY in sandbox.ts), and Hermes and
+ * Cursor Cloud, where Omni cannot take a tool away, get it as an instruction in the prompt (runner/prompts.ts).
+ */
+export const NO_EDITS_DENIED = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
 
 /**
  * Why a delegate-only role cannot run on a remote harness (Hermes, Cursor Cloud): it would have no omni tools to

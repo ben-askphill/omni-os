@@ -56,6 +56,14 @@ export async function handshake(client: CodexClient): Promise<boolean> {
   }
 }
 
+/**
+ * A no-edits role (the reviewer, crew.ts): Codex asks before every file patch and every command it does not know to be
+ * safe ('untrusted'), and the adapter declines the patches and lets the commands run (codex/adapter.ts). So its edit
+ * tool is gone and its shell stays, network and `gh` included, as on Claude Code. A read-only sandbox would also stop
+ * the network, and with it `gh pr diff`. A role or quick ask that already runs read only needs none of it.
+ */
+export const declinesPatches = (ctx: AdapterContext) => ctx.role?.tools === 'no-edits' && !readsOnly(ctx.thread);
+
 /** The parameters thread/start and thread/resume share. */
 export function sessionParams(ctx: AdapterContext) {
   const thread = ctx.thread;
@@ -70,16 +78,17 @@ export function sessionParams(ctx: AdapterContext) {
     quick: readsOnly(thread),
   });
   const policy = ctx.permission ? codexPolicy(ctx.permission.access) : null;
+  // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off. A quick ask
+  // only reads too (apps/server/quick-ask.ts). Either lock holds whatever the channel's level.
+  const sandbox = ctx.role?.delegateOnly || readsOnly(thread) ? 'read-only' : (policy?.sandbox ?? 'danger-full-access');
   return {
     model: thread.model || undefined,
     cwd: thread.cwd,
     // Below full access, the channel's level (apps/server/access.ts): read only is Codex's read-only sandbox, Ask first
     // its workspace sandbox with every other action asked for and judged (codex/adapter.ts). A quick ask never asks:
     // it only reads, and needing more is what turns it into a task.
-    approvalPolicy: readsOnly(thread) ? 'never' : (policy?.approvalPolicy ?? 'never'),
-    // A delegate-only role (the Conductor) reads but cannot change anything, so it hands the work off. A quick ask
-    // only reads too (apps/server/quick-ask.ts). Either lock holds whatever the channel's level.
-    sandbox: ctx.role?.delegateOnly || readsOnly(thread) ? 'read-only' : (policy?.sandbox ?? 'danger-full-access'),
+    approvalPolicy: readsOnly(thread) ? 'never' : declinesPatches(ctx) && sandbox !== 'read-only' ? 'untrusted' : (policy?.approvalPolicy ?? 'never'),
+    sandbox,
     developerInstructions: ctx.systemPrompt,
     config: threadConfig(mcp.mcpServers),
   };

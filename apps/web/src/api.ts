@@ -204,6 +204,8 @@ export interface CrewRole {
   effort?: string;
   channel?: string;
   mcp: string[];
+  /** full, no-edits (no file-edit tools, shell kept) or delegate-only. A server from before no-edits sends only delegateOnly. */
+  tools?: 'full' | 'no-edits' | 'delegate-only';
   /** Routes work only, without the tools that do it. */
   delegateOnly: boolean;
   /** The Conductor may delegate to it. False for the Conductor and usage-scan. */
