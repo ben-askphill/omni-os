@@ -7,7 +7,7 @@ export function isPlainKey(e: KeyboardEvent, key: string): boolean {
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
   const el = e.target instanceof HTMLElement ? e.target : null;
   if (el && (el.isContentEditable || el.matches('input, textarea, select') || el.closest('.xterm, [contenteditable]'))) return false;
-  if (document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return false;
+  if (document.querySelector('dialog[open], [aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return false;
   return true;
 }
 

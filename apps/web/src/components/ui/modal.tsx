@@ -1,16 +1,10 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ErrorNote } from './feedback.tsx';
 import { KbdHintText } from './overlay.tsx';
 import { Button, IconButton } from './primitives.tsx';
-import { useDismissable } from './use-dismissable.ts';
+import { useModalDialog } from './use-modal-dialog.ts';
 
 // ---------- modal / confirm ----------
-
-/**
- * The dimmed layer under every modal and the palette: the whole window, the channel rail included. In the desktop app
- * it also lifts the window's drag regions under it, so a press on the dim closes the modal instead of moving the window.
- */
-export const SCRIM = 'scrim fixed inset-0 z-50 flex justify-center [-webkit-app-region:no-drag]';
 
 /** A modal's actions along its bottom edge, the main one last, with the key that runs it on the left. */
 export function ModalFooter({ hint, children, className = '' }: { hint?: { keys: readonly string[]; label: string }; children: ReactNode; className?: string }) {
@@ -26,46 +20,92 @@ export function ModalFooter({ hint, children, className = '' }: { hint?: { keys:
   );
 }
 
-/** `wide` for a page-sized view (a diff, a viewer), `roomy` for a form with long text (a crew role's charter). */
-export function Modal({ open, onClose, children, title, wide, roomy }: { open: boolean; onClose: () => void; children: ReactNode; title?: ReactNode; wide?: boolean; roomy?: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  useDismissable(open, onClose, { outside: false });
-  // On open only. Callers pass a new onClose on each render, and the app re-renders whenever any thread moves: a
-  // focus move on each of those took the caret out of the field Ben was typing in.
+const UnsavedCtx = createContext<((dirty: boolean) => void) | null>(null);
+
+/**
+ * Tell the enclosing `<Modal dismiss="confirm">` whether its form holds edits that a close would throw away. While it
+ * does, Escape, a press on the backdrop and the Close button ask first. Saving still closes through `onClose`.
+ */
+export function useUnsavedChanges(dirty: boolean) {
+  const report = useContext(UnsavedCtx);
   useEffect(() => {
-    if (!open) return;
-    const prev = document.activeElement as HTMLElement | null;
-    const dialog = ref.current;
-    // A field that took the focus itself (autoFocus) keeps it; otherwise the marked control, then the first one.
-    if (dialog && !dialog.contains(document.activeElement)) {
-      (dialog.querySelector<HTMLElement>('[data-autofocus]') ?? dialog.querySelector<HTMLElement>('button, input, select, textarea'))?.focus();
-    }
-    return () => {
-      prev?.focus?.();
-    };
-  }, [open]);
-  if (!open) return null;
+    report?.(dirty);
+    return () => report?.(false);
+  }, [report, dirty]);
+}
+
+type ModalProps = {
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  title?: ReactNode;
+  wide?: boolean;
+  roomy?: boolean;
+  /**
+   * `any` (the default): Escape, the backdrop and Close all close it. `confirm`, for a form: those ask first while
+   * its body reports edits with `useUnsavedChanges`.
+   */
+  dismiss?: 'any' | 'confirm';
+};
+
+/** `wide` for a page-sized view (a diff, a viewer), `roomy` for a form with long text (a crew role's charter). */
+export function Modal(props: ModalProps) {
+  // Mounted only while open, so the dialog's showModal() and close() follow the component's life.
+  return props.open ? <ModalDialog {...props} /> : null;
+}
+
+function ModalDialog({ onClose, children, title, wide, roomy, dismiss = 'any' }: ModalProps) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const dirty = useRef(false);
+  const [asking, setAsking] = useState(false);
+  const report = useCallback((d: boolean) => {
+    dirty.current = d;
+  }, []);
+  const request = useCallback(() => {
+    if (dismiss === 'confirm' && dirty.current) setAsking(true);
+    else onCloseRef.current();
+  }, [dismiss]);
+  const { ready, dialogProps } = useModalDialog(ref, request);
   return (
-    <div className={`${SCRIM} items-end p-0 sm:items-center sm:p-6`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div
-        ref={ref}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={title ? titleId : undefined}
-        className={`modal-in max-h-[92vh] w-full overflow-auto rounded-t-[28px] bg-elev pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-menu)] sm:rounded-[28px] sm:pb-0 ${wide ? 'sm:max-w-5xl' : roomy ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}
-      >
-        {title && (
-          <div className="flex items-center justify-between gap-3 py-3 pr-3 pl-6">
-            <div id={titleId} className="min-w-0 font-display text-[length:var(--fs-heading)]">
-              {title}
+    <dialog
+      ref={ref}
+      aria-labelledby={title ? titleId : undefined}
+      {...dialogProps}
+      className={`modal modal-in w-full sm:w-[calc(100%-48px)] ${wide ? 'sm:max-w-5xl' : roomy ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}
+    >
+      {ready && (
+        <UnsavedCtx.Provider value={report}>
+          {title && (
+            <div className="flex items-center justify-between gap-3 py-3 pr-3 pl-6">
+              <div id={titleId} className="min-w-0 font-display text-[length:var(--fs-heading)]">
+                {title}
+              </div>
+              <IconButton icon="x" label="Close" onClick={request} />
             </div>
-            <IconButton icon="x" label="Close" onClick={onClose} />
-          </div>
-        )}
-        {children}
-      </div>
-    </div>
+          )}
+          {children}
+          {dismiss === 'confirm' && (
+            <ConfirmDialog
+              open={asking}
+              title="Discard your changes?"
+              confirmLabel="Discard"
+              cancelLabel="Keep editing"
+              danger
+              onConfirm={() => {
+                setAsking(false);
+                onCloseRef.current();
+              }}
+              onCancel={() => setAsking(false)}
+            >
+              What you changed here is not saved yet.
+            </ConfirmDialog>
+          )}
+        </UnsavedCtx.Provider>
+      )}
+    </dialog>
   );
 }
 
@@ -74,6 +114,7 @@ export function ConfirmDialog({
   title,
   children,
   confirmLabel,
+  cancelLabel = 'Cancel',
   danger,
   busy,
   error,
@@ -84,6 +125,7 @@ export function ConfirmDialog({
   title: string;
   children: ReactNode;
   confirmLabel: string;
+  cancelLabel?: string;
   danger?: boolean;
   busy?: boolean;
   error?: string | null;
@@ -97,7 +139,7 @@ export function ConfirmDialog({
       <ModalFooter>
         {/* Focus starts on Cancel: every confirm here is destructive, so a stray Enter must not fire it. */}
         <Button variant="secondary" onClick={onCancel} disabled={busy} data-autofocus>
-          Cancel
+          {cancelLabel}
         </Button>
         <Button variant={danger ? 'needs' : 'primary'} onClick={onConfirm} busy={busy}>
           {confirmLabel}

@@ -147,7 +147,7 @@ it('shows the role hidden once Hide is done, offering Show', async () => {
   expect(calls.some((c) => c.url === '/api/crew/builder/hidden' && c.body.hidden === true)).toBe(true);
   expect(button('Hide')).toBeUndefined();
   expect(button('Show')).toBeDefined();
-  const dialog = host.querySelector('[role="dialog"]')!;
+  const dialog = host.querySelector('dialog')!;
   expect(dialog.textContent).toContain('Hidden');
   // The title keeps the role's name, though the app's crew list no longer has it.
   expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)?.textContent).toBe('Edit Builder');
