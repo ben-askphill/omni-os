@@ -189,7 +189,7 @@ export function SearchField({ value, onChange, placeholder, label, className = '
         onKeyDown={(e) => e.key === 'Escape' && value && onChange('')}
         placeholder={placeholder}
         aria-label={label}
-        className="h-full min-w-0 flex-1 bg-transparent text-[length:var(--fs-ui)] text-fg outline-none placeholder:text-fg-3"
+        className="field-sm h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-3"
       />
     </label>
   );

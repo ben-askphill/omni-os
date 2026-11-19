@@ -4,7 +4,7 @@ import { desktop } from '../desktop.ts';
 import { isConnectLanding, openWithConnect, redeemConnectCode, takeConnectCode, type ConnectMethod } from '../connect-key.ts';
 import { OmniMark } from './brand.tsx';
 import { GoogleSignIn } from './GoogleSignIn.tsx';
-import { Button, ErrorNote, Label } from './ui.tsx';
+import { Button, ErrorNote, IDENTIFIER, Label } from './ui.tsx';
 
 // The server takes only requests that carry this install's token (apps/server/request-guard.ts), and serves this
 // page without it. A browser pairs once: the token, pasted here or arriving as `?pair=` in a link from
@@ -204,13 +204,14 @@ function PairScreen({ offline, connectError, onPaired }: { offline: boolean; con
           </Label>
           <input
             id="pair-token"
-            className="field w-full font-mono !text-[13px]"
+            {...IDENTIFIER}
+            className="field field-mono w-full"
             type="password"
             value={token}
             autoFocus
-            autoComplete="off"
-            spellCheck={false}
-            autoCapitalize="off"
+            // The install token (data/api-token) stays the same until it is rotated, so a password manager may keep it.
+            autoComplete="current-password"
+            enterKeyHint="go"
             placeholder="64 hex characters"
             onChange={(e) => setToken(e.target.value)}
           />

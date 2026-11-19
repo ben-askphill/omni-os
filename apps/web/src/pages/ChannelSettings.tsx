@@ -6,7 +6,7 @@ import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRu
 import { apiUrl } from '../api-base.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { AUTO, AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
-import { Avatar, Button, ErrorNote, FolderInput, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, FolderInput, IDENTIFIER, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
 import { CHANNEL_GLYPHS, CONDUCTOR_CHANNEL, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
@@ -359,7 +359,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
       <Card title="Code">
         <Field label="Repo path" htmlFor="ch-repo" hint="Absolute path to a local git repo. Omni reads its GitHub repo from it, and it enables per-thread worktrees and the PRs tab.">
-          <FolderInput id="ch-repo" dialogTitle="Repo folder" value={f.repo_path} onChange={(v) => set('repo_path', v)} placeholder="~/code/acme-theme" spellCheck={false} />
+          <FolderInput id="ch-repo" dialogTitle="Repo folder" value={f.repo_path} onChange={(v) => set('repo_path', v)} placeholder="~/code/acme-theme" />
         </Field>
       </Card>
 
@@ -385,10 +385,10 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Card title="Store">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
-              <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" spellCheck={false} />
+              <input id="ch-store" {...IDENTIFIER} className="field field-mono" inputMode="url" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" />
             </Field>
             <Field label="Client portal slug" htmlFor="ch-portal" hint="The company's slug in your client portal, for client context.">
-              <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" spellCheck={false} />
+              <input id="ch-portal" {...IDENTIFIER} className="field field-mono" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" />
             </Field>
           </div>
         </Card>
@@ -401,7 +401,8 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           <Field label="Id" htmlFor="ch-id" hint="Lowercase slug, used in URLs and by the Conductor. Cannot change later.">
             <input
               id="ch-id"
-              className="field font-mono !text-[13px]"
+              {...IDENTIFIER}
+              className="field field-mono"
               value={f.id}
               onChange={(e) => {
                 setIdTouched(true);
@@ -426,7 +427,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
               htmlFor="ch-gh"
               hint={githubFailed ? 'Omni could not read it from the repo path. Type owner/name, or leave it empty to try again on save.' : 'owner/name. Empty reads it from the repo path again.'}
             >
-              <input id="ch-gh" className="field font-mono !text-[13px]" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="acme/acme-theme" spellCheck={false} />
+              <input id="ch-gh" {...IDENTIFIER} className="field field-mono" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="acme/acme-theme" />
             </Field>
           ) : (
             <AutoValue
@@ -439,7 +440,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         {!hasRepo &&
           (showBase ? (
             <Field label="Base directory" htmlFor="ch-base" hint="Where threads run when there is no repo. Empty uses your workspace folder (Settings), so its CLAUDE.md and skills load.">
-              <FolderInput id="ch-base" dialogTitle="Base directory" value={f.base_dir} onChange={(v) => set('base_dir', v)} placeholder="~/Omni" spellCheck={false} />
+              <FolderInput id="ch-base" dialogTitle="Base directory" value={f.base_dir} onChange={(v) => set('base_dir', v)} placeholder="~/Omni" />
             </Field>
           ) : (
             <AutoValue label="Base directory" value="Your workspace folder" note="No repo, so threads run there" onEdit={() => setEditing((e) => ({ ...e, base: true }))} />
@@ -460,7 +461,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             >
               <textarea
                 id="ch-wt-include"
-                className="field min-h-[68px] resize-y font-mono !text-[13px]"
+                className="field field-mono min-h-[68px] resize-y"
                 value={f.worktree_include}
                 onChange={(e) => set('worktree_include', e.target.value)}
                 placeholder={'.env\nshopify.theme.toml'}
@@ -474,7 +475,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             >
               <textarea
                 id="ch-wt-shared"
-                className="field min-h-[68px] resize-y font-mono !text-[13px]"
+                className="field field-mono min-h-[68px] resize-y"
                 value={f.worktree_shared}
                 onChange={(e) => set('worktree_shared', e.target.value)}
                 placeholder="node_modules"

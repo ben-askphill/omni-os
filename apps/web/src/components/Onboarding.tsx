@@ -26,7 +26,7 @@ import {
   browserTimezone,
   createChannel,
 } from './onboarding-parts.tsx';
-import { Button, ErrorNote, FolderInput } from './ui.tsx';
+import { Button, ErrorNote, FolderInput, IDENTIFIER } from './ui.tsx';
 import { ModalFooter, SCRIM } from './ui/modal.tsx';
 
 export { PronounsInput, TimezoneInput } from './onboarding-parts.tsx';
@@ -279,14 +279,13 @@ function Wizard() {
                         dialogTitle="Repo folder"
                         value={channelRepo}
                         placeholder={`${state.resolved.reposDir}/acme-site`}
-                        spellCheck={false}
                         onChange={setChannelRepo}
                       />
                     </Row>
                   )}
                   {store && (
                     <Row label="Shopify store" htmlFor="ob-ch-store" hint="Optional. The myshopify domain.">
-                      <input id="ob-ch-store" className="field w-full font-mono !text-[13px]" value={channelStore} placeholder="acme.myshopify.com" spellCheck={false} onChange={(e) => setChannelStore(e.target.value)} />
+                      <input id="ob-ch-store" {...IDENTIFIER} className="field field-mono w-full" inputMode="url" value={channelStore} placeholder="acme.myshopify.com" onChange={(e) => setChannelStore(e.target.value)} />
                     </Row>
                   )}
                 </>

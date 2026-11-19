@@ -169,7 +169,7 @@ export function Picker<T extends string>({
                 }}
                 placeholder={`Find ${label.toLowerCase()}`}
                 aria-label={`Find ${label.toLowerCase()}`}
-                className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
+                className="field-sm h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-4"
               />
             </label>
           )}

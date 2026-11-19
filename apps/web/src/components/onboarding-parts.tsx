@@ -12,7 +12,7 @@ import { api, errorText, type HarnessWithRunning } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { desktop } from '../desktop.ts';
 import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
-import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, Icon, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
+import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, IDENTIFIER, Icon, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
 export const STEPS = ['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Routines', 'Done'] as const;
@@ -74,7 +74,7 @@ export function FilesScreen({
   return (
     <Screen caption="Files" title="Where should Omni keep your files?" body="Agents work in this folder and save what they make there. Omni makes it if it is missing.">
       <Row label="Folder" htmlFor="ob-root">
-        <FolderInput id="ob-root" dialogTitle="Where Omni keeps your files" value={value.root} placeholder={fallbacks.workspaceRoot} spellCheck={false} onChange={(root) => onChange({ root })} />
+        <FolderInput id="ob-root" dialogTitle="Where Omni keeps your files" value={value.root} placeholder={fallbacks.workspaceRoot} onChange={(root) => onChange({ root })} />
       </Row>
       <div className="flex items-start gap-4 rounded-[16px] bg-surface p-3.5" data-addon="code">
         <div className="min-w-0 flex-1">
@@ -86,10 +86,10 @@ export function FilesScreen({
       {code && (
         <>
           <Row label="Repos folder" htmlFor="ob-repos" hint="Where your git checkouts live. Used to suggest repo paths for projects.">
-            <FolderInput id="ob-repos" dialogTitle="Repos folder" value={value.reposDir} placeholder={fallbacks.reposDir} spellCheck={false} onChange={(reposDir) => onChange({ reposDir })} />
+            <FolderInput id="ob-repos" dialogTitle="Repos folder" value={value.reposDir} placeholder={fallbacks.reposDir} onChange={(reposDir) => onChange({ reposDir })} />
           </Row>
           <Row label="GitHub owner" htmlFor="ob-gh" hint="Optional. Your GitHub user or org, for your repos.">
-            <input id="ob-gh" className="field w-full font-mono !text-[13px]" value={value.githubOwner} placeholder="octocat" spellCheck={false} autoCapitalize="off" onChange={(e) => onChange({ githubOwner: e.target.value })} />
+            <input id="ob-gh" {...IDENTIFIER} className="field field-mono w-full" value={value.githubOwner} placeholder="octocat" onChange={(e) => onChange({ githubOwner: e.target.value })} />
           </Row>
         </>
       )}
@@ -384,13 +384,13 @@ function ClaudeSignIn({ onDone }: { onDone: () => void }) {
       {/* Not a form: the wizard around it is one, and Enter here finishes the sign-in, not the step. */}
       <div className="space-y-2">
         <input
-          className="field w-full font-mono !text-[13px]"
+          {...IDENTIFIER}
+          className="field field-mono w-full"
           value={code}
           placeholder="Paste the code"
           aria-label="Code from the Claude page"
-          spellCheck={false}
-          autoCapitalize="off"
-          autoComplete="off"
+          autoComplete="one-time-code"
+          enterKeyHint="done"
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;

@@ -3,7 +3,7 @@ import { ACTION_PORT_HINT, ACTION_SETUP_HINT, ACTION_TEARDOWN_HINT, actionInput,
 import { api, errorText, useApi } from '../api.ts';
 import { href } from '../router.ts';
 import { ActionLine } from './thread/panel/ActionsTab.tsx';
-import { Button, Chip, ErrorNote, InlineConfirm, Label, Loading, Segmented } from './ui.tsx';
+import { Button, Chip, ErrorNote, IDENTIFIER, InlineConfirm, Label, Loading, Segmented } from './ui.tsx';
 
 /** Editing a new action rather than one in the list. */
 const NEW = '';
@@ -116,11 +116,11 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
         </Label>
         <textarea
           id={`act-cmd-${id}`}
-          className="field min-h-[84px] resize-y font-mono !text-[13px]"
+          {...IDENTIFIER}
+          className="field field-mono min-h-[84px] resize-y"
           value={d.command}
           onChange={(e) => set('command', e.target.value)}
           placeholder="shopify theme dev --port $OMNI_PORT"
-          spellCheck={false}
         />
       </div>
       <div>
@@ -140,11 +140,11 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
         </Label>
         <input
           id={`act-secrets-${id}`}
-          className="field font-mono !text-[13px]"
+          {...IDENTIFIER}
+          className="field field-mono"
           value={d.secrets}
           onChange={(e) => set('secrets', e.target.value.toUpperCase())}
           placeholder="SHOPIFY_CLI_THEME_TOKEN"
-          spellCheck={false}
         />
       </div>
       <div>
@@ -165,7 +165,7 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
           {d.portMode === 'fixed' && (
             <input
               aria-label="Fixed port"
-              className="field w-28 font-mono !text-[13px]"
+              className="field field-mono w-28"
               inputMode="numeric"
               value={d.port}
               onChange={(e) => set('port', e.target.value.replace(/\D/g, ''))}

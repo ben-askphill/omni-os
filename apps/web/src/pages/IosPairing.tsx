@@ -3,7 +3,7 @@ import type { ServerCapabilities } from '@omni/shared/app-pairing.ts';
 import type { ConnectStatus } from '@omni/server/connect/service.ts';
 import { api, useApi } from '../api.ts';
 import { QrCode } from '../components/QrCode.tsx';
-import { Button, ErrorNote, Label, LinkButton, Loading, Picker, Segmented } from '../components/ui.tsx';
+import { Button, ErrorNote, IDENTIFIER, Label, LinkButton, Loading, Picker, Segmented } from '../components/ui.tsx';
 import {
   clock,
   NEEDS_INSTALL_TOKEN,
@@ -184,12 +184,11 @@ export function IosPairingSection() {
               <div className="flex gap-2">
                 <input
                   id="ios-address"
-                  className="field min-w-0 flex-1 font-mono !text-[13px]"
+                  {...IDENTIFIER}
+                  className="field field-mono min-w-0 flex-1"
+                  inputMode="url"
                   value={draft}
                   autoComplete="off"
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  inputMode="url"
                   placeholder="https://mac.tailnet.ts.net"
                   onChange={(e) => setDraft(e.target.value)}
                 />
