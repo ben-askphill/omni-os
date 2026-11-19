@@ -82,24 +82,25 @@
   --fw-medium: 600;
   --fw-semibold: 700;
   --fw-bold: 800;
-  --type-caption: var(--fw-medium) 12px/1.2 var(--font-sans);
+  --type-caption: var(--fw-medium) var(--fs-12)/1.2 var(--font-sans);
   /* Type sizes, line heights, spacing and radii from the Claude Design system (tokens/type.css, tokens/space.css).
-     Use them as values (`text-[length:var(--fs-meta)]`): Tailwind's own radius and text names mean other sizes. */
-  --fs-label: 10.5px;
-  --fs-meta: 11px;
-  --fs-code: 11.5px;
-  --fs-12: 12px;
-  --fs-small: 12.5px;
-  --fs-ui: 13px;
-  --fs-nav: 13.5px;
-  --fs-body: 14px;
-  --fs-prose: 14.5px;
-  --fs-subhead: 15px;
-  --fs-input: 16px;
-  --fs-heading: 17px;
-  --fs-title: 26px;
-  --fs-title-lg: 30px;
-  --fs-display: 44px;
+     Use them as values (`text-[length:var(--fs-meta)]`): Tailwind's own radius and text names mean other sizes.
+     Type sizes are rem, so text follows the browser's font size setting; the comment is the size at the default 16px. */
+  --fs-label: 0.65625rem; /* 10.5px */
+  --fs-meta: 0.6875rem; /* 11px */
+  --fs-code: 0.71875rem; /* 11.5px */
+  --fs-12: 0.75rem; /* 12px */
+  --fs-small: 0.78125rem; /* 12.5px */
+  --fs-ui: 0.8125rem; /* 13px */
+  --fs-nav: 0.84375rem; /* 13.5px */
+  --fs-body: 0.875rem; /* 14px */
+  --fs-prose: 0.90625rem; /* 14.5px */
+  --fs-subhead: 0.9375rem; /* 15px */
+  --fs-input: 1rem; /* 16px */
+  --fs-heading: 1.0625rem; /* 17px */
+  --fs-title: 1.625rem; /* 26px */
+  --fs-title-lg: 1.875rem; /* 30px */
+  --fs-display: 2.75rem; /* 44px */
   --lh-tight: 1.1;
   --lh-heading: 1.25;
   --lh-ui: 1.4;
@@ -246,7 +247,7 @@
     background: var(--canvas);
     color: var(--fg);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--fs-body);
     font-weight: var(--fw-regular);
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
