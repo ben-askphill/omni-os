@@ -26,6 +26,7 @@ import { useShowsCode } from '../display.ts';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
+import { ProgressCard, useProgressPanel } from '../components/thread/ProgressCard.tsx';
 import type { PanelTab } from './useThreadSession.ts';
 import { AGENTS_CARD_ID } from '../components/thread/panel/AgentsSection.tsx';
 import { Empty, ErrorNote, Icon, LinkButton, Loading } from '../components/ui.tsx';
@@ -117,6 +118,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   // What the running turn is doing, for the header pill's dot and the quick card's.
   const turn = useMemo(() => (thread?.status === 'running' ? turnPhase(events) : null), [events, thread?.status]);
   const agents = useMemo(() => runningSubagents(tasks, id), [tasks, id]);
+  const progress = useProgressPanel(events, thread?.status === 'running', asking);
   const selectArtifact = useCallback(
     (artifact: number) => {
       setSelected(artifact);
@@ -317,7 +319,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             )}
           </div>
           {surface === 'card' && (
-            <div className="absolute top-2 right-2 z-20 max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] overflow-y-auto md:static md:max-h-none md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pl-1">
+            <div className="absolute top-2 right-2 z-20 flex max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] flex-col gap-[var(--sp-4)] overflow-y-auto md:static md:max-h-full md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pb-2 md:pl-1">
               <ThreadQuickCard
                 thread={thread}
                 code={code}
@@ -337,7 +339,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 asking={asking}
                 turn={turn}
                 reconnecting={reconnecting}
+                className="shrink-0"
               />
+              <ProgressCard threadId={thread.id} panel={progress} className="shrink-0" />
             </div>
           )}
         </div>
