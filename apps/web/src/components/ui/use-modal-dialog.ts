@@ -14,6 +14,24 @@ import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as Reac
 /** Dialogs closed by an owner unmounting them, whose close event is not a dismissal. */
 const closedByOwner = new WeakSet<HTMLDialogElement>();
 
+/**
+ * The open modals, the top one last. A page behind a modal is inert even where it sits higher in the top layer, so
+ * whatever must stay usable over a modal (the toasts) renders inside the top one.
+ */
+const openModals: HTMLDialogElement[] = [];
+const modalListeners = new Set<() => void>();
+const modalsChanged = () => modalListeners.forEach((fn) => fn());
+
+/** The modal on top, or null when none is open. */
+export const topModal = (): HTMLDialogElement | null => openModals.at(-1) ?? null;
+
+export function subscribeModals(fn: () => void) {
+  modalListeners.add(fn);
+  return () => {
+    modalListeners.delete(fn);
+  };
+}
+
 export function useModalDialog(ref: RefObject<HTMLDialogElement | null>, onDismiss?: () => void) {
   const [ready, setReady] = useState(false);
   const dismissRef = useRef(onDismiss);
@@ -25,6 +43,8 @@ export function useModalDialog(ref: RefObject<HTMLDialogElement | null>, onDismi
     if (!d) return;
     closedByOwner.delete(d);
     if (!d.open) d.showModal();
+    if (!openModals.includes(d)) openModals.push(d);
+    modalsChanged();
     // Only this dialog's own events: a nested dialog's are not ours, and React would hand them up the tree.
     const onCancel = (e: Event) => {
       if (e.target !== d) return;
@@ -50,7 +70,10 @@ export function useModalDialog(ref: RefObject<HTMLDialogElement | null>, onDismi
       for (const shut of [...d.querySelectorAll<HTMLDialogElement>('dialog[open]')].reverse().concat(d)) {
         closedByOwner.add(shut);
         if (shut.open) shut.close();
+        const at = openModals.indexOf(shut);
+        if (at >= 0) openModals.splice(at, 1);
       }
+      modalsChanged();
     };
   }, [ref]);
 

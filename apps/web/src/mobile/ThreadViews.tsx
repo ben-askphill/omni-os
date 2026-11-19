@@ -215,7 +215,7 @@ export function PRScreen() {
       shell.toast('Asked for a PR');
       shell.back();
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     } finally {
       setAsking(false);
     }
@@ -570,7 +570,7 @@ export function ViewerScreen({ route }: { route: Route }) {
         shell.toast('Link copied. It opens where Omni is paired.');
       }
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') shell.toast(errorText(e));
+      if ((e as Error).name !== 'AbortError') shell.toast(errorText(e), 'error');
     }
   };
   const sub =

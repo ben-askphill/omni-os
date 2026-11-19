@@ -1,10 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { glyphLabel } from '@omni/shared/display.ts';
 import { technicalNow } from '../display.ts';
 import { api, type Thread } from '../api.ts';
 import { href, useRoute } from '../router.ts';
 import { useFeed } from '../store.tsx';
 import { Icon, IconButton, StatusDot, glyphFor, threadGlyph, type IconName } from './ui.tsx';
+import { subscribeModals, topModal } from './ui/use-modal-dialog.ts';
 
 export interface ToastInput {
   title: ReactNode;
@@ -26,19 +28,24 @@ const Ctx = createContext<(t: ToastInput) => void>(() => {});
 export const useToast = () => useContext(Ctx);
 
 function ToastView({ t, dismiss }: { t: ToastItem; dismiss: (id: number) => void }) {
+  // Held while the pointer is over it or the focus is in it, so a keyboard user who tabs to Open still finds it there.
   const [hover, setHover] = useState(false);
+  const [focused, setFocused] = useState(false);
   useEffect(() => {
-    if (hover || t.leaving) return;
+    if (hover || focused || t.leaving) return;
     const tm = setTimeout(() => dismiss(t.id), t.timeout ?? 6500);
     return () => clearTimeout(tm);
-  }, [hover, t.leaving, t.id, t.timeout, dismiss]);
+  }, [hover, focused, t.leaving, t.id, t.timeout, dismiss]);
   return (
     <div
       role={t.status && glyphFor(t.status) === 'failed' ? 'alert' : 'status'}
       className="toast float w-full md:max-w-none"
+      data-toast={t.id}
       data-leaving={t.leaving || undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setFocused(false)}
     >
       {/* One lead slot for every toast, so the titles line up down the stack. */}
       <span className="grid w-4 shrink-0 place-items-center">{t.status ? <StatusDot status={t.status} /> : t.icon ? <Icon name={t.icon} size={15} className="text-fg-3" /> : null}</span>
@@ -66,11 +73,22 @@ export function pushToast(stack: { items: ToastItem[]; more: number }, t: ToastI
   return { items: items.slice(over), more: stack.more + over };
 }
 
+/** Where the focus goes when a toast that holds it leaves: back where it came from, else into the page. */
+function refocus(from: Element | null, region: HTMLElement) {
+  const back = from instanceof HTMLElement && from.isConnected && !from.closest('[inert]') && !region.contains(from) ? from : null;
+  (back ?? region.closest('dialog') ?? document.getElementById('main'))?.focus({ preventScroll: true });
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<{ items: ToastItem[]; more: number }>({ items: [], more: 0 });
   const seq = useRef(0);
+  const region = useRef<HTMLElement>(null);
+  // What had the focus before it moved into a toast.
+  const cameFrom = useRef<Element | null>(null);
 
   const dismiss = useCallback((id: number) => {
+    const el = region.current?.querySelector(`[data-toast="${id}"]`);
+    if (region.current && el?.contains(document.activeElement)) refocus(cameFrom.current, region.current);
     setStack((s) => ({ ...s, items: s.items.map((t) => (t.id === id ? { ...t, leaving: true } : t)) }));
     setTimeout(
       () =>
@@ -87,18 +105,39 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setStack((s) => pushToast(s, { ...t, id }));
   }, []);
 
+  // A manual popover in the top layer, so the toasts stay over a modal's backdrop. The page behind a modal is inert
+  // however high it sits, so while one is open the toasts render inside the top modal: still in the top layer, and
+  // still clickable. A change of modal moves them, which remounts them in their new place.
+  const modal = useSyncExternalStore(subscribeModals, topModal, () => null);
+  useLayoutEffect(() => {
+    const el = region.current;
+    if (el && !el.matches(':popover-open')) el.showPopover();
+  }, [modal]);
+
+  // A page rendered to a string has no body to portal into, and no toasts to show.
+  const place = modal ?? (typeof document === 'undefined' ? null : document.body);
   return (
     <Ctx.Provider value={push}>
       {children}
-      <div
-        aria-live="polite"
-        className="pointer-events-none fixed inset-x-4 bottom-[calc(88px+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 md:inset-x-auto md:right-5 md:bottom-5 md:w-[360px]"
-      >
-        {stack.more > 0 && <div className="float self-end rounded-full px-2.5 py-1 text-[12px] font-medium text-fg-3">+{stack.more} more</div>}
-        {stack.items.map((t) => (
-          <ToastView key={t.id} t={t} dismiss={dismiss} />
-        ))}
-      </div>
+      {place &&
+        createPortal(
+          <section
+            ref={region}
+            popover="manual"
+            aria-label="Notifications"
+            aria-live="polite"
+            onFocus={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget)) cameFrom.current = e.relatedTarget;
+            }}
+            className="pointer-events-none fixed inset-x-4 top-auto bottom-[calc(88px+env(safe-area-inset-bottom))] m-0 flex w-auto flex-col items-center gap-2 overflow-visible border-0 bg-transparent p-0 text-inherit md:inset-x-auto md:right-5 md:bottom-5 md:w-[360px]"
+          >
+            {stack.more > 0 && <div className="float self-end rounded-full px-2.5 py-1 text-[12px] font-medium text-fg-3">+{stack.more} more</div>}
+            {stack.items.map((t) => (
+              <ToastView key={t.id} t={t} dismiss={dismiss} />
+            ))}
+          </section>,
+          place,
+        )}
     </Ctx.Provider>
   );
 }

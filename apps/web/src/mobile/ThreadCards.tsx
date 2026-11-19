@@ -289,7 +289,7 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
       const res = await api.post<{ pending?: PendingMsg[] }>(`/threads/${encodeURIComponent(thread.id)}/requests/${route}`, { ids });
       if (res.pending) onPending(res.pending);
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     } finally {
       setBusy(null);
     }
