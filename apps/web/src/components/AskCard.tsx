@@ -10,6 +10,7 @@ import { withLive } from '../transcript/delegation.ts';
 import { CrewMark, isCrewRole } from './brand.tsx';
 import { RemoteMark } from './ConnectAgent.tsx';
 import { DelegationCard } from './Delegation.tsx';
+import { isImeEnter } from '../ime.ts';
 import { Button, ErrorNote, Icon, Label, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from './ui.tsx';
 
 /** The roles Ben can ask from this thread (askableRoles): never the Conductor, a hidden role or the thread's own. */
@@ -148,7 +149,7 @@ function AskForm({ thread, onClose, onSent }: { thread: Thread; onClose: () => v
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void send();
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeEnter(e)) void send();
             }}
             placeholder={`What should ${role.name} look into?`}
           />
