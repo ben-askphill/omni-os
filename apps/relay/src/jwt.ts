@@ -8,6 +8,8 @@ export const MINT_REQUEST = 'omni-connect-mint+jwt';
 export const MINT_RESPONSE = 'omni-connect-mint-response+jwt';
 export const HEALTH_REQUEST = 'omni-connect-health+jwt';
 export const HEALTH_RESPONSE = 'omni-connect-health-response+jwt';
+/** A machine registering again under a new relay token signs this with the key it enrolled. */
+export const REGISTER_PROOF = 'omni-connect-register+jwt';
 /** The relay's `iss`, and the `aud` of a machine's answers. */
 export const RELAY_ISSUER = 'omni-relay';
 

@@ -1,10 +1,13 @@
 // Delegation card: the threads a Conductor (or a team lead) fanned out to, or a thread's own sub-agents, each with its live state.
 import type { ReactNode } from 'react';
 import { relTime } from '@omni/shared/format.ts';
+import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { href } from '../router.ts';
 import { useNow } from '../store.tsx';
 import type { Branch } from '../transcript/delegation.ts';
 import { CrewMark, HarnessMark, isCrewRole } from './brand.tsx';
+import { Folded } from './Folded.tsx';
+import { Markdown } from './Markdown.tsx';
 import { Icon, StatusPill } from './ui.tsx';
 
 // The rail's ink: --line-strong flattened onto the page, so the rail and an elbow do not darken where they overlap.
@@ -53,8 +56,22 @@ export function BranchFace({ role, title, status, children }: { role: string | n
   );
 }
 
-/** `report`: where this thread's crew report is while the parent has not read it (apps/web/src/requests.ts `reportNotes`). */
-function BranchRow({ b, report }: { b: Branch; report?: string }) {
+/** A thread's answer on its card: the report it sent, shown in place (ReportP `shown`), folded when long. */
+export function Answer({ r }: { r: ReportP }) {
+  return (
+    <div className="mt-2 rounded-[16px] bg-bg px-3.5 py-3 text-[14px] shadow-[var(--shadow-card)]">
+      <Folded>
+        <Markdown text={r.text || '(no reply)'} />
+      </Folded>
+    </div>
+  );
+}
+
+/**
+ * `report`: where this thread's crew report is while the parent has not read it (apps/web/src/requests.ts `reportNotes`).
+ * `answer`: the report itself, when it showed in place.
+ */
+function BranchRow({ b, report, answer }: { b: Branch; report?: string; answer?: ReportP }) {
   useNow();
   const busy = b.status === 'running' || b.status === 'queued';
   const when = b.updated_at ? relTime(b.updated_at) : null;
@@ -72,7 +89,9 @@ function BranchRow({ b, report }: { b: Branch; report?: string }) {
           </BranchFace>
         </a>
       }
-    />
+    >
+      {answer && !busy && <Answer r={answer} />}
+    </RailItem>
   );
 }
 
@@ -88,6 +107,7 @@ export function DelegationCard({
   team = false,
   agents = [],
   reports,
+  answers,
 }: {
   branches?: Branch[];
   lead?: Branch;
@@ -95,6 +115,8 @@ export function DelegationCard({
   agents?: ReactNode[];
   /** Crew reports the thread has not read yet, by the thread that reported: shown on that thread's row. */
   reports?: Map<string, string>;
+  /** Reports shown in place, by the thread that sent them: each shows under its row, a lead's under the card. */
+  answers?: Record<string, ReportP>;
 }) {
   if (!branches.length && !agents.length && !lead) return null;
   const n = branches.length + agents.length;
@@ -121,10 +143,11 @@ export function DelegationCard({
       {/* ml-3: the rail sits under the centre of the header's mark (the header's px-1 plus half the 16px mark). */}
       <ol className="ml-3 flex flex-col gap-2 pt-1">
         {branches.map((b) => (
-          <BranchRow key={b.id} b={b} report={reports?.get(b.id)} />
+          <BranchRow key={b.id} b={b} report={reports?.get(b.id)} answer={answers?.[b.id]} />
         ))}
         {agents}
       </ol>
+      {lead && answers?.[lead.id] && lead.status !== 'running' && <Answer r={answers[lead.id]} />}
     </section>
   );
 }

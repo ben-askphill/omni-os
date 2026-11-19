@@ -64,7 +64,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
   const { view, conductor, conductorChannel, ch, thread, changes, pr, now, shell } = c;
   const steps = (t: TurnView) => shell.open(href.threadView(thread.id, 'steps', t.key));
   const viewer = (a: Artifact) => shell.open(href.thread(thread.id, a.id));
-    const delegated = t.children.length > 0 && <Delegation kids={t.children} />;
+    const delegated = t.children.length > 0 && <Delegation kids={t.children} answers={t.answers} />;
     if (last && (t.status === 'running' || t.status === 'queued')) {
       return (
         <>

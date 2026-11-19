@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { AttachmentChips } from '../../attachments/AttachmentChips';
 import { restoreStaged } from '../../attachments/staged';
 import type { ThreadLive } from '../../live/hub';
-import { useStore } from '../../live/react';
+import { useStore, useThreadKey } from '../../live/react';
 import { space, useOmniTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { UserBubble } from '../UserBubble';
@@ -16,6 +16,7 @@ import { editInComposer } from './drafts';
  */
 export function OutboxRow({ live, threadId }: { live: ThreadLive; threadId: string }) {
   const { outbox, progress } = useStore(live.send.state);
+  const key = useThreadKey(threadId);
   const item = outbox.item;
   if (!item) return null;
   const text = [item.text, ...item.context.map((c) => `Attached ${c.label}`)].filter(Boolean).join('\n');
@@ -37,8 +38,8 @@ export function OutboxRow({ live, threadId }: { live: ThreadLive; threadId: stri
   const edit = () => {
     const taken = live.send.edit();
     if (!taken) return;
-    restoreStaged(threadId, taken.files);
-    editInComposer(threadId, taken.text);
+    restoreStaged(key, taken.files);
+    editInComposer(key, taken.text);
   };
 
   return (

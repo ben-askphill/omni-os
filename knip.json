@@ -4,7 +4,8 @@
     "flock",
     "scutil",
     "ioreg",
-    "pgrep"
+    "pgrep",
+    "mkfifo"
   ],
   "ignore": [
     ".claude/**",
@@ -18,7 +19,8 @@
   "workspaces": {
     ".": {
       "entry": [
-        "scripts/*.{mjs,ts}"
+        "scripts/*.{mjs,ts}",
+        "crew/tools/*.mjs"
       ]
     },
     "apps/server": {
