@@ -145,7 +145,7 @@ export const events = {
     return row ? (JSON.parse(row.payload).text as string) ?? '' : '';
   },
   /**
-   * The commands Ben used most recently on a harness, in any thread, newest first and each once.
+   * The commands the user used most recently on a harness, in any thread, newest first and each once.
    * Only messages he typed count: in Omni or in claude-bar's hotkey prompt, not the Conductor's or an Automation's.
    */
   recentCommands(harness: string, limit = 20): string[] {

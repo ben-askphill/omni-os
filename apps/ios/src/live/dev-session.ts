@@ -10,6 +10,7 @@ export function devSession(env: { url?: string; token?: string }, isDev: boolean
   const token = env.token;
   return {
     serverUrl: env.url,
+    serverId: `dev:${env.url}`,
     token: async () => token,
     refreshAuth: async () => false,
   };

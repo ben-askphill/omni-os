@@ -216,7 +216,7 @@ function ChannelSettingsForm({ channel, navigation }: { channel: Channel | null;
       {shopify ? (
       <Group title="Store">
         <InputRow first label="Store domain" value={form.store_domain} code keyboardType="url" placeholder="acme.myshopify.com" onChangeText={(t) => set('store_domain', t)} />
-        <InputRow label="Portal slug" value={form.portal_slug} code placeholder="acme" hint="Ask Phill Portal company slug, for client context." onChangeText={(t) => set('portal_slug', t)} />
+        <InputRow label="Client portal slug" value={form.portal_slug} code placeholder="acme" hint="The company's slug in your client portal, for client context." onChangeText={(t) => set('portal_slug', t)} />
       </Group>
       ) : null}
 

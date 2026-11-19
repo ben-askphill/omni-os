@@ -76,6 +76,7 @@ export function blockedReason(t: Thread): string | null {
   if (isProviderHarness(t.harness)) return 'This thread runs off this machine, so its actions have no checkout here to run in.';
   if (t.setup === 'preparing') return "The thread's worktree is still being prepared.";
   if (t.setup === 'failed') return `The thread's worktree could not be prepared: ${t.setup_error ?? 'unknown error'}`;
+  if (t.setup === 'signin' && t.branch) return "The thread's worktree is not made yet: the thread waits for a sign-in.";
   return null;
 }
 
@@ -269,7 +270,7 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals) {
  * Stop a run: SIGTERM to its process group, then SIGKILL after STOP_GRACE_MS. Resolves with the record once it has
  * exited. Stopping a run that already ended returns it as it is.
  */
-export async function stopRun(runId: string, why = 'Stopped by Ben.'): Promise<ActionRun | undefined> {
+export async function stopRun(runId: string, why = 'Stopped by you.'): Promise<ActionRun | undefined> {
   const l = live.get(runId);
   if (!l) return settleOrphan(runId);
   l.stopping ??= why;

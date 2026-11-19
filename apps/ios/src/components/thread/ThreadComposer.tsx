@@ -9,7 +9,7 @@ import { AttachmentChips } from '../../attachments/AttachmentChips';
 import { clearStaged, getStaged, removeStagedFile, restoreStaged, useStaged } from '../../attachments/staged';
 import { removeDraftContext, useDraftContext } from '../../context/draft';
 import type { ThreadLive } from '../../live/hub';
-import { useStore, useTechnical } from '../../live/react';
+import { useStore, useTechnical, useThreadKey } from '../../live/react';
 import { canStop, composerPlaceholder, sendLabel } from '../../send/rules';
 import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { tap } from '../../ui/haptics';
@@ -25,8 +25,8 @@ const INPUT_PADDING = (BUTTON_SIZE - INPUT_LINE_HEIGHT) / 2;
 
 /**
  * The box a message is written in. It steers or queues while a turn runs (the placeholder and the button's label say
- * which), and swaps Send for Stop when the box is empty and a turn can be stopped. The draft is per thread and
- * outlives the screen.
+ * which), and swaps Send for Stop when the box is empty and a turn can be stopped. The draft is per server and thread
+ * (live/thread-key.ts) and outlives the screen.
  */
 export function ThreadComposer({
   live,
@@ -47,12 +47,13 @@ export function ThreadComposer({
   const catalog = useStore(live.catalog);
   const technical = useTechnical();
   const { outbox, stopping, notice } = useStore(live.send.state);
-  const draft = useDraft(thread.id);
-  const files = useStaged(thread.id);
-  const context = useDraftContext(thread.id);
+  const key = useThreadKey(thread.id);
+  const draft = useDraft(key);
+  const files = useStaged(key);
+  const context = useDraftContext(key);
   const [attachNotice, setAttachNotice] = useState<string | null>(null);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
-  useFocusRequests(thread.id, input);
+  useFocusRequests(key, input);
 
   const empty = draft.trim() === '' && context.length === 0;
   // The server takes files only with a message, so a file with no text says what is missing.
@@ -64,15 +65,16 @@ export function ThreadComposer({
     if (empty || slotTaken) return;
     tap();
     const text = draft;
-    const attached = getStaged(thread.id);
-    setDraft(thread.id, '');
-    clearStaged(thread.id);
+    const attached = getStaged(key);
+    setDraft(key, '');
+    clearStaged(key);
     setAttachNotice(null);
     const sent = await live.send.submit(thread, text, attached, context);
     // A failed send keeps its text and files in the outbox, and its context stays in the draft until a send lands. Nothing in the slot and nothing sent means it never started.
+    // `key` is this render's: a send that ends after a server switch puts its text back on the server it was for.
     if (!sent && live.send.state.get().outbox.item === null) {
-      restoreDraft(thread.id, text);
-      restoreStaged(thread.id, attached);
+      restoreDraft(key, text);
+      restoreStaged(key, attached);
     }
   };
 
@@ -90,7 +92,7 @@ export function ThreadComposer({
       {attachNotice ? <AttachNotice text={attachNotice} /> : null}
       {files.length > 0 ? (
         <View style={styles.chips}>
-          <AttachmentChips files={files} onRemove={(id) => removeStagedFile(thread.id, id)} />
+          <AttachmentChips files={files} onRemove={(id) => removeStagedFile(key, id)} />
         </View>
       ) : null}
       {context.length ? (
@@ -100,7 +102,7 @@ export function ThreadComposer({
               <Text numberOfLines={1} ellipsizeMode="middle" style={[styles.contextLabel, { color: colors.fg2 }]}>
                 {c.label}
               </Text>
-              <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${c.label}`} hitSlop={space.s6} onPress={() => removeDraftContext(thread.id, c.id)}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${c.label}`} hitSlop={space.s6} onPress={() => removeDraftContext(key, c.id)}>
                 <Icon name="close" size={11} color={colors.fg3} />
               </Pressable>
             </View>
@@ -108,13 +110,13 @@ export function ThreadComposer({
         </ScrollView>
       ) : null}
       <View style={[styles.pill, { backgroundColor: colors.surface, borderColor: colors.line }]}>
-        <AttachControl scope={thread.id} disabled={slotTaken} onNotice={setAttachNotice} />
+        <AttachControl scope={key} disabled={slotTaken} onNotice={setAttachNotice} />
         <TextInput
           ref={input}
           accessibilityLabel={placeholder}
           multiline
           value={draft}
-          onChangeText={(text) => setDraft(thread.id, text)}
+          onChangeText={(text) => setDraft(key, text)}
           placeholder={placeholder}
           placeholderTextColor={colors.fg3}
           style={[styles.input, { color: colors.fg }]}

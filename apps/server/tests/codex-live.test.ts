@@ -39,7 +39,7 @@ describe.skipIf(!LIVE)('the real codex-cli', () => {
       omniUrl: 'http://127.0.0.1:9',
     });
     const names = Object.keys(mcpServers);
-    expect([...names].sort()).toEqual(['omni', 'omni-ask', 'omni-browser', 'omni-render']);
+    expect([...names].sort()).toEqual(['omni', 'omni-ask', 'omni-browser', 'omni-render', 'omni-steps']);
 
     const client = new CodexClient({ bin: codexBin()!, env: harnessEnv('codex', {}), cwd: H.tmp });
     try {

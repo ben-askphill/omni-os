@@ -69,6 +69,7 @@ export const PLAIN_MARK: Record<Mark, PlainStatus> = {
   crew_question: 'Needs you',
   held: 'Needs you',
   review: 'Needs you',
+  signin: 'Needs you',
   failed: 'Failed',
   crew_failed: 'Failed',
   setup_failed: 'Failed',

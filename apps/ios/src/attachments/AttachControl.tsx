@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 
 import { useLiveHub } from '../live/react';
+import type { ThreadKey } from '../live/thread-key';
 import { fontSize, space, useOmniTheme } from '../theme';
 import { Button } from '../ui/Button';
 import { Icon, type IconName } from '../ui/Icon';
@@ -23,10 +24,10 @@ const CHOICES: readonly { pick: Pick; icon: IconName; label: string; sub: string
 /**
  * The plus button beside a composer and the sheet it opens. A choice closes the sheet first and opens the system
  * picker once the sheet is gone, because iOS refuses to present one view controller over another that is leaving.
- * What it picks goes to the scope's staged files (`attachments/staged`). Anything Ben should hear about, a refused
- * file or a denied permission, goes to `onNotice`.
+ * What it picks goes to the scope's staged files (`attachments/staged`), kept for that thread on its server. Anything
+ * Ben should hear about, a refused file or a denied permission, goes to `onNotice`.
  */
-export function AttachControl({ scope, disabled = false, onNotice }: { scope: string; disabled?: boolean; onNotice: (text: string | null) => void }) {
+export function AttachControl({ scope, disabled = false, onNotice }: { scope: ThreadKey; disabled?: boolean; onNotice: (text: string | null) => void }) {
   const { colors } = useOmniTheme();
   const hub = useLiveHub();
   const staged = useStaged(scope);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { setupWait } from '@omni/shared/setup-wait.ts';
 import { api, errorText, type Artifact, type PendingMsg, type Thread } from '../api.ts';
 import { harnessLabel } from '../components/brand.tsx';
 import { Markdown } from '../components/Markdown.tsx';
@@ -16,8 +17,11 @@ import { NeedsActions } from './NeedsCard.tsx';
 import { MoAvatar, MoDiff, MoStripes } from './parts.tsx';
 import { useShell } from './shell.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../forwarded.ts';
-import type { NowDoing, PlanView, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
+import type { NowDoing, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
+import { actionsLabel, STEP_GLYPH, stepsHeader, stepsLabel, type StepsView } from '@omni/shared/steps.ts';
 import { threadMark } from '@omni/shared/status.ts';
+import type { ReportP } from '@omni/shared/transcript-fold.ts';
+import { Folded } from '../components/Folded.tsx';
 
 /** The phone's turn, carrying the web's own artifact and thread rows. */
 export type TurnView = TurnOf<Artifact, Thread>;
@@ -37,7 +41,7 @@ export function Outcome({ t, harness, limit }: { t: TurnView; harness: string; l
   return (
     <div className="flex items-center gap-2 text-[12.5px] leading-[1.3] text-fg-3 tabular-nums">
       <StatusDot status={limit ? 'limited' : t.status} size={8} />
-      {[limit ?? (took ? `${after} ${took}` : word), t.steps ? plural(t.steps, 'step') : null, harnessLabel(harness)].filter(Boolean).join(' · ')}
+      {[limit ?? (took ? `${after} ${took}` : word), t.progress ? stepsLabel(t.progress.steps.length) : null, harnessLabel(harness)].filter(Boolean).join(' · ')}
     </div>
   );
 }
@@ -52,24 +56,71 @@ export function Clamped({ text }: { text: string }) {
   );
 }
 
-export function StepsRow({ t, live, onClick }: { t: TurnView; live?: boolean; onClick: () => void }) {
+/**
+ * A turn's plain steps (@omni/shared/steps.ts), as desktop shows them: open while the turn runs, a line with Show
+ * steps once it ends. The calls stay one tap away: "N actions" opens the Actions screen.
+ */
+export function MoSteps({ v, failed, onActions }: { v: StepsView; failed: number; onActions: () => void }) {
+  const [shown, setShown] = useState(false);
+  const open = v.live || shown;
+  const ended = v.steps.some((s) => s.state === 'failed') ? 'failed' : v.steps.every((s) => s.state === 'done') ? 'done' : 'settled';
   return (
-    <button type="button" onClick={onClick} className="mo-press flex h-11 items-center gap-2.5 rounded-full bg-surface px-3.5 text-left text-[13.5px] leading-none text-fg-2">
-      <Icon name="tool" size={15} />
-      <span className="flex-1 tabular-nums">
-        {live ? `${plural(t.steps, 'step')} so far` : plural(t.steps, 'step')}
-        {t.failed > 0 && (
-          <>
-            <span className="text-fg-3"> · </span>
-            <span className="inline-flex items-center gap-[5px]">
-              <StatusDot status="failed" size={7} />
-              {t.failed} failed
+    <div className="flex flex-col rounded-[20px] bg-surface">
+      {v.live ? (
+        <div className="flex items-center px-4 pt-3 pb-1 text-[13px] leading-none font-medium">
+          {stepsHeader(v)}
+          <span className="flex-1" />
+          {v.source !== 'phases' && (
+            <span className="font-normal text-fg-3 tabular-nums">
+              {v.done}/{v.steps.length}
             </span>
-          </>
-        )}
-      </span>
-      <Icon name="chevronRight" size={15} className="text-fg-3" />
-    </button>
+          )}
+        </div>
+      ) : (
+        <button type="button" onClick={() => setShown((o) => !o)} aria-expanded={open} className="mo-press flex min-h-11 items-center gap-2.5 px-4 py-2.5 text-left text-[13.5px] leading-none text-fg-2">
+          <StatusDot status={ended} size={8} />
+          <span className="flex-1 tabular-nums">{stepsHeader(v)}</span>
+          <span className="text-[12.5px] text-fg-3">{open ? 'Hide' : 'Show steps'}</span>
+          <Icon name="chevronRight" size={15} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
+        </button>
+      )}
+      {open && (
+        <ol className="flex flex-col gap-[9px] px-4 pt-2 pb-1">
+          {v.steps.map((s) => {
+            const on = s.state === 'active' || s.state === 'needs';
+            return (
+              <li key={s.key} data-state={s.state} className="flex items-start gap-2.5">
+                <span className="grid h-[19px] w-3 shrink-0 place-items-center">
+                  <StatusDot status={STEP_GLYPH[s.state]} size={8} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-[14px] leading-[1.35] ${on ? 'text-fg' : 'text-fg-3'}`}>{s.title}</span>
+                  {s.now && <span className="block text-[12.5px] leading-[1.35] text-fg-3">Now: {s.now}</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {open && v.actions > 0 && (
+        <button type="button" onClick={onActions} className="mo-press mt-1 flex h-11 items-center gap-2.5 border-t border-line px-4 text-left text-[13px] leading-none text-fg-3">
+          <span className="flex-1 tabular-nums">
+            {actionsLabel(v.actions)}
+            {failed > 0 && (
+              <>
+                <span> · </span>
+                <span className="inline-flex items-center gap-[5px] text-fg-2">
+                  <StatusDot status="failed" size={7} />
+                  {failed} failed
+                </span>
+              </>
+            )}
+          </span>
+          <Icon name="chevronRight" size={15} />
+        </button>
+      )}
+      {open && !v.actions && <div className="h-2" />}
+    </div>
   );
 }
 
@@ -124,38 +175,14 @@ export function NowLine({ now, meta }: { now: NowDoing; meta?: string }) {
   );
 }
 
-export function Plan({ plan }: { plan: PlanView }) {
-  return (
-    <div className="flex flex-col gap-[9px] rounded-[20px] bg-surface px-4 py-3">
-      <div className="flex text-[13px] leading-none font-medium">
-        Plan
-        <span className="flex-1" />
-        <span className="font-normal text-fg-3 tabular-nums">
-          {plan.done}/{plan.todos.length}
-        </span>
-      </div>
-      {plan.todos.map((p, i) => {
-        const st = p.status === 'completed' ? 'done' : p.status === 'in_progress' ? 'running' : 'idle';
-        return (
-          <div key={i} className={`flex items-center gap-2.5 text-[14px] leading-[1.35] ${st === 'running' ? 'text-fg' : 'text-fg-3'}`}>
-            <span className="grid w-3 place-items-center">
-              <StatusDot status={st} size={8} />
-            </span>
-            {(st === 'running' && p.activeForm) || p.content}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /** A delegated thread's state, a question it asked through its job included. */
 function KidPill({ k }: { k: Thread }) {
   return <StatusPill mark={threadMark(k, { need: useNeedOf(k.id) })} />;
 }
 
 /** The threads a Conductor turn delegated, each opening its thread, with Needs you's answer under one that waits. */
-export function Delegation({ kids }: { kids: Thread[] }) {
+/** `answers`: reports shown in place (ReportP `shown`), by the thread that sent them, each under its row. */
+export function Delegation({ kids, answers }: { kids: Thread[]; answers?: Record<string, ReportP> }) {
   const shell = useShell();
   const { needsYou, channel } = useApp();
   const now = useNow(60_000);
@@ -182,6 +209,13 @@ export function Delegation({ kids }: { kids: Thread[] }) {
             {card && (
               <div className="px-3 pb-3 pl-[54px]">
                 <NeedsActions card={card} size="md" />
+              </div>
+            )}
+            {answers?.[k.id] && k.status !== 'running' && k.status !== 'queued' && (
+              <div className="px-3 pb-3 text-[15px]">
+                <Folded>
+                  <MoProse text={answers[k.id].text || '(no reply)'} />
+                </Folded>
               </div>
             )}
           </div>
@@ -230,7 +264,7 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
     <>
       {items.map((m) => (
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
-          <span className="text-[12px] leading-[1.3] text-fg-3">{isForwarded(m) ? forwardedLabel(m, trouble) : (parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
+          <span className="text-[12px] leading-[1.3] text-fg-3">{isForwarded(m) ? forwardedLabel(m, trouble) : (setupWait(thread.setup)?.label ?? parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
           {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} /> : null}
           <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
           {(m.text || !hasContext(m.context)) && (

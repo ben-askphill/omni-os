@@ -68,6 +68,7 @@ export function sourceBlock(t: Thread): ContinueBlock | null {
   if (isProviderHarness(t.harness)) return block('remote', continueSourceRefusal(t.harness) ?? `This thread runs ${providerWhere(t.harness)}, so its files are not on this machine.`);
   if (t.setup === 'preparing') return block('setup', "Omni is still preparing this thread's worktree.");
   if (t.setup === 'failed') return block('setup', "This thread's worktree could not be prepared. Retry it first.");
+  if (t.setup === 'signin') return block('setup', 'This thread waits for a sign-in. Sign in, then press Try again.');
   // Folder work forks into a folder of its own, and repo work reads the source's checkout, which readCheckout refuses
   // when it is not here. So only a run on, or a handoff to, another machine blocks a fork here.
   const elsewhere = elsewhereBlocked(t, runsHere(t.id));

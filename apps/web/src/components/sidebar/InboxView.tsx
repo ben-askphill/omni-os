@@ -230,6 +230,11 @@ function InboxCard({
           <span className="min-w-0 flex-1 truncate">{title}</span>
           {!line && harness}
         </span>
+        {t.step && (
+          <span className="mt-0.5 block truncate text-[12px] leading-4 text-fg-2" data-step>
+            {t.step}
+          </span>
+        )}
         {line && (
           <span className="mt-0.5 flex h-4 items-center gap-1.5 text-[11.5px] text-fg-3" title={where.title || undefined} data-ran-on={where.machine ?? undefined}>
             {label && <Icon name={where.machine ? 'monitor' : 'branch'} size={11} className="shrink-0" />}

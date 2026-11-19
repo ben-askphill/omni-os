@@ -43,9 +43,10 @@ export interface AttentionAlert {
 
 /** A Needs you item, narrowed. */
 export interface AttentionItem {
-  thread: { id: string; channel_id: string; title: string | null; status?: string; last_text?: string | null };
+  /** `step`: the step a running thread is on (steps.ts `stepLine`), which the server adds while it runs. */
+  thread: { id: string; channel_id: string; title: string | null; status?: string; last_text?: string | null; step?: string };
   result: { uid: string; status: string; at: string } | null;
-  blockers: { kind: string; detail: string | null; count: number; at?: string | null }[];
+  blockers: { kind: string; detail: string | null; count: number; at?: string | null; signin?: boolean }[];
   at?: string;
 }
 
@@ -89,9 +90,21 @@ export function resultAlert(item: AttentionItem, channelName?: string): Attentio
   };
 }
 
-/** A worktree that could not be prepared: the thread failed before its first turn, so there is no result to alert. */
+/**
+ * A worktree that could not be prepared: the thread failed before its first turn, so there is no result to alert. A
+ * thread held for a sign-in alerts as a question, since it waits for Ben to sign in, though it reads as stopped.
+ */
 export function setupAlert(item: AttentionItem, channelName?: string): AttentionAlert | null {
   const b = item.blockers.find((x) => x.kind === 'setup');
+  if (b?.signin)
+    return {
+      id: `signin:${item.thread.id}:${b.detail ?? ''}`,
+      kind: 'question',
+      threadId: item.thread.id,
+      channelId: item.thread.channel_id,
+      title: titleOf(item.thread.title),
+      body: withDetail(`Sign in needed in ${where(item.thread.channel_id, channelName)}`, b.detail),
+    };
   // Stopped while it was being prepared: Ben's own doing. A failed result says it already.
   if (!b || item.thread.status === 'stopped' || item.result?.status === 'failed') return null;
   return {
@@ -118,7 +131,9 @@ export function questionAlert(item: AttentionItem, channelName?: string): Attent
   const q = item.blockers.find((b) => b.kind === 'question');
   const id = questionKey(item);
   if (!q || !id) return null;
-  const head = q.count > 1 ? `${q.count} questions wait in ${where(item.thread.channel_id, channelName)}` : `Waiting on your answer in ${where(item.thread.channel_id, channelName)}`;
+  const wait = q.count > 1 ? `${q.count} questions wait in ${where(item.thread.channel_id, channelName)}` : `Waiting on your answer in ${where(item.thread.channel_id, channelName)}`;
+  // Where it stopped to ask: "Step 2 of 3 · Read the reviews · waiting on your answer in #volero".
+  const head = item.thread.step ? `${item.thread.step} · ${wait[0].toLowerCase()}${wait.slice(1)}` : wait;
   return { id, kind: 'question', threadId: item.thread.id, channelId: item.thread.channel_id, title: titleOf(item.thread.title), body: withDetail(head, q.detail) };
 }
 

@@ -205,7 +205,7 @@ export class ThreadController {
     return taken;
   }
 
-  /** Replace the held list with one Ben edited or reordered (pending.ts). */
+  /** Replace the held list with one the user edited or reordered (pending.ts). */
   replaceHeld(list: Msg[]) {
     this.held = list;
   }

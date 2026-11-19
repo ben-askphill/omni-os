@@ -95,7 +95,17 @@ describe('thread cards', () => {
 
   it('calls a stopped setup stopped, and shows a preparing one without a button', () => {
     expect(cards(thread({ setup: 'failed', status: 'stopped' }))[0]).toMatchObject({ title: 'Setup stopped' });
-    expect(cards(thread({ setup: 'preparing' }))[0]).toMatchObject({ kind: 'setup', failed: false, title: 'Preparing worktree', buttons: [] });
+    expect(cards(thread({ setup: 'preparing', branch: 'omni/x' }))[0]).toMatchObject({ kind: 'setup', failed: false, title: 'Preparing worktree', buttons: [] });
+  });
+
+  it('offers Try again and Start anyway on a thread that waits for a sign-in', () => {
+    const [card] = cards(thread({ setup: 'signin', setup_error: 'Slack is signed out on omarchy, so this job has not started.', status: 'stopped' }));
+    expect(card).toMatchObject({ kind: 'setup', failed: true, title: 'Sign in needed', detail: 'Slack is signed out on omarchy, so this job has not started.' });
+    expect(card?.buttons).toEqual([
+      { key: 'retry', label: 'Try again', action: { kind: 'retry-setup' }, primary: true },
+      { key: 'anyway', label: 'Start anyway', action: { kind: 'retry-setup', skipSignIn: true }, primary: false },
+    ]);
+    expect(cards(thread({ setup: 'preparing', branch: null }))[0]).toMatchObject({ title: 'Checking sign-ins', buttons: [] });
   });
 
   it('turns a limit into buttons in order', () => {

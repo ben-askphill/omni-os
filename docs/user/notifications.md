@@ -6,7 +6,7 @@ Omni can tell you when something needs you: in the desktop app as native notific
 
 | Kind | When |
 |---|---|
-| Questions | An agent asked you something (`ask_user_question`) and waits for the answer. A newer question card in the same thread notifies again. |
+| Questions | An agent asked you something (`ask_user_question`) and waits for the answer. A newer question card in the same thread notifies again. While the thread runs, the body names the step it stopped at ([Steps](threads.md#steps)). |
 | Failed threads | A turn failed, or Omni could not prepare a thread's worktree. |
 | Finished threads | A turn finished and its result waits in Needs you. A delegated thread's success goes to its parent as a crew report instead. |
 | Crew reports | A delegated thread reported back to a Conductor thread. |
@@ -50,4 +50,4 @@ Crew reports and pull requests come from the server's live feed:
 
 - only the machine where the report landed or the PR watch runs notifies for them;
 - one sent while the app or tab was not connected to the server (the app starting, the server restarting) is not shown later;
-- a crew report usually wakes its Conductor thread, so a Finished notification for that thread follows the report, as on the iPhone.
+- a crew report shows in its Conductor thread without waking it, unless the delegation asked for a follow-up; then a Finished notification for that thread follows the report, as on the iPhone.

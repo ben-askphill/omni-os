@@ -125,10 +125,10 @@ export function StepsScreen({ turn }: { turn?: number }) {
   const tails = !!t && hasLiveOutput(t.harness);
   return (
     <>
-      <MoHeader onBack={shell.back} title="Steps" sub={thread?.title} />
+      <MoHeader onBack={shell.back} title="Actions" sub={thread?.title} />
       <ThreadIdCtx.Provider value={thread?.id ?? ''}>
         <Body className="gap-2">
-          {t ? t.items.map((it) => <StepItem key={it.key} it={it} running={running} cwd={thread?.cwd ?? ''} tails={tails} />) : <MoEmpty>{held ? 'No steps yet.' : 'Loading'}</MoEmpty>}
+          {t ? t.items.map((it) => <StepItem key={it.key} it={it} running={running} cwd={thread?.cwd ?? ''} tails={tails} />) : <MoEmpty>{held ? 'No actions yet.' : 'Loading'}</MoEmpty>}
           {t && !t.steps && <MoEmpty>This turn answered without calling a tool.</MoEmpty>}
         </Body>
       </ThreadIdCtx.Provider>

@@ -4,7 +4,7 @@ import type { DeliveryPhase } from '../delivery.ts';
 import { about } from '../about.ts';
 import { config } from '../config.ts';
 import { events, messageRequests, outbox, remoteCommands, threads, type DeliveryState, type MessageRequest } from '../db.ts';
-import { publishFeed, publishThread } from '../bus.ts';
+import { bus, EVENT_ADDED, publishFeed, publishThread } from '../bus.ts';
 import type { Attachment } from '../uploads.ts';
 import { contextAttachments, harnessText } from '../message-context/project.ts';
 import type { CommandList } from '../commands.ts';
@@ -166,6 +166,8 @@ export function emitThread(id: string) {
 export function addEvent(threadId: string, kind: string, payload: unknown) {
   const row = events.add(threadId, kind, payload);
   publishThread(threadId, row);
+  // The step a running thread is on may have moved (step-line.ts).
+  bus.emit(EVENT_ADDED, threadId, kind);
   return row;
 }
 

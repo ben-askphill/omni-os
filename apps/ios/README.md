@@ -78,7 +78,7 @@ Settings opens with Servers, then a search over every setting and the same group
 - Machines: the server's machine, read-only, and Update all machines, which checks, downloads and updates every synced machine through `/update/fleet` as the Web UI's card does.
 - Sync: what the server reports, plus each machine's signing key (paired machines are trusted with their first key; Confirm new key when a machine's key changed, with how many of its actions wait, and Trust this machine only for one still not trusted) and the changes this server refused.
 - Sharing & access: Signed-in devices, Rotate install token and the MCP clients that reached `/mcp` (Approve, Remove).
-- Extras: Wispr Flow (a switch in the Mac app only), whether Grok Bot is on, and the Hermes URL and central brain folder (`PUT /setup`; the folder shows its value).
+- Extras: Wispr Flow (a switch in the Mac app only), whether Grok Bot is on, and the Hermes URL and notes folder (`PUT /setup`; the folder shows its value).
 - About: what the server reports, read-only.
 - Secrets: names by scope, add or replace a value, delete one. A value is never shown again.
 

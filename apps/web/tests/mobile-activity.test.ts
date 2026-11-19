@@ -66,4 +66,15 @@ describe('needsCard', () => {
     const card = needsCard(failing, undefined, harness, NOW);
     expect(card.actions[0]).toEqual({ kind: 'open', label: 'Review', thread: 'member' });
   });
+  it('offers Try again and Start anyway on a thread that waits for a sign-in', () => {
+    const n = inbox();
+    const item = n.items.find((i) => i.thread.title === 'Fix the widget')!;
+    const held = { ...item, thread: { ...item.thread, status: 'stopped' as const, setup: 'signin' as const }, blockers: [{ kind: 'setup' as const, signin: true as const, detail: 'Slack is signed out on omarchy.', count: 0 }] };
+    const card = needsCard(held, channel(held.thread.channel_id), harness, NOW);
+    expect(card).toMatchObject({ kind: 'setup', glyph: 'needs', label: 'Sign in needed', detail: 'Slack is signed out on omarchy.' });
+    expect(card.actions).toEqual([
+      { kind: 'retry', label: 'Try again' },
+      { kind: 'retry', label: 'Start anyway', skipSignIn: true },
+    ]);
+  });
 });

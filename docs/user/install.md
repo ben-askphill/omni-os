@@ -36,14 +36,14 @@ The desktop app replaced both, and the repo no longer has them.
 | Need | Check | Fix |
 | --- | --- | --- |
 | Node 24+ and npm, to run from a checkout or build the app | `node -v` | `nvm install 24`, `mise use node@24`, or `brew install node` |
-| Rust, to run from a checkout (the threads' `ask_user_question`, `html_render` and `read_referenced_thread`, and `scripts/omni.sh`) or build the app | `cargo --version` | https://rustup.rs. The repo's `rust-toolchain.toml` pins the version. Building the app's `omni` command also needs a C compiler: Xcode's command line tools, or `musl-tools` on Linux |
+| Rust, to run from a checkout (the threads' `ask_user_question`, `html_render`, `set_steps` and `read_referenced_thread`, and `scripts/omni.sh`) or build the app | `cargo --version` | https://rustup.rs. The repo's `rust-toolchain.toml` pins the version. Building the app's `omni` command also needs a C compiler: Xcode's command line tools, or `musl-tools` on Linux |
 | Chromium on Linux, for the agents' browser | `command -v chromium` | Your distro's Chromium, Chrome or Brave. Omarchy already has one |
 | Claude Code, signed in | `claude --version` | `npm install -g @anthropic-ai/claude-code`, then `claude` and `/login` |
 | `gh`, signed in (GitHub panel, PR automations) | `gh auth status` | `brew install gh && gh auth login` |
 
 Signing Claude Code in over ssh works too. The login keychain is locked there, so `claude` saves the login to `~/.claude/.credentials.json`. Before each Claude Code thread starts, Omni copies that login into the Keychain when it is newer than the one there, because the desktop session reads the Keychain first and would otherwise fail with "OAuth session expired". `OMNI_CLAUDE_LOGIN_SYNC=0` in `.env` turns this off.
 
-Secrets go in the Keychain on a Mac and in `data/secrets.json` on Linux ([Configuration](configuration.md#secrets)). Cursor Agent is optional. Codex is too, but the Conductor has it review every pull request Claude wrote, and asks you each time when it is missing ([Crew](crew.md)). See [Harnesses](harnesses.md).
+Secrets go in the Keychain on a Mac and in `data/secrets.json` on Linux ([Configuration](configuration.md#secrets)). Cursor Agent is optional. Codex is too: when you ask the Conductor to review a pull request Claude wrote, the review runs on Codex ([Crew](crew.md)). See [Harnesses](harnesses.md).
 
 ## Agent instructions
 
@@ -89,7 +89,7 @@ This section is for an agent doing the setup (the README has the prompt to paste
 
 5. **Confirm it runs.** The app starts the server itself. Check: `curl -s 'http://127.0.0.1:4747/api/auth/proof?nonce=0123456789abcdef0123456789abcdef'` returns JSON with a `proof` field. If nothing answers yet, wait a few seconds and try again. An answer without `proof` means something else holds port 4747. Stop and tell the user rather than killing it.
 
-6. **Hand over.** Tell the user the app is open and that its first-run screens ask who they are and where their work lives. After a `git pull`, the command in step 4 builds it again.
+6. **Hand over.** Tell the user the app is open and that its first-run screens ask who they are, what they do and where Omni should keep their files. After a `git pull`, the command in step 4 builds it again.
 
 Prefer the browser? Steps 1 to 3 are the same. Then run `npm run setup` ([Set up by hand](#set-up-by-hand)) and `npm run dev`, and open http://localhost:4748.
 
@@ -102,13 +102,16 @@ npm install --include=dev
 npm run setup
 ```
 
-`npm run setup` asks what the first-run screens in the Web UI and the desktop app ask, except notifications:
+The first-run screens in the Web UI and the desktop app ask, in plain words:
 
-1. **You**: your name (what Omni and its agents call you), email, timezone (prefilled from the system) and pronouns (default they/them)
-2. **Workspace**: the workspace folder (default `~/Omni`; threads without a repo run there and its CLAUDE.md and skills load in every Claude thread), your repos folder (default `~/code`) and your GitHub owner
-3. **Harnesses**: whether Claude Code, Codex and Cursor Agent are ready, not installed, signed out or failing, with the install command for a missing one, the sign-in command for a signed-out one, and the reason for any other. A ready one names the account it is signed in to, so a work or personal mix-up shows here. The GitHub CLI gets a row too, with the login `gh` uses, because the PR steps, PR alerts and the Conductor's PR reviews all run it
-4. **First channel**: a client or project with an optional repo and Shopify store, or skip
-5. **Done**: saves `data/omni.config.json` and, in the Web UI, opens #conductor with a welcome message. It also points at what to set up next: the iPhone app (Settings > Sharing & access), a second machine (Settings > Sync) and the [`omni` command](cli.md) (`scripts/omni.sh` in a checkout; a phone gets no command)
+1. **Who are you?** Your name (what Omni and its agents call you), email, timezone (prefilled from the system) and pronouns (default they/them)
+2. **What do you do?** A line about your work and the tools you use (chips such as Email, Calendar, Notion and Slack, plus any others). Every agent's prompt carries both, so answers fit your work and reach for your tools first. Picking GitHub turns on the code add-on, Shopify the store field
+3. **Where should Omni keep your files?** The folder agents work in and save to (default `~/Omni`; threads without a repo run there and its CLAUDE.md and skills load in every Claude thread). **I work with code** is an add-on: it shows your repos folder (default `~/code`) and GitHub owner. Without it the GitHub CLI row and repo fields stay hidden. An empty GitHub owner fills in from the signed-in `gh` login, never from the checkout's own remote
+4. **Harnesses**: whether Claude Code, Codex and Cursor Agent are ready, not installed, signed out or failing, with the install command for a missing one, the sign-in command for a signed-out one, and the reason for any other. A ready one names the account it is signed in to, so a work or personal mix-up shows here. With the code add-on, the GitHub CLI gets a row too, with the login `gh` uses, because the PR steps, PR alerts and the Conductor's PR reviews all run it
+5. **First project**: a project or client channel, or skip. The repo folder shows with the code add-on, the Shopify store when you picked Shopify. Quick questions that belong to no project go to General (the seeded channel `inbox`)
+6. **Done**: saves `data/omni.config.json` and leaves a welcome message in #conductor. Type a first question and **Ask** opens a thread in General on its answer; leave it empty and **Open Conductor** opens the welcome. It also points at what to set up next: the iPhone app (Settings > Sharing & access), a second machine (Settings > Sync) and the [`omni` command](cli.md) (`scripts/omni.sh` in a checkout; a phone gets no command)
+
+`npm run setup` asks the same, except notifications, the first question and the tool chips: it takes your tools as one comma-separated line.
 
 On the first-run screens, a signed-out GitHub CLI row also has **Connect GitHub**. It runs `gh auth login --web` on the machine Omni runs on and shows gh's one-time code with a link to github.com/login/device. Enter the code there and approve, and the row turns to "Signed in as" your login. gh keeps the token, as it does when you sign in from a terminal, and Omni never sees it. **Cancel** stops gh. Skipping the button changes nothing, and Done lists the GitHub CLI as signed out.
 

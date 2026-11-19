@@ -11,7 +11,7 @@ import { changesProblems, turnChangesProblems } from '@omni/shared/changes.ts';
 import { reviewNoteProblems } from '@omni/shared/review-notes.ts';
 import { WIRE_FIXTURES } from '@omni/test-fixtures';
 import { diff, shapeOf, tagOf } from './fixture-shape.ts';
-import { FAKE_CLAUDE, diffFile, fakeAlive } from './support.ts';
+import { FAKE_CLAUDE, diffFile, fakeAlive, hasMcpBuild } from './support.ts';
 
 // Golden fixtures of the server JSON the clients read, in packages/test-fixtures/wire. The web and shared tests read
 // them too. Boots the real server with the fake claude CLI, makes a channel and runs a thread through three turns, and
@@ -178,6 +178,9 @@ const NAMES = [
   'pr-auto-merge-off.json',
   // A question a delegated thread asked, as the thread that delegated it lists it.
   'crew-questions.json',
+  // A thread whose agent posted its plan with set_steps, on its second step: its `step` line and the calls the step
+  // view reads (@omni/shared/steps.ts). Last, so its ids number after the others'.
+  'thread-steps.json',
 ] as const;
 type Name = (typeof NAMES)[number];
 
@@ -969,6 +972,19 @@ async function scenario() {
   await call('POST', `/threads/${asker.id}/questions`, { questions: [digestQuestion] });
   const asked = keep('crew-questions.json', await get(`/threads/${conductor.id}/crew-questions`)) as { items: { thread_id: string }[] };
   expect(asked.items.map((q) => q.thread_id)).toEqual([asker.id]);
+
+  // The agent posts its plan through the omni-steps server, the way the real CLI calls an MCP tool. Without an omni-mcp
+  // build the calls fail and the thread shows the phase of its calls instead: the shape is the same.
+  const planned = (await call('POST', '/threads', { channel: 'acme', prompt: 'STEPS:1500 pick a review app', title: 'Pick a review app' })) as Thread;
+  const onStep = hasMcpBuild ? 'Step 2 of 3 · Read the reviews' : 'Searching the web';
+  keep(
+    'thread-steps.json',
+    await eventually(async () => {
+      const d = (await detail(planned.id)) as Detail & { thread: { step?: string } };
+      return d.thread.step === onStep && d;
+    }, `the steps thread on "${onStep}"`),
+  );
+  await eventually(async () => (await detail(planned.id)).thread.status === 'done', 'the steps thread to finish');
 }
 
 /** A request body a client sends: the recorded one, so the server must still take it. */

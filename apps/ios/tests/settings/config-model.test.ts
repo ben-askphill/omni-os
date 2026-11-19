@@ -9,7 +9,7 @@ const state = (over: Partial<SetupState['config']> = {}, env: Record<string, str
   path: '~/omni/data/omni.config.json',
   config: {
     version: 1,
-    user: { name: 'Ben', pronouns: 'they/them', timezone: '', email: '' },
+    user: { name: 'Ben', pronouns: 'they/them', timezone: '', email: '', work: '', tools: '' },
     workspace: { root: '', reposDir: '~/code', githubOwner: 'askphill' },
     integrations: { hermesUrl: '', centralBrainDir: '', tailscaleLogin: '', mcpPublicUrl: '', clerkPublishableKey: '', clerkClientId: '', mcpClients: '', syncSignatures: 'actions' },
     runOn: { device: '' },
@@ -17,7 +17,7 @@ const state = (over: Partial<SetupState['config']> = {}, env: Record<string, str
     worktrees: { retention: { enabled: false, idleDays: 14 }, slim: { enabled: false, idleDays: 7 } },
     ...over,
   },
-  resolved: { timezone: 'Europe/Amsterdam', workspaceRoot: '~/Omni', reposDir: '~/code', centralBrainDir: '~/central-brain', hermesUrl: '' },
+  resolved: { timezone: 'Europe/Amsterdam', workspaceRoot: '~/Omni', reposDir: '~/code', centralBrainDir: '~/notes', hermesUrl: '' },
   fallbacks: { timezone: 'Europe/Amsterdam', workspaceRoot: '~/Omni', reposDir: '~/repos', home: '~' },
   omniRepo: null,
   env,
@@ -33,7 +33,7 @@ describe('config fields on the phone', () => {
     ]);
     expect(configRows('extras', state()).map((r) => [r.label, r.editable, r.shown])).toEqual([
       ['Hermes URL', true, 'Not set'],
-      ['Central brain folder', false, '~/central-brain'],
+      ['Notes folder', false, '~/notes'],
     ]);
   });
 
@@ -47,7 +47,7 @@ describe('config fields on the phone', () => {
     const rows = configRows('general', s);
     const values = { ...configValues(rows, s), 'user.name': ' Ben R ', 'user.pronouns': '' };
     expect(configDirty(rows, values, s)).toBe(true);
-    expect(configPatch(rows, values)).toEqual({ user: { name: 'Ben R', pronouns: 'they/them', timezone: '', email: '' } });
+    expect(configPatch(rows, values)).toEqual({ user: { name: 'Ben R', pronouns: 'they/them', timezone: '', email: '', work: '', tools: '' } });
     expect(configDirty(rows, configValues(rows, s), s)).toBe(false);
   });
 

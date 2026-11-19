@@ -4,7 +4,8 @@ import type { LimitAction } from './limit';
 
 /** What a card's button does: one recovery call, each answered with the thread and its pending list as they are now. */
 export type NeedsAction =
-  | { kind: 'retry-setup' }
+  /** `skipSignIn`: Start anyway, past the sign-in a thread waits for. */
+  | { kind: 'retry-setup'; skipSignIn?: boolean }
   | { kind: 'limit'; action: LimitAction }
   | { kind: 'resume'; ids?: readonly string[] }
   | { kind: 'discard'; id: string };
@@ -14,7 +15,7 @@ export type RecoveryApi = Pick<OmniApi, 'retrySetup' | 'scheduleLimit' | 'cancel
 export function runNeedsAction(api: RecoveryApi, threadId: string, a: NeedsAction): Promise<Recovered> {
   switch (a.kind) {
     case 'retry-setup':
-      return api.retrySetup(threadId);
+      return a.skipSignIn ? api.retrySetup(threadId, { skipSignIn: true }) : api.retrySetup(threadId);
     case 'limit':
       return a.action === 'schedule' ? api.scheduleLimit(threadId) : a.action === 'cancel' ? api.cancelLimit(threadId) : api.resumeLimit(threadId);
     case 'resume':
