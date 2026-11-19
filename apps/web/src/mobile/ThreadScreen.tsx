@@ -46,6 +46,13 @@ import { statusLabel } from '@omni/shared/status-line.ts';
 import { asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
 import { defers, LIVE_TURNS } from '../transcript/defer.ts';
+import { FindBar } from '../components/thread/FindBar.tsx';
+import { useThreadFind } from '../pages/useThreadFind.ts';
+import { FindTargetCtx } from '../transcript/find-target.ts';
+import { tailId } from '@omni/shared/history.ts';
+
+/** The phone follows no bottom: a find has nothing to let go of. */
+const STAYS = () => {};
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
 export function ThreadScreen() {
@@ -93,6 +100,9 @@ export function ThreadScreen() {
   const artifactCount = files.length + shots.length + crewArtifacts.files.length + crewArtifacts.shots.length;
   const workCwd = init?.cwd || thread?.cwd || '';
   const { scroll, newest } = useOpenOnNewestTurn({ view, history, ready, revealTarget, clearReveal });
+  // Find in the thread: from Thread options. A match in a call or an earlier reply, which the Steps screen shows, lands
+  // on its turn.
+  const find = useThreadFind({ threadId: thread?.id ?? '', reveal: history.reveal, release: STAYS, scrollRef: scroll, tail: tailId(history.history) });
   const handedOff = (a: HandoffAnswer) => {
     applyThread(a.thread, true);
     setHandoff(a.handoff);
@@ -262,8 +272,10 @@ export function ThreadScreen() {
             </div>
           </>
         )}
+        <FindBar find={find} touch className="absolute top-2 right-2 left-2 z-10" />
         <div ref={scroll} className="mo-scroll h-full min-h-0 overflow-y-auto px-4 pt-2 pb-4 [overflow-anchor:none]">
           <HistoryCtx.Provider value={history}>
+            <FindTargetCtx.Provider value={find.target}>
             <div className="flex flex-col gap-4">
               <MoContinueLinks links={s.links} onOpen={(id) => shell.open(href.thread(id))} />
               {view.turns.map((t, i) => {
@@ -319,6 +331,7 @@ export function ThreadScreen() {
               )}
               {actionError && <ErrorNote>{actionError}</ErrorNote>}
             </div>
+            </FindTargetCtx.Provider>
           </HistoryCtx.Provider>
         </div>
       </div>
@@ -342,6 +355,7 @@ export function ThreadScreen() {
           pr={pr?.pr ? { label: `PR #${pr.pr.number}`, line: prLine(pr.pr).text } : pr?.crew.length ? { label: 'PRs from delegated threads', line: crewLine(pr.crew).text } : null}
           changes={changes?.files.length ? `${plural(changes.files.length, 'file')} · +${changes.add} −${changes.del}` : null}
           onClose={() => setMenu(false)}
+          onFind={find.show}
         />
       )}
       {machineSheet && held && (

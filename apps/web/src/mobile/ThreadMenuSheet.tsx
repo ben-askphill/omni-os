@@ -196,6 +196,7 @@ export function MenuSheet({
   changes,
   code = true,
   onClose,
+  onFind,
 }: {
   thread: Thread;
   pr: { label: string; line: string } | null;
@@ -203,6 +204,8 @@ export function MenuSheet({
   /** Show technical details is on, or the channel has a repo: PR, Changes, Terminal and Actions list. */
   code?: boolean;
   onClose: () => void;
+  /** Opens the thread's find bar (useThreadFind). */
+  onFind?: () => void;
 }) {
   const shell = useShell();
   const { tasks, status } = useApp();
@@ -248,6 +251,23 @@ export function MenuSheet({
     <MoSheet onClose={onClose} label="Thread options">
       <div className={`truncate ${SHEET_TITLE}`}>{thread.title || 'Untitled'}</div>
       <div className="flex flex-col gap-2.5 px-3">
+        {onFind && (
+          <MoGroup>
+            <MoListRow
+              icon="search"
+              label="Find in thread"
+              sub="Every message, older ones too"
+              chevron={false}
+              onClick={() => {
+                // Out of the sheet first, so it does not hand the focus back to ⋯ as it closes: the bar's field takes it.
+                if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                onClose();
+                onFind();
+              }}
+              last
+            />
+          </MoGroup>
+        )}
         <MoGroup>
           <MoListRow icon="info" label="Details" sub={code ? 'Agents, harness, model, session' : 'Agents, AI app and model'} onClick={() => go(href.threadView(thread.id, 'details'))} last={!code} />
           {code && (thread.branch || pr) && <MoListRow icon="pr" label={pr?.label ?? 'PR'} sub={pr?.line ?? 'No PR yet'} onClick={() => go(href.threadView(thread.id, 'pr'))} />}

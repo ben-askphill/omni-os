@@ -46,6 +46,9 @@ import { useThreadPresence } from './useThreadPresence.ts';
 import { useThreadSession } from './useThreadSession.ts';
 import { useTranscriptScroll } from './useTranscriptScroll.ts';
 import { useReveal } from './useReveal.ts';
+import { useThreadFind } from './useThreadFind.ts';
+import { FindBar } from '../components/thread/FindBar.tsx';
+import { FindTargetCtx } from '../transcript/find-target.ts';
 import { scrollBehavior } from '../motion.ts';
 import { tailId } from '@omni/shared/history.ts';
 import { blockedNote } from '@omni/shared/thread-machine.ts';
@@ -104,6 +107,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   useEffect(() => {
     follows.current = following;
   }, [follows, following]);
+  const find = useThreadFind({ threadId: id, reveal: history.reveal, release, scrollRef, tail: tailId(history.history) });
   useReveal(scrollRef, revealTarget, events, () => {
     release();
     clearReveal();
@@ -243,6 +247,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             asking,
             turn,
             pr: prs?.pr,
+            onFind: find.show,
+            findOpen: find.open,
           }}
         />
 
@@ -255,7 +261,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 {/* Queued means waiting for a slot: nothing is working yet. */}
                 <LinkChannel.Provider value={thread.channel_id}>
                   <ThreadIdCtx.Provider value={id}>
-                    <Transcript threadId={id} code={code} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
+                    <FindTargetCtx.Provider value={find.target}>
+                      <Transcript threadId={id} code={code} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
+                    </FindTargetCtx.Provider>
                   </ThreadIdCtx.Provider>
                 </LinkChannel.Provider>
                 <div className="mt-4 empty:hidden">
@@ -312,6 +320,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 )}
               </div>
             </div>
+            <FindBar find={find} className="absolute top-3 right-3 z-10 max-w-[calc(100%-1.5rem)] md:right-5" />
             {showJump && (
               <button
                 type="button"

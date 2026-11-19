@@ -5,7 +5,7 @@ import { canMarkDone } from '../../needs-you.ts';
 import { useNeedOf, useNow } from '../../store.tsx';
 import { threadPill } from './thread-state.ts';
 import { closeMenu, openMenu, useMenuOpenFor } from '../ContextMenu.tsx';
-import { Button, IconButton, StatusPill } from '../ui.tsx';
+import { Button, IconButton, MOD_KEY, StatusPill } from '../ui.tsx';
 
 // The header keeps the context meter, Done (Restore on an archived thread), the status, the thread menu and the panel
 // toggle. Pin, rename, move, archive, fork, reference, hand off and Send to Grok Bot are in the thread menu (⋯), the
@@ -24,6 +24,8 @@ export function HeaderActions({
   asking = false,
   turn,
   pr,
+  onFind,
+  findOpen = false,
 }: {
   thread: Thread;
   meter: ReactNode;
@@ -42,6 +44,9 @@ export function HeaderActions({
   turn?: TurnPhase | null;
   /** The pull request on the thread's branch: finished with one open, the pill reads Ready for review. */
   pr?: { state?: string; isDraft: boolean } | null;
+  /** Opens the find bar (useThreadFind), as Cmd+F does. */
+  onFind?: () => void;
+  findOpen?: boolean;
 }) {
   const menuOpen = useMenuOpenFor('thread', thread.id);
   const now = useNow(60_000);
@@ -70,6 +75,7 @@ export function HeaderActions({
       <span className="inline-flex" title={reconnecting ? 'Reconnecting to the live stream. The thread keeps running on the server.' : undefined}>
         <StatusPill mark={pill.mark} label={pill.label} />
       </span>
+      {onFind && <IconButton icon="search" label={`Find in thread (${MOD_KEY}F)`} active={findOpen} onClick={onFind} />}
       <IconButton
         icon="more"
         label="Thread actions"

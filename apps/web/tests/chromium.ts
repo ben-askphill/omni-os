@@ -13,7 +13,7 @@ export type Page = {
   goto(url: string): Promise<unknown>;
   click(selector: string): Promise<void>;
   waitForSelector(selector: string, options?: { state?: 'attached' | 'detached' | 'visible' | 'hidden' }): Promise<unknown>;
-  waitForFunction(fn: () => boolean, arg?: undefined, options?: { timeout: number }): Promise<unknown>;
+  waitForFunction<A = undefined>(fn: (arg: A) => boolean, arg?: A, options?: { timeout: number }): Promise<unknown>;
   evaluate<T, A = void>(fn: (arg: A) => T, arg?: A): Promise<T>;
   emulateMedia(options: { reducedMotion: 'reduce' | 'no-preference' }): Promise<void>;
   locator(selector: string): Locator;
@@ -46,6 +46,12 @@ async function findChromium(): Promise<string | null> {
 }
 
 export const executablePath = await findChromium();
+
+/** Chromium alone, for a test that serves its own pages (thread-find-browser.test.ts runs the whole Web UI). */
+export async function launchChromium(): Promise<Browser> {
+  const chromium = await loadChromium();
+  return chromium.launch({ executablePath: executablePath! });
+}
 
 /** Serve tests/fixtures/<name> and launch Chromium on it. */
 export async function startFixture(name: string): Promise<{ url: string; browser: Browser; stop: () => Promise<void> }> {

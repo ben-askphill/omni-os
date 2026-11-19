@@ -1,4 +1,5 @@
 import { memo, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useFindOpens } from '../transcript/find-target.ts';
 import type { Artifact, EventRow, Thread } from '../api.ts';
 import { duration, plural } from '../format.ts';
 import { href } from '../router.ts';
@@ -121,12 +122,14 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
  */
 function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean; lazy?: boolean }) {
   const [more, setMore] = useState(false);
+  // The find bar's match is in this message: a long one shows all of it.
+  const found = useFindOpens((t) => t === event, () => setMore(true));
   // Where the pill whose description is open starts.
   const [about, setAbout] = useState<number | null>(null);
   const text = p.text ?? '';
   // A clipped message shows all it came with; Show all under it loads the rest. A folded one has its own Show more.
   const long = !clipped && !fold && text.length > 1400;
-  const cut = long && !more;
+  const cut = long && !more && !found;
   const pieces = slashPieces(text, p.slash, cut ? 1200 : text.length);
   const open = pieces.find((x) => x.hit?.start === about)?.hit;
   const label = p.source ? SOURCE_LABEL[p.source] : undefined;
@@ -168,17 +171,22 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
       <ContextChips records={chipRecords(text, p.context)} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
       {(text || !hasContext(p.context)) && (
         <div
+          data-find-event={event}
           className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap @lg:max-w-[80%] ${
             p.dropped ? 'border border-dashed border-line-strong' : 'bg-bubble'
           }`}
         >
-          {fold ? <Folded>{body}</Folded> : body}
+          {fold ? <Folded opens={found}>{body}</Folded> : body}
           {long && (
-            <button type="button" onClick={() => setMore((m) => !m)} className="mt-1 block text-[12px] font-medium text-fg-3 underline underline-offset-2">
+            <button type="button" data-find-skip onClick={() => setMore((m) => !m)} className="mt-1 block text-[12px] font-medium text-fg-3 underline underline-offset-2">
               {more ? 'Show less' : 'Show all'}
             </button>
           )}
-          {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
+          {p.items?.length ? (
+            <div data-find-skip>
+              <PRWakeList items={p.items} more={p.more} />
+            </div>
+          ) : null}
         </div>
       )}
       <ClippedNote event={event} clipped={clipped} className="mt-1 justify-end" />
@@ -249,21 +257,23 @@ function ModLog({ lines }: { lines: ModLine[] }) {
   );
 }
 
-function ErrorCallout({ text }: { text: string }) {
+function ErrorCallout({ text, event }: { text: string; event: number }) {
   return (
     <div className="rounded-[20px] bg-surface px-4 py-3">
       <div className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-fg">
         <StatusDot status="needs" size={9} /> Error
       </div>
-      <pre className="scroll-thin max-h-72 overflow-auto font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words text-fg-2">{text}</pre>
+      <pre data-find-event={event} className="scroll-thin max-h-72 overflow-auto font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words text-fg-2">
+        {text}
+      </pre>
     </div>
   );
 }
 
-function ReportCard({ p }: { p: ReportP }) {
+function ReportCard({ p, event }: { p: ReportP; event: number }) {
   return (
-    <div className={`overflow-hidden rounded-[22px] bg-surface ${p.dropped ? 'opacity-60' : ''}`}>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-3 text-[12.5px]">
+    <div data-find-event={event} className={`overflow-hidden rounded-[22px] bg-surface ${p.dropped ? 'opacity-60' : ''}`}>
+      <div data-find-skip className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-3 text-[12.5px]">
         <span className="grid h-7 w-7 place-items-center rounded-full bg-bg text-fg-3">
           <Icon name="inbox" size={14} />
         </span>
@@ -341,7 +351,9 @@ const ItemRow = memo(
         case 'text':
           return (
             <div key={it.key} className="group/msg flex flex-col">
-              <Markdown text={it.p.text ?? ''} />
+              <div data-find-event={it.key}>
+                <Markdown text={it.p.text ?? ''} />
+              </div>
               <ClippedNote event={it.key} clipped={it.clipped} />
               <CopyMsg text={it.p.text ?? ''} />
             </div>
@@ -379,9 +391,9 @@ const ItemRow = memo(
         case 'result':
           return <ResultLine key={it.key} p={it.p} limit={limit} code={code !== false} />;
         case 'error':
-          return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
+          return <ErrorCallout key={it.key} event={it.key} text={it.p.text ?? ''} />;
         case 'report':
-          return onCard ? null : <ReportCard key={it.key} p={it.p} />;
+          return onCard ? null : <ReportCard key={it.key} event={it.key} p={it.p} />;
         case 'mod':
           return <ModLog key={it.key} lines={it.lines} />;
         case 'cloud':
