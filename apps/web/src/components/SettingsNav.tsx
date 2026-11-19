@@ -18,7 +18,7 @@ export function SettingsNav({ section }: { section: SettingsSectionId }) {
   };
   return (
     <nav aria-label="Settings sections" className="space-y-4">
-      <label className="flex h-9 items-center gap-2 rounded-full bg-surface px-3 text-fg-3 focus-within:shadow-[inset_0_0_0_1px_var(--line-strong)]">
+      <label className="flex h-9 items-center gap-2 rounded-full bg-surface px-3 text-fg-3 focus-ring-within focus-within:shadow-[inset_0_0_0_1px_var(--line-strong)]">
         <Icon name="search" size={14} />
         <input
           type="search"

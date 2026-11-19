@@ -536,7 +536,8 @@ function Viewport({ b, address, box, overlay }: { b: Browser; address: RefObject
       }}
       onFocus={claim}
       onContextMenu={(e) => e.preventDefault()}
-      className="relative min-h-0 flex-1 overflow-hidden bg-bg outline-none"
+      role="application"
+      className="relative min-h-0 flex-1 overflow-hidden bg-bg -outline-offset-2"
       aria-label="Live browser. Click to interact, then type."
     >
       <canvas
