@@ -13,6 +13,7 @@ import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { readOpenItems } from '@omni/shared/open-items.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
+import { stampMachineMentions } from './message-context/machine-mention.ts';
 import { getCrew } from './crew.ts';
 import { lineageRefusal, senderOf as sender, threadCredential } from './automation-guard.ts';
 import { userName } from './profile.ts';
@@ -353,7 +354,9 @@ threadActionsApi.post('/:id/messages', async (c) => {
   const again = request_id ? acceptedAgain(id, request_id, fingerprint) : null;
   if (again) return c.json(again);
   // After the retry check, and the fingerprint is of what Ben sent: a retry after a rename or a delete still gets its first answer.
-  const stamped = stampThreadReferences(id, context.value);
+  const referenced = stampThreadReferences(id, context.value);
+  if (!referenced.ok) return c.json({ error: referenced.error }, 400);
+  const stamped = await stampMachineMentions(referenced.value);
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const attachments = await saveUploads(id, files);
   // Ben's Fix checks step (the channel's own prompt or the built-in one) goes out with the failing checks and their log tails (fix-checks.ts), from any client.

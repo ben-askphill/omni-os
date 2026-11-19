@@ -14,6 +14,15 @@ Project context and conventions live in `CLAUDE.md`. Read it first.
 - Why: folders once shipped web-only (#177) and never reached the old SwiftUI Mac app, and later the phone Channels screen ignored folder data.
 - The `omni` command (`crates/omni-cli`) is not a surface: a feature does not grow a command. It keeps its six commands, and the MCP tools cover the rest ([ADR 0014](docs/adr/0014-omni-command-line.md)).
 
+### Browser support
+
+- Desktop app (Electron): any feature its Chromium ships. Code only the desktop app runs (QuickPrompt, the Activity Monitor, `server-screen.ts`, anything behind `window.omniDesktop`) needs no fallback.
+- Desktop web and phone web (`apps/web/`, server-rendered pages, the relay's Connect page): Baseline widely available features freely, and Baseline newly available features once iOS Safari 18.0 has them. iPhone Safari, mostly as a home-screen app, is the floor. It matches the iOS app's deployment target (`apps/ios/app.config.ts`), so raise both together.
+- Anything newer, or Chromium-only, goes in only as progressive enhancement: behind `@supports` or a feature check (`CSS.supports(...)`, `'x' in el`), and the page still works without it. The fallback is today's code, or at most ~20 new lines with no new dependency unless the task's brief names a bigger one. No polyfills unless the brief names one.
+- `packages/shared` also runs on the iOS app's Hermes engine: check a newer JS built-in (`Promise.withResolvers`, `Intl.DurationFormat`) there too.
+- Look support up on MDN or webstatus.dev, not from memory, and say in the PR which browsers get the fallback.
+- Why: nothing was written down, and Chromium-only APIs (`focusgroup`, `interestfor`, `closedby`) work in the desktop app but not on iPhone Safari. The modern web audit (#838) is the first work held to it.
+
 ### New UI components go into the design system
 
 - The Omni OS design system lives in Claude Design: https://claude.ai/design/p/a7120f6b-8577-40e3-9087-e512ce20d673. Reuse its components and tokens first.

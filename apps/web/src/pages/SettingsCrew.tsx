@@ -10,20 +10,25 @@ import {
   crewRunLine,
   crewSaveBody,
   lineDiff,
+  NO_EDITS_NOTE,
+  ROLE_MEMORY_CHOICES,
   type CrewDetailView,
   type CrewDraft,
 } from '@omni/shared/crew-settings.ts';
 import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '../api.ts';
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { CrewAvatar } from '../components/CrewAvatar.tsx';
-import { Button, Chip, ErrorNote, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from '../components/ui.tsx';
+import { RoleMemory } from '../components/RoleMemory.tsx';
+import { Button, Chip, ErrorNote, fieldHintId, Icon, IDENTIFIER, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, useUnsavedChanges, type PickerOption } from '../components/ui.tsx';
+import { useScrollRegion } from '../components/ui/use-scroll-region.ts';
 import { useApp } from '../store.tsx';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, LockNote } from './settings-parts.tsx';
 
 // Settings > Crew: every crew role this machine has, hidden ones included, and an editor for each (plan slice S3,
 // docs/plans/2026-11-18-user-defined-crew.md). Saves go to /api/crew (apps/server/crew-api.ts): a role of your own is
-// its whole file in data/crew/, an edit of a built-in is an overlay that adds to its charter or replaces it. The same
+// its whole file in data/crew/, an edit of a built-in is an overlay that adds to its charter or replaces it. The
+// editor's Memory tab holds the role's lessons (slice S6, components/RoleMemory.tsx), which save one by one. The same
 // page is the phone's Settings section and the desktop app's.
 
 type CrewDetail = CrewDetailView<CrewRole>;
@@ -34,8 +39,8 @@ export function CrewSection() {
   const harnesses = useApi<HarnessWithRunning[]>('/harnesses');
   const [editing, setEditing] = useState<{ id: string | null } | null>(null);
   const reload = roles.reload;
-  // A save here, by the Conductor or on another machine.
-  useEffect(() => subscribe((e) => (e.type === 'crew' || e.type === 'reconnect') && reload()), [subscribe, reload]);
+  // A save here, by the Conductor or on another machine, or a lesson proposed or settled (the waiting counts).
+  useEffect(() => subscribe((e) => (e.type === 'crew' || e.type === 'reconnect' || (e.type === 'memory' && !!e.role)) && reload()), [subscribe, reload]);
 
   const names = {
     harness: (id: string) => harnesses.data?.find((h) => h.id === id)?.name,
@@ -76,6 +81,7 @@ export function CrewSection() {
                       {crewRunLine(r, names)}
                       {r.channel && ` · #${r.channel}`}
                       {r.delegateOnly && ' · routes only'}
+                      {r.tools === 'no-edits' && ' · no file edits'}
                       {r.review && ' · reviews'}
                     </span>
                   </span>
@@ -92,7 +98,7 @@ export function CrewSection() {
   );
 }
 
-function RoleChips({ role }: { role: Pick<CrewRole, 'kind' | 'hidden' | 'builtInChanged' | 'error' | 'charterMode'> }) {
+function RoleChips({ role }: { role: Pick<CrewRole, 'kind' | 'hidden' | 'builtInChanged' | 'error' | 'charterMode' | 'memoryWaiting'> }) {
   return (
     <>
       {crewChips(role).map((c) => (
@@ -127,9 +133,11 @@ function CrewEditor({
   // Settings' list has hidden roles too; the app's crew list, which pickers use, leaves them out.
   const name = id ? ((roles ?? crew).find((r) => r.id === id)?.name ?? crew.find((r) => r.id === id)?.name ?? id) : null;
   const title = !id ? 'New role' : view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : `Edit ${name}`;
+  // From the list, which reloads when a lesson is proposed or decided anywhere.
+  const waiting = (id && roles?.find((r) => r.id === id)?.memoryWaiting) || 0;
   return (
-    <Modal open={!!target} onClose={onClose} title={title} roomy>
-      {target && <EditorBody key={id ?? '+new'} id={id} view={view} setView={setView} onClose={onClose} onOpen={onOpen} onSaved={onSaved} />}
+    <Modal open={!!target} onClose={onClose} title={title} roomy dismiss="confirm">
+      {target && <EditorBody key={id ?? '+new'} id={id} waiting={waiting} view={view} setView={setView} onClose={onClose} onOpen={onOpen} onSaved={onSaved} />}
     </Modal>
   );
 }
@@ -168,12 +176,31 @@ function Switch({ label, hint, checked, onChange, locked }: { label: string; hin
   );
 }
 
-function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: string | null; view: View; setView: (v: View) => void; onClose: () => void; onOpen: (id: string) => void; onSaved: () => void }) {
+function EditorBody({
+  id,
+  waiting,
+  view,
+  setView,
+  onClose,
+  onOpen,
+  onSaved,
+}: {
+  id: string | null;
+  /** Lessons its threads proposed that wait for the user: the Memory tab's count. */
+  waiting: number;
+  view: View;
+  setView: (v: View) => void;
+  onClose: () => void;
+  onOpen: (id: string) => void;
+  onSaved: () => void;
+}) {
   const { channels } = useApp();
   const detail = useApi<CrewDetail>(id ? `/crew/${encodeURIComponent(id)}` : null);
   const [draft, setDraft] = useState<CrewDraft | null>(id ? null : blankCrewDraft());
   const [newId, setNewId] = useState<string | null>(null);
   const [mode, setMode] = useState<'form' | 'markdown'>('form');
+  // The Memory tab: the role's lessons, saved one by one, beside the draft the Form and Markdown tabs share.
+  const [memoryTab, setMemoryTab] = useState(false);
   const [markdown, setMarkdown] = useState(id ? '' : crewMarkdownOf(null));
   // The Markdown tab's text as it last matched the form. An edit there is read into the form on the way back.
   const [synced, setSynced] = useState(markdown);
@@ -190,6 +217,14 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
     setMarkdown(crewMarkdownOf(detail.data));
     setSynced(crewMarkdownOf(detail.data));
   }, [detail.data, draft]);
+
+  // The role as it opened, so a close asks first once the form or its Markdown differs.
+  const snapshot = draft ? JSON.stringify([draft, markdown]) : null;
+  const [pristine, setPristine] = useState<string | null>(null);
+  useEffect(() => {
+    if (pristine === null && snapshot !== null) setPristine(snapshot);
+  }, [pristine, snapshot]);
+  useUnsavedChanges(pristine !== null && snapshot !== pristine);
 
   const set = <K extends keyof CrewDraft>(k: K, v: CrewDraft[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
   const d = detail.data ?? null;
@@ -335,11 +370,34 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
           </div>
         )}
 
-        <Segmented label="Edit as" size="sm" value={mode} onChange={switchTo} options={[{ id: 'form', label: 'Form' }, { id: 'markdown', label: 'Markdown' }]} />
+        <Segmented
+          label="Edit as"
+          size="sm"
+          value={memoryTab ? 'memory' : mode}
+          onChange={(v) => {
+            setMemoryTab(v === 'memory');
+            if (v !== 'memory') switchTo(v);
+          }}
+          options={[
+            { id: 'form', label: 'Form' },
+            { id: 'markdown', label: 'Markdown' },
+            ...(role
+              ? [
+                  {
+                    id: 'memory' as const,
+                    label: 'Memory',
+                    ...(waiting > 0 && { badge: <span className="font-num text-[10.5px] text-fg-3 tabular-nums">{waiting}</span>, title: `${waiting} ${waiting === 1 ? 'lesson waits' : 'lessons wait'} for you` }),
+                  },
+                ]
+              : []),
+          ]}
+        />
 
-        {mode === 'markdown' ? (
+        {memoryTab && role ? (
+          <RoleMemory role={role} />
+        ) : mode === 'markdown' ? (
           <Field id="crew-md" label="Markdown" hint={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole role: frontmatter and charter. Saved as written.'}>
-            <textarea id="crew-md" className="field min-h-[360px] resize-y font-mono !text-[12.5px] leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
+            <textarea id="crew-md" aria-describedby={fieldHintId('crew-md')} className="field field-mono field-xs min-h-[360px] resize-y leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
           </Field>
         ) : (
           <>
@@ -349,11 +407,11 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
               </Field>
               {!id && (
                 <Field id="crew-id" label="Id" hint="The file's name and what threads store. It never changes.">
-                  <input id="crew-id" className="field font-mono !text-[13px]" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" spellCheck={false} />
+                  <input id="crew-id" aria-describedby={fieldHintId('crew-id')} {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setNewId(e.target.value)} placeholder="store-ops" />
                 </Field>
               )}
               <Field id="crew-desc" label="Description" hint="The Conductor reads it to pick a role for a task.">
-                <textarea id="crew-desc" className="field min-h-[64px] resize-y" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder="Hands-on store work: admin, theme checks, imports." />
+                <textarea id="crew-desc" aria-describedby={fieldHintId('crew-desc')} className="field min-h-[64px] resize-y" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder="Hands-on store work: admin, theme checks, imports." />
               </Field>
               <Field label="Avatar" hint={builtIn ? 'Without one, the built-in mark.' : 'Without one, its initials.'}>
                 <IconPicker
@@ -378,7 +436,6 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
                     <LockNote>{locked.charter_mode}</LockNote>
                   ) : (
                     <Segmented
-                      radio
                       label="Your text"
                       size="sm"
                       value={draft.charterMode}
@@ -406,7 +463,7 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
                       : '{{user}} and the other placeholders are filled in when a thread starts.'
                 }
               >
-                <textarea id="crew-charter" className="field min-h-[200px] resize-y font-mono !text-[12.5px] leading-relaxed" value={draft.charter} onChange={(e) => set('charter', e.target.value)} placeholder="You operate on client stores. Dry run first." spellCheck={false} />
+                <textarea id="crew-charter" aria-describedby={fieldHintId('crew-charter')} className="field field-mono field-xs min-h-[200px] resize-y leading-relaxed" value={draft.charter} onChange={(e) => set('charter', e.target.value)} placeholder="You operate on client stores. Dry run first." spellCheck={false} />
               </Field>
             </Section>
 
@@ -427,12 +484,46 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
               <Switch label="Conductor tools" hint="Omni's delegate tools in its threads, so it can hand work to other roles." checked={draft.conductorTools} onChange={(v) => set('conductorTools', v)} locked={locked.mcp} />
               <Switch label="Only routes work" hint="Runs without the shell, file edits, browser and subagents: it writes briefs and delegates. Needs the conductor tools." checked={draft.delegateOnly} onChange={(v) => set('delegateOnly', v)} locked={locked.delegate_only} />
               <Switch
+                label="No file edits"
+                hint={NO_EDITS_NOTE}
+                checked={draft.noEdits && !draft.delegateOnly}
+                onChange={(v) => set('noEdits', v)}
+                locked={draft.delegateOnly ? 'Only routes work takes the shell and every edit tool away already.' : undefined}
+              />
+              <Switch
                 label="Reviews work"
                 hint="A review on a GPT model runs at high effort, and one the Conductor starts for a thread runs on the other model family from that thread's."
                 checked={draft.review}
                 onChange={(v) => set('review', v)}
                 locked={locked.review}
               />
+            </Section>
+
+            <Section title="Memory">
+              <Field label="Lessons" hint={ROLE_MEMORY_CHOICES.find((c) => c.id === draft.memory)?.hint}>
+                <Segmented label="Lessons" size="sm" value={draft.memory} onChange={(v) => set('memory', v)} options={ROLE_MEMORY_CHOICES.map((c) => ({ id: c.id, label: c.label }))} />
+              </Field>
+              {draft.memory === 'read-write' && (
+                <Field
+                  label="What its threads propose"
+                  hint={
+                    draft.memoryWrites === 'auto'
+                      ? 'Applies at once, and each lesson names its thread. A thread under an automation, or a lesson for every channel, still waits for you.'
+                      : 'Waits for you in the Memory tab. Approve, edit or dismiss each one.'
+                  }
+                >
+                  <Segmented
+                    label="What its threads propose"
+                    size="sm"
+                    value={draft.memoryWrites}
+                    onChange={(v) => set('memoryWrites', v)}
+                    options={[
+                      { id: 'review', label: 'Waits for me' },
+                      { id: 'auto', label: 'Applies at once' },
+                    ]}
+                  />
+                </Field>
+              )}
             </Section>
           </>
         )}
@@ -455,6 +546,7 @@ function CompareView({ detail, busy, error, onBack, onPick }: { detail: CrewDeta
   const rows = lineDiff(detail.charters.builtIn ?? '', detail.charters.effective);
   const own = detail.charters.own ?? '';
   const changes = rows.filter((r) => r.kind !== 'same').length;
+  const region = useScrollRegion<HTMLDivElement>('Built-in and your charter, line by line', 'both');
   return (
     <div>
       <div className="space-y-3 px-6 pb-5">
@@ -465,15 +557,18 @@ function CompareView({ detail, busy, error, onBack, onPick }: { detail: CrewDeta
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--diff-del-bg)] shadow-[inset_0_0_0_1px_var(--diff-del-fg)]" />Only in the built-in</span>
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--diff-add-bg)] shadow-[inset_0_0_0_1px_var(--diff-add-fg)]" />Only in yours</span>
         </div>
-        <div className="max-h-[50vh] overflow-auto rounded-[14px] bg-surface py-2 font-mono text-[11.5px] leading-[18px]" role="table" aria-label="Built-in and your charter, line by line">
+        {/* A scroll region the keyboard can scroll, its lines plain text: a screen reader hears which side a changed line is on. */}
+        <div className="max-h-[50dvh] overflow-auto rounded-[14px] bg-surface py-2 font-mono text-[11.5px] leading-[18px]" {...region}>
           {rows.map((r, i) => (
             <div
               key={i}
-              role="row"
               className={`flex gap-2 px-3 whitespace-pre-wrap ${r.kind === 'add' ? 'bg-[var(--diff-add-bg)] text-[var(--diff-add-fg)]' : r.kind === 'del' ? 'bg-[var(--diff-del-bg)] text-[var(--diff-del-fg)]' : 'text-fg-2'}`}
             >
               <span aria-hidden="true" className="w-3 shrink-0 select-none">{r.kind === 'add' ? '+' : r.kind === 'del' ? '−' : ''}</span>
-              <span className="min-w-0 break-words">{r.text || ' '}</span>
+              <span className="min-w-0 break-words">
+                {r.kind !== 'same' && <span className="sr-only">{r.kind === 'add' ? 'Only in yours: ' : 'Only in the built-in: '}</span>}
+                {r.text || ' '}
+              </span>
             </div>
           ))}
         </div>
@@ -523,7 +618,7 @@ function DuplicateView({ from, busy, error, onBack, onDuplicate }: { from: CrewR
           <input id="dup-name" className="field" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </Field>
         <Field id="dup-id" label="Id">
-          <input id="dup-id" className="field font-mono !text-[13px]" value={theId} onChange={(e) => setId(e.target.value)} spellCheck={false} />
+          <input id="dup-id" {...IDENTIFIER} className="field field-mono" value={theId} onChange={(e) => setId(e.target.value)} />
         </Field>
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>

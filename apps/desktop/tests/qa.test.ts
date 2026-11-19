@@ -11,6 +11,8 @@ describe('parseStep', () => {
     expect(parseStep({ wait: { for: '#root', timeout: 30 } })).toEqual({ kind: 'waitFor', selector: '#root', timeoutMs: 30_000 });
     expect(parseStep({ openThread: 'abc-123' })).toEqual({ kind: 'openWindow', route: '#/t/abc-123', timeoutMs: 10_000 });
     expect(parseStep({ appearance: 'dark' })).toEqual({ kind: 'appearance', appearance: 'dark' });
+    expect(parseStep({ motion: 'reduce' })).toEqual({ kind: 'motion', motion: 'reduce' });
+    expect(parseStep({ motion: 'less' })).toEqual({ error: 'motion is reduce or no-preference' });
     expect(parseStep({ quit: true })).toEqual({ kind: 'quit' });
   });
 

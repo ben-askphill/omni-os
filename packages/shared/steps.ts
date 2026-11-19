@@ -6,6 +6,7 @@
 // Pure, on top of the transcript fold.
 import { isQuestionTool } from './question.ts';
 import { str, type Item, type ToolCall } from './transcript-fold.ts';
+import { BROWSER_SERVER, connectorFor, type Connector } from './connectors.ts';
 
 /** html_render, as html-render.ts names it. Not imported from there: that module holds the frame's script, and the fold must stay free of browser globals for iOS (tests/transcript-portable.test.ts). */
 const isRenderTool = (name: string) => /^mcp__omni[-_]render__html_render$/.test(name);
@@ -47,6 +48,8 @@ export interface Step {
   state: StepState;
   /** On the active step while the turn runs: what it is doing right now, in plain words. */
   now: string | null;
+  /** The outside connector `now` uses ("Using Granola"), for its mark beside the line. Absent otherwise. */
+  connector?: Connector | null;
   /** The calls made while it was the step, in order, sub-agents' calls nested under theirs. */
   calls: ToolCall[];
   /** Those calls, sub-agents' own counted. */
@@ -121,6 +124,8 @@ export interface Plain {
   phase: string;
   title: string;
   now: string;
+  /** The outside connector the call reaches, whose mark shows beside `now`. */
+  connector?: Connector;
 }
 
 const base = (p: string) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
@@ -157,39 +162,24 @@ const OMNI = 'Checking on the work';
 const WORKING = 'Working on it';
 const ANSWER = 'Writing the answer';
 
-/** A connector's server name as people say it: claude_ai_Google_Drive is Google Drive. */
-function appName(server: string) {
-  if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(server)) return 'a connected app';
-  const name = server
-    .replace(/^claude_ai_/, '')
-    .replace(/^plugin_[^_]+_/, '')
-    .replace(/[_-]+/g, ' ')
-    .trim();
-  return name ? name[0].toUpperCase() + name.slice(1) : 'a connected app';
-}
-
-/** Known connectors by what they hold, so the phase reads "Checking your mail", not "Using Gmail": title, then noun. */
-const APPS: [RegExp, string, string][] = [
-  [/mail|outlook|spark/i, 'Checking your mail', 'your mail'],
-  [/calendar/i, 'Checking your calendar', 'your calendar'],
-  [/drive|dropbox/i, 'Looking in your files online', 'your files'],
-  [/docs/i, 'Working on the document', 'the document'],
-  [/slack/i, 'Looking in Slack', 'Slack'],
-  [/notion/i, 'Looking in Notion', 'Notion'],
-  [/github/i, 'Checking GitHub', 'GitHub'],
-  [/figma|design/i, 'Looking at the designs', 'the designs'],
-  [/shopify/i, 'Checking the store', 'the store'],
-  [/vercel/i, 'Checking the website hosting', 'the hosting'],
+/**
+ * Known connectors by what they hold, so the phase reads "Checking your mail", not "Using Gmail". The line under the
+ * step names the app itself ("Now: Using Gmail") with its mark (connectors.ts), as Claude's apps do.
+ */
+const APPS: [RegExp, string][] = [
+  [/mail|outlook|spark/i, 'Checking your mail'],
+  [/calendar/i, 'Checking your calendar'],
+  [/drive|dropbox/i, 'Looking in your files online'],
+  [/docs/i, 'Working on the document'],
+  [/slack/i, 'Looking in Slack'],
+  [/notion/i, 'Looking in Notion'],
+  [/github/i, 'Checking GitHub'],
+  [/figma|design/i, 'Looking at the designs'],
+  [/shopify/i, 'Checking the store'],
+  [/vercel/i, 'Checking the website hosting'],
+  [/granola|meetings/i, 'Reading the meeting notes'],
 ];
 
-/** What a connector call does, from its tool name: search, read or change. */
-function appNow(tool: string, noun: string) {
-  if (/search|query|find|list/i.test(tool)) return `Searching ${noun}`;
-  if (/create|update|write|set|add|save|send|post|delete|remove|label|move|trash|apply|draft/i.test(tool)) return `Updating ${noun}`;
-  return `Reading ${noun}`;
-}
-
-const BROWSER_SERVER = /browser|playwright|chrome-devtools|puppeteer/i;
 
 function browserNow(tool: string, input: Record<string, unknown>) {
   if (/navigate|open|goto|new_page/i.test(tool)) {
@@ -283,10 +273,14 @@ export function plainCall(c: Pick<ToolCall, 'name' | 'input'>): Plain {
     if (BROWSER_SERVER.test(server)) return { phase: 'browser', title: BROWSER, now: browserNow(tool, i) };
     if (server === 'omni') return omniPlain(tool, i);
     if (/^omni[-_]threads$/.test(server)) return { phase: 'omni', title: OMNI, now: 'Reading the thread you pointed to' };
-    const known = APPS.find(([re]) => re.test(server));
-    if (known) return { phase: `app:${known[1]}`, title: known[1], now: appNow(tool, known[2]) };
-    const app = appName(server);
-    return { phase: `app:${app}`, title: `Using ${app}`, now: `Using ${app}` };
+    const app = connectorFor(server);
+    if (app) {
+      const now = `Using ${app.name === 'Connected app' ? 'a connected app' : app.name}`;
+      const outside = app.kind === 'connector' ? { connector: app } : {};
+      const known = APPS.find(([re]) => re.test(server));
+      if (known) return { phase: `app:${known[1]}`, title: known[1], now, ...outside };
+      return { phase: `app:${app.name}`, title: now, now, ...outside };
+    }
   }
   return { phase: 'other', title: WORKING, now: WORKING };
 }
@@ -415,7 +409,8 @@ export function turnSteps(items: readonly Item[], { live, asking = false, status
   if (!running && !work.length && !agent && !planned) return null;
 
   const open = openCall(calls);
-  const nowLine = status || (open ? plainCall(open).now : writing ? ANSWER : 'Thinking it over');
+  const openPlain = open ? plainCall(open) : null;
+  const nowLine = status || (openPlain ? openPlain.now : writing ? ANSWER : 'Thinking it over');
 
   let steps: Step[];
   let source: StepsView['source'];
@@ -483,6 +478,7 @@ export function turnSteps(items: readonly Item[], { live, asking = false, status
     const on = steps.find((s) => s.state === 'active');
     if (on) {
       on.now = on.key === '#answer' && !open && !status ? null : nowLine;
+      if (on.now && !status && openPlain?.connector) on.connector = openPlain.connector;
       if (asking) on.state = 'needs';
     }
   } else {

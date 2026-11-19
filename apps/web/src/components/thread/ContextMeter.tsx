@@ -14,6 +14,8 @@ import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, type ContextView, type Thread } from '../../api.ts';
 import { Button, ErrorNote, Icon } from '../ui.tsx';
 import { useDismissable } from '../ui/use-dismissable.ts';
+import { isImeEnter } from '../../ime.ts';
+import { useScrollFade } from '../rail/useScrollFade.ts';
 
 const STROKE: Record<ContextLevel, string> = { ok: 'var(--fg-3)', warn: 'var(--warn)', critical: 'var(--needs)' };
 const TEXT: Record<ContextLevel, string> = { ok: 'text-fg-3', warn: 'text-warn', critical: 'text-needs' };
@@ -203,19 +205,13 @@ function ContextPanel({
   const tools = [...(context?.tools ?? [])].sort((a, b) => b.callTokens + b.resultTokens - (a.callTokens + a.resultTokens)).slice(0, 6);
   const largest = view?.largest ?? [];
   const scale = context?.max || context?.used || 1;
-  // A fade over the bottom edge while more of the panel sits below it.
-  const scroller = useRef<HTMLDivElement>(null);
-  const [more, setMore] = useState(false);
-  const measure = useCallback(() => {
-    const el = scroller.current;
-    if (el) setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
-  }, []);
-  useEffect(measure, [measure, context, view]);
+  // The panel fades at an edge while more of it sits past that edge.
+  const scroller = useScrollFade();
 
   return (
     <div role="dialog" aria-label="Context window" style={{ transformOrigin: '100% 0' }} className="pik-card top-[calc(100%+8px)] right-0 w-[min(380px,calc(100vw-32px))] p-0">
       <div className="relative">
-        <div ref={scroller} onScroll={measure} className="scroll-thin max-h-[min(560px,70vh)] overflow-y-auto px-3.5 pt-3 pb-2">
+        <div ref={scroller} className="scroll-thin scroll-fade max-h-[min(560px,70vh)] overflow-y-auto px-3.5 pt-3 pb-2">
           {/* headline */}
           <div className="flex items-start gap-3">
             <ContextRing percent={percent} size={40} />
@@ -310,7 +306,6 @@ function ContextPanel({
             </p>
           )}
         </div>
-        {more && <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-elev to-transparent" />}
       </div>
       {/* Cursor has no compact command; the panel is the meter and the thread's spend. */}
       {thread.harness !== 'cursor' && <CompactAction thread={thread} view={view} onCompacted={onCompacted} />}
@@ -429,11 +424,13 @@ function CompactAction({ thread, view, onCompacted }: { thread: Thread; view: Co
               value={focus}
               onChange={(e) => setFocus(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void run();
+                if (e.key === 'Enter' && !isImeEnter(e)) void run();
               }}
               maxLength={2000}
+              aria-label="What the summary should keep"
               placeholder="Optional: what the summary should keep"
-              className="mt-2 h-8 w-full rounded-lg bg-surface-2 px-2.5 text-[12.5px] outline-none placeholder:text-fg-4"
+              enterKeyHint="go"
+              className="field-xs mt-2 h-8 w-full rounded-lg bg-surface-2 px-2.5 outline-none placeholder:text-fg-4"
             />
           )}
           <div className="mt-2 flex items-center justify-end gap-1.5">

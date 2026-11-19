@@ -81,7 +81,7 @@ const chip = () => host.querySelector<HTMLButtonElement>('button[aria-haspopup="
 const open = () => act(async () => chip()!.click());
 const options = () => [...host.querySelectorAll<HTMLButtonElement>('[role="option"]')];
 const option = (label: string) => options().find((o) => o.textContent?.startsWith(label));
-const dialog = () => host.querySelector<HTMLElement>('[role="dialog"]');
+const dialog = () => host.querySelector<HTMLElement>('dialog, [role="dialog"]');
 
 describe('the Machine chip on a thread another Mac holds', () => {
   it('names that Mac, selected, with this one by its name as Take over', async () => {

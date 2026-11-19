@@ -9,7 +9,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { allowedUsers, CLIENT_PREFIX, newToken, RelayError, sha256, tokenUser, verifyIdToken, type ClerkTrust } from './auth.ts';
 import { CloudflareApi } from './cloudflare.ts';
 import { CLIENT_DAYS, ConnectStore, notConfigured } from './connect.ts';
-import { connectPage, errorPage, PAGE_HEADERS } from './page.ts';
+import { connectPage, errorPage, pageHeaders } from './page.ts';
 import { SIGNIN_OBJECT, SigninStore } from './signin.ts';
 import { Maintenance, SLICE_GAP_MS } from './maintain.ts';
 import { objectPath, RelayStore } from './store.ts';
@@ -46,7 +46,7 @@ function cookie(req: Request, name: string): string | null {
 const setClientCookie = (url: URL, value: string, maxAge: number) =>
   `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${url.protocol === 'https:' ? '; Secure' : ''}`;
 
-const html = (body: string, status = 200) => new Response(body, { status, headers: PAGE_HEADERS });
+const html = async (body: string, status = 200) => new Response(body, { status, headers: await pageHeaders() });
 
 /** The Connect page's own POSTs come from its origin. Anything else is another site acting on the cookie. */
 function sameOrigin(req: Request, url: URL) {

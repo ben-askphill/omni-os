@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
 import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts';
 import { useFolders } from '../folders.tsx';
 import { desktop } from '../desktop.ts';
@@ -9,18 +9,46 @@ import { openContinue } from './ContinueSheet.tsx';
 import { useThreadMenuActions } from './useThreadMenuActions.ts';
 import { ThreadReferencePanel } from './ThreadReference.tsx';
 import { threadTarget } from '../message-context/thread-picker.ts';
-import { FolderChoices, MenuCaption, MenuGroups, containerItems, focusFirstItem, itemForKey, moveFocus, useMenuDismiss, useMenuPlacement, useThreadRow, type MenuItem } from './ContextMenuParts.tsx';
+import { FolderChoices, MenuCaption, MenuGroups, containerItems, focusFirstItem, isMenuMoveKey, itemForKey, moveFocus, refocus, useMenuDismiss, useMenuPlacement, useMenuPopover, useThreadRow, type MenuItem } from './ContextMenuParts.tsx';
+import { useExit } from './ui/use-exit.ts';
 import { KbdFooter, MENU_SURFACE, MOD_KEY } from './ui/overlay.tsx';
+import { isImeEnter } from '../ime.ts';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
-/** `align: 'end'`: `x` is the menu's right edge, for a button that opens it under itself at the right of a bar. */
-type Open = { target: Target; x: number; y: number; align?: 'start' | 'end' };
+/**
+ * `align: 'end'`: `x` is the menu's right edge, for a button that opens it under itself at the right of a bar. `from`:
+ * that button, which gets the focus back when the menu closes from inside it.
+ */
+type Open = { target: Target; x: number; y: number; align?: 'start' | 'end'; from?: HTMLElement | null };
 
 const OPEN_EVENT = 'omni:context-menu';
 
 /** Open the menu for `target` at a point, as a right-click there would: the "…" button on a folder or the thread header, or a key. */
-export function openMenu(target: Target, x: number, y: number, align: 'start' | 'end' = 'start') {
-  window.dispatchEvent(new CustomEvent<Open>(OPEN_EVENT, { detail: { target, x, y, align } }));
+export function openMenu(target: Target, x: number, y: number, align: 'start' | 'end' = 'start', from?: HTMLElement | null) {
+  window.dispatchEvent(new CustomEvent<Open>(OPEN_EVENT, { detail: { target, x, y, align, from } }));
+}
+
+/** Close the menu, as its "…" button does when pressed again. */
+export function closeMenu() {
+  window.dispatchEvent(new CustomEvent<Open | null>(OPEN_EVENT, { detail: null }));
+}
+
+// Which target's menu is open, for its button's aria-expanded.
+let openKey: string | null = null;
+const openListeners = new Set<() => void>();
+function setOpenKey(key: string | null) {
+  if (key === openKey) return;
+  openKey = key;
+  for (const fn of openListeners) fn();
+}
+
+/** Whether the menu is open for `target`: a "…" button's `aria-expanded`. */
+export function useMenuOpenFor(kind: Target['kind'], id: string): boolean {
+  return useSyncExternalStore(
+    (fn) => (openListeners.add(fn), () => openListeners.delete(fn)),
+    () => openKey === `${kind}:${id}`,
+    () => false,
+  );
 }
 
 const THREAD_HREF = /^#\/t\/([^/?]+)/;
@@ -55,7 +83,7 @@ export function ContextMenuHost() {
       e.preventDefault();
       setOpen({ target, x: e.clientX, y: e.clientY });
     };
-    const onOpen = (e: Event) => setOpen((e as CustomEvent<Open>).detail);
+    const onOpen = (e: Event) => setOpen((e as CustomEvent<Open | null>).detail);
     document.addEventListener('contextmenu', onMenu);
     window.addEventListener(OPEN_EVENT, onOpen);
     return () => {
@@ -63,14 +91,28 @@ export function ContextMenuHost() {
       window.removeEventListener(OPEN_EVENT, onOpen);
     };
   }, []);
+  // The menu last opened stays in while its exit plays.
+  const [last, setLast] = useState<Open | null>(null);
+  if (open && open !== last) setLast(open);
+  const el = useRef<HTMLDivElement>(null);
+  const exit = useExit(!!open, el);
+  const shown = open ?? (exit.shown ? last : null);
+  useEffect(() => setOpenKey(open ? `${open.target.kind}:${open.target.id}` : null), [open]);
   // A new open starts fresh, even over one already showing.
-  return open ? <Menu key={`${open.target.kind}:${open.target.id}:${open.x}:${open.y}`} open={open} onClose={() => setOpen(null)} /> : null;
+  return shown ? <Menu key={`${shown.target.kind}:${shown.target.id}:${shown.x}:${shown.y}`} el={el} open={shown} closing={!open} onClose={() => setOpen(null)} /> : null;
 }
 
-function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
+function Menu({ open, onClose, closing, el }: { open: Open; onClose: () => void; closing: boolean; el: RefObject<HTMLDivElement | null> }) {
   const { target } = open;
   const { channel, status } = useApp();
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = el;
+  // The button or row that had the focus as it opened, which gets it back when the menu closes from inside.
+  const [opener] = useState(() => open.from ?? document.activeElement);
+  /** Close, handing the focus back where it was if it is in the menu: Escape, or an item that ran. */
+  const done = (back = true) => {
+    if (back) refocus(opener, ref.current);
+    onClose();
+  };
   // Set while the menu shows the title field in place of its items.
   const [draft, setDraft] = useState<string | null>(null);
   // Set while the menu lists the folders a thread can move to.
@@ -78,23 +120,26 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   // Set while the menu shows the thread reference picker.
   const [referencing, setReferencing] = useState(false);
   const { archived, current, row } = useThreadRow(target.kind, target.id);
-  const { error, toggleArchive, rename: renameTo, togglePin, toggleDone, sendGrok } = useThreadMenuActions({ id: target.id, row, archived, current, onClose });
+  const { error, toggleArchive, rename: renameTo, togglePin, toggleDone, sendGrok } = useThreadMenuActions({ id: target.id, row, archived, current, onClose: done });
   const folders = useFolders();
 
   const pos = useMenuPlacement(ref, open.x, open.y, open.align);
+  const top = useMenuPopover(ref);
 
   // Keyboard: the first item takes the focus, arrows move it.
   useEffect(() => {
     focusFirstItem(ref);
-  }, [moving, row]);
-  useMenuDismiss(ref, onClose);
+  }, [moving, row, ref]);
+  // The button that opened it toggles it: a press there is not outside.
+  const from = useRef(open.from ?? null);
+  useMenuDismiss(ref, (back) => done(back), from, !closing);
 
   const folder = target.kind === 'folder' ? folders.find(target.id) : undefined;
   // The folders the thread can move to: its channel's, once its row has come.
   const choices = row ? (channel(row.channel_id)?.folders ?? []).filter((f) => !f.id.startsWith('tmp-')) : [];
   const moveTo = (folderId: string | null) => {
     if (row) void folders.moveThread({ id: row.id, channel_id: row.channel_id, title: row.title, status: row.status, created_at: row.created_at, folder_id: row.folder_id }, folderId);
-    onClose();
+    done();
   };
 
   // The thread's actions, from the list the phone renders too. `off`: why one cannot run here, shown under it.
@@ -104,14 +149,15 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
     rename: () => setDraft(current ?? ''),
     move: () => setMoving(true),
     archive: () => void toggleArchive(),
-    fork: () => (row && openContinue(row), onClose()),
+    // The Fork modal hands the focus back to whatever had it as it opened, so close first.
+    fork: () => (done(), row && openContinue(row)),
     reference: () => setReferencing(true),
     grok: () => void sendGrok(),
   };
   // The desktop app opens a thread in a window of its own.
   const ownWindow: { items: MenuItem[] }[] =
     desktop && target.kind === 'thread'
-      ? [{ items: [{ label: 'Open in new window', icon: 'external', keys: [MOD_KEY, '↵'], run: () => (desktop?.openWindow(href.thread(target.id)), onClose()) }] }]
+      ? [{ items: [{ label: 'Open in new window', icon: 'external', keys: [MOD_KEY, '↵'], run: () => (desktop?.openWindow(href.thread(target.id)), done()) }] }]
       : [];
   const groups: { title?: string; items: MenuItem[] }[] =
     target.kind === 'thread'
@@ -125,14 +171,28 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
           harness: row?.harness ?? null,
           grokBot: !!status?.grokBot,
         }).map((g) => ({ title: g.title, items: g.items.map(({ key, ...it }) => ({ ...it, keys: key ? [key] : undefined, run: runs[it.id] })) }))]
-      : [{ items: containerItems(target, folders, onClose) }];
+      : [{ items: containerItems(target, folders, done) }];
   const title = target.kind === 'channel' ? `#${channel(target.id)?.name ?? ''}` : folder ? folder.name : undefined;
   // The items show: not the title field, the folder list or the reference picker, which keep their own keys.
   const listing = draft === null && !moving && !referencing;
+  // The title field and the reference picker are not menu items: a small non-modal dialog holds them instead.
+  const panel = referencing || draft !== null;
+  const label =
+    target.kind === 'thread'
+      ? moving
+        ? 'Move to folder'
+        : referencing
+          ? 'Reference a thread'
+          : draft !== null
+            ? 'Rename thread'
+            : 'Thread actions'
+      : target.kind === 'folder'
+        ? 'Folder actions'
+        : 'Channel actions';
 
   const onKey = (e: ReactKeyboardEvent) => {
-    if (referencing || draft !== null) return;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (panel) return;
+    if (isMenuMoveKey(e.key)) {
       e.preventDefault();
       moveFocus(ref, e.key);
       return;
@@ -146,16 +206,18 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
   return (
     <div
       ref={ref}
-      role="menu"
-      aria-label={target.kind === 'thread' ? (moving ? 'Move to folder' : referencing ? 'Reference a thread' : 'Thread actions') : target.kind === 'folder' ? 'Folder actions' : 'Channel actions'}
+      {...top}
+      role={panel ? 'dialog' : 'menu'}
+      aria-label={label}
+      data-closing={closing || undefined}
       style={{ left: pos.x, top: pos.y }}
       onKeyDown={onKey}
-      className={`pop-in fixed z-[60] ${MENU_SURFACE} ${referencing ? 'max-h-[calc(100vh-1rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto' : 'min-w-[220px] max-w-[280px]'}`}
+      className={`menu-pop pop-in fixed z-[60] ${MENU_SURFACE} ${referencing ? 'max-h-[calc(100dvh-1rem)] w-[min(23rem,calc(100%-1rem))] overflow-y-auto' : 'min-w-[220px] max-w-[280px]'}`}
     >
       <div className={referencing ? '' : 'p-1.5'}>
         {title && <MenuCaption>{title}</MenuCaption>}
         {referencing && row ? (
-          <ThreadReferencePanel to={threadTarget(row)} onPicked={onClose} />
+          <ThreadReferencePanel to={threadTarget(row)} onPicked={() => done()} />
         ) : moving && row ? (
           <FolderChoices current={row.folder_id ?? null} choices={choices} onPick={moveTo} />
         ) : draft !== null ? (
@@ -166,8 +228,8 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
             aria-label="Thread title"
             onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && renameTo(draft)}
-            className="h-8 w-[260px] rounded-[var(--r-sm)] bg-surface px-2.5 text-[13px] text-fg outline-none"
+            onKeyDown={(e) => e.key === 'Enter' && !isImeEnter(e) && renameTo(draft)}
+            className="field-sm h-8 w-[260px] rounded-[var(--r-sm)] bg-surface px-2.5 text-fg outline-none"
           />
         ) : (
           <MenuGroups groups={groups} />

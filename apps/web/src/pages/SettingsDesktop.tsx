@@ -77,7 +77,7 @@ export function DesktopSection({ bridge }: { bridge: DesktopBridge }) {
   };
 
   const mac = bridge.platform === 'darwin';
-  if (!settings) return error ? <ErrorNote>{error}</ErrorNote> : <Loader />;
+  if (!settings) return error ? <ErrorNote>{error}</ErrorNote> : <Loader label="Loading" />;
   const qp = settings.quickPrompt;
   const label = (s: QuickPromptShortcut) => quickPromptShortcutLabel(s, bridge.platform);
   const thisApp = <Origin of="device" label="This app" />;
@@ -168,7 +168,7 @@ export function WisprFlowCard({ bridge }: { bridge: DesktopBridge }) {
     <Card entry="wispr-flow" title="Wispr Flow" subtitle="Say what you need instead of typing it: Wispr Flow dictates into the Quick Prompt.">
       {error && <ErrorNote>{error}</ErrorNote>}
       {!qp ? (
-        !error && <Loader />
+        !error && <Loader label="Loading" />
       ) : (
         <SwitchRow
           title="Dictate with Wispr Flow"
@@ -208,7 +208,7 @@ export function ZoomRow({ bridge }: { bridge: DesktopBridge }) {
               options={ZOOM_LEVELS.map((z) => ({ value: String(z), label: zoomLabel(z), avatar: false }))}
             />
           ) : (
-            !error && <Loader size={14} />
+            !error && <Loader size={14} label="Loading" />
           )
         }
       />
@@ -271,7 +271,7 @@ function UpdatesCard({ bridge, autoUpdate, onAutoUpdate }: { bridge: DesktopBrid
           <div className="font-num text-[13.5px] font-medium">{status.title}</div>
           <p className={`mt-0.5 text-[12.5px] ${status.failed ? 'text-fg-2' : 'text-fg-3'}`}>{status.detail}</p>
         </div>
-        {update?.state === 'checking' && <Loader size={14} />}
+        {update?.state === 'checking' && <Loader size={14} label="Checking" />}
         {action && (
           <Button size="sm" variant={action.kind === 'check' ? 'secondary' : 'primary'} busy={busy} onClick={act} className="shrink-0">
             {action.label}

@@ -53,7 +53,7 @@ function PanelHeader({ title, lead, right }: { title: ReactNode; lead?: ReactNod
   return (
     <div className="rail-panel-top flex h-[62px] shrink-0 items-end gap-1 px-3 pb-1.5">
       {lead}
-      <h2 className={`min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] text-fg ${lead ? '' : 'pl-2.5'}`}>{title}</h2>
+      <h2 className={`line-clamp-2 min-w-0 flex-1 text-[15px] leading-[1.25] font-semibold tracking-[-0.01em] text-balance text-fg ${lead ? '' : 'pl-2.5'}`}>{title}</h2>
       {right}
     </div>
   );
@@ -61,9 +61,9 @@ function PanelHeader({ title, lead, right }: { title: ReactNode; lead?: ReactNod
 
 /** The panel's scrolling list, fading at an edge while rows hide past it, as the rail does. */
 function PanelScroll({ children }: { children: ReactNode }) {
-  const { ref, fade } = useScrollFade();
+  const ref = useScrollFade();
   return (
-    <div ref={ref} className="scroll-thin mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4" style={{ maskImage: fade, WebkitMaskImage: fade }}>
+    <div ref={ref} className="scroll-thin scroll-fade mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
       {children}
     </div>
   );

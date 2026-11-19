@@ -9,7 +9,7 @@ export function ActionsScreen() {
   return (
     <>
       <MoHeader onBack={shell.back} title="Actions" sub="Runs in this thread's checkout" />
-      <div className="flex min-h-0 flex-1 flex-col pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+      <div className="safe-b-6 flex min-h-0 flex-1 flex-col pt-1">
         {thread ? <ActionsTab thread={thread} /> : <MoEmpty>Loading</MoEmpty>}
       </div>
     </>

@@ -77,7 +77,8 @@ describe('threadView', () => {
   it('is thinking between calls, and names a tool it has no verb for', () => {
     const v = threadView({ events: [user('Go', 0), tool('a', 'Read', { file_path: '/w/a' }, 1), out('a', 1)], thread: thread('running'), artifacts: [], children: [] });
     expect(v.now).toEqual({ verb: 'Thinking', target: '' });
-    expect(nowDoing({ name: 'mcp__shopify__run_query', input: { query: '{ shop { name } }' } }).verb).toBe('Using shopify · run_query');
+    expect(nowDoing({ name: 'mcp__shopify__run_query', input: { query: '{ shop { name } }' } })).toMatchObject({ verb: 'Using Shopify', connector: { id: 'shopify' } });
+    expect(nowDoing({ name: 'mcp__omni__list_threads', input: {} })).toEqual({ verb: 'Using omni · list_threads', target: '' });
   });
 
   it('marks how a turn ended: stopped, failed, or an earlier turn that never finished', () => {

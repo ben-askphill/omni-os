@@ -83,7 +83,9 @@ The Web UI holds one `History` and folds it with its spans (`buildItems(events, 
 
 - The stream's `after` moves only on the first load, on streamed rows and on a snapshot sync. An older page never moves it, or the replay would skip rows.
 - "New activity" and follow-the-bottom key on `tailId`, not on the row count, so an earlier page never looks like new output.
-- Web: the transcript sets `overflow-anchor: none` and `useScrollAnchor` restores the first visible `[data-key]` row itself, because phone Safari has no scroll anchoring. Without `none`, Chrome corrects a second time.
+- Web: the transcript sets `overflow-anchor: none` and `useScrollAnchor` restores a `[data-key]` row itself, because phone Safari has no scroll anchoring. Without `none`, Chrome corrects a second time.
+- Web: every row but the newest (12 rows on the desktop, 2 turns on the phone, `transcript/defer.ts`) is a `.tx-row`, which skips rendering out of view (`content-visibility: auto`) at an estimated height until it first renders. So the anchor is the first row that starts in view, not one across the top edge: that one can still be a placeholder, and holding its top while it takes its real height moves everything under it. A reveal renders the hit and the rows above it before it scrolls, for the same reason.
+- Web: the first page applies in a `startTransition`, and the list gate (`listGate`) opens once it has committed. Opened at the fetch, the lists' answers land mid render and start it over.
 - A reveal (`?at=`) reads from the start of the hit's turn, so the hit's group folds as it would in the full thread.
 
 ## A thread held open

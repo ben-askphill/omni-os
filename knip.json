@@ -61,6 +61,9 @@
     "apps/web": {
       "entry": [
         "tests/**/*.test.ts"
+      ],
+      "ignoreDependencies": [
+        "playwright"
       ]
     },
     "apps/desktop": {

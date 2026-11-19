@@ -4,7 +4,8 @@ import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { type ContinueSource } from '@omni/shared/continue-flow.ts';
 import { useThreadSession } from '../pages/useThreadSession.ts';
 import { shownResult } from '../needs-you.ts';
-import { useApp, usePageVisible } from '../store.tsx';
+import { useApp } from '../store.tsx';
+import { usePageVisible } from '../visible.ts';
 import { useSeenUnlisted } from '../app/useSeenUnlisted.ts';
 
 export type ShellSheet = { name: 'new'; channel?: string; prompt?: string } | { name: 'search' } | { name: 'continue'; source: ContinueSource };
@@ -15,7 +16,8 @@ export interface MobileShellApi {
   /** Open a route, as a path or an href. */
   open: (to: string) => void;
   sheet: (s: ShellSheet | null) => void;
-  toast: (text: string) => void;
+  /** A short note over the tab bar. An `error` one is read out at once and stays until it is dismissed. */
+  toast: (text: string, tone?: 'error') => void;
 }
 
 export const ShellCtx = createContext<MobileShellApi | null>(null);
@@ -25,6 +27,11 @@ export function useShell() {
   if (!v) throw new Error('useShell outside MobileShell');
   return v;
 }
+
+/** Whether this root tab is the one on screen. Visited tabs stay mounted under the shown one, or under a pushed screen. */
+export const TabShownCtx = createContext(true);
+
+export const useTabShown = () => useContext(TabShownCtx);
 
 export type ThreadSession = ReturnType<typeof useThreadSession>;
 const ThreadCtx = createContext<ThreadSession | null>(null);

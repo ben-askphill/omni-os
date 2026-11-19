@@ -1,6 +1,8 @@
 // Settings > Crew, as every client draws it: a role's chips and run line in the list, the editor's form and what a
 // save sends, and the line diff Compare shows. The server's /api/crew (apps/server/crew-api.ts) is the contract.
 
+import type { Memory, RoleMemoryMode, RoleMemoryWrites } from './memory.ts';
+
 /** A crew role as GET /api/crew lists it: the fields Settings reads. */
 export interface CrewListed {
   id: string;
@@ -12,9 +14,17 @@ export interface CrewListed {
   effort?: string;
   channel?: string;
   mcp: string[];
+  /** full, no-edits (no file-edit tools, shell kept) or delegate-only. Missing from a server before no-edits: read it with crewTools. */
+  tools?: CrewTools;
   delegateOnly: boolean;
   delegatable: boolean;
   review: boolean;
+  /** Whether its threads read its lessons and propose new ones. Missing from a server before role memory: read-write. */
+  memory?: RoleMemoryMode;
+  /** Whether a lesson its threads propose waits for the user. Missing from a server before role memory: review. */
+  memoryWrites?: RoleMemoryWrites;
+  /** How many lessons its threads proposed wait for the user, when any do. */
+  memoryWaiting?: number;
   kind: 'shipped' | 'edited' | 'own';
   hidden: boolean;
   charterMode?: 'append' | 'replace';
@@ -22,6 +32,18 @@ export interface CrewListed {
   locks?: CrewLocks;
   error?: string;
 }
+
+export type CrewTools = 'full' | 'no-edits' | 'delegate-only';
+
+/** A role's tools, from a server that sends `tools` or an older one that sends only `delegateOnly`. */
+export const crewTools = (r: Pick<CrewListed, 'tools' | 'delegateOnly'>): CrewTools => r.tools ?? (r.delegateOnly ? 'delegate-only' : 'full');
+
+/**
+ * What no-edits takes away on each harness, for Settings to say. It is not read only: the shell stays everywhere it
+ * can be kept, so a command can still change a file.
+ */
+export const NO_EDITS_NOTE =
+  'Takes the file-edit tools away: Edit, Write and NotebookEdit on Claude Code, file patches on Codex, file writes on Cursor. The shell stays for gh and checks, so this is not read only: a command can still change files. Hermes and Cursor Cloud get it as an instruction only.';
 
 /** A key a save may not change on a built-in Omni relies on. `charter_mode` locked: the charter may only be added to. */
 export type CrewLockedField = 'delegate_only' | 'mcp' | 'delegatable' | 'review' | 'charter_mode';
@@ -62,7 +84,7 @@ export interface CrewChip {
 }
 
 /** The chips a role's row shows: where it comes from, then whatever needs a look. */
-export function crewChips(r: Pick<CrewListed, 'kind' | 'hidden' | 'builtInChanged' | 'error' | 'charterMode'>): CrewChip[] {
+export function crewChips(r: Pick<CrewListed, 'kind' | 'hidden' | 'builtInChanged' | 'error' | 'charterMode' | 'memoryWaiting'>): CrewChip[] {
   const chips: CrewChip[] = [];
   if (r.kind === 'shipped') chips.push({ label: 'Built-in', tone: 'outline', title: 'Shipped with Omni. Each release can update it.' });
   else if (r.kind === 'edited')
@@ -75,6 +97,8 @@ export function crewChips(r: Pick<CrewListed, 'kind' | 'hidden' | 'builtInChange
   if (r.hidden) chips.push({ label: 'Hidden', tone: 'outline', title: 'Hidden on this machine: no new thread starts as it.' });
   if (r.builtInChanged) chips.push({ label: 'Built-in charter changed', tone: 'default', title: 'Your charter replaces a built-in one that changed since. Compare to see what you are missing.' });
   if (r.error) chips.push({ label: "Can't run here", tone: 'needs', title: r.error });
+  if (r.memoryWaiting)
+    chips.push({ label: `${r.memoryWaiting} ${r.memoryWaiting === 1 ? 'lesson waits' : 'lessons wait'}`, tone: 'needs', title: 'Its threads proposed lessons for its memory. Open the role to approve or dismiss them.' });
   return chips;
 }
 
@@ -112,9 +136,13 @@ export interface CrewDraft {
   effort: string;
   channel: string;
   delegateOnly: boolean;
+  /** No file-edit tools (`tools: no-edits`). Moot while delegateOnly is on, which takes more away. */
+  noEdits: boolean;
   delegatable: boolean;
   conductorTools: boolean;
   review: boolean;
+  memory: RoleMemoryMode;
+  memoryWrites: RoleMemoryWrites;
   /** For a built-in: the text added to or put in place of its charter. For a role of the user's own: the whole charter. */
   charter: string;
   charterMode: 'append' | 'replace';
@@ -130,9 +158,12 @@ const fieldsOf = (r: CrewListed) => ({
   effort: r.effort ?? '',
   channel: r.channel ?? '',
   delegateOnly: r.delegateOnly,
+  noEdits: r.tools === 'no-edits',
   delegatable: r.delegatable,
   conductorTools: r.mcp.includes('omni'),
   review: r.review,
+  memory: r.memory ?? 'read-write',
+  memoryWrites: r.memoryWrites ?? 'review',
 });
 
 /** The form for a role as it stands. A built-in no one edited adds to its charter until the user picks Replace. */
@@ -142,7 +173,7 @@ export function crewDraftOf(d: CrewDetailView): CrewDraft {
 
 /** A blank role of the user's own. */
 export function blankCrewDraft(): CrewDraft {
-  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, delegatable: true, conductorTools: false, review: false, charter: '', charterMode: 'replace' };
+  return { name: '', description: '', icon: '', bg: '', harness: '', model: 'auto', effort: '', channel: '', delegateOnly: false, noEdits: false, delegatable: true, conductorTools: false, review: false, memory: 'read-write', memoryWrites: 'review', charter: '', charterMode: 'replace' };
 }
 
 /** Why the form cannot be saved yet, or null. */
@@ -178,7 +209,7 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
     if (k === 'icon' || k === 'bg') continue;
     if (before && same(now[k], before[k])) continue;
     const key = WIRE[k];
-    const value = k === 'conductorTools' ? (now[k] ? ['omni'] : []) : now[k];
+    const value = k === 'conductorTools' ? (now[k] ? ['omni'] : []) : k === 'noEdits' ? (now[k] ? 'no-edits' : 'full') : now[k];
     // Back to the built-in's value: an empty string or null takes the key out of the overlay. A role of the user's own
     // leaves a switch at its default out of the file the same way.
     const unset = builtIn ? same(now[k], builtIn[k]) : k in SWITCH_DEFAULTS && now[k] === SWITCH_DEFAULTS[k as keyof typeof SWITCH_DEFAULTS];
@@ -196,7 +227,7 @@ export function crewSaveBody(d: CrewDraft, detail: CrewDetailView | null): CrewS
 }
 
 /** What a role is when its file leaves a switch out (apps/server/crew.ts). */
-const SWITCH_DEFAULTS = { delegateOnly: false, delegatable: true, review: false } as const;
+const SWITCH_DEFAULTS = { delegateOnly: false, noEdits: false, delegatable: true, review: false, memory: 'read-write', memoryWrites: 'review' } as const;
 
 const WIRE: Record<FieldKey, string> = {
   name: 'name',
@@ -208,9 +239,12 @@ const WIRE: Record<FieldKey, string> = {
   effort: 'effort',
   channel: 'channel',
   delegateOnly: 'delegate_only',
+  noEdits: 'tools',
   delegatable: 'delegatable',
   conductorTools: 'mcp',
   review: 'review',
+  memory: 'memory',
+  memoryWrites: 'memory_writes',
 };
 
 /** The draft read back as a listed role, so a save compares like with like. */
@@ -226,9 +260,12 @@ function fromDraft(d: CrewDraft, base: CrewListed | undefined): CrewListed {
     effort: d.effort || undefined,
     channel: d.channel || undefined,
     mcp: d.conductorTools ? ['omni', ...mcp] : mcp,
+    tools: d.delegateOnly ? 'delegate-only' : d.noEdits ? 'no-edits' : 'full',
     delegateOnly: d.delegateOnly,
     delegatable: d.delegatable,
     review: d.review,
+    memory: d.memory,
+    memoryWrites: d.memoryWrites,
     kind: base?.kind ?? 'own',
     hidden: base?.hidden ?? false,
   };
@@ -278,3 +315,13 @@ export const CHANGED_CHARTER_ACTIONS = {
   takeBuiltIn: (): Pick<CrewSaveBody, 'charter' | 'charter_mode'> => ({ charter: '', charter_mode: 'append' }),
   addMine: (own: string): Pick<CrewSaveBody, 'charter' | 'charter_mode'> => ({ charter: own, charter_mode: 'append' }),
 } as const;
+
+/** The choices for a role's memory, as Settings > Crew offers them. */
+export const ROLE_MEMORY_CHOICES: readonly { id: RoleMemoryMode; label: string; hint: string }[] = [
+  { id: 'read-write', label: 'Reads and proposes', hint: 'Its threads get the lessons you approved, and propose new ones with remember.' },
+  { id: 'read', label: 'Reads only', hint: 'Its threads get the lessons you approved. Only you add them.' },
+  { id: 'off', label: 'Off', hint: 'Its threads get no lessons and propose none. What it has stays, unused.' },
+];
+
+/** Where a role's lesson applies, in a few words: every channel, or the channel it is tagged with. */
+export const memoryScope = (m: Pick<Memory, 'channel_id'>): string => (m.channel_id ? `#${m.channel_id} only` : 'Every channel');

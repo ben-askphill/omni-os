@@ -19,12 +19,15 @@
   --fg-2: light-dark(#3c3b37, #b8b7b1);
   --fg-3: light-dark(#62615c, #a09f99);
   /* fg-4 is 2.75:1 on white: placeholders, disabled labels and decoration only, never text that must be read
-     (apps/web/tests/fg4-contrast.test.ts). --fg-disabled names that use. */
+     (apps/web/tests/token-contrast.test.ts). --fg-disabled names that use. */
   --fg-4: light-dark(#9d9c96, #83827c);
   --fg-disabled: var(--fg-4);
   --on-ink: light-dark(#ffffff, #101114);
   --line: light-dark(rgb(23 24 26 / 0.08), rgb(236 235 231 / 0.08));
   --line-strong: light-dark(rgb(23 24 26 / 0.16), rgb(236 235 231 / 0.16));
+  /* The edge a control's shape depends on: the scrollbar thumb and the Toggle's off track. 3:1 on bg, surface,
+     surface-2 and surface-3 in both schemes, where the hairlines above are about 1.4:1 (tests/token-contrast.test.ts). */
+  --line-control: light-dark(#85847e, #83827c);
   /* Status is the only color: ultramarine = running, vermilion = needs you, volt = done.
      Full saturation, never tinted. Needs and done carry ink text; vermilion is never text on white. */
   --ink: #17181a;
@@ -129,6 +132,16 @@
   --h-search: 40px;
   --w-page: 896px;
 }
+/* Increase contrast (macOS and iOS) or a high contrast setting: hairlines reach 3:1, faint text reads as fg-3. */
+@media (prefers-contrast: more) {
+  :root,
+  .scheme-dark {
+    --line: light-dark(rgb(23 24 26 / 0.3), rgb(236 235 231 / 0.3));
+    --line-strong: light-dark(rgb(23 24 26 / 0.5), rgb(236 235 231 / 0.5));
+    --line-control: var(--fg-3);
+    --fg-4: var(--fg-3);
+  }
+}
 :root[data-theme="light"] {
   color-scheme: light;
 }
@@ -204,6 +217,20 @@
   --font-weight-bold: var(--fw-bold);
 }
 
+/* Safe areas (index.html sets viewport-fit=cover). safe-b pads the bottom by the home indicator's inset, and safe-b-<n>
+   by the inset or n spacing steps, whichever is more (safe-b-6: at least 24px). safe-x pads the left and right insets,
+   which a landscape iPhone has under the notch and the rounded corners. */
+@utility safe-b {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility safe-b-* {
+  padding-bottom: max(calc(var(--spacing) * --value(integer)), env(safe-area-inset-bottom));
+}
+@utility safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 @layer base {
   *,
   ::before,
@@ -267,9 +294,35 @@
     box-shadow: inset 0 0 0 1px var(--line);
     border-radius: 14px;
     padding: 9px 14px;
-    font-size: 14px;
+    font: inherit;
+    font-size: var(--fs-body);
     outline: none;
     transition: box-shadow 160ms var(--ease-out), background-color 160ms;
+  }
+  /* A field's text size. iOS zooms into any field under 16px when it takes focus and stays zoomed, so the smaller
+     sizes apply to a fine pointer only and a touch screen always gets at least 16px (the coarse rule below). Never
+     size a field with a text-[..] utility: utilities beat this layer, the coarse rule included (tests/field-zoom.test.ts).
+     field-sm and field-xs also size a bare input inside a box of its own (the Picker and SearchField search inputs).
+     field-mono: a code-like value (a path, slug, URL or token) in the mono face at field-sm's size. */
+  .field-mono {
+    font-family: var(--font-mono);
+  }
+  @media (pointer: fine) {
+    .field-sm,
+    .field-mono {
+      font-size: var(--fs-ui);
+    }
+    .field-xs {
+      font-size: var(--fs-small);
+    }
+  }
+  @media (pointer: coarse) {
+    .field,
+    .field-sm,
+    .field-xs,
+    .field-mono {
+      font-size: max(1rem, 1em);
+    }
   }
   .field:hover {
     box-shadow: inset 0 0 0 1px var(--line-strong);
@@ -278,8 +331,34 @@
     background: var(--bg);
     box-shadow: inset 0 0 0 1px var(--line-strong), 0 0 0 4px var(--wash);
   }
+  /* The focus ring: 2px of fg, never the 1px hairline hover shows. An outline, so forced colors keeps it.
+     focus-ring-within puts it on a box whose own input has none (SearchField, the Settings search). */
+  .field:focus-visible,
+  .focus-ring:focus-visible,
+  .focus-ring-within:has(:focus-visible) {
+    outline: 2px solid var(--fg);
+    outline-offset: 1px;
+  }
+  .field:focus-visible {
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+  /* Forced colors drops the inset hairline, which is all that draws a field's box. */
+  @media (forced-colors: active) {
+    .field {
+      border: 1px solid CanvasText;
+    }
+  }
   .field::placeholder {
     color: var(--fg-4);
+  }
+  /* A field whose problem shows (useFieldErrors): the red edge comes with its message and aria-invalid, never before.
+     Not :user-invalid, which Safari and Chrome apply at different moments; aria-invalid is the one switch for both. */
+  .field[aria-invalid="true"],
+  .field[aria-invalid="true"]:hover {
+    box-shadow: inset 0 0 0 1.5px var(--needs);
+  }
+  .field[aria-invalid="true"]:focus {
+    box-shadow: inset 0 0 0 1.5px var(--needs), 0 0 0 4px var(--wash);
   }
   select.field {
     appearance: none;
@@ -290,14 +369,7 @@
   }
   .scroll-thin {
     scrollbar-width: thin;
-    scrollbar-color: var(--line-strong) transparent;
-  }
-  /* Scrolls without a visible bar: the thread transcript. */
-  .scroll-none {
-    scrollbar-width: none;
-  }
-  .scroll-none::-webkit-scrollbar {
-    display: none;
+    scrollbar-color: var(--line-control) transparent;
   }
 
   /* Headline type: SF Pro, tight. */
@@ -347,11 +419,22 @@
   .hov:disabled::before {
     opacity: 0;
   }
+  /* Reduced motion: the wash fades in at full size. */
+  @media (prefers-reduced-motion: reduce) {
+    .hov::before {
+      transition: opacity 160ms;
+    }
+  }
   .press {
     transition: transform 220ms var(--ease-settle);
   }
   .press:active:not(:disabled) {
     transform: scale(0.96);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .press {
+      transition: none;
+    }
   }
 
   /* ---- status marks (Mark in packages/shared/status.ts, drawn by StatusDot) ----
@@ -614,6 +697,26 @@
     padding: 0 10px;
     font-size: 12.5px;
   }
+  /* The selected item's underline. Transparent, so the wash above is all that shows, until forced colors removes the
+     wash and paints this border in the system color: the selection never rests on a background alone. */
+  .seg-item {
+    position: relative;
+  }
+  .seg-item[data-active="true"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 8px;
+    bottom: 2px;
+    border-bottom: 2px solid transparent;
+  }
+  /* Pressed tools and the browser's selected tab show by a wash too: outline them in forced colors. */
+  @media (forced-colors: active) {
+    [aria-pressed="true"],
+    [role="tab"][aria-selected="true"]:not(.seg-item) {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
 
   /* ---- liquid toggle ---- */
   .tgl {
@@ -627,10 +730,15 @@
     height: var(--h);
     border-radius: 999px;
     background: var(--surface-3);
-    transition: background-color 0.26s var(--ease-stretch);
+    /* Off, the track is about 1.1:1 on a card: the line-control edge is what shows it is there. */
+    box-shadow: inset 0 0 0 1px var(--line-control);
+    transition:
+      background-color 0.26s var(--ease-stretch),
+      box-shadow 0.26s var(--ease-stretch);
   }
   .tgl[aria-checked="true"] {
     background: var(--fg);
+    box-shadow: inset 0 0 0 1px var(--fg);
   }
   .tgl:disabled {
     opacity: 0.5;
@@ -658,6 +766,43 @@
   .tgl[aria-checked="true"]:active:not(:disabled) .tgl-knob {
     transform: translateX(calc(var(--w) - var(--k) - 9px));
   }
+  /* Forced colors drops the shadow and repaints both fills as Canvas, so the switch draws itself in system colors. */
+  @media (forced-colors: active) {
+    .tgl {
+      forced-color-adjust: none;
+      background: Canvas;
+      border: 1px solid CanvasText;
+    }
+    .tgl:focus-visible {
+      outline-color: Highlight;
+    }
+    .tgl-knob {
+      top: 1px;
+      left: 1px;
+      background: CanvasText;
+      box-shadow: none;
+    }
+    .tgl[aria-checked="true"] {
+      background: Highlight;
+      border-color: Highlight;
+    }
+    .tgl[aria-checked="true"] .tgl-knob {
+      background: HighlightText;
+    }
+    .tgl:disabled {
+      opacity: 1;
+      border-color: GrayText;
+    }
+    .tgl:disabled .tgl-knob {
+      background: GrayText;
+    }
+  }
+  /* Reduced motion: the knob jumps; the track's colour still fades. */
+  @media (prefers-reduced-motion: reduce) {
+    .tgl-knob {
+      transition: none;
+    }
+  }
 
   /* ---- inline confirm with undo fuse (Bencho "say") ---- */
   .say {
@@ -668,6 +813,11 @@
     background: var(--say-bg, var(--surface-2));
     overflow: hidden;
     transition: width 0.34s var(--ease-spring);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .say {
+      transition: none;
+    }
   }
   .say-row {
     display: inline-flex;
@@ -792,6 +942,12 @@
   .sld-wash[data-spring] {
     transition: width 0.5s var(--ease-settle);
   }
+  @media (prefers-reduced-motion: reduce) {
+    .sld-grip[data-spring],
+    .sld-wash[data-spring] {
+      transition: none;
+    }
+  }
   .sld[data-done] {
     background: var(--fg);
     color: var(--on-ink);
@@ -823,6 +979,44 @@
   .pik-card[data-up] {
     transform-origin: 0 100%;
   }
+  /* The shared Picker's and ModelPicker's list, in the top layer (use-anchored-popover.ts), so a modal never clips it.
+     Script places it where the browser has no anchor positioning; the rule under it does where it has. */
+  .pik-card[popover] {
+    position: fixed;
+    inset: auto;
+    min-width: 0;
+    margin: 0;
+    border: 0;
+    overflow: visible;
+    color: inherit;
+  }
+  /* A menu in the top layer as a manual popover (ContextMenuParts useMenuPopover): the ContextMenu and the rail's More
+     menu. Script places it, so this only undoes the browser's popover box; the menu's own utilities set the rest. */
+  .menu-pop[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: visible;
+    color: inherit;
+  }
+  @supports (position-area: block-end) {
+    .pik-card[popover] {
+      min-width: anchor-size(width);
+      margin-block: 8px;
+      position-area: block-end span-inline-end;
+      position-try-fallbacks:
+        flip-block,
+        flip-inline,
+        flip-block flip-inline,
+        --pik-below-centred,
+        --pik-above-centred;
+    }
+    .pik-card[popover][data-align="right"] {
+      position-area: block-end span-inline-start;
+    }
+  }
   .pik-row {
     display: flex;
     align-items: center;
@@ -836,6 +1030,11 @@
   }
   .pik-row[data-cursor="true"] {
     background: var(--wash);
+  }
+  /* Once the keys move the cursor, its row also draws the ink ring of .item:focus-visible, so it reads at 3:1. */
+  .pik-card[data-keys] .pik-row[data-cursor="true"] {
+    outline: 2px solid var(--fg);
+    outline-offset: -2px;
   }
   .pik-mark {
     display: grid;
@@ -859,6 +1058,11 @@
   }
   [aria-expanded="true"] > .pik-chev {
     rotate: 180deg;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pik-chev {
+      transition: none;
+    }
   }
 
   /* ---- animated checklist row (Bencho "chk") ---- */
@@ -919,6 +1123,12 @@
   [data-state="in_progress"] > .chk-box {
     box-shadow: inset 0 0 0 1.5px var(--fg);
   }
+  /* Reduced motion: the box fills at once; the tick still draws and the strike still runs. */
+  @media (prefers-reduced-motion: reduce) {
+    .chk-fill {
+      transition: none;
+    }
+  }
 
   /* ---- progress ticks (Bencho "tick") ---- */
   .ticks {
@@ -940,6 +1150,11 @@
     height: 100%;
     background: var(--tick-on, var(--fg));
   }
+  @media (prefers-reduced-motion: reduce) {
+    .ticks > i {
+      transition: background-color 0.3s;
+    }
+  }
 
   /* ---- toast (Bencho "bell") ---- */
   .toast {
@@ -948,7 +1163,8 @@
     align-items: center;
     gap: 10px;
     min-height: 44px;
-    max-width: min(420px, calc(100vw - 32px));
+    /* Its stack (Toaster.tsx) already keeps 16px off each edge, or 360px wide from 768px: 100% of it, not the window. */
+    max-width: min(420px, 100%);
     padding: 6px 6px 6px 16px;
     border-radius: 22px;
     font-size: 13px;
@@ -957,463 +1173,640 @@
   .toast[data-leaving] {
     animation: toast-out 0.22s var(--ease-stretch) forwards;
   }
+
+  /* ---- modal: a <dialog> opened with showModal() (ui/modal.tsx, the command menu, setup) ----
+     A sheet on the bottom edge of a phone, in the middle from 640px. These undo the browser's dialog box (border,
+     padding, Canvas colors, its gap to the edges) and leave the width to the caller's utilities. */
+  dialog.modal {
+    margin: auto 0 0;
+    max-width: 100%;
+    /* The visible height: on iPhone Safari a vh unit measures the page with its toolbars hidden, so the sheet's top went under them. */
+    max-height: 92dvh;
+    padding: 0 0 env(safe-area-inset-bottom);
+    border: 0;
+    border-radius: 28px 28px 0 0;
+    background: var(--elev);
+    color: inherit;
+    box-shadow: var(--shadow-menu);
+    overflow: auto;
+    /* Scrolling inside it stops at its edge instead of moving the page behind. */
+    overscroll-behavior: contain;
+  }
+  @media (min-width: 640px) {
+    dialog.modal {
+      margin: auto;
+      padding-bottom: 0;
+      border-radius: 28px;
+    }
+  }
+  /* The dim under it covers the whole window, the channel rail included. overflow makes it a scroll container, so
+     overscroll-behavior holds a scroll over it too. In the desktop app it lifts the window's drag regions, so a press
+     on the dim closes the modal instead of moving the window. */
+  dialog.modal::backdrop {
+    background: var(--scrim);
+    animation: omni-scrim 0.24s var(--ease-out);
+    overflow: hidden;
+    overscroll-behavior: contain;
+    -webkit-app-region: no-drag;
+  }
+
+  /* ---- transcript rows ---- */
+  /*
+   * An older row out of view skips style, layout and paint (transcript/defer.ts picks the rows; the newest never get
+   * it). It keeps the height it last rendered at, and an estimate until it first renders, so the scrollbar holds and
+   * useScrollAnchor corrects for the difference as rows render. Desktop rows run about 6 lines, phone turns
+   * (.tx-turn) about 30.
+   */
+  .tx-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 6lh;
+    /* It also clips paint to the row: a focus ring or a card's shadow at its edge still shows. */
+    overflow-clip-margin: 8px;
+  }
+  .tx-turn {
+    contain-intrinsic-size: auto none auto 30lh;
+  }
 }
 
-/* Markdown rendered from agents. Kept compact and readable. */
-.md {
-  font-size: 14.5px;
-  line-height: 1.8;
-  color: var(--fg-2);
-  overflow-wrap: anywhere;
-}
-/* Prose keeps a readable measure; code and tables use the full column. */
-.md > :is(p, ul, ol, blockquote, h1, h2) {
-  max-width: 72ch;
-}
-/* Screenshots get the full column too. */
-.md > p:has(> img) {
-  max-width: none;
-}
-.md > :first-child {
-  margin-top: 0;
-}
-.md > :last-child {
-  margin-bottom: 0;
-}
-.md p,
-.md ul,
-.md ol,
-.md pre,
-.md table,
-.md blockquote {
-  margin: 0.6em 0;
-}
-.md h1,
-.md h2,
-.md h3,
-.md h4 {
-  font-family: var(--font-head);
-  font-weight: var(--fw-medium);
-  letter-spacing: -0.01em;
-  line-height: 1.25;
-  color: var(--fg);
-  margin: 1.5em 0 0.5em;
-}
-.md h1 {
-  font-size: 1.35em;
-}
-.md h2 {
-  font-size: 1.18em;
-}
-.md h3,
-.md h4 {
-  font-family: var(--font-sans);
-  font-size: 11.5px;
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-  margin-top: 1.9em;
-  padding-top: 1.1em;
-  border-top: 1px solid var(--line);
-}
-.md > h3:first-child,
-.md > h4:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-.md ul {
-  list-style: disc;
-  padding-left: 1.3em;
-}
-.md ol {
-  list-style: decimal;
-  padding-left: 1.4em;
-}
-.md li {
-  margin: 0.5em 0;
-}
-.md li > ul,
-.md li > ol {
-  margin: 0.3em 0 0.1em;
-}
-.md li li {
-  font-size: 13.5px;
-  margin: 0.25em 0;
-  color: var(--fg-3);
-}
-.md li::marker {
-  color: var(--fg-3);
-}
-.md a {
-  color: var(--fg);
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 3px;
-  transition: text-decoration-color 0.16s;
-}
-.md a:hover {
-  text-decoration-color: currentColor;
-}
-/* A link a source named (link-sources.ts): its mark, its id muted, then its title. */
-.link-mark {
-  display: inline-block;
-  width: 1.05em;
-  height: 1.05em;
-  flex: none;
-  vertical-align: -0.17em;
-}
-.md a.link-chip {
-  text-decoration: none;
-}
-.md a.link-chip > .link-mark {
-  margin-right: 0.3em;
-}
-.md a.link-chip > span:last-child {
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 3px;
-  transition: text-decoration-color 0.16s;
-}
-.md a.link-chip:hover > span:last-child {
-  text-decoration-color: currentColor;
-}
-.md a.link-chip > .link-ref {
-  color: var(--fg-3);
-  margin-right: 0.35em;
-  font-variant-numeric: tabular-nums;
-}
-.md strong {
-  font-weight: var(--fw-semibold);
-  color: var(--fg);
-}
-/* An opening bold line is the reply's verdict. */
-.md > p:first-child:has(> strong:first-child) {
-  font-size: 15.5px;
-  line-height: 1.5;
-}
-.md code {
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-  color: var(--fg);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--line);
-  padding: 0.12em 0.4em;
-  border-radius: 6px;
-}
-.md pre {
-  background: var(--code-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
-  border-radius: 14px;
-  padding: 12px 14px;
-  overflow-x: auto;
-  font-size: 12.5px;
-  line-height: 1.55;
-}
-.md pre code {
-  background: none;
-  box-shadow: none;
-  padding: 0;
-  font-size: inherit;
-}
-.md blockquote {
-  border-left: 2px solid var(--line-strong);
-  padding-left: 0.9em;
-  color: var(--fg-2);
-}
-.md hr {
-  border: 0;
-  border-top: 1px solid var(--line);
-  margin: 1.2em 0;
-}
-.md table {
-  border-collapse: collapse;
-  display: block;
-  overflow-x: auto;
-  font-size: 13px;
-}
-.md th,
-.md td {
-  border-bottom: 1px solid var(--line);
-  padding: 6px 12px 6px 0;
-  text-align: left;
-  vertical-align: top;
-}
-.md th {
-  font-weight: var(--fw-medium);
-  color: var(--fg-3);
-}
-.md input[type="checkbox"] {
-  margin-right: 0.4em;
-  vertical-align: -1px;
-  accent-color: var(--fg);
-}
-/* Each image on its own line under its caption. */
-.md img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: 0.5em 0;
-  border-radius: 12px;
-  /* Keeps a white screenshot's edge visible on a light surface and a dark one's in dark mode. */
-  outline: 1px solid var(--line);
-  outline-offset: -1px;
-}
+/* Markdown and the helper classes sit in the components layer, under Tailwind's utilities, so a class passed with
+   them (the phone's `text-[15px] leading-[1.6]` on a reply) wins as it reads. */
+@layer components {
+  /* Markdown rendered from agents. Kept compact and readable. */
+  .md {
+    font-size: 14.5px;
+    line-height: 1.8;
+    color: var(--fg-2);
+    overflow-wrap: anywhere;
+  }
+  /* Prose keeps a readable measure; code and tables use the full column. */
+  .md > :is(p, ul, ol, blockquote, h1, h2) {
+    max-width: 72ch;
+  }
+  /* Screenshots get the full column too. */
+  .md > p:has(> img) {
+    max-width: none;
+  }
+  .md > :first-child {
+    margin-top: 0;
+  }
+  .md > :last-child {
+    margin-bottom: 0;
+  }
+  .md p,
+  .md ul,
+  .md ol,
+  .md pre,
+  .md blockquote {
+    margin: 0.6em 0;
+  }
+  .md h1,
+  .md h2,
+  .md h3,
+  .md h4 {
+    font-family: var(--font-head);
+    font-weight: var(--fw-medium);
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    color: var(--fg);
+    margin: 1.5em 0 0.5em;
+  }
+  .md h1 {
+    font-size: 1.35em;
+  }
+  .md h2 {
+    font-size: 1.18em;
+  }
+  .md h3,
+  .md h4 {
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+    margin-top: 1.9em;
+    padding-top: 1.1em;
+    border-top: 1px solid var(--line);
+  }
+  .md > h3:first-child,
+  .md > h4:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .md ul {
+    list-style: disc;
+    padding-left: 1.3em;
+  }
+  .md ol {
+    list-style: decimal;
+    padding-left: 1.4em;
+  }
+  .md li {
+    margin: 0.5em 0;
+  }
+  .md li > ul,
+  .md li > ol {
+    margin: 0.3em 0 0.1em;
+  }
+  .md li li {
+    font-size: 13.5px;
+    margin: 0.25em 0;
+    color: var(--fg-3);
+  }
+  .md li::marker {
+    color: var(--fg-3);
+  }
+  .md a {
+    color: var(--fg);
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.16s;
+  }
+  .md a:hover {
+    text-decoration-color: currentColor;
+  }
+  /* A link a source named (link-sources.ts): its mark, its id muted, then its title. */
+  .link-mark {
+    display: inline-block;
+    width: 1.05em;
+    height: 1.05em;
+    flex: none;
+    vertical-align: -0.17em;
+  }
+  .md a.link-chip {
+    text-decoration: none;
+  }
+  .md a.link-chip > .link-mark {
+    margin-right: 0.3em;
+  }
+  .md a.link-chip > span:last-child {
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.16s;
+  }
+  .md a.link-chip:hover > span:last-child {
+    text-decoration-color: currentColor;
+  }
+  .md a.link-chip > .link-ref {
+    color: var(--fg-3);
+    margin-right: 0.35em;
+    font-variant-numeric: tabular-nums;
+  }
+  .md strong {
+    font-weight: var(--fw-semibold);
+    color: var(--fg);
+  }
+  /* An opening bold line is the reply's verdict. */
+  .md > p:first-child:has(> strong:first-child) {
+    font-size: 15.5px;
+    line-height: 1.5;
+  }
+  .md code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--fg);
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--line);
+    padding: 0.12em 0.4em;
+    border-radius: 6px;
+  }
+  .md pre {
+    background: var(--code-bg);
+    box-shadow: inset 0 0 0 1px var(--line);
+    border-radius: 14px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .md pre code {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    font-size: inherit;
+  }
+  .md blockquote {
+    border-left: 2px solid var(--line-strong);
+    padding-left: 0.9em;
+    color: var(--fg-2);
+  }
+  .md hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 1.2em 0;
+  }
+  /* A table scrolls in its own region (Markdown.tsx: TableScroll), so the table keeps display: table and its row and
+     cell roles. Its cells wrap between words only: a narrow column scrolls the region instead of splitting "Store"
+     into "St / or / e". */
+  .md .md-scroll {
+    margin: 0.6em 0;
+    overflow-x: auto;
+    border-radius: 4px;
+  }
+  .md table {
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .md th,
+  .md td {
+    border-bottom: 1px solid var(--line);
+    padding: 6px 12px 6px 0;
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: normal;
+  }
+  .md th {
+    font-weight: var(--fw-medium);
+    color: var(--fg-3);
+  }
+  .md input[type="checkbox"] {
+    margin-right: 0.4em;
+    vertical-align: -1px;
+    accent-color: var(--fg);
+  }
+  /* Each image on its own line under its caption. */
+  .md img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0.5em 0;
+    border-radius: 12px;
+    /* Keeps a white screenshot's edge visible on a light surface and a dark one's in dark mode. */
+    outline: 1px solid var(--line);
+    outline-offset: -1px;
+  }
 
-@keyframes omni-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
+  /* Inline diagrams use the same tokens and scrolling as fenced code. */
+  .md .mermaid-diagram {
+    margin: 0.6em 0;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--code-bg);
+    color: var(--fg);
   }
-  50% {
-    opacity: 0.45;
-    transform: scale(0.82);
+  .md .mermaid-diagram > div { padding: 12px 14px; }
+  .md .mermaid-diagram svg { display: block; height: auto; max-width: 100%; margin: auto; }
+  .md .mermaid-diagram pre { margin: 0; border: 0; }
+
+  @keyframes omni-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.82);
+    }
   }
-}
-.pulse {
-  animation: omni-pulse 1.4s ease-in-out infinite;
-}
-@keyframes omni-ping {
-  0% {
-    transform: scale(1);
-    opacity: 0.55;
+  .pulse {
+    animation: omni-pulse 1.4s ease-in-out infinite;
   }
-  80%,
-  100% {
-    transform: scale(2.6);
-    opacity: 0;
+  @keyframes omni-ping {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    80%,
+    100% {
+      transform: scale(2.6);
+      opacity: 0;
+    }
   }
-}
-/* A status mark moves in one of two ways (StatusDot): a halo leaves it while the agent's own turn works (.ping), and
-   it fades and returns while it waits on other work, as crew, checks or a limit's clock (.breathe). */
-.ping {
-  animation: omni-ping var(--dur-ping) var(--ease-out) infinite;
-}
-@keyframes omni-breathe {
-  0%,
-  100% {
-    opacity: 1;
+  /* A status mark moves in one of two ways (StatusDot): a halo leaves it while the agent's own turn works (.ping), and
+     it fades and returns while it waits on other work, as crew, checks or a limit's clock (.breathe). */
+  .ping {
+    animation: omni-ping var(--dur-ping) var(--ease-out) infinite;
   }
-  50% {
-    opacity: 0.35;
+  @keyframes omni-breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
   }
-}
-.breathe {
-  animation: omni-breathe calc(var(--dur-ping) * 1.5) var(--ease-fluid) infinite;
-}
-/* The browser panel's loading bar, Chrome style: a sliver sweeping under the address bar. */
-@keyframes omni-load {
-  0% {
-    transform: translateX(-100%) scaleX(0.3);
+  .breathe {
+    animation: omni-breathe calc(var(--dur-ping) * 1.5) var(--ease-fluid) infinite;
   }
-  60% {
-    transform: translateX(40%) scaleX(0.6);
+  /* The browser panel's loading bar, Chrome style: a sliver sweeping under the address bar. */
+  @keyframes omni-load {
+    0% {
+      transform: translateX(-100%) scaleX(0.3);
+    }
+    60% {
+      transform: translateX(40%) scaleX(0.6);
+    }
+    100% {
+      transform: translateX(100%) scaleX(0.3);
+    }
   }
-  100% {
-    transform: translateX(100%) scaleX(0.3);
+  .load-bar {
+    animation: omni-load 1.3s var(--ease-out) infinite;
+    transform-origin: left;
   }
-}
-.load-bar {
-  animation: omni-load 1.3s var(--ease-out) infinite;
-  transform-origin: left;
-}
-@keyframes omni-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
+  @keyframes omni-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
-  to {
-    opacity: 1;
-    transform: none;
+  .fade-in {
+    animation: omni-in 240ms var(--ease-out);
   }
-}
-.fade-in {
-  animation: omni-in 240ms var(--ease-out);
-}
-@keyframes omni-pop {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.97);
+  @keyframes omni-pop {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.pop-in {
-  animation: omni-pop 0.42s var(--ease-settle);
-}
-/* A search hit the thread scrolled to: the search mark's wash behind it, fading out. */
-@keyframes omni-flash {
-  from {
-    background-color: var(--mark);
-    box-shadow: 0 0 0 8px var(--mark);
-  }
-  to {
-    background-color: transparent;
-    box-shadow: 0 0 0 8px transparent;
-  }
-}
-.flash {
-  border-radius: 14px;
-  animation: omni-flash 2s var(--ease-out) 0.2s both;
-}
-@keyframes omni-sheet {
-  from {
-    transform: translateY(24px);
-    opacity: 0;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
-}
-.modal-in {
-  animation: omni-sheet 0.42s var(--ease-out);
-}
-@media (min-width: 640px) {
-  .modal-in {
+  .pop-in {
     animation: omni-pop 0.42s var(--ease-settle);
   }
-}
-@keyframes omni-scrim {
-  from {
-    opacity: 0;
+  /* A search hit the thread scrolled to: the search mark's wash behind it, fading out. */
+  @keyframes omni-flash {
+    from {
+      background-color: var(--mark);
+      box-shadow: 0 0 0 8px var(--mark);
+    }
+    to {
+      background-color: transparent;
+      box-shadow: 0 0 0 8px transparent;
+    }
   }
-}
-.scrim {
-  background: var(--scrim);
-  animation: omni-scrim 0.24s var(--ease-out);
-}
-@keyframes omni-panel {
-  from {
-    transform: translateX(18px) scale(0.985);
-    opacity: 0;
+  .flash {
+    border-radius: 14px;
+    animation: omni-flash 2s var(--ease-out) 0.2s both;
   }
-}
-/* Thread side panel: slides in from the right and settles. */
-.panel-in {
-  animation: omni-panel 0.5s var(--ease-settle);
-}
-/* Its tab strip: 32px tabs, icon-only but for the open one, which also shows its name. */
-.seg.inspector-tabs .seg-item {
-  height: 32px;
-  padding: 0 9px;
-  font-size: 12.5px;
-}
-@keyframes say-burn {
-  from {
-    width: 100%;
+  @keyframes omni-sheet {
+    from {
+      transform: translateY(24px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
   }
-  to {
-    width: 0;
+  .modal-in {
+    animation: omni-sheet 0.42s var(--ease-out);
   }
-}
-@keyframes pik-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.96);
+  @media (min-width: 640px) {
+    .modal-in {
+      animation: omni-pop 0.42s var(--ease-settle);
+    }
   }
-  to {
-    opacity: 1;
-    transform: none;
+  @keyframes omni-scrim {
+    from {
+      opacity: 0;
+    }
   }
-}
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.92);
+  @keyframes omni-panel {
+    from {
+      transform: translateX(18px) scale(0.985);
+      opacity: 0;
+    }
   }
-  to {
-    opacity: 1;
-    transform: none;
+  /* Thread side panel: slides in from the right and settles. */
+  .panel-in {
+    animation: omni-panel 0.5s var(--ease-settle);
   }
-}
-@keyframes toast-out {
-  to {
-    opacity: 0;
-    transform: translateY(6px) scale(0.96);
+  /* Its tab strip: 32px tabs, icon-only but for the open one, which also shows its name. */
+  .seg.inspector-tabs .seg-item {
+    height: 32px;
+    padding: 0 9px;
+    font-size: 12.5px;
   }
-}
-@keyframes omni-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+  @keyframes say-burn {
+    from {
+      width: 100%;
+    }
+    to {
+      width: 0;
+    }
   }
-  to {
-    opacity: 1;
-    transform: none;
+  @keyframes pik-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
-}
-/* Staggered entrance for lists and walls; set --i per child. */
-.rise > * {
-  animation: omni-rise 0.5s var(--ease-out) both;
-  animation-delay: calc(min(var(--i, 0), 12) * 28ms);
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes toast-out {
+    to {
+      opacity: 0;
+      transform: translateY(6px) scale(0.96);
+    }
+  }
+  @keyframes omni-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  /* Staggered entrance for lists and walls; set --i per child. */
+  .rise > * {
+    animation: omni-rise 0.5s var(--ease-out) both;
+    animation-delay: calc(min(var(--i, 0), 12) * 28ms);
+  }
+
+  /* The wordmark writes itself out again, one pen stroke, on hover. */
+  @keyframes omni-write {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .wordmark-write:is(:hover, :focus-visible) .wordmark-line {
+    stroke-dasharray: 1;
+    animation: omni-write 0.9s cubic-bezier(0.45, 0, 0.2, 1) both;
+  }
+
+  /* A running turn's label: a vermilion highlight sweeps across muted text. */
+  @keyframes omni-shimmer {
+    from {
+      background-position: 115% 0;
+    }
+    to {
+      background-position: -15% 0;
+    }
+  }
+  .shimmer-text {
+    background: linear-gradient(
+        90deg,
+        var(--fg-4) 0%,
+        var(--fg-4) 14%,
+        color-mix(in srgb, var(--fg-4) 30%, var(--vermilion)) 26%,
+        color-mix(in srgb, var(--fg-3) 10%, var(--vermilion)) 38%,
+        var(--vermilion) 50%,
+        color-mix(in srgb, var(--fg-3) 10%, var(--vermilion)) 62%,
+        color-mix(in srgb, var(--fg-4) 30%, var(--vermilion)) 74%,
+        var(--fg-4) 86%,
+        var(--fg-4) 100%
+      )
+      115% 0 / 480% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: omni-shimmer 1.75s var(--ease-fluid) infinite;
+  }
 }
 
-/* The wordmark writes itself out again, one pen stroke, on hover. */
-@keyframes omni-write {
-  from {
-    stroke-dashoffset: 1;
+/* A window too narrow for the list from either edge of its pill: centred across the window, under or over the pill. */
+@position-try --pik-below-centred {
+  position-area: block-end span-all;
+  justify-self: center;
+}
+@position-try --pik-above-centred {
+  position-area: block-start span-all;
+  justify-self: center;
+}
+/* ---- exits (ui/use-exit.ts) ----
+   An overlay on its way out keeps its place for one short animation, then goes: a modal and its dim, a picker's list,
+   a menu, the phone quick card. use-exit.ts waits only for animations named exit-*. With Reduce motion on none of these
+   apply, so it goes at once. Closing, it takes no presses: the layer under it has them. */
+[data-closing] {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pik-card[data-closing],
+  .menu-pop[data-closing] {
+    animation: exit-pop 0.14s var(--ease-out) forwards;
   }
-  to {
-    stroke-dashoffset: 0;
+  dialog.modal[data-closing] {
+    animation: exit-sheet 0.18s var(--ease-out) forwards;
+  }
+  dialog.modal[data-closing]::backdrop {
+    animation: exit-fade 0.18s var(--ease-out) forwards;
   }
 }
-.wordmark-write:is(:hover, :focus-visible) .wordmark-line {
-  stroke-dasharray: 1;
-  animation: omni-write 0.9s cubic-bezier(0.45, 0, 0.2, 1) both;
+@media (prefers-reduced-motion: no-preference) and (min-width: 640px) {
+  dialog.modal[data-closing] {
+    animation-name: exit-pop;
+  }
+}
+@keyframes exit-pop {
+  to {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.97);
+  }
+}
+@keyframes exit-sheet {
+  to {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes exit-fade {
+  to {
+    opacity: 0;
+  }
 }
 
-/* A running turn's label: a vermilion highlight sweeps across muted text. */
-@keyframes omni-shimmer {
-  from {
-    background-position: 115% 0;
-  }
-  to {
-    background-position: -15% 0;
-  }
-}
-.shimmer-text {
-  background: linear-gradient(
-      90deg,
-      var(--fg-4) 0%,
-      var(--fg-4) 14%,
-      color-mix(in srgb, var(--fg-4) 30%, var(--vermilion)) 26%,
-      color-mix(in srgb, var(--fg-3) 10%, var(--vermilion)) 38%,
-      var(--vermilion) 50%,
-      color-mix(in srgb, var(--fg-3) 10%, var(--vermilion)) 62%,
-      color-mix(in srgb, var(--fg-4) 30%, var(--vermilion)) 74%,
-      var(--fg-4) 86%,
-      var(--fg-4) 100%
-    )
-    115% 0 / 480% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: omni-shimmer 1.75s var(--ease-fluid) infinite;
-}
-
+/* ---- reduced motion ----
+   Rule by rule, not one switch for everything: movement stops (slides, scale, push, sweeps, loops) while fades,
+   colour changes, the search-hit flash and the undo fuse still play. Each entrance below keeps its name and
+   duration and loses only its movement, so an inline `animation:` (the phone sheets and toast) follows too. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-  }
+  /* Loops that move or pulse: still. The status marks keep their shape and colour. */
   .pulse,
   .ping,
   .breathe,
-  .shimmer-text {
-    animation: none !important;
+  .load-bar,
+  .shimmer-text,
+  .wordmark-write:is(:hover, :focus-visible) .wordmark-line {
+    animation: none;
+  }
+  /* A Loader still shows that something is happening: no halo, a slow fade in place instead. */
+  .glyph[data-mark="loading"] > svg {
+    animation: omni-breathe 2.4s var(--ease-fluid) infinite;
   }
   .shimmer-text {
     color: var(--fg-3);
     background: none;
     -webkit-background-clip: unset;
     background-clip: unset;
+  }
+  @keyframes omni-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes omni-pop {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes omni-sheet {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes omni-panel {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes omni-rise {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pik-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes toast-out {
+    to {
+      opacity: 0;
+    }
+  }
+  /* The undo fuse counts down by fading out across its full width instead of shrinking. */
+  @keyframes say-burn {
+    from {
+      width: 100%;
+    }
+    to {
+      width: 100%;
+      opacity: 0;
+    }
   }
 }
 
@@ -1441,6 +1834,11 @@ body.col-resizing iframe {
   }
   .mo-press:active:not(:disabled) {
     transform: scale(0.96);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mo-press {
+      transition: none;
+    }
   }
   .mo-row {
     border-radius: 14px;
@@ -1491,19 +1889,139 @@ html:has(.mo-app) body {
     opacity: 1;
   }
 }
-
-/* Inline diagrams use the same tokens and scrolling as fenced code. */
-.md .mermaid-diagram {
-  margin: 0.6em 0;
-  overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--code-bg);
-  color: var(--fg);
+/* Reduced motion: a pushed screen, a sheet and the toast fade in where they land (see "reduced motion" above).
+   After the keyframes they replace, since the last @keyframes of a name wins. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes mo-push {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes mo-up {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes mo-toast {
+    from {
+      transform: translate(-50%, 0);
+      opacity: 0;
+    }
+    to {
+      transform: translate(-50%, 0);
+    }
+  }
 }
-.md .mermaid-diagram > div { padding: 12px 14px; }
-.md .mermaid-diagram svg { display: block; height: auto; max-width: 100%; margin: auto; }
-.md .mermaid-diagram pre { margin: 0; border: 0; }
+
+/* ---- phone stack transitions (mobile/stack-transition.ts) ----
+   Where the browser has view transition types, a push slides the new screen in from the right edge over the old
+   one, which drifts a third to the left; back runs it the other way, the top screen on top as it leaves. The page is
+   one snapshot, so the header and the tab bar move with their screen. Taps go through to the new screen while it
+   plays. Reduced motion keeps the browser's cross-fade, shorter. Other browsers play mo-push (MobileShell.tsx). */
+::view-transition {
+  pointer-events: none;
+}
+html:active-view-transition-type(push, pop)::view-transition-group(root) {
+  animation-duration: 380ms;
+  animation-timing-function: var(--ease-out);
+}
+html:active-view-transition-type(push, pop)::view-transition-old(root),
+html:active-view-transition-type(push, pop)::view-transition-new(root) {
+  animation-timing-function: var(--ease-out);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:active-view-transition-type(push, pop)::view-transition-old(root),
+  html:active-view-transition-type(push, pop)::view-transition-new(root) {
+    mix-blend-mode: normal;
+  }
+  html:active-view-transition-type(push)::view-transition-old(root) {
+    animation-name: mo-vt-under-out;
+  }
+  html:active-view-transition-type(push)::view-transition-new(root) {
+    animation-name: mo-vt-over-in;
+  }
+  html:active-view-transition-type(pop)::view-transition-old(root) {
+    z-index: 1;
+    animation-name: mo-vt-over-out;
+  }
+  html:active-view-transition-type(pop)::view-transition-new(root) {
+    animation-name: mo-vt-under-in;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:active-view-transition-type(push, pop)::view-transition-group(root) {
+    animation-duration: 200ms;
+  }
+}
+@keyframes mo-vt-over-in {
+  from {
+    translate: 100% 0;
+  }
+}
+@keyframes mo-vt-over-out {
+  to {
+    translate: 100% 0;
+  }
+}
+@keyframes mo-vt-under-in {
+  from {
+    translate: -30% 0;
+  }
+}
+@keyframes mo-vt-under-out {
+  to {
+    translate: -30% 0;
+  }
+}
+
+/* ---- scroll fades (useScrollFade.ts: the channel rail, the list panel, the context panel) ----
+   The list fades out at an edge only while more of it sits past that edge. Where CSS has scroll-driven animations,
+   each fade grows over the first --fade-size of scrolling away from its end; elsewhere the hook marks the edges.
+   Keys and find-in-page stop a fade's width short of the edge, so focus never lands inside one. */
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.scroll-fade {
+  --fade-size: 28px;
+  scroll-padding-block: var(--fade-size);
+  mask-image: linear-gradient(to bottom, transparent 0, black var(--fade-start), black calc(100% - var(--fade-end)), transparent 100%);
+}
+.scroll-fade[data-fade-start] {
+  --fade-start: var(--fade-size);
+}
+.scroll-fade[data-fade-end] {
+  --fade-end: var(--fade-size);
+}
+@supports (animation-timeline: scroll()) {
+  .scroll-fade {
+    animation:
+      scroll-fade-start linear both,
+      scroll-fade-end linear both;
+    /* After the shorthand, which the build writes out as 0s: a scroll timeline's length is the scroll range. */
+    animation-duration: auto;
+    animation-timeline: scroll(self block);
+    animation-range:
+      0 var(--fade-size),
+      calc(100% - var(--fade-size)) 100%;
+  }
+}
+@keyframes scroll-fade-start {
+  to {
+    --fade-start: var(--fade-size);
+  }
+}
+@keyframes scroll-fade-end {
+  from {
+    --fade-end: var(--fade-size);
+  }
+}
 
 /* ---- the desktop app's own title bar on macOS (apps/desktop/src/windows.ts: hiddenInset) ----
    The window has no title bar: it drags by the chrome around the panes and by the sidebar's top row, where the
@@ -1580,4 +2098,17 @@ html:has(.mo-app) body {
 [data-desktop="darwin"] .mo-app {
   top: 28px;
   max-height: calc(100% - 28px);
+}
+
+/* Reduced motion for Tailwind's transition utilities that move things: the chevrons that turn on open and the
+   onboarding step dots that grow. They take their end state at once; colours still fade. */
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .transition-transform {
+      transition-property: none;
+    }
+    .transition-all {
+      transition-property: color, background-color, border-color, opacity, box-shadow;
+    }
+  }
 }

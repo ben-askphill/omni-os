@@ -8,6 +8,8 @@ import { ModelPicker } from '../ModelPicker.tsx';
 import { pickerAccounts, useAccounts } from '../../accounts.ts';
 import { currentRun, pickedRun, shownRun, threadChoice, threadRunLabels, type RunPick } from '@omni/shared/thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
+import { useAnchoredPopover } from '../ui/use-anchored-popover.ts';
+import { useExit } from '../ui/use-exit.ts';
 
 
 
@@ -18,7 +20,7 @@ const SEND_OPTIONS: { mode: SendMode; label: Term; hint: string; icon: IconName;
   { mode: 'interrupt', label: 'interrupt', hint: 'Stops the current step, then runs this', icon: 'stop', keys: [MOD, 'Shift', 'Enter'] },
 ];
 
-const halfCls = 'inline-flex h-[34px] items-center bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out select-none active:scale-[.92] disabled:opacity-25';
+const halfCls = 'inline-flex h-[34px] items-center bg-fg text-on-ink transition-[opacity,transform] duration-150 ease-out select-none motion-reduce:transition-opacity active:scale-[.92] disabled:opacity-25';
 
 /** Split button for a busy thread: Steer (or Queue when the harness can't steer), plus a menu. */
 export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disabled: boolean; busy: boolean; canSteer?: boolean; onSend: (mode: SendMode) => void }) {
@@ -26,32 +28,17 @@ export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disab
   const technical = useTechnical();
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     if (disabled || busy) setOpen(false);
   }, [disabled, busy]);
 
-  useEffect(() => {
-    if (!open) return;
-    items.current[0]?.focus();
-    const onDown = (e: PointerEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
-    };
-    // The thread page skips its Esc-to-interrupt while a [role=menu] is open, so this only closes the menu.
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.preventDefault();
-      setOpen(false);
-      trigger.current?.focus();
-    };
-    document.addEventListener('pointerdown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  // A popover over the composer, in the top layer. Escape closes only it and puts the focus back on the chevron; the
+  // thread page skips its Esc-to-interrupt while a layer is open.
+  const pop = useAnchoredPopover({ open, onDismiss: () => setOpen(false), wrap, trigger, panel, align: 'right', initialFocus: () => items.current[0] });
+  const exit = useExit(open, panel);
 
   const onMenuKey = (e: ReactKeyboardEvent) => {
     const list = items.current.filter((b): b is HTMLButtonElement => !!b);
@@ -83,7 +70,8 @@ export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disab
         aria-label="More ways to send"
         title="More ways to send"
         disabled={disabled || busy}
-        onClick={() => setOpen((o) => !o)}
+        {...pop.triggerProps}
+        onClick={() => setOpen(!pop.clickCloses())}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
@@ -94,12 +82,15 @@ export function SteerButton({ disabled, busy, canSteer = true, onSend }: { disab
       >
         <Icon name="chevronDown" size={13} />
       </button>
-      {open && (
+      {exit.shown && (
         <div
+          ref={panel}
+          {...pop.panelProps}
           role="menu"
           aria-label="Send options"
+          data-closing={exit.closing || undefined}
           onKeyDown={onMenuKey}
-          className="fade-in absolute right-0 bottom-full z-20 mb-1.5 w-72 max-w-[calc(100vw-1.5rem)] sm:w-80 rounded-[22px] bg-elev p-1.5 shadow-[var(--shadow-menu)]"
+          className={`pik-card w-72 max-w-[calc(100vw-1.5rem)] sm:w-80 ${pop.inlineClass}`}
         >
           {options.map((o, k) => (
             <button

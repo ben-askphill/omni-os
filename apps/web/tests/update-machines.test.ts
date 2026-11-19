@@ -83,14 +83,14 @@ import { UpdateMachinesCard } from '../src/pages/UpdateMachines.tsx';
 let root: Root;
 let host: HTMLDivElement;
 const flush = () => act(async () => {});
-const rows = () => [...host.querySelectorAll('li')].filter((li) => !li.closest('[role="dialog"]'));
+const rows = () => [...host.querySelectorAll('li')].filter((li) => !li.closest('dialog'));
 const row = (name: string) => rows().find((li) => li.querySelector('span.truncate')?.textContent === name)!;
 const button = (scope: ParentNode, label: string) => [...scope.querySelectorAll('button')].find((b) => b.textContent === label) as HTMLButtonElement | undefined;
 const click = async (b: HTMLButtonElement | undefined) => {
   await act(async () => b!.click());
   await flush();
 };
-const dialog = () => host.querySelector('[role="dialog"]');
+const dialog = () => host.querySelector('dialog');
 
 beforeEach(async () => {
   vi.useFakeTimers();

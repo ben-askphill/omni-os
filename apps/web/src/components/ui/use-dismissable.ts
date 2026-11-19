@@ -1,41 +1,25 @@
-import { useEffect, useRef } from 'react';
+import { useDismissLayer } from './dismiss-stack.ts';
 
 /**
- * While `active`, call `onDismiss` for a mousedown outside `root` and for Escape.
- * Either listener can be left off. The callback is read from a ref so a new function
- * identity does not detach and reattach the listeners.
+ * While `active`, call `onDismiss` for a press outside `root` and for Escape, when this is the top layer
+ * (dismiss-stack.ts): an inline confirm in a modal closes alone, and so does a menu over the annotation view.
+ * Either can be left off. The callback is read from a ref, so a new function identity changes nothing.
  */
 export function useDismissable(
   active: boolean,
   onDismiss: () => void,
   options?: {
     root?: { readonly current: HTMLElement | null };
-    /** Listen for mousedown outside `root`. Default true. */
+    /** Close on a press outside `root`. Default true. */
     outside?: boolean;
-    /** Listen for Escape. Default true. */
+    /** Close on Escape. Default true. */
     escape?: boolean;
   },
 ): void {
-  const onDismissRef = useRef(onDismiss);
-  onDismissRef.current = onDismiss;
   const root = options?.root;
-  const outside = options?.outside ?? true;
-  const escape = options?.escape ?? true;
-
-  useEffect(() => {
-    if (!active) return;
-    const onDown = (e: MouseEvent) => {
-      if (root?.current?.contains(e.target as Node)) return;
-      onDismissRef.current();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onDismissRef.current();
-    };
-    if (outside) document.addEventListener('mousedown', onDown);
-    if (escape) window.addEventListener('keydown', onKey);
-    return () => {
-      if (outside) document.removeEventListener('mousedown', onDown);
-      if (escape) window.removeEventListener('keydown', onKey);
-    };
-  }, [active, escape, outside, root]);
+  useDismissLayer(active, {
+    roots: () => [root?.current],
+    escape: options?.escape === false ? undefined : () => onDismiss(),
+    outside: options?.outside === false ? undefined : onDismiss,
+  });
 }

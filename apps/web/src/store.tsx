@@ -99,17 +99,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void loadDisplay();
   }, [reloadChannels, reloadStatus, reloadCrew, reloadTasks, reloadNeedsYou]);
 
-  // Thread events arrive in bursts; refresh running counts at most every ~0.5s.
+  // Thread events arrive in bursts; refresh running counts at most every ~0.5s. While the page is hidden only Needs you
+  // reloads (it drives notifications); the channel list and running counts wait for the page to come back.
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const missed = useRef(false);
   const scheduleRefresh = useCallback(() => {
     if (refreshTimer.current) return;
     refreshTimer.current = setTimeout(() => {
       refreshTimer.current = undefined;
+      reloadNeedsYou();
+      if (document.visibilityState === 'hidden') {
+        missed.current = true;
+        return;
+      }
       void reloadChannels();
       void reloadStatus();
-      reloadNeedsYou();
     }, 500);
   }, [reloadChannels, reloadStatus, reloadNeedsYou]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || !missed.current) return;
+      missed.current = false;
+      void reloadChannels();
+      void reloadStatus();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [reloadChannels, reloadStatus]);
 
   useEffect(() => {
     const emit = (e: FeedEvent) => listeners.current.forEach((fn) => fn(e));
@@ -328,17 +344,6 @@ export function useSyncOnReturn() {
       sync.cancel();
     };
   }, []);
-}
-
-/** True while the tab is on screen. */
-export function usePageVisible() {
-  const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
-  useEffect(() => {
-    const on = () => setVisible(document.visibilityState === 'visible');
-    document.addEventListener('visibilitychange', on);
-    return () => document.removeEventListener('visibilitychange', on);
-  }, []);
-  return visible;
 }
 
 /** Where the server keeps secret values, as a sentence names it: "the server Mac's Keychain". */

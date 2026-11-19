@@ -6,12 +6,12 @@ import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRu
 import { apiUrl } from '../api-base.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { AUTO, AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
-import { Avatar, Button, ErrorNote, FolderInput, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
+import { Avatar, Button, ErrorNote, fieldDescribedBy, fieldHintId, FolderInput, Icon, IDENTIFIER, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle, useFieldErrors } from '../components/ui.tsx';
 import { CHANNEL_GLYPHS, CONDUCTOR_CHANNEL, glyphIcon, parseChannelIcon, readSvgIcon } from '@omni/shared/channel-icon.ts';
 import { readDesignSystem } from '@omni/shared/design-system.ts';
 import { bytes } from '@omni/shared/format.ts';
 import { lastGrapheme } from '../format.ts';
-import { channelBody, channelForm, channelFormProblem, CHANNEL_ID, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelRun } from '@omni/shared/channel-form.ts';
+import { channelBody, channelForm, channelFormProblems, CHANNEL_ID, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelRun } from '@omni/shared/channel-form.ts';
 import { PR_STEPS, STEP_LABEL, STEP_PROMPTS } from '@omni/shared/thread-glance.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -20,12 +20,16 @@ import { pageColumn } from '../components/ui/feedback.tsx';
 import { Advanced, Card } from './settings-parts.tsx';
 import { AccessCard } from './ChannelAccess.tsx';
 
+/** The control each of channelFormProblems' fields belongs to; the avatar background's is the color picker's own. */
+const FIELD_ID = { name: 'ch-name', avatar_bg: 'ch-avatar-bg', id: 'ch-id', worktree_include: 'ch-wt-include', worktree_shared: 'ch-wt-shared' } as const;
+const FIELD_OF = Object.fromEntries(Object.entries(FIELD_ID).map(([k, id]) => [id, k])) as Record<string, keyof typeof FIELD_ID>;
+
 /** Settings' channel scope still imports the card by this name. */
 
-function Field({ label, hint, children, htmlFor }: { label: string; hint?: ReactNode; children: ReactNode; htmlFor?: string }) {
+function Field({ label, hint, children, htmlFor, error }: { label: string; hint?: ReactNode; children: ReactNode; htmlFor?: string; error?: string }) {
   return (
     <div>
-      <Label hint={hint} htmlFor={htmlFor}>
+      <Label hint={hint} htmlFor={htmlFor} error={error}>
         {label}
       </Label>
       {children}
@@ -58,7 +62,7 @@ const SVG_FILE_MAX = 512 * 1024;
  * A channel's or crew role's icon: an emoji, one of the shared icons or, unless `svg` is off, an uploaded SVG. A crew
  * role's lives in its markdown file, where an SVG would not read.
  */
-export function IconPicker({ value, name, avatarBg, omni, onChange, svg = true, inputId = 'ch-icon', preview }: { avatarBg?: string; value: string; name: string; omni?: boolean; onChange: (v: string) => void; svg?: boolean; inputId?: string; preview?: ReactNode }) {
+export function IconPicker({ value, name, avatarBg, omni, onChange, svg = true, inputId = 'ch-icon', describedBy, preview }: { avatarBg?: string; value: string; name: string; omni?: boolean; onChange: (v: string) => void; svg?: boolean; inputId?: string; describedBy?: string; preview?: ReactNode }) {
   const mark = parseChannelIcon(value);
   const fileRef = useRef<HTMLInputElement>(null);
   const [svgError, setSvgError] = useState<string | null>(null);
@@ -83,6 +87,7 @@ export function IconPicker({ value, name, avatarBg, omni, onChange, svg = true, 
         {preview ?? <Avatar name={name} omni={omni} channelIcon={value} avatarBg={avatarBg} size={36} />}
         <input
           id={inputId}
+          aria-describedby={describedBy}
           className="field w-24 text-center !text-[18px] placeholder:!text-[13px]"
           value={mark?.kind === 'emoji' ? mark.text : ''}
           onChange={(e) => change(lastGrapheme(e.target.value))}
@@ -259,11 +264,24 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   const showId = isNew && (idFailed || !!editing.id);
   const showGithub = hasRepo && (githubFailed || !!editing.github);
   const showBase = !hasRepo && (!!f.base_dir.trim() || !!editing.base);
+  const found = channelFormProblems(f, isNew);
+  const problems = useFieldErrors(Object.fromEntries(Object.entries(found).map(([k, p]) => [FIELD_ID[k as keyof typeof found], p])));
+  const fieldError = (k: keyof typeof found) => problems.error(FIELD_ID[k]);
+  // Where each field shows once its problem does (a problem opens the Advanced fold). The avatar background has no
+  // field of its own: the picker only ever sets a valid color.
+  const onPage: Record<keyof typeof found, boolean> = { name: true, avatar_bg: false, id: showId, worktree_include: hasRepo && f.use_worktree, worktree_shared: hasRepo && f.use_worktree };
+  /** The control's validation attributes: aria-invalid, its hint and error, and onBlur. */
+  const check = (k: keyof typeof found, hint?: boolean) => ({
+    'aria-invalid': problems.invalid(FIELD_ID[k]),
+    'aria-describedby': fieldDescribedBy(FIELD_ID[k], { hint, error: fieldError(k) }),
+    onBlur: problems.onBlur,
+  });
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const problem = channelFormProblem(f, isNew);
-    if (problem) return setError(problem);
+    const blocked = problems.submit();
+    // A problem whose field the form does not show says so in the form instead.
+    if (blocked) return setError(onPage[FIELD_OF[blocked.id]] ? null : blocked.message);
     setBusy(true);
     setError(null);
     // The GitHub repo goes only when typed, so the server reads it from the repo path: on create, and when the path changes.
@@ -302,13 +320,13 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-4" noValidate>
       <Card title="Basics">
-        <Field label="Name" htmlFor="ch-name">
-          <input id="ch-name" className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
+        <Field label="Name" htmlFor="ch-name" error={fieldError('name')}>
+          <input id="ch-name" required {...check('name')} className="field" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Acme" autoFocus={isNew} />
         </Field>
         <Field label="Icon" htmlFor="ch-icon" hint={`Shown in the sidebar and on the channel. Type an emoji (Ctrl+Cmd+Space opens the picker), upload an SVG or pick an icon. Empty uses ${isConductor ? 'the Omni mark' : 'the first letter'}.`}>
-          <IconPicker avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} omni={isConductor} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
+          <IconPicker describedBy={fieldHintId('ch-icon')} avatarBg={f.avatar_bg} value={f.icon} name={f.name || f.id} omni={isConductor} onChange={(v) => { setSaved(false); setF((prev) => ({ ...prev, icon: v, ...(!prev.avatar_bg_manual ? { avatar_bg: autoAvatarColor(v) ?? '' } : {}) })); }} />
         </Field>
         <Field label="Avatar background" hint="Automatic follows the avatar. A custom color stays when you change the icon.">
           <AvatarColorPicker icon={f.icon} name={f.name || f.id} omni={isConductor} value={f.avatar_bg} manual={!!f.avatar_bg_manual}
@@ -318,7 +336,6 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         {!isSystem && (
           <Field label="Kind">
             <Segmented
-              radio
               label="Kind"
               value={f.kind}
               onChange={(k) => set('kind', k)}
@@ -338,7 +355,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
           </Field>
         )}
         <Field label="Notes" htmlFor="ch-notes" hint="Added to every thread's system prompt in this channel. Keep it short: who the client is, conventions, what not to touch.">
-          <textarea id="ch-notes" className="field min-h-[84px] resize-y" value={f.notes} onChange={(e) => set('notes', e.target.value)} />
+          <textarea id="ch-notes" aria-describedby={fieldHintId('ch-notes')} className="field min-h-[84px] resize-y" value={f.notes} onChange={(e) => set('notes', e.target.value)} />
         </Field>
       </Card>
 
@@ -359,7 +376,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
       <Card title="Code">
         <Field label="Repo path" htmlFor="ch-repo" hint="Absolute path to a local git repo. Omni reads its GitHub repo from it, and it enables per-thread worktrees and the PRs tab.">
-          <FolderInput id="ch-repo" dialogTitle="Repo folder" value={f.repo_path} onChange={(v) => set('repo_path', v)} placeholder="~/code/acme-theme" spellCheck={false} />
+          <FolderInput id="ch-repo" aria-describedby={fieldHintId('ch-repo')} dialogTitle="Repo folder" value={f.repo_path} onChange={(v) => set('repo_path', v)} placeholder="~/code/acme-theme" />
         </Field>
       </Card>
 
@@ -385,10 +402,10 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         <Card title="Store">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
-              <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" spellCheck={false} />
+              <input id="ch-store" aria-describedby={fieldHintId('ch-store')} {...IDENTIFIER} className="field field-mono" inputMode="url" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" />
             </Field>
             <Field label="Client portal slug" htmlFor="ch-portal" hint="The company's slug in your client portal, for client context.">
-              <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" spellCheck={false} />
+              <input id="ch-portal" aria-describedby={fieldHintId('ch-portal')} {...IDENTIFIER} className="field field-mono" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" />
             </Field>
           </div>
         </Card>
@@ -396,19 +413,22 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
 
       {/* Id, GitHub repo and base directory fill themselves in; each shows as a field only when Omni could not work
           it out or you choose to change it, and a failure opens the fold (#405). */}
-      <Advanced summary="Id, GitHub repo, worktrees, the browser window and usage scans" open={idFailed || githubFailed}>
+      <Advanced summary="Id, GitHub repo, worktrees, the browser window and usage scans" open={idFailed || githubFailed || !!(fieldError('id') || fieldError('worktree_include') || fieldError('worktree_shared'))}>
         {showId ? (
-          <Field label="Id" htmlFor="ch-id" hint="Lowercase slug, used in URLs and by the Conductor. Cannot change later.">
+          <Field label="Id" htmlFor="ch-id" hint="Lowercase slug, used in URLs and by the Conductor. Cannot change later." error={fieldError('id')}>
             <input
               id="ch-id"
-              className="field font-mono !text-[13px]"
+              required
+              pattern="[a-z0-9\-]{2,40}"
+              {...check('id', true)}
+              {...IDENTIFIER}
+              className="field field-mono"
               value={f.id}
               onChange={(e) => {
                 setIdTouched(true);
                 set('id', e.target.value.toLowerCase());
               }}
               placeholder="acme"
-              aria-invalid={!!f.id && !idValid}
             />
           </Field>
         ) : (
@@ -426,7 +446,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
               htmlFor="ch-gh"
               hint={githubFailed ? 'Omni could not read it from the repo path. Type owner/name, or leave it empty to try again on save.' : 'owner/name. Empty reads it from the repo path again.'}
             >
-              <input id="ch-gh" className="field font-mono !text-[13px]" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="acme/acme-theme" spellCheck={false} />
+              <input id="ch-gh" aria-describedby={fieldHintId('ch-gh')} {...IDENTIFIER} className="field field-mono" value={f.github_repo} onChange={(e) => set('github_repo', e.target.value)} placeholder="acme/acme-theme" />
             </Field>
           ) : (
             <AutoValue
@@ -439,7 +459,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         {!hasRepo &&
           (showBase ? (
             <Field label="Base directory" htmlFor="ch-base" hint="Where threads run when there is no repo. Empty uses your workspace folder (Settings), so its CLAUDE.md and skills load.">
-              <FolderInput id="ch-base" dialogTitle="Base directory" value={f.base_dir} onChange={(v) => set('base_dir', v)} placeholder="~/Omni" spellCheck={false} />
+              <FolderInput id="ch-base" aria-describedby={fieldHintId('ch-base')} dialogTitle="Base directory" value={f.base_dir} onChange={(v) => set('base_dir', v)} placeholder="~/Omni" />
             </Field>
           ) : (
             <AutoValue label="Base directory" value="Your workspace folder" note="No repo, so threads run there" onEdit={() => setEditing((e) => ({ ...e, base: true }))} />
@@ -456,11 +476,13 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             <Field
               label="Copy into new worktrees"
               htmlFor="ch-wt-include"
+              error={fieldError('worktree_include')}
               hint="Ignored files each new worktree gets from the main checkout, one per line in .gitignore syntax, such as .env. Added to the repo's own .worktreeinclude."
             >
               <textarea
                 id="ch-wt-include"
-                className="field min-h-[68px] resize-y font-mono !text-[13px]"
+                {...check('worktree_include', true)}
+                className="field field-mono min-h-[68px] resize-y"
                 value={f.worktree_include}
                 onChange={(e) => set('worktree_include', e.target.value)}
                 placeholder={'.env\nshopify.theme.toml'}
@@ -470,11 +492,13 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
             <Field
               label="Shared directories"
               htmlFor="ch-wt-shared"
+              error={fieldError('worktree_shared')}
               hint="Folders each new worktree links to in the main checkout instead of installing again, one path per line, such as node_modules. A folder the main checkout lacks is skipped."
             >
               <textarea
                 id="ch-wt-shared"
-                className="field min-h-[68px] resize-y font-mono !text-[13px]"
+                {...check('worktree_shared', true)}
+                className="field field-mono min-h-[68px] resize-y"
                 value={f.worktree_shared}
                 onChange={(e) => set('worktree_shared', e.target.value)}
                 placeholder="node_modules"

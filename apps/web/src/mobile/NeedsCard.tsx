@@ -36,7 +36,7 @@ export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
       try {
         if (await markDone(card.thread, true)) shell.toast(DONE.done!);
       } catch (e) {
-        shell.toast(errorText(e));
+        shell.toast(errorText(e), 'error');
       } finally {
         setBusy(null);
       }
@@ -49,7 +49,7 @@ export function useNeedsAction(onRecovered?: (r: Recovered) => void) {
       onRecovered?.(res);
       shell.toast(a.kind === 'retry' && signin ? (a.skipSignIn ? 'Starting without the sign-in check' : 'Checking the sign-in again') : (DONE[a.kind] ?? a.label));
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     } finally {
       setBusy(null);
     }

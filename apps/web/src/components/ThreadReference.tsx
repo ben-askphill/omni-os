@@ -147,7 +147,7 @@ export function ReferenceThreadButton({ to, disabled }: { to: ReferenceTarget; d
   useDismissable(open, () => setOpen(false), { root: wrap });
   return (
     <div ref={wrap} className="relative">
-      <IconButton icon="message" label="Reference a thread" size={15} disabled={disabled} active={open} onClick={() => setOpen((o) => !o)} />
+      <IconButton icon="message" label="Reference a thread" size={15} disabled={disabled} active={open} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
       {open && (
         <div role="dialog" aria-label="Reference a thread" className={`pop-in absolute top-[calc(100%+8px)] left-0 z-30 w-[min(23rem,calc(100vw-2rem))] ${MENU_SURFACE}`}>
           <ThreadReferencePanel to={to} onPicked={() => setOpen(false)} />

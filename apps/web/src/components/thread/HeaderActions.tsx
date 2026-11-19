@@ -4,7 +4,7 @@ import type { TurnPhase } from '@omni/shared/status.ts';
 import { canMarkDone } from '../../needs-you.ts';
 import { useNeedOf, useNow } from '../../store.tsx';
 import { threadPill } from './thread-state.ts';
-import { openMenu } from '../ContextMenu.tsx';
+import { closeMenu, openMenu, useMenuOpenFor } from '../ContextMenu.tsx';
 import { Button, IconButton, StatusPill } from '../ui.tsx';
 
 // The header keeps the context meter, Done (Restore on an archived thread), the status, the thread menu and the panel
@@ -43,6 +43,7 @@ export function HeaderActions({
   /** The pull request on the thread's branch: finished with one open, the pill reads Ready for review. */
   pr?: { state?: string; isDraft: boolean } | null;
 }) {
+  const menuOpen = useMenuOpenFor('thread', thread.id);
   const now = useNow(60_000);
   const need = useNeedOf(thread.id);
   const pill = threadPill(thread, { asking, reconnecting, now, turn, need, pr });
@@ -73,9 +74,11 @@ export function HeaderActions({
         icon="more"
         label="Thread actions"
         aria-haspopup="menu"
+        aria-expanded={menuOpen}
         onClick={(e) => {
+          if (menuOpen) return closeMenu();
           const r = e.currentTarget.getBoundingClientRect();
-          openMenu({ kind: 'thread', id: thread.id }, r.right, r.bottom + 6, 'end');
+          openMenu({ kind: 'thread', id: thread.id }, r.right, r.bottom + 6, 'end', e.currentTarget);
         }}
       />
       <span className="relative">

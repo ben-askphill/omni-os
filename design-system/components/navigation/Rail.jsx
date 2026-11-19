@@ -132,7 +132,7 @@ export function Rail({ channels = [], activeId, onSelect, conductor = { state: '
           {onTheme && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 8 }}>
               <span className="om-caption">Theme</span>
-              <Segmented radio size="sm" label="Theme" value={theme || 'light'} onChange={onTheme} options={[{ id: 'light', icon: 'sun', title: 'Light' }, { id: 'system', icon: 'monitor', title: 'Match system' }, { id: 'dark', icon: 'moon', title: 'Dark' }]} />
+              <Segmented size="sm" label="Theme" value={theme || 'light'} onChange={onTheme} options={[{ id: 'light', icon: 'sun', title: 'Light' }, { id: 'system', icon: 'monitor', title: 'Match system' }, { id: 'dark', icon: 'moon', title: 'Dark' }]} />
             </div>
           )}
         </div>

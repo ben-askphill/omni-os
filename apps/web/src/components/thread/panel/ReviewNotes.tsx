@@ -28,6 +28,7 @@ import { ShellCtx } from '../../../mobile/shell.tsx';
 import { useFeed } from '../../../store.tsx';
 import type { LineNotes } from '../../DiffViewer.tsx';
 import { Button, Chip, ErrorNote, Icon, IconButton, Picker, type PickerOption } from '../../ui.tsx';
+import { isImeEnter } from '../../../ime.ts';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
@@ -359,7 +360,7 @@ export function NoteCard({ note, place, actions, inline = false }: { note: Revie
               setError(null);
             }}
             onKeyDown={(e) => {
-              if (e.nativeEvent.isComposing) return;
+              if (isImeEnter(e)) return;
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 void save();

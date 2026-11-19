@@ -1,5 +1,5 @@
 {
-  "kinds": ["diff_selection", "terminal_excerpt", "browser_annotation", "thread_reference"],
+  "kinds": ["diff_selection", "terminal_excerpt", "browser_annotation", "thread_reference", "machine_mention"],
   "records": [
     {
       "name": "a diff selection",
@@ -275,6 +275,53 @@
         "id": "e2b6a4c8-1d7f-4b95-8a03-6c9e5f1b3d72",
         "label": "Thread: Fix the cart total (Shop · 7d3e91a0)",
         "note": "the cart fix I mean"
+      }
+    },
+    {
+      "name": "a machine mention",
+      "raw": {
+        "id": "a41f0c2e-6b8d-4e17-9c35-2d7e8f1a0b64",
+        "kind": "machine_mention",
+        "v": 1,
+        "label": "@omarchy",
+        "note": "",
+        "body": {
+          "machine": "9c364d1b-a954-4cb8-b584-7679fc64c5da",
+          "name": "omarchy",
+          "reachability": "offline",
+          "last_seen": "2026-11-19T08:00:00.000Z",
+          "captured_at": "2026-11-19T12:00:00.000Z"
+        }
+      },
+      "expect": {
+        "as": "known",
+        "id": "a41f0c2e-6b8d-4e17-9c35-2d7e8f1a0b64",
+        "label": "@omarchy",
+        "note": ""
+      }
+    },
+    {
+      "name": "a machine mention of a newer version",
+      "raw": {
+        "id": "a41f0c2e-6b8d-4e17-9c35-2d7e8f1a0b64",
+        "kind": "machine_mention",
+        "v": 2,
+        "label": "@omarchy",
+        "note": "",
+        "body": {
+          "machine": "9c364d1b-a954-4cb8-b584-7679fc64c5da",
+          "name": "omarchy",
+          "reachability": "offline",
+          "last_seen": "2026-11-19T08:00:00.000Z",
+          "captured_at": "2026-11-19T12:00:00.000Z"
+        }
+      },
+      "expect": {
+        "as": "fallback",
+        "why": "newer_version",
+        "id": "a41f0c2e-6b8d-4e17-9c35-2d7e8f1a0b64",
+        "label": "@omarchy",
+        "note": ""
       }
     }
   ],

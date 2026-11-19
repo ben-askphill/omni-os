@@ -1,26 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { effortWord, term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import type { HarnessWithRunning } from '../api.ts';
 import type { PickerAccounts } from '../accounts.ts';
 import { Icon, Picker, type PickerOption } from './ui.tsx';
 import { HarnessLogo } from './brand.tsx';
-import { ModelList } from './model-picker/ModelList.tsx';
+import { ModelList, listedChoices } from './model-picker/ModelList.tsx';
+import { useAnchoredPopover } from './ui/use-anchored-popover.ts';
+import { useListbox } from './ui/use-listbox.ts';
+import { useExit } from './ui/use-exit.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
 import { pickerModels } from '@omni/shared/model-visibility.ts';
 
 export interface ModelChoice {
   harness: string;
   model: string;
-}
-
-/** The open list's height: the search field and the 320px list. */
-const LIST_HEIGHT = 380;
-
-/** Under a thread the pill sits at the bottom of the page, so the list opens upward when it has no room below. */
-function opensUp(btn: HTMLElement | null) {
-  const r = btn?.getBoundingClientRect();
-  return !!r && window.innerHeight - r.bottom < LIST_HEIGHT && r.top > window.innerHeight - r.bottom;
 }
 
 /**
@@ -30,6 +24,10 @@ function opensUp(btn: HTMLElement | null) {
  * isn't installed or logged in shows disabled with the command that fixes it. `onOpen` fires as
  * the list opens, so the caller can refetch and a fresh login shows up without a reload. With `effort`, the pill also
  * reads the effort ("Sonnet 5.5 · high") and the list ends with the picked model's levels, as the phone's model sheet.
+ *
+ * The list is a top-layer popover tethered to the pill, as the shared Picker's: under a thread the pill sits at the
+ * bottom of the page, so it opens upward when there is no room below. The search field is a combobox: the arrow keys,
+ * Enter and Escape work from it, and `aria-activedescendant` names the model under the cursor.
  */
 export function ModelPicker({
   harnesses,
@@ -69,10 +67,13 @@ export function ModelPicker({
   accounts?: PickerAccounts | null;
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
-  const [up, setUp] = useState(false);
   const [q, setQ] = useState('');
   const wrap = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
+  const card = useRef<HTMLDivElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  /** The list opened from the keyboard, so its cursor shows the focus ring. */
+  const openedByKey = useRef(false);
 
   const auto = asksAuto(value);
   const current = useMemo(() => {
@@ -93,6 +94,18 @@ export function ModelPicker({
     });
   }, [harnesses, q, value]);
   const showAuto = offerAuto && 'auto'.includes(q.trim().toLowerCase());
+  const choices = listedChoices(groups, showAuto);
+  const list = useListbox(choices.length, open);
+  const exit = useExit(open, card);
+  const pop = useAnchoredPopover({ open, onDismiss: () => setOpen(false), wrap, trigger: btn, panel: card, initialFocus: () => search.current });
+
+  // On the picked model as the list opens. The search is empty by then, so the choices are the whole list.
+  useLayoutEffect(() => {
+    if (!open) return;
+    list.reset(Math.max(0, choices.findIndex((c) => c.harness === value.harness && c.model === value.model)), openedByKey.current);
+    openedByKey.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     if (defaultOpen) onOpen?.();
@@ -103,24 +116,24 @@ export function ModelPicker({
     if (!openRequest) return;
     onOpen?.();
     setQ('');
-    setUp(opensUp(btn.current));
+    openedByKey.current = true;
     setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [open]);
-
+  const openList = (byKey: boolean) => {
+    onOpen?.();
+    setQ('');
+    openedByKey.current = byKey;
+    setOpen(true);
+  };
+  const close = (refocus = true) => {
+    setOpen(false);
+    if (refocus) btn.current?.focus();
+  };
   const pick = (v: ModelChoice) => {
     onChange(v);
-    setOpen(false);
-    btn.current?.focus();
+    close();
   };
 
   const technical = useTechnical();
@@ -136,18 +149,20 @@ export function ModelPicker({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? list.listId : undefined}
         disabled={disabled}
         aria-label={
           auto
             ? 'Model: Auto'
             : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${effortShown ? `, ${term('effort', technical).toLowerCase()} ${effortShown}` : ''}`
         }
-        onClick={() => {
-          if (!open) {
-            onOpen?.();
-            setUp(opensUp(btn.current));
+        {...pop.triggerProps}
+        onClick={(e) => (pop.clickCloses() ? close() : openList(e.detail === 0))}
+        onKeyDown={(e) => {
+          if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            openList(true);
           }
-          setOpen(!open);
         }}
         className="press inline-flex h-8 max-w-full items-center gap-2 rounded-full bg-surface-2 pr-2.5 pl-1 text-[12.5px] text-fg transition-colors hover:bg-surface-3 disabled:opacity-45"
       >
@@ -168,20 +183,65 @@ export function ModelPicker({
         )}
         <Icon name="chevronDown" size={13} className="text-fg-3" />
       </button>
-      {open && (
-        <div className={`pik-card w-[min(340px,calc(100vw-32px))] left-0 ${up ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'}`} data-up={up || undefined}>
+      {exit.shown && (
+        <div
+          ref={card}
+          {...pop.panelProps}
+          data-closing={exit.closing || undefined}
+          className={`pik-card w-[min(340px,calc(100vw-32px))] ${pop.inlineClass}`}
+          data-keys={list.keyed || undefined}
+          // Escape from anywhere in the list, the effort levels too; the search field's own keys run first.
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            e.stopPropagation();
+            close();
+          }}
+          // Tab or Shift+Tab out of it closes it, as the shared Picker's Tab does. A press on its own padding moves the
+          // focus nowhere and leaves it open.
+          onBlur={(e) => {
+            if (e.relatedTarget && !card.current?.contains(e.relatedTarget)) close(false);
+          }}
+        >
           <label className="mb-1 flex h-10 items-center gap-2 rounded-2xl bg-surface px-3 text-fg-3">
             <Icon name="search" size={14} />
             <input
-              autoFocus
+              ref={search}
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => {
+                setQ(e.target.value);
+                list.reset(0, list.keyed);
+              }}
+              onKeyDown={(e) => {
+                list.onKeyDown(e, {
+                  onPick: (i) => choices[i] && pick(choices[i]),
+                  onClose: (refocus) => refocus && close(),
+                });
+              }}
+              role="combobox"
+              aria-expanded="true"
+              aria-controls={list.listId}
+              aria-autocomplete="list"
+              aria-activedescendant={list.cursor >= 0 ? list.optionId(list.cursor) : undefined}
               placeholder={term('findModel', technical)}
               aria-label={term('findModel', technical)}
-              className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
+              className="field-sm h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-4"
             />
           </label>
-          <ModelList groups={groups} showAuto={showAuto} auto={auto} value={value} query={q} onPick={pick} accounts={accounts} />
+          <ModelList
+            groups={groups}
+            showAuto={showAuto}
+            auto={auto}
+            value={value}
+            query={q}
+            onPick={pick}
+            accounts={accounts}
+            listId={list.listId}
+            optionId={list.optionId}
+            cursor={list.cursor}
+            onHover={list.hover}
+            scroller={list.scroller}
+          />
           {levels && levels.efforts.length > 0 && (
             <div className="mt-1 border-t border-line px-2 pt-2 pb-1">
               <div className="caption mb-1.5 px-1">
@@ -196,8 +256,7 @@ export function ModelPicker({
                     aria-checked={effort!.value === e}
                     onClick={() => {
                       effort!.onChange(e);
-                      setOpen(false);
-                      btn.current?.focus();
+                      close();
                     }}
                     className="press h-7 rounded-full px-2.5 text-[12px] text-fg-2 transition-colors hover:bg-surface-3 hover:text-fg aria-checked:bg-fg aria-checked:text-on-ink"
                   >

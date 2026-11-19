@@ -157,7 +157,8 @@ function Rows({ threads, showChannel, prs, draggable, handoffs = [] }: {
   handoffs?: ChannelWithRunning['handoffs'];
 }) {
   return (
-    <div className="rise">
+    // The day or folder header sticks over the top of the list: a row that takes focus stops below it.
+    <div className="rise **:scroll-mt-10">
       {threads.map((t, i) => (
         <div
           key={t.id}
@@ -294,7 +295,7 @@ export function ArchivedThreads({ channelId }: { channelId: string }) {
         </button>
       </h3>
       {open && (
-        <div className="rise">
+        <div className="rise **:scroll-mt-10">
           {list.data!.map((t, i) => (
             <ArchivedRow key={t.id} t={t} i={i} />
           ))}

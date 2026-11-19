@@ -25,7 +25,7 @@ function PageScreen({ route }: { route: Route }) {
   return (
     <>
       <MoHeader onBack={shell.back} title={pageTitle(route, (id) => channel(id)?.name)} />
-      <div className="relative min-h-0 flex-1 overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="safe-b relative min-h-0 flex-1 overflow-hidden">
         <Page route={route} />
       </div>
     </>
