@@ -19,16 +19,29 @@ export function useReveal(scrollRef: RefObject<HTMLElement | null>, target: numb
       rows.map((r) => Number(r.dataset.key)),
       target,
     );
-    const row = rows.find((r) => Number(r.dataset.key) === key);
+    const at = rows.findIndex((r) => Number(r.dataset.key) === key);
+    const row = rows[at];
     if (!row) return;
-    const box = el.getBoundingClientRect();
+    // An older row out of view is only a placeholder (.tx-row). The row and the ones that will show above it render
+    // now, so it lands on their real heights and none of them changes size under it once it is there.
+    const shown = [row];
+    row.style.contentVisibility = 'visible';
     const r = row.getBoundingClientRect();
     const offset = center ? Math.max(8, (el.clientHeight - r.height) / 2) : 8;
-    el.scrollTop += r.top - box.top - offset;
+    for (let i = at - 1, room = offset; i >= 0 && room > 0; i--) {
+      rows[i].style.contentVisibility = 'visible';
+      shown.push(rows[i]);
+      room -= rows[i].getBoundingClientRect().height;
+    }
+    el.scrollTop += row.getBoundingClientRect().top - el.getBoundingClientRect().top - offset;
     row.classList.remove('flash');
     void row.offsetWidth;
     row.classList.add('flash');
-    setTimeout(() => row.classList.remove('flash'), FLASH_MS);
+    setTimeout(() => {
+      row.classList.remove('flash');
+      // They can skip again once they scroll away.
+      for (const x of shown) x.style.contentVisibility = '';
+    }, FLASH_MS);
     after.current();
   }, [target, content]); // eslint-disable-line react-hooks/exhaustive-deps
 }

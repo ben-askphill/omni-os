@@ -68,7 +68,7 @@ function BrowserNotifications({ scoped }: { scoped?: string }) {
 
 function AppNotifications({ bridge, scoped }: { bridge: DesktopBridge; scoped?: string }) {
   const { settings, error, save } = useDesktopSettings(bridge);
-  if (!settings) return error ? <ErrorNote>{error}</ErrorNote> : <Loader />;
+  if (!settings) return error ? <ErrorNote>{error}</ErrorNote> : <Loader label="Loading" />;
   const prefs = settings.notifications;
   const mac = bridge.platform === 'darwin';
   const origin = <Origin of="device" label="This app" />;

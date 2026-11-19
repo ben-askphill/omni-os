@@ -7,6 +7,7 @@ import { parseSlash } from '@omni/shared/slash.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
 import type { DraftRun } from '@omni/shared/draft-run.ts';
 import { type SlashCommand } from '@omni/shared/slash.ts';
+import { isImeEnter } from '../../ime.ts';
 
 
 /**
@@ -73,8 +74,7 @@ export function useSlashMenu({
 
   /** Arrow keys, Enter, Tab and Esc drive the menu while it is open. True when the key was used. */
   const onKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    // 229: Safari's Enter that ends an IME composition, which it doesn't flag as composing.
-    if (!open || e.nativeEvent.isComposing || e.keyCode === 229) return false;
+    if (!open || isImeEnter(e)) return false;
     const n = items.length;
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
       moveTo((active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n);

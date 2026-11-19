@@ -198,7 +198,7 @@ describe('the phone card\'s Done question', () => {
     await render(createElement(DoneConfirmProvider, null, createElement(NeedsActions, { card })));
     const done = [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Mark done')!;
     await act(async () => done.click());
-    const dialog = document.querySelector('[role="dialog"]');
+    const dialog = document.querySelector('dialog');
     expect(dialog?.textContent).toContain('Under Ship the thread tree, 1 still runs');
     expect(dialog?.textContent).not.toContain('Untitled');
   });

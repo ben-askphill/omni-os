@@ -5,6 +5,7 @@ import type { AskP } from './ask.ts';
 import type { ThreadQuestion } from './question.ts';
 import type { Clipped, Span } from './history.ts';
 import { cloudStatus } from './cloud-agent.ts';
+import { connectorOf, isOutsideConnector, type Connector } from './connectors.ts';
 import { turnSteps, type StepsView } from './steps.ts';
 import { buildItems, isAsking, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
 
@@ -76,6 +77,8 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
 export interface NowDoing {
   verb: string;
   target: string;
+  /** The outside connector it uses, for its mark. */
+  connector?: Connector;
 }
 
 export interface ThreadView<A extends TurnArtifact = TurnArtifact, C extends TurnChild = TurnChild> {
@@ -107,7 +110,12 @@ const VERB: Record<string, string> = {
 };
 
 export function nowDoing(call: Pick<ToolCall, 'name' | 'input'>, cwd?: string | null): NowDoing {
-  return { verb: VERB[call.name] ?? `Using ${toolLabel(call.name)}`, target: call.name === 'TodoWrite' ? '' : toolSummary(call, cwd) };
+  const target = call.name === 'TodoWrite' ? '' : toolSummary(call, cwd);
+  if (VERB[call.name]) return { verb: VERB[call.name], target };
+  // An outside connector by its own name and mark: "Using Granola", not "Using claude_ai_Granola · search_meetings".
+  const app = connectorOf(call.name);
+  if (isOutsideConnector(app)) return { verb: `Using ${app.name}`, target, connector: app };
+  return { verb: `Using ${toolLabel(call.name)}`, target };
 }
 
 const walk = (calls: ToolCall[], fn: (c: ToolCall) => void) => {

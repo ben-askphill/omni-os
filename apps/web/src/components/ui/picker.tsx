@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar } from './primitives.tsx';
-import { useDismissable } from './use-dismissable.ts';
+import { useAnchoredPopover } from './use-anchored-popover.ts';
+import { useListbox } from './use-listbox.ts';
+import { useExit } from './use-exit.ts';
 
 // ---------- picker (Bencho "pik") ----------
 
@@ -23,6 +25,13 @@ export interface PickerOption<T extends string> {
   disabled?: boolean;
 }
 
+
+/**
+ * A pill or field that opens a list to pick one option from. The list is a top-layer popover tethered to the pill
+ * (`useAnchoredPopover`), so it shows whole inside a modal. With a search field (`searchable`, or more than seven
+ * options) the field is a combobox; without, the list takes the focus. Either way `aria-activedescendant` names the
+ * option under the cursor, so a screen reader reads it as the arrow keys move.
+ */
 export function Picker<T extends string>({
   value,
   options,
@@ -52,26 +61,33 @@ export function Picker<T extends string>({
   describedBy?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [up, setUp] = useState(false);
-  const [cursor, setCursor] = useState(0);
   const [q, setQ] = useState('');
   const wrap = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
-  const list = useRef<HTMLDivElement>(null);
+  const card = useRef<HTMLDivElement>(null);
+  const search = useRef<HTMLInputElement>(null);
   const current = options.find((o) => o.value === value);
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
     return s ? options.filter((o) => `${o.label} ${o.sub ?? ''}`.toLowerCase().includes(s)) : options;
   }, [options, q]);
   const canSearch = searchable ?? options.length > 7;
+  const list = useListbox(shown.length, open);
+  const exit = useExit(open, card);
+  const pop = useAnchoredPopover({
+    open,
+    onDismiss: () => setOpen(false),
+    wrap,
+    trigger: btn,
+    panel: card,
+    align,
+    initialFocus: () => (canSearch ? search.current : list.scroller.current),
+  });
 
-  const openMenu = () => {
+  const openMenu = (byKey: boolean) => {
     if (disabled) return;
-    const r = btn.current?.getBoundingClientRect();
-    const need = Math.min(options.length * 44 + (canSearch ? 52 : 0) + 16, 340);
-    setUp(!!r && window.innerHeight - r.bottom < need && r.top > window.innerHeight - r.bottom);
     setQ('');
-    setCursor(Math.max(0, options.findIndex((o) => o.value === value)));
+    list.reset(Math.max(0, options.findIndex((o) => o.value === value)), byKey);
     setOpen(true);
   };
   const close = (refocus = true) => {
@@ -82,35 +98,7 @@ export function Picker<T extends string>({
     onChange(o.value);
     close();
   };
-
-  useDismissable(open, () => close(false), { root: wrap, escape: false });
-
-  useEffect(() => {
-    if (!open || canSearch) return;
-    list.current?.focus();
-  }, [open, canSearch]);
-
-  useEffect(() => {
-    list.current?.querySelector<HTMLElement>(`[data-i="${cursor}"]`)?.scrollIntoView({ block: 'nearest' });
-  }, [cursor]);
-
-  const onKey = (e: ReactKeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setCursor((c) => Math.min(shown.length - 1, c + 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setCursor((c) => Math.max(0, c - 1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const o = shown[cursor];
-      if (o && !o.disabled) pick(o);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      close();
-    } else if (e.key === 'Tab') close(false);
-  };
+  const active = open && list.cursor >= 0 ? list.optionId(list.cursor) : undefined;
 
   return (
     <div ref={wrap} className={`relative ${className}`}>
@@ -121,13 +109,16 @@ export function Picker<T extends string>({
         aria-describedby={describedBy}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? list.listId : undefined}
         aria-label={`${label}: ${current?.label ?? 'none'}`}
         disabled={disabled}
-        onClick={() => (open ? close() : openMenu())}
+        {...pop.triggerProps}
+        // A click from the keyboard (Enter or Space) has no pointer, so its list shows the cursor's focus ring.
+        onClick={(e) => (pop.clickCloses() ? close() : openMenu(e.detail === 0))}
         onKeyDown={(e) => {
           if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
             e.preventDefault();
-            openMenu();
+            openMenu(true);
           }
         }}
         className={
@@ -151,40 +142,67 @@ export function Picker<T extends string>({
         <span className={`min-w-0 truncate ${size === 'field' ? 'flex-1' : ''}`}>{current?.label ?? 'Choose'}</span>
         <Icon name="chevronDown" size={13} className="pik-chev text-fg-3" />
       </button>
-      {open && (
+      {exit.shown && (
         <div
-          className={`pik-card w-[min(300px,calc(100vw-32px))] ${up ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'} ${align === 'right' ? 'right-0' : 'left-0'}`}
-          data-up={up || undefined}
-          onKeyDown={onKey}
+          ref={card}
+          {...pop.panelProps}
+          data-closing={exit.closing || undefined}
+          className={`pik-card w-[min(300px,calc(100vw-32px))] ${pop.inlineClass}`}
+          data-keys={list.keyed || undefined}
+          onKeyDown={(e) =>
+            list.onKeyDown(e, {
+              onPick: (i) => {
+                const o = shown[i];
+                if (o && !o.disabled) pick(o);
+              },
+              onClose: close,
+              homeEnd: !canSearch,
+              space: !canSearch,
+            })
+          }
         >
           {canSearch && (
             <label className="mb-1 flex h-10 items-center gap-2 rounded-2xl bg-surface px-3 text-fg-3">
               <Icon name="search" size={14} />
               <input
-                autoFocus
+                ref={search}
                 value={q}
                 onChange={(e) => {
                   setQ(e.target.value);
-                  setCursor(0);
+                  list.reset(0, list.keyed);
                 }}
+                role="combobox"
+                aria-expanded="true"
+                aria-controls={list.listId}
+                aria-autocomplete="list"
+                aria-activedescendant={active}
                 placeholder={`Find ${label.toLowerCase()}`}
                 aria-label={`Find ${label.toLowerCase()}`}
-                className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
+                className="field-sm h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-4"
               />
             </label>
           )}
-          <div ref={list} role="listbox" aria-label={label} tabIndex={-1} className="scroll-thin max-h-[280px] overflow-y-auto outline-none">
+          <div
+            ref={list.scroller}
+            id={list.listId}
+            role="listbox"
+            aria-label={label}
+            aria-activedescendant={canSearch ? undefined : active}
+            tabIndex={-1}
+            className="scroll-thin max-h-[280px] overflow-y-auto outline-none"
+          >
             {shown.map((o, i) => (
               <button
                 key={o.value}
+                id={list.optionId(i)}
                 type="button"
                 role="option"
-                data-i={i}
+                tabIndex={-1}
                 aria-selected={o.value === value}
                 aria-disabled={o.disabled || undefined}
                 disabled={o.disabled}
-                data-cursor={i === cursor}
-                onMouseEnter={() => setCursor(i)}
+                data-cursor={i === list.cursor}
+                onMouseMove={() => list.hover(i)}
                 onClick={() => pick(o)}
                 className="pik-row disabled:opacity-45"
               >
@@ -206,8 +224,8 @@ export function Picker<T extends string>({
                 </span>
               </button>
             ))}
-            {!shown.length && <div className="px-3 py-3 text-[12.5px] text-fg-3">No match</div>}
           </div>
+          {!shown.length && <div className="px-3 py-3 text-[12.5px] text-fg-3">No match</div>}
         </div>
       )}
     </div>

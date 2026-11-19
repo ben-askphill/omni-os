@@ -4,6 +4,7 @@
 // /auth/app-pairings/redeem. desktop-pair is the desktop app's window: a loopback GET with no proxy and a one-time
 // nonce (desktop-pairing.ts), and the token never appears in the URL. A paired browser holds a session, never the token.
 // App pairing (app-pairing.ts) gives a native app its own revocable session; push-tokens.ts keeps its push token.
+import { randomBytes } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
@@ -354,14 +355,16 @@ authApi.post('/app-pairings/redeem', async (c) => {
  * The answer a phone's browser gets once GET /pair-link paired it: a page that keeps the session's cookie path where
  * the Web UI reads its base (@omni/shared/api-base.ts), then opens the Web UI. A browser takes no `?api=` (any site
  * could link one, apps/web/src/api-base.ts takeApiParam), and the path must stay out of every address and of any
- * cookie a sibling port gets (browser-session.ts), so it goes in this body only. Not cached, and no referrer.
+ * cookie a sibling port gets (browser-session.ts), so it goes in this body only. Not cached, and no referrer. Its one
+ * script runs by a nonce fresh on each answer, so nothing else on the page could.
  */
 function pairedPage(c: Context, path: string) {
+  const nonce = randomBytes(16).toString('base64');
   c.header('cache-control', 'no-store');
   c.header('referrer-policy', 'no-referrer');
-  c.header('content-security-policy', "default-src 'none'; script-src 'unsafe-inline'");
+  c.header('content-security-policy', `default-src 'none'; script-src 'nonce-${nonce}'; base-uri 'none'; frame-ancestors 'none'`);
   const keep = `try{localStorage.setItem(${JSON.stringify(API_BASE_STORE_KEY)},${JSON.stringify(path)})}catch(e){}location.replace('/')`;
-  return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Omni</title><script>${keep}</script>`);
+  return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Omni</title><script nonce="${nonce}">${keep}</script>`);
 }
 
 /**

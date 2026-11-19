@@ -136,7 +136,7 @@ function FilesPage() {
                 key={a.id}
                 href={href.thread(a.thread_id, a.id)}
                 style={{ '--i': i } as CSSProperties}
-                className="group flex flex-col rounded-[var(--r-xl)] bg-surface p-1.5 transition-[transform,box-shadow,background-color] duration-300 [transition-timing-function:var(--ease-spring)] hover:-translate-y-0.5 hover:bg-elev hover:shadow-[var(--shadow-card)]"
+                className="group flex flex-col rounded-[var(--r-xl)] bg-surface p-1.5 transition-[transform,box-shadow,background-color] duration-300 [transition-timing-function:var(--ease-spring)] hover:-translate-y-0.5 hover:bg-elev hover:shadow-[var(--shadow-card)] motion-reduce:transition-[box-shadow,background-color] motion-reduce:hover:translate-y-0"
               >
                 <div className="relative aspect-[16/10] overflow-hidden rounded-[var(--r-lg)] bg-surface-2 shadow-[inset_0_0_0_1px_var(--line)]">
                   <ArtifactThumb a={a} />

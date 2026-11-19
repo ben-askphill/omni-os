@@ -18,7 +18,11 @@ export interface SegmentedProps {
   onChange?: (id: string) => void;
   size?: 'sm' | 'md';
   label?: string;
-  radio?: boolean;
+  /** choice (default): a radio group · tabs: a tablist, `panel` the tabpanel's id · nav: page links with aria-current */
+  kind?: 'choice' | 'tabs' | 'nav';
+  panel?: string;
+  /** tabs: the arrows only move the focus, Enter or Space picks */
+  manual?: boolean;
   bare?: boolean;
   /** thumb tone: default white thumb · wash · soft */
   tone?: 'wash' | 'soft';

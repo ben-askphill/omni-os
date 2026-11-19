@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
+import { layerOpen } from '../components/ui/dismiss-stack.ts';
 
 /**
  * Esc interrupts a busy thread. Capture phase, so it sees the page before any other Escape
- * handler closes its layer: an open modal, lightbox, drawer, sheet, menu or list keeps Esc for itself.
+ * handler closes its layer: an open layer (dismiss-stack.ts), a modal or popover, or a composer menu keeps Esc for itself.
  */
 export function useThreadInterruptKey({
   slotBusy,
@@ -18,7 +19,7 @@ export function useThreadInterruptKey({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.repeat || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-      if (document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]')) return;
+      if (layerOpen()) return;
       // Esc in another field (sidebar search, a form) belongs to that field. The reply composer is the exception.
       const el = e.target instanceof HTMLElement ? e.target : null;
       // A zoomed image preview keeps Esc to zoom back out.

@@ -11,6 +11,7 @@ import { plural } from '../format.ts';
 import { addDraftContext } from '../message-context/draft.ts';
 import { ShellCtx } from '../mobile/shell.tsx';
 import { Button, ErrorNote, Icon } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 
 export const SELECTION_GONE = 'The selection is gone. Select the output again.';
 
@@ -123,7 +124,7 @@ export function TerminalSelectionDock({ threadId, cwd, term, text }: { threadId:
           setError(null);
         }}
         onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing) return;
+          if (isImeEnter(e)) return;
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             void add();

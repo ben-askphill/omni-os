@@ -1,14 +1,17 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { askLabel, askOf } from '@omni/shared/ask.ts';
 import { term } from '@omni/shared/display.ts';
 import { useTechnical } from '../display.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
+import { useAutosize } from '../components/composer/controls.tsx';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
 import { LivesOnNote, sendRefusal, type SendRefusal } from '../components/thread/LivesOn.tsx';
 import type { Takeover } from '@omni/shared/handoff.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
+import { machineMentions } from '../message-context/machine-mention.tsx';
+import { FileMenu, useFileMenu } from '../components/FileMenu.tsx';
 import { canSteer } from '../steer.ts';
 import { currentRun, pickedModelRun, shownRun, threadChoice, threadRunLabels } from '@omni/shared/thread-run.ts';
 import type { Run } from '@omni/shared/run-switch.ts';
@@ -16,8 +19,7 @@ import { useDictation, withPhrase } from './dictation.ts';
 import { PICK, PlusSheet, type Pick } from './PlusSheet.tsx';
 import { ModelSheet } from './ModelSheet.tsx';
 import { pickerAccounts, useAccounts } from '../accounts.ts';
-import { MoDiff, MoRound } from './parts.tsx';
-import { FileMenu, useFileMenu } from '../components/FileMenu.tsx';
+import { bottomInset, MoDiff, MoRound } from './parts.tsx';
 import { ASK_DEFAULTS, AskChip, postAsk, useAskRoles, type AskOptions } from '../components/AskCard.tsx';
 
 export interface ComposerChip {
@@ -79,26 +81,25 @@ export function MoComposer({
   const send = useReplySend(thread.id);
   const ref = useRef<HTMLTextAreaElement>(null);
   const file = useRef<HTMLInputElement>(null);
+  // The `@` menu: files, and in a thread that can delegate, the machines a task can be sent to.
+  const mentions = machineMentions(thread.id, setError);
   const update = (v: string) => {
     setText(v);
     drafts.set(thread.id, v);
+    mentions.edited(v);
   };
   const mic = useDictation((p) => update(withPhrase(ref.current?.value ?? '', p)));
+  // A message that starts with `@<role>` is an Ask (packages/shared/ask.ts), as in the desktop reply box.
+  const askRoles = useAskRoles(thread);
+  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(thread.id)}`, roles: askRoles, onMachine: mentions.picked });
+  const { aria: menuAria, ...menuEvents } = fileMenu.textarea;
   // Once Take over is asked for (or the thread is here again), the card's offer is past.
   useEffect(() => {
     if (!takeover) setAway((a) => (a?.livesOn ? null : a));
   }, [takeover]);
 
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
-  }, [text]);
+  useAutosize(ref, text);
 
-  // A message that starts with `@<role>` is an Ask (packages/shared/ask.ts), as in the desktop reply box.
-  const askRoles = useAskRoles(thread);
-  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(thread.id)}`, roles: askRoles });
   const ask = useMemo(() => askOf(text, askRoles), [text, askRoles]);
   const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
   const submitAsk = async () => {
@@ -188,7 +189,7 @@ export function MoComposer({
 
   return (
     // Not positioned, so the + sheet covers the screen rather than the composer.
-    <div className="shrink-0 bg-bg px-3 pt-1.5" style={{ paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom) - 2px))' }}>
+    <div className="shrink-0 bg-bg px-3 pt-1.5" style={{ paddingBottom: bottomInset(2) }}>
       {(chips.length > 0 || next) && (
         <div className="mo-scroll flex gap-2 overflow-x-auto pt-0.5 pb-2.5">
           {next && (
@@ -241,20 +242,18 @@ export function MoComposer({
             ref={ref}
             rows={1}
             value={text}
+            {...menuEvents}
+            {...(fileMenu.open ? menuAria : {})}
             onChange={(e) => {
               update(e.target.value);
-              fileMenu.textarea.onChange(e);
+              menuEvents.onChange(e);
             }}
-            onSelect={fileMenu.textarea.onSelect}
-            onFocus={fileMenu.textarea.onFocus}
-            onBlur={fileMenu.textarea.onBlur}
             onKeyDown={(e) => void fileMenu.onKey(e)}
-            {...fileMenu.textarea.aria}
             onPaste={att.onPaste}
             enterKeyHint="send"
             placeholder={hint}
             aria-label={hint}
-            className="min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-3"
+            className="field-sizing-content max-h-[132px] min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2 text-[16px] leading-[1.35] text-fg outline-none placeholder:text-fg-3"
           />
           {stop && !canSend && !att.files.length && !mic.on ? (
             <MoRound ink icon="stop" label={stop.busy ? 'Stopping' : 'Stop'} onClick={stop.run} disabled={stop.busy} />

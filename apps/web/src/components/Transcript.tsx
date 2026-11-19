@@ -14,7 +14,7 @@ import { PRWakeList } from './thread/PRWatch.tsx';
 import { ClippedNote, HistoryCtx, HistoryEdgeRow } from './thread/HistoryEdgeRow.tsx';
 import { QuestionCard } from './thread/QuestionCard.tsx';
 import { Markdown } from './Markdown.tsx';
-import { copyText, Icon, Loader, StatusDot, StatusPill } from './ui.tsx';
+import { COPY_SAID, CopyStatus, Icon, Loader, StatusDot, StatusPill, useCopy } from './ui.tsx';
 import { SOURCE_TAG } from '@omni/shared/slash-menu.ts';
 import { slashPieces } from '@omni/shared/slash-pills.ts';
 import { statusLabel, turnStart } from '@omni/shared/status-line.ts';
@@ -28,11 +28,13 @@ import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { buildItems, buildTasks, keepSame, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
+import { defers, LIVE_ROWS } from '../transcript/defer.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
 import { clock, toDate } from '@omni/shared/format.ts';
 import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 
-import { AgentRow, flatten, TaskCtx } from './thread/ToolRows.tsx';
+import { AgentRow, ConnectorRow, flatten, TaskCtx } from './thread/ToolRows.tsx';
+import { connectorGroups } from '@omni/shared/connectors.ts';
 import { StepsCard } from './thread/StepsCard.tsx';
 import { Attachments } from './thread/Attachments.tsx';
 import { QueuedMessages, SendingMessages } from './thread/PendingMessages.tsx';
@@ -92,27 +94,30 @@ function CommandPill({ label, cmd, open, onToggle }: { label: string; cmd: Slash
 
 /** A small Copy control under a message, shown on hover or keyboard focus (always on touch). Copies the source text. */
 function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'end' }) {
-  const [done, setDone] = useState(false);
+  const { state, copy, icon } = useCopy();
   if (!text.trim()) return null;
   return (
-    <button
-      type="button"
-      aria-label="Copy message"
-      title="Copy message"
-      onClick={async () => {
-        await copyText(text);
-        setDone(true);
-        setTimeout(() => setDone(false), 1400);
-      }}
-      className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-3 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
-    >
-      <Icon name={done ? 'check' : 'copy'} size={12} /> {done ? 'Copied' : 'Copy'}
-    </button>
+    <>
+      <button
+        type="button"
+        aria-label="Copy message"
+        title="Copy message"
+        onClick={() => void copy(text)}
+        className={`hov press mt-0.5 inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-fg-3 opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 hover:text-fg focus-visible:opacity-100 data-[copy=failed]:opacity-100 [@media(hover:none)]:opacity-100 ${align === 'end' ? 'self-end' : 'self-start'}`}
+        data-copy={state}
+      >
+        <Icon name={icon} size={12} /> {state === 'idle' ? 'Copy' : COPY_SAID[state]}
+      </button>
+      <CopyStatus state={state} />
+    </>
   );
 }
 
-/** Ben's message, or the one an agent or automation sent. `fold` keeps it to its first lines (a delegated thread's brief). */
-function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean }) {
+/**
+ * Ben's message, or the one an agent or automation sent. `fold` keeps it to its first lines (a delegated thread's brief).
+ * `lazy`: its images wait until they near the screen, as older rows do; the newest rows load them at once.
+ */
+function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean; lazy?: boolean }) {
   const [more, setMore] = useState(false);
   // Where the pill whose description is open starts.
   const [about, setAbout] = useState<number | null>(null);
@@ -157,11 +162,11 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
         )}
         <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
-      {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} /> : null}
-      <ContextChips records={p.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
+      {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} lazy={lazy} /> : null}
+      <ContextChips records={p.context} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
       {(text || !hasContext(p.context)) && (
         <div
-          className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%] ${
+          className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap @lg:max-w-[80%] ${
             p.dropped ? 'border border-dashed border-line-strong' : 'bg-bubble'
           }`}
         >
@@ -314,6 +319,8 @@ interface ItemRowProps {
   answers?: Record<string, ReportP>;
   /** A report row whose answer shows on its thread's delegation card instead. */
   onCard?: boolean;
+  /** Not one of the newest rows: it skips rendering while out of view (`.tx-row`). */
+  defer?: boolean;
 }
 
 /**
@@ -322,11 +329,11 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
-          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} />;
+          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} lazy={defer} />;
           return team ? [bubble, <DelegationCard key="team" branches={team} team reports={reports} />] : bubble;
         }
         case 'text':
@@ -355,7 +362,16 @@ const ItemRow = memo(
           const subagents = agents.length ? (
             <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
           ) : null;
-          const out = [subagents, ...cards].filter(Boolean);
+          // Outside connectors stay in sight in the transcript, as Claude's apps show them: one row per app per group.
+          const apps = connectorGroups(it.calls);
+          const connectors = apps.length ? (
+            <div key={`k${it.key}`} className="space-y-0.5">
+              {apps.map((g) => (
+                <ConnectorRow key={g.connector.id} g={g} cwd={cwd} running={running} />
+              ))}
+            </div>
+          ) : null;
+          const out = [connectors, subagents, ...cards].filter(Boolean);
           return steps ? [<StepsCard key="steps" v={steps} cwd={cwd} byId={byId} />, ...out] : out;
         }
         case 'result':
@@ -381,7 +397,7 @@ const ItemRow = memo(
     const shown = Array.isArray(body) ? body.length > 0 : !!body;
     // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
     return shown ? (
-      <div data-key={it.key} className="space-y-4">
+      <div data-key={it.key} className={defer ? 'tx-row space-y-4' : 'space-y-4'}>
         {body}
       </div>
     ) : null;
@@ -506,6 +522,7 @@ export const Transcript = memo(function Transcript({
               code={it.type === 'result' ? code : undefined}
               answers={it.type === 'tools' ? answersFor(it.calls, answers) : it.type === 'ask' && answers.has(it.p.thread_id) ? { [it.p.thread_id]: answers.get(it.p.thread_id)! } : undefined}
               onCard={it.type === 'report' && it.p.shown && answers.has(it.p.thread_id)}
+              defer={defers(idx, items.length, LIVE_ROWS)}
             />,
           ])}
           {edgeRow(-1)}

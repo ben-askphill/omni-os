@@ -4,4 +4,4 @@ Segmented pill with a Bencho sliding thumb — tabs, filters, theme switch.
 <Segmented value={tab} onChange={setTab} options={[{id:"threads",label:"Threads"},{id:"prs",label:"PRs",count:2}]} />
 ```
 
-size sm|md · radio · tone wash|soft · vertical. useSlidingThumb + Thumb are exported for custom tracks (sidebar, palette).
+size sm|md · kind choice|tabs|nav (radio group, tablist with panel, links with aria-current; choice and tabs are one Tab stop with arrow keys, manual tabs pick on Enter) · tone wash|soft · vertical. useSlidingThumb + Thumb are exported for custom tracks (sidebar, palette).

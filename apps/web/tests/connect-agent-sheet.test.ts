@@ -40,7 +40,7 @@ describe('Connect an agent sheet', () => {
     await act(async () => root!.render(createElement(ConnectAgentSheet, { open: true, initial: LINK, onClose: () => {} })));
     await act(async () => void (await new Promise((r) => setTimeout(r, 5))));
     expect(posts).toEqual([]);
-    const dialog = document.querySelector('[role="dialog"]')!;
+    const dialog = document.querySelector('dialog')!;
     expect((dialog.querySelector('#connect-input') as HTMLInputElement).value).toBe(LINK);
     expect(dialog.querySelector('[data-from-link]')?.textContent).toMatch(/Opened from a link/);
     const find = [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Find')!;

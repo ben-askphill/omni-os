@@ -34,7 +34,7 @@ const SIZES = {
   lg: 'h-11 px-5 text-[14px] gap-2',
 };
 
-const btnBase = 'press inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-[background-color,color,opacity,transform] duration-200 select-none';
+const btnBase = 'press inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap transition-[background-color,color,opacity,transform] duration-200 select-none motion-reduce:transition-[background-color,color,opacity]';
 
 export function Button({
   variant = 'secondary',
@@ -43,13 +43,17 @@ export function Button({
   children,
   className = '',
   busy,
+  onClick,
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md' | 'lg'; icon?: IconName; busy?: boolean }) {
+  // Busy is aria-disabled, not disabled: a disabled button drops focus to the page, and the request it started usually
+  // ends with focus wanted right there. So a busy button still gets clicks (and a form's Enter); it ignores them.
   return (
     <button
       type="button"
       {...rest}
-      disabled={rest.disabled || busy}
+      onClick={busy ? (e) => e.preventDefault() : onClick}
+      aria-disabled={busy || undefined}
       aria-busy={busy || undefined}
       className={`${btnBase} ${SIZES[size]} ${VARIANTS[variant]} ${busy ? 'cursor-progress' : DISABLED[variant]} ${className}`}
     >
@@ -65,14 +69,24 @@ export function IconButton({
   className = '',
   size = 16,
   active,
+  pressed,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { icon: IconName; label: string; size?: number; active?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon: IconName;
+  label: string;
+  size?: number;
+  /** Shown as on, with no state for assistive tech: a button whose popup is open says so with aria-expanded. */
+  active?: boolean;
+  /** A toggle that stays on or off (a tool, a view): shown as on and exposed as aria-pressed. */
+  pressed?: boolean;
+}) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
-      data-on={active || undefined}
+      aria-pressed={pressed}
+      data-on={active || pressed || undefined}
       {...rest}
       className={`hov press inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-fg-3 transition-colors hover:text-fg disabled:opacity-40 data-[on=true]:text-fg ${className}`}
     >

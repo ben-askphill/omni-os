@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { getPath } from 'hono/utils/url';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import { paths } from './config.ts';
 // The runner's ports are bound before any route can reach it (apps/server/compose.ts).
@@ -22,7 +22,7 @@ import { actionsApi } from './actions-api.ts';
 import { foldersApi } from './folders-api.ts';
 import { commandsApi } from './commands-api.ts';
 import { templatesApi } from './templates-api.ts';
-import { memoryApi } from './memory-api.ts';
+import { crewMemoryApi, memoryApi } from './memory-api.ts';
 import { mentionsApi } from './mentions-api.ts';
 import { referencedHistoryApi, threadReferencesApi } from './thread-references-api.ts';
 import { feedApi } from './feed-api.ts';
@@ -48,6 +48,7 @@ import { threadHistoryApi } from './thread-history-api.ts';
 import { toolOutputApi } from './tool-output-api.ts';
 import { threadsApi } from './threads-api.ts';
 import { connectApi } from './connect-api.ts';
+import { cspReportApi } from './csp-report-api.ts';
 import { connectHostname } from './connect/service.ts';
 import { requestGuard, useConnectHost, useLegacyUpgrade, useSessionCheck, useThreadTokenCheck } from './request-guard.ts';
 import { threadOfToken } from './thread-tokens.ts';
@@ -57,6 +58,7 @@ import { toolFailuresApi } from './tool-failures-api.ts';
 import { worktreesApi } from './worktrees-api.ts';
 import { updateApi } from './update-api.ts';
 import { usageScanApi } from './usage-scan/api.ts';
+import { webShell } from './web-headers.ts';
 
 // Every /api route, and the Web UI. apps/server/index.ts boots it. A browser on plain HTTP sends its requests under
 // /api/k/<key>, its cookie's own path (browser-session.ts); the routes see them without the key.
@@ -119,6 +121,7 @@ api.route('/', automationDeliveriesApi);
 api.route('/', prWatchApi);
 api.route('/', crewApi);
 api.route('/', customHarnessApi);
+api.route('/', crewMemoryApi);
 api.route('/', metaApi);
 api.route('/commands', commandsApi);
 api.route('/templates', templatesApi);
@@ -135,6 +138,7 @@ api.route('/worktrees', worktreesApi);
 api.route('/update', updateApi);
 api.route('/accounts', accountsApi);
 api.route('/usage-scan', usageScanApi);
+api.route('/csp-report', cspReportApi);
 
 // Last, so only a request no route above takes lands here, and never on the Web UI's index.html.
 api.all('*', (c) => c.json({ error: 'Not found' }, 404));
@@ -150,12 +154,20 @@ app.route('/.well-known', oauthMetadataApi);
 // ---------- web ----------
 
 if (existsSync(paths.webDist)) {
-  // index.html names this build's hashed assets, so a browser revalidates it on every load and picks up a rebuild.
-  // Without a Cache-Control header it guessed from Last-Modified and could keep showing the old Web UI.
+  const index = `${paths.webDist}/index.html`;
   app.use('/*', async (c, next) => {
     await next();
-    if (c.res.headers.get('content-type')?.startsWith('text/html')) c.res.headers.set('Cache-Control', 'no-cache');
+    // /api, /mcp and /.well-known answer above and stop there. Should one ever fall through, it keeps its own
+    // headers: an artifact page with this frame-ancestors would no longer load in the Web UI's frames.
+    if (/^\/(api|mcp|\.well-known)(\/|$)/.test(c.req.path)) return;
+    c.res.headers.set('X-Content-Type-Options', 'nosniff');
+    if (!c.res.headers.get('content-type')?.startsWith('text/html')) return;
+    // index.html names this build's hashed assets, so a browser revalidates it on every load and picks up a rebuild.
+    // Without a Cache-Control header it guessed from Last-Modified and could keep showing the old Web UI.
+    c.res.headers.set('Cache-Control', 'no-cache');
+    // The CSP, clickjacking guard and referrer policy (web-headers.ts), with the hash of the build's inline script.
+    for (const [name, value] of Object.entries(webShell(index).headers)) c.res.headers.set(name, value);
   });
   app.use('/*', serveStatic({ root: paths.webDist }));
-  app.get('*', (c) => c.html(readFileSync(`${paths.webDist}/index.html`, 'utf8')));
+  app.get('*', (c) => c.html(webShell(index).html));
 }

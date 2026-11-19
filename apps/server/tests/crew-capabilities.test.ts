@@ -127,6 +127,11 @@ describe('a lock against a file written by hand', () => {
 
       writeOwn('conductor', '---\ndelegate_only: false\nmcp: []\ndelegatable: true\nmodel: opus\ncharter_mode: append\n---\nAsk before you merge.\n');
       expect(getCrew('conductor')).toMatchObject({ delegateOnly: true, mcp: ['omni'], delegatable: false, model: 'opus', charter: 'Route everything.\n\nAsk before you merge.' });
+      // `tools:` cannot lift delegate-only either, alone or beside delegate_only: false.
+      writeOwn('conductor', '---\ntools: full\ncharter_mode: append\n---\n');
+      expect(getCrew('conductor')).toMatchObject({ tools: 'delegate-only', delegateOnly: true });
+      writeOwn('conductor', '---\ndelegate_only: false\ntools: no-edits\ncharter_mode: append\n---\n');
+      expect(getCrew('conductor')).toMatchObject({ tools: 'delegate-only', delegateOnly: true });
 
       // Usage scan's steps come with each release: a replacing overlay is read as an addition.
       writeOwn('usage-scan', '---\ndelegate_only: false\n---\nAlso look at cron jobs.\n');

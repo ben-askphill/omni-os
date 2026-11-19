@@ -8,6 +8,7 @@ import { href } from '../../router.ts';
 import { actionsLabel, STEP_GLYPH, stepsHeader, type Step, type StepsView } from '@omni/shared/steps.ts';
 import { Icon, StatusDot, StatusPill, Ticks } from '../ui.tsx';
 import { ToolRow } from './ToolRows.tsx';
+import { NowWithConnector } from '../ConnectorMark.tsx';
 
 const CHEVRON = 'text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)]';
 
@@ -34,7 +35,11 @@ function StepRow({ s, cwd, running, byId }: { s: Step; cwd?: string | null; runn
         </span>
         <span className="min-w-0 flex-1">
           <span className={`block text-[13.5px] leading-[1.4] break-words ${on ? 'font-medium text-fg' : s.state === 'pending' ? 'text-fg-3' : 'text-fg-2'}`}>{s.title}</span>
-          {s.now && <span className="block text-[12.5px] leading-[1.4] break-words text-fg-3">Now: {s.now}</span>}
+          {s.now && (
+            <span className="block text-[12.5px] leading-[1.4] break-words text-fg-3">
+              <NowWithConnector now={s.now} connector={s.connector} />
+            </span>
+          )}
         </span>
         {s.actions > 0 && (
           <button

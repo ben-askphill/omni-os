@@ -3,7 +3,7 @@ import { quickAskRule, readsOnly } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
 import { artifacts, memories, type Channel, type Thread } from '../db.ts';
-import { learningsPrompt } from '@omni/shared/memory.ts';
+import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
 import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { harnessName } from '../harness/registry.ts';
@@ -150,6 +150,50 @@ function notionLines(thread: Thread, secretNames: readonly string[]) {
 const delegateOnlyRule = (name: string) =>
   `Answer quick asks yourself, in this thread, and start no thread for them: anything you can answer from the conversation, Omni's own state (the omni tools) or a light lookup with the tools you have (a fact you know, a page or doc read in a call or two, a connector read). Delegate with Omni's delegate tool, before anything else, when the work writes or edits files, runs commands, browses at length, changes code, a store, an inbox, a calendar or Notion, or will clearly grow past a few lookups. You have no shell, file editing, browser or subagent tools, by design: when a quick ask turns out to need them, delegate it instead of working around that. A plain question gets a plain answer: no brief, no folder question. Ask ${name} only for decisions that are theirs to make.`;
 
+/**
+ * A no-edits role (the reviewer): what it is without, and that the shell is not a way around it. Omni takes the edit
+ * tools away on Claude Code, Codex and Cursor (crew.ts NO_EDITS_DENIED); on Hermes and Cursor Cloud it cannot, so
+ * there the rule is this text alone.
+ */
+function noEditsLines(thread: Thread, role?: CrewRole) {
+  if (role?.tools !== 'no-edits' || readsOnly(thread)) return [];
+  return [
+    '',
+    '## No file edits',
+    isProviderHarness(thread.harness)
+      ? 'This role does not edit files. Omni cannot take the edit tools away on this harness, so the rule is yours to keep: do not change, create or delete files, and do not commit or push.'
+      : 'This role does not edit files: your file-edit tools are off. The shell is still yours for reading, `gh`, git and running checks. Do not use it to change, create or delete files, or to commit or push, either.',
+    'Report what you found instead, and leave the changes to the thread that owns the work.',
+  ];
+}
+
+/**
+ * A crew role's memory (crew plan S6): the lessons the user approved for it, the untagged ones and this channel's, and
+ * how to propose one where the thread has a tool for it. A role with `memory: off` gets none. Remote harnesses get
+ * the lessons but no tool: they run no Omni MCP server.
+ */
+function roleMemorySection(thread: Thread, channel: Channel, role?: CrewRole) {
+  if (!role || role.memory === 'off' || readsOnly(thread)) return [];
+  const name = userName();
+  const facts = roleMemoryLines(memories.approvedForRole(role.id, channel.id));
+  const tool = role.memory === 'read-write' && !isProviderHarness(thread.harness);
+  const conductor = role.mcp.includes('omni');
+  const kept = role.memoryWrites === 'auto' ? 'It applies to later threads at once' : `It waits for ${name}'s approval`;
+  const how = !tool
+    ? ''
+    : conductor
+      ? `To keep a lesson about how a crew role works (a correction ${name} made, a step a crewmate missed), propose it with remember for that role. It waits for ${name}'s approval unless they let that role keep its lessons at once. A lesson about a client or channel goes to propose_learning instead.`
+      : `When ${name} corrects how you work, or you find a step every later ${role.name} thread should take, propose it with remember: one short sentence about how to work, never about this one task, and never a secret. ${kept}, and it holds in this channel only unless you pass everywhere: true.`;
+  if (!facts.length && !how) return [];
+  return [
+    '',
+    `## Your memory as ${role.name}`,
+    facts.length ? `Lessons ${name} approved for this role, from earlier threads. Follow them unless the task says otherwise.` : '',
+    ...facts,
+    how,
+  ];
+}
+
 /** What the user said about their work and tools in onboarding or Settings > General, when they said anything. */
 function profileLines(name: string) {
   const { work, tools } = userConfig().user;
@@ -199,6 +243,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     channel.notes ? `- Channel notes: ${channel.notes}` : '',
     // What the user approved as lessons for this channel (memory-api.ts). Only this channel's: one client's never reaches another's.
     ...learningsPrompt(memories.approvedIn(channel.id)),
+    // The role's own lessons (memory-api.ts): untagged ones and this channel's.
+    ...roleMemorySection(thread, channel, role),
     ...(readsOnly(thread) ? ['', ...quickAskRule(name)] : []),
     // A usage scan's lead gets the omni tools to save what the user picks, not to route work: it never delegates.
     ...(role?.mcp.includes('omni') && role.id !== SCAN_ROLE
@@ -209,6 +255,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
           SESSION_CACHE_RULE,
         ]
       : []),
+    ...noEditsLines(thread, role),
     ...(hands ? workspaceLines(thread, channel) : []),
     ...(hands ? notionLines(thread, secretNames) : []),
     ...commandLineLines(thread, role),

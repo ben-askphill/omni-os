@@ -2,15 +2,19 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, 
 import { api } from '../api.ts';
 import { fileQuery, pickFile, startsMessage, type FileMention } from '@omni/shared/mention-menu.ts';
 import { roleRows, type AskRole } from '@omni/shared/ask.ts';
-import { Icon } from './ui.tsx';
+import { Icon, StatusDot } from './ui.tsx';
 import { optionId } from './SlashMenu.tsx';
+import { isImeEnter } from '../ime.ts';
+import { reachLine } from '../message-context/machine-mention.tsx';
 
 
 /**
  * The `@` menu over a composer's textarea: the files a message can name, from this thread's
- * artifacts and the repo it works in. `scope` is `thread=<id>` or `channel=<id>`. It only reads the
- * caret and keys; the composer's own handlers keep the text and the `/` menu. `roles`: the crew roles Ben can ask from
- * a thread, listed first while the `@` starts the message (packages/shared/ask.ts).
+ * artifacts and the repo it works in, and in a thread that can delegate, the synced machines first.
+ * `scope` is `thread=<id>` or `channel=<id>`. It only reads the caret and keys; the composer's own
+ * handlers keep the text and the `/` menu. `onMachine` gets a picked machine row after its `@name` is written.
+ * `roles`: the crew roles Ben can ask from a thread, listed first while the `@` starts the message
+ * (packages/shared/ask.ts).
  */
 export function useFileMenu({
   ref,
@@ -18,12 +22,14 @@ export function useFileMenu({
   onText,
   scope,
   roles,
+  onMachine,
 }: {
   ref: RefObject<HTMLTextAreaElement | null>;
   text: string;
   onText: (text: string) => void;
   scope: string;
   roles?: readonly AskRole[];
+  onMachine?: (row: FileMention) => void;
 }) {
   const menuId = useId();
   const [caret, setCaret] = useState(0);
@@ -79,11 +85,12 @@ export function useFileMenu({
     onText(next.text);
     setCaret(next.caret);
     setPicked({ caret: next.caret });
+    if (r.kind === 'machine') onMachine?.(r);
   };
 
   /** Arrow keys, Enter, Tab and Esc drive the menu while it is open. True when the key was used. */
   const onKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (!open || e.nativeEvent.isComposing || e.keyCode === 229) return false;
+    if (!open || isImeEnter(e)) return false;
     const n = rows.length;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       moveTo((active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n);
@@ -120,6 +127,8 @@ export function useFileMenu({
   return { open, menu, onKey, textarea };
 }
 
+const MACHINE_DOT = { online: 'done', offline: 'settled', unknown: 'idle' } as const;
+
 /** The `@` menu above a composer, or `below` one near the top of the page. Focus stays in the composer. */
 export function FileMenu({
   id,
@@ -145,7 +154,7 @@ export function FileMenu({
       ref={ref}
       id={id}
       role="listbox"
-      aria-label="Files and roles"
+      aria-label={rows.some((r) => r.kind === 'role') ? (rows.some((r) => r.kind === 'machine') ? 'Roles, machines and files' : 'Files and roles') : rows.some((r) => r.kind === 'machine') ? 'Machines and files' : 'Files'}
       // Keep focus (and the phone keyboard) in the composer.
       onMouseDown={(e) => e.preventDefault()}
       className={`fade-in scroll-thin absolute inset-x-0 z-20 max-h-[min(22rem,45vh)] overflow-y-auto rounded-[var(--r-2xl)] bg-elev p-1.5 shadow-[var(--shadow-menu)] ${below ? 'top-full mt-2' : 'bottom-full mb-2'}`}
@@ -161,13 +170,14 @@ export function FileMenu({
           onClick={() => onPick(r)}
           className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-2xl px-3 py-1.5 data-[active]:bg-[var(--wash)]"
         >
-          <Icon name={r.kind === 'role' ? 'message' : 'file'} size={14} className="shrink-0 text-fg-3" />
+          <Icon name={r.kind === 'role' ? 'message' : r.kind === 'machine' ? 'monitor' : 'file'} size={14} className="shrink-0 text-fg-3" />
           <span className="flex min-w-0 flex-1 items-baseline gap-2">
             <span className="shrink-0 text-[13px] font-medium text-fg">{r.name}</span>
-            <span className="truncate text-[11.5px] text-fg-3">{r.detail}</span>
+            <span className="truncate text-[11.5px] text-fg-3">{r.machine && !r.machine.here ? reachLine(r.machine.reachability, r.machine.lastSeen) : r.detail}</span>
           </span>
           {r.kind === 'artifact' && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">artifact</span>}
           {r.remote && <span className="shrink-0 rounded-full px-2 py-px text-[11px] text-fg-3 shadow-[inset_0_0_0_1px_var(--line-strong)]">Remote</span>}
+          {r.machine && <StatusDot status={MACHINE_DOT[r.machine.reachability]} size={7} className="shrink-0" />}
         </div>
       ))}
     </div>

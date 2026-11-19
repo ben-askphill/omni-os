@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { ACTION_PORT_HINT, ACTION_SETUP_HINT, ACTION_TEARDOWN_HINT, actionInput, draftOf, type ActionDraft, type ChannelAction } from '@omni/shared/channel-actions.ts';
+import { ACTION_PORT_HINT, ACTION_SETUP_HINT, ACTION_TEARDOWN_HINT, actionInput, actionPortProblem, draftOf, type ActionDraft, type ChannelAction } from '@omni/shared/channel-actions.ts';
 import { api, errorText, useApi } from '../api.ts';
 import { href } from '../router.ts';
 import { ActionLine } from './thread/panel/ActionsTab.tsx';
-import { Button, Chip, ErrorNote, InlineConfirm, Label, Loading, Segmented } from './ui.tsx';
+import { Button, Chip, ErrorNote, FieldError, fieldErrorId, fieldHintId, IDENTIFIER, InlineConfirm, Label, Loading, Segmented, useFieldErrors } from './ui.tsx';
 
 /** Editing a new action rather than one in the list. */
 const NEW = '';
@@ -84,9 +84,13 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof ActionDraft>(k: K, v: ActionDraft[K]) => setD((prev) => ({ ...prev, [k]: v }));
   const id = action?.id ?? 'new';
+  const portId = `act-port-${id}`;
+  const problems = useFieldErrors({ [portId]: actionPortProblem(d) });
+  const portError = problems.error(portId);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (problems.submit()) return;
     const parsed = actionInput(d);
     if ('error' in parsed) return setError(parsed.error);
     setBusy(true);
@@ -115,12 +119,12 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
           Command
         </Label>
         <textarea
-          id={`act-cmd-${id}`}
-          className="field min-h-[84px] resize-y font-mono !text-[13px]"
+          id={`act-cmd-${id}`} aria-describedby={fieldHintId(`act-cmd-${id}`)}
+          {...IDENTIFIER}
+          className="field field-mono min-h-[84px] resize-y"
           value={d.command}
           onChange={(e) => set('command', e.target.value)}
           placeholder="shopify theme dev --port $OMNI_PORT"
-          spellCheck={false}
         />
       </div>
       <div>
@@ -139,19 +143,18 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
           Secrets
         </Label>
         <input
-          id={`act-secrets-${id}`}
-          className="field font-mono !text-[13px]"
+          id={`act-secrets-${id}`} aria-describedby={fieldHintId(`act-secrets-${id}`)}
+          {...IDENTIFIER}
+          className="field field-mono"
           value={d.secrets}
           onChange={(e) => set('secrets', e.target.value.toUpperCase())}
           placeholder="SHOPIFY_CLI_THEME_TOKEN"
-          spellCheck={false}
         />
       </div>
       <div>
         <Label hint={ACTION_PORT_HINT[d.portMode]}>Port</Label>
         <div className="flex flex-wrap items-center gap-2">
           <Segmented
-            radio
             size="sm"
             label="Port"
             value={d.portMode}
@@ -164,8 +167,12 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
           />
           {d.portMode === 'fixed' && (
             <input
+              id={portId}
               aria-label="Fixed port"
-              className="field w-28 font-mono !text-[13px]"
+              aria-invalid={problems.invalid(portId)}
+              aria-describedby={portError ? fieldErrorId(portId) : undefined}
+              onBlur={problems.onBlur}
+              className="field field-mono w-28"
               inputMode="numeric"
               value={d.port}
               onChange={(e) => set('port', e.target.value.replace(/\D/g, ''))}
@@ -173,11 +180,11 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
             />
           )}
         </div>
+        {portError && <FieldError id={fieldErrorId(portId)}>{portError}</FieldError>}
       </div>
       <div>
         <Label hint={ACTION_SETUP_HINT[d.setup ?? 'off']}>Run in new worktrees</Label>
         <Segmented
-          radio
           size="sm"
           label="Run in new worktrees"
           value={d.setup ?? 'off'}
@@ -192,7 +199,6 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
       <div>
         <Label hint={ACTION_TEARDOWN_HINT[d.teardown ? 'on' : 'off']}>Run before a worktree is removed</Label>
         <Segmented
-          radio
           size="sm"
           label="Run before a worktree is removed"
           value={d.teardown ? 'on' : 'off'}

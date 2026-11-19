@@ -7,7 +7,7 @@ import { useSending } from '../sending.ts';
 import { ArtifactThumb } from '../components/ArtifactThumb.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { Attachments } from '../components/Transcript.tsx';
-import { Button, Icon, StatusDot, StatusPill } from '../components/ui.tsx';
+import { Button, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { duration, plural } from '../format.ts';
 import { isOmnis, parkedLabel } from '../requests.ts';
 import { useApp, useNeedOf, useNow } from '../store.tsx';
@@ -23,6 +23,8 @@ import { actionsLabel, STEP_GLYPH, stepsHeader, stepsLabel, type StepsView } fro
 import { threadMark } from '@omni/shared/status.ts';
 import type { ReportP } from '@omni/shared/transcript-fold.ts';
 import { Folded } from '../components/Folded.tsx';
+import { ConnectorMark, NowWithConnector } from '../components/ConnectorMark.tsx';
+import { connectorsUsed } from '@omni/shared/connectors.ts';
 
 /** The phone's turn, carrying the web's own artifact and thread rows. */
 export type TurnView = TurnOf<Artifact, Thread>;
@@ -96,7 +98,11 @@ export function MoSteps({ v, failed, onActions }: { v: StepsView; failed: number
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className={`block text-[14px] leading-[1.35] ${on ? 'text-fg' : 'text-fg-3'}`}>{s.title}</span>
-                  {s.now && <span className="block text-[12.5px] leading-[1.35] text-fg-3">Now: {s.now}</span>}
+                  {s.now && (
+                    <span className="block text-[12.5px] leading-[1.35] text-fg-3">
+                      <NowWithConnector now={s.now} connector={s.connector} />
+                    </span>
+                  )}
                 </span>
               </li>
             );
@@ -164,10 +170,38 @@ export function ChangesCard({ files, onOpen }: { files: { path: string; add: num
   );
 }
 
+/**
+ * The outside connectors a turn used, one row each, as Claude's apps show them in a reply: the app's tile, "Working on
+ * it" while one of its calls runs and "Used Granola" after. A tap opens the turn's actions, where each call opens.
+ */
+export function MoConnectors({ t, onOpen }: { t: TurnView; onOpen: () => void }) {
+  const calls = t.items.flatMap((it) => (it.type === 'tools' ? it.calls : []));
+  const used = connectorsUsed(calls);
+  if (!used.length) return null;
+  const live = t.status === 'running';
+  return (
+    <div className="flex flex-col">
+      {used.map((u) => {
+        const busy = live && u.running > 0;
+        return (
+          <button key={u.connector.id} type="button" data-connector-row={u.connector.id} onClick={onOpen} className="mo-press flex min-h-11 items-center gap-2.5 rounded-2xl px-1 text-left text-[14px] leading-none">
+            <ConnectorMark connector={u.connector} size={26} />
+            <span className="shrink-0 font-medium text-fg-2">{busy ? 'Working on it' : `Used ${u.connector.name}`}</span>
+            <span className="min-w-0 truncate text-[13px] text-fg-3">{plural(u.calls, 'call')}</span>
+            <Icon name="chevronRight" size={14} className="shrink-0 text-fg-3" />
+            <span className="flex-1" />
+            {busy ? <Loader size={12} className="shrink-0 text-fg-3" /> : u.failed > 0 ? <StatusDot status="failed" size={7} /> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function NowLine({ now, meta }: { now: NowDoing; meta?: string }) {
   return (
     <div className="flex items-center gap-2.5 rounded-2xl bg-surface px-3.5 py-3">
-      <StatusDot status="running" size={9} />
+      {now.connector ? <ConnectorMark connector={now.connector} size={18} /> : <StatusDot status="running" size={9} />}
       <span className="min-w-0 flex-1 truncate text-[14px] leading-[1.35]">
         {now.verb} {now.target && <span className="font-mono text-[13px]">{now.target}</span>}
       </span>
@@ -260,7 +294,7 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
       const res = await api.post<{ pending?: PendingMsg[] }>(`/threads/${encodeURIComponent(thread.id)}/requests/${route}`, { ids });
       if (res.pending) onPending(res.pending);
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     } finally {
       setBusy(null);
     }
@@ -270,7 +304,7 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
       {items.map((m) => (
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
           <span className="text-[12px] leading-[1.3] text-fg-3">{isForwarded(m) ? forwardedLabel(m, trouble) : (setupWait(thread.setup)?.label ?? parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
-          {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} /> : null}
+          {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} lazy={false} /> : null}
           <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
           {(m.text || !hasContext(m.context)) && (
             <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>
@@ -318,7 +352,7 @@ export function Sending({ threadId, pending }: { threadId: string; pending: Pend
         return (
           <div key={m.request_id} ref={m.request_id === newest ? last : undefined} className="flex flex-col items-end gap-1.5 opacity-75">
             <span className="text-[12px] leading-[1.3] text-fg-3">Sending</span>
-            {m.files.length ? <Attachments threadId={threadId} items={m.files.map((f) => f.attachment)} href={(a) => urls.get(a.name) ?? ''} /> : null}
+            {m.files.length ? <Attachments threadId={threadId} items={m.files.map((f) => f.attachment)} href={(a) => urls.get(a.name) ?? ''} lazy={false} /> : null}
             {m.text && <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>}
           </div>
         );

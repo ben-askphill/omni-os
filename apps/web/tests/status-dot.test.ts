@@ -96,8 +96,13 @@ describe("a thread row's mark", () => {
 describe('loading', () => {
   it('is the same dot in the text color, not a spinner', () => {
     const html = renderToStaticMarkup(createElement(Loader, { size: 12 }));
-    expect(html).toContain('role="status" aria-label="Loading" data-s="running" data-mark="loading"');
+    expect(html).toContain('aria-hidden="true" data-s="running" data-mark="loading"');
     expect(html).toContain('class="ping"');
+  });
+
+  it('is never a live region, and is an image only when it stands alone with a label', () => {
+    expect(renderToStaticMarkup(createElement(Loader, {}))).not.toContain('role=');
+    expect(renderToStaticMarkup(createElement(Loader, { label: 'Loading' }))).toContain('role="img" aria-label="Loading"');
   });
 });
 
@@ -156,10 +161,10 @@ describe('no spinner says that something runs', () => {
     // The mark rules set color only: the halo and the breath are the two animations, each one class.
     const marks = css.slice(css.indexOf('/* ---- status marks'), css.indexOf('/* Status pill'));
     expect(marks).not.toMatch(/animation|transition|@keyframes/);
-    expect(css).toMatch(/\n\.ping \{\s*animation: omni-ping var\(--dur-ping\)/);
-    expect(css).toMatch(/\n\.breathe \{\s*animation: omni-breathe /);
-    const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(reduced).toMatch(/\.ping,\s*\.breathe[^{]*\{\s*animation: none !important/);
+    expect(css).toMatch(/\n\s*\.ping \{\s*animation: omni-ping var\(--dur-ping\)/);
+    expect(css).toMatch(/\n\s*\.breathe \{\s*animation: omni-breathe /);
+    const reduced = css.slice(css.indexOf('/* ---- reduced motion ----'));
+    expect(reduced).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[^@]*\.ping,\s*\.breathe[^{]*\{\s*animation: none;/);
     // Still, the halo is not drawn at all: no disc sits behind a hollow mark.
     expect(marks).toMatch(/\.glyph > \.ping \{[^}]*opacity: 0;/);
   });

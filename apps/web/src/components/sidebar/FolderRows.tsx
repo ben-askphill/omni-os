@@ -1,10 +1,11 @@
 import { useRef, useState, type DragEvent } from 'react';
 import { taskHost, type BackgroundTask, type ChannelWithRunning, type FolderWithThreads } from '../../api.ts';
 import { FOLDER_NAME_MAX, drag, draftKey, useFolders } from '../../folders.tsx';
-import { openMenu } from '../ContextMenu.tsx';
+import { closeMenu, openMenu, useMenuOpenFor } from '../ContextMenu.tsx';
 import { plural } from '../../format.ts';
 import { Icon, StatusDot } from '../ui.tsx';
 import { ChannelThreadEntry } from './SidebarRows.tsx';
+import { isImeEnter } from '../../ime.ts';
 
 /** A folder's name being typed: Enter or leaving the field saves, Escape cancels. */
 export function FolderNameField({ initial, onSave, onCancel }: { initial: string; onSave: (name: string) => void; onCancel: () => void }) {
@@ -29,7 +30,7 @@ export function FolderNameField({ initial, onSave, onCancel }: { initial: string
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation();
-          if (e.key === 'Enter') finish(true);
+          if (e.key === 'Enter' && !isImeEnter(e)) finish(true);
           else if (e.key === 'Escape') finish(false);
         }}
         onBlur={() => finish(true)}
@@ -57,6 +58,7 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
   const [over, setOver] = useState<'thread' | 'folder' | null>(null);
   const [all, setAll] = useState(false);
   const editing = folders.editing === f.id;
+  const menuOpen = useMenuOpenFor('folder', f.id);
   const open = !f.collapsed;
   const agents = (id: string) => tasks.filter((k) => taskHost(k) === id);
   const busy = f.running > 0 || f.threads.some((t) => agents(t.id).length > 0);
@@ -139,9 +141,12 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
             type="button"
             aria-label={`${f.name} actions`}
             title="Folder actions"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
             onClick={(e) => {
+              if (menuOpen) return closeMenu();
               const r = e.currentTarget.getBoundingClientRect();
-              openMenu({ kind: 'folder', id: f.id }, r.left, r.bottom + 4);
+              openMenu({ kind: 'folder', id: f.id }, r.left, r.bottom + 4, 'start', e.currentTarget);
             }}
             className="hov relative z-[2] -ml-7 grid h-6 w-6 shrink-0 place-items-center rounded-full text-fg-3 opacity-100 transition-opacity hover:text-fg focus-visible:opacity-100 md:opacity-0 md:group-hover/folder:opacity-100 md:group-focus-within/folder:opacity-100"
           >

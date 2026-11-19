@@ -30,9 +30,10 @@ import { href, navigate } from '../router.ts';
 import { MachineChip } from './composer/MachineChip.tsx';
 import { EffortPicker, ModelPicker } from './ModelPicker.tsx';
 import { useForkMachine } from './RunOnPicker.tsx';
-import { Button, Chip, ErrorNote, Icon, IconButton, Label, Loading, Modal, Toggle, type ChipTone } from './ui.tsx';
+import { Button, Chip, ErrorNote, fieldHintId, Icon, IconButton, Label, Loading, Modal, Toggle, useUnsavedChanges, type ChipTone } from './ui.tsx';
 import { ModalFooter } from './ui/modal.tsx';
 import { MOD_KEY } from './ui/overlay.tsx';
+import { isImeEnter } from '../ime.ts';
 
 /**
  * One continue sheet's state, for the desktop and the phone: the picked run and machine's preview, asked again whenever
@@ -136,7 +137,7 @@ export function ContinueSheet({ source, onClose }: { source: ContinueSource; onC
   const { data: catalog, error, reload } = useApi<HarnessWithRunning[]>('/harnesses');
   const targets = useMemo(() => (catalog ? continueTargets(catalog) : null), [catalog]);
   return (
-    <Modal open onClose={onClose} wide title="Fork thread">
+    <Modal open onClose={onClose} wide title="Fork thread" dismiss="confirm">
       {targets ? (
         <ContinueForm source={source} targets={targets} onPickerOpen={reload} onClose={onClose} />
       ) : error ? (
@@ -158,6 +159,9 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
     navigate(href.thread(t.id));
   });
   const { run } = s;
+  // A message written here is the one thing a stray Escape or backdrop press would lose.
+  const [firstText] = useState(s.text);
+  useUnsavedChanges(s.text !== firstText);
   const note = refusalText(s.refusal);
   const hint = slashHint(s.text);
   const files = shownPreview(s.preview)?.carryover ?? null;
@@ -215,6 +219,7 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
             </Label>
             <textarea
               id="continue-message"
+              aria-describedby={fieldHintId('continue-message')}
               autoFocus
               rows={6}
               value={s.text}
@@ -222,7 +227,7 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
               className="field min-h-[132px] resize-y leading-relaxed"
               onChange={(e) => dispatch({ type: 'text', text: e.target.value })}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeEnter(e)) {
                   e.preventDefault();
                   void start();
                 }

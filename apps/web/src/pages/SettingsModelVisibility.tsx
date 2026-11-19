@@ -129,7 +129,7 @@ export function ModelVisibilityCard() {
           <SettingRow
             label="Models nobody switched"
             hint={POLICY_HINT[policy]}
-            control={<Segmented radio size="sm" label="Models nobody switched" value={policy} onChange={(p) => void save(setNewModels(mine, current.models, p))} options={POLICY_OPTIONS} />}
+            control={<Segmented size="sm" label="Models nobody switched" value={policy} onChange={(p) => void save(setNewModels(mine, current.models, p))} options={POLICY_OPTIONS} />}
           />
           <div className="flex min-h-7 flex-wrap items-center gap-2 text-[12.5px] text-fg-3">
             <HarnessLogo harness={current.id} size={13} />
@@ -147,7 +147,7 @@ export function ModelVisibilityCard() {
                 onChange={(e) => setQ(e.target.value)}
                 placeholder={`Find a ${current.name} model`}
                 aria-label={`Find a ${current.name} model`}
-                className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
+                className="field-sm h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-4"
               />
             </label>
           )}

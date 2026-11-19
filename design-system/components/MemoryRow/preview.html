@@ -1,0 +1,45 @@
+<!-- @dsCard group="13 Panels" name="MemoryRow — a learning or a role's lesson" subtitle="Waiting, approved and kept at once, with the scope chip and the Memory tab's add row; light and dark" width=1120 height=640 -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+body{margin:0;padding:20px 24px;background:var(--canvas);color:var(--fg);font:var(--type-body)}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.pane{min-width:0;padding:14px 16px;border-radius:var(--r-2xl);background:var(--bg);color:var(--fg);box-shadow:0 0 0 1px var(--line)}
+.pane h3{margin:2px 0 10px;font:500 12px/1.2 var(--font-sans);color:var(--fg-3)}
+.note{margin:0 0 10px;font:400 12.5px/18px var(--font-sans);color:var(--fg-3)}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+li{padding:10px 14px;border-radius:14px;background:var(--surface-2)}
+li p{margin:0;font:400 13px/1.55 var(--font-sans);color:var(--fg)}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:6px;font:400 12px/1.3 var(--font-sans);color:var(--fg-3)}
+.meta a{color:var(--fg-2);text-decoration:none}
+.end{margin-left:auto;display:flex;gap:6px}
+.chip{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;font:500 11px/1 var(--font-sans)}
+.chip.outline{box-shadow:inset 0 0 0 1px var(--line-strong);color:var(--fg-3)}
+.chip.needs{background:var(--needs);color:var(--on-needs)}
+.btn{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font:500 12px/1 var(--font-sans);color:var(--fg-2)}
+.btn.primary{background:var(--fg);color:var(--bg)}
+.add{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.field{flex:1 1 100%;height:36px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);padding:0 12px;display:flex;align-items:center;font:400 13px/1 var(--font-sans);color:var(--fg-3)}
+.pick{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;background:var(--surface-2);font:500 12.5px/1 var(--font-sans);color:var(--fg-2)}
+.addbtn{margin-left:auto;display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:999px;background:var(--surface-2);font:500 12.5px/1 var(--font-sans);color:var(--fg-3)}
+</style>
+</head><body>
+<template id="rows">
+  <p class="note">Its threads get the lessons you approved, and propose new ones with remember. Nothing they propose applies until you approve it.</p>
+  <ul>
+    <li><p>Quote the failing line in each finding.</p><div class="meta"><span class="chip needs">Waiting for you</span><span class="chip outline">Every channel</span><a href="#">From a thread</a><span class="end"><span class="btn primary">Approve</span><span class="btn">Edit</span><span class="btn">Dismiss</span></span></div></li>
+    <li><p>Acme wants findings in Dutch.</p><div class="meta"><span>Approved 2h ago</span><span class="chip outline">#acme only</span><a href="#">From a thread</a><span class="end"><span class="btn">Edit</span><span class="btn">Delete</span></span></div></li>
+    <li><p>Read the error before you retry.</p><div class="meta"><span>Kept at once 5m ago</span><span class="chip outline">#acme only</span><a href="#">From a thread</a><span class="end"><span class="btn">Edit</span><span class="btn">Delete</span></span></div></li>
+    <li><p>Run the repo's own check script before you report.</p><div class="meta"><span>Approved yesterday</span><span class="chip outline">Every channel</span><span class="end"><span class="btn">Edit</span><span class="btn">Delete</span></span></div></li>
+  </ul>
+  <div class="add"><span class="field">Add a lesson, like: Run the repo's own check script before you report</span><span class="pick">Every channel ⌄</span><span class="addbtn">Add lesson</span></div>
+</template>
+<div class="pair">
+  <div class="pane" data-theme="light"><h3>Light</h3><div class="slot"></div></div>
+  <div class="pane" data-theme="dark"><h3>Dark</h3><div class="slot"></div></div>
+</div>
+<script>
+for (const slot of document.querySelectorAll('.slot')) slot.appendChild(document.getElementById('rows').content.cloneNode(true));
+</script>
+</body></html>

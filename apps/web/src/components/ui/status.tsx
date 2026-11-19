@@ -157,11 +157,13 @@ export function StatusDot({
 
 /**
  * Something loads that is not a thread at work: a button's request, a list being read. The running dot in the text's
- * own color, half its box so it sits where an icon would.
+ * own color, half its box so it sits where an icon would. Not a live region: "Loading" read out each time a request
+ * starts is noise. Hidden from assistive tech next to words that say what loads (a busy Button says aria-busy itself);
+ * `label` names one that stands alone, as an image.
  */
-export function Loader({ size = 14, className = '' }: { size?: number; className?: string }) {
+export function Loader({ size = 14, className = '', label }: { size?: number; className?: string; label?: string }) {
   return (
-    <span role="status" aria-label="Loading" data-s="running" data-mark="loading" data-phase="loading" className={`glyph ${className}`} style={{ width: size, height: size }}>
+    <span {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })} data-s="running" data-mark="loading" data-phase="loading" className={`glyph ${className}`} style={{ width: size, height: size }}>
       <i className="ping" />
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
         {SHAPE.loading}

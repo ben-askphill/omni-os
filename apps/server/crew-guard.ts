@@ -7,9 +7,10 @@
 // - Only a thread running as the Conductor may: the reserved id, whose powers no save can change (crew-store.ts). Never
 //   one an automation started, any thread below one, or a usage scan.
 // - A save from an agent changes charters, descriptions, run defaults and default channels, never powers: no `mcp`,
-//   `delegate_only` or `delegatable`, and no whole-file markdown, which could set them. So no save an agent makes can
-//   hand another role the conductor tools, or route around this guard. A reset that would change a role's powers (Ben
-//   gave the built-in `delegate_only` in his overlay, say) is refused for the same reason.
+//   `delegate_only`, `tools`, `delegatable`, `review`, `memory` or `memory_writes`, and no whole-file markdown, which
+//   could set them. So no save an agent makes can hand another role the conductor tools, lift a reviewer's no-edits,
+//   let a role keep its own lessons at once, or route around this guard. A reset that would change a role's powers
+//   (Ben gave the built-in `delegate_only` in his overlay, say) is refused for the same reason.
 // - Only after Ben answered in that thread: a message of his after its first one, or an answer to a question it asked.
 //   An agent's own call never counts as his: the message routes record it as the Conductor's, and the question routes
 //   refuse its answer. The guard cannot read whether he agreed. It holds the rule that the Conductor proposes an edit
@@ -32,10 +33,18 @@ const BENS: Partial<Record<CrewWrite, string>> = { duplicate: 'duplicates', dele
 const EDITOR_ROLE = 'conductor';
 
 /** Frontmatter keys that give a role its powers. Only Ben sets them. */
-const POWERS = ['mcp', 'delegate_only', 'delegatable', 'review'] as const;
+const POWERS = ['mcp', 'delegate_only', 'tools', 'delegatable', 'review', 'memory', 'memory_writes'] as const;
 
 /** A role's powers as they compare: by frontmatter key. */
-const powersOf = (r: CrewRole): Record<(typeof POWERS)[number], unknown> => ({ mcp: [...r.mcp].sort(), delegate_only: r.delegateOnly, delegatable: r.delegatable, review: r.review });
+const powersOf = (r: CrewRole): Record<(typeof POWERS)[number], unknown> => ({
+  mcp: [...r.mcp].sort(),
+  delegate_only: r.delegateOnly,
+  tools: r.tools,
+  delegatable: r.delegatable,
+  review: r.review,
+  memory: r.memory,
+  memory_writes: r.memoryWrites,
+});
 
 /** The powers resetting role `id` would change: the ones the user's overlay sets differently from the built-in. */
 function resetPowers(id: string): string[] {
@@ -44,7 +53,9 @@ function resetPowers(id: string): string[] {
   if (!now || shipped === null) return [];
   const before = powersOf(now);
   const after = powersOf(parseCrewFile(id, shipped));
-  return POWERS.filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+  const differs = (k: (typeof POWERS)[number]) => JSON.stringify(before[k]) !== JSON.stringify(after[k]);
+  // Delegate-only is both keys' doing: name it once.
+  return POWERS.filter((k) => differs(k) && !(k === 'tools' && differs('delegate_only')));
 }
 
 const listed = (keys: string[]) => `${keys.join(', ')} ${keys.length === 1 ? 'is' : 'are'}`;

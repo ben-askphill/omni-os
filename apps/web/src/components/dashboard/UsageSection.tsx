@@ -9,6 +9,7 @@ import { HarnessLogo } from '../brand.tsx';
 import { Chip, Loader, Segmented, Ticks } from '../ui.tsx';
 import { compact, dayLabel, grouped, pct, SOURCE_COLOR, SOURCE_NAME, SOURCE_ORDER, usd } from './numbers.ts';
 import { UsageChart } from './UsageChart.tsx';
+import { useScrollRegion } from '../ui/use-scroll-region.ts';
 import { readDisplay, useTechnical } from '../../display.ts';
 import { term } from '@omni/shared/display.ts';
 
@@ -80,6 +81,8 @@ function ShareBar({ part, whole, color }: { part: number; whole: number; color: 
 
 function BreakdownTable({ usage, view }: { usage: InsightsUsage; view: Breakdown }) {
   const all = usage.total.cost;
+  // Under 520px wide the table scrolls sideways; the region lets the keyboard scroll it.
+  const region = useScrollRegion<HTMLDivElement>(`Spend by ${view === 'harness' ? term('harness', readDisplay().technical).toLowerCase() : view}`);
   const allTokens = tokensOf(usage.total);
   const rows =
     view === 'model'
@@ -89,7 +92,7 @@ function BreakdownTable({ usage, view }: { usage: InsightsUsage; view: Breakdown
         : [...usage.days].reverse().map((d) => ({ id: d.day, name: dayLabel(d.day), source: null, cost: d.cost, tokens: Object.values(d.tokens).reduce((a, b) => a + (b ?? 0), 0), mono: false }));
   if (!rows.length) return <p className="px-1 py-4 text-[12.5px] text-fg-3">No requests in this range.</p>;
   return (
-    <div className="scroll-thin overflow-x-auto rounded-[14px] shadow-[inset_0_0_0_1px_var(--line)]">
+    <div className="scroll-thin overflow-x-auto rounded-[14px] shadow-[inset_0_0_0_1px_var(--line)]" {...region}>
       <table className="w-full min-w-[520px] border-collapse text-[12.5px]">
         <thead>
           <tr className="text-left text-[11px] text-fg-3">

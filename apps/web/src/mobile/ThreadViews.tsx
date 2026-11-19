@@ -31,6 +31,8 @@ import { mergeNote } from '@omni/shared/pr-merge.ts';
 import { checkTone, STEP_WORKING, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { useApp } from '../store.tsx';
 import { toolLabel, toolSummary, type Item, type ToolCall } from '@omni/shared/transcript-fold.ts';
+import { connectorAction, connectorOf } from '@omni/shared/connectors.ts';
+import { ConnectorMark } from '../components/ConnectorMark.tsx';
 import { CrewFileList } from './CrewFiles.tsx';
 import { CrewPRList } from './CrewPRs.tsx';
 import { MoAutoMerge } from './MoAutoMerge.tsx';
@@ -49,7 +51,7 @@ const SOURCE: Record<string, string> = { manual: 'You', conductor: 'The Conducto
 
 function Body({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`mo-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-2 ${className}`} style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+    <div className={`mo-scroll safe-b-6 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-2 ${className}`}>
       {children}
     </div>
   );
@@ -70,12 +72,15 @@ function Step({ c, depth, running, cwd, tails }: { c: ToolCall; depth: number; r
   const target = outputTarget(c, running);
   // A step Ben opened stays openable when its call settles, so the card does not fold away under his thumb.
   const tappable = open || target?.kind === 'saved' || (target?.kind === 'live' && tails);
+  // A connector call wears its app's tile and name, and says what it does in words.
+  const app = connectorOf(c.name);
   const head = (
     <>
       <span className="flex items-center gap-2.5">
         <StatusDot status={state} size={8} />
-        <span className="shrink-0 text-[13px] font-medium">{toolLabel(c.name)}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-[1.3] text-fg-2">{toolSummary(c, cwd)}</span>
+        {app && <ConnectorMark connector={app} size={18} />}
+        <span className="shrink-0 text-[13px] font-medium">{app ? app.name : toolLabel(c.name)}</span>
+        <span className={`min-w-0 flex-1 truncate text-[12.5px] leading-[1.3] text-fg-2 ${app ? '' : 'font-mono'}`}>{app ? [connectorAction(c.name), toolSummary(c, cwd)].filter(Boolean).join(' · ') : toolSummary(c, cwd)}</span>
         {tappable && <Icon name="chevronRight" size={14} className={`shrink-0 text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />}
       </span>
       {out && !open && <span className={`ml-[18px] block ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{out}</span>}
@@ -93,7 +98,7 @@ function Step({ c, depth, running, cwd, tails }: { c: ToolCall; depth: number; r
         )}
         {open && (
           <div className="flex flex-col gap-2 px-3.5 pb-[11px]">
-            <ToolOutput call={c} running={running} touch box={(text) => <div className={`mo-scroll max-h-[60vh] overflow-auto ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{text || '(no output)'}</div>} />
+            <ToolOutput call={c} running={running} touch box={(text) => <div className={`mo-scroll max-h-[60dvh] overflow-auto ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{text || '(no output)'}</div>} />
           </div>
         )}
       </div>
@@ -147,7 +152,7 @@ export function ChangesScreen() {
   return (
     <>
       <MoHeader onBack={shell.back} title="Changes" sub={thread?.branch ?? thread?.title} />
-      <div className="min-h-0 flex-1 pt-1" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="safe-b min-h-0 flex-1 pt-1">
         {thread ? <ChangesTab thread={thread} /> : <MoEmpty>Loading</MoEmpty>}
       </div>
     </>
@@ -210,7 +215,7 @@ export function PRScreen() {
       shell.toast('Asked for a PR');
       shell.back();
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     } finally {
       setAsking(false);
     }
@@ -331,7 +336,7 @@ export function PRScreen() {
         {crew.length > 0 && <CrewPRList crew={crew} onOpen={(p) => setPicked(p.url)} />}
       </Body>
       {open && (
-        <div className="flex shrink-0 flex-col gap-2 px-4 pt-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+        <div className="safe-b-4 flex shrink-0 flex-col gap-2 px-4 pt-2">
           {note && <span className="text-center text-[12.5px] leading-[1.3] text-fg-3">{note}</span>}
           {error && <ErrorNote>{error}</ErrorNote>}
           <SlideToConfirm label="Slide to squash and merge" doneLabel={`Merged #${p.number}`} busyLabel="Merging" disabled={p.isDraft} onConfirm={merge} />
@@ -377,7 +382,7 @@ function BrowserBody({ channelId, threadId, onBack }: { channelId: string; threa
         sub={[url, 'watch only'].filter(Boolean).join(' · ')}
         right={<MoRound icon="annotate" label={annotating ? 'Stop annotating' : 'Annotate this page'} ink={annotating} disabled={!usable} onClick={() => (annotating ? stop() : setAnnotating(true))} />}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+      <div className="safe-b-6 flex min-h-0 flex-1 flex-col gap-2.5 px-3 pt-1">
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] bg-surface">
           <BrowserWatch b={b} box={box}>
             {on && <LiveAnnotateOverlay b={b} box={box} live={live} drive={false} />}
@@ -409,7 +414,7 @@ export function TerminalScreen() {
   return (
     <>
       <MoHeader onBack={shell.back} title="Terminal" sub="Read only · tap lines to add them to a message" />
-      <div className="flex min-h-0 flex-1 flex-col px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+      <div className="safe-b-6 flex min-h-0 flex-1 flex-col px-3 pt-1">
         {thread ? (
           <Suspense fallback={<MoEmpty>Loading</MoEmpty>}>
             <TerminalView threadId={thread.id} cwd={thread.cwd} readOnly />
@@ -552,8 +557,7 @@ export function ViewerScreen({ route }: { route: Route }) {
       if (a.url) {
         if (navigator.share) await navigator.share({ title: a.name, url: a.url });
         else {
-          await copyText(a.url);
-          shell.toast('Link copied');
+          shell.toast((await copyText(a.url)) ? 'Link copied' : "Couldn't copy the link");
         }
         return;
       }
@@ -561,11 +565,10 @@ export function ViewerScreen({ route }: { route: Route }) {
       const file = new File([blob], a.name, { type: blob.type });
       if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: a.name });
       else {
-        await copyText(sharedApiUrl(artifactUrl(a), location.href));
-        shell.toast('Link copied. It opens where Omni is paired.');
+        shell.toast((await copyText(sharedApiUrl(artifactUrl(a), location.href))) ? 'Link copied. It opens where Omni is paired.' : "Couldn't copy the link");
       }
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') shell.toast(errorText(e));
+      if ((e as Error).name !== 'AbortError') shell.toast(errorText(e), 'error');
     }
   };
   const sub =

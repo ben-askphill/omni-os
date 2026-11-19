@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   facetOptions,
   filterCount,
@@ -14,7 +14,9 @@ import {
 } from '@omni/shared/pr-query.ts';
 import { Button, Chip, Icon, Picker, type IconName } from '../components/ui.tsx';
 import { PageToolbar, RefreshButton, SearchField } from '../components/ui/feedback.tsx';
-import { useDismissable } from '../components/ui/use-dismissable.ts';
+import { isMenuMoveKey, moveFocus } from '../components/ContextMenuParts.tsx';
+import { useAnchoredPopover } from '../components/ui/use-anchored-popover.ts';
+import { useExit } from '../components/ui/use-exit.ts';
 
 /** Takes the next query, or how to make it from the current one so presses in one frame all land. */
 export type SetPRQuery = (next: PRQuery | ((q: PRQuery) => PRQuery)) => void;
@@ -73,19 +75,50 @@ export function PRToolbar({
 function FilterMenu({ q, set, prs }: { q: PRQuery; set: SetPRQuery; prs: ListedPR[] }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const n = filterCount(q.filters);
-  useDismissable(open, () => setOpen(false), { root: wrap });
+  // A popover tethered to the button. It takes the focus on its first item; the arrows, Home and End walk the items,
+  // Escape closes it and puts the focus back on the button, and Tab closes it and moves on.
+  const pop = useAnchoredPopover({ open, onDismiss: () => setOpen(false), wrap, trigger, panel, align: 'right', initialFocus: () => panel.current?.querySelector<HTMLElement>('[role^="menuitem"]') });
+  const exit = useExit(open, panel);
+  const onMenuKey = (e: ReactKeyboardEvent) => {
+    if (isMenuMoveKey(e.key)) {
+      e.preventDefault();
+      moveFocus(panel, e.key);
+    } else if (e.key === 'Tab') setOpen(false);
+  };
   const sections = PR_FACETS.map((facet) => ({ facet, options: facetOptions(prs, facet, q.filters[facet]) })).filter((s) => s.options.length);
   return (
-    // On a phone this menu and the repo's hang from the pills' row, not the button, so they stay on screen.
-    <div ref={wrap} className="sm:relative">
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} className={pill}>
+    <div ref={wrap} className="relative">
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        {...pop.triggerProps}
+        onClick={() => setOpen(!pop.clickCloses())}
+        onKeyDown={(e) => {
+          if (open || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+          e.preventDefault();
+          setOpen(true);
+        }}
+        className={pill}
+      >
         <Icon name="sliders" size={14} className="text-fg-3" />
         Filters
         {n > 0 && <Chip tone="ink">{n}</Chip>}
       </button>
-      {open && (
-        <div role="menu" aria-label="Filters" className="pik-card top-[calc(100%+8px)] right-0 w-[min(300px,calc(100vw-32px))]">
+      {exit.shown && (
+        <div
+          ref={panel}
+          {...pop.panelProps}
+          role="menu"
+          aria-label="Filters"
+          data-closing={exit.closing || undefined}
+          onKeyDown={onMenuKey}
+          className={`pik-card w-[min(300px,calc(100vw-32px))] ${pop.inlineClass}`}
+        >
           <div className="scroll-thin max-h-[min(420px,70vh)] overflow-y-auto">
             {sections.map(({ facet, options }) => (
               <div key={facet} role="group" aria-label={FACETS[facet].title} className="pb-1">
@@ -98,9 +131,9 @@ function FilterMenu({ q, set, prs }: { q: PRQuery; set: SetPRQuery; prs: ListedP
                       type="button"
                       role="menuitemcheckbox"
                       aria-checked={on}
-                      aria-selected={on}
+                      tabIndex={-1}
                       onClick={() => set((q) => ({ ...q, filters: toggleFilter(q.filters, facet, o.value) }))}
-                      className="pik-row min-h-9 hover:bg-[var(--wash)]"
+                      className="pik-row min-h-9 hover:bg-[var(--wash)] focus-visible:bg-[var(--wash)]"
                     >
                       <span className="pik-mark">{on && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
                       <span className="min-w-0 flex-1 truncate text-[13px] text-fg">{o.label}</span>
@@ -113,7 +146,7 @@ function FilterMenu({ q, set, prs }: { q: PRQuery; set: SetPRQuery; prs: ListedP
           </div>
           {n > 0 && (
             <div className="mt-1 border-t border-line px-1 pt-1.5">
-              <Button size="sm" variant="ghost" icon="x" onClick={() => set((q) => ({ ...q, filters: {} }))}>
+              <Button size="sm" variant="ghost" icon="x" role="menuitem" tabIndex={-1} onClick={() => set((q) => ({ ...q, filters: {} }))}>
                 Clear filters
               </Button>
             </div>

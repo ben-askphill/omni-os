@@ -58,7 +58,7 @@ function useThreadActions(thread: Thread, onClose: () => void) {
       applyThread(await setPinned(thread, !thread.pinned_at), true);
       shell.toast(thread.pinned_at ? 'Unpinned' : 'Pinned to Activity');
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     }
   };
   const done = async () => {
@@ -69,7 +69,7 @@ function useThreadActions(thread: Thread, onClose: () => void) {
       applyThread(next, true);
       shell.toast(thread.done_at ? 'Back in Needs you' : 'Marked done');
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     }
   };
   const sendGrok = async () => {
@@ -98,7 +98,7 @@ function useThreadActions(thread: Thread, onClose: () => void) {
         shell.back();
       }
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     }
   };
   return { go, pin, done, sendGrok, archive, grokBusy, grokError };
@@ -119,7 +119,7 @@ function RenameSheet({ thread, onClose }: { thread: Thread; onClose: () => void 
       await reloadChannels();
       shell.toast('Renamed');
     } catch (e) {
-      shell.toast(errorText(e));
+      shell.toast(errorText(e), 'error');
     }
   };
   return (

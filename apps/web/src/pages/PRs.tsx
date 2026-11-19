@@ -1,7 +1,7 @@
-import { useState, type CSSProperties } from 'react';
+import { useId, useState, type CSSProperties } from 'react';
 import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, useApi, type Channel, type Checks, type PRDetail as PRDetailT, type PRSummary } from '../api.ts';
-import { Button, Chip, StatusDot, Empty, ErrorNote, Icon, LinkButton, Loading, Tabs } from '../components/ui.tsx';
+import { Button, Chip, StatusDot, Empty, ErrorNote, Icon, LinkButton, Loading, Tabs, tabPanelProps } from '../components/ui.tsx';
 import { pageColumn, PageToolbar, RefreshButton } from '../components/ui/feedback.tsx';
 import { prBadge } from '@omni/shared/thread-glance.ts';
 import { pullRequestUrl } from '@omni/shared/pr-links.ts';
@@ -63,7 +63,7 @@ export function PRList({ channel }: { channel: Channel }) {
           </>
         }
       >
-        <Tabs size="sm" tabs={STATES.map((s) => ({ id: s, label: s[0].toUpperCase() + s.slice(1) }))} value={state} onChange={setState} />
+        <Tabs size="sm" label="Pull request state" tabs={STATES.map((s) => ({ id: s, label: s[0].toUpperCase() + s.slice(1) }))} value={state} onChange={setState} />
       </PageToolbar>
       {noRepo ? (
         <NoRepo channel={channel} />
@@ -140,6 +140,7 @@ function PRThreadLinks({ thread }: { thread: NonNullable<PRDetailT['thread']> })
 export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
   const q = useApi<PRDetailT>(channel.github_repo ? `/channels/${encodeURIComponent(channel.id)}/prs/${n}` : null);
   const [tab, setTab] = useState<DetailTab>('conversation');
+  const panel = useId();
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const rerun = useRerunFailedChecks(channel.id, n, q.data?.checkRuns, !q.data?.state || q.data.state === 'OPEN');
@@ -223,6 +224,9 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
       <Tabs
         className="mt-6"
         size="sm"
+        kind="tabs"
+        panel={panel}
+        label="Pull request"
         value={tab}
         onChange={setTab}
         tabs={[
@@ -233,7 +237,7 @@ export function PRDetail({ channel, n }: { channel: Channel; n: number }) {
       />
 
       <LinkChannel.Provider value={channel.id}>
-        <div className="mt-4">
+        <div className="mt-4" {...tabPanelProps(panel, tab)}>
           <PRDetailTabBody tab={tab} p={p} />
         </div>
       </LinkChannel.Provider>

@@ -8,19 +8,21 @@ import { callerOf } from './automation-guard.ts';
 import { crewRefusal, type CrewWrite } from './crew-guard.ts';
 import { listCrew } from './crew.ts';
 import { crewDetail, crewRunProblem, crewSave, deleteCrew, draftCrew, duplicateCrew, resetCrew, saveCrew, setCrewHidden, type CrewSave, type CrewSaveContext } from './crew-store.ts';
-import { channels } from './db.ts';
+import { channels, memories } from './db.ts';
 import { getCatalog } from './harness/catalog-service.ts';
 
 export const crewApi = new Hono();
 
 // Hidden roles only with ?all=1 (Settings): pickers and the Conductor offer only the rest.
+// memoryWaiting: how many lessons its threads proposed wait for the user (memory-api.ts), when any do.
 crewApi.get('/crew', (c) => {
   const cat = getCatalog();
   const all = c.req.query('all') === '1';
+  const waiting = memories.waitingByRole();
   return c.json(
     listCrew()
       .filter((r) => all || !r.hidden)
-      .map((r) => ({ ...r, error: r.error ?? crewRunProblem(r, cat) })),
+      .map((r) => ({ ...r, error: r.error ?? crewRunProblem(r, cat), ...(waiting[r.id] && { memoryWaiting: waiting[r.id] }) })),
   );
 });
 

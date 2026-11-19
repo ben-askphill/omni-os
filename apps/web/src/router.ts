@@ -136,11 +136,53 @@ export const SETTINGS_LABEL = Object.fromEntries(SETTINGS_SECTION_DEFS.map((s) =
 export const settingsHash = (section?: SettingsSection, focus?: string) =>
   section ? `#/settings/${section}${focus ? `?focus=${encodeURIComponent(focus)}` : ''}` : '#/settings';
 
-const subscribe = (cb: () => void) => {
-  window.addEventListener('hashchange', cb);
-  return () => window.removeEventListener('hashchange', cb);
+/**
+ * Wraps the page's move to a new hash: `apply` shows it (renders every `useHash`), `to` and `from` are the new and
+ * the shown hash. The phone layout plays its push and back as a view transition this way (MobileShell.tsx).
+ */
+export type HashChangeWrap = (apply: () => void, to: string, from: string) => void;
+let wrapHashChange: HashChangeWrap | null = null;
+/** Sets the wrap until the returned function clears it. */
+export function setHashChangeWrap(wrap: HashChangeWrap): () => void {
+  wrapHashChange = wrap;
+  return () => {
+    if (wrapHashChange === wrap) wrapHashChange = null;
+  };
+}
+
+// The hash the page shows. It trails location.hash while a wrap holds the change back, so a render before the
+// wrap applies it still draws the old screen.
+let shown: string | null = null;
+// The hash a wrap holds back. Another event for it (two moves in one frame send two) waits for the same apply.
+let held: string | null = null;
+const listeners = new Set<() => void>();
+const onHashChange = () => {
+  const from = shown ?? '';
+  const to = window.location.hash;
+  if (to === held) return;
+  const apply = () => {
+    held = null;
+    shown = window.location.hash;
+    for (const cb of [...listeners]) cb();
+  };
+  if (!wrapHashChange || to === from) return apply();
+  held = to;
+  wrapHashChange(apply, to, from);
 };
-const getHash = () => window.location.hash;
+const subscribe = (cb: () => void) => {
+  if (!listeners.size) {
+    shown = window.location.hash;
+    window.addEventListener('hashchange', onHashChange);
+  }
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+    if (listeners.size) return;
+    window.removeEventListener('hashchange', onHashChange);
+    shown = held = null;
+  };
+};
+const getHash = () => shown ?? window.location.hash;
 
 export function useHash() {
   return useSyncExternalStore(subscribe, getHash, () => '');

@@ -2,12 +2,12 @@ import type { ReactNode } from 'react';
 
 /**
  * Animated to-do row (Bencho "chk", web/src ui.tsx). completed: box fills (spring), tick draws, label strikes through
- * left→right. in_progress: ink edge + a breathing ultramarine bead. Used for plans (TodoWrite) in threads.
+ * left→right. in_progress: ink edge + a breathing ultramarine bead. Used for plans (TodoWrite) in threads. A list item
+ * with its state in words (To do, In progress, Done), never a control: render rows inside a <ul>.
  */
 export interface CheckItemProps {
   state?: 'pending' | 'in_progress' | 'completed';
   children: ReactNode;
-  onClick?: () => void;
 }
 export function CheckItem(props: CheckItemProps): JSX.Element;
 

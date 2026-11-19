@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { channelBody, channelForm, channelFormProblem, promptsBody, runBody, slugify, storeDomain, type ChannelRecord } from '../channel-form.ts';
+import { channelBody, channelForm, channelFormProblem, channelFormProblems, promptsBody, runBody, slugify, storeDomain, type ChannelRecord } from '../channel-form.ts';
 import { setsRun } from '../draft-run.ts';
 
 const acme: ChannelRecord = {
@@ -112,5 +112,13 @@ describe('channel form', () => {
     expect(channelFormProblem({ ...channelForm(), name: '!!', id: slugify('!!') }, true)).toMatch(/id needs/);
     expect(channelFormProblem({ ...channelForm(), name: 'Café Noir', id: slugify('Café Noir') }, true)).toBeNull();
     expect(slugify('Café Noir')).toBe('cafe-noir');
+  });
+
+  it('says which field each problem belongs to, so the form can show it there', () => {
+    const problems = channelFormProblems({ ...channelForm(), name: ' ', id: '!', worktree_shared: '../elsewhere' }, true);
+    expect(problems).toMatchObject({ name: 'Give the channel a name.', avatar_bg: null, worktree_include: null });
+    expect(problems.id).toMatch(/id needs/);
+    expect(problems.worktree_shared).toMatch(/inside the repo/);
+    expect(channelFormProblem({ ...channelForm(), name: ' ', id: '!' }, true)).toBe(problems.name);
   });
 });

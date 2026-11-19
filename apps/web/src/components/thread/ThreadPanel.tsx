@@ -1,10 +1,10 @@
-import { lazy, Suspense, useState, type ComponentProps } from 'react';
+import { lazy, Suspense, useId, useState, type ComponentProps } from 'react';
 import type { Artifact, ArtifactWithThread, Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { plural } from '../../format.ts';
 import { crewLine, prLine } from '@omni/shared/thread-glance.ts';
 import { desktop } from '../../desktop.ts';
-import { IconButton, Loading, Segmented, StatusDot, type IconName } from '../ui.tsx';
+import { IconButton, Loading, Segmented, StatusDot, tabPanelProps, type IconName } from '../ui.tsx';
 import { ActionsTab } from './panel/ActionsTab.tsx';
 import { ArtifactsTab } from './panel/ArtifactsTab.tsx';
 import { BrowserTab } from './panel/BrowserTab.tsx';
@@ -74,6 +74,7 @@ export function ThreadPanel({
   prs: Omit<PRs, 'thread'>;
 }) {
   const { agents } = details;
+  const panel = useId();
   const fileCount = files.length + crewArtifacts.files.length;
   const shotCount = shots.length + crewArtifacts.shots.length;
   // Outside a code project with the switch off, a tab shows only with something in it: no code tabs, and Artifacts and
@@ -97,6 +98,10 @@ export function ThreadPanel({
       <div className="flex items-center gap-1 px-2.5 py-2.5">
         <div className="scroll-thin min-w-0 flex-1 overflow-x-auto">
           <Segmented
+            kind="tabs"
+            panel={panel}
+            // Terminal and Web start a process or a page, and Terminal takes the focus: arrowing past them must not.
+            manual
             label="Thread inspector"
             className="inspector-tabs"
             value={tab}
@@ -122,7 +127,7 @@ export function ThreadPanel({
         </div>
         <IconButton icon="x" label="Close panel" onClick={onClose} />
       </div>
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1" {...tabPanelProps(panel, tab)}>
         {tab === 'details' && <DetailsTab thread={thread} {...details} />}
         {tab === 'prs' && <PRsTab thread={thread} {...prs} />}
         {tab === 'artifacts' && <ArtifactsTab artifacts={files} crew={crewArtifacts.files} selected={selectedArtifact} onSelect={onSelect} />}

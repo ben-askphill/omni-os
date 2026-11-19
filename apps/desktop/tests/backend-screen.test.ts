@@ -30,6 +30,19 @@ describe('server screen', () => {
     expect(bare).not.toContain('Last lines of the server log');
     expect(screenHtml({ kind: 'starting', port: 4747 })).toContain('Starting the server on port 4747');
   });
+
+  it('runs no script: its CSP allows none, and the log opens at its last line by CSS', () => {
+    for (const html of [
+      screenHtml({ kind: 'failed', message: 'x', logTail: 'a\nb\n', logExists: true }),
+      screenHtml({ kind: 'starting', port: 4747 }),
+    ]) {
+      const csp = /http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)?.[1] ?? '';
+      expect(csp).toBe("default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");
+      expect(csp).not.toContain('script-src');
+      expect(html).not.toContain('<script');
+    }
+    expect(screenHtml({ kind: 'failed', message: 'x', logTail: 'a\nb\n', logExists: true })).toContain('<pre><span>a\nb</span></pre>');
+  });
 });
 
 describe('activity monitor', () => {
