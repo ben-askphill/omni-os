@@ -96,7 +96,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
     if (!thread) return;
     if (!asking) return navigation.replace('Thread', { id: thread.id });
     setText('');
-    clearStaged(NEW_SCOPE);
+    clearStaged(scope);
     setAnswering(thread.id);
   };
   const submitRef = useRef(submit);
