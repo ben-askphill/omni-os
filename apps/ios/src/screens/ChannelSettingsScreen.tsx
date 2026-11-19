@@ -1,5 +1,5 @@
 import { autoAvatarColor, AVATAR_SWATCHES } from '@omni/shared/avatar-color.ts';
-import type { Channel, HarnessInfo, OmniApi } from '@omni/client-core';
+import type { Channel, HarnessInfo, Memory, OmniApi } from '@omni/client-core';
 import { portLabel, SETUP_MODE_LABEL } from '@omni/shared/channel-actions.ts';
 import { CHANNEL_GLYPHS, glyphIcon } from '@omni/shared/channel-icon.ts';
 import { channelBody, channelForm, channelFormProblem, CHANNEL_KINDS, slugify, type ChannelForm, type ChannelKind } from '@omni/shared/channel-form.ts';
@@ -249,6 +249,8 @@ function ChannelSettingsForm({ channel, machineDefault, navigation }: { channel:
 
       {channel ? <ActionsGroup channel={channel} navigation={navigation} /> : null}
 
+      {channel ? <LearningsGroup channel={channel} /> : null}
+
       {channel ? (
         <Group title="Secrets" footer="API keys and tokens this channel's threads get. A channel secret overrides a global one.">
           <ListRow first icon="key" title="Channel secrets" chevron onPress={() => navigation.navigate('Secrets', { channel: channel.id })} />
@@ -410,6 +412,58 @@ function ActionsGroup({ channel, navigation }: { channel: Channel; navigation: R
         />
       ))}
       <ListRow first={list.length === 0} icon="plus" title="Add action" onPress={() => navigation.navigate('ChannelAction', { channel: channel.id })} />
+    </Group>
+  );
+}
+
+const loadLearnings = (channelId: string) => (api: OmniApi) => api.learnings(channelId);
+
+/**
+ * The channel's Recent learnings (the Web UI's ChannelLearnings): lessons every thread here gets once approved. A tap
+ * offers Approve, Edit and Dismiss or Delete; each saves on its own.
+ */
+function LearningsGroup({ channel }: { channel: Channel }) {
+  const hub = useLiveHub();
+  const load = useMemo(() => loadLearnings(channel.id), [channel.id]);
+  const learnings = useRemote(load);
+  const { reload } = learnings;
+  const [error, setError] = useState<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
+  async function run(call: (api: OmniApi) => Promise<unknown>) {
+    setError(null);
+    try {
+      await hub.request(call);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
+    }
+  }
+  const edit = (m: Memory) =>
+    Alert.prompt('Edit learning', undefined, (text) => text?.trim() && void run((api) => api.updateLearning(m.id, { text })), 'plain-text', m.text);
+  const open = (m: Memory) => {
+    const waiting = m.status === 'proposed';
+    Alert.alert(waiting ? 'Waiting for you' : 'Learning', m.text, [
+      ...(waiting ? [{ text: 'Approve', onPress: () => void run((api) => api.updateLearning(m.id, { approve: true })) }] : []),
+      { text: 'Edit', onPress: () => edit(m) },
+      { text: waiting ? 'Dismiss' : 'Delete', style: 'destructive' as const, onPress: () => void run((api) => api.removeLearning(m.id)) },
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  };
+  const add = () => Alert.prompt('Add a learning', 'Every thread in this channel gets it.', (text) => text?.trim() && void run((api) => api.addLearning(channel.id, text)), 'plain-text');
+  const list = learnings.data?.learnings ?? [];
+  return (
+    <Group
+      title="Recent learnings"
+      footer={error ?? (learnings.error && !learnings.data ? learnings.error : "Lessons every thread in this channel gets, and no other channel's. Agents propose them; nothing applies until you approve it.")}
+    >
+      {list.map((m, i) => (
+        <ListRow key={m.id} first={i === 0} title={m.text} detail={m.status === 'proposed' ? 'Waiting for you' : 'Approved'} chevron onPress={() => open(m)} />
+      ))}
+      <ListRow first={list.length === 0} icon="plus" title="Add learning" onPress={add} />
     </Group>
   );
 }

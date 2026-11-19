@@ -15,3 +15,4 @@ import './review-note.ts';
 import './automation-file.ts';
 import './crew-file.ts';
 import './mcp-client.ts';
+import './memory.ts';

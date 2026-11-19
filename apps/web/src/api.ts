@@ -489,6 +489,8 @@ export type FeedEvent =
   | { type: 'automations' }
   /** A crew role was saved, reset, deleted, hidden or shown, here or on another machine: refetch GET /api/crew. */
   | { type: 'crew' }
+  /** A channel's Recent learnings changed, here or on another machine: refetch GET /api/memory?channel=<id>. */
+  | { type: 'memory'; channel_id: string | null }
   /** Show technical details or the Shopify add-on changed, here or on another machine: refetch GET /api/display. */
   | { type: 'display' }
   /** The update check or Update moved on: refetch GET /api/update. */

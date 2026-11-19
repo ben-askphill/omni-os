@@ -41,5 +41,6 @@ export { isCommandAhead, remoteCommands } from './db/repos/remote-commands.ts';
 export { assignments, parseTrail, type Assignment, type TrailStop } from './db/repos/assignments.ts';
 export { transitions, type TransitionRow } from './db/repos/transitions.ts';
 export { reviewNotes, type ReviewNote } from './db/repos/review-notes.ts';
+export { memories, type Memory } from './db/repos/memories.ts';
 export type { SyncEntity, SyncOp, OutboxRow } from './db/sync.ts';
 export { SEED_TS, outbox, syncMeta } from './db/sync.ts';
