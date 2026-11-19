@@ -25,7 +25,7 @@ let db: typeof import('../db.ts');
 /** The relay's key, as the fake relay hands it out. */
 let relayKey: { privateJwk: JsonWebKey; publicJwk: EcJwk };
 const relayCalls: { op: string; body?: unknown }[] = [];
-let registered: { publicKey: EcJwk; port: number } | null = null;
+let registered: { machineId: string; publicKey: EcJwk; port: number; proof?: string } | null = null;
 
 const fakeRelay: ConnectRelay = {
   info: async () => ({ connect: true }),
@@ -122,6 +122,27 @@ describe('turning Omni Connect on and off', () => {
     expect(registered!.publicKey).not.toHaveProperty('d');
     expect(auth.owner()?.sub).toBe(USER);
     expect(await secrets.globalSecret('OMNI_CONNECT_TUNNEL_TOKEN')).toBe('connector-token');
+  });
+
+  it('signs its registration with its own key, for this relay token, so the relay lets it register again after a new sign-in', async () => {
+    await enable();
+    const proof = registered!.proof;
+    expect(typeof proof).toBe('string');
+    // Checked in WebCrypto, as the relay (apps/relay/src/connect.ts) checks it.
+    const [h, p, sig] = proof!.split('.');
+    const key = await crypto.subtle.importKey('jwk', registered!.publicKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    expect(await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, Buffer.from(sig, 'base64url'), new TextEncoder().encode(`${h}.${p}`))).toBe(true);
+    expect(JSON.parse(Buffer.from(h, 'base64url').toString())).toEqual({ alg: 'ES256', typ: 'omni-connect-register+jwt' });
+    const claims = JSON.parse(Buffer.from(p, 'base64url').toString()) as Record<string, number | string>;
+    const hex = (b: ArrayBuffer) => Buffer.from(b).toString('hex');
+    expect(claims).toMatchObject({
+      iss: 'mac-a',
+      aud: 'omni-relay',
+      sub: USER,
+      tkh: hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(RELAY_TOKEN))),
+      jkt: jwt.thumbprint(registered!.publicKey),
+    });
+    expect(Number(claims.exp) - Number(claims.iat)).toBeLessThanOrEqual(120);
   });
 
   it('refuses when this Omni is linked to another Google account', async () => {

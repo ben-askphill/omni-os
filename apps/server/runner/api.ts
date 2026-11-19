@@ -22,7 +22,7 @@ import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
-import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
+import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST, type SetupRetryBy } from './setup.ts';
 import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
@@ -549,11 +549,11 @@ function goalSend(thread: Thread, prompt: string, files: number): { stops: boole
  * uncertain one may already have reached the harness, so it goes only when named. Each goes through the runner
  * like a new message, so the harness's concurrency cap holds. Only the Mac that accepted a request resumes it.
  */
-export async function resumeRequests(threadId: string, ids?: string[]): Promise<Thread> {
+export async function resumeRequests(threadId: string, ids?: string[], by: SetupRetryBy = {}): Promise<Thread> {
   const thread = threads.get(threadId);
   if (!thread) throw refusal('thread not found', 404);
   // What waits on a worktree goes once it is made: Resume there is Retry, and while it is made, nothing more.
-  if (thread.setup) return retrySetup(threadId);
+  if (thread.setup) return retrySetup(threadId, by);
   const parked = messageRequests.parked(threadId);
   const chosen = ids ? parked.filter((r) => ids.includes(r.id)) : parked.filter((r) => r.state === 'recovered');
   if (ids && chosen.length !== new Set(ids).size) throw refusal('Some of these messages are no longer waiting to be resumed.', 409);
