@@ -56,7 +56,7 @@ How a server hands Omni its key without anyone pasting it ([Connect an agent](..
 | Call | Request | Answer |
 | --- | --- | --- |
 | `POST /v1/omni/pair` | `{ code, client_id, client_name }`, no `Authorization` | 200 `{ protocol, key, key_id?, url?, name?, kind?, shared_key?, revoke? }`; 404 for a code that is unknown, used or expired (the same answer for all three); 429 after repeated misses from one address |
-| `POST /v1/omni/revoke` | `{ key_id }`, with the key as the bearer | 204, after which the key no longer works. Only when the pair answer said `revoke: true` |
+| `POST /v1/omni/revoke` | `{ key_id }`, with the key as the bearer, at the pairing address | 204, after which the key no longer works. Only when the pair answer said `revoke: true` |
 
 - **The code** has at least 128 bits, works once, lives at most 10 minutes and is held only as a hash, compared in constant time. Omni sends it as typed: the server ignores case, dashes and spaces.
 - **`client_id`** is the machine's id and **`client_name`** "Omni on <machine>", so the agent can list who paired.

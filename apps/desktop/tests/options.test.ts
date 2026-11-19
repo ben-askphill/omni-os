@@ -9,6 +9,12 @@ describe('omni:// links and a launch on a page', () => {
     expect(linkRoute('omni://')).toBe('#/');
   });
 
+  it('opens the pairing link a remote agent\'s helper prints as the Connect an agent page, query and all', () => {
+    const link = 'omni://connect-agent?url=http%3A%2F%2Fhermes.tail1.ts.net%3A8642&code=GB8Z-DP5J-0TGX-R608-WYSB-WV2T-G8SV&name=Hermes%20on%20box&pair=http%3A%2F%2Fhermes.tail1.ts.net%3A8643';
+    expect(linkRoute(link)).toBe(`#/${link.slice('omni://'.length)}`);
+    expect(launchRoute(['/Applications/Omni.app/Contents/MacOS/Omni', link])).toBe(`#/${link.slice('omni://'.length)}`);
+  });
+
   it('refuses any other scheme and anything the Web UI would not route', () => {
     expect(linkRoute('https://example.com/#/t/x')).toBeNull();
     expect(linkRoute('omni://t/x"><script>')).toBeNull();

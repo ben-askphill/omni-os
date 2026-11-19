@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
 import { HarnessLogo } from '../components/brand.tsx';
-import { Button, ErrorNote, Icon, Loading, StatusDot } from '../components/ui.tsx';
+import { ConnectAgentSheet, RemoteMark, TestOutcome } from '../components/ConnectAgent.tsx';
+import { Button, ErrorNote, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, StatusDot, Toggle } from '../components/ui.tsx';
+import { customHarnessSlug } from '@omni/shared/custom-harness.ts';
+import type { AgentTest } from '@omni/shared/connect-agent.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp } from '../store.tsx';
 import { asksAuto } from '@omni/shared/thread-run.ts';
@@ -9,7 +12,7 @@ import { runBody, type ChannelRun } from '@omni/shared/channel-form.ts';
 import { applyRunToChannels, bulkRunError, NO_RUN, picksRun, resetChannelsToAuto, selectedIds, toggleSelected } from '@omni/shared/channel-bulk-run.ts';
 import { RunDefaultsField } from './ChannelSettings.tsx';
 import { Card, LinkLine, Origin, ResetButton, ServerOptions, useScopedChannel } from './settings-parts.tsx';
-import { href } from '../router.ts';
+import { href, navigate, useRoute } from '../router.ts';
 import { ModelVisibilityCard } from './SettingsModelVisibility.tsx';
 
 // Settings, Models: each harness with whether it can run, how to fix it, its models and its cap; which models
@@ -32,8 +35,28 @@ export function ModelsSection() {
 
 function HarnessesCard({ channel }: { channel?: string }) {
   const res = useApi<HarnessWithRunning[]>(harnessesPath(channel));
+  // An omni://connect-agent link, or #/settings/models?connect=<link>, opens the sheet filled in.
+  const route = useRoute();
+  const linked = route.name === 'settings' ? route.connect : undefined;
+  const [connecting, setConnecting] = useState(false);
+  const [editing, setEditing] = useState<HarnessWithRunning | null>(null);
+  const closeConnect = () => {
+    setConnecting(false);
+    if (linked) navigate(href.settingsSection('models'), { replace: true });
+  };
   return (
-    <Card entry="harnesses" title="Harnesses" subtitle="The agents Omni can start a thread on. Omni checks each one again when a picker opens.">
+    <Card
+      entry="harnesses"
+      title="Harnesses"
+      subtitle="The agents Omni can start a thread on. Omni checks each one again when a picker opens."
+      actions={
+        <Button size="sm" icon="plus" onClick={() => setConnecting(true)}>
+          Connect an agent
+        </Button>
+      }
+    >
+      <ConnectAgentSheet open={connecting || !!linked} initial={linked} onClose={closeConnect} onConnected={() => res.reload()} />
+      {editing && <EditHarnessSheet harness={editing} onClose={() => setEditing(null)} onSaved={() => res.reload()} />}
       {res.error ? (
         <ErrorNote onRetry={res.reload}>{res.error}</ErrorNote>
       ) : !res.data ? (
@@ -48,10 +71,13 @@ function HarnessesCard({ channel }: { channel?: string }) {
                   <HarnessLogo harness={h.id} size={14} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-medium break-words">{h.name}</div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-[13px] font-medium break-words">{h.name}</span>
+                    {h.remote?.custom && <RemoteMark host={h.remote.host} />}
+                  </div>
                   {h.remote?.custom && (
                     <p className="mt-0.5 text-[12.5px] break-words text-fg-2">
-                      Custom harness{h.remote.host && ` on ${h.remote.host}`} · key in <code className="text-[11.5px]">{h.remote.secret}</code>
+                      Custom harness · key in <code className="text-[11.5px]">{h.remote.secret}</code>
                     </p>
                   )}
                   <p className="mt-0.5 text-[12.5px] break-words text-fg-3">
@@ -64,6 +90,7 @@ function HarnessesCard({ channel }: { channel?: string }) {
                       To fix: {isCommand(h.fix ?? h.install ?? '') ? <code className="text-[11.5px]">{h.fix ?? h.install}</code> : (h.fix ?? h.install)}
                     </p>
                   )}
+                  {h.remote?.custom && <CustomHarnessActions harness={h} onEdit={() => setEditing(h)} onChanged={() => res.reload()} />}
                 </div>
                 <span className="mt-0.5 inline-flex w-[76px] shrink-0 items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg-2">
                   <StatusDot status={h.available ? 'done' : 'needs'} size={7} />
@@ -75,6 +102,144 @@ function HarnessesCard({ channel }: { channel?: string }) {
         </ul>
       )}
     </Card>
+  );
+}
+
+/** A custom harness row's Test connection, Edit and Remove. Remove revokes its key at the agent when it can. */
+function CustomHarnessActions({ harness, onEdit, onChanged }: { harness: HarnessWithRunning; onEdit: () => void; onChanged: () => void }) {
+  const slug = customHarnessSlug(harness.id) ?? '';
+  const [test, setTest] = useState<AgentTest | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const runTest = async () => {
+    setTesting(true);
+    setError(null);
+    setTest(null);
+    try {
+      setTest(await api.post<AgentTest>(`/harnesses/custom/${encodeURIComponent(slug)}/test`, {}));
+      onChanged();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setTesting(false);
+    }
+  };
+  const remove = async () => {
+    try {
+      const r = await api.del<{ revoked: boolean | null; secret: string | null }>(`/harnesses/custom/${encodeURIComponent(slug)}`);
+      setNote(
+        [r.revoked === true && 'Its key was revoked at the agent.', r.revoked === false && 'The agent did not revoke its key: change the key on the server to cut it off.', r.secret && `${r.secret} was removed from Secrets.`]
+          .filter(Boolean)
+          .join(' ') || null,
+      );
+      onChanged();
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button size="sm" busy={testing} disabled={testing} onClick={() => void runTest()}>
+          Test connection
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onEdit}>
+          Edit
+        </Button>
+        <InlineConfirm label="Remove" icon="trash" confirmLabel="Remove" busyLabel="Removing" tone="danger" onConfirm={remove} />
+      </div>
+      {test && <TestOutcome test={test} />}
+      {note && <p className="text-[12.5px] text-fg-2">{note}</p>}
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </div>
+  );
+}
+
+interface CustomHarnessFile {
+  id: string;
+  name: string;
+  url: string;
+  secret: string;
+  bills: string;
+  cap: number;
+  capabilities: { steer: boolean };
+}
+
+/** Edit a custom harness's file: name, address, the secret its key is in, what it bills, its cap and Steer. */
+function EditHarnessSheet({ harness, onClose, onSaved }: { harness: HarnessWithRunning; onClose: () => void; onSaved: () => void }) {
+  const slug = customHarnessSlug(harness.id) ?? '';
+  const files = useApi<CustomHarnessFile[]>('/harnesses/custom');
+  const file = files.data?.find((f) => f.id === harness.id);
+  return (
+    <Modal open onClose={onClose} title={`Edit ${harness.name}`}>
+      {file ? <EditHarnessForm key={file.id} slug={slug} file={file} onClose={onClose} onSaved={onSaved} /> : files.error ? <ErrorNote>{files.error}</ErrorNote> : <Loading />}
+    </Modal>
+  );
+}
+
+function EditHarnessForm({ slug, file, onClose, onSaved }: { slug: string; file: CustomHarnessFile; onClose: () => void; onSaved: () => void }) {
+  const [draft, setDraft] = useState({ name: file.name, url: file.url, secret: file.secret, bills: file.bills, cap: file.cap, steer: file.capabilities.steer });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = <K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.put(`/harnesses/custom/${encodeURIComponent(slug)}`, { name: draft.name, url: draft.url, secret: draft.secret, bills: draft.bills, cap: draft.cap, capabilities: { steer: draft.steer } });
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <div className="space-y-3 px-6 pb-5">
+        <div>
+          <Label htmlFor="harness-name">Name</Label>
+          <input id="harness-name" className="field w-full" value={draft.name} maxLength={80} onChange={(e) => set('name', e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="harness-url" hint="https://, or http:// on the tailnet or this machine">
+            Address
+          </Label>
+          <input id="harness-url" className="field w-full" value={draft.url} onChange={(e) => set('url', e.target.value)} spellCheck={false} />
+        </div>
+        <div>
+          <Label htmlFor="harness-secret" hint="The secret in Settings > Secrets that holds its key">
+            Key secret
+          </Label>
+          <input id="harness-secret" className="field w-full font-mono" value={draft.secret} onChange={(e) => set('secret', e.target.value.toUpperCase())} spellCheck={false} />
+        </div>
+        <div>
+          <Label htmlFor="harness-bills" hint="Shown in pickers, like Claude plan">
+            Bills
+          </Label>
+          <input id="harness-bills" className="field w-full" value={draft.bills} maxLength={160} onChange={(e) => set('bills', e.target.value)} />
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div>
+            <Label htmlFor="harness-cap">Turns at once</Label>
+            <input id="harness-cap" className="field w-24" type="number" min={1} max={64} value={draft.cap} onChange={(e) => set('cap', Number(e.target.value) || 1)} />
+          </div>
+          <label className="flex items-center gap-2 text-[13px] text-fg-2">
+            <Toggle checked={draft.steer} onChange={(v) => set('steer', v)} label="Steer" />
+            Steer a running turn
+          </label>
+        </div>
+        {error && <ErrorNote>{error}</ErrorNote>}
+      </div>
+      <ModalFooter>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="primary" busy={busy} disabled={busy || !draft.name.trim() || !draft.url.trim() || !draft.secret.trim()} onClick={() => void save()}>
+          Save
+        </Button>
+      </ModalFooter>
+    </>
   );
 }
 

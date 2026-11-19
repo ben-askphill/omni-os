@@ -19,6 +19,8 @@ import { CrewAvatar } from '../components/CrewAvatar.tsx';
 import { Button, Chip, ErrorNote, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from '../components/ui.tsx';
 import { useApp } from '../store.tsx';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
+import { isRemoteHarnessId } from '@omni/shared/custom-harness.ts';
+import { remoteRoleNote } from '@omni/shared/crew-settings.ts';
 import { Card, LockNote } from './settings-parts.tsx';
 
 // Settings > Crew: every crew role this machine has, hidden ones included, and an editor for each (plan slice S3,
@@ -414,6 +416,11 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
               <Field label="Harness, model and effort" hint="Default leaves it to the channel, then Auto. A thread or delegation that names its own run wins.">
                 <RunDefaultsField value={{ harness: draft.harness, model: draft.model, effort: draft.effort }} onChange={(v) => setDraft((x) => (x ? { ...x, ...v } : x))} />
               </Field>
+              {isRemoteHarnessId(draft.harness) && (
+                <p className="text-[12.5px] leading-[18px] text-fg-2" data-remote-note>
+                  {remoteRoleNote(draft.harness)}
+                </p>
+              )}
             </Section>
 
             <Section title="Where">

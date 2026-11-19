@@ -110,7 +110,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'notify', section: 'notifications', title: 'Notify on this device', keywords: ['alerts', 'finished', 'failed', 'desktop', 'permission', 'needs you', 'native', 'macos'] },
   { id: 'notify-kinds', section: 'notifications', title: 'What notifies', keywords: ['questions', 'crew', 'pull request', 'checks', 'review', 'finished', 'failed', 'kinds'] },
   { id: 'notify-channels', section: 'notifications', title: 'Notifications per channel', keywords: ['mute', 'silence', 'channel'] },
-  { id: 'harnesses', section: 'models', title: 'Harnesses', keywords: ['claude code', 'codex', 'cursor', 'hermes', 'cursor cloud', 'custom harness', 'remote', 'runs api', 'install', 'login', 'available', 'providers'] },
+  { id: 'harnesses', section: 'models', title: 'Harnesses', keywords: ['claude code', 'codex', 'cursor', 'hermes', 'cursor cloud', 'custom harness', 'remote', 'runs api', 'connect an agent', 'own agent', 'pairing code', 'pair', 'install', 'login', 'available', 'providers'] },
   { id: 'model-visibility', section: 'models', title: 'Models in the picker', keywords: ['hide', 'hidden', 'show', 'visible', 'models', 'picker', 'new models', 'latest', 'family', 'clutter', 'check for new models', 'refresh'] },
   { id: 'channel-model', section: 'models', title: 'Default model for new threads', keywords: ['auto', 'model', 'effort', 'reasoning', 'override', 'channel default'] },
   { id: 'concurrency', section: 'models', title: 'Turns at once per harness', keywords: ['max concurrent', 'queue', 'cap', 'parallel', 'limit'] },

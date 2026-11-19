@@ -124,12 +124,12 @@ describe('writing a custom harness', () => {
   });
 
   it('changes only the keys a save names, and keeps the rest of the file', async () => {
-    writeFileSync(file('kept'), `${GOOD}pairing:\n  key_id: k1\ncapabilities:\n  steer: false\n`);
+    writeFileSync(file('kept'), `${GOOD}git:\n  ref: k1\ncapabilities:\n  steer: false\n`);
     const res = await save('kept', { name: 'Renamed', url: 'https://other.example.com', secret: 'HETZNER_KEY', cap: 3 }, {}, 'PUT');
     expect(res.status).toBe(200);
     const text = readFileSync(file('kept'), 'utf8');
     expect(text).toContain('name: Renamed');
-    expect(text).toContain('key_id: k1');
+    expect(text).toContain('ref: k1');
     expect(text).toContain('steer: false');
     expect(customHarness('custom:kept')).toMatchObject({ url: 'https://other.example.com', cap: 3, capabilities: { steer: false } });
   });

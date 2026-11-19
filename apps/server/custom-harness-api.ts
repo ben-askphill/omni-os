@@ -1,15 +1,22 @@
-// /harnesses/custom: list, add, change and remove custom harnesses (harness/custom.ts). Reads are open to every client.
+// /harnesses/custom: list, add, change, test and remove custom harnesses (harness/custom.ts), and /harnesses/connect,
+// Connect an agent's steps (agent-connect.ts). Reads are open to every client.
 // A write decides where briefs go and which secret travels to which server, so it is Ben's only (decision F9 of
 // docs/plans/2026-11-18-connect-an-agent.md):
 // - an agent thread, known by its own token (automation-guard.ts callerOf), never writes one;
 // - and only the install's token or a session paired with it may (request-guard.ts shellAllowed), as for a shell: a
 //   stolen Google or Connect session could otherwise point a harness at its own server and name any secret as its key.
 import { Hono, type Context } from 'hono';
+import { z } from 'zod';
+import { pairHelperCommand } from '@omni/shared/connect-agent.ts';
+import { about } from './about.ts';
+import { connectAgent, findAgent, pairAgent, removeAgent, testConnection, testSaved } from './agent-connect.ts';
 import { callerOf } from './automation-guard.ts';
+import { channels } from './db.ts';
 import { checkCustomHarness, getCatalog } from './harness/catalog-service.ts';
 import { customHarnesses } from './harness/custom.ts';
-import { customHarnessSave, deleteCustomHarness, saveCustomHarness } from './harness/custom-store.ts';
+import { customHarnessSave, saveCustomHarness } from './harness/custom-store.ts';
 import { userName } from './profile.ts';
+import { omniRepo } from './user-config.ts';
 import { shellAllowed } from './request-guard.ts';
 
 export const customHarnessApi = new Hono();
@@ -23,12 +30,85 @@ customHarnessApi.get('/harnesses/custom', (c) => {
 customHarnessApi.post('/harnesses/custom/:slug', (c) => write(c, true));
 customHarnessApi.put('/harnesses/custom/:slug', (c) => write(c, false));
 
-customHarnessApi.delete('/harnesses/custom/:slug', (c) => {
+/** Remove: revoke the key at the agent when it can, delete the secret Connect made, then the file. */
+customHarnessApi.delete('/harnesses/custom/:slug', async (c) => {
   const refusal = guard(c);
   if (refusal) return refusal;
   try {
-    deleteCustomHarness(c.req.param('slug'));
-    return c.json({ deleted: true });
+    return c.json(await removeAgent(c.req.param('slug')));
+  } catch (err) {
+    return failed(c, err);
+  }
+});
+
+/** The harness row's Test connection: a signed-in probe and one test turn with the key on this machine. */
+customHarnessApi.post('/harnesses/custom/:slug/test', async (c) => {
+  const refusal = guard(c);
+  if (refusal) return refusal;
+  try {
+    return c.json(await testSaved(c.req.param('slug')));
+  } catch (err) {
+    return failed(c, err);
+  }
+});
+
+// ---------- Connect an agent (agent-connect.ts): find, sign in, test, then connect ----------
+
+/**
+ * The Hermes pairing helper's command from this Omni's own GitHub repo (its checkout's origin), pinned to this build:
+ * its commit in a checkout, its release tag in the app. No command when there is no GitHub origin to fetch it from.
+ */
+customHarnessApi.get('/harnesses/connect/helper', (c) => {
+  const repo = omniRepo();
+  const ref = about.gitHead ?? `v${about.version}`;
+  return c.json({ command: repo ? pairHelperCommand(repo, ref) : null, repo, ref });
+});
+
+const text = (max: number) => z.string().trim().max(max).optional();
+
+customHarnessApi.post('/harnesses/connect/find', async (c) => {
+  const refusal = guard(c);
+  if (refusal) return refusal;
+  const body = z.object({ url: text(500), pair: text(500), code: text(100), name: text(200) }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: 'Send { url, pair?, code?, name? }.' }, 400);
+  return c.json(await findAgent(body.data));
+});
+
+customHarnessApi.post('/harnesses/connect/pair', async (c) => {
+  const refusal = guard(c);
+  if (refusal) return refusal;
+  const body = z.object({ url: text(500), pair: text(500), code: z.string().trim().min(1).max(100), name: text(200) }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: 'Send { url?, pair?, code }.' }, 400);
+  try {
+    return c.json(await pairAgent(body.data));
+  } catch (err) {
+    return failed(c, err);
+  }
+});
+
+customHarnessApi.post('/harnesses/connect/test', async (c) => {
+  const refusal = guard(c);
+  if (refusal) return refusal;
+  const body = z.object({ draft: text(100), url: text(500), secret: text(64) }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: 'Send { draft } or { url, secret }.' }, 400);
+  try {
+    return c.json(await testConnection(body.data));
+  } catch (err) {
+    return failed(c, err);
+  }
+});
+
+customHarnessApi.post('/harnesses/connect', async (c) => {
+  const refusal = guard(c);
+  if (refusal) return refusal;
+  const body = z
+    .object({ slug: z.string().trim().min(1).max(48), name: z.string().trim().min(1).max(80), draft: text(100), url: text(500), secret: text(64), bills: text(160), role: z.boolean().default(true) })
+    .strict()
+    .safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'Send { slug, name, draft or url and secret, role }.' }, 400);
+  try {
+    const done = await connectAgent(body.data, () => ({ catalog: getCatalog(), channelExists: (id) => !!channels.get(id) }));
+    return c.json({ ...done, harness: { ...done.harness, catalog: getCatalog().harnesses.find((h) => h.id === done.harness.id) ?? null } }, 201);
   } catch (err) {
     return failed(c, err);
   }
@@ -58,6 +138,6 @@ async function write(c: Context, create: boolean) {
 
 function failed(c: Context, err: unknown) {
   const status = (err as { status?: number }).status;
-  if (status === 400 || status === 404 || status === 409) return c.json({ error: (err as Error).message }, status);
+  if (status === 400 || status === 404 || status === 409 || status === 502) return c.json({ error: (err as Error).message }, status);
   throw err;
 }

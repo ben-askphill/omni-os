@@ -12,7 +12,8 @@ import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inb
 import { desktop } from '../desktop.ts';
 import { saveDisplay, useDisplay } from '../display.ts';
 import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
-import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
+import { href, navigate, settingsHash, useHash, useRoute, type SettingsSection } from '../router.ts';
+import { connectPageHash } from '@omni/shared/connect-agent.ts';
 import { setSettingsScope } from '../settings-scope.ts';
 import { useApp, useIsMobile, useSecretStoreLabel } from '../store.tsx';
 import { ChannelSettingsForm } from './ChannelSettings.tsx';
@@ -66,9 +67,12 @@ export function SettingsPage({ section, focus }: { section?: SettingsSection; fo
   const def = sectionDef(current);
   // The pages Settings replaced (#/sync, #/storage, #/secrets) and old section names land here; the address becomes the section's own.
   const hash = useHash();
+  // A pairing link (#/connect-agent?...) lands on Models with it kept, as #/settings/models?connect=<link>.
+  const route = useRoute();
+  const connect = route.name === 'settings' && current === 'models' ? route.connect : undefined;
   useEffect(() => {
-    if (section && hash.split('?')[0] !== settingsHash(current)) navigate(settingsHash(current, current === section ? focus : undefined), { replace: true });
-  }, [hash, section, current, focus]);
+    if (section && hash.split('?')[0] !== settingsHash(current)) navigate(connect ? connectPageHash(connect) : settingsHash(current, current === section ? focus : undefined), { replace: true });
+  }, [hash, section, current, focus, connect]);
   useFocus(current, focus);
   const layout = useLayout();
 
