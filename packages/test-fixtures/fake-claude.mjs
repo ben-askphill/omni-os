@@ -1167,6 +1167,8 @@ async function main() {
         entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT ?? null, mcp_tool_timeout: process.env.MCP_TOOL_TIMEOUT ?? null,
         // The credential Omni handed this process (thread-tokens.ts), for the tests that check it is never the install's.
         omni_token: process.env.OMNI_TOKEN ?? null, omni_token_file: process.env.OMNI_TOKEN_FILE ?? null,
+        // Whether the desktop app's pairing secret reached this process (only that, never its value).
+        pair_secret: 'OMNI_DESKTOP_PAIR_SECRET' in process.env,
       }) + '\n',
     );
   }

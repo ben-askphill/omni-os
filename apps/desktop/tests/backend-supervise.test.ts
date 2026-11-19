@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Backend, isRecordedServer, parseRecord, type BackendState } from '../src/backend/index.ts';
 import { exitMessage, probePort, proofFor } from '../src/backend/launch.ts';
+import { desktopPairUrl } from '../src/backend/pairing.ts';
 import { exitCode, stopGroup } from '../src/backend/process.ts';
 
 const TOKEN = 'e'.repeat(64);
@@ -26,6 +27,11 @@ if (existsSync(join(dir, 'crash'))) {
   process.exit(3);
 }
 const token = readFileSync(join(dir, 'api-token'), 'utf8').trim();
+// As the real server does (apps/server/desktop-pairing.ts): the secret from the descriptor the app names. It notes
+// whether the secret was in its environment, never the value.
+const fd = Number(process.env.OMNI_DESKTOP_PAIR_FD);
+const pairSecret = fd > 2 ? readFileSync(fd, 'utf8').trim() : (process.env.OMNI_DESKTOP_PAIR_SECRET ?? '');
+appendFileSync(join(dir, 'pair-env'), ('OMNI_DESKTOP_PAIR_SECRET' in process.env ? 'env' : 'no-env') + '\\n');
 createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
   if (url.pathname === '/api/auth/proof') {
@@ -34,7 +40,7 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === '/api/auth/desktop-nonce' && req.method === 'POST') {
-    const secretOk = !!process.env.OMNI_DESKTOP_PAIR_SECRET && req.headers['x-omni-desktop-secret'] === process.env.OMNI_DESKTOP_PAIR_SECRET;
+    const secretOk = !!pairSecret && req.headers['x-omni-desktop-secret'] === pairSecret;
     if (!secretOk && req.headers.authorization !== 'Bearer ' + token) { res.statusCode = 403; res.end('{}'); return; }
     res.end(JSON.stringify({ nonce: 'n' + Date.now() + Math.random().toString(16).slice(2), expiresIn: 60 }));
     return;
@@ -327,6 +333,20 @@ describe('Backend', () => {
 
     await r.backend.stop();
     expect(r.backend.pairSecret()).toBeNull();
+  });
+
+  it('hands the server its secret on a pipe, never in its environment, and pairs with it alone across a restart', async () => {
+    const r = await rig();
+    await r.backend.start();
+    const secretOnly = () => desktopPairUrl({ origin: r.backend.origin(), secret: r.backend.pairSecret(), token: null });
+    expect(await secretOnly()).toContain('desktop-pair?nonce=');
+    r.advance(60_000);
+    const ready = next(r.backend, 'ready');
+    await exitWith(r, 75);
+    await ready;
+    expect(await secretOnly()).toContain('desktop-pair?nonce=');
+    // Two spawns, and neither had the secret in its environment, which every child of the server would copy.
+    expect(readFileSync(join(r.dataDir, 'pair-env'), 'utf8').trim().split('\n')).toEqual(['no-env', 'no-env']);
   });
 
   it('does not know the secret of a server an earlier launch started, and pairs with the token alone', async () => {

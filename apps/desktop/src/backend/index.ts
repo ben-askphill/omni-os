@@ -262,8 +262,8 @@ export class Backend {
     const { args, cwd } = serverCommand({ bundled: this.config.bundled, appRoot: this.config.appRoot });
     // A new secret for each spawn, a restart after Update's exit included.
     const pairSecret = newPairSecret();
-    const env = childEnv(process.env, { path: this.path, port: this.config.port, dataDir: this.config.dataDir, pairSecret });
-    const child = spawnServer({ command: this.config.binary, args, cwd, env, logFile: this.config.logFile });
+    const env = childEnv(process.env, { path: this.path, port: this.config.port, dataDir: this.config.dataDir });
+    const child = spawnServer({ command: this.config.binary, args, cwd, env, logFile: this.config.logFile, secret: pairSecret });
     const startedAt = this.deps.now();
     this.owned = { pid: child.pid, child, pairSecret };
     this.writeRecord(child.pid);

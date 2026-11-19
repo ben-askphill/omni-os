@@ -78,4 +78,10 @@ describe('terminal env', () => {
     expect(env.PATH).toBe('/bin');
     expect(env.HOME).toBe('/home/ben');
   });
+
+  it("drops the server's own credentials and the desktop app's pairing secret", () => {
+    const env = terminalEnv({ PATH: '/bin', OMNI_DESKTOP_PAIR_SECRET: 'from-the-app', OMNI_DESKTOP_PAIR_FD: '3', OMNI_TOKEN: 'install', OMNI_TOKEN_FILE: '/data/api-token', OMNI_MCP_TOKEN: 'mcp' });
+    for (const name of ['OMNI_DESKTOP_PAIR_SECRET', 'OMNI_DESKTOP_PAIR_FD', 'OMNI_TOKEN', 'OMNI_TOKEN_FILE', 'OMNI_MCP_TOKEN']) expect(env[name]).toBeUndefined();
+    expect(env.PATH).toBe('/bin');
+  });
 });

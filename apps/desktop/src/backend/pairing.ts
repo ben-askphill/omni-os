@@ -1,11 +1,17 @@
 // How a main window pairs with the server: main asks the server for a one-time nonce, then the window opens
-// desktop-pair with it. The server hands out a nonce only to a request that carries either the secret it got in its
-// environment from the app that started it or the install's token, so a page on another localhost port or a stray curl
+// desktop-pair with it. The server hands out a nonce only to a request that carries either the secret it got on a pipe
+// from the app that started it or the install's token, so a page on another localhost port or a stray curl
 // cannot pair. Main sends the token on every request, and the secret too when it started the server.
 // Neither the secret nor the install's token ever reaches a URL, the page or a log: only the nonce goes in the URL.
 import { randomBytes } from 'node:crypto';
 
-export const PAIR_SECRET_ENV = 'OMNI_DESKTOP_PAIR_SECRET';
+/**
+ * The secret goes to the server on this descriptor, never in its environment: every process the server starts copies
+ * its environment, and another process of the same user can read a process's starting environment (/proc on Linux,
+ * KERN_PROCARGS2 on a Mac). The variable tells the server which descriptor to read (apps/server/desktop-pairing.ts).
+ */
+export const PAIR_SECRET_FD = 3;
+export const PAIR_SECRET_FD_ENV = 'OMNI_DESKTOP_PAIR_FD';
 export const PAIR_SECRET_HEADER = 'X-Omni-Desktop-Secret';
 export const DESKTOP_NONCE_PATH = '/api/auth/desktop-nonce';
 export const DESKTOP_PAIR_PATH = '/api/auth/desktop-pair';

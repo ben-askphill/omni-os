@@ -117,4 +117,15 @@ describe('harness env guard', () => {
       expect(harnessEnv(h, { OMNI_TOKEN: 'omt_thread' }, { OMNI_TOKEN: 'from-a-secret' }, server).OMNI_TOKEN).toBe('omt_thread');
     }
   });
+
+  it("never passes on the desktop app's pairing secret, whatever its source", () => {
+    // With it a thread could mint a desktop-pair nonce and pair a window session that counts as Ben.
+    const server = { ...base, OMNI_DESKTOP_PAIR_SECRET: 'from-the-app', OMNI_DESKTOP_PAIR_FD: '3' } as NodeJS.ProcessEnv;
+    for (const h of HARNESS_IDS) {
+      for (const name of ['OMNI_DESKTOP_PAIR_SECRET', 'OMNI_DESKTOP_PAIR_FD']) {
+        expect(name in harnessEnv(h, {}, {}, server)).toBe(false);
+        expect(name in harnessEnv(h, { [name]: 'x' }, { [name]: 'y' }, base)).toBe(false);
+      }
+    }
+  });
 });

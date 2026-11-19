@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, networkInterfaces, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { startRunner } from './runner-boot.ts';
@@ -172,7 +172,11 @@ describe('/api/auth', () => {
 
   it('pairs the desktop app window from this machine with a one-time nonce, never the token (S8)', async () => {
     const SECRET = 'desktop-secret-0123456789abcdef0123456789';
-    process.env.OMNI_DESKTOP_PAIR_SECRET = SECRET;
+    // The app hands the secret over on a descriptor (apps/desktop/src/backend/process.ts). A file stands in for the pipe.
+    const { adoptDesktopSecret } = await import('../desktop-pairing.ts');
+    const secretFile = join(mkdtempSync(join(tmpdir(), 'omni-pair-')), 'secret');
+    writeFileSync(secretFile, `${SECRET}\n`);
+    adoptDesktopSecret({ OMNI_DESKTOP_PAIR_FD: String(openSync(secretFile, 'r')) });
     try {
       // Main asks for a nonce with the secret it started the server with, or with the token.
       const minted = await app.request('/api/auth/desktop-nonce', { method: 'POST', headers: { authorization: '', 'x-omni-desktop-secret': SECRET } });
@@ -196,7 +200,7 @@ describe('/api/auth', () => {
       const without = await app.request('/api/auth/desktop-pair', { headers: { authorization: '' } });
       expect(without.status).toBe(303);
     } finally {
-      delete process.env.OMNI_DESKTOP_PAIR_SECRET;
+      adoptDesktopSecret({});
     }
   });
 

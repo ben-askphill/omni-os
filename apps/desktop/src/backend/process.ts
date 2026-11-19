@@ -4,7 +4,9 @@ import { randomBytes } from 'node:crypto';
 import { constants } from 'node:os';
 import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import type { Writable } from 'node:stream';
 import { extractPath } from './launch.ts';
+import { PAIR_SECRET_FD } from './pairing.ts';
 
 function minimalEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = {};
@@ -69,12 +71,24 @@ export function exitCode(status: number | null, signal: NodeJS.Signals | null): 
   return signal ? 128 + (constants.signals[signal] ?? 0) : 0;
 }
 
-export function spawnServer(input: { command: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv; logFile: string }): Spawned {
+/**
+ * `secret`, when given, goes to the child on descriptor PAIR_SECRET_FD (pairing.ts) and the pipe is closed after it:
+ * never in the environment, which every process the server starts would copy.
+ */
+export function spawnServer(input: { command: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv; logFile: string; secret?: string }): Spawned {
   mkdirSync(dirname(input.logFile), { recursive: true, mode: 0o700 });
   const fd = openSync(input.logFile, 'a', 0o600);
   try {
     // Its own process group, so stopping it also stops what it started, and a crash of this app does not.
-    const child = spawn(input.command, input.args, { cwd: input.cwd, env: input.env, detached: true, stdio: ['ignore', fd, fd] });
+    const stdio: ('ignore' | 'pipe' | number)[] = ['ignore', fd, fd];
+    if (input.secret !== undefined) stdio[PAIR_SECRET_FD] = 'pipe';
+    const child = spawn(input.command, input.args, { cwd: input.cwd, env: input.env, detached: true, stdio });
+    if (input.secret !== undefined) {
+      const pipe = child.stdio[PAIR_SECRET_FD] as Writable | null;
+      // A server that exits before it reads the pipe makes the write fail. Its exit is reported, not this.
+      pipe?.on('error', () => {});
+      pipe?.end(`${input.secret}\n`);
+    }
     let code: number | null = null;
     let killedBy: NodeJS.Signals | null = null;
     const listeners: ((code: number, signal: NodeJS.Signals | null) => void)[] = [];

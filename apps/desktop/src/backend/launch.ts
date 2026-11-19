@@ -2,7 +2,7 @@
 // that the process on the port holds this install's token, or a free port.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { join } from 'node:path';
-import { PAIR_SECRET_ENV } from './pairing.ts';
+import { PAIR_SECRET_FD, PAIR_SECRET_FD_ENV } from './pairing.ts';
 
 /** PATH from a login shell, between markers, so a shell that echoes the command cannot fake it. */
 export function extractPath(output: string, id: string): string | null {
@@ -32,10 +32,10 @@ export function blockedEnvKey(key: string): boolean {
 }
 
 /**
- * The server's environment: a few of ours, PATH, the port, the data dir and this spawn's pairing secret. Nothing
- * else, and no billing keys.
+ * The server's environment: a few of ours, PATH, the port, the data dir and where to read this spawn's pairing
+ * secret. Nothing else, no billing keys, and never the secret itself (spawnServer writes it to that descriptor).
  */
-export function childEnv(app: NodeJS.ProcessEnv, input: { path: string; port: number; dataDir: string; pairSecret: string }): Record<string, string> {
+export function childEnv(app: NodeJS.ProcessEnv, input: { path: string; port: number; dataDir: string }): Record<string, string> {
   const env: Record<string, string> = {};
   for (const key of PASSTHROUGH) {
     const value = app[key];
@@ -50,8 +50,8 @@ export function childEnv(app: NodeJS.ProcessEnv, input: { path: string; port: nu
   env.OMNI_SUPERVISOR = 'desktop';
   // The server runs on this app's own binary, which acts as Node only when told.
   env.ELECTRON_RUN_AS_NODE = '1';
-  // A request with it, or with the install's token, gets a nonce for desktop-pair (pairing.ts).
-  env[PAIR_SECRET_ENV] = input.pairSecret;
+  // A request with the secret on this descriptor, or with the install's token, gets a nonce for desktop-pair (pairing.ts).
+  env[PAIR_SECRET_FD_ENV] = String(PAIR_SECRET_FD);
   return env;
 }
 
