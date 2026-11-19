@@ -16,6 +16,7 @@ import { parsePayload } from '@omni/shared/transcript-fold.ts';
 import { cantShowText, ContextChips, ContextInspector, NEWER_LABEL } from '../src/message-context/ContextChips.tsx';
 import { rangeText, sourceText } from '../src/message-context/diff-selection.tsx';
 import { CONTEXT_VIEWS } from '../src/message-context/kinds.ts';
+import { machineMentions } from '../src/message-context/machine-mention.tsx';
 import { addDraftContext, draftContext, removeDraftContext, settleDraftContext } from '../src/message-context/draft.ts';
 import { sendKey } from '../src/requests.ts';
 import type { UserP } from '@omni/shared/transcript-fold.ts';
@@ -122,6 +123,10 @@ describe('context chips', () => {
       expect(inspector).toContain('Shop');
       expect(inspector).toContain('thread 7d3e91a0');
       expect(inspector).toContain('Open thread');
+      expect(inspector).not.toContain('Update Omni');
+    } else if ((c.raw as { kind: string }).kind === 'machine_mention') {
+      expect(inspector).toContain('omarchy');
+      expect(inspector).toContain('Asleep or offline, last seen');
       expect(inspector).not.toContain('Update Omni');
     } else {
       expect(inspector).toContain('src/cart.ts');
@@ -247,5 +252,37 @@ describe('request keys with context', () => {
     expect(requestIdFor(first, sendKey('', undefined, [], ['a']), make)).toBe(first);
     expect(requestIdFor(first, sendKey('', undefined, [], ['a', 'b']), make).id).toBe('id-2');
     expect(requestIdFor(first, sendKey('', undefined, []), make).id).toBe('id-3');
+  });
+});
+
+describe('machine mentions in a composer', () => {
+  const row = (id: string, name: string) => ({
+    insert: name,
+    name,
+    detail: 'Online',
+    kind: 'machine' as const,
+    machine: { id, here: false, reachability: 'online' as const, lastSeen: null },
+  });
+
+  it('puts a picked machine on the draft once, and drops it only when an edit takes its @name out', () => {
+    const thread = 'thread-machine-mentions';
+    const errors: string[] = [];
+    const m = machineMentions(thread, (why) => errors.push(why));
+    m.edited('@omarchy');
+    m.picked(row('box-1', 'omarchy'));
+    m.picked(row('box-1', 'omarchy'));
+    m.picked(row('mac-1', 'MacBook Pro'));
+    expect(draftContext(thread).map((r) => [r.label, (r.body as { machine: string }).machine])).toEqual([
+      ['@omarchy', 'box-1'],
+      ['@MacBook Pro', 'mac-1'],
+    ]);
+    // A render that still holds the text from before the pick never runs this, so nothing comes off until an edit.
+    m.edited('@omarchy run the server tests, @MacBook Pro build the page');
+    expect(draftContext(thread)).toHaveLength(2);
+    m.edited('@omarchy run the server tests, build the page');
+    expect(draftContext(thread).map((r) => r.label)).toEqual(['@omarchy']);
+    m.edited('');
+    expect(draftContext(thread)).toEqual([]);
+    expect(errors).toEqual([]);
   });
 });

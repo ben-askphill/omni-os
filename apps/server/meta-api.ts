@@ -23,6 +23,7 @@ import { runningByHarness } from './runner.ts';
 import { getProfile, profileInput, setProfile } from './profile.ts';
 import { deleteSecret, hasSecret, listSecrets, setSecret } from './secrets.ts';
 import { listDevices } from './sync/devices.ts';
+import { pickFor } from './machine-pick.ts';
 import { checkSecret, secretDrop, secretDrops, sendSecret } from './secret-drop.ts';
 
 export const metaApi = new Hono();
@@ -78,6 +79,8 @@ metaApi.put('/display', async (c) => {
 
 /** The other synced Macs a thread can be handed to, with whether Tailscale sees each up. Empty while sync is off. */
 metaApi.get('/devices', async (c) => c.json(await listDevices()));
+/** The machine "here", a machine's id or its name (this machine's own included) names, for the Conductor's delegate and continue_thread. */
+metaApi.get('/devices/pick', async (c) => c.json(await pickFor(z.string().trim().min(1).max(100).parse(c.req.query('device')))));
 
 metaApi.get('/secrets', (c) => c.json(listSecrets()));
 metaApi.post('/secrets', async (c) => {
