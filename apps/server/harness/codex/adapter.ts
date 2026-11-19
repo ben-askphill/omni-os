@@ -16,7 +16,7 @@ import type { Record as StreamRecord } from '../../stream.ts';
 import { processSession } from '../session.ts';
 import { CAPABILITIES } from '../types.ts';
 import type { AdapterCallbacks, AdapterContext, CommandUse, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
-import { CodexClient } from './client.ts';
+import { CodexClient, type RpcServerRequest } from './client.ts';
 import { handshake, openThread, sessionEnv, sessionParams, threadConfig } from './session-start.ts';
 export { threadConfig };
 import { codexBin } from './bin.ts';
@@ -141,7 +141,32 @@ export const codexAdapter: HarnessAdapter = {
       emit({ kind: 'replay', payload: { uuid: m.uuid, text: m.text } });
     };
 
-    const client = new CodexClient({ bin, cwd: thread.cwd, env: sessionEnv(ctx), onNotification: onNote });
+    const client = new CodexClient({ bin, cwd: thread.cwd, env: sessionEnv(ctx), onNotification: onNote, onRequest });
+    /** File changes as they started, so an approval for one can say which files it touches. */
+    const changes = new Map<string, string[]>();
+
+    /**
+     * Codex asks before a command or a file change its sandbox does not allow (Ask first, session-start.ts). The
+     * channel's level judges it, through an approval card when it needs a yes (runner/approvals.ts). Anything else it
+     * asks is declined: Omni has nowhere to show it.
+     */
+    function onRequest(r: RpcServerRequest) {
+      const p = (r.params ?? {}) as { command?: string | null; cwd?: string | null; itemId?: string; reason?: string | null };
+      const call =
+        r.method === 'item/commandExecution/requestApproval' || r.method === 'execCommandApproval'
+          ? { tool: 'command', input: { command: p.command ?? '', cwd: p.cwd ?? thread.cwd } }
+          : r.method === 'item/fileChange/requestApproval' || r.method === 'applyPatchApproval'
+            ? { tool: 'file change', input: { summary: (changes.get(p.itemId ?? '') ?? []).join(', ') || p.reason || 'Change files', detail: p.reason ?? '' } }
+            : null;
+      const legacy = r.method === 'execCommandApproval' || r.method === 'applyPatchApproval';
+      const answer = (ok: boolean) => client.respond(r.id, { decision: legacy ? (ok ? 'approved' : 'denied') : ok ? 'accept' : 'decline' });
+      if (!call) return void client.respond(r.id, {});
+      if (!ctx.permission) return void answer(true);
+      ctx.permission
+        .check(call)
+        .then((v) => answer(v.allow))
+        .catch(() => answer(false));
+    }
 
     /** The runner opens a turn on its init: one per turn, from Codex's answer or turn/started, whichever is first. */
     function turnBegan() {
@@ -165,6 +190,7 @@ export const codexAdapter: HarnessAdapter = {
           break;
         case 'item/started':
           if (!p.item) break;
+          if (p.item.type === 'fileChange') changes.set(p.item.id, ((p.item as { changes?: { path?: string }[] }).changes ?? []).map((c) => c.path ?? '').filter(Boolean));
           for (const rec of normalizeStarted(p.item)) emit(rec);
           // A command's row opens when it starts, so Ben can follow its output while it runs (apps/server/tool-tail.ts).
           if (p.item.type === 'commandExecution') {

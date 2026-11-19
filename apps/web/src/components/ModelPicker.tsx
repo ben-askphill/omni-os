@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { effortWord, term } from '@omni/shared/display.ts';
+import { useTechnical } from '../display.ts';
 import type { HarnessWithRunning } from '../api.ts';
 import type { PickerAccounts } from '../accounts.ts';
 import { Icon, Picker, type PickerOption } from './ui.tsx';
@@ -121,9 +123,11 @@ export function ModelPicker({
     btn.current?.focus();
   };
 
+  const technical = useTechnical();
   const buttonLabel = label ?? (auto ? 'Auto' : current.m ? current.m.label : placeholder);
   const levels = effort && !auto ? modelOf(harnesses, value) : null;
-  const effortShown = levels?.efforts.length ? effort!.value || levels.model?.defaultEffort || 'default' : null;
+  const effortLevel = levels?.efforts.length ? effort!.value || levels.model?.defaultEffort || 'default' : null;
+  const effortShown = effortLevel && effortWord(effortLevel, technical);
 
   return (
     <div ref={wrap} className={`relative ${className}`}>
@@ -136,7 +140,7 @@ export function ModelPicker({
         aria-label={
           auto
             ? 'Model: Auto'
-            : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${effortShown ? `, effort ${effortShown}` : ''}`
+            : `Model: ${label ?? current.m?.label ?? 'none'}${current.h ? ` on ${current.h.name}` : ''}${effortShown ? `, ${term('effort', technical).toLowerCase()} ${effortShown}` : ''}`
         }
         onClick={() => {
           if (!open) {
@@ -172,16 +176,18 @@ export function ModelPicker({
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Find a model or harness"
-              aria-label="Find a model or harness"
+              placeholder={term('findModel', technical)}
+              aria-label={term('findModel', technical)}
               className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
             />
           </label>
           <ModelList groups={groups} showAuto={showAuto} auto={auto} value={value} query={q} onPick={pick} accounts={accounts} />
           {levels && levels.efforts.length > 0 && (
             <div className="mt-1 border-t border-line px-2 pt-2 pb-1">
-              <div className="caption mb-1.5 px-1">Effort for {levels.model?.label ?? 'this model'}</div>
-              <div role="radiogroup" aria-label="Effort" className="flex flex-wrap gap-1">
+              <div className="caption mb-1.5 px-1">
+                {term('effortFor', technical)} {levels.model?.label ?? 'this model'}
+              </div>
+              <div role="radiogroup" aria-label={term('effort', technical)} className="flex flex-wrap gap-1">
                 {['', ...levels.efforts].map((e) => (
                   <button
                     key={e || 'default'}
@@ -195,7 +201,7 @@ export function ModelPicker({
                     }}
                     className="press h-7 rounded-full px-2.5 text-[12px] text-fg-2 transition-colors hover:bg-surface-3 hover:text-fg aria-checked:bg-fg aria-checked:text-on-ink"
                   >
-                    {e || (levels.model?.defaultEffort ? `Default (${levels.model.defaultEffort})` : 'Default')}
+                    {e ? effortWord(e, technical) : levels.model?.defaultEffort ? `Default (${effortWord(levels.model.defaultEffort, technical)})` : 'Default'}
                   </button>
                 ))}
               </div>

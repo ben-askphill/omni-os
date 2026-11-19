@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { setupWait } from '@omni/shared/setup-wait.ts';
 import { bytes } from '@omni/shared/format.ts';
 import { requestIdFor } from '@omni/shared/request-id.ts';
 import { Attachments } from './Attachments.tsx';
@@ -12,7 +13,6 @@ import { ContextChips, hasContext } from '../../message-context/ContextChips.tsx
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../../forwarded.ts';
 
 /** A message that waits for the thread's worktree (SetupCard). */
-const SETUP_LABEL = 'Sends once the worktree is ready';
 
 function pendingLabel(m: PendingMsg, lead: boolean) {
   if (m.state === 'waiting') return 'Waiting for a free slot';
@@ -131,9 +131,9 @@ export function QueuedMessages({
         ) : isForwarded(m) ? (
           <PendingBubble key={m.uuid} m={m} label={forwardedLabel(m, trouble)} icon={trouble ? 'alert' : 'send'} threadId={threadId} />
         ) : threadId && isEditable(m) ? (
-          ownRow(m, setup ? SETUP_LABEL : pendingLabel(m, false), 'clock')
+          ownRow(m, setup ? setupWait(setup)!.heading : pendingLabel(m, false), 'clock')
         ) : (
-          <PendingBubble key={m.uuid ?? i} m={m} label={setup ? SETUP_LABEL : pendingLabel(m, m === lead)} icon={m.state === 'sent' ? 'send' : 'clock'} threadId={threadId} />
+          <PendingBubble key={m.uuid ?? i} m={m} label={setup ? setupWait(setup)!.heading : pendingLabel(m, m === lead)} icon={m.state === 'sent' ? 'send' : 'clock'} threadId={threadId} />
         ),
       )}
       {parked.length > 0 && threadId && <ParkedMessages threadId={threadId} items={parked} onPending={onPending} row={ownRow} busy={busy} setup={setup} sessionBlocked={sessionBlocked} />}
@@ -422,7 +422,7 @@ function ParkedMessages({
   return (
     <div className="flex flex-col gap-3 border-t border-line pt-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[12px] text-fg-3">{setup ? SETUP_LABEL : parkedHeading(items, sessionBlocked)}</span>
+        <span className="text-[12px] text-fg-3">{setup ? setupWait(setup)!.heading : parkedHeading(items, sessionBlocked)}</span>
         {recovered.length > 0 && !setup && (
           <Button size="sm" variant="primary" icon="play" busy={busy === 'resume'} disabled={off} onClick={() => void resume('resume')}>
             Resume{recovered.length > 1 ? ` ${recovered.length}` : ''}
@@ -436,7 +436,7 @@ function ParkedMessages({
           </Button>
         );
         const icon = m.delivery === 'uncertain' ? 'alert' : 'clock';
-        const label = setup ? 'Waits for the worktree' : parkedLabel(m, sessionBlocked);
+        const label = setup ? setupWait(setup)!.label : parkedLabel(m, sessionBlocked);
         if (!isOmnis(m)) return row(m, label ?? '', icon, again);
         return (
           <PendingBubble key={m.uuid} m={m} label={label ?? 'Held for Resume'} icon={icon}>

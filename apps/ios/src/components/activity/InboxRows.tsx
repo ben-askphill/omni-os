@@ -78,7 +78,7 @@ export function InboxRowView({ row, last, actions, onPress, tree }: { row: Inbox
       <View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={[row.title, row.pinned ? 'pinned' : null, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
+          accessibilityLabel={[row.title, row.pinned ? 'pinned' : null, row.step, where, right, row.tree ? tallyLabel(row.tree.tally) : null].filter(Boolean).join(', ')}
           onPress={onPress}
           style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.wash : colors.bg }]}
         >
@@ -90,6 +90,11 @@ export function InboxRowView({ row, last, actions, onPress, tree }: { row: Inbox
               </Text>
               <Text style={[styles.right, { color: colors.fg3 }]}>{right}</Text>
             </View>
+            {row.step ? (
+              <Text numberOfLines={1} style={[styles.meta, { color: colors.fg2 }]}>
+                {row.step}
+              </Text>
+            ) : null}
             <View style={styles.line}>
               {row.pinned ? <Icon name="pin" size={11} color={colors.fg3} /> : null}
               <Text numberOfLines={1} style={[styles.meta, { color: colors.fg3 }]}>

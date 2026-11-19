@@ -35,6 +35,7 @@ import { refreshCursorUsage } from '../cursor-usage.ts';
 import { HARNESS_IDS, type HarnessId, type HarnessInfo } from './types.ts';
 import {
   claudeHarness,
+  claudeProbeOf,
   codexHarness,
   cursorHarness,
   hermesHarness,
@@ -49,6 +50,7 @@ import {
   CODEX_NOT_FOUND,
   codexFix,
   type Catalog,
+  type ClaudeProbe,
   type ClaudeReportedModel,
   type CodexProbe,
   type CursorProbe,
@@ -101,8 +103,29 @@ export async function probeClaudeModels(): Promise<ClaudeReportedModel[] | null>
   return init ? parseClaudeReported(init.models) : null;
 }
 
+/** How long `claude auth status` may take. It reads local credentials and makes no model call. */
+const CLAUDE_AUTH_MS = 8_000;
+
+/**
+ * Whether Claude Code is installed and signed in, from `claude auth status --json`, the way Codex and Cursor are
+ * probed. It exits non-zero when signed out, and its stdout still answers.
+ */
+export function probeClaudeAuth(bin = config.claudeBin): Promise<ClaudeProbe> {
+  return new Promise((resolve) => {
+    execFile(bin, ['auth', 'status', '--json'], { env: harnessEnv('claude-code', {}), timeout: CLAUDE_AUTH_MS, maxBuffer: 256 * 1024, killSignal: 'SIGKILL' }, (err, stdout) => {
+      const code = (err as NodeJS.ErrnoException | null)?.code;
+      resolve(claudeProbeOf({ stdout: stdout?.trim() ? stdout : null, missing: code === 'ENOENT' || code === 'EACCES' }));
+    });
+  });
+}
+
+/** The last probe, so a catalog rebuilt without probing keeps it. Available until the first answer. */
+let claudeAuth: ClaudeProbe = { available: true };
+
 /** Claude Code with what it reports now, or with what it reported last when it does not answer. */
 async function probeClaudeHarness(cap: number): Promise<HarnessInfo> {
+  claudeAuth = await probeClaudeAuth().catch((): ClaudeProbe => ({ available: true }));
+  if (!claudeAuth.available) return claudeHarness(cap, config.defaultModel, lastClaudeModels(), claudeAuth);
   const reported = await probeClaudeModels().catch(() => null);
   if (reported) {
     claudeReported = reported;
@@ -112,7 +135,7 @@ async function probeClaudeHarness(cap: number): Promise<HarnessInfo> {
       // A read-only data dir only costs the head start after a restart.
     }
   }
-  return claudeHarness(cap, config.defaultModel, lastClaudeModels());
+  return claudeHarness(cap, config.defaultModel, lastClaudeModels(), claudeAuth);
 }
 
 /**
@@ -339,7 +362,7 @@ export function getCatalog(): Catalog {
   const c = caps();
   return {
     harnesses: [
-      claudeHarness(c['claude-code'], config.defaultModel, lastClaudeModels()),
+      claudeHarness(c['claude-code'], config.defaultModel, lastClaudeModels(), claudeAuth),
       codexHarness({ available: false, models: [] }, c.codex),
       cursorHarness({ available: false, models: [] }, c.cursor),
       hermesHarness({ available: false }, c.hermes),

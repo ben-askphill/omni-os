@@ -11,6 +11,8 @@ import { clearStaged, removeStagedFile, useStaged } from '../attachments/staged'
 import { ChannelAvatar } from '../components/ChannelAvatar';
 import { HeaderButton } from '../components/HeaderButton';
 import { MachineSheet } from '../components/thread/MachineSheet';
+import { QuickAnswer } from '../components/QuickAnswer';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { RunOptions } from '../components/thread/RunOptions';
 import { useChannels, useThreadKey } from '../live/react';
 import { useMachineFacts } from '../machine/hooks';
@@ -21,6 +23,7 @@ import {
   CONDUCTOR,
   draftChipLabel,
   draftSheetModel,
+  quickRequest,
   runOnList,
   shownDraftRun,
   targetsOf,
@@ -28,7 +31,8 @@ import {
   type DraftPick,
   type Target,
 } from '../newthread/draft';
-import { useCrew, useStartThread } from '../newthread/hooks';
+import { useCrew, useStartThread, useTemplates } from '../newthread/hooks';
+import { sortTemplates, templateDraft } from '@omni/shared/templates.ts';
 import { chipHeight, chipSlop, fontSize, lineHeight, minTarget, radius, space, useOmniTheme, weight } from '../theme';
 import { useHarnessCatalog } from '../thread/hooks';
 import { Button } from '../ui/Button';
@@ -46,6 +50,7 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
   const { colors } = useOmniTheme();
   const { channels } = useChannels();
   const crew = useCrew();
+  const templates = useTemplates();
   const [target, setTarget] = useState(route.params?.channel ?? CONDUCTOR);
   // An open item's + starts with its prompt (components/thread/OpenItemsCard.tsx).
   const [text, setText] = useState(route.params?.prompt ?? '');
@@ -54,6 +59,9 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
   const [machinePick, setMachinePick] = useState<string | null>(null);
   const [pickingMachine, setPickingMachine] = useState(false);
   const [pickingTarget, setPickingTarget] = useState(false);
+  // Ask: answered on this screen (components/QuickAnswer.tsx). An open item's prompt is a task to start.
+  const [mode, setMode] = useState<'ask' | 'task'>(route.params?.prompt ? 'task' : 'ask');
+  const [answering, setAnswering] = useState<string | null>(null);
   const { facts } = useMachineFacts(true);
   const devices = offersRunOn(facts?.devices) ? facts.devices : null;
   const catalog = useHarnessCatalog(target, true);
@@ -78,7 +86,8 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
     harnesses: catalog.harnesses,
     runOn: { pick: machinePick, devices },
   };
-  const request = createRequest(inputs);
+  const asking = mode === 'ask';
+  const request = asking ? quickRequest(inputs) : createRequest(inputs);
   const shown = shownDraftRun(inputs);
   const targets = useMemo(() => targetsOf(channels), [channels]);
   const ready = request !== null && crew !== null && !starting;
@@ -86,7 +95,11 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
   const submit = async () => {
     if (!request || crew === null) return;
     const thread = await start(request, files);
-    if (thread) navigation.replace('Thread', { id: thread.id });
+    if (!thread) return;
+    if (!asking) return navigation.replace('Thread', { id: thread.id });
+    setText('');
+    clearStaged(scope);
+    setAnswering(thread.id);
   };
   const submitRef = useRef(submit);
   useEffect(() => {
@@ -95,11 +108,12 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
 
   useEffect(() => {
     navigation.setOptions({
-      title: target === CONDUCTOR ? 'New delegation' : 'New thread',
-      headerLeft: () => <HeaderButton label="Cancel" onPress={() => navigation.goBack()} />,
-      headerRight: () => <HeaderButton label={starting ? 'Starting' : 'Start'} disabled={!ready} onPress={() => void submitRef.current()} />,
+      title: asking ? 'Ask' : target === CONDUCTOR ? 'New delegation' : 'New thread',
+      headerLeft: () => <HeaderButton label={answering ? 'Done' : 'Cancel'} onPress={() => navigation.goBack()} />,
+      headerRight: () =>
+        answering ? null : <HeaderButton label={starting ? (asking ? 'Asking' : 'Starting') : asking ? 'Ask' : 'Start'} disabled={!ready} onPress={() => void submitRef.current()} />,
     });
-  }, [navigation, target, ready, starting]);
+  }, [navigation, target, ready, starting, asking, answering]);
 
   const onTarget = (id: string) => {
     if (id === target) return;
@@ -127,6 +141,24 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets
       >
+        {answering ? (
+          <View style={styles.answer}>
+            <QuickAnswer id={answering} onOpen={(id) => navigation.replace('Thread', { id })} />
+            <Button label="New ask" variant="ghost" onPress={() => setAnswering(null)} />
+          </View>
+        ) : (
+        <>
+        <SegmentedControl
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            dismiss();
+          }}
+          options={[
+            { value: 'ask', label: 'Ask' },
+            { value: 'task', label: 'Task' },
+          ]}
+        />
         <TextInput
           autoFocus
           multiline
@@ -137,11 +169,31 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
           }}
           editable={!starting}
           accessibilityLabel="First message"
-          placeholder={target === CONDUCTOR ? 'Ask the Conductor. It delegates to the crew.' : `Describe the task for #${channelName ?? target}`}
+          placeholder={asking ? 'Ask anything. The answer shows here.' : target === CONDUCTOR ? 'Ask the Conductor. It delegates to the crew.' : `Describe the task for #${channelName ?? target}`}
           placeholderTextColor={colors.fg4}
           style={[styles.input, { color: colors.fg, backgroundColor: colors.surface }]}
           textAlignVertical="top"
         />
+        {!text.trim() && templates.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templates} keyboardShouldPersistTaps="handled" accessibilityLabel="Templates">
+            {sortTemplates(templates).map((t) => (
+              <Pressable
+                key={t.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Template: ${t.name}`}
+                accessibilityHint={t.description}
+                disabled={starting}
+                hitSlop={chipSlop}
+                onPress={() => setText(templateDraft(t))}
+                style={({ pressed }) => [styles.chip, { backgroundColor: pressed ? colors.surface3 : colors.surface2 }]}
+              >
+                <Text numberOfLines={1} style={[styles.chipLabel, { color: colors.fg2 }]}>
+                  {t.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
         {files.length > 0 ? (
           <View style={styles.notice}>
             <AttachmentChips files={files} onRemove={starting ? undefined : (id) => removeStagedFile(scope, id)} />
@@ -215,6 +267,8 @@ export function NewThreadScreen({ navigation, route }: RootScreenProps<'NewThrea
             </Callout>
           </View>
         ) : null}
+        </>
+        )}
       </ScrollView>
       <Sheet visible={pickingTarget} title="Channel" onClose={() => setPickingTarget(false)}>
         <ScrollView contentContainerStyle={styles.sheetContent}>
@@ -285,6 +339,7 @@ function targetName(t: Target): string {
 }
 
 const styles = StyleSheet.create({
+  answer: { gap: space.s6 },
   content: {
     gap: space.s6,
     paddingVertical: space.s6,
@@ -298,6 +353,10 @@ const styles = StyleSheet.create({
     lineHeight: Math.round(fontSize.input * lineHeight.body),
   },
   notice: {
+    paddingHorizontal: space.s8,
+  },
+  templates: {
+    gap: space.s4,
     paddingHorizontal: space.s8,
   },
   runRow: {

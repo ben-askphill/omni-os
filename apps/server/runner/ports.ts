@@ -38,6 +38,8 @@ export interface RunnerPorts {
      * nothing to report, which it then filed as done, so the runner sends no alert.
      */
     quietRun(threadId: string, reply: string | null): boolean;
+    /** A quick ask's turn ended done with this reply (quick-ask.ts afterQuickTurn): a TASK line or a file promotes it. */
+    quickTurn(threadId: string, reply: string): Promise<void>;
   };
 }
 
@@ -67,7 +69,7 @@ const unbound = (what: string) => () => {
 const ports: RunnerPorts = {
   routing: { targetFor: unbound('routing.targetFor'), forwardMessage: unbound('routing.forwardMessage'), forwardReport: unbound('routing.forwardReport') },
   handoff: { sendNewThread: unbound('handoff.sendNewThread') },
-  reporting: { toolResult: unbound('reporting.toolResult'), quietRun: unbound('reporting.quietRun') },
+  reporting: { toolResult: unbound('reporting.toolResult'), quietRun: unbound('reporting.quietRun'), quickTurn: unbound('reporting.quickTurn') },
 };
 
 let deps: ControllerDeps | null = null;

@@ -90,6 +90,18 @@ expires: 8h     # an unanswered draft is skipped after this; needs approve
 - **Dry run** on a card runs it now and has the agent list what it would do, each item with what it would send or change, without acting or asking for approval. It always reports, quiet or not. Its thread is titled `Dry run · <name>`. The Conductor's `run_automation` takes `dry_run: true` for the same.
 - A card shows Quiet when empty and Asks first, with the expiry, as chips. Desktop web, phone web and the desktop app have the fields, the chips and Dry run; the native iOS screen only toggles.
 
+## Sign-in check
+
+A thread whose brief or role needs an account (Gmail, Google Calendar, Slack, Notion, Google Drive, Granola) checks that it is signed in on this machine before any harness starts. Only Claude Code reports its connectors' sign-ins: the check reads the newest session's server list and, when that is old or says signed out, `claude mcp list`. A signed-out account holds the thread as **Sign in needed** with the account, the machine and how to sign in. Nothing runs and nothing is spent. Try again checks again; Start anyway starts it without the check. An account whose state Omni cannot read never holds a thread.
+
+An automation names the accounts it reads with `connectors:`:
+
+```yaml
+connectors: [slack, calendar]   # gmail, calendar, slack, notion, drive, granola
+```
+
+A role names them the same way in its frontmatter. A brief that names one ("check my Slack") counts too. For a scheduled run, the first run that finds one signed out makes its thread, which waits as Sign in needed and alerts. Later runs with the same accounts signed out are skipped, with the reason in the run history and no new thread, until a run finds them signed in again. Run now and event runs always make their thread, which waits the same way.
+
 ## Choose a machine
 
 In Automations, "Run automations on" picks this machine or another synced machine for every scheduled and event-triggered automation that does not name its own. The choice reaches the other machines through sync.

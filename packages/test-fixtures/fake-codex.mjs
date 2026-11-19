@@ -18,7 +18,8 @@
 // as a turn of its own with a contextCompaction item. Neither can be steered, as in Codex.
 //
 // Directives in a turn's input text:
-//   CMD       run a shell command (a commandExecution item) before the reply
+//   CMD       run a shell command (a commandExecution item) before the reply. Started with approvalPolicy
+//             "untrusted", it first asks the client (item/commandExecution/requestApproval) and runs only on accept
 //   NOISY     run a command that prints 3,000 lines (outputDelta) and stays up FAKE_CODEX_NOISY_MS (700) before it ends
 //   PLAN      update the checklist (turn/plan/updated) before the reply
 //   SLOW      take 400 ms before replying
@@ -42,7 +43,7 @@
 //   FAKE_CODEX_SILENT=<m,...>    never answer these methods, but stay up, like a wedged process
 //   CODEX_HOME=<dir>          personal skills are read from <dir>/skills, as Codex does
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const argv = process.argv.slice(2);
@@ -176,6 +177,19 @@ const NEEDS_PARAMS = /^(account|config|model|thread|turn)\//;
 const SANDBOX_MODES = ['read-only', 'workspace-write', 'danger-full-access'];
 
 let threadId = null;
+/** The approvalPolicy thread/start or thread/resume asked for. */
+let approvalPolicy = 'on-request';
+/** Our own requests to the client (approvals), waiting for its answer, by id. */
+const asked = new Map();
+let askSeq = 0;
+/** Ask the client, as Codex asks for an approval. Resolves to its result. */
+function askClient(method, params) {
+  const id = `srv-${++askSeq}`;
+  return new Promise((resolve) => {
+    asked.set(id, resolve);
+    write({ id, method, params });
+  });
+}
 let turnSeq = 0;
 let itemSeq = 0;
 let rateLimitsSent = false;
@@ -252,8 +266,16 @@ async function runTurn(turn, input) {
       durationMs: null,
     };
     item(turn, cmd, 'started');
+    const answer = approvalPolicy === 'untrusted'
+      ? await askClient('item/commandExecution/requestApproval', { threadId, turnId: turn.id, itemId: cmd.id, command: 'touch codex-approved.txt', cwd: process.cwd(), startedAtMs: Date.now() })
+      : { decision: 'accept' };
     await delay(5);
-    item(turn, { ...cmd, status: 'completed', aggregatedOutput: 'hi\n', exitCode: 0, durationMs: 3 }, 'completed');
+    if (answer?.decision === 'accept' || answer?.decision === 'acceptForSession') {
+      if (approvalPolicy === 'untrusted') writeFileSync(join(process.cwd(), 'codex-approved.txt'), 'ran\n');
+      item(turn, { ...cmd, status: 'completed', aggregatedOutput: 'hi\n', exitCode: 0, durationMs: 3 }, 'completed');
+    } else {
+      item(turn, { ...cmd, status: 'declined', aggregatedOutput: null, exitCode: null, durationMs: 0 }, 'completed');
+    }
   }
   if (said.includes('NOISY')) {
     // A command that prints a lot while it runs, then stays up for a while: its row opens at once and its output
@@ -330,7 +352,7 @@ function openThread(id, method, params) {
     disabledPluginIds: [],
     cwd,
     instructionSources: [],
-    approvalPolicy: params.approvalPolicy ?? 'on-request',
+    approvalPolicy: (approvalPolicy = params.approvalPolicy ?? 'on-request'),
     approvalsReviewer: 'user',
     sandbox: { type: params.sandbox === 'danger-full-access' ? 'dangerFullAccess' : 'workspaceWrite' },
     reasoningEffort: CONFIG.model_reasoning_effort,
@@ -448,7 +470,12 @@ function interrupt(id, params) {
 function onMessage(msg) {
   if (dead) return;
   const { id, method, params } = msg;
-  if (method === undefined) return; // a response; the client never sends those
+  if (method === undefined) {
+    // The client's answer to one of our approval requests.
+    const done = asked.get(id);
+    if (done) asked.delete(id), done(msg.result);
+    return;
+  }
   log(method, params);
   if (SILENT.has(method)) return;
   if (NEEDS_PARAMS.test(method) && (params == null || typeof params !== 'object')) {

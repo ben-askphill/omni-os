@@ -1,6 +1,6 @@
 import type { Device, HandoffView } from '@omni/shared/handoff.ts';
 import type { FleetRequest, FleetResult, FleetView } from '@omni/shared/update-fleet.ts';
-import type { AccountsView } from '@omni/shared/harness-accounts.ts';
+import type { AccountsView, ThreadAccount } from '@omni/shared/harness-accounts.ts';
 import type { MachinesView } from '@omni/shared/machines.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 import type { Thread } from './threads.ts';
@@ -92,6 +92,8 @@ export function machinesApi(http: HttpClient) {
     refusedChanges: (limit = 50) => http.request<RefusedChange[]>('GET', apiPath`/sync/refused`, { query: { limit } }),
     /** Which account each harness is signed in to, here and on every synced machine (apps/server/harness-accounts.ts). `refresh` reads this machine again. */
     accounts: (refresh = false) => http.request<AccountsView>('GET', apiPath`/accounts`, { query: { refresh: refresh ? 1 : undefined } }),
+    /** The account a thread's harness last ran as, and on which machine. Null before its first run. */
+    threadAccount: (threadId: string) => http.request<{ account: ThreadAccount | null }>('GET', apiPath`/accounts/threads/${threadId}`),
     /** Acknowledges the account switch shown for a harness on a machine, for every client. */
     acknowledgeAccountSwitch: (machine: string, harness: string) => http.request<AccountsView>('POST', apiPath`/accounts/seen`, { body: { machine, harness } }),
     cancelHandoff: (threadId: string) => http.request<HandoffAnswer>('POST', apiPath`/threads/${threadId}/handoff/cancel`, { body: {} }),

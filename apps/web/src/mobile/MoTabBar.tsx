@@ -1,5 +1,6 @@
 import { Icon, StatusDot, type IconName } from '../components/ui.tsx';
 import { useApp } from '../store.tsx';
+import { usePRsShown } from '../display.ts';
 import type { Tab } from './screens.ts';
 
 const TABS: { id: Tab; icon: IconName; label: string }[] = [
@@ -14,12 +15,14 @@ const TABS: { id: Tab; icon: IconName; label: string }[] = [
  * .item), and a needs glyph rides Activity while anything waits on Ben. Hidden on pushed screens.
  */
 export function MoTabBar({ tab, onTab, onNew }: { tab: Tab; onTab: (t: Tab) => void; onNew: () => void }) {
-  const { needsYou } = useApp();
+  const { needsYou, channels } = useApp();
   const needs = needsYou?.items.length ?? 0;
+  // PRs only once there is code to review: Show technical details, or a channel with a repo.
+  const tabs = usePRsShown(channels) ? TABS : TABS.filter((t) => t.id !== 'prs');
   return (
     <div className="absolute right-3.5 left-3.5 z-20 flex gap-2.5" style={{ bottom: 'calc(max(env(safe-area-inset-bottom), 20px) - 6px)' }}>
-      <nav aria-label="Tabs" className="grid h-[60px] flex-1 grid-cols-4 rounded-full bg-elev p-1 shadow-[var(--shadow-menu)]">
-        {TABS.map((t) => (
+      <nav aria-label="Tabs" className={`grid h-[60px] flex-1 rounded-full bg-elev p-1 shadow-[var(--shadow-menu)] ${tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"

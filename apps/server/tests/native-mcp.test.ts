@@ -2,8 +2,8 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { chmodSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Which program a thread's ask, render and threads servers start from (native-mcp.ts): omni-mcp, when the install
-// has one that runs, and none of the three when it does not. The stand-ins here are shell scripts that answer --version.
+// Which program a thread's ask, render, steps and threads servers start from (native-mcp.ts): omni-mcp, when the install
+// has one that runs, and none of the four when it does not. The stand-ins here are shell scripts that answer --version.
 
 vi.mock('../db.ts', () => {
   throw new Error('db.ts must not be imported by sandbox tests');
@@ -75,16 +75,16 @@ describe('whether a binary starts', () => {
 });
 
 describe('what a thread gets', () => {
-  it('starts ask, render and threads from the binary, with the API environment, and says so once', () => {
+  it('starts ask, render, steps and threads from the binary, with the API environment, and says so once', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     process.env.OMNI_NATIVE_MCP = GOOD;
     const got = servers();
-    expect(Object.keys(got)).toEqual(['omni-ask', 'omni-render', 'omni-threads']);
-    for (const [name, arg] of [['omni-ask', 'ask'], ['omni-render', 'render'], ['omni-threads', 'threads']] as const) {
+    expect(Object.keys(got)).toEqual(['omni-ask', 'omni-render', 'omni-steps', 'omni-threads']);
+    for (const [name, arg] of [['omni-ask', 'ask'], ['omni-render', 'render'], ['omni-steps', 'steps'], ['omni-threads', 'threads']] as const) {
       expect(got[name]).toMatchObject({ command: GOOD, args: [arg], env: { OMNI_URL: URL, OMNI_THREAD_ID: 't', OMNI_TOKEN_FILE: expect.any(String) } });
     }
     servers();
-    expect(log.mock.calls.filter(([line]) => String(line).startsWith('[mcp]'))).toEqual([[`[mcp] ask, render and threads run on ${GOOD} (9.9.9)`]]);
+    expect(log.mock.calls.filter(([line]) => String(line).startsWith('[mcp]'))).toEqual([[`[mcp] ask, render, steps and threads run on ${GOOD} (9.9.9)`]]);
   });
 
   it('keeps the conductor on its TypeScript server, which has no Rust build yet', () => {
@@ -96,13 +96,13 @@ describe('what a thread gets', () => {
     expect(got['omni-threads']).toBeUndefined();
   });
 
-  it('leaves the three out, with one warning that says how to build it, when the binary does not start', () => {
+  it('leaves the four out, with one warning that says how to build it, when the binary does not start', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     process.env.OMNI_NATIVE_MCP = script('broken', 'exit 1');
     expect(servers()).toEqual({});
     expect(servers(conductor)).toEqual({ omni: expect.objectContaining({ args: [paths.mcpOmni] }) });
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain('Threads get no ask_user_question, html_render or read_referenced_thread. Build it with npm run dev');
+    expect(String(warn.mock.calls[0][0])).toContain('Threads get no ask_user_question, html_render, set_steps or read_referenced_thread. Build it with npm run dev');
     expect(nativeMcpCommand('ask')).toBeNull();
   });
 

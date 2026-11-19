@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, RefreshControl, SectionList, StyleSheet, View
 import { Text } from '../ui/Text';
 
 import { channelThreads, threadSections, type ThreadRow } from '../live/channel-model';
-import { useChannels, useChannelThreadPages, useHandoffOpen, useLiveHub, usePullRefresh } from '../live/react';
+import { useChannels, useChannelThreadPages, useHandoffOpen, useLiveHub, usePullRefresh, useTechnical } from '../live/react';
 import { ChannelAvatar } from '../components/ChannelAvatar';
 import { FolderHeader } from '../components/FolderHeader';
 import { HandoffRowView } from '../components/HandoffRowView';
@@ -27,6 +27,7 @@ export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>)
   const [menuId, setMenuId] = useState<string | null>(null);
   // Every thread in the channel, paged from the server; the sidebar previews stand in until the first page lands.
   const paged = useChannelThreadPages(id);
+  const technical = useTechnical();
 
   useEffect(() => {
     if (name) navigation.setOptions({ title: name, headerTitle: () => <ChannelTitle name={name} icon={icon} avatarBg={channel?.avatar_bg} conductor={id === 'conductor'} /> });
@@ -35,8 +36,8 @@ export function ChannelScreen({ route, navigation }: RootScreenProps<'Channel'>)
   const sections = useMemo(() => {
     if (!channel) return [];
     const nameOf = (channelId: string) => channels?.find((c) => c.id === channelId)?.name ?? channelId;
-    return threadSections(channelThreads(channel, Date.now(), nameOf, paged.threads ?? undefined));
-  }, [channel, channels, paged.threads]);
+    return threadSections(channelThreads(channel, Date.now(), nameOf, paged.threads ?? undefined, technical));
+  }, [channel, channels, paged.threads, technical]);
 
   const toggleFolder = async (folderId: string, collapsed: boolean) => {
     const failure = await hub.setFolderCollapsed(folderId, collapsed);

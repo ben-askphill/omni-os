@@ -36,6 +36,8 @@ A file there with a shipped role's name is your edit of that built-in, an overla
 
 `delegatable: false` keeps a role out of the Conductor's `list_crew` and makes `delegate` and `delegate_team` refuse it. The conductor and usage-scan set it. Starting a thread as a role no file has, or one hidden on this machine, is refused with the valid ids; it used to run with no charter.
 
+`access: read` or `access: ask` runs the role's threads stricter than their channel's level, never looser ([Access levels](threads.md#access-levels)).
+
 `harness` is the role's runtime binding: any harness id this machine's catalog has, checked when the role is saved. A role whose harness this machine lacks still loads, with an error on it. Omni keeps frontmatter keys it does not know when it edits a file.
 
 ## Settings > Crew

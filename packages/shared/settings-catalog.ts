@@ -48,7 +48,7 @@ export const SETTINGS_SECTION_DEFS = [
   { id: 'desktop', group: 'devices', title: 'Desktop app', icon: 'monitor', blurb: 'Quick Prompt and how this app starts.', desktopApp: true },
   { id: 'worktrees', group: 'developer', title: 'Worktrees', icon: 'branch', blurb: 'The checkouts Omni makes for threads, and cleaning them up.' },
   { id: 'secrets', group: 'developer', title: 'Secrets', icon: 'key', blurb: 'API keys and tokens for threads, kept outside the database.' },
-  { id: 'extras', group: 'extras', title: 'Extras', icon: 'plug', blurb: 'Optional add-ons: Wispr Flow, Grok Bot, Hermes and the notes folder.' },
+  { id: 'extras', group: 'extras', title: 'Extras', icon: 'plug', blurb: 'Optional add-ons: Wispr Flow, Grok Bot, Shopify, Hermes and the notes folder.' },
   { id: 'about', group: 'app', title: 'About', icon: 'info', blurb: 'Version, server and where Omni keeps its files.' },
 ] as const satisfies readonly SettingsSectionDef[];
 
@@ -104,6 +104,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'setup', section: 'general', title: 'Run setup again', keywords: ['onboarding', 'wizard', 'harness check', 'first run'] },
   { id: 'theme', section: 'appearance', title: 'Theme', keywords: ['dark', 'light', 'system', 'mode', 'colors'] },
   { id: 'layout', section: 'appearance', title: 'Classic sidebar', keywords: ['beta', 'layout', 'rail', 'sidebar', 'channel rail', 'classic', 'new ui', 'redesign', 'color', 'colour', 'grayscale', 'greyscale'] },
+  { id: 'technical', section: 'appearance', title: 'Show technical details', keywords: ['technical', 'developer', 'engineering', 'plain', 'simple', 'pull requests', 'branches', 'worktrees', 'tokens', 'context', 'harness', 'effort', 'status', 'advanced'] },
   { id: 'inbox-key', section: 'appearance', title: 'Press I for the Inbox', keywords: ['keyboard', 'shortcut', 'key', 'inbox', 'i key', 'quick command'] },
   { id: 'zoom', section: 'appearance', title: 'Text size and zoom', keywords: ['zoom', 'scale', 'font size', 'text size', 'bigger', 'smaller'] },
   { id: 'notify', section: 'notifications', title: 'Notify on this device', keywords: ['alerts', 'finished', 'failed', 'desktop', 'permission', 'needs you', 'native', 'macos'] },
@@ -120,6 +121,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'keep-alive', section: 'threads', title: 'Keep sessions warm', keywords: ['keepalive', 'idle', 'process', 'background agents', 'interrupt'] },
   { id: 'limits', section: 'threads', title: 'Usage-limit recovery', keywords: ['rate limit', 'usage limit', 'reset', 'continue', 'resume', 'grace'] },
   { id: 'thread-features', section: 'threads', title: 'Reply suggestions, turn snapshots, browser and uploads', keywords: ['suggestions', 'haiku', 'snapshots', 'this turn', 'diff', 'browser', 'playwright', 'chrome', 'uploads', 'attachments', 'mods', 'plugins'] },
+  { id: 'templates', section: 'threads', title: 'Templates', keywords: ['template', 'templates', 'skills', 'cro', 'audit', 'agenda', 'meeting', 'recall', 'proposal', 'ticket', 'adr', 'decision', 'client question', 'data/templates'] },
   { id: 'automations', section: 'threads', title: 'Automations', keywords: ['scheduled', 'schedule', 'cron', 'webhook', 'tasks', 'recurring'] },
   { id: 'channel-list', section: 'channels', title: 'Channels', keywords: ['projects', 'clients', 'new channel', 'archive'] },
   { id: 'channel-basics', section: 'channels', title: 'Channel name, icon, notes and design system', keywords: ['emoji', 'kind', 'notes', 'system prompt', 'instructions', 'design system'] },
@@ -143,6 +145,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'network', section: 'access', title: 'Tailscale logins and public MCP URL', keywords: ['tailscale', 'tailnet', 'serve', 'mcp', 'claude.ai', 'chatgpt', 'clerk', 'remote access'] },
   { id: 'secrets', section: 'secrets', title: 'Secrets', keywords: ['api key', 'token', 'env', 'keychain', 'password', 'credentials'] },
   { id: 'wispr-flow', section: 'extras', title: 'Dictate with Wispr Flow', keywords: ['wispr flow', 'dictate', 'dictation', 'voice', 'speak', 'talk', 'quick prompt'] },
+  { id: 'shopify', section: 'extras', title: 'Shopify add-on', keywords: ['shopify', 'store', 'store domain', 'myshopify', 'portal', 'portal slug', 'ask phill', 'pack', 'add-on'] },
   { id: 'grok-bot', section: 'extras', title: 'Grok Bot', keywords: ['grok', 'grok bot', 'webhook', 'GROKBOT_WEBHOOK_URL', 'send to grok bot'] },
   { id: 'hermes', section: 'extras', title: 'Hermes URL', keywords: ['hermes', 'tailnet', 'HERMES_API_KEY', 'integrations'] },
   { id: 'brain', section: 'extras', title: 'Notes folder', keywords: ['notes', 'brain-export', 'export', 'digests', 'knowledge base'] },

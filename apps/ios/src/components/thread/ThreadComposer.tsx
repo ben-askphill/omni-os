@@ -9,7 +9,7 @@ import { AttachmentChips } from '../../attachments/AttachmentChips';
 import { clearStaged, getStaged, removeStagedFile, restoreStaged, useStaged } from '../../attachments/staged';
 import { removeDraftContext, useDraftContext } from '../../context/draft';
 import type { ThreadLive } from '../../live/hub';
-import { useStore, useThreadKey } from '../../live/react';
+import { useStore, useTechnical, useThreadKey } from '../../live/react';
 import { canStop, composerPlaceholder, sendLabel } from '../../send/rules';
 import { fontSize, lineHeight, radius, space, useOmniTheme, weight } from '../../theme';
 import { tap } from '../../ui/haptics';
@@ -45,6 +45,7 @@ export function ThreadComposer({
 }) {
   const { colors } = useOmniTheme();
   const catalog = useStore(live.catalog);
+  const technical = useTechnical();
   const { outbox, stopping, notice } = useStore(live.send.state);
   const key = useThreadKey(thread.id);
   const draft = useDraft(key);
@@ -56,7 +57,7 @@ export function ThreadComposer({
 
   const empty = draft.trim() === '' && context.length === 0;
   // The server takes files only with a message, so a file with no text says what is missing.
-  const placeholder = files.length > 0 && empty ? 'Add a message to send with the files' : composerPlaceholder(thread, catalog);
+  const placeholder = files.length > 0 && empty ? 'Add a message to send with the files' : composerPlaceholder(thread, catalog, technical);
   const slotTaken = outbox.item !== null;
   const showStop = empty && !slotTaken && canStop(thread);
 

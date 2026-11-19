@@ -75,6 +75,8 @@ const type = async (text: string) => {
 describe.each([false, true])('base of a new thread, phone=%s', (phone) => {
   const mount = async () => {
     await act(async () => root.render(phone ? createElement(NewSheet, { channel: 'web' }) : createElement(NewThreadComposer, { channelId: 'web' })));
+    // The sheet opens on Ask, a quick ask with no worktree: a base is for a task.
+    if (phone) await click(buttons().find((b) => b.textContent === 'Task'));
   };
   const open = () => click(host.querySelector('button[aria-label^="Base:"]'));
   const choose = async (label: string) => {

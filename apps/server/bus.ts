@@ -22,6 +22,8 @@ export type FeedEvent =
   | { type: 'automations' }
   /** A crew role was saved, reset, deleted, hidden or shown, here or on another machine (crew-store.ts, sync). Clients refetch GET /api/crew. */
   | { type: 'crew' }
+  /** Show technical details or the Shopify add-on changed, here or on another machine (display.ts). Clients refetch GET /api/display. */
+  | { type: 'display' }
   /** The update check or Update moved on (update.ts). Clients refetch GET /api/update. */
   | { type: 'update' }
   /** A claude.ai Artifacts refresh started or ended, or its schedule changed (claude-artifacts.ts). Clients refetch the list when it ends. */
@@ -44,6 +46,9 @@ export type FeedEvent =
 
 export const publishFeed = (e: FeedEvent) => bus.emit('feed', e);
 export const publishThread = (threadId: string, e: unknown) => bus.emit(`thread:${threadId}`, e);
+
+/** A thread event was stored, by a run here (runner/state.ts addEvent) or synced in: (threadId, kind). The step line may have moved (step-line.ts). */
+export const EVENT_ADDED = 'event_added';
 
 /** A sub-agent's task row came in from another machine (sync/handlers/event.ts), so `delegating` may have changed. */
 export const SYNCED_TASK = 'synced_task';

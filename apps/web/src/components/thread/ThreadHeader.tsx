@@ -3,7 +3,8 @@ import type { Channel, ModStatus, Thread } from '../../api.ts';
 import { headerShowsRole } from '@omni/shared/crew-role.ts';
 import { ChannelStack } from '../ChannelStack.tsx';
 import { ContinueCrumbs } from '../ContinueLinks.tsx';
-import { CrewMark, isCrewRole } from '../brand.tsx';
+import { CrewMark, harnessLabel, isCrewRole } from '../brand.tsx';
+import { threadAccountLabel, type ThreadAccount } from '@omni/shared/harness-accounts.ts';
 import { Avatar, Chip, Icon } from '../ui.tsx';
 import { href } from '../../router.ts';
 import { HeaderActions } from './HeaderActions.tsx';
@@ -33,6 +34,17 @@ function RoleChip({ role, name }: { role: string; name: string }) {
   );
 }
 
+/** The account the thread's harness last ran as (apps/server/harness-accounts.ts), after the crumbs. */
+function AccountChip({ ran }: { ran: ThreadAccount | null | undefined }) {
+  if (!ran) return null;
+  return (
+    <span className="ml-1 inline-flex min-w-0 items-center gap-1 text-fg-3" title={`${harnessLabel(ran.harness)} runs as ${ran.label}${ran.org ? ` (${ran.org})` : ''} on ${ran.machineName}`}>
+      <Icon name="user" size={12} className="shrink-0" />
+      <span className="min-w-0 truncate">{threadAccountLabel(ran)}</span>
+    </span>
+  );
+}
+
 /**
  * The thread page's header: the channel and parent crumbs, the crew role it runs as, the title, mod status lines, the
  * channels its delegated threads work in and the header actions. `delegated`: those threads, finished ones and team
@@ -47,6 +59,7 @@ export function ThreadHeader({
   delegated,
   actions,
   roleName = null,
+  account = null,
 }: {
   thread: Thread;
   channel: Channel | null | undefined;
@@ -57,6 +70,8 @@ export function ThreadHeader({
   actions: ComponentProps<typeof HeaderActions>;
   /** The display name of its crew role (crewRoleName), shown when headerShowsRole says so. */
   roleName?: string | null;
+  /** The account its harness last ran as (useThreadAccount). */
+  account?: ThreadAccount | null;
 }) {
   return (
     <div className="@container flex shrink-0 items-center gap-3 px-3 pt-3 pb-2 md:px-6 md:pt-4">
@@ -78,6 +93,7 @@ export function ThreadHeader({
           )}
           {roleName && headerShowsRole(thread) && <RoleChip role={thread.role!} name={roleName} />}
           {thread.task_id && <span className="ml-1 shrink-0 font-num text-[10.5px] text-fg-3">{thread.task_id}</span>}
+          <AccountChip ran={account} />
           <ContinueCrumbs links={links} />
         </div>
         <h1 className="mt-0.5 truncate font-display text-[length:var(--fs-heading)] leading-snug" title={thread.title}>

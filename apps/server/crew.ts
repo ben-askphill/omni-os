@@ -6,6 +6,8 @@ import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import type { CrewLockedField, CrewLocks } from '@omni/shared/crew-settings.ts';
 import { paths } from './config.ts';
 import { fillPlaceholders, userConfig } from './user-config.ts';
+import { parseConnectorList } from './connectors.ts';
+import { isAccessLevel, type AccessLevel } from '@omni/shared/access.ts';
 
 // Crew roles: one markdown file each, frontmatter and a charter. The shipped ones live in crew/ and each release
 // replaces them. The user's own live in data/crew/: a file there with a new id is a whole role of theirs, and one with
@@ -43,6 +45,16 @@ export interface CrewRole {
   channel?: string;
   /** Extra MCP servers this role gets. "omni" = the conductor tools. */
   mcp: string[];
+  /**
+   * `access:`, the most this role may do in any channel (read, ask or full; packages/shared/access.ts). A channel set
+   * stricter wins. Unset: the channel's level alone.
+   */
+  access?: AccessLevel;
+  /**
+   * `connectors:`, the accounts every thread of this role reads (connectors.ts ids such as slack or calendar). A new
+   * thread of the role waits at its sign-in check while one is signed out. Unset when the role names none.
+   */
+  connectors?: string[];
   /** The role routes work and never does it: no shell, file edits, browser or subagents (DELEGATE_ONLY_DENIED). */
   delegateOnly: boolean;
   /** The Conductor may hand work to it: list_crew offers it and `delegate` takes it. False for the Conductor and usage-scan. */
@@ -153,6 +165,13 @@ export function avatarOf(v: unknown): CrewAvatar | undefined {
 const pick = (key: string, over: Record<string, unknown>, base: Record<string, unknown>) =>
   over[key] !== undefined && over[key] !== null && over[key] !== '' ? over[key] : base[key];
 
+/** A role's `connectors:`, when it names valid ones. A bad list is left out rather than holding every thread. */
+function connectorsOf(raw: unknown): { connectors?: string[] } {
+  if (raw === undefined || raw === null) return {};
+  const ids = parseConnectorList(raw);
+  return Array.isArray(ids) && ids.length ? { connectors: ids } : {};
+}
+
 function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: CrewKind, error?: string): CrewRole {
   return {
     id,
@@ -164,6 +183,8 @@ function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: C
     effort: text(meta.effort),
     channel: text(meta.channel),
     mcp: Array.isArray(meta.mcp) ? meta.mcp.filter((x): x is string => typeof x === 'string') : [],
+    ...connectorsOf(meta.connectors),
+    ...(isAccessLevel(meta.access) && { access: meta.access }),
     delegateOnly: meta.delegate_only === true,
     delegatable: meta.delegatable !== false,
     review: meta.review === true,

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTechnical } from '../display.ts';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -29,6 +30,7 @@ import { ForkThreadButton } from './ContinueSheet.tsx';
 import { removeDraftContext, settleDraftContext, useDraftContext } from '../message-context/draft.ts';
 import { referencesFor } from '../message-context/thread-picker.ts';
 import { ReferenceThreadButton } from './ThreadReference.tsx';
+import { QuickAnswer } from './QuickAnswer.tsx';
 
 import { AttachButton, AttachmentStrip, useAttachments } from './composer/attachments.tsx';
 import { DropHint, enterKey, SendButton, shell, StopButton, useAutosize, useFocusRequests, withKeys } from './composer/controls.tsx';
@@ -38,6 +40,8 @@ import { finePointer, SteerButton, ThreadRunPills } from './composer/ReplyContro
 import { ThreadMachineChip, type MachineHeld } from './composer/MachineChip.tsx';
 import { LivesOnNote, sendRefusal, type SendRefusal } from './thread/LivesOn.tsx';
 import { TakeoverConfirm } from './thread/Takeover.tsx';
+import { TemplateChips, useTemplates } from '../templates.tsx';
+import { templateDraft, type Template } from '@omni/shared/templates.ts';
 
 export { AttachmentStrip, useAttachments };
 
@@ -78,6 +82,8 @@ export function NewThreadComposer({
   // As the channel sees them: Cursor Cloud needs its GitHub repo.
   const { data: harnesses, reload: reloadHarnesses } = useApi<HarnessWithRunning[]>(harnessesPath(channel));
   const [busy, setBusy] = useState(false);
+  // A quick ask from Ask: answered under the composer (components/QuickAnswer.tsx), no thread to open.
+  const [answering, setAnswering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const att = useAttachments();
@@ -141,6 +147,7 @@ export function NewThreadComposer({
   };
 
   const { slashMenu, fileMenu, menus, hint } = useNewThreadMenus({ ref, text, onText: update, choice, channel });
+  const templates = useTemplates();
 
   /** POST /api/grokbot with the text and the channel, the route Send to Grok Bot uses. The box empties once it took it. */
   const sendToGrok = async (prompt: string) => {
@@ -190,78 +197,129 @@ export function NewThreadComposer({
     }
   };
 
+  /** Ask: a quick ask in this channel, on the picked run, answered right here with read-only tools. */
+  const ask = async () => {
+    const prompt = text.trim();
+    if (!prompt || busy || toGrok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const t = await api.send<Thread>(
+        '/threads',
+        { channel, prompt, quick: true, ...draftRunRequest(picked ? { choice, effort } : null), ...(refs.length && { context: referencesFor(refs, channel) }) },
+        att.files,
+      );
+      keepLocalFiles(t.id, att.files);
+      drafts.delete(key);
+      settleDraftContext(key, refs.map((r) => r.id));
+      setText('');
+      att.clear();
+      setAnswering(t.id);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const { channelOptions, roleOptions } = pickerOptions(visibleChannels, channel, crew);
+  // A template chip puts `/<name> ` in the box, ready for what the job is about.
+  const pickTemplate = (t: Template) => {
+    update(templateDraft(t));
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+  };
   return (
-    <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
-      <DropHint over={att.over} />
-      {/* Near the top of the page, so it opens downward. */}
-      {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
-      {fileMenu.menu && <FileMenu {...fileMenu.menu} below />}
-      <ContextChips records={refs} onRemove={(id) => removeDraftContext(key, id)} className="px-3 pt-3 pb-0.5" />
-      <AttachmentStrip files={att.files} onRemove={att.remove} />
-      <textarea
-        ref={ref}
-        value={text}
-        {...menus.textarea}
-        onPaste={att.onPaste}
-        onKeyDown={(e) => {
-          if (menus.onKey(e)) return;
-          if (enterKey(e, text, update)) void submit();
-        }}
-        rows={big ? 3 : 2}
-        placeholder={toGrok ? GROK_BOT_PLACEHOLDER : withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
-        className={`block max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none placeholder:text-fg-3 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
-      />
-      <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
-        {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
-        {showRole && <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />}
-        {harnesses && !toGrok && (
-          <ModelPicker
-            harnesses={harnesses}
-            onOpen={() => {
-              reloadHarnesses();
-              accounts.reload();
-            }}
-            accounts={target}
-            defaultOpen={preset?.pickModel}
-            value={choice}
-            onChange={(c) => {
-              setPicked({ choice: c, effort: '' }); // changing the model resets effort to the default
-            }}
-            effort={{ value: effort, onChange: (effort) => setPicked({ choice, effort }) }}
-          />
-        )}
-        {!toGrok && <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />}
-        <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} />
-        <AttachButton onPick={att.add} disabled={busy} />
-        {!toGrok && <ReferenceThreadButton to={{ draft: key, channel }} disabled={busy} />}
-        {folder && channel === preset?.channel && !toGrok && (
-          <button
-            type="button"
-            onClick={() => setFolder(null)}
-            title="Filed in this folder. Click to start it ungrouped."
-            aria-label={`In folder ${folder.name}. Remove`}
-            className="hov inline-flex h-[30px] max-w-[180px] items-center gap-1.5 rounded-full px-2.5 text-[12.5px] text-fg-2 hover:text-fg"
-          >
-            <Icon name="folder" size={13} className="text-fg-3" />
-            <span className="truncate">{folder.name}</span>
-            <Icon name="x" size={12} className="text-fg-3" />
-          </button>
-        )}
-        <div className="ml-auto flex items-center gap-2.5">
-          <SendButton armed={!!text.trim() && !grokBlock} busy={busy} onClick={submit}>
-            {toGrok ? 'Send' : 'Start'}
-          </SendButton>
+    <>
+      <div className={shell('rounded-[20px] bg-surface', att.over)} {...att.dropZone}>
+        <DropHint over={att.over} />
+        {/* Near the top of the page, so it opens downward. */}
+        {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
+        {fileMenu.menu && <FileMenu {...fileMenu.menu} below />}
+        <ContextChips records={refs} onRemove={(id) => removeDraftContext(key, id)} className="px-3 pt-3 pb-0.5" />
+        <AttachmentStrip files={att.files} onRemove={att.remove} />
+        <textarea
+          ref={ref}
+          value={text}
+          {...menus.textarea}
+          onPaste={att.onPaste}
+          onKeyDown={(e) => {
+            if (menus.onKey(e)) return;
+            if (enterKey(e, text, update)) void submit();
+          }}
+          rows={big ? 3 : 2}
+          placeholder={toGrok ? GROK_BOT_PLACEHOLDER : withKeys(placeholder ?? (channel === 'conductor' ? 'Ask the Conductor anything. It delegates to the crew.' : 'Describe the task'))}
+          className={`block max-h-[220px] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-[1.8] outline-none placeholder:text-fg-3 ${big ? 'min-h-[96px] text-[16px]' : 'min-h-[60px] text-[14.5px]'}`}
+        />
+        <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">
+          {!channelId && <Picker label="Channel" value={channel} options={channelOptions} onChange={onChannel} />}
+          {showRole && <Picker label="Role" value={role} options={roleOptions} onChange={onRole} />}
+          {harnesses && !toGrok && (
+            <ModelPicker
+              harnesses={harnesses}
+              onOpen={() => {
+                reloadHarnesses();
+                accounts.reload();
+              }}
+              accounts={target}
+              defaultOpen={preset?.pickModel}
+              value={choice}
+              onChange={(c) => {
+                setPicked({ choice: c, effort: '' }); // changing the model resets effort to the default
+              }}
+              effort={{ value: effort, onChange: (effort) => setPicked({ choice, effort }) }}
+            />
+          )}
+          {!toGrok && <BasePicker channel={channel} harness={choice.harness} value={base} onChange={setBase} />}
+          <RunOnPicker rows={runOn.rows} value={runOn.pick} onChange={runOn.setPick} accountFor={accountFor} />
+          <AttachButton onPick={att.add} disabled={busy} />
+          {!toGrok && <ReferenceThreadButton to={{ draft: key, channel }} disabled={busy} />}
+          {folder && channel === preset?.channel && !toGrok && (
+            <button
+              type="button"
+              onClick={() => setFolder(null)}
+              title="Filed in this folder. Click to start it ungrouped."
+              aria-label={`In folder ${folder.name}. Remove`}
+              className="hov inline-flex h-[30px] max-w-[180px] items-center gap-1.5 rounded-full px-2.5 text-[12.5px] text-fg-2 hover:text-fg"
+            >
+              <Icon name="folder" size={13} className="text-fg-3" />
+              <span className="truncate">{folder.name}</span>
+              <Icon name="x" size={12} className="text-fg-3" />
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-2.5">
+            {!toGrok && (
+              <Button size="sm" variant="secondary" disabled={!text.trim() || busy} onClick={() => void ask()} title="Answer here with read-only tools, without starting a thread">
+                Ask
+              </Button>
+            )}
+            <SendButton armed={!!text.trim() && !grokBlock} busy={busy} onClick={submit}>
+              {toGrok ? 'Send' : 'Start'}
+            </SendButton>
+          </div>
         </div>
+        {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
+        <div aria-live="polite">{hint && !menus.open && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
+        {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
+        {toGrok && !grokBlock && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{GROK_BOT_NOTE}</div>}
+        {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
+        {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
+        {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
+        {answering && (
+          <div className="mx-2 mb-2 rounded-[16px] bg-bg px-3.5 py-3 shadow-[var(--shadow-card)]">
+            <QuickAnswer key={answering} id={answering} onOpen={(id) => navigate(`/t/${id}`)} />
+            <button type="button" onClick={() => setAnswering(null)} className="press mt-2 text-[12.5px] font-medium text-fg-3 hover:text-fg">
+              Close
+            </button>
+          </div>
+        )}
       </div>
-      {/* Mounted before it says anything, so a screen reader reads each hint as it appears. */}
-      <div aria-live="polite">{hint && !menus.open && !toGrok && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{hint}</div>}</div>
-      {showRole && roleObj?.description && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{roleObj.description}</div>}
-      {toGrok && !grokBlock && <div className="px-4 pb-2.5 text-[12px] text-fg-3">{GROK_BOT_NOTE}</div>}
-      {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
-      {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
-      {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
-    </div>
+      {!text.trim() && !toGrok && templates.data && <TemplateChips templates={templates.data.templates} onPick={pickTemplate} className="mt-3 px-1" />}
+    </>
   );
 }
 
@@ -338,6 +396,7 @@ export function ReplyComposer({
   const { id: threadId, status } = thread;
   // A switch queued behind the turn: what Ben sends waits for it too (apps/server/runner/queue.ts), so nothing steers.
   const steers = canSteer && !thread.queued_harness;
+  const technical = useTechnical();
   const key = `reply:${threadId}`;
   const [text, setText] = useState(() => drafts.get(key) ?? '');
   const [busy, setBusy] = useState(false);
@@ -492,7 +551,7 @@ export function ReplyComposer({
           void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
-        placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread || replying ? 'Reply' : steers ? 'Steer the agent. It reads this at its next step' : 'Queue a message. It runs after this turn')}
+        placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread || replying ? 'Reply' : steers ? (technical ? 'Steer the agent. It reads this at its next step' : 'Add to this. It reads it at its next step') : technical ? 'Queue a message. It runs after this turn' : 'Send when it finishes')}
         className="block max-h-[220px] min-h-[60px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none placeholder:text-fg-3"
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">

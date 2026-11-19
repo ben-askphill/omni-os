@@ -126,6 +126,10 @@ export const paths = {
    * apps/desktop/tests/stage.test.ts check it). OMNI_AUTOMATIONS_DIR points tests at their own.
    */
   automations: env.OMNI_AUTOMATIONS_DIR ? resolve(ROOT, env.OMNI_AUTOMATIONS_DIR) : join(ROOT, 'automations'),
+  /** Shipped templates (apps/server/templates.ts). OMNI_TEMPLATES_DIR points tests at their own. */
+  templates: env.OMNI_TEMPLATES_DIR ? resolve(ROOT, env.OMNI_TEMPLATES_DIR) : join(ROOT, 'templates'),
+  /** The user's own templates: a file here replaces the shipped one with the same name. */
+  personalTemplates: join(DATA, 'templates'),
   /** The user's own automations, beside the shared ones in automations/. Same id here wins. */
   personalAutomations: join(DATA, 'automations'),
   /** Who the user is and where their work lives (apps/server/user-config.ts). */
@@ -133,7 +137,7 @@ export const paths = {
     return configPath();
   },
   webDist: env.OMNI_WEB_DIST ? resolve(ROOT, env.OMNI_WEB_DIST) : join(ROOT, 'apps', 'web', 'dist'),
-  /** The conductor's MCP server. ask, render and threads run on omni-mcp instead (native-mcp.ts). */
+  /** The conductor's MCP server. ask, render, steps and threads run on omni-mcp instead (native-mcp.ts). */
   mcpOmni: join(ROOT, 'apps', 'mcp', BUNDLED ? 'omni.mjs' : 'omni.ts'),
   /** Claude Code mods (plugins of function hooks) Omni loads when config.mods is on. */
   mods: join(ROOT, 'mods'),

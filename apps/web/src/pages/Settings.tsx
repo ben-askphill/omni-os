@@ -10,6 +10,7 @@ import { useTheme } from '../components/theme.tsx';
 import { setLayout, setRailColor, useLayout, useRailColor } from '../layout-pref.ts';
 import { setDoneKeyOn, setInboxKeyOn, useDoneKeyOn, useInboxKeyOn } from '../inbox-key.ts';
 import { desktop } from '../desktop.ts';
+import { saveDisplay, useDisplay } from '../display.ts';
 import { Avatar, Button, ErrorNote, FolderInput, Icon, LinkButton, Loading, PageHeader, Picker, Segmented, StatusDot } from '../components/ui.tsx';
 import { href, navigate, settingsHash, useHash, type SettingsSection } from '../router.ts';
 import { setSettingsScope } from '../settings-scope.ts';
@@ -27,6 +28,8 @@ import { ModelsSection } from './SettingsAgents.tsx';
 import { CrewSection } from './SettingsCrew.tsx';
 import { AccountsSection } from './SettingsAccounts.tsx';
 import { StorageSection } from './Storage.tsx';
+import { useTemplates } from '../templates.tsx';
+import { sortTemplates } from '@omni/shared/templates.ts';
 import { PathMapEditor, SyncSection } from './Sync.tsx';
 import {
   Advanced,
@@ -226,8 +229,30 @@ function ExtrasSection() {
         <Card entry="wispr-flow" title="Wispr Flow" subtitle="Say what you need instead of typing it: Wispr Flow dictates into the Quick Prompt. Its switch is here in Omni's Mac app." />
       )}
       <GrokBotCard />
+      <ShopifyCard />
       <ConfigSection part="extras" />
     </>
+  );
+}
+
+/** The Shopify pack: the Store card and Portal slug on a channel, its store link, and their lines in a thread's instructions. */
+function ShopifyCard() {
+  const { shopify } = useDisplay();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card entry="shopify" title="Shopify">
+      <SwitchRow
+        title="Shopify add-on"
+        origin={<Origin of="machine" label="Every machine" />}
+        detail="A store domain and client portal slug on each channel's settings, the store link on its page, and both in its threads' instructions. Off, Omni keeps any you set but shows and sends none."
+        checked={shopify}
+        onChange={(on) => {
+          setError(null);
+          saveDisplay({ shopify: on }).catch((e: unknown) => setError(errorText(e)));
+        }}
+      />
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Card>
   );
 }
 
@@ -265,6 +290,44 @@ function WorktreesSection() {
   );
 }
 
+/** Settings > Threads: the templates the `/` menu and the New box offer, and where their files live. */
+function TemplatesCard() {
+  const { data, error, reload } = useTemplates();
+  return (
+    <Card entry="templates" title="Templates" subtitle="Ready-made jobs in the / menu and under a new thread's box. Type / and a template's name, then what it is about.">
+      {error ? (
+        <ErrorNote onRetry={reload}>{error}</ErrorNote>
+      ) : !data ? (
+        <Loading />
+      ) : (
+        <div className="space-y-3">
+          {sortTemplates(data.templates).map((t) => (
+            <SettingRow
+              key={t.id}
+              label={t.name}
+              hint={t.description}
+              origin={
+                <code className="text-[12px] text-fg-3">
+                  /{t.id}
+                  {t.argumentHint ? ` ${t.argumentHint}` : ''}
+                </code>
+              }
+            />
+          ))}
+          {data.hidden > 0 && (
+            <FootNote>
+              {data.hidden} Shopify template{data.hidden === 1 ? '' : 's'} show{data.hidden === 1 ? 's' : ''} once the Shopify add-on is on.
+            </FootNote>
+          )}
+          <FootNote>
+            Add your own as Markdown files in <code>data/templates/</code>. A file with the same name as a shipped one replaces it.
+          </FootNote>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function ThreadsSection() {
   const { state } = useSetupState();
   return (
@@ -275,6 +338,7 @@ function ThreadsSection() {
         <span id={settingAnchor('thread-features')} />
         <ServerOptions section="threads" />
       </div>
+      <TemplatesCard />
       <div id={settingAnchor('automations')} className="scroll-mt-6">
         <LinkLine href={href.automations()}>Automations have their own page</LinkLine>
       </div>
@@ -735,6 +799,27 @@ function PronounsField({
   );
 }
 
+/** Show technical details (packages/shared/display.ts): kept by the server, so it follows you to every machine. */
+function TechnicalCard() {
+  const { technical } = useDisplay();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card entry="technical" title="Detail">
+      <SwitchRow
+        title="Show technical details"
+        origin={<Origin of="machine" label="Every machine" />}
+        detail="Status names like Steering and Checks failing, the AI app and effort by their own names, and pull requests, branches, token counts and the context ring in every channel. Off, a channel with a repo still shows its code detail."
+        checked={technical}
+        onChange={(on) => {
+          setError(null);
+          saveDisplay({ technical: on }).catch((e: unknown) => setError(errorText(e)));
+        }}
+      />
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Card>
+  );
+}
+
 function AppearanceCard() {
   const [theme, setTheme] = useTheme();
   const layout = useLayout();
@@ -785,6 +870,7 @@ function AppearanceCard() {
           />
         )}
       </Card>
+      <TechnicalCard />
       <Card entry="inbox-key" title="Keyboard">
         <SwitchRow
           title="Press I for the Inbox"

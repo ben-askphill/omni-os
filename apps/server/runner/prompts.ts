@@ -1,4 +1,5 @@
 // The system prompt handed to a harness for one thread.
+import { quickAskRule, readsOnly } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
 import { artifacts, type Channel, type Thread } from '../db.ts';
@@ -7,6 +8,7 @@ import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { userConfig } from '../user-config.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
+import { displayPrefs } from '../display.ts';
 import { accessSync, closeSync, constants, openSync, readSync, statSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
@@ -164,7 +166,9 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   const cloud = thread.harness === 'cursor-cloud';
   const name = userName();
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
-  const hands = !role?.delegateOnly;
+  // A quick ask only reads, and turns into a task for the rest (packages/shared/quick-ask.ts).
+  const hands = !role?.delegateOnly && !readsOnly(thread);
+  const { shopify } = displayPrefs();
   const lines = [
     '# Omni OS context',
     TOOL_FAILURE_POLICY,
@@ -177,8 +181,9 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     ...profileLines(name),
     `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,
     `- Channel: #${channel.id} (${channel.name}, ${channel.kind})`,
-    channel.store_domain ? `- Store: ${channel.store_domain}` : '',
-    channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
+    // The Shopify pack (display.ts): its store and portal lines go out only while it is on.
+    shopify && channel.store_domain ? `- Shopify store: ${channel.store_domain}` : '',
+    shopify && channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
     channel.github_repo ? `- GitHub repo: ${channel.github_repo}` : '',
     remote
       ? '- This thread does not run in an Omni worktree or browser. Work on your own clone of the repo and open pull requests there.'
@@ -190,6 +195,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? `- Shell commands run in zsh: quote glob arguments (--include='*.ts'), and never start a word with = (zsh reads echo === as a command lookup).${process.platform === 'darwin' ? ' The command-line tools are BSD, not GNU.' : ''}`
       : '',
     channel.notes ? `- Channel notes: ${channel.notes}` : '',
+    ...(readsOnly(thread) ? ['', ...quickAskRule(name)] : []),
     // A usage scan's lead gets the omni tools to save what the user picks, not to route work: it never delegates.
     ...(role?.mcp.includes('omni') && role.id !== SCAN_ROLE
       ? [
@@ -225,6 +231,14 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     remote
       ? ''
       : `When ${name} asks you to "show me", "list out" or "visualize" something, or a brief passes that ask on, show the result with html_render as cards, a table or a chart above your reply instead of a wall of text. A short answer stays plain text.`,
+    // The thread's step view (@omni/shared/steps.ts). set_steps is on omni-mcp, which Hermes and Cursor cloud do not get.
+    ...(remote
+      ? []
+      : [
+          '',
+          '## Progress',
+          `For a task with more than one stage, call set_steps before you start, with 3 to 6 steps in the plain words ${name} would use ("Find candidate apps", "Compare prices"), then again each time a step starts or finishes. Omni shows the list as the thread's progress. Skip it for a quick answer.`,
+        ]),
   ];
   if (thread.source === 'team') {
     lines.push(

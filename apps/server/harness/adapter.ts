@@ -3,6 +3,7 @@
 // events and the feed — and each adapter owns its CLI's process (if it has one) and protocol,
 // translating Omni's messages into it and its output into Omni's records.
 import type { SlashCommand } from '@omni/shared/slash.ts';
+import type { PermissionGate } from '../runner/approvals.ts';
 import type { Channel, Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 import type { ContextUsage, CursorTurnUsage } from '@omni/shared/context-meter.ts';
@@ -30,6 +31,11 @@ export interface AdapterContext {
   resume: boolean;
   /** A switched session still needs its history, including a retry into an empty native session. */
   handoverPending?: boolean;
+  /**
+   * The channel's access level, when it is not full access (runner/approvals.ts): the harness asks it before each tool
+   * runs, or runs with the settings that level allows. Null or missing: every tool runs, as before levels.
+   */
+  permission?: PermissionGate | null;
 }
 
 /** A harness command a message names, resolved when it was sent. `end` is exclusive. */

@@ -144,7 +144,7 @@
       "group": "extras",
       "title": "Extras",
       "icon": "plug",
-      "blurb": "Optional add-ons: Wispr Flow, Grok Bot, Hermes and the notes folder."
+      "blurb": "Optional add-ons: Wispr Flow, Grok Bot, Shopify, Hermes and the notes folder."
     },
     {
       "id": "about",
@@ -209,6 +209,27 @@
         "colour",
         "grayscale",
         "greyscale"
+      ]
+    },
+    {
+      "id": "technical",
+      "section": "appearance",
+      "title": "Show technical details",
+      "keywords": [
+        "technical",
+        "developer",
+        "engineering",
+        "plain",
+        "simple",
+        "pull requests",
+        "branches",
+        "worktrees",
+        "tokens",
+        "context",
+        "harness",
+        "effort",
+        "status",
+        "advanced"
       ]
     },
     {
@@ -450,6 +471,27 @@
         "attachments",
         "mods",
         "plugins"
+      ]
+    },
+    {
+      "id": "templates",
+      "section": "threads",
+      "title": "Templates",
+      "keywords": [
+        "template",
+        "templates",
+        "skills",
+        "cro",
+        "audit",
+        "agenda",
+        "meeting",
+        "recall",
+        "proposal",
+        "ticket",
+        "adr",
+        "decision",
+        "client question",
+        "data/templates"
       ]
     },
     {
@@ -763,6 +805,22 @@
       ]
     },
     {
+      "id": "shopify",
+      "section": "extras",
+      "title": "Shopify add-on",
+      "keywords": [
+        "shopify",
+        "store",
+        "store domain",
+        "myshopify",
+        "portal",
+        "portal slug",
+        "ask phill",
+        "pack",
+        "add-on"
+      ]
+    },
+    {
       "id": "grok-bot",
       "section": "extras",
       "title": "Grok Bot",
@@ -959,6 +1017,7 @@
       "expected": [
         "server",
         "channel-actions",
+        "shopify",
         "brain"
       ]
     },

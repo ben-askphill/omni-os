@@ -13,6 +13,8 @@ import { webhookSecretName } from './github-webhook.ts';
 import { channelCatalog, freshCatalog, getCatalog, loadCatalog, refreshStale } from './harness/catalog-service.ts';
 import { markHidden, modelVisibility, setHarnessModelPrefs } from './harness/model-visibility.ts';
 import { parseHarnessPrefs } from '@omni/shared/model-visibility.ts';
+import { parseDisplayPatch } from '@omni/shared/display.ts';
+import { displayPrefs, setDisplayPrefs } from './display.ts';
 import { validateDefaults } from './harness/resolve.ts';
 import { HARNESS_INSTALL, isHarnessId, type HarnessInfo } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
@@ -62,6 +64,14 @@ metaApi.put('/model-visibility/:harness', async (c) => {
   const prefs = parseHarnessPrefs(await c.req.json().catch(() => null));
   if (!prefs) return c.json({ error: 'Send { show, hide, newModels }.' }, 400);
   return c.json(setHarnessModelPrefs(harness, prefs));
+});
+
+// Show technical details and the Shopify add-on (display.ts). A PUT sets either or both and answers with both.
+metaApi.get('/display', (c) => c.json(displayPrefs()));
+metaApi.put('/display', async (c) => {
+  const patch = parseDisplayPatch(await c.req.json().catch(() => null));
+  if (!patch) return c.json({ error: 'Send { technical, shopify } as booleans.' }, 400);
+  return c.json(setDisplayPrefs(patch));
 });
 
 /** The other synced Macs a thread can be handed to, with whether Tailscale sees each up. Empty while sync is off. */

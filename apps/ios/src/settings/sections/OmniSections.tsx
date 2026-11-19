@@ -2,9 +2,11 @@ import type { OmniApi } from '@omni/client-core';
 import { relTime } from '@omni/shared/format.ts';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
+import { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { ListHeading } from '../../components/ListHeading';
+import { useLiveHub, useStore } from '../../live/react';
 import { useRemote } from '../../live/use-remote';
 import { useOmniTheme } from '../../theme';
 import { ListRow } from '../../ui/GroupedList';
@@ -12,7 +14,7 @@ import { SegmentedControl } from '../../ui/SegmentedControl';
 import { setThemePref, useThemePref } from '../appearance';
 import { THEME_OPTIONS } from '../appearance-model';
 import { ConfigForm } from '../ConfigForm';
-import { Footnote, Group, SettingsPage } from '../parts';
+import { Footnote, Group, SettingsPage, SwitchRow } from '../parts';
 import { versionLabel } from '../settings-model';
 
 const loadSetup = (api: OmniApi) => api.setup();
@@ -51,8 +53,29 @@ export function AppearanceSection() {
         <SegmentedControl options={THEME_OPTIONS} value={theme} onChange={setThemePref} />
         <Footnote>This phone only. Match system follows Light or Dark in iOS Settings.</Footnote>
       </View>
+      <TechnicalGroup />
       <Footnote>Text size follows Text Size in iOS Settings, under Display & Brightness.</Footnote>
     </SettingsPage>
+  );
+}
+
+/** Show technical details: kept by the server, so it changes every client (packages/shared/display.ts). */
+function TechnicalGroup() {
+  const hub = useLiveHub();
+  const display = useStore(hub.display);
+  const [error, setError] = useState<string | null>(null);
+  // An older server has no switch: its threads read as they always did.
+  if (!display) return null;
+  return (
+    <Group
+      title="Detail"
+      footer={
+        error ??
+        'Status names like Steering and Checks failing, the AI app and effort by their own names, and pull requests, branches and token counts in every channel. Off, a channel with a repo still shows its code detail. Every device.'
+      }
+    >
+      <SwitchRow first title="Show technical details" value={display.technical} onValueChange={(on) => void hub.setDisplay({ technical: on }).then(setError)} />
+    </Group>
   );
 }
 

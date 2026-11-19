@@ -4,6 +4,9 @@ export default defineConfig({
   root: import.meta.dirname,
   test: {
     include: ['tests/**/*.test.ts'],
+    // Show technical details on, as on an install from before the switch: the tests name marks and controls by their
+    // technical names. A test of the plain words turns it off itself (tests/display-plain.test.ts).
+    setupFiles: ['tests/setup-display.ts'],
     environment: 'node',
     // Half the cores, not all but one: npm test runs two packages at once, and the server suite's files each boot
     // servers and fake CLIs. Unbounded, a whole run was killed with exit 137. Override with --maxWorkers.

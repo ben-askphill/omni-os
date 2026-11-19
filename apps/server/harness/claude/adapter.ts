@@ -1,5 +1,6 @@
 // Claude Code behind the harness adapter interface: one warm `claude -p` process per thread,
 // stream-json both ways. The env strips the API auth vars, and output goes through stream.ts.
+import { readsOnly } from '@omni/shared/quick-ask.ts';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -26,6 +27,36 @@ import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession }
 const COMMANDS_REQUEST = 'omni-commands';
 /** Omni's `get_context_usage` requests: the CLI's split of the context window. Costs no tokens. */
 const CONTEXT_REQUEST = 'omni-context';
+
+/**
+ * Below full access, every tool call comes to Omni first: the CLI asks over stdio (`can_use_tool`), and a PreToolUse
+ * hook that answers "ask" for every tool makes it ask even where the user's own settings allow the tool. Checked against
+ * claude 2.1.316 (ADR 0015).
+ */
+export const ASK_EVERY_TOOL = JSON.stringify({
+  hooks: {
+    PreToolUse: [
+      {
+        matcher: '*',
+        hooks: [{ type: 'command', command: `printf %s '${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' } })}'` }],
+      },
+    ],
+  },
+});
+
+/** The permission flags for a thread: bypass at full access, else every call asked over stdio. */
+export function permissionArgs(gated: boolean): string[] {
+  if (!gated) return ['--permission-mode', config.permissionMode];
+  return ['--permission-mode', 'default', '--permission-prompt-tool', 'stdio', '--settings', ASK_EVERY_TOOL];
+}
+
+/** A `can_use_tool` request the CLI sends before a tool runs, or null for any other event. */
+function permissionRequest(evt: unknown): { id: string; tool: string; input: Record<string, unknown> } | null {
+  const e = evt as { type?: unknown; request_id?: unknown; request?: { subtype?: unknown; tool_name?: unknown; input?: unknown } };
+  if (e.type !== 'control_request' || e.request?.subtype !== 'can_use_tool' || typeof e.request_id !== 'string' || typeof e.request.tool_name !== 'string') return null;
+  const input = e.request.input && typeof e.request.input === 'object' ? (e.request.input as Record<string, unknown>) : {};
+  return { id: e.request_id, tool: e.request.tool_name, input };
+}
 
 /** The parts of a stream-json event the adapter reads itself; parseEvent reads the rest. */
 interface ClaudeEvent {
@@ -132,7 +163,7 @@ export const claudeAdapter: HarnessAdapter = {
       '--verbose',
       '--replay-user-messages',
       '--model', model,
-      '--permission-mode', config.permissionMode,
+      ...permissionArgs(!!ctx.permission),
       '--add-dir', threadDir(thread.id),
       '--append-system-prompt', systemPrompt,
     ];
@@ -141,7 +172,8 @@ export const claudeAdapter: HarnessAdapter = {
     if (mcpFile) args.push('--mcp-config', mcpFile);
     // Its own AskUserQuestion cannot be answered in -p mode: agents ask with Omni's ask_user_question instead.
     // A delegate-only role (the Conductor) also loses every tool that does work, so it can only hand it off.
-    args.push('--disallowedTools', ['AskUserQuestion', ...(ctx.role?.delegateOnly ? DELEGATE_ONLY_DENIED : [])].join(','));
+    // A quick ask only reads: the same tools go, and needing one is what turns it into a task (apps/server/quick-ask.ts).
+    args.push('--disallowedTools', ['AskUserQuestion', ...(ctx.role?.delegateOnly || readsOnly(thread) ? DELEGATE_ONLY_DENIED : [])].join(','));
     for (const dir of modDirs()) args.push('--plugin-dir', dir);
     args.push(resume ? '--resume' : '--session-id', thread.session_id);
 
@@ -174,6 +206,8 @@ export const claudeAdapter: HarnessAdapter = {
         return;
       }
       if (!evt || typeof evt !== 'object') return;
+      const asked = permissionRequest(evt);
+      if (asked) return answerPermission(asked);
       const listed = listedCommands(evt);
       if (listed) cb.commands?.(normalizeClaudeCommands(listed));
       const context = contextAnswer(evt);
@@ -200,6 +234,17 @@ export const claudeAdapter: HarnessAdapter = {
       } catch {
         return false;
       }
+    };
+
+    /** The channel's access level answers, through an approval card when it needs a yes (runner/approvals.ts). */
+    const answerPermission = (r: { id: string; tool: string; input: Record<string, unknown> }) => {
+      const gate = ctx.permission;
+      const reply = (response: object) => writeLine({ type: 'control_response', response: { subtype: 'success', request_id: r.id, response } });
+      if (!gate) return void reply({ behavior: 'allow', updatedInput: r.input });
+      gate
+        .check({ tool: r.tool, input: r.input })
+        .then((p) => reply(p.allow ? { behavior: 'allow', updatedInput: r.input } : { behavior: 'deny', message: p.message }))
+        .catch((err) => reply({ behavior: 'deny', message: `Omni could not check this call: ${(err as Error).message}` }));
     };
 
     let contextRequests = 0;
