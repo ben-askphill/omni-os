@@ -36,8 +36,13 @@ const DRAWN = new Set(['html', 'image', 'svg']);
 const ext = (name: string) => (name.includes('.') ? name.split('.').pop()! : 'file');
 const ENDED: Record<string, [string, string]> = { done: ['Done', 'Done in'], failed: ['Failed', 'Failed after'], stopped: ['Stopped', 'Stopped after'] };
 
-export function MoProse({ text }: { text: string }) {
-  return <Markdown text={text} className="text-[15px] leading-[1.6] text-pretty" />;
+/** `event`: the answer's row, for the find bar (thread-find-dom.ts). */
+export function MoProse({ text, event }: { text: string; event?: number | null }) {
+  return (
+    <div data-find-event={event ?? undefined}>
+      <Markdown text={text} className="text-[15px] leading-[1.6] text-pretty" />
+    </div>
+  );
 }
 
 /** `limit`: the thread's limit line (limits.ts `limitLabel`) on the turn the usage limit stopped. */

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { CONDUCTOR_CHANNEL, hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { CrewMark, isCrewRole } from '../components/brand.tsx';
 import { Folded } from '../components/Folded.tsx';
+import { FindTargetCtx } from '../transcript/find-target.ts';
 import { Avatar, Icon, StatusDot, type Glyph, type IconName } from '../components/ui.tsx';
 import type { Mark, Phase } from '@omni/shared/status.ts';
 import type { RowItem } from './rows.ts';
@@ -243,14 +244,16 @@ export function MoListRow({
  * Ben's message. `above` sits over the bubble (the context he attached); without `children` there is no bubble.
  * `fold` keeps a long message to its first lines, faded, with Show more under it.
  */
-export function MoBubble({ children, caption, above, fold }: { children: ReactNode; caption?: ReactNode; above?: ReactNode; fold?: boolean }) {
+/** `event`: the message's row, for the find bar (thread-find-dom.ts), which opens a fold its match is in. */
+export function MoBubble({ children, caption, above, fold, event }: { children: ReactNode; caption?: ReactNode; above?: ReactNode; fold?: boolean; event?: number }) {
+  const found = useContext(FindTargetCtx) === event && event !== undefined;
   return (
     <div className="flex flex-col items-end gap-1">
       {caption && <span className="text-[12px] leading-[1.3] text-fg-3">{caption}</span>}
       {above}
       {children != null && (
-        <div className="max-w-[86%] rounded-[20px] bg-bubble px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap text-pretty">
-          {fold ? <Folded>{children}</Folded> : children}
+        <div data-find-event={event} className="max-w-[86%] rounded-[20px] bg-bubble px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap text-pretty">
+          {fold ? <Folded opens={found}>{children}</Folded> : children}
         </div>
       )}
     </div>

@@ -129,7 +129,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
           <HtmlRender key={a.id} a={a} title={a.name} onOpen={() => viewer(a)} />
         ))}
         <MoConnectors t={t} onOpen={() => steps(t)} />
-        {t.prose && <MoProse text={t.prose} />}
+        {t.prose && <MoProse text={t.prose} event={t.proseKey} />}
         {t.prose && t.proseClipped && <ClippedNote event={t.proseClipped.key} clipped={t.proseClipped.clipped} />}
         {delegated}
         {t.artifacts.filter((a) => !isRenderPath(a.path)).map((a) => (
@@ -151,6 +151,7 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
       return (
       <Fragment key={k}>
         <MoBubble
+          event={p.key}
           fold={brief}
           caption={
             p.dropped

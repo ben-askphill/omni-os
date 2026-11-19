@@ -10,6 +10,7 @@ import { Icon, StatusDot, StatusPill, Ticks } from '../ui.tsx';
 import { ToolRow } from './ToolRows.tsx';
 import { StepRail } from './StepRail.tsx';
 import { NowWithConnector } from '../ConnectorMark.tsx';
+import { callsHold, useFindOpens } from '../../transcript/find-target.ts';
 
 const CHEVRON = 'text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)]';
 
@@ -29,7 +30,9 @@ function StepThread({ id, byId }: { id: string; byId: Map<string, Thread> }) {
 const MID = 14.5;
 
 function StepRow({ s, index, count, cwd, running, byId }: { s: Step; index: number; count: number; cwd?: string | null; running: boolean; byId: Map<string, Thread> }) {
-  const [open, setOpen] = useState(false);
+  const [opened, setOpen] = useState(false);
+  // The find bar's match is in one of this step's calls: its actions open.
+  const open = useFindOpens((t) => callsHold(s.calls, t), () => setOpen(true)) || opened;
   const on = s.state === 'active' || s.state === 'needs';
   return (
     <li data-state={s.state} className="flex min-w-0 gap-2.5">
@@ -77,7 +80,8 @@ function StepRow({ s, index, count, cwd, running, byId }: { s: Step; index: numb
 
 export function StepsCard({ v, cwd, byId }: { v: StepsView; cwd?: string | null; byId: Map<string, Thread> }) {
   const [shown, setShown] = useState(false);
-  const open = v.live || shown;
+  const found = useFindOpens((t) => v.steps.some((s) => callsHold(s.calls, t)), () => setShown(true));
+  const open = v.live || shown || found;
   const n = v.steps.length;
   const failed = v.steps.some((s) => s.state === 'failed');
   return (

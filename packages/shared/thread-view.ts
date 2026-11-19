@@ -47,6 +47,8 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   texts: string[];
   /** The turn's answer: its last text. */
   prose: string | null;
+  /** The answer's row: the find bar's match in it is drawn there. Null with no answer. */
+  proseKey?: number | null;
   /** The answer's row, when it came clipped. */
   proseClipped: { key: number; clipped: Clipped } | null;
   reports: ReportP[];
@@ -154,7 +156,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   // Until the first switch, the thread ran where that switch moved it from.
   let harness = items.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
   const start = (key: number, at: string): TurnView<A, C> => {
-    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
+    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseKey: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], asks: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
     turns.push(t);
     return t;
   };
@@ -174,6 +176,7 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
     } else if (it.type === 'text') {
       cur ??= start(it.key, it.at);
       cur.texts.push(it.p.text);
+      cur.proseKey = it.key;
       cur.proseClipped = it.clipped ? { key: it.key, clipped: it.clipped } : null;
     } else if (it.type === 'tools') {
       const turn: TurnView<A, C> = (cur ??= start(it.key, it.calls[0]?.at ?? ''));

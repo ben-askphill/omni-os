@@ -244,6 +244,19 @@ Replies render as Markdown on desktop web, phone web and the desktop app. A `mer
 
 Open a call under a step's **N actions** to read its output. Long output starts with a preview, then loads in chunks with Load more. A running Codex command can show its live tail. The other harnesses show output when the call ends. If the harness cut the output before saving it, loading more cannot recover it. The budgets and client rules are in [Thread history](../internals/thread-history.md).
 
+### Find in a thread
+
+Cmd+F (Ctrl+F off a Mac), or the search button in the thread header, opens a find bar over the transcript. On a phone it is **Find in thread** under Thread options (⋯). It finds text anywhere in the thread, not just the part on screen: your messages, replies, crew reports, errors, and every tool call's input and output, earlier pages included. Matching ignores case.
+
+- The bar counts the matches, "3 of 12", and starts on the first one at or below the message you are reading, or the newest when you are at the bottom.
+- Enter goes to the next match and Shift+Enter to the previous one, wrapping at either end. The arrows do the same.
+- Each step loads the page that holds the match if needed, opens the steps card, the step's actions and the tool row it sits in, and scrolls it to the middle. Every match on screen is marked, and the current one is solid and underlined.
+- Esc, or the close button, closes the bar and takes the marks off.
+- One answer lists at most 1,000 matches. Past that the count reads "1000+".
+- On a phone, tool calls and replies before a turn's last one live on the Steps screen, so a match there scrolls to its turn instead.
+- The count comes from the stored text, so it can be higher than what the page draws: a link's address, Markdown syntax, or a long tool output past the part loaded so far. The bar still goes to that message.
+- The iOS app has no find yet.
+
 ## Steps
 
 An agent on a task with more than one stage posts its plan as 3 to 6 steps in plain words with Omni's `set_steps` tool, then moves the marker as each step starts or finishes. Claude Code, Codex and Cursor threads have it through the `omni-steps` MCP server, and their system prompt asks for it. When the agent posts no list, Omni uses the plan the harness keeps (Claude Code's todo list or its tasks, a Codex plan, Cursor's todos). With neither, Omni groups the turn's calls into plain phases such as "Searching the web" or "Looking through the files", ending in "Writing the answer". Hermes and Cursor Cloud threads have no Omni MCP servers, so they show phases. No step names a tool, a path or a command.

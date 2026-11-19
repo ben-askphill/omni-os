@@ -9,9 +9,9 @@ const FOLD_SLACK = 2;
 /**
  * A long message kept to its first lines, faded, with Show more and Show less under it. A delegated thread's first
  * message, the Conductor's brief, folds this way on desktop and on the phone. It goes inside the message's bubble,
- * whose line height it counts in.
+ * whose line height it counts in. `opens`: the find bar's match is inside (find-target.ts), so it opens and stays open.
  */
-export function Folded({ children }: { children: ReactNode }) {
+export function Folded({ children, opens }: { children: ReactNode; opens?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [tall, setTall] = useState(false);
   const [open, setOpen] = useState(false);
@@ -26,7 +26,10 @@ export function Folded({ children }: { children: ReactNode }) {
     if (box.current) seen.observe(box.current);
     return () => seen.disconnect();
   }, []);
-  const folded = tall && !open;
+  useEffect(() => {
+    if (opens) setOpen(true);
+  }, [opens]);
+  const folded = tall && !open && !opens;
   return (
     <>
       <div
@@ -39,6 +42,7 @@ export function Folded({ children }: { children: ReactNode }) {
       {tall && (
         <button
           type="button"
+          data-find-skip
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
           className="press -mb-1 flex h-8 items-center gap-1 text-[13px] leading-none font-medium whitespace-normal text-fg-2"

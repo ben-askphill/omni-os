@@ -11,6 +11,7 @@ import { exitCodeOf, outputMeta } from '@omni/shared/tool-output.ts';
 import { toDate } from '@omni/shared/format.ts';
 import { connectorAction, connectorOf, type ConnectorGroup } from '@omni/shared/connectors.ts';
 import { ConnectorMark } from '../ConnectorMark.tsx';
+import { callHolds, callsHold, useFindOpens } from '../../transcript/find-target.ts';
 
 export const TaskCtx = createContext<Map<string, TaskView>>(new Map());
 
@@ -24,10 +25,11 @@ function toolIcon(name: string) {
 
 // ---------- tool rows ----------
 
-function Pre({ children, tone, className = '' }: { children: ReactNode; tone?: 'bad' | 'add' | 'del'; className?: string }) {
+function Pre({ children, tone, className = '', find }: { children: ReactNode; tone?: 'bad' | 'add' | 'del'; className?: string; find?: number }) {
   const bg = tone === 'add' ? 'bg-[var(--diff-add-bg)]' : tone === 'del' ? 'bg-[var(--diff-del-bg)]' : 'bg-code';
   return (
     <pre
+      data-find-event={find}
       className={`scroll-thin max-h-80 overflow-auto rounded-xl px-3 py-2.5 font-mono text-[11.5px] leading-[1.6] whitespace-pre-wrap break-words shadow-[inset_0_0_0_1px_var(--line)] ${bg} ${tone === 'bad' ? 'text-fg' : 'text-fg-2'} ${className}`}
     >
       {children}
@@ -35,8 +37,19 @@ function Pre({ children, tone, className = '' }: { children: ReactNode; tone?: '
   );
 }
 
-/** A call's output in the box a tool row shows it in. */
-const outputBox = (err?: boolean) => (text: string) => <Pre tone={err ? 'bad' : undefined}>{text || '(no output)'}</Pre>;
+/** A call's output in the box a tool row shows it in. `event`: its result's row, for the find bar. */
+const outputBox = (err: boolean | undefined, event: number | undefined) => (text: string) => (
+  <Pre tone={err ? 'bad' : undefined} find={event}>
+    {text || '(no output)'}
+  </Pre>
+);
+
+/** A call's input, tagged with its row for the find bar (thread-find-dom.ts). */
+const FoundInput = ({ c }: { c: ToolCall }) => (
+  <div data-find-event={c.event} className="space-y-1.5">
+    <ToolInput c={c} />
+  </div>
+);
 
 function ToolInput({ c }: { c: ToolCall }) {
   const i = c.input;
@@ -137,7 +150,8 @@ function TaskBadge({ t }: { t: TaskView }) {
 }
 
 export function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | null; running: boolean; depth?: number }) {
-  const [open, setOpen] = useState(false);
+  const [opened, setOpen] = useState(false);
+  const open = useFindOpens((t) => callHolds(c, t), () => setOpen(true)) || opened;
   const task = useContext(TaskCtx).get(c.id);
   // A background agent's result comes back at launch, so its task says whether it still runs.
   const pending = task ? task.running : !c.result;
@@ -176,9 +190,9 @@ export function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: str
       </button>
       {open && (
         <div className="fade-in mt-1 mb-2.5 ml-7 space-y-1.5">
-          <ToolInput c={c} />
+          <FoundInput c={c} />
           <ClippedNote event={c.event} clipped={c.clipped} />
-          <ToolOutput call={c} running={running} box={outputBox(err)} />
+          <ToolOutput call={c} running={running} box={outputBox(err, c.result?.event)} />
         </div>
       )}
       {c.children.length > 0 && (open || (pending && (running || !!task))) && (
@@ -198,8 +212,9 @@ export function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: str
  * call opens straight to what it sent and got back; more open as their own rows.
  */
 export function ConnectorRow({ g, cwd, running }: { g: ConnectorGroup; cwd?: string | null; running: boolean }) {
-  const [open, setOpen] = useState(false);
+  const [opened, setOpen] = useState(false);
   const { connector, calls } = g;
+  const open = useFindOpens((t) => callsHold(calls, t), () => setOpen(true)) || opened;
   const busy = running && calls.some((c) => !c.result);
   const failed = calls.filter((c) => c.result?.is_error && !interruptedTool(c)).length;
   const last = calls[calls.length - 1];
@@ -229,9 +244,9 @@ export function ConnectorRow({ g, cwd, running }: { g: ConnectorGroup; cwd?: str
         <div className="fade-in mt-1 mb-2 ml-[34px] space-y-1.5">
           {only ? (
             <>
-              <ToolInput c={only} />
+              <FoundInput c={only} />
               <ClippedNote event={only.event} clipped={only.clipped} />
-              <ToolOutput call={only} running={running} box={outputBox(only.result?.is_error && !interruptedTool(only))} />
+              <ToolOutput call={only} running={running} box={outputBox(only.result?.is_error && !interruptedTool(only), only.result?.event)} />
             </>
           ) : (
             <div className="rounded-[16px] bg-surface p-1">
@@ -251,7 +266,8 @@ export function ConnectorRow({ g, cwd, running }: { g: ConnectorGroup; cwd?: str
  * answer and the calls it made. While it runs its latest calls show under it.
  */
 export function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null; running: boolean }) {
-  const [open, setOpen] = useState(false);
+  const [opened, setOpen] = useState(false);
+  const open = useFindOpens((t) => callHolds(c, t), () => setOpen(true)) || opened;
   const task = useContext(TaskCtx).get(c.id);
   const stopped = interruptedTool(c);
   const status = agentStatus(c, task, running, stopped);
@@ -279,9 +295,9 @@ export function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null
     >
       {open && (
         <div className="fade-in mt-2 space-y-1.5 px-1">
-          <ToolInput c={c} />
+          <FoundInput c={c} />
           <ClippedNote event={c.event} clipped={c.clipped} />
-          {c.result && outputMeta(c.result) ? <ToolOutput call={c} running={running} box={outputBox(err)} /> : c.result ? <Pre tone={err ? 'bad' : undefined}>{c.result.text || '(no output)'}</Pre> : null}
+          {c.result && outputMeta(c.result) ? <ToolOutput call={c} running={running} box={outputBox(err, c.result.event)} /> : c.result ? outputBox(err, c.result.event)(c.result.text) : null}
           {c.result && <ClippedNote event={c.result.event} clipped={c.result.clipped} />}
         </div>
       )}

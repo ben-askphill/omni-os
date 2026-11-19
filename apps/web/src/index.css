@@ -288,6 +288,16 @@
     border-radius: 3px;
     padding: 0 1px;
   }
+  /* Find in a thread (thread-find-dom.ts): every match the search mark, the current one solid and underlined, so it
+     reads without the color too. */
+  ::highlight(thread-find) {
+    background-color: var(--mark);
+  }
+  ::highlight(thread-find-current) {
+    background-color: var(--warn);
+    color: var(--on-ink);
+    text-decoration: underline 2px;
+  }
 }
 
 @layer components {
