@@ -4,7 +4,8 @@
     "flock",
     "scutil",
     "ioreg",
-    "pgrep"
+    "pgrep",
+    "mkfifo"
   ],
   "ignore": [
     ".claude/**",
