@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- The shell's Trusted Types directives (apps/server/web-headers.ts), enforced here: a string that reaches a sink
+         without a policy throws, so a page that renders proves none did. -->
+    <meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'; trusted-types omni-mermaid dompurify default" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trusted Types fixture</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

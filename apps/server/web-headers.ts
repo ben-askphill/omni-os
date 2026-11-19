@@ -24,8 +24,16 @@ function inlineScriptHashes(html: string): string[] {
 }
 
 /**
+ * The Trusted Types policies the Web UI may create (apps/web/src/trusted-html.ts): `omni-mermaid` for a diagram's SVG,
+ * `default` for Mermaid's own writes while it draws, and `dompurify`, which DOMPurify creates for its parser.
+ */
+export const TRUSTED_TYPES_POLICIES = ['omni-mermaid', 'dompurify', 'default'] as const;
+
+/**
  * The shell's policy. Scripts only from this origin and the inline theme script (by hash), no plugins, no `<base>`,
  * no framing. `style-src` stays open: React style attributes and Tailwind's arbitrary values need inline styles.
+ * Trusted Types: a string written to a DOM sink (innerHTML, DOMParser, eval, a script's src) must come from one of the
+ * named policies. Browsers without Trusted Types (iPhone Safari before 26) ignore both directives.
  */
 function shellPolicy(hashes: string[]): string {
   return [
@@ -33,6 +41,8 @@ function shellPolicy(hashes: string[]): string {
     "object-src 'none'",
     "base-uri 'none'",
     "frame-ancestors 'none'",
+    "require-trusted-types-for 'script'",
+    `trusted-types ${TRUSTED_TYPES_POLICIES.join(' ')}`,
     `report-uri ${CSP_REPORT_PATH}`,
   ].join('; ');
 }
