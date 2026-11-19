@@ -68,10 +68,11 @@ describe('reduced motion in index.css', () => {
   });
 
   it('gives every moving entrance a fade-only version that comes after it', () => {
-    // Loops that stop outright, and the stack's slides, which only play with no preference set.
+    // Loops that stop outright, and the stack's slides and the overlay exits (use-exit.ts), which only play with no
+    // preference set.
     const stopped: Record<string, string> = { 'omni-pulse': '.pulse', 'omni-ping': '.ping', 'omni-load': '.load-bar', 'omni-write': '.wordmark-line' };
     const still = reduce.map((b) => b.body).join('\n');
-    for (const k of base.filter((k) => moves(k.body) && !k.name.startsWith('mo-vt-'))) {
+    for (const k of base.filter((k) => moves(k.body) && !k.name.startsWith('mo-vt-') && !k.name.startsWith('exit-'))) {
       if (stopped[k.name]) {
         expect(still, k.name).toContain(stopped[k.name]);
         continue;
@@ -89,9 +90,10 @@ describe('reduced motion in index.css', () => {
 
   it('slides the phone stack only when motion is fine, and cross-fades it otherwise', () => {
     const slides = noPreference.map((b) => b.body).join('\n');
+    const rest = noPreference.reduce((text, b) => text.replace(b.body, ''), css);
     for (const name of ['mo-vt-over-in', 'mo-vt-over-out', 'mo-vt-under-in', 'mo-vt-under-out']) {
       expect(slides).toContain(`animation-name: ${name};`);
-      expect(css.replace(slides, '')).not.toContain(`animation-name: ${name};`);
+      expect(rest).not.toContain(`animation-name: ${name};`);
     }
     expect(css).toMatch(/::view-transition \{\s*pointer-events: none;/);
     expect(reduce.some((b) => /::view-transition-group\(root\) \{\s*animation-duration: 200ms;/.test(b.body))).toBe(true);
