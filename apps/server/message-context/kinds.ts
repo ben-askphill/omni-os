@@ -2,6 +2,7 @@
 import type { ServerKinds } from './project.ts';
 import { projectBrowserAnnotation } from './browser-annotation.ts';
 import { projectDiffSelection } from './diff-selection.ts';
+import { projectMachineMention } from './machine-mention.ts';
 import { projectTerminalExcerpt } from './terminal-excerpt.ts';
 import { projectThreadReference } from './thread-reference.ts';
 
@@ -10,4 +11,5 @@ export const SERVER_KINDS: ServerKinds = {
   terminal_excerpt: projectTerminalExcerpt,
   browser_annotation: projectBrowserAnnotation,
   thread_reference: projectThreadReference,
+  machine_mention: projectMachineMention,
 };

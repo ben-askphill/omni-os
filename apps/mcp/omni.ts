@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { filterClaudeArtifacts, type ClaudeArtifact } from '@omni/shared/claude-artifacts.ts';
 import { openNotesView } from '@omni/shared/review-notes.ts';
 import { awaitingStats, statsReport, type MachinesView } from '@omni/shared/machines.ts';
+import type { MachinePick } from '@omni/shared/machine-pick.ts';
 import { ApiError, call, SELF, text } from './api.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
@@ -15,6 +16,12 @@ import { threadId } from './thread-id.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
 const USER = process.env.OMNI_USER || 'the user';
+
+/** How delegate and continue_thread describe `device`. */
+const DEVICE_ASK =
+  `"here" for this machine, or a synced machine by id or name from list_devices (this machine's own name means here). ` +
+  `When ${USER}'s message @mentions machines, it carries a "Machine mention" item for each with its device id: pass that id for the task ${USER} wrote next to the mention, one call per task. ` +
+  `A machine that cannot take the thread (offline on Tailscale, or sync off) fails the call and nothing is made: tell ${USER}, and never run that task on another machine instead`;
 
 const server = new McpServer({ name: 'omni', version: '0.1.0' });
 
@@ -331,18 +338,19 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          `Where it runs: a synced machine by id or name from list_devices, or "here" for this machine. Omit to use ${USER}'s default from Settings. ` +
+          `Where it runs: ${DEVICE_ASK}. Omit to use ${USER}'s default from Settings. ` +
             'A thread sent elsewhere runs on that machine and its report still comes back to you. No files travel.',
         ),
     },
   },
   async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, follow_up, base, device, owner }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
+    const machine = await pickDevice(device);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, follow_up, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device), ...(owner?.trim() && { owner }) }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, follow_up, base: basePick(base), parent_id: SELF, source: 'conductor', device: machine?.device, ...(owner?.trim() && { owner }) }),
     });
-    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch, owner: t.owner ?? null });
+    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch, owner: t.owner ?? null, ...(machine && { machine: ranOn(machine) }) });
   },
 );
 
@@ -353,7 +361,8 @@ server.registerTool(
       'Hand several parts of one job to a team: one lead thread in the channel with a member thread per task under it. ' +
       `Use it when ${USER} asks for several agents on one topic (for example price, reviews and alternatives for one product). ` +
       'The members run in parallel; once all have reported, the lead combines their replies into one answer, ' +
-      'which comes back to you as a single [crew report]. Do not poll for it.',
+      'which comes back to you as a single [crew report]. Do not poll for it. ' +
+      `A team runs on this machine. When ${USER} @mentions machines for the parts, use delegate with each part's device instead.`,
     inputSchema: {
       channel: z.string().describe('Channel id, e.g. "inbox". Use list_channels.'),
       title: z.string().describe('Short title for the lead thread, e.g. "Shure MV7+ research".'),
@@ -686,13 +695,13 @@ server.registerTool(
       device: z
         .string()
         .optional()
-        .describe(`Where the new thread runs: a synced machine by id or name from list_devices, or "here" for this machine. Omit to use ${USER}'s default from Settings.`),
+        .describe(`Where the new thread runs: ${DEVICE_ASK}. Omit to use ${USER}'s default from Settings.`),
     },
   },
   async ({ thread_id, harness, model, effort, message, attachments, device }) => {
     thread_id = await threadId(thread_id);
-    const machine = await deviceId(device);
-    const run = { harness, model: model ?? '', effort: effort ?? '', ...(machine && { device: machine }) };
+    const machine = await pickDevice(device);
+    const run = { harness, model: model ?? '', effort: effort ?? '', ...(machine && { device: machine.device }) };
     const previewOf = (picked?: string[]) => call(`/threads/${thread_id}/continue/preview`, { method: 'POST', body: JSON.stringify({ ...run, attachments: picked }) });
     let preview = await previewOf();
     if (attachments?.length) {
@@ -720,6 +729,7 @@ server.registerTool(
       status: thread.status,
       branch: thread.branch,
       ...(files.length && { attachments: files }),
+      ...(machine && { machine: ranOn(machine) }),
     });
   },
 );
@@ -798,6 +808,15 @@ async function deviceId(device: string | undefined): Promise<string | undefined>
   if (!hit) throw new Error(`No synced machine is called "${want}". Machines: ${devices.map((d) => `${d.name} (${d.id})`).join(', ') || 'none, sync is off'}.`);
   return hit.id;
 }
+
+/** The machine a delegated or continued thread runs on, as GET /devices/pick names it. Undefined leaves the default. */
+async function pickDevice(device: string | undefined): Promise<MachinePick | undefined> {
+  const want = device?.trim();
+  return want ? call(`/devices/pick?${new URLSearchParams({ device: want })}`) : undefined;
+}
+
+/** The machine a tool result says the thread was sent to. */
+const ranOn = (p: MachinePick) => ({ id: p.id, name: p.name, here: p.here });
 
 server.registerTool(
   'set_automations_machine',

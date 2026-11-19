@@ -1,5 +1,8 @@
 // The composer's `@` menu as pure functions: the file being typed at the caret, and what picking a
-// row does to the text. Which files exist is the server's to say (apps/server/mentions.ts).
+// row does to the text. Which files exist is the server's to say (apps/server/mentions.ts). In a thread that can
+// delegate, the synced machines come first (apps/server/machine-pick.ts): picking one also adds a machine_mention
+// record to the message (message-context-machine.ts).
+import type { Reachability } from './handoff.ts';
 
 /** The `@name` being typed, with the caret in it. `end` is where the name ends. */
 export interface FileQuery {
@@ -11,13 +14,23 @@ export interface FileQuery {
 
 /** What `/api/mentions` lists for a row. */
 export interface FileMention {
-  /** What goes after the `@`: `artifacts/report.html` for a thread's artifact, a repo-relative path otherwise. */
+  /** What goes after the `@`: `artifacts/report.html` for a thread's artifact, a repo-relative path otherwise, a machine's name. */
   insert: string;
   /** The file's own name, shown bold. */
   name: string;
-  /** Where it lives, shown quiet: the thread, or the folder inside the repo. */
+  /** Where it lives, shown quiet: the thread, or the folder inside the repo. For a machine, whether it is up. */
   detail: string;
-  kind: 'artifact' | 'file';
+  kind: 'artifact' | 'file' | 'machine';
+  /** A machine row's machine. */
+  machine?: MentionedMachine;
+}
+
+/** A synced machine as the `@` menu lists it. */
+export interface MentionedMachine {
+  id: string;
+  here: boolean;
+  reachability: Reachability;
+  lastSeen: string | null;
 }
 
 const TYPING = /(?<![\w@/.-])@([A-Za-z0-9._\-/]*)$/;

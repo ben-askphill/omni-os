@@ -17,6 +17,7 @@ import { asksAuto } from '@omni/shared/thread-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { SlashMenu, useCommands } from './SlashMenu.tsx';
 import { FileMenu, useFileMenu } from './FileMenu.tsx';
+import { machineMentions } from '../message-context/machine-mention.tsx';
 import { replySlash } from '@omni/shared/composer-slash.ts';
 import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
 import { newThreadBody, sameSettings } from '../new-thread-preset.ts';
@@ -433,14 +434,16 @@ export function ReplyComposer({
   latest.current = text;
 
   // ----- the `/` menu -----
+  const mentions = machineMentions(threadId, setError);
   const update = (v: string) => {
     setText(v);
     drafts.set(key, v);
+    mentions.edited(v);
   };
   const commands = useCommands(`thread=${encodeURIComponent(threadId)}`);
   const { list } = commands;
   const slashMenu = useSlashMenu({ ref, text, onText: update, commands, where: 'reply' });
-  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(threadId)}` });
+  const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(threadId)}`, onMachine: mentions.picked });
   const menus = joinMenus(slashMenu, fileMenu);
 
   // `mode` only matters while a turn is in progress; an idle thread just starts the next turn.
