@@ -23,4 +23,5 @@ A link in a reply shows as its tool's mark, its id and the title the tool gives 
 - No secret needed: YouTube, Loom and Vimeo (oEmbed), npm, public GitLab and Bitbucket PRs, claude.ai artifacts Omni published, and Google Docs shared by link. Notion, Figma, Linear, Confluence and Trello links fall back to the title in their URL.
 - Google Drive, Miro, Canva, Vercel, HubSpot, Klaviyo, Stripe, DatoCMS, Prismic, SharePoint, Teams and others get their mark and what the URL says. Any other public page shows its `<title>`; Omni never fetches private, loopback or link-local addresses.
 - Omni sends credentials only to fixed API hosts (or a self-hosted GitLab named in `GITLAB_HOST`). It checks ids from a link before they go in a request path, and it follows no redirects. The page-title fetch checks the address it connects to, so DNS rebinding cannot reach a private one.
-- Without its secret a link reads "Work item 29549", and its tooltip names the secret to add.
+- Without its secret a link reads "Work item 29549", followed by a short line naming the secret to add.
+- Hover a link, or Tab to it, for its preview: its source, title and address. On a phone the link shows only its title.

@@ -5,7 +5,7 @@ import type { BackgroundTask } from '../src/api.ts';
 import { AgentsSection } from '../src/components/thread/panel/AgentsSection.tsx';
 import { DetailsTab } from '../src/components/thread/panel/DetailsTab.tsx';
 import type { Thread } from '../src/api.ts';
-import { runningSubagents, subagentKind, subagentTip } from '../src/subagents.ts';
+import { runningSubagents, subagentKind, subagentProgress, subagentTip } from '../src/subagents.ts';
 
 // The Details tab's agents card (components/thread/panel/AgentsSection.tsx) and the phone's
 // thread options sheet list the agents a thread spawned itself, from the feed's live task list.
@@ -47,6 +47,18 @@ describe('running subagents', () => {
       'Map the repo · in the background · 3 tool calls · last Grep\nJump to where it started',
     );
     expect(subagentTip(task({ event_id: undefined }))).toBe('Map the repo');
+  });
+
+  it('shows how far it got on the row itself, and the whole line as its tooltip', () => {
+    expect(subagentProgress(task({ background: true, tool_uses: 3, last_tool: 'Grep' }))).toBe('in the background · 3 tool calls · last Grep');
+    expect(subagentProgress(task())).toBe('');
+    const html = renderToStaticMarkup(
+      createElement(AgentsSection, { parent: null, links: { from: null, into: [] }, children: [], agents: [task({ tool_uses: 3, last_tool: 'Grep' })], onJump: () => {} }),
+    );
+    const row = html.slice(html.lastIndexOf('<button', html.indexOf('Map the repo')), html.indexOf('</button>', html.indexOf('Map the repo')));
+    expect(row).toContain('3 tool calls · last Grep</span>');
+    expect(row).not.toMatch(/<button[^>]* title=/);
+    expect(html).toMatch(/aria-describedby="(tip-[^"]+)"[\s\S]*id="\1" role="tooltip"/);
   });
 
   it('renders nothing for a thread with no agents around it', () => {

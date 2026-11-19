@@ -115,9 +115,10 @@ export function MoInboxRow({
               {t.step}
             </span>
           )}
+          {/* The channels the job delegated into, by name: the phone has no hover for the desktop rollup's tooltip. */}
+          {tree && <ChannelRollup threads={tree.threads} own={t.channel_id} size={16} named className="text-[12.5px] leading-[1.35] text-fg-3" />}
           <span className="flex items-center gap-2 text-[12.5px] leading-[1.35] text-fg-3">
             {pinned && <Icon name="pin" size={12} className="shrink-0" />}
-            {tree && <ChannelRollup threads={tree.threads} own={t.channel_id} size={16} className="-mr-0.5" />}
             <span className={`min-w-0 truncate ${label ? 'max-w-[45%] shrink-0' : 'flex-1'}`}>
               #{ch?.name ?? t.channel_id}
               {forOwner}

@@ -1,8 +1,9 @@
 // Overlapping channel avatars, each with the channel's own face from the sidebar. ChannelStack sits in a thread's
 // header: one disc per channel its delegated threads work in, a link that opens Details at the agents card.
 // ChannelRollup sits on a job's Inbox card (its own channel first, in place of the channel's avatar) and on its
-// sidebar and phone Activity rows (without its own channel), with a tooltip and no click of its own. Past four
-// channels the last disc is a +N chip. The rules are @omni/shared/channel-stack.ts.
+// sidebar rows (without its own channel), with a tooltip and no click of its own. A phone Activity row writes the
+// names out beside the discs (`named`), wrapping rather than cut off, since a phone has no hover for a tooltip. Past
+// four channels the last disc is a +N chip. The rules are @omni/shared/channel-stack.ts.
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { CONDUCTOR_CHANNEL } from '@omni/shared/channel-icon.ts';
 import {
@@ -86,7 +87,8 @@ export function ChannelStack({ threads, own, to, size = 24, className = '' }: { 
  * The channels a job touches, on its card or row. `threads`: every thread under it, oldest first (JobTree.threads).
  * `lead`: its own channel leads, on the Inbox card where the stack replaces that channel's avatar; without it the row
  * leaves its own channel out. `size`: 18 on the card, 14 on a sidebar row, 16 on a phone row. `fallback` shows when
- * nothing under the job works outside its channel: the card's single avatar, or nothing on a row.
+ * nothing under the job works outside its channel: the card's single avatar, or nothing on a row. `named`: the
+ * channels' names written out after the discs, for the phone.
  */
 export function ChannelRollup({
   threads,
@@ -94,6 +96,7 @@ export function ChannelRollup({
   lead = false,
   size,
   fallback = null,
+  named = false,
   className = '',
 }: {
   threads: readonly StackThread[];
@@ -101,12 +104,23 @@ export function ChannelRollup({
   lead?: boolean;
   size: number;
   fallback?: ReactNode;
+  named?: boolean;
   className?: string;
 }) {
   const name = useChannelName();
   const stack = useMemo(() => channelRollup(threads, own, { lead }), [threads, own, lead]);
   if (!stack) return <>{fallback}</>;
   const label = (lead ? channelRollupLabel : channelStackLabel)(stack, name);
+  if (named)
+    return (
+      <span data-channel-rollup={stack.channels.length} className={`flex min-w-0 items-start gap-1.5 ${className}`}>
+        <span aria-hidden className="inline-flex shrink-0 items-center">
+          <Discs stack={stack} size={size} />
+        </span>
+        {/* It wraps rather than cuts off: the names are the point. */}
+        <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
+      </span>
+    );
   return (
     <span role="img" title={label} aria-label={label} data-channel-rollup={stack.channels.length} className={`inline-flex shrink-0 items-center ${className}`}>
       <Discs stack={stack} size={size} />

@@ -7,7 +7,7 @@ export function supportsPopover(): boolean {
 }
 
 /** CSS anchor positioning: Chromium, so the desktop app, and Safari 26. */
-function supportsAnchoring(): boolean {
+export function supportsAnchoring(): boolean {
   return typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('position-area: block-end');
 }
 

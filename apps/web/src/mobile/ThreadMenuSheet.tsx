@@ -5,7 +5,7 @@ import { threadMenu, type ThreadActionId } from '@omni/shared/thread-actions.ts'
 import { toDate } from '@omni/shared/format.ts';
 import { Button, ErrorNote, Loader, StatusDot } from '../components/ui.tsx';
 import { duration } from '../format.ts';
-import { runningSubagents, subagentKind } from '../subagents.ts';
+import { runningSubagents, subagentKind, subagentProgress } from '../subagents.ts';
 import { canMarkDone } from '../needs-you.ts';
 import { sendThreadToGrokBot } from '../grokbot.ts';
 import { useFolders } from '../folders.tsx';
@@ -17,14 +17,17 @@ import { threadTarget } from '../message-context/thread-picker.ts';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
 import { useShell, useThread } from './shell.tsx';
 
-/** A running sub-agent, last in the options sheet as under the resume command on desktop. A tap closes the sheet on the turn that started it. */
+/**
+ * A running sub-agent, last in the options sheet as under the resume command on desktop, with how far it got inline: a
+ * phone has no hover for a tooltip. A tap closes the sheet on the turn that started it.
+ */
 function MoSubagentRow({ t, last, onJump }: { t: BackgroundTask; last: boolean; onJump: (eventId: number) => void }) {
   const now = useNow(1000);
   return (
     <MoListRow
       icon={<span className="mx-0.5 grid size-3.5 place-items-center"><StatusDot status="running" size={8} /></span>}
       label={t.description}
-      sub={subagentKind(t)}
+      sub={[subagentKind(t), subagentProgress(t)].filter(Boolean).join(' · ') || undefined}
       right={duration(Math.max(0, now - toDate(t.started_at).getTime()))}
       chevron={false}
       disabled={!t.event_id}

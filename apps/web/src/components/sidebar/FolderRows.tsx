@@ -6,6 +6,7 @@ import { plural } from '../../format.ts';
 import { Icon, StatusDot } from '../ui.tsx';
 import { ChannelThreadEntry } from './SidebarRows.tsx';
 import { isImeEnter } from '../../ime.ts';
+import { useTooltip } from '../ui/tooltip.tsx';
 
 /** A folder's name being typed: Enter or leaving the field saves, Escape cancels. */
 export function FolderNameField({ initial, onSave, onCancel }: { initial: string; onSave: (name: string) => void; onCancel: () => void }) {
@@ -67,6 +68,8 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
   // Past the limit it still shows the open thread and any with agents running, so they never hide behind "N more".
   const shown = all ? list : list.filter((t, i) => i < MAX_FOLDER_THREADS || t.id === openId || agents(t.id).length > 0);
   const label = `${f.name}, ${plural(f.count, 'thread')}${f.running ? `, ${f.running} running` : ''}`;
+  // How to rename, on hover and on keyboard focus: a `title` alone never reached the keyboard.
+  const renameTip = useTooltip('Double-click or F2 to rename');
 
   const onOver = (e: DragEvent) => {
     if (!accepts(f)) return;
@@ -103,6 +106,7 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
           onDrop={onDrop}
         >
           <button
+            {...renameTip.triggerProps}
             type="button"
             draggable
             onDragStart={(e) => {
@@ -127,7 +131,6 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
             }}
             aria-expanded={open}
             aria-label={label}
-            title={`${label}. Double-click or F2 to rename.`}
             className="item flex h-8 min-w-0 flex-1 items-center gap-2 pr-1 pl-3 text-left text-[13px] text-fg-2 hover:text-fg md:h-7 md:text-[12.5px]"
           >
             <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} className="-ml-0.5 shrink-0 text-fg-3" />
@@ -137,6 +140,7 @@ export function FolderRow({ f, openId, tasks, onNavigate }: { f: FolderWithThrea
               {f.count}
             </span>
           </button>
+          {renameTip.tip}
           <button
             type="button"
             aria-label={`${f.name} actions`}
