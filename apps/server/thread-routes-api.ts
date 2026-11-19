@@ -162,7 +162,9 @@ threadRoutesApi.post('/', async (c) => {
   if (made) return made.channel_id === body.channel ? c.json(made) : c.json({ error: `Thread id ${id} was already used in another channel.` }, 409);
   // After the retry check, as on a reply, so a retry after a referenced thread was deleted still gets its thread. The
   // channel is the one openThread will make the thread in.
-  const stamped = stampNewThreadReferences(body.channel || getCrew(body.role)?.channel || 'inbox', parsed.value);
+  const referenced = stampNewThreadReferences(body.channel || getCrew(body.role)?.channel || 'inbox', parsed.value);
+  if (!referenced.ok) return c.json({ error: referenced.error }, 400);
+  const stamped = await stampMachineMentions(referenced.value);
   if (!stamped.ok) return c.json({ error: stamped.error }, 400);
   const input = { ...body, files, ...(stamped.value.length && { context: stamped.value }) };
   const make = body.quick ? startQuickAsk : createThread;

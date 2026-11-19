@@ -11,8 +11,9 @@ export const mentionsApi = new Hono();
 /**
  * `?thread=<id>&q=<text>`: in a thread whose role has the omni tools (the Conductor), so it can delegate, the synced
  * machines first; then the thread's artifacts, then the files of the folder it runs in.
- * `?channel=<id>&q=<text>`: a new thread's composer, which has no artifacts yet, and lists the
- * files of the folder a thread in that channel starts from. Its Machine chip picks where it runs, so no machines.
+ * `?channel=<id>&role=<id>&q=<text>`: a new thread's composer, which has no artifacts yet, and lists the files of the
+ * folder a thread in that channel starts from. When the role it starts as can delegate (the Conductor), the machines
+ * come first, as in a reply: the first message can say which machine each task goes to.
  */
 mentionsApi.get('/', async (c) => {
   const query = c.req.query('q') ?? '';
@@ -25,5 +26,6 @@ mentionsApi.get('/', async (c) => {
   }
   const channel = channels.get(c.req.query('channel') ?? '');
   if (!channel) return c.json({ error: 'not found' }, 404);
-  return c.json(listMentions({ cwd: commandsFolder(channel), query }));
+  const machines = getCrew(c.req.query('role') ?? '')?.mcp.includes('omni') ? await machineMentionRows(query) : [];
+  return c.json([...machines, ...listMentions({ cwd: commandsFolder(channel), query })]);
 });

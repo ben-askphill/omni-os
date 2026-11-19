@@ -1,4 +1,4 @@
-import { Fragment, memo, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Artifact, EventRow, Thread } from '../api.ts';
 import { duration, plural } from '../format.ts';
 import { href } from '../router.ts';
@@ -25,6 +25,8 @@ import { publishedFrom, type Published } from '@omni/shared/published.ts';
 import { renderedFrom } from '@omni/shared/html-render.ts';
 import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
+import { MentionText } from '../message-context/MentionField.tsx';
+import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { buildItems, buildTasks, keepSame, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
@@ -135,7 +137,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
         hit ? (
           <CommandPill key={i} label={t} cmd={hit} open={hit === open} onToggle={() => setAbout((a) => (a === hit.start ? null : hit.start))} />
         ) : (
-          <Fragment key={i}>{t}</Fragment>
+          <MentionText key={i} text={t} records={p.context} />
         ),
       )}
       {cut && '...'}
@@ -163,7 +165,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP;
         <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
       {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} lazy={lazy} /> : null}
-      <ContextChips records={p.context} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
+      <ContextChips records={chipRecords(text, p.context)} align="end" className="mb-1.5 w-full max-w-[92%] @lg:max-w-[80%]" />
       {(text || !hasContext(p.context)) && (
         <div
           className={`max-w-[92%] rounded-[22px] rounded-tr-lg px-4 py-2.5 text-[14.5px] leading-[1.55] break-words whitespace-pre-wrap @lg:max-w-[80%] ${

@@ -13,6 +13,10 @@ import { ThreadReferencePanel } from '../components/ThreadReference.tsx';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { clearDraftContext, removeDraftContext, useDraftContext } from '../message-context/draft.ts';
 import { referencesFor } from '../message-context/thread-picker.ts';
+import { machineMentions } from '../message-context/machine-mention.tsx';
+import { useMentionField } from '../message-context/MentionField.tsx';
+import { FileMenu, newThreadScope, useFileMenu } from '../components/FileMenu.tsx';
+import { chipRecords, machineMention } from '@omni/shared/message-context-machine.ts';
 import { keepLocalFiles } from '../sending.ts';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
 import { Avatar, ErrorNote, Segmented } from '../components/ui.tsx';
@@ -99,6 +103,16 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const ch = conductor ? undefined : listed.find((c) => c.id === target);
   const role = conductor && crew.some((r) => r.id === 'conductor') ? 'conductor' : '';
   const ro = crew.find((r) => r.id === role);
+  // The `@` menu: files, and for a task the Conductor starts, the machine each task goes to, as on the desktop. An Ask
+  // runs here with read-only tools, so it lists no machines.
+  const mentions = machineMentions(NEW_SHEET_DRAFT, setError);
+  const update = (v: string) => {
+    setText(v);
+    mentions.edited(v);
+  };
+  const fileMenu = useFileMenu({ ref: box, text, onText: update, scope: newThreadScope(target, mode === 'task' ? role : undefined), onMachine: mentions.picked });
+  const { aria: menuAria, ...menuEvents } = fileMenu.textarea;
+  const field = useMentionField(box, text, refs);
   const run = harnesses ? draftRun(picked?.target === target ? picked : null, ro, channels.find((c) => c.id === target), harnesses) : null;
   const { rows: baseRows, reload: reloadBases } = useBaseRows(target, run?.choice.harness ?? '');
   // Who the picked harness runs as on the machine it will run on, as on the desktop composer. Auto picks one later.
@@ -137,12 +151,14 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
     if (!prompt || busy) return;
     if (toGrok) return sendToGrok(prompt);
     if (asking) {
+      // A quick ask runs here and delegates nothing, so a machine mention stays out of it.
+      const quickRefs = refs.filter((r) => r.kind !== machineMention.kind);
       setBusy(true);
       setError(null);
       try {
         const t = await api.send<Thread>(
           '/threads',
-          { channel: target, prompt, quick: true, ...draftRunRequest(picked?.target === target ? run : null), ...(refs.length && { context: referencesFor(refs, target) }) },
+          { channel: target, prompt, quick: true, ...draftRunRequest(picked?.target === target ? run : null), ...(quickRefs.length && { context: referencesFor(quickRefs, target) }) },
           att.files,
         );
         clearDraftContext(NEW_SHEET_DRAFT);
@@ -230,14 +246,32 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
             </button>
           ))}
         </div>
-        <div className="mx-3 flex flex-col gap-2.5 rounded-[26px] bg-surface px-2 pt-3.5 pb-2">
-          <ContextChips records={refs} onRemove={(id) => removeDraftContext(NEW_SHEET_DRAFT, id)} className="px-1" />
+        <div className="relative mx-3 flex flex-col gap-2.5 rounded-[26px] bg-surface px-2 pt-3.5 pb-2">
+          {/* Upward: the sheet ends near the box, and the phone keyboard sits under it. */}
+          {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
+          <ContextChips records={chipRecords(text, refs)} onRemove={(id) => removeDraftContext(NEW_SHEET_DRAFT, id)} className="px-1" />
           <AttachmentStrip files={att.files} onRemove={att.remove} />
+          {field.layer}
           <textarea
             ref={box}
             autoFocus
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            {...menuEvents}
+            {...(fileMenu.open ? menuAria : {})}
+            onChange={(e) => {
+              update(e.target.value);
+              menuEvents.onChange(e);
+            }}
+            onSelect={(e) => {
+              field.onSelect(e);
+              menuEvents.onSelect(e);
+            }}
+            onKeyDown={(e) => {
+              if (fileMenu.onKey(e)) return;
+              field.onKeyDown(e, update);
+            }}
+            onScroll={field.onScroll}
+            style={field.style}
             onPaste={att.onPaste}
             rows={4}
             enterKeyHint="send"

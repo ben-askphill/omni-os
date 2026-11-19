@@ -11,7 +11,7 @@ import { reachLine } from '../message-context/machine-mention.tsx';
 /**
  * The `@` menu over a composer's textarea: the files a message can name, from this thread's
  * artifacts and the repo it works in, and in a thread that can delegate, the synced machines first.
- * `scope` is `thread=<id>` or `channel=<id>`. It only reads the caret and keys; the composer's own
+ * `scope` is `thread=<id>`, or `channel=<id>` with an optional `&role=<id>` (newThreadScope). It only reads the caret and keys; the composer's own
  * handlers keep the text and the `/` menu. `onMachine` gets a picked machine row after its `@name` is written.
  * `roles`: the crew roles Ben can ask from a thread, listed first while the `@` starts the message
  * (packages/shared/ask.ts).
@@ -126,6 +126,9 @@ export function useFileMenu({
   const menu = open ? { id: menuId, rows, active, onActive: moveTo, onPick: pick } : null;
   return { open, menu, onKey, textarea };
 }
+
+/** The `@` menu's scope in a new-thread composer: its channel, and the role it starts as, which decides the machines. */
+export const newThreadScope = (channel: string, role?: string) => `channel=${encodeURIComponent(channel)}${role ? `&role=${encodeURIComponent(role)}` : ''}`;
 
 const MACHINE_DOT = { online: 'done', offline: 'settled', unknown: 'idle' } as const;
 

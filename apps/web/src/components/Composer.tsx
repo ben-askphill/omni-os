@@ -20,6 +20,8 @@ import { FileMenu, useFileMenu } from './FileMenu.tsx';
 import { askOf } from '@omni/shared/ask.ts';
 import { ASK_DEFAULTS, AskChip, postAsk, useAskRoles, type AskOptions } from './AskCard.tsx';
 import { machineMentions } from '../message-context/machine-mention.tsx';
+import { useMentionField } from '../message-context/MentionField.tsx';
+import { chipRecords, machineMention } from '@omni/shared/message-context-machine.ts';
 import { replySlash } from '@omni/shared/composer-slash.ts';
 import { STEP_WORKING } from '@omni/shared/thread-glance.ts';
 import { newThreadBody, sameSettings } from '../new-thread-preset.ts';
@@ -144,12 +146,16 @@ export function NewThreadComposer({
     setPicked(null);
   };
 
+  // `@` a machine: the Conductor (or a role with the omni tools) starts the task there (message-context/machine-mention.tsx).
+  const mentions = machineMentions(key, setError);
   const update = (v: string) => {
     setText(v);
     drafts.set(key, v);
+    mentions.edited(v);
   };
 
-  const { slashMenu, fileMenu, menus, hint } = useNewThreadMenus({ ref, text, onText: update, choice, channel });
+  const { slashMenu, fileMenu, menus, hint } = useNewThreadMenus({ ref, text, onText: update, choice, channel, role, onMachine: mentions.picked });
+  const field = useMentionField(ref, text, refs);
   const templates = useTemplates();
 
   /** POST /api/grokbot with the text and the channel, the route Send to Grok Bot uses. The box empties once it took it. */
@@ -201,6 +207,8 @@ export function NewThreadComposer({
   };
 
   /** Ask: a quick ask in this channel, on the picked run, answered right here with read-only tools. */
+  // It runs here and delegates nothing, so a machine mention stays out of it.
+  const quickRefs = refs.filter((r) => r.kind !== machineMention.kind);
   const ask = async () => {
     const prompt = text.trim();
     if (!prompt || busy || toGrok) return;
@@ -209,7 +217,7 @@ export function NewThreadComposer({
     try {
       const t = await api.send<Thread>(
         '/threads',
-        { channel, prompt, quick: true, ...draftRunRequest(picked ? { choice, effort } : null), ...(refs.length && { context: referencesFor(refs, channel) }) },
+        { channel, prompt, quick: true, ...draftRunRequest(picked ? { choice, effort } : null), ...(quickRefs.length && { context: referencesFor(quickRefs, channel) }) },
         att.files,
       );
       keepLocalFiles(t.id, att.files);
@@ -244,15 +252,23 @@ export function NewThreadComposer({
         {/* Near the top of the page, so it opens downward. */}
         {slashMenu.menu && <SlashMenu {...slashMenu.menu} below />}
         {fileMenu.menu && <FileMenu {...fileMenu.menu} below />}
-        <ContextChips records={refs} onRemove={(id) => removeDraftContext(key, id)} className="px-3 pt-3 pb-0.5" />
+        <ContextChips records={chipRecords(text, refs)} onRemove={(id) => removeDraftContext(key, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
+        {field.layer}
         <textarea
           ref={ref}
           value={text}
           {...menus.textarea}
+          onSelect={(e) => {
+            field.onSelect(e);
+            menus.textarea.onSelect(e);
+          }}
+          onScroll={field.onScroll}
+          style={field.style}
           onPaste={att.onPaste}
           onKeyDown={(e) => {
             if (menus.onKey(e)) return;
+            if (field.onKeyDown(e, update)) return;
             if (enterKey(e, text, update)) void submit();
           }}
           rows={big ? 3 : 2}
@@ -451,6 +467,7 @@ export function ReplyComposer({
   const askRoles = useAskRoles(thread);
   const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(threadId)}`, roles: askRoles, onMachine: mentions.picked });
   const menus = joinMenus(slashMenu, fileMenu);
+  const field = useMentionField(ref, text, context);
   const ask = useMemo(() => askOf(text, askRoles), [text, askRoles]);
   const [askOptions, setAskOptions] = useState<AskOptions>(ASK_DEFAULTS);
 
@@ -562,16 +579,24 @@ export function ReplyComposer({
       {slashMenu.menu && <SlashMenu {...slashMenu.menu} />}
       {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
       {ask && <AskChip threadId={threadId} role={ask.role} options={askOptions} onOptions={setAskOptions} />}
-      <ContextChips records={context} onRemove={(id) => removeDraftContext(threadId, id)} className="px-3 pt-3 pb-0.5" />
+      <ContextChips records={chipRecords(text, context)} onRemove={(id) => removeDraftContext(threadId, id)} className="px-3 pt-3 pb-0.5" />
       <AttachmentStrip files={att.files} onRemove={att.remove} />
+      {field.layer}
       <textarea
         ref={ref}
         data-reply-composer
         value={text}
         {...menus.textarea}
+        onSelect={(e) => {
+          field.onSelect(e);
+          menus.textarea.onSelect(e);
+        }}
+        onScroll={field.onScroll}
+        style={field.style}
         onPaste={att.onPaste}
         onKeyDown={(e) => {
           if (menus.onKey(e)) return;
+          if (field.onKeyDown(e, update)) return;
           if (e.key === 'Tab' && suggestion && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             return update(suggestion);

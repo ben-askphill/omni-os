@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newContext } from '../message-context.ts';
 import { parseContexts, readContexts } from '../message-context-kinds.ts';
-import { droppedMentions, machineMention, mentionBody, mentions, mentionsMachine } from '../message-context-machine.ts';
+import { chipRecords, deleteMention, droppedMentions, machineMention, mentionBody, mentionPieces, mentionSpans, mentions, mentionsMachine, snapOutOfMention } from '../message-context-machine.ts';
 
 const AT = new Date('2026-11-19T12:00:00.000Z');
 const ids = (() => {
@@ -46,5 +46,61 @@ describe('machine_mention', () => {
     expect(droppedMentions("@Ben's MacBook Pro build it, then run the tests", [pro, box])).toEqual([box.id]);
     expect(mentionsMachine([pro, box], 'box-1')).toBe(true);
     expect(mentionsMachine([pro], 'box-1')).toBe(false);
+  });
+});
+
+describe('machine mentions inline', () => {
+  const text = "@Ben's MacBook Pro build it, @omarchy run the tests";
+  const pro0 = 0;
+  const proEnd = "@Ben's MacBook Pro".length;
+  const boxStart = text.indexOf('@omarchy');
+
+  it('finds where each mention sits, in text order, and none for text without its record', () => {
+    expect(mentionSpans(text, [box, pro]).map((s) => [s.start, s.end, s.id])).toEqual([
+      [pro0, proEnd, pro.id],
+      [boxStart, boxStart + '@omarchy'.length, box.id],
+    ]);
+    expect(mentionSpans(text, [pro]).map((s) => s.id)).toEqual([pro.id]);
+    expect(mentionSpans(text, 'not a list')).toEqual([]);
+    expect(mentionSpans('mail me@omarchy.dev', [box])).toEqual([]);
+  });
+
+  it('lets the longer name win where two overlap', () => {
+    const mac = newContext(machineMention, mentionBody({ id: 'm', name: 'Mac', reachability: 'online', lastSeen: null }, AT), '', ids);
+    const mini = newContext(machineMention, mentionBody({ id: 'mm', name: 'Mac mini', reachability: 'online', lastSeen: null }, AT), '', ids);
+    expect(mentionSpans('@Mac mini and @Mac', [mac, mini]).map((s) => s.id)).toEqual([mini.id, mac.id]);
+  });
+
+  it('cuts the text into runs and pills, and keeps the chips of mentions the text does not show', () => {
+    expect(mentionPieces(text, [pro, box]).map((p) => [p.text, !!p.span])).toEqual([
+      ["@Ben's MacBook Pro", true],
+      [' build it, ', false],
+      ['@omarchy', true],
+      [' run the tests', false],
+    ]);
+    const other = { id: 'x', kind: 'thread_reference', v: 1, label: 'T-1', note: '', body: {} };
+    expect(chipRecords(text, [pro, other])).toEqual([other]);
+    expect(chipRecords('build it', [pro, other])).toEqual([pro, other]);
+  });
+
+  it('deletes a mention as one unit with Backspace or Delete, and grows a selection that cuts into one', () => {
+    const spans = mentionSpans(text, [pro, box]);
+    const rest = text.slice(proEnd);
+    expect(deleteMention(text, proEnd, proEnd, 'Backspace', spans)).toEqual({ text: rest, caret: 0 });
+    expect(deleteMention(text, 3, 3, 'Backspace', spans)).toEqual({ text: rest, caret: 0 });
+    expect(deleteMention(text, 0, 0, 'Delete', spans)).toEqual({ text: rest, caret: 0 });
+    expect(deleteMention(text, 0, 0, 'Backspace', spans)).toBeNull();
+    expect(deleteMention(text, proEnd, proEnd, 'Delete', spans)).toBeNull();
+    expect(deleteMention(text, 5, proEnd + 6, 'Backspace', spans)).toEqual({ text: text.slice(proEnd + 6), caret: 0 });
+    expect(deleteMention(text, 0, proEnd, 'Backspace', spans)).toBeNull();
+  });
+
+  it('moves a caret out of a pill the way it came', () => {
+    const spans = mentionSpans(text, [pro, box]);
+    expect(snapOutOfMention(proEnd - 1, proEnd, spans)).toBe(0);
+    expect(snapOutOfMention(1, 0, spans)).toBe(proEnd);
+    expect(snapOutOfMention(proEnd - 2, 30, spans)).toBe(0);
+    expect(snapOutOfMention(proEnd - 2, proEnd - 3, spans)).toBe(proEnd);
+    expect(snapOutOfMention(proEnd, 0, spans)).toBeNull();
   });
 });
