@@ -148,9 +148,10 @@ describe("a usage scan's lead", () => {
     expect(body.fields.enabled).toBe(false);
     expect(find('weekly-copy-check')?.enabled).toBe(false);
     const yaml = '# from the scan\nname: Daily copy check\nenabled: true\ncron: "0 9 * * 1-5"\nchannel: scratch\nprompt: Check the shop.\n';
-    const fromYaml = await call('POST', '/automations', { yaml }, scan);
-    expect(fromYaml.status).toBe(201);
-    expect(find('daily-copy-check')?.enabled).toBe(false);
+    // A whole file could carry keys the fields cannot set, such as a precheck command.
+    const fromYaml = await call('POST', '/automations', { yaml: `${yaml}precheck: "true"\n` }, scan);
+    expect(fromYaml.status).toBe(403);
+    expect(find('daily-copy-check')).toBeUndefined();
   });
 
   it('counts an answer to a question it asked', async () => {

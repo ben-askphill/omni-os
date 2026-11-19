@@ -205,7 +205,8 @@ metaApi.post('/automations', async (c) => {
   const caller = callerOf(c);
   const off = !!caller && !!lineage(caller).scan;
   const body = parsed.data;
-  if ('yaml' in body) return edit(c, () => createAutomationYaml(body.yaml, body.id, off, { shell: shellAllowed(c) }), 201);
+  // A scan saves only the editor's fields: a whole file could carry keys it may not set (a precheck command, connectors).
+  if ('yaml' in body) return off ? c.json({ error: 'A usage scan saves automations from fields, not YAML.' }, 403) : edit(c, () => createAutomationYaml(body.yaml, body.id, { shell: shellAllowed(c) }), 201);
   const fields = off ? { ...body.fields, enabled: false } : body.fields;
   return edit(c, () => createAutomation(fields, body.id), 201);
 });

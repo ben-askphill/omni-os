@@ -281,18 +281,16 @@ function holdPrecheck(id: string, base: string, text: string, by: AutomationWrit
 }
 
 /**
- * A new automation from a whole YAML file, written as given (comments kept). `off` writes it turned off. A precheck in
- * it is a shell command none ran before, so it needs a caller that may reach a shell (holdPrecheck), as a save does.
+ * A new automation from a whole YAML file, written as given (comments kept). A precheck in it is a shell command none
+ * ran before, so it needs a caller that may reach a shell (holdPrecheck), as a save does.
  */
-export function createAutomationYaml(yaml: string, id?: string, off = false, by: AutomationWriteBy = {}): AutomationDefinition {
+export function createAutomationYaml(yaml: string, id?: string, by: AutomationWriteBy = {}): AutomationDefinition {
   const doc = YAML.parseDocument(yaml);
   if (doc.errors.length || !isMap(doc.contents)) throw refused('The file is not valid YAML.');
   const want = newId(str(doc.get('name')), id);
-  if (off) setKey(doc, 'enabled', false);
-  const text = off ? doc.toString({ lineWidth: 0 }) : yaml;
-  check(want, text, undefined);
-  holdPrecheck(want, '', text, by);
-  write(want, text);
+  check(want, yaml, undefined);
+  holdPrecheck(want, '', yaml, by);
+  write(want, yaml);
   return definitionOf(want)!;
 }
 
