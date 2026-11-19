@@ -12,7 +12,7 @@ import { api, errorText, type HarnessWithRunning } from '../api.ts';
 import { PERMISSION_LABEL, permissionNow, setNotificationsEnabled, useNotificationPrefs, type Permission } from '../attention.ts';
 import { desktop } from '../desktop.ts';
 import { DeviceCodeSignIn, type DeviceCodeWords } from './GoogleSignIn.tsx';
-import { Button, ChipSet, CopyButton, ErrorNote, FolderInput, IDENTIFIER, Icon, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
+import { Button, ChipSet, CopyButton, ErrorNote, fieldHintId, FolderInput, Icon, IDENTIFIER, Label, LinkButton, StatusDot, Toggle } from './ui.tsx';
 import { isImeEnter } from '../ime.ts';
 
 export const PRONOUNS = ['they/them', 'she/her', 'he/him'];
@@ -28,6 +28,7 @@ export function WorkScreen({ work, tools, onWork, onTools }: { work: string; too
       <Row label="Your work" htmlFor="ob-work" hint="Optional. Change it any time in Settings > General.">
         <textarea
           id="ob-work"
+          aria-describedby={fieldHintId('ob-work')}
           className="field min-h-[72px] w-full resize-y"
           value={work}
           maxLength={300}
@@ -42,7 +43,7 @@ export function WorkScreen({ work, tools, onWork, onTools }: { work: string; too
         <ChipSet label="Tools you use" options={ONBOARDING_TOOLS.map((t) => ({ id: t.id, label: t.label }))} value={picked} onChange={pick} />
       </div>
       <Row label="Others" htmlFor="ob-tools-other" hint="Comma separated.">
-        <input id="ob-tools-other" className="field w-full" value={otherTools(tools)} placeholder="Xero, HubSpot" onChange={(e) => onTools(withOtherTools(tools, e.target.value))} />
+        <input id="ob-tools-other" aria-describedby={fieldHintId('ob-tools-other')} className="field w-full" value={otherTools(tools)} placeholder="Xero, HubSpot" onChange={(e) => onTools(withOtherTools(tools, e.target.value))} />
       </Row>
     </Screen>
   );
@@ -87,10 +88,10 @@ export function FilesScreen({
       {code && (
         <>
           <Row label="Repos folder" htmlFor="ob-repos" hint="Where your git checkouts live. Used to suggest repo paths for projects.">
-            <FolderInput id="ob-repos" dialogTitle="Repos folder" value={value.reposDir} placeholder={fallbacks.reposDir} onChange={(reposDir) => onChange({ reposDir })} />
+            <FolderInput id="ob-repos" aria-describedby={fieldHintId('ob-repos')} dialogTitle="Repos folder" value={value.reposDir} placeholder={fallbacks.reposDir} onChange={(reposDir) => onChange({ reposDir })} />
           </Row>
           <Row label="GitHub owner" htmlFor="ob-gh" hint="Optional. Your GitHub user or org, for your repos.">
-            <input id="ob-gh" {...IDENTIFIER} className="field field-mono w-full" value={value.githubOwner} placeholder="octocat" onChange={(e) => onChange({ githubOwner: e.target.value })} />
+            <input id="ob-gh" aria-describedby={fieldHintId('ob-gh')} {...IDENTIFIER} className="field field-mono w-full" value={value.githubOwner} placeholder="octocat" onChange={(e) => onChange({ githubOwner: e.target.value })} />
           </Row>
         </>
       )}
@@ -623,7 +624,9 @@ export function Steps({ step }: { step: number }) {
   return (
     <ol className="flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}>
       {STEPS.map((s, i) => (
-        <li key={s} title={s} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-6 bg-fg' : i < step ? 'w-1.5 bg-fg-2' : 'w-1.5 bg-fg-4'}`} />
+        <li key={s} title={s} aria-current={i === step ? 'step' : undefined} className={`h-1.5 rounded-full transition-all ${i === step ? 'w-6 bg-fg' : i < step ? 'w-1.5 bg-fg-2' : 'w-1.5 bg-fg-4'}`}>
+          <span className="sr-only">{s}</span>
+        </li>
       ))}
     </ol>
   );

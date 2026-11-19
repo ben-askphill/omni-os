@@ -12,4 +12,5 @@ export { SlideToConfirm } from './ui/slide-confirm.tsx';
 export { Picker, type PickerOption } from './ui/picker.tsx';
 export { FolderInput } from './ui/folder-input.tsx';
 export { IDENTIFIER } from './ui/input-hints.ts';
-export { ErrorNote, Empty, Loading, Ticks, CheckItem, copyText, CopyButton, Toggle, PageHeader, PageToolbar, SearchField, RefreshButton, pageColumn, type PageWidth, Label, Kbd } from './ui/feedback.tsx';
+export { ErrorNote, Empty, Loading, Ticks, CheckItem, copyText, useCopy, CopyStatus, COPY_SAID, CopyButton, Toggle, PageHeader, PageToolbar, SearchField, RefreshButton, pageColumn, type PageWidth, Label, FieldError, fieldHintId, fieldErrorId, fieldDescribedBy, Kbd } from './ui/feedback.tsx';
+export { useFieldErrors } from './ui/use-field-errors.ts';

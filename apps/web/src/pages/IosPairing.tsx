@@ -3,7 +3,7 @@ import type { ServerCapabilities } from '@omni/shared/app-pairing.ts';
 import type { ConnectStatus } from '@omni/server/connect/service.ts';
 import { api, useApi } from '../api.ts';
 import { QrCode } from '../components/QrCode.tsx';
-import { Button, ErrorNote, IDENTIFIER, Label, LinkButton, Loading, Picker, Segmented } from '../components/ui.tsx';
+import { Button, ErrorNote, fieldHintId, IDENTIFIER, Label, LinkButton, Loading, Picker, Segmented } from '../components/ui.tsx';
 import {
   clock,
   NEEDS_INSTALL_TOKEN,
@@ -183,6 +183,7 @@ export function IosPairingSection() {
               <div className="flex gap-2">
                 <input
                   id="ios-address"
+                  aria-describedby={fieldHintId('ios-address')}
                   {...IDENTIFIER}
                   className="field field-mono min-w-0 flex-1"
                   inputMode="url"

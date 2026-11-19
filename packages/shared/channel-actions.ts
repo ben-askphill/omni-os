@@ -160,17 +160,17 @@ export function draftOf(a?: ChannelAction): ActionDraft {
 /** Secret names as typed: comma or space separated, upper-cased, each once. */
 export const parseSecrets = (text: string) => [...new Set(text.toUpperCase().split(/[\s,]+/).filter(Boolean))];
 
+/** A fixed port with no number, which would read as 0. The editor shows it at the port field. */
+export const actionPortProblem = (d: ActionDraft) => (d.portMode === 'fixed' && (!/^\d+$/.test(d.port.trim()) || Number(d.port) === 0) ? 'Give the fixed port a number, like 9292.' : null);
+
 /**
  * What POST or PATCH sends, always with `setup` and `teardown`: PATCH replaces the whole action, so leaving it out would clear it.
- * The server checks the rest; this only catches a fixed port with no number, which would read as 0.
+ * The server checks the rest; this only catches actionPortProblem.
  */
 export function actionInput(d: ActionDraft): { input: ChannelActionInput } | { error: string } {
-  let port: number | null = null;
-  if (d.portMode === 'free') port = 0;
-  if (d.portMode === 'fixed') {
-    if (!/^\d+$/.test(d.port.trim()) || Number(d.port) === 0) return { error: 'Give the fixed port a number, like 9292.' };
-    port = Number(d.port);
-  }
+  const problem = actionPortProblem(d);
+  if (problem) return { error: problem };
+  const port = d.portMode === 'free' ? 0 : d.portMode === 'fixed' ? Number(d.port) : null;
   return { input: { name: d.name.trim(), command: d.command.trim(), secrets: parseSecrets(d.secrets), port, setup: d.setup, teardown: d.teardown } };
 }
 

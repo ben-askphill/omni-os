@@ -241,6 +241,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
             onPaste={att.onPaste}
             rows={4}
             enterKeyHint="send"
+            aria-label="Message"
             placeholder={toGrok ? GROK_BOT_PLACEHOLDER : asking ? 'Ask anything. The answer shows here.' : ch ? `Describe the task for #${ch.name}` : 'Ask the Conductor. It delegates to the crew.'}
             className="resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-3"
           />

@@ -79,13 +79,13 @@ function ToolInput({ c }: { c: ToolCall }) {
   }
   if (c.name === 'TodoWrite' && Array.isArray(i.todos)) {
     return (
-      <div>
+      <ul aria-label="To-dos">
         {(i.todos as Todo[]).map((t, k) => (
           <CheckItem key={k} state={t.status ?? 'pending'}>
             {t.content}
           </CheckItem>
         ))}
-      </div>
+      </ul>
     );
   }
   const json = JSON.stringify(i, null, 2);
@@ -121,7 +121,7 @@ function TaskBadge({ t }: { t: TaskView }) {
         {t.background && <span>background ·</span>}
         {t.tool_uses ? <span>{plural(t.tool_uses, 'tool')} ·</span> : null}
         <Elapsed since={t.started} />
-        <Loader size={11} />
+        <Loader size={11} label="Running" />
       </span>
     );
   }
@@ -165,7 +165,7 @@ export function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: str
         {task ? (
           <TaskBadge t={task} />
         ) : pending && running ? (
-          <Loader size={11} className="text-fg-3" />
+          <Loader size={11} label="Running" className="text-fg-3" />
         ) : err ? (
           <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg">
             <StatusDot status="needs" size={7} /> error{exit !== undefined && ` · exit ${exit}`}

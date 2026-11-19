@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import { quickAskKey, quickAskView, promotedLine, suggestedLine, type QuickEvent } from '@omni/shared/quick-ask.ts';
 import { api, errorText, useThreadStream, type EventRow, type Thread, type ThreadDetail } from '../api.ts';
 import { Markdown } from './Markdown.tsx';
-import { Button, copyText, Icon, Loader } from './ui.tsx';
+import { Button, COPY_SAID, CopyStatus, Icon, Loader, useCopy } from './ui.tsx';
 
 /** A quick ask's thread and events, kept current from its stream. */
 export function useQuickAsk(id: string) {
@@ -53,7 +53,7 @@ export function QuickAnswer({ id, onOpen, touch = false }: { id: string; onOpen:
   const [text, setText] = useState('');
   const [busy, setBusy] = useState<'send' | 'keep' | 'task' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const copier = useCopy(1200);
   const field = useRef<HTMLTextAreaElement>(null);
   const list = useRef<HTMLDivElement>(null);
   // The newest question and its answer stay in view as they come in.
@@ -93,7 +93,7 @@ export function QuickAnswer({ id, onOpen, touch = false }: { id: string; onOpen:
     void act(k === 'ask' ? 'send' : 'task', k === 'task-open');
   };
 
-  if (!thread || !view) return <Loader size={14} />;
+  if (!thread || !view) return <Loader size={14} label="Loading" />;
   const size = touch ? 'text-[15px]' : 'text-[14px]';
   const done = view.promoted || view.kept;
   return (
@@ -160,12 +160,13 @@ export function QuickAnswer({ id, onOpen, touch = false }: { id: string; onOpen:
             <Button
               size="sm"
               variant="secondary"
-              icon={copied ? 'check' : 'copy'}
+              icon={copier.icon}
               disabled={!view.copy}
-              onClick={() => view.copy && void copyText(view.copy).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1200)))}
+              onClick={() => view.copy && void copier.copy(view.copy)}
             >
-              {copied ? 'Copied' : 'Copy'}
+              {copier.state === 'idle' ? 'Copy' : COPY_SAID[copier.state]}
             </Button>
+            <CopyStatus state={copier.state} />
             <Button size="sm" variant="secondary" busy={busy === 'keep'} disabled={view.busy} onClick={() => void act('keep')}>
               Keep as thread
             </Button>

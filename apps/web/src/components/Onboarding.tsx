@@ -26,7 +26,7 @@ import {
   browserTimezone,
   createChannel,
 } from './onboarding-parts.tsx';
-import { Button, ErrorNote, FolderInput, IDENTIFIER } from './ui.tsx';
+import { Button, ErrorNote, fieldHintId, FolderInput, IDENTIFIER } from './ui.tsx';
 import { ModalFooter } from './ui/modal.tsx';
 import { useModalDialog } from './ui/use-modal-dialog.ts';
 import { isImeEnter } from '../ime.ts';
@@ -245,17 +245,17 @@ function Wizard() {
             {state && step === 0 && (
               <Screen caption={rerun ? 'Setup' : 'Welcome to Omni'} title="Who are you?" body="Your name and pronouns are told to every agent, so a thread knows who it works for. Automations use your timezone.">
                 <Row label="Name" htmlFor="ob-name" hint="Agents address you by this name.">
-                  <input id="ob-name" className="field w-full" value={name} maxLength={NAME_MAX} autoComplete="name" placeholder="Your name" autoFocus onChange={(e) => setName(e.target.value)} />
+                  <input id="ob-name" aria-describedby={fieldHintId('ob-name')} className="field w-full" value={name} maxLength={NAME_MAX} autoComplete="name" placeholder="Your name" autoFocus onChange={(e) => setName(e.target.value)} />
                 </Row>
                 <Row label="Email" htmlFor="ob-email" hint="Optional. Agents use it to recognise your own commits, PRs and mail.">
-                  <input id="ob-email" className="field w-full" type="email" value={email} autoComplete="email" placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
+                  <input id="ob-email" aria-describedby={fieldHintId('ob-email')} className="field w-full" type="email" value={email} autoComplete="email" placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
                 </Row>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Row label="Timezone" htmlFor="ob-tz" hint="Prefilled from this device.">
-                    <TimezoneInput id="ob-tz" value={timezone} onChange={setTimezone} />
+                    <TimezoneInput id="ob-tz" describedBy={fieldHintId('ob-tz')} value={timezone} onChange={setTimezone} />
                   </Row>
                   <Row label="Pronouns" htmlFor="ob-pronouns" hint="Used when agents mention you.">
-                    <PronounsInput id="ob-pronouns" value={pronouns} onChange={setPronouns} />
+                    <PronounsInput id="ob-pronouns" describedBy={fieldHintId('ob-pronouns')} value={pronouns} onChange={setPronouns} />
                   </Row>
                 </div>
               </Screen>
@@ -284,6 +284,7 @@ function Wizard() {
                       <Row label="Repo folder" htmlFor="ob-ch-repo" hint="Optional. A git checkout on this machine; every thread gets its own copy.">
                         <FolderInput
                           id="ob-ch-repo"
+                          aria-describedby={fieldHintId('ob-ch-repo')}
                           dialogTitle="Repo folder"
                           value={channelRepo}
                           placeholder={`${state.resolved.reposDir}/acme-site`}
@@ -293,7 +294,7 @@ function Wizard() {
                     )}
                     {store && (
                       <Row label="Shopify store" htmlFor="ob-ch-store" hint="Optional. The myshopify domain.">
-                        <input id="ob-ch-store" {...IDENTIFIER} className="field field-mono w-full" inputMode="url" value={channelStore} placeholder="acme.myshopify.com" onChange={(e) => setChannelStore(e.target.value)} />
+                        <input id="ob-ch-store" aria-describedby={fieldHintId('ob-ch-store')} {...IDENTIFIER} className="field field-mono w-full" inputMode="url" value={channelStore} placeholder="acme.myshopify.com" onChange={(e) => setChannelStore(e.target.value)} />
                       </Row>
                     )}
                   </>
@@ -316,6 +317,7 @@ function Wizard() {
                   <Row label="Your first question" htmlFor="ob-ask" hint="Optional. Anything you would ask a capable assistant.">
                     <textarea
                       id="ob-ask"
+                      aria-describedby={fieldHintId('ob-ask')}
                       className="field min-h-[64px] w-full resize-y"
                       rows={2}
                       value={ask}

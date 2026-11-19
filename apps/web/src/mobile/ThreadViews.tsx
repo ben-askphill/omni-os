@@ -557,8 +557,7 @@ export function ViewerScreen({ route }: { route: Route }) {
       if (a.url) {
         if (navigator.share) await navigator.share({ title: a.name, url: a.url });
         else {
-          await copyText(a.url);
-          shell.toast('Link copied');
+          shell.toast((await copyText(a.url)) ? 'Link copied' : "Couldn't copy the link");
         }
         return;
       }
@@ -566,8 +565,7 @@ export function ViewerScreen({ route }: { route: Route }) {
       const file = new File([blob], a.name, { type: blob.type });
       if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: a.name });
       else {
-        await copyText(sharedApiUrl(artifactUrl(a), location.href));
-        shell.toast('Link copied. It opens where Omni is paired.');
+        shell.toast((await copyText(sharedApiUrl(artifactUrl(a), location.href))) ? 'Link copied. It opens where Omni is paired.' : "Couldn't copy the link");
       }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') shell.toast(errorText(e), 'error');

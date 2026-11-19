@@ -86,7 +86,6 @@ const ALLOWED: Record<string, string> = {
   'components/LiveBrowser.tsx': 'maps a key to the text it types into the remote page; the page does its own IME',
   'components/ContextMenuParts.tsx': 'reads a Cmd+Enter shortcut label for a menu row, not a text field',
   'components/ui/slide-confirm.tsx': 'a slider handle, which takes no text',
-  'components/ui/feedback.tsx': 'a role=button row, which takes no text',
 };
 const LOOK_BACK = 6;
 

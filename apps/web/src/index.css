@@ -351,6 +351,15 @@
   .field::placeholder {
     color: var(--fg-4);
   }
+  /* A field whose problem shows (useFieldErrors): the red edge comes with its message and aria-invalid, never before.
+     Not :user-invalid, which Safari and Chrome apply at different moments; aria-invalid is the one switch for both. */
+  .field[aria-invalid="true"],
+  .field[aria-invalid="true"]:hover {
+    box-shadow: inset 0 0 0 1.5px var(--needs);
+  }
+  .field[aria-invalid="true"]:focus {
+    box-shadow: inset 0 0 0 1.5px var(--needs), 0 0 0 4px var(--wash);
+  }
   select.field {
     appearance: none;
     padding-right: 34px;
@@ -1738,6 +1747,10 @@
   .shimmer-text,
   .wordmark-write:is(:hover, :focus-visible) .wordmark-line {
     animation: none;
+  }
+  /* A Loader still shows that something is happening: no halo, a slow fade in place instead. */
+  .glyph[data-mark="loading"] > svg {
+    animation: omni-breathe 2.4s var(--ease-fluid) infinite !important;
   }
   .shimmer-text {
     color: var(--fg-3);

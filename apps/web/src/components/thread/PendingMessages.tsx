@@ -5,7 +5,7 @@ import { requestIdFor } from '@omni/shared/request-id.ts';
 import { Attachments } from './Attachments.tsx';
 import { api, ApiError, errorText, type Attachment, type PendingMsg, type Thread } from '../../api.ts';
 import { plural } from '../../format.ts';
-import { Button, copyText, Icon, IconButton } from '../ui.tsx';
+import { Button, COPY_SAID, CopyStatus, Icon, IconButton, useCopy } from '../ui.tsx';
 import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf } from '../../requests.ts';
 import { useSending } from '../../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../../pending-edits.ts';
@@ -262,7 +262,7 @@ function FileChip({ name, size, disabled, onRemove }: { name: string; size: numb
 function StaleEdit({ threadId, draft: d, onClose }: { threadId: string; draft: EditDraft; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const copier = useCopy();
   // One id for this text, so a retried send is answered as the same message.
   const [requestId] = useState(() => requestIdFor(null, d.uuid).id);
   const sendNew = async () => {
@@ -289,14 +289,12 @@ function StaleEdit({ threadId, draft: d, onClose }: { threadId: string; draft: E
         <Button
           size="sm"
           variant="ghost"
-          icon={copied ? 'check' : 'copy'}
-          onClick={() => {
-            void copyText(d.prompt);
-            setCopied(true);
-          }}
+          icon={copier.icon}
+          onClick={() => void copier.copy(d.prompt)}
         >
-          {copied ? 'Copied' : 'Copy'}
+          {copier.state === 'idle' ? 'Copy' : COPY_SAID[copier.state]}
         </Button>
+        <CopyStatus state={copier.state} />
         <Button size="sm" variant="secondary" icon="send" busy={busy} disabled={!d.prompt.trim()} onClick={() => void sendNew()}>
           Send as new
         </Button>

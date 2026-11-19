@@ -8,7 +8,7 @@ import type { PanelTab } from '../../pages/useThreadSession.ts';
 import { HarnessLogo, HarnessMark, harnessLabel } from '../brand.tsx';
 import { useThreadAccount } from '../../accounts.ts';
 import { threadAccountLine } from '@omni/shared/harness-accounts.ts';
-import { Chip, copyText, Icon, IconButton, IconLink, Loader, statusLabel, StatusDot, ThreadDot, type ChipTone, type IconName } from '../ui.tsx';
+import { Chip, CopyStatus, Icon, IconButton, IconLink, Loader, statusLabel, StatusDot, ThreadDot, useCopy, type ChipTone, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
@@ -269,20 +269,12 @@ function Connectors({ used, live }: { used: ConnectorUse[]; live: boolean }) {
 }
 
 function CopyPath({ path }: { path: string }) {
-  const [done, setDone] = useState(false);
+  const { state, copy, icon } = useCopy();
   return (
-    <IconButton
-      icon={done ? 'check' : 'copy'}
-      label={done ? 'Copied' : 'Copy the working directory path'}
-      size={13}
-      className="mr-[var(--sp-2)] h-7 w-7 shrink-0"
-      onClick={() => {
-        void copyText(path).then(() => {
-          setDone(true);
-          setTimeout(() => setDone(false), 1400);
-        });
-      }}
-    />
+    <>
+      <IconButton icon={icon} label="Copy the working directory path" size={13} className="mr-[var(--sp-2)] h-7 w-7 shrink-0" onClick={() => void copy(path)} />
+      <CopyStatus state={state} />
+    </>
   );
 }
 

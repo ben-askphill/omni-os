@@ -427,8 +427,10 @@ function CompactAction({ thread, view, onCompacted }: { thread: Thread; view: Co
                 if (e.key === 'Enter' && !isImeEnter(e)) void run();
               }}
               maxLength={2000}
+              aria-label="What the summary should keep"
               placeholder="Optional: what the summary should keep"
-              className="mt-2 h-8 w-full rounded-lg bg-surface-2 px-2.5 text-[12.5px] outline-none placeholder:text-fg-4"
+              enterKeyHint="go"
+              className="field-xs mt-2 h-8 w-full rounded-lg bg-surface-2 px-2.5 outline-none placeholder:text-fg-4"
             />
           )}
           <div className="mt-2 flex items-center justify-end gap-1.5">
