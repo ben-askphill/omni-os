@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type RefObject, type SyntheticEvent } from 'react';
 import { optionId, useCommands } from '../SlashMenu.tsx';
-import { useFileMenu } from '../FileMenu.tsx';
+import { newThreadScope, useFileMenu } from '../FileMenu.tsx';
+import type { FileMention } from '@omni/shared/mention-menu.ts';
 import { mentionSections, menuSections, pickCommand, rowKey, slashQuery } from '@omni/shared/slash-menu.ts';
 import { menuCommands, newThreadHint } from '@omni/shared/composer-slash.ts';
 import { parseSlash } from '@omni/shared/slash.ts';
@@ -148,19 +149,25 @@ export function useNewThreadMenus({
   onText,
   choice,
   channel,
+  role,
+  onMachine,
 }: {
   ref: RefObject<HTMLTextAreaElement | null>;
   text: string;
   onText: (text: string) => void;
   choice: DraftRun['choice'];
   channel: string;
+  /** The crew role the thread starts as. One with the omni tools (the Conductor) gets the machines in the `@` menu. */
+  role?: string;
+  /** A machine picked from the `@` menu (message-context/machine-mention.tsx `machineMentions`). */
+  onMachine?: (row: FileMention) => void;
 }) {
   // Auto picks the harness only once the prompt is sent, so its menu is Claude Code's.
   const auto = asksAuto(choice);
   const menuHarness = auto ? 'claude-code' : choice.harness;
   const commands = useCommands(`harness=${encodeURIComponent(menuHarness)}&channel=${encodeURIComponent(channel)}`);
   const slashMenu = useSlashMenu({ ref, text, onText, commands, where: 'new-thread' });
-  const fileMenu = useFileMenu({ ref, text, onText, scope: `channel=${encodeURIComponent(channel)}` });
+  const fileMenu = useFileMenu({ ref, text, onText, scope: newThreadScope(channel, role), onMachine });
   const menus = joinMenus(slashMenu, fileMenu);
   const hint = useMemo(() => newThreadHint(text, commands.list, menuHarness), [text, commands.list, menuHarness]);
   // Another harness or channel has its own list: fetch it for what is typed, so the hint re-checks it.

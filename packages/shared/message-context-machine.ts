@@ -86,3 +86,96 @@ export function droppedMentions(text: string, records: readonly MessageContext[]
 
 /** Whether `records` already mention the machine `id`, so a second pick of it adds no second chip. */
 export const mentionsMachine = (records: readonly MessageContext[], id: string) => records.some((r) => asMention(r)?.machine === id);
+
+// ----- the mention as an inline pill -----
+// A composer draws each `@<name>` its message carries a record for as a pill inside the text, and a sent message shows
+// it the same way instead of as a chip over the bubble. The text and the records stay as they are: this only finds
+// where in the text each mention sits, so the composers and the bubbles can draw it and edit it as one unit.
+
+/** Where one machine mention sits in a message's text: `text.slice(start, end)` is its `@<name>`. */
+export interface MentionSpan {
+  start: number;
+  end: number;
+  /** The record's id. */
+  id: string;
+  mention: MachineMention;
+}
+
+const readMention = (r: unknown): { id: string; mention: MachineMention } | null =>
+  isObj(r) && r.kind === machineMention.kind && typeof r.id === 'string' && isObj(r.body) && typeof r.body.name === 'string' && typeof r.body.machine === 'string' && r.body.name
+    ? { id: r.id, mention: r.body as unknown as MachineMention }
+    : null;
+
+/**
+ * Every `@<name>` in `text` that one of `records` (read leniently: anything not a list holds none) is the mention of,
+ * in text order. Where two names overlap ("@Mac" and "@Mac mini"), the longer one wins.
+ */
+export function mentionSpans(text: string, records: unknown): MentionSpan[] {
+  if (!text.includes('@') || !Array.isArray(records)) return [];
+  const found: MentionSpan[] = [];
+  for (const r of records) {
+    const m = readMention(r);
+    if (!m) continue;
+    const re = new RegExp(`(?<![\\w@])@${escape(m.mention.name)}(?![\\w'])`, 'gi');
+    for (const hit of text.matchAll(re)) found.push({ start: hit.index, end: hit.index + hit[0].length, ...m });
+  }
+  found.sort((a, b) => a.start - b.start || b.end - a.end);
+  const out: MentionSpan[] = [];
+  for (const s of found) if (!out.length || s.start >= out[out.length - 1].end) out.push(s);
+  return out;
+}
+
+/** `text` cut into plain runs and mention spans, in order, for a bubble or a composer to draw. */
+export function mentionPieces(text: string, records: unknown): { text: string; span?: MentionSpan }[] {
+  const pieces: { text: string; span?: MentionSpan }[] = [];
+  let at = 0;
+  for (const s of mentionSpans(text, records)) {
+    if (s.start > at) pieces.push({ text: text.slice(at, s.start) });
+    pieces.push({ text: text.slice(s.start, s.end), span: s });
+    at = s.end;
+  }
+  if (at < text.length) pieces.push({ text: text.slice(at) });
+  return pieces;
+}
+
+/** `records` (read leniently, as ContextChips does) without the machine mentions `text` shows inline: what still shows as chips over it. */
+export function chipRecords<T>(text: string, records: readonly T[]): T[];
+export function chipRecords(text: string, records: unknown): unknown[];
+export function chipRecords(text: string, records: unknown): unknown[] {
+  if (!Array.isArray(records) || !records.length) return [];
+  const inline = new Set(mentionSpans(text, records).map((s) => s.id));
+  return inline.size ? records.filter((r) => !(isObj(r) && typeof r.id === 'string' && inline.has(r.id))) : [...records];
+}
+
+/**
+ * Backspace or Delete over a mention: the whole `@<name>` goes, never one letter of it. A selection that cuts into a
+ * mention grows to take all of it. Null when the key touches no mention, so the textarea edits as usual.
+ */
+export function deleteMention(text: string, from: number, to: number, key: 'Backspace' | 'Delete', spans: readonly MentionSpan[]): { text: string; caret: number } | null {
+  let start = from;
+  let end = to;
+  if (from === to) {
+    const s = spans.find((x) => (key === 'Backspace' ? from > x.start && from <= x.end : from >= x.start && from < x.end));
+    if (!s) return null;
+    start = s.start;
+    end = s.end;
+  } else {
+    const cut = spans.filter((x) => x.start < to && x.end > from);
+    if (!cut.some((x) => x.start < from || x.end > to)) return null;
+    start = Math.min(from, ...cut.map((x) => x.start));
+    end = Math.max(to, ...cut.map((x) => x.end));
+  }
+  return { text: text.slice(0, start) + text.slice(end), caret: start };
+}
+
+/**
+ * Where a caret that landed inside a mention goes instead, so a pill is never typed into: out the side it came from
+ * (`prev`), else the nearer side. Null when `caret` is not inside one.
+ */
+export function snapOutOfMention(caret: number, prev: number, spans: readonly MentionSpan[]): number | null {
+  const s = spans.find((x) => caret > x.start && caret < x.end);
+  if (!s) return null;
+  if (prev >= s.end) return s.start;
+  if (prev <= s.start) return s.end;
+  return caret - s.start < s.end - caret ? s.start : s.end;
+}

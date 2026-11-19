@@ -83,7 +83,7 @@ Pick where a new thread runs: this machine, or any other synced machine, such as
 
 ## Send a task to a machine
 
-In the Conductor's reply box, type `@` and pick a machine: the menu lists every synced machine (this one first) with whether it is online, asleep or offline, or unknown to Tailscale. Picking one writes `@<name>` into the message and adds a chip for that machine above the box. One message can mention several, each next to its own task: "@Ben's MacBook Pro build the POOWS collection page, @omarchy run the server tests".
+In the Conductor's reply box, or in the composer that starts a Conductor thread (Home's dashboard, the Conductor channel, the phone's New sheet on Task), type `@` and pick a machine: the menu lists every synced machine (this one first) with whether it is online, asleep or offline, or unknown to Tailscale. Picking one writes `@<name>` into the message as an inline pill with a monitor icon. Backspace removes the whole pill, and Undo brings it back. The sent message shows the same pill in its bubble; tap it for the machine's id and its state when you sent it. One message can mention several, each next to its own task: "@Ben's MacBook Pro build the POOWS collection page, @omarchy run the server tests".
 
 - The message carries each mentioned machine's id, not only its name. The Conductor reads it in the message's context and runs each task with `delegate` on the machine mentioned for it, one thread per task.
 - Delete the `@<name>` from the text and its chip goes too. The sent message shows the chips over its text, and a chip opens to the machine's name and state when you sent it.
@@ -91,6 +91,7 @@ In the Conductor's reply box, type `@` and pick a machine: the menu lists every 
 - A mentioned machine that cannot take its task (offline on Tailscale, or sync not running) makes that `delegate` fail, and the Conductor tells you. It never runs the task on another machine instead.
 - Teams run on this machine, so the Conductor uses one `delegate` per mentioned machine rather than `delegate_team`.
 - Desktop web, phone web and the desktop app have the menu. The iOS app shows a mention on a sent message as a plain chip and has no menu.
+- A quick ask runs here with read-only tools, so it leaves machine mentions out, and the phone's New sheet lists no machines in Ask mode.
 
 ## Where a thread runs
 

@@ -1283,6 +1283,62 @@
 /* Markdown and the helper classes sit in the components layer, under Tailwind's utilities, so a class passed with
    them (the phone's `text-[15px] leading-[1.6]` on a reply) wins as it reads. */
 @layer components {
+  /* A machine @mention inline (message-context/MentionField.tsx). In a composer the pill is drawn on a layer behind
+     the textarea, so it may change nothing that moves a glyph: no padding, weight or size, only color and a
+     background spread by a shadow. The `@` keeps its width and the monitor icon sits over it. */
+  .mention-layer {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
+  }
+  .mention-pill {
+    --pill: color-mix(in srgb, var(--live) 13%, transparent);
+    color: var(--live-text);
+    background: var(--pill);
+    box-shadow: -2px 0 0 2px var(--pill), 2px 0 0 2px var(--pill);
+    border-radius: 6px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .mention-at {
+    position: relative;
+    color: transparent;
+  }
+  .mention-at-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0.85em;
+    height: 0.85em;
+    transform: translate(-50%, -50%);
+    color: var(--live-text);
+  }
+  /* In a bubble nothing sits under it, so it takes real padding. */
+  .mention-pill-sent {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    padding: 0 0.4em;
+    box-shadow: none;
+    border-radius: 6px;
+    line-height: inherit;
+    white-space: nowrap;
+    vertical-align: baseline;
+  }
+  .mention-pill-sent:focus-visible {
+    outline: 2px solid var(--live);
+    outline-offset: 1px;
+  }
+  .mention-sent-icon {
+    width: 0.85em;
+    height: 0.85em;
+  }
+}
+
+@layer components {
   /* Markdown rendered from agents. Kept compact and readable. */
   .md {
     font-size: 14.5px;

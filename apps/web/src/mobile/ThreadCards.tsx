@@ -6,6 +6,8 @@ import { Markdown } from '../components/Markdown.tsx';
 import { useSending } from '../sending.ts';
 import { ArtifactThumb } from '../components/ArtifactThumb.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
+import { MentionText } from '../message-context/MentionField.tsx';
+import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { Attachments } from '../components/Transcript.tsx';
 import { Button, Icon, Loader, StatusDot, StatusPill } from '../components/ui.tsx';
 import { duration, plural } from '../format.ts';
@@ -305,9 +307,11 @@ export function Pending({ thread, items, onPending }: { thread: Thread; items: P
         <div key={m.uuid} className="flex flex-col items-end gap-1.5 opacity-75">
           <span className="text-[12px] leading-[1.3] text-fg-3">{isForwarded(m) ? forwardedLabel(m, trouble) : (setupWait(thread.setup)?.label ?? parkedLabel(m, !!thread.resume_blocked) ?? (m.state === 'held' ? 'Queued for after this turn' : 'Sent, waiting for the agent'))}</span>
           {m.attachments?.length ? <Attachments threadId={thread.id} items={m.attachments} lazy={false} /> : null}
-          <ContextChips records={m.context} align="end" className="w-full max-w-[86%]" />
+          <ContextChips records={chipRecords(m.text, m.context)} align="end" className="w-full max-w-[86%]" />
           {(m.text || !hasContext(m.context)) && (
-            <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">{m.text}</div>
+            <div className="max-w-[86%] rounded-[20px] border border-dashed border-line-strong px-3.5 py-2.5 text-[15px] leading-[1.45] break-words whitespace-pre-wrap">
+              <MentionText text={m.text} records={m.context} />
+            </div>
           )}
           {(m.delivery === 'uncertain' || (m.delivery && isOmnis(m))) && (
             <div className="flex gap-2">

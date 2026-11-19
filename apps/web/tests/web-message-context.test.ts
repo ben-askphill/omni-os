@@ -17,6 +17,10 @@ import { cantShowText, ContextChips, ContextInspector, NEWER_LABEL } from '../sr
 import { rangeText, sourceText } from '../src/message-context/diff-selection.tsx';
 import { CONTEXT_VIEWS } from '../src/message-context/kinds.ts';
 import { machineMentions } from '../src/message-context/machine-mention.tsx';
+import { MentionText } from '../src/message-context/MentionField.tsx';
+import { referencesFor } from '../src/message-context/thread-picker.ts';
+import { newThreadScope } from '../src/components/FileMenu.tsx';
+import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { addDraftContext, draftContext, removeDraftContext, settleDraftContext } from '../src/message-context/draft.ts';
 import { sendKey } from '../src/requests.ts';
 import type { UserP } from '@omni/shared/transcript-fold.ts';
@@ -284,5 +288,50 @@ describe('machine mentions in a composer', () => {
     m.edited('');
     expect(draftContext(thread)).toEqual([]);
     expect(errors).toEqual([]);
+  });
+
+  it('brings a pill back with a fresh id when Undo returns its @name', () => {
+    const thread = 'thread-machine-undo';
+    const m = machineMentions(thread);
+    m.picked(row('box-1', 'omarchy'));
+    const [first] = draftContext(thread);
+    m.edited(' run the tests');
+    expect(draftContext(thread)).toEqual([]);
+    m.edited('@omarchy run the tests');
+    const [back] = draftContext(thread);
+    expect([back.label, (back.body as { machine: string }).machine]).toEqual(['@omarchy', 'box-1']);
+    expect(back.id).not.toBe(first.id);
+    m.edited('');
+  });
+
+  // Home's dashboard composer (NewThreadComposer, draft key `new:*`): the `@` menu asks for the machines with the role,
+  // and Start posts the picked machine as a machine_mention next to any thread references.
+  it('sends the dashboard composer pick with the new thread, with its device id', () => {
+    expect(newThreadScope('conductor', 'conductor')).toBe('channel=conductor&role=conductor');
+    expect(newThreadScope('shop')).toBe('channel=shop');
+    const key = 'new:*';
+    const m = machineMentions(key);
+    m.picked(row('mac-air', "Ben's MacBook Air"));
+    const text = "@Ben's MacBook Air run the ingest";
+    m.edited(text);
+    const context = referencesFor(draftContext(key), 'conductor');
+    expect(context.map((r) => [r.kind, r.label, (r.body as { machine: string }).machine])).toEqual([['machine_mention', "@Ben's MacBook Air", 'mac-air']]);
+    // Shown inline, so no chip over the box.
+    expect(chipRecords(text, draftContext(key))).toEqual([]);
+    settleDraftContext(key, draftContext(key).map((r) => r.id));
+  });
+
+  it('shows a sent mention inline in the bubble, and no chip for it', () => {
+    const thread = 'thread-machine-bubble';
+    machineMentions(thread).picked(row('mac-air', "Ben's MacBook Air"));
+    const records = draftContext(thread);
+    const text = "@Ben's MacBook Air run the ingest";
+    const html = renderToStaticMarkup(createElement(MentionText, { text, records }));
+    expect(html).toMatch(/^<button[^>]*class="mention-pill mention-pill-sent"[^>]*>.*Ben&#x27;s MacBook Air<\/button> run the ingest$/);
+    expect(html).not.toContain('@');
+    expect(renderToStaticMarkup(createElement(ContextChips, { records: chipRecords(text, records) }))).toBe('');
+    // Text that lost its @name keeps the chip.
+    expect(chipRecords('run the ingest', records)).toHaveLength(1);
+    settleDraftContext(thread, records.map((r) => r.id));
   });
 });

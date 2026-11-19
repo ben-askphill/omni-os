@@ -11,6 +11,8 @@ import type { Takeover } from '@omni/shared/handoff.ts';
 import { ContextChips } from '../message-context/ContextChips.tsx';
 import { removeDraftContext, useDraftContext } from '../message-context/draft.ts';
 import { machineMentions } from '../message-context/machine-mention.tsx';
+import { useMentionField } from '../message-context/MentionField.tsx';
+import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { FileMenu, useFileMenu } from '../components/FileMenu.tsx';
 import { canSteer } from '../steer.ts';
 import { currentRun, pickedModelRun, shownRun, threadChoice, threadRunLabels } from '@omni/shared/thread-run.ts';
@@ -93,6 +95,7 @@ export function MoComposer({
   const askRoles = useAskRoles(thread);
   const fileMenu = useFileMenu({ ref, text, onText: update, scope: `thread=${encodeURIComponent(thread.id)}`, roles: askRoles, onMachine: mentions.picked });
   const { aria: menuAria, ...menuEvents } = fileMenu.textarea;
+  const field = useMentionField(ref, text, context);
   // Once Take over is asked for (or the thread is here again), the card's offer is past.
   useEffect(() => {
     if (!takeover) setAway((a) => (a?.livesOn ? null : a));
@@ -234,10 +237,11 @@ export function MoComposer({
       <div className="relative flex flex-col rounded-[26px] bg-surface">
         {fileMenu.menu && <FileMenu {...fileMenu.menu} />}
         {ask && <AskChip threadId={thread.id} role={ask.role} options={askOptions} onOptions={setAskOptions} />}
-        <ContextChips records={context} onRemove={(id) => removeDraftContext(thread.id, id)} className="px-3 pt-3 pb-0.5" />
+        <ContextChips records={chipRecords(text, context)} onRemove={(id) => removeDraftContext(thread.id, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
         <div className="flex min-h-[52px] items-end gap-1.5 p-1.5">
           <MoRound icon="plus" label={term('plusSheet', technical)} onClick={() => setPlus(true)} disabled={busy} />
+          {field.layer}
           <textarea
             ref={ref}
             rows={1}
@@ -248,7 +252,16 @@ export function MoComposer({
               update(e.target.value);
               menuEvents.onChange(e);
             }}
-            onKeyDown={(e) => void fileMenu.onKey(e)}
+            onSelect={(e) => {
+              field.onSelect(e);
+              menuEvents.onSelect(e);
+            }}
+            onScroll={field.onScroll}
+            style={field.style}
+            onKeyDown={(e) => {
+              if (fileMenu.onKey(e)) return;
+              field.onKeyDown(e, update);
+            }}
             onPaste={att.onPaste}
             enterKeyHint="send"
             placeholder={hint}

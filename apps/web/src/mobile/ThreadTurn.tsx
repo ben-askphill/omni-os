@@ -12,6 +12,8 @@ import { Avatar } from '../components/ui.tsx';
 import { hasOwnLook } from '@omni/shared/channel-icon.ts';
 import { ThinkingLine } from '../components/thread/ThinkingLine.tsx';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
+import { MentionText } from '../message-context/MentionField.tsx';
+import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { changesView } from '@omni/shared/changes-view.ts';
 import { atStart } from '@omni/shared/history.ts';
 import { href } from '../router.ts';
@@ -166,11 +168,11 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
           above={
             <>
               {p.attachments?.length ? <Attachments threadId={thread.id} items={p.attachments} lazy={!last} /> : null}
-              <ContextChips records={p.context} align="end" className="w-full max-w-[86%]" />
+              <ContextChips records={chipRecords(p.text ?? '', p.context)} align="end" className="w-full max-w-[86%]" />
             </>
           }
         >
-          {p.text || !hasContext(p.context) ? p.text : null}
+          {p.text || !hasContext(p.context) ? <MentionText text={p.text ?? ''} records={p.context} /> : null}
           {p.items?.length ? <PRWakeList items={p.items} more={p.more} /> : null}
         </MoBubble>
         <ClippedNote event={p.key} clipped={p.clipped} className="-mt-2.5 justify-end" />

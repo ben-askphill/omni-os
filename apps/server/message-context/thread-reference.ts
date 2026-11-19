@@ -26,8 +26,9 @@ export function stampThreadReferences(threadId: string, records: readonly Messag
  * record of another kind is refused rather than passed on.
  */
 export function stampNewThreadReferences(channel: string, records: readonly MessageContext[], at: Date = new Date()): Stamped {
-  const other = records.find((r) => r.kind !== 'thread_reference');
-  if (other) return { ok: false, error: `${other.label}: a new thread's first message can carry thread references only. Add it in a reply once the thread has started.` };
+  // Machine mentions are stamped by the route after this (machine-mention.ts stampMachineMentions).
+  const other = records.find((r) => r.kind !== 'thread_reference' && r.kind !== 'machine_mention');
+  if (other) return { ok: false, error: `${other.label}: a new thread's first message can carry thread references and machine mentions only. Add it in a reply once the thread has started.` };
   return stamp(null, channels.get(channel) ? channel : null, records, at);
 }
 

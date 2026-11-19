@@ -198,6 +198,42 @@ describe('a Conductor message that @mentions two machines', () => {
   });
 });
 
+// The dashboard's composer (and a channel's) starts a thread: its `@` menu has the machines when the role it starts as
+// can delegate, and the first message carries the mention the way a reply does.
+describe('the new-thread composer', () => {
+  const newRows = async (q: string) => ((await a.json(`/mentions?${q}`)).body as any[]).filter((r) => r.kind === 'machine');
+
+  it('lists the machines when the thread starts as the Conductor, and none for a role that cannot delegate', async () => {
+    expect((await newRows('channel=scratch&role=conductor&q=')).map((r) => [r.name, r.machine.id])).toEqual([
+      ['Mac A', 'mac-a'],
+      ['Box B', 'box-b'],
+    ]);
+    expect(await newRows('channel=scratch&q=')).toEqual([]);
+    expect(await newRows('channel=scratch&role=builder&q=')).toEqual([]);
+  });
+
+  it('starts a thread whose first message carries the stamped mention with the device id', T, async () => {
+    const box = (await newRows('channel=scratch&role=conductor&q=box'))[0];
+    const prompt = '@Box B run the ingest';
+    const res = await a.json('/threads', { body: { channel: 'scratch', role: 'conductor', prompt, context: [mention(box)] } });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const id = (res.body as any).id as string;
+    const first = (await waitFor(() => a.byKind(id, 'user').find((e) => e.p.text === prompt)?.p, 'the first message', 15_000)) as { context: MessageContext[] };
+    expect(first.context.map((r) => [r.kind, r.label, (r.body as any).machine])).toEqual([['machine_mention', '@Box B', 'box-b']]);
+    expect((first.context[0].body as any).captured_at).not.toBe(AT.toISOString());
+    expect(harnessText(prompt, first.context, a.thread(id))).toContain('pass device "box-b" to delegate or continue_thread');
+    await a.json(`/threads/${id}/stop`, { body: {} });
+  });
+
+  it('refuses a first message that mentions a machine nobody knows, and makes no thread', async () => {
+    const ghost = newContext(machineMention, mentionBody({ id: 'gone-1', name: 'Old Mac', reachability: 'online', lastSeen: null }, AT), '');
+    const before = threadCount(a);
+    const res = await a.json('/threads', { body: { channel: 'scratch', role: 'conductor', prompt: '@Old Mac do it', context: [ghost] } });
+    expect(res).toMatchObject({ status: 400, body: { error: '@Old Mac: no synced machine has that id now. Remove the mention, then @mention the machine again.' } });
+    expect(threadCount(a)).toBe(before);
+  });
+});
+
 describe('a mentioned machine that cannot take the task', () => {
   it('shows as offline in the menu and on the record, and its delegate fails with nothing made', T, async () => {
     a.tailnet(tailscaleStatus(NODE_A, [{ ...NODE_B, online: false, lastSeen: '2026-11-19T08:00:00Z' }]));

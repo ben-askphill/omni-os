@@ -10,6 +10,8 @@ import { isOmnis, isParked, parkedHeading, parkedLabel, parkedOf } from '../../r
 import { useSending } from '../../sending.ts';
 import { canMove, canSteerNow, editBody, editFailed, isEditable, movedOrder, openEdit, reconcileEdits, STALE_NOTE, type EditDraft } from '../../pending-edits.ts';
 import { ContextChips, hasContext } from '../../message-context/ContextChips.tsx';
+import { MentionText } from '../../message-context/MentionField.tsx';
+import { chipRecords } from '@omni/shared/message-context-machine.ts';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../../forwarded.ts';
 import { isImeEnter } from '../../ime.ts';
 
@@ -355,10 +357,10 @@ export function PendingBubble({
           {files.length && !threadId ? <span className="text-fg-3">· {plural(files.length, 'file')}</span> : null}
         </div>
         {threadId && files.length ? <Attachments threadId={threadId} items={files} href={href} lazy={false} /> : null}
-        <ContextChips records={m.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
+        <ContextChips records={chipRecords(m.text, m.context)} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
         {(m.text || !hasContext(m.context)) && (
           <div className="max-w-[92%] rounded-[22px] rounded-tr-lg border border-dashed border-line-strong px-4 py-2.5 text-[14px] leading-[1.55] break-words whitespace-pre-wrap sm:max-w-[80%]">
-            {m.text}
+            <MentionText text={m.text} records={m.context} />
           </div>
         )}
       </div>

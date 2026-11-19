@@ -419,7 +419,7 @@ describe('starting a new thread with a thread reference', () => {
     const diff = JSON.parse(readFileSync(fixture('message-context.json'), 'utf8')).records[0].raw as MessageContext;
     const other = await create({ context: [diff] });
     expect(other.status).toBe(400);
-    expect((await other.json()).error).toBe(`${diff.label}: a new thread's first message can carry thread references only. Add it in a reply once the thread has started.`);
+    expect((await other.json()).error).toBe(`${diff.label}: a new thread's first message can carry thread references and machine mentions only. Add it in a reply once the thread has started.`);
     expect((await create({ context: [{ kind: 'nope' }] })).status).toBe(400);
     expect(threadCount()).toBe(n);
   });
