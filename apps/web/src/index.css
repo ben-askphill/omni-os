@@ -849,6 +849,33 @@
   .pik-card[data-up] {
     transform-origin: 0 100%;
   }
+  /* The shared Picker's and ModelPicker's list, in the top layer (use-anchored-popover.ts), so a modal never clips it.
+     Script places it where the browser has no anchor positioning; the rule under it does where it has. */
+  .pik-card[popover] {
+    position: fixed;
+    inset: auto;
+    min-width: 0;
+    margin: 0;
+    border: 0;
+    overflow: visible;
+    color: inherit;
+  }
+  @supports (position-area: block-end) {
+    .pik-card[popover] {
+      min-width: anchor-size(width);
+      margin-block: 8px;
+      position-area: block-end span-inline-end;
+      position-try-fallbacks:
+        flip-block,
+        flip-inline,
+        flip-block flip-inline,
+        --pik-below-centred,
+        --pik-above-centred;
+    }
+    .pik-card[popover][data-align="right"] {
+      position-area: block-end span-inline-start;
+    }
+  }
   .pik-row {
     display: flex;
     align-items: center;
@@ -862,6 +889,11 @@
   }
   .pik-row[data-cursor="true"] {
     background: var(--wash);
+  }
+  /* Once the keys move the cursor, its row also draws the ink ring of .item:focus-visible, so it reads at 3:1. */
+  .pik-card[data-keys] .pik-row[data-cursor="true"] {
+    outline: 2px solid var(--fg);
+    outline-offset: -2px;
   }
   .pik-mark {
     display: grid;
@@ -1366,6 +1398,15 @@
   to {
     width: 0;
   }
+}
+/* A window too narrow for the list from either edge of its pill: centred across the window, under or over the pill. */
+@position-try --pik-below-centred {
+  position-area: block-end span-all;
+  justify-self: center;
+}
+@position-try --pik-above-centred {
+  position-area: block-start span-all;
+  justify-self: center;
 }
 @keyframes pik-in {
   from {
