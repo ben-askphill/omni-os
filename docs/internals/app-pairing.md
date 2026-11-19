@@ -14,7 +14,7 @@ The QR payload is a JSON object with `version` set to `1`, `serverUrl` set to th
 
 ## Pair a phone's browser
 
-The same code pairs a phone's browser. The settings card's **Phone browser** QR names `<serverUrl>/api/auth/pair-link?code=<code>`, which the phone's camera opens. `GET /api/auth/pair-link` requires no session: it spends the code for a browser session (`kind` browser, `method` pairing), sets it as the HttpOnly session cookie and redirects to `/`. A missing, used or expired code redirects to `/#/pair?link=expired` (`busy` for a rate limit) and sets nothing. The link never holds the install token, and the code still expires after 300 seconds and works once.
+The same code pairs a phone's browser. The settings card's **Phone browser** QR names `<serverUrl>/api/auth/pair-link?code=<code>`, which the phone's camera opens. `GET /api/auth/pair-link` requires no session: it spends the code for a browser session (`kind` browser, `method` pairing) and sets it as the HttpOnly session cookie, on a keyed path of its own over plain HTTP as `/pair` does (`browser-session.ts`). It answers a small no-store page that writes that path where the Web UI keeps its base (localStorage `omni.api`, `@omni/shared/api-base.ts`) and opens `/`, so the path is never in an address or a cookie another port on the host is sent. A missing, used or expired code redirects to `/#/pair?link=expired` (`busy` for a rate limit) and sets nothing. The link never holds the install token, and the code still expires after 300 seconds and works once.
 
 ## Capabilities
 

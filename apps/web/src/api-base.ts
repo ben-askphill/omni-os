@@ -4,7 +4,8 @@
 // The server names the path when it pairs this browser (`api` in the answer, or `?api=` on the desktop app's first
 // load). The page keeps it in localStorage, which is per origin, so another port cannot read it.
 
-const STORE_KEY = 'omni.api';
+import { API_BASE_STORE_KEY as STORE_KEY } from '@omni/shared/api-base.ts';
+
 const SHAPE = /^\/api(?:\/k\/[0-9a-f]{32})?$/;
 const KEYED = /^\/api\/k\/[0-9a-f]{32}(?=\/|\?|$)/;
 

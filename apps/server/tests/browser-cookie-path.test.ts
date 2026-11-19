@@ -175,6 +175,26 @@ describe("a paired browser's session cookie, with another service on a sibling p
     expect((await jar.fetch(`${OMNI}${fresh}/channels`, { headers: fromPage })).status).toBe(200);
   });
 
+  // A phone's browser that opens the pairing QR's link (auth-api.ts GET /pair-link) gets the same keyed cookie, and
+  // learns its path from the answer's body, never from an address or a cookie the sibling could be sent.
+  it("pairs a phone's browser from the QR link on a keyed path that never reaches the sibling", async () => {
+    const { mintPairing } = await import('../app-pairing.ts');
+    const jar = new Jar();
+    const res = await jar.fetch(`${OMNI}/api/auth/pair-link?code=${encodeURIComponent(mintPairing().code)}`, { headers: { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate' } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
+    const api = /localStorage\.setItem\("omni\.api","(\/api\/k\/[0-9a-f]{32})"\)/.exec(await res.text())?.[1];
+    expect(api).toBeTruthy();
+    expect(jar.session()?.path).toBe(api);
+    expect((await jar.fetch(`${OMNI}${api}/channels`, { headers: fromPage })).status).toBe(200);
+    expect((await jar.fetch(`${OMNI}/api/channels`, { headers: fromPage })).status).toBe(401);
+
+    const captured = await visitSibling(jar);
+    expect(captured.join('\n')).not.toContain(sessionCookieName());
+    expect(captured.join('\n')).not.toContain(api!.slice('/api/k/'.length));
+    for (const cookie of captured) expect((await replay(cookie)).status).toBe(401);
+  });
+
   it('sends a document load on the keyed path to a signed address for that one URL, which shows no key', async () => {
     const { jar, api } = await pairedBrowser();
     const frame = { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'iframe' };

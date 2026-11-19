@@ -7,6 +7,7 @@
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
+import { API_BASE_STORE_KEY } from '@omni/shared/api-base.ts';
 import { deviceCookieName, proofFor, rotateToken, sessionCookieName, TokenPinned } from './api-token.ts';
 import { cookieOptions, DESKTOP_PAIR_COOKIE_PATH, newCookiePath, requestBase, sessionCookies, setSessionCookie } from './browser-session.ts';
 import { DESKTOP_SECRET_HEADER, mintNonce, secretMatches, takeNonce } from './desktop-pairing.ts';
@@ -347,17 +348,31 @@ authApi.post('/app-pairings/redeem', async (c) => {
 });
 
 /**
+ * The answer a phone's browser gets once GET /pair-link paired it: a page that keeps the session's cookie path where
+ * the Web UI reads its base (@omni/shared/api-base.ts), then opens the Web UI. A browser takes no `?api=` (any site
+ * could link one, apps/web/src/api-base.ts takeApiParam), and the path must stay out of every address and of any
+ * cookie a sibling port gets (browser-session.ts), so it goes in this body only. Not cached, and no referrer.
+ */
+function pairedPage(c: Context, path: string) {
+  c.header('cache-control', 'no-store');
+  c.header('referrer-policy', 'no-referrer');
+  c.header('content-security-policy', "default-src 'none'; script-src 'unsafe-inline'");
+  const keep = `try{localStorage.setItem(${JSON.stringify(API_BASE_STORE_KEY)},${JSON.stringify(path)})}catch(e){}location.replace('/')`;
+  return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Omni</title><script>${keep}</script>`);
+}
+
+/**
  * Open: a phone's browser opened the pairing QR's link (Settings, Sharing & access). The same one-time code an app
- * spends, spent here for a browser session in an HttpOnly cookie, then on to the Web UI. A spent, wrong or expired
- * code goes to the pairing screen instead, which says so. The install's token is never in the link.
+ * spends, spent here for a browser session in an HttpOnly cookie on a path of its own over plain HTTP, as /pair does,
+ * then on to the Web UI through pairedPage. A spent, wrong or expired code goes to the pairing screen instead, which
+ * says so. The install's token is never in the link.
  */
 authApi.get('/pair-link', (c) => {
   const code = c.req.query('code') ?? '';
   if (!code || code.length > 200) return c.redirect('/#/pair?link=expired', 303);
   try {
     const s = redeemPairing(code, browserName(c.req.header('user-agent')), clientKey(c), undefined, 'browser');
-    setSessionCookie(c, s.token);
-    return c.redirect('/', 303);
+    return pairedPage(c, issueCookie(c, { id: s.sessionId, token: s.token }));
   } catch (err) {
     if (err instanceof PairingError) return c.redirect(`/#/pair?link=${err.status === 429 ? 'busy' : 'expired'}`, 303);
     throw err;

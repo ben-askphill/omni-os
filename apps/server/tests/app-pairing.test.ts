@@ -117,7 +117,9 @@ describe('minting a code', () => {
   it('is minted for a session paired with the install token, the desktop window and a browser that used the token', async () => {
     const res = await req('POST', '/auth/pair', {}, as(MASTER));
     const cookie = res.headers.get('set-cookie')!.match(/(omni_session_\d+=[^;]+)/)![1];
-    const minted = await req('POST', '/auth/app-pairings', {}, { ...NONE, cookie });
+    // Its cookie works on the path /pair answered (browser-session.ts), as the page sends every request.
+    const { api } = (await res.json()) as { api: string };
+    const minted = await app.request(`http://127.0.0.1:4747${api}/auth/app-pairings`, { method: 'POST', headers: { ...NONE, cookie, 'content-type': 'application/json' }, body: '{}' });
     expect(minted.status).toBe(200);
     expect(((await minted.json()) as { code: string }).code).toMatch(/^omni_p_/);
     // A phone that paired with that code cannot mint the next one.
@@ -675,16 +677,26 @@ describe('pairing a phone browser from the QR link', () => {
   const open = (code: string) => req('GET', `/auth/pair-link?code=${encodeURIComponent(code)}`, undefined, NONE);
   const cookieOf = (res: Response) => /(?:^|,\s*)([^=;,\s]+=[^;]+)/.exec(res.headers.get('set-cookie') ?? '')?.[1] ?? null;
 
-  it('spends the one-time code for a browser session cookie, then opens the Web UI', async () => {
+  // Over plain HTTP the cookie lives on a keyed path (browser-session.ts), which the page must learn without it ever
+  // being in an address: the answer is a page that keeps it in the Web UI's localStorage, then opens the Web UI.
+  it('spends the one-time code for a browser session cookie on its own path, and hands the page that path', async () => {
     const { code } = await mint();
     const res = await open(code);
-    expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('/');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer');
     const cookie = cookieOf(res)!;
     expect(cookie.startsWith(`${sessionCookieName()}=`)).toBe(true);
     expect(res.headers.get('set-cookie')).toMatch(/HttpOnly/i);
+    const path = /Path=(\/api\/k\/[0-9a-f]{32})/i.exec(res.headers.get('set-cookie') ?? '')?.[1];
+    expect(path).toBeTruthy();
+    const page = await res.text();
+    expect(page).toContain(`localStorage.setItem("omni.api","${path}")`);
+    expect(page).toContain("location.replace('/')");
     expect(sessions().filter((s) => !s.revoked_at)).toEqual([expect.objectContaining({ kind: 'browser', method: 'pairing' })]);
-    expect((await req('GET', '/threads', undefined, { ...NONE, cookie })).status).toBe(200);
+    // The session works on its path only.
+    expect((await app.request(`http://127.0.0.1:4747${path}/threads`, { headers: { ...NONE, cookie } })).status).toBe(200);
+    expect((await req('GET', '/threads', undefined, { ...NONE, cookie })).status).toBe(401);
   });
 
   it('a spent, wrong or missing code goes to the pairing screen and sets nothing', async () => {
