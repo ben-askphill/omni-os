@@ -6,6 +6,8 @@ import { App } from './App.tsx';
 import { PairGate } from './components/Pair.tsx';
 import { takeApiParam } from './api-base.ts';
 import { desktop } from './desktop.ts';
+import { prefetchWhenIdle } from './lazy.tsx';
+import { parseHash } from './router.ts';
 import './index.css';
 // The channel rail's faces (index.css :root[data-layout="rail"]). Each @font-face downloads only when used.
 import '@fontsource/adwaita-sans/400.css';
@@ -29,3 +31,5 @@ createRoot(document.getElementById('root')!).render(
     </PairGate>
   </StrictMode>,
 );
+// The desktop app's Quick Prompt panel is a page of its own (App.tsx) and never opens the pages lazy.tsx holds.
+if (!(desktop && parseHash(location.hash).name === 'quick-prompt')) prefetchWhenIdle();

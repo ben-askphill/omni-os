@@ -105,12 +105,8 @@ export function DoneTips({ tips }: { tips: DoneTip[] }) {
 
 export { NAME_MAX };
 
-export function Onboarding() {
-  const { setupOpen } = useApp();
-  return setupOpen ? <Wizard /> : null;
-}
-
-function Wizard() {
+/** The setup dialog. lazy.tsx's Onboarding fetches this chunk and shows it while setup is open. */
+export function SetupWizard() {
   const { closeSetup, reloadProfile, reloadChannels } = useApp();
   // No onDismiss: Escape and the backdrop leave setup open. Skip setup and Cancel are the ways out.
   const dialog = useRef<HTMLDialogElement>(null);

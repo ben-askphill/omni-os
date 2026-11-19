@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Paints the canvas in the system's scheme before the stylesheet arrives. The script below pins a forced theme. -->
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0c0d0f" media="(prefers-color-scheme: dark)" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -14,11 +16,47 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg transform='translate(7 9) skewX(-10)'%3E%3Ccircle r='4.5' fill='none' stroke='%230D0D0C' stroke-width='2.4'/%3E%3Ccircle cx='5.9' cy='-5.9' r='1.75' fill='%230D0D0C'/%3E%3C/g%3E%3C/svg%3E" media="(prefers-color-scheme: light)" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg transform='translate(7 9) skewX(-10)'%3E%3Ccircle r='4.5' fill='none' stroke='%23ffffff' stroke-width='2.4'/%3E%3Ccircle cx='5.9' cy='-5.9' r='1.75' fill='%23ffffff'/%3E%3C/g%3E%3C/svg%3E" media="(prefers-color-scheme: dark)" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- The rail's faces the script below preloads, space-separated. A build fills in their hashed paths (vite.config.ts). -->
+    <meta name="omni-rail-fonts" content="" />
+    <!--
+      Before the first paint: a forced theme (components/theme.tsx) and the desktop shell's layout (layout-pref.ts), so
+      the page paints in its scheme and the rail's faces from the first frame. App.tsx keeps both up to date from
+      there. tests/head-script.test.ts runs this script against the code it mirrors. The CSP hashes it from the
+      built index.html (apps/server/web-headers.ts), so an edit needs no constant changed.
+    -->
     <script>
-      try {
-        var t = JSON.parse(localStorage.getItem('omni.theme') || '"system"');
-        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-      } catch (e) {}
+      (function () {
+        function pref(key, fallback) {
+          try {
+            var v = localStorage.getItem('omni.' + key);
+            return v == null ? fallback : JSON.parse(v);
+          } catch (e) {
+            return fallback;
+          }
+        }
+        var root = document.documentElement;
+        var theme = pref('theme', 'system');
+        if (theme === 'light' || theme === 'dark') {
+          root.dataset.theme = theme;
+          document.querySelector('meta[name="color-scheme"]').content = theme;
+        }
+        // The phone layout and the desktop app's Quick Prompt panel keep Apple's faces.
+        if (!matchMedia('(min-width: 768px)').matches || /^#\/*quick-prompt\/*(\?|$)/.test(location.hash)) return;
+        var layout = pref('layout', 'rail') === 'classic' ? 'classic' : 'rail';
+        root.dataset.layout = layout;
+        // The rail's faces, fetched beside the bundle, so the first layout has them rather than asking for them.
+        var fonts = document.querySelector('meta[name="omni-rail-fonts"]').content;
+        if (layout !== 'rail' || !fonts) return;
+        fonts.split(' ').forEach(function (href) {
+          var link = document.createElement('link');
+          link.rel = 'preload';
+          link.as = 'font';
+          link.type = 'font/woff2';
+          link.crossOrigin = 'anonymous';
+          link.href = href;
+          document.head.appendChild(link);
+        });
+      })();
     </script>
     <title>Omni</title>
   </head>

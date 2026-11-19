@@ -161,9 +161,12 @@
   --face-serif: "New York", ui-serif, Georgia, serif;
   --face-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-/* The channel rail Beta (App.tsx sets data-layout) sets type the way the Linux desktop app does on GNOME and
-   Omarchy: Adwaita Sans for text, headings and initials, JetBrains Mono for code. main.tsx bundles both (OFL), so a
-   Mac shows them too; a browser downloads them only once the rail uses them. */
+/* The channel rail Beta (index.html's head script sets data-layout before the first paint, App.tsx keeps it) sets
+   type the way the Linux desktop app does on GNOME and Omarchy: Adwaita Sans for text, headings and initials,
+   JetBrains Mono for code. main.tsx bundles both (OFL), so a Mac shows them too; a browser downloads them only once
+   the rail uses them, and the head script preloads the three weights a first screen draws. No font-size-adjust:
+   from-font reads the fallback's own aspect while the face loads, so it holds nothing, and a fixed value also
+   resizes the mono, emoji and CJK text inherited under it (measured in Chromium, 2026-11-19). */
 :root[data-layout="rail"] {
   --face-sans: "Adwaita Sans", system-ui, sans-serif;
   --face-head: var(--face-sans);

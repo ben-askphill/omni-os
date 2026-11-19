@@ -7,10 +7,14 @@ export type ThemePref = 'system' | 'light' | 'dark';
 
 const CHROME = { light: '#ffffff', dark: '#0c0d0f' };
 
+/** index.html's head script does the same before the first paint, minus the browser chrome. */
 function apply(t: ThemePref) {
   const root = document.documentElement;
   if (t === 'system') delete root.dataset.theme;
   else root.dataset.theme = t;
+  // The canvas the browser paints before the stylesheet applies, and the native controls.
+  const colorScheme = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]');
+  if (colorScheme) colorScheme.content = t === 'system' ? 'light dark' : t;
   // Keep the browser chrome in step with a forced scheme.
   document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => {
     const scheme = t === 'system' ? (m.media.includes('dark') ? 'dark' : 'light') : t;
@@ -23,6 +27,9 @@ let current: ThemePref = (() => {
   const v = readPref<unknown>('theme', 'system');
   return valid(v) ? v : 'system';
 })();
+// The browser chrome takes a forced theme from the start, not from the first change in Settings. (Tests import this
+// module without a DOM.)
+if (typeof document !== 'undefined') apply(current);
 // The desktop app draws its own window chrome and menus in the theme the page picked.
 desktop?.setAppearance(current);
 const listeners = new Set<(t: ThemePref) => void>();
