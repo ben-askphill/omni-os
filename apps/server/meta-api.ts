@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { deleteAutomation, lastRuns, loadAutomations, runAutomation } from './automations.ts';
 import { automationRefusal, callerOf, lineage, threadCredential, type AutomationWrite } from './automation-guard.ts';
 import { placeholderFieldsIn, placeholderRefusal } from './user-config.ts';
-import { automationFields, createAutomation, definitionOf, resetAutomation, saveAutomation, setAutomationEnabled, sourceKind } from './automation-files.ts';
+import { automationFields, createAutomation, createAutomationYaml, definitionOf, resetAutomation, saveAutomation, setAutomationEnabled, sourceKind } from './automation-files.ts';
 import { ownerOf } from './sync/owner.ts';
 import { shellAllowed } from './request-guard.ts';
 import { pollErrors, watchedRepo } from './automation-watch.ts';
@@ -194,14 +194,21 @@ metaApi.put('/automations/:id', async (c) => {
 });
 // A new automation in data/automations/<id>.yaml. `id` is optional: one is made from the name.
 metaApi.post('/automations', async (c) => {
-  const parsed = z.object({ id: z.string().max(64).optional(), fields: automationFields }).strict().safeParse(await c.req.json().catch(() => null));
+  const id = z.string().max(64).optional();
+  const parsed = z
+    .union([z.object({ id, fields: automationFields }).strict(), z.object({ id, yaml: z.string().min(1).max(200_000) }).strict()])
+    .safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid automation' }, 400);
   const no = refusal(c, 'create');
   if (no) return no;
   // What a usage scan saves starts off: Ben turns each one on himself (automation-guard.ts).
   const caller = callerOf(c);
-  const fields = caller && lineage(caller).scan ? { ...parsed.data.fields, enabled: false } : parsed.data.fields;
-  return edit(c, () => createAutomation(fields, parsed.data.id), 201);
+  const off = !!caller && !!lineage(caller).scan;
+  const body = parsed.data;
+  // A scan saves only the editor's fields: a whole file could carry keys it may not set (a precheck command, connectors).
+  if ('yaml' in body) return off ? c.json({ error: 'A usage scan saves automations from fields, not YAML.' }, 403) : edit(c, () => createAutomationYaml(body.yaml, body.id, { shell: shellAllowed(c) }), 201);
+  const fields = off ? { ...body.fields, enabled: false } : body.fields;
+  return edit(c, () => createAutomation(fields, body.id), 201);
 });
 // Drop the user's copy of a shipped automation, so the shipped YAML loads again. Bringing back a shipped precheck that
 // the copy does not run needs the install token or a session paired with it, as a save does.

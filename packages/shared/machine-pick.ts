@@ -40,8 +40,8 @@ const machinesLine = (candidates: readonly PickCandidate[]) =>
   candidates.map((c) => `${c.name} (${[c.id, c.here && 'this machine'].filter(Boolean).join(', ')})`).join(', ');
 
 /**
- * The machine `asked` names: "here", a machine's id, or its name (any case, this machine's own included). A name two
- * machines share, or one no machine has, is refused with the machines there are. Whether the machine can take a
+ * The machine `asked` names: "here", a machine's id, or its name (any case, this machine's own included), or a part
+ * of a name one machine has ("MacBook Pro" finds "Ben's MacBook Pro"). A name two machines share, or one no machine has, is refused with the machines there are. Whether the machine can take a
  * thread now is POST /threads' to say (run-on.ts targetFor): it refuses one Tailscale sees offline.
  */
 export function pickMachine(asked: string, candidates: readonly PickCandidate[]): PickResult {
@@ -53,5 +53,8 @@ export function pickMachine(asked: string, candidates: readonly PickCandidate[])
   const named = candidates.filter((c) => c.name.trim().toLowerCase() === want.toLowerCase());
   if (named.length === 1) return { ok: true, pick: pickOf(named[0], 'name') };
   if (named.length > 1) return { ok: false, status: 400, error: `${named.length} machines are called "${want}". Pass the id instead: ${named.map((c) => c.id ?? 'here').join(', ')}.` };
+  const part = candidates.filter((c) => c.name.toLowerCase().includes(want.toLowerCase()));
+  if (part.length === 1) return { ok: true, pick: pickOf(part[0], 'name') };
+  if (part.length > 1) return { ok: false, status: 400, error: `${part.length} machines match "${want}": ${machinesLine(part)}. Pass the id instead.` };
   return { ok: false, status: 404, error: `No synced machine has the id or name "${want}". Machines: ${machinesLine(candidates) || 'none, sync is off'}.` };
 }

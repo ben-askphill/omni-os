@@ -22,7 +22,7 @@ export const reviewNotes = {
   },
   /** Oldest first. */
   byThread(threadId: string): ReviewNote[] {
-    return (db.prepare(`SELECT ${COLUMNS} FROM review_notes WHERE thread_id = ? ORDER BY created_at, id`).all(threadId) as Row[]).map(toNote);
+    return (db.prepare(`SELECT ${COLUMNS} FROM review_notes WHERE thread_id = ? ORDER BY created_at, rowid`).all(threadId) as Row[]).map(toNote);
   },
   count: (threadId: string) => (db.prepare('SELECT COUNT(*) AS n FROM review_notes WHERE thread_id = ?').get(threadId) as { n: number }).n,
 

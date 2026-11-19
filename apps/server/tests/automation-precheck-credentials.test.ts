@@ -132,6 +132,30 @@ describe('adding or changing a precheck in the YAML', () => {
     });
 });
 
+// A new automation from a whole YAML file (#833) is a precheck none ran before.
+describe('creating an automation from a YAML file that carries a precheck', () => {
+  for (const who of WHO)
+    it(`${who}: ${CREDENTIALS[who].shell ? 'may' : 'may not'} create one`, async () => {
+      const id = `from-yaml-${++n}`;
+      const command = marker(who);
+      const res = await call(who, 'POST', '/automations', { id, yaml: yaml(`precheck: ${command}\n`) });
+      if (CREDENTIALS[who].shell) {
+        expect(res.status, JSON.stringify(res.body)).toBe(201);
+        expect(loaded(id).precheck?.command).toBe(command);
+        return;
+      }
+      expectRefused(who, res);
+      expect(existsSync(personalFile(id))).toBe(false);
+    });
+  it('stays open to every signed-in device without one', async () => {
+    for (const who of SIGNED_IN) {
+      const id = `from-yaml-${++n}`;
+      const res = await call(who, 'POST', '/automations', { id, yaml: yaml() });
+      expect(res.status, `${who}: ${JSON.stringify(res.body)}`).toBe(201);
+    }
+  });
+});
+
 describe('a precheck that never ran', () => {
   for (const who of SIGNED_IN)
     it(`${who}: ${CREDENTIALS[who].shell ? 'may' : 'may not'} put an event automation that carries one on a schedule, or fix a file that did not load`, async () => {

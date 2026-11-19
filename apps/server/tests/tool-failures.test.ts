@@ -139,6 +139,8 @@ describe('tool failure capture and triage', () => {
     config.browser = true;
     try {
       expect(prompt('claude-code')).toContain('browser_find searches for a `text` substring or a `regex`');
+    expect(prompt('claude-code')).toContain('To reload or open another page, call browser_navigate');
+    expect(prompt('claude-code')).toContain("without Node's require, fs or process");
       for (const harness of ['claude-code', 'cursor']) expect(prompt(harness)).toContain('take the snapshot ref as `target`, not `ref`');
       expect(prompt('claude-code')).toContain('stop it by its PID: `pkill -f` with its command line also matches your own shell');
     } finally {

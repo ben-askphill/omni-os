@@ -152,6 +152,17 @@ describe('creating', () => {
     expect((await call('PUT', '/automations/digest', { yaml })).status).toBe(200);
     expect(readFileSync(own('digest'), 'utf8')).toBe(yaml);
   });
+
+  it('makes a new one from a whole YAML file, comments kept, its id from the name', async () => {
+    const yaml = '# restored by hand\nname: Weekly Review\nenabled: false\ncron: "0 9 * * 1"\nchannel: scratch\nprompt: look back\n';
+    const { status, body } = await call('POST', '/automations', { yaml });
+    expect(status, JSON.stringify(body)).toBe(201);
+    expect(body.id).toBe('weekly-review');
+    expect(readFileSync(own('weekly-review'), 'utf8')).toBe(yaml);
+    expect((await call('POST', '/automations', { yaml })).status).toBe(409);
+    expect((await call('POST', '/automations', { id: 'broken', yaml: 'name: [' })).status).toBe(400);
+    expect((await call('POST', '/automations', { id: 'both', yaml, fields: fields() })).status).toBe(400);
+  });
 });
 
 describe('choosing a machine, with sync on', () => {
