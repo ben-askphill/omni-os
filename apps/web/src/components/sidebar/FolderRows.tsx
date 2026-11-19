@@ -5,6 +5,7 @@ import { openMenu } from '../ContextMenu.tsx';
 import { plural } from '../../format.ts';
 import { Icon, StatusDot } from '../ui.tsx';
 import { ChannelThreadEntry } from './SidebarRows.tsx';
+import { isImeEnter } from '../../ime.ts';
 
 /** A folder's name being typed: Enter or leaving the field saves, Escape cancels. */
 export function FolderNameField({ initial, onSave, onCancel }: { initial: string; onSave: (name: string) => void; onCancel: () => void }) {
@@ -29,7 +30,7 @@ export function FolderNameField({ initial, onSave, onCancel }: { initial: string
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation();
-          if (e.key === 'Enter') finish(true);
+          if (e.key === 'Enter' && !isImeEnter(e)) finish(true);
           else if (e.key === 'Escape') finish(false);
         }}
         onBlur={() => finish(true)}

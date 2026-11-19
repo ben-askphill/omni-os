@@ -14,6 +14,7 @@ import { relTime } from '@omni/shared/format.ts';
 import { api, errorText, type ContextView, type Thread } from '../../api.ts';
 import { Button, ErrorNote, Icon } from '../ui.tsx';
 import { useDismissable } from '../ui/use-dismissable.ts';
+import { isImeEnter } from '../../ime.ts';
 
 const STROKE: Record<ContextLevel, string> = { ok: 'var(--fg-3)', warn: 'var(--warn)', critical: 'var(--needs)' };
 const TEXT: Record<ContextLevel, string> = { ok: 'text-fg-3', warn: 'text-warn', critical: 'text-needs' };
@@ -429,7 +430,7 @@ function CompactAction({ thread, view, onCompacted }: { thread: Thread; view: Co
               value={focus}
               onChange={(e) => setFocus(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void run();
+                if (e.key === 'Enter' && !isImeEnter(e)) void run();
               }}
               maxLength={2000}
               placeholder="Optional: what the summary should keep"

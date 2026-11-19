@@ -11,6 +11,7 @@ import { plural } from '../../../format.ts';
 import { addDraftContext } from '../../../message-context/draft.ts';
 import { ShellCtx } from '../../../mobile/shell.tsx';
 import { Button, ErrorNote, Icon } from '../../ui.tsx';
+import { isImeEnter } from '../../../ime.ts';
 
 /**
  * The panel's pick. A new `scope` (another turn) drops it, and so does a reload that changed the picked file's diff,
@@ -104,7 +105,7 @@ export function SelectionDock({
           setError(null);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeEnter(e)) {
             e.preventDefault();
             add();
           }

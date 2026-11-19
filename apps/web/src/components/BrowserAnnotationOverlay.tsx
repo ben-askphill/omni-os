@@ -27,6 +27,7 @@ import { useReplySend } from './Composer.tsx';
 import type { Browser } from './LiveBrowser.tsx';
 import { dragRect, elementName, initialLiveAnnotate, liveAnnotateReducer, resolveSelection, styleRows, type Selection } from './browser-live-annotate.ts';
 import { Button, ErrorNote, Icon, IconButton, Kbd } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 
 /** A press that moves less than this many screen pixels is a click. */
 const DRAG_START = 3;
@@ -532,7 +533,7 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
               placeholder="What about this?"
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
+                if (isImeEnter(e)) return;
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   if (ready) void send();

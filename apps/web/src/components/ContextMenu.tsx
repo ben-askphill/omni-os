@@ -11,6 +11,7 @@ import { ThreadReferencePanel } from './ThreadReference.tsx';
 import { threadTarget } from '../message-context/thread-picker.ts';
 import { FolderChoices, MenuCaption, MenuGroups, containerItems, focusFirstItem, itemForKey, moveFocus, useMenuDismiss, useMenuPlacement, useThreadRow, type MenuItem } from './ContextMenuParts.tsx';
 import { KbdFooter, MENU_SURFACE, MOD_KEY } from './ui/overlay.tsx';
+import { isImeEnter } from '../ime.ts';
 
 type Target = { kind: 'thread'; id: string } | { kind: 'channel'; id: string } | { kind: 'folder'; id: string };
 /** `align: 'end'`: `x` is the menu's right edge, for a button that opens it under itself at the right of a bar. */
@@ -166,7 +167,7 @@ function Menu({ open, onClose }: { open: Open; onClose: () => void }) {
             aria-label="Thread title"
             onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && renameTo(draft)}
+            onKeyDown={(e) => e.key === 'Enter' && !isImeEnter(e) && renameTo(draft)}
             className="h-8 w-[260px] rounded-[var(--r-sm)] bg-surface px-2.5 text-[13px] text-fg outline-none"
           />
         ) : (

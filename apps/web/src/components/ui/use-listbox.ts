@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { isImeEnter } from '../../ime.ts';
 
 /**
  * The cursor of a dropdown listbox (the shared Picker, ModelPicker). Focus stays on the search field (a combobox) or on
@@ -48,7 +49,7 @@ export function useListbox(count: number, open: boolean) {
     else if (e.key === 'ArrowUp') move(at - 1);
     else if (homeEnd && e.key === 'Home') move(0);
     else if (homeEnd && e.key === 'End') move(count - 1);
-    else if (e.key === 'Enter' || (space && e.key === ' ')) {
+    else if ((e.key === 'Enter' && !isImeEnter(e)) || (space && e.key === ' ')) {
       e.preventDefault();
       if (at >= 0) onPick(at);
     } else if (e.key === 'Escape') {

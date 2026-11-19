@@ -6,6 +6,7 @@ import { useApp } from '../store.tsx';
 import { Icon, Kbd } from './ui.tsx';
 import { KbdFooter, overlayRow } from './ui/overlay.tsx';
 import { useModalDialog } from './ui/use-modal-dialog.ts';
+import { isImeEnter } from '../ime.ts';
 
 /** ⌘K: jump to a page, channel or recent thread, or search everything. */
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -68,7 +69,7 @@ function Palette({ onClose }: { onClose: () => void }) {
                 } else if (e.key === 'ArrowUp') {
                   e.preventDefault();
                   setCursor((c) => Math.max(0, c - 1));
-                } else if (e.key === 'Enter') {
+                } else if (e.key === 'Enter' && !isImeEnter(e)) {
                   e.preventDefault();
                   run(items[safeCursor]);
                 }

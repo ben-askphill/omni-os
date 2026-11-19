@@ -33,6 +33,7 @@ import { useForkMachine } from './RunOnPicker.tsx';
 import { Button, Chip, ErrorNote, Icon, IconButton, Label, Loading, Modal, Toggle, useUnsavedChanges, type ChipTone } from './ui.tsx';
 import { ModalFooter } from './ui/modal.tsx';
 import { MOD_KEY } from './ui/overlay.tsx';
+import { isImeEnter } from '../ime.ts';
 
 /**
  * One continue sheet's state, for the desktop and the phone: the picked run and machine's preview, asked again whenever
@@ -225,7 +226,7 @@ function ContinueForm({ source, targets, onPickerOpen, onClose }: { source: Cont
               className="field min-h-[132px] resize-y leading-relaxed"
               onChange={(e) => dispatch({ type: 'text', text: e.target.value })}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeEnter(e)) {
                   e.preventDefault();
                   void start();
                 }

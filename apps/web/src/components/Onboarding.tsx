@@ -29,6 +29,7 @@ import {
 import { Button, ErrorNote, FolderInput, IDENTIFIER } from './ui.tsx';
 import { ModalFooter } from './ui/modal.tsx';
 import { useModalDialog } from './ui/use-modal-dialog.ts';
+import { isImeEnter } from '../ime.ts';
 
 export { PronounsInput, TimezoneInput } from './onboarding-parts.tsx';
 
@@ -321,7 +322,7 @@ function Wizard() {
                       placeholder="What should I check before I sign a lease for an office?"
                       onChange={(e) => setAsk(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        if (e.key === 'Enter' && !e.shiftKey && !isImeEnter(e)) {
                           e.preventDefault();
                           e.currentTarget.form?.requestSubmit();
                         }

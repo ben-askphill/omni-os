@@ -5,6 +5,7 @@ import { api, errorText, useApi, type CrewRole } from '../api.ts';
 import { useApp, useFeed } from '../store.tsx';
 import { MemoryRow } from './MemoryRow.tsx';
 import { Button, ErrorNote, Loading, Picker, type PickerOption } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 
 // A crew role's memory (GET /api/crew/<id>/memory, apps/server/memory-api.ts; crew plan S6): lessons every later
 // thread of the role gets in its prompt, in every channel or in one. Its threads propose them with remember, and none
@@ -77,7 +78,7 @@ export function RoleMemory({ role }: { role: Pick<CrewRole, 'id' | 'name' | 'mem
           maxLength={MEMORY_MAX}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            if (e.key !== 'Enter' || isImeEnter(e)) return;
             e.preventDefault();
             void add();
           }}

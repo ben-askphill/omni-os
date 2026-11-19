@@ -14,6 +14,7 @@ import { MarkToolbar } from './BrowserMarkToolbar.tsx';
 import { useMarkEditor } from './useMarkEditor.ts';
 import { renderMarked } from './browser-marks-canvas.ts';
 import { Button, ErrorNote, Icon, IconButton } from './ui.tsx';
+import { isImeEnter } from '../ime.ts';
 
 /** A page the server can capture: the browser is up and shows a web page. */
 export const canAnnotate = (s: { running: boolean; url: string } | null | undefined) => !!s?.running && /^https?:\/\//i.test(s.url);
@@ -321,7 +322,7 @@ function Draw({ capture, channelId, threadId, onAdded, from }: { capture: Browse
               onPointerDown={(e) => e.stopPropagation()}
               onBlur={commitText}
               onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
+                if (isImeEnter(e)) return;
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   commitText();
@@ -360,7 +361,7 @@ function Draw({ capture, channelId, threadId, onAdded, from }: { capture: Browse
                 setError(null);
               }}
               onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
+                if (isImeEnter(e)) return;
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   void add();
