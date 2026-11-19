@@ -141,7 +141,7 @@ export function Turn({ t, first, last, c }: { t: TurnView; first: boolean; last:
           }
           above={
             <>
-              {p.attachments?.length ? <Attachments threadId={thread.id} items={p.attachments} /> : null}
+              {p.attachments?.length ? <Attachments threadId={thread.id} items={p.attachments} lazy={!last} /> : null}
               <ContextChips records={p.context} align="end" className="w-full max-w-[86%]" />
             </>
           }

@@ -81,6 +81,12 @@ const atOf = (layers: Layer[]) => {
 
 // `isolate`: a layer's own z-indexes (its header, a segmented thumb) must not reach over the layer pushed above it.
 const layerCls = 'absolute inset-0 isolate flex flex-col overflow-hidden bg-bg';
+/**
+ * A layer no one can see: a tab in the background, or a screen under the top one once its push has played. Its
+ * content skips style, layout and paint and keeps its rendering state, scroll positions included, for when it shows
+ * again. Browsers without content-visibility draw it, under the opaque layers above it, as before.
+ */
+const SKIPPED: CSSProperties = { contentVisibility: 'hidden' };
 
 export function MobileShell() {
   const hash = useHash();
@@ -138,10 +144,19 @@ export function MobileShell() {
   const api = useMemo<MobileShellApi>(() => ({ back, open: (to) => navigate(to), sheet: setSheet, toast: showToast }), [back, showToast]);
 
   const pushedIn = place.hash === hash && place.dir === 'forward';
+  // The top screen whose push is still playing: what it covers stays drawn under it until it lands.
+  const [pushing, setPushing] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    if (!pushedIn || !top) return;
+    setPushing(top.key);
+    const t = setTimeout(() => setPushing(null), PUSH_MS + 40);
+    return () => clearTimeout(t);
+  }, [top?.key, pushedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const landed = !top || pushing !== top.key;
   const layers: Layer[] = underlay && !stack.some((l) => l.key === underlay.key) ? [underlay, ...stack] : stack;
   const renderLayer = (l: Layer): ReactNode => {
     const isTop = l === top;
-    const style: CSSProperties = isTop && pushedIn ? { animation: `mo-push ${PUSH_MS}ms var(--ease-spring)` } : {};
+    const style: CSSProperties = isTop && pushedIn ? { animation: `mo-push ${PUSH_MS}ms var(--ease-spring)` } : !isTop && landed ? SKIPPED : {};
     return (
       <div key={l.key} className={layerCls} style={style} inert={!isTop || undefined} aria-hidden={!isTop || undefined}>
         {RENDER[screenOf(l.route)](l.route)}
@@ -159,7 +174,12 @@ export function MobileShell() {
             <div
               key={t}
               className={layerCls}
-              style={{ visibility: shown ? 'visible' : 'hidden', animation: shown && !covered && place.dir !== 'none' ? 'mo-fade 220ms var(--ease-out)' : 'none' }}
+              style={{
+                visibility: shown ? 'visible' : 'hidden',
+                animation: shown && !covered && place.dir !== 'none' ? 'mo-fade 220ms var(--ease-out)' : 'none',
+                // A tab in the background, or one a pushed screen has covered, skips layout and paint.
+                ...(!shown || (covered && landed) ? SKIPPED : {}),
+              }}
               inert={!shown || covered || undefined}
               aria-hidden={!shown || covered || undefined}
             >

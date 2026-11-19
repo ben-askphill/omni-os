@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstBelow } from '../src/pages/useScrollAnchor.ts';
+import { anchorRow, firstBelow } from '../src/pages/useScrollAnchor.ts';
 import { BOTTOM_SLACK, followAfterScroll, onContent } from '../src/pages/useTranscriptScroll.ts';
 
 // The transcript's auto scroll: a scroll up leaves the bottom, however small.
@@ -45,5 +45,31 @@ describe('firstBelow', () => {
     expect(firstBelow(bottoms.length, (i) => bottoms[i], 120)).toBe(2);
     expect(firstBelow(bottoms.length, (i) => bottoms[i], 300)).toBe(4);
     expect(firstBelow(0, () => 0, 0)).toBe(0);
+  });
+});
+
+describe('anchorRow', () => {
+  // Rows [top, bottom] with 16px gaps; the view runs from 100 to 600.
+  const rows = [
+    [0, 80],
+    [96, 300],
+    [316, 400],
+    [416, 2000],
+  ];
+  const at = (r: number[][], top: number, bottom = 600) => anchorRow(r.length, (i) => r[i][0], (i) => r[i][1], top, bottom);
+
+  it('holds the first row that starts in view, not the one across the top edge, which may still be a placeholder', () => {
+    expect(at(rows, 100)).toBe(2);
+    expect(at(rows, 96)).toBe(1);
+  });
+
+  it('holds the row across the edge when no other starts in view', () => {
+    expect(at(rows, 500)).toBe(3);
+    expect(at(rows, 350, 410)).toBe(2);
+  });
+
+  it('holds nothing past the last row', () => {
+    expect(at(rows, 2100)).toBe(4);
+    expect(at([], 0)).toBe(0);
   });
 });

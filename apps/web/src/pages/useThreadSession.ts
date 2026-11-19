@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, errorText, listGate, useThreadStream, type Artifact, type ArtifactWithThread, type Channel, type ContextUsage, type HistoryEvent, type PendingMsg, type Thread, type ThreadOpen } from '../api.ts';
 import { useToast } from '../components/Toaster.tsx';
 import { useFeed } from '../store.tsx';
@@ -76,6 +76,19 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
   // The `at` the first load or a later reveal already took, so each is scrolled to once.
   const revealed = useRef<number | undefined>(undefined);
 
+  // The list gates the first load holds, each opened once its page has committed: the lists' answers would otherwise
+  // land while the transition below renders and start it over. Null while unmounted, when a gate opens at once.
+  const gates = useRef<(() => void)[] | null>(null);
+  const [opens, setOpens] = useState(0);
+  useEffect(() => gates.current?.splice(0).forEach((release) => release()), [opens]);
+  useEffect(() => {
+    gates.current = [];
+    return () => {
+      gates.current?.splice(0).forEach((release) => release());
+      gates.current = null;
+    };
+  }, []);
+
   const artifactIds = useRef(new Set<number>());
   const upsertArtifact = useCallback((a: Artifact) => {
     const isNew = !artifactIds.current.has(a.id);
@@ -112,33 +125,43 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
     async () => {
       // The lists the app reloads by itself wait until this page is in (api.ts listGate).
       const release = listGate.hold();
+      let held = true;
       try {
         const d = await api.get<ThreadOpen>(`/threads/${encodeURIComponent(id)}?history=recent`);
         const target = atRef.current;
         // Before any state is set, so the thread first renders with the hit's page already held.
         const opened = await prepare(d, target);
-        applyDetail(d);
-        setLinks(linksOf(d));
-        open(opened);
-        // Not held when its page failed: the reveal below tries again and says why.
-        if (target && holds(opened, target)) {
-          revealed.current = target;
-          setRevealTarget(target);
+        if (gates.current) {
+          gates.current.push(release);
+          held = false;
         }
-        setReady(true);
-        if (!artifactParamRef.current) {
-          const visible = d.artifacts.filter((a) => a.kind !== 'screenshot');
-          const html = [...visible].reverse().find((a) => a.kind === 'html');
-          // A thread with no files of its own opens on the newest its crew made.
-          const pick = html ?? visible[visible.length - 1] ?? crewShown(d.artifacts, d.crew_artifacts ?? []).files[0];
-          if (pick) setSelected(pick.id);
-        }
-        setError(null);
+        // Up to a page of rows, each through the Markdown pass: as a transition React renders it in slices and a tap
+        // made meanwhile goes first. All of it lands in one commit, so nothing shows half loaded.
+        startTransition(() => {
+          setOpens((n) => n + 1);
+          applyDetail(d);
+          setLinks(linksOf(d));
+          open(opened);
+          // Not held when its page failed: the reveal below tries again and says why.
+          if (target && holds(opened, target)) {
+            revealed.current = target;
+            setRevealTarget(target);
+          }
+          setReady(true);
+          if (!artifactParamRef.current) {
+            const visible = d.artifacts.filter((a) => a.kind !== 'screenshot');
+            const html = [...visible].reverse().find((a) => a.kind === 'html');
+            // A thread with no files of its own opens on the newest its crew made.
+            const pick = html ?? visible[visible.length - 1] ?? crewShown(d.artifacts, d.crew_artifacts ?? []).files[0];
+            if (pick) setSelected(pick.id);
+          }
+          setError(null);
+        });
       } catch (e) {
         if ((e as { status?: number }).status === 404) setNotFound(true);
         else setError(errorText(e));
       } finally {
-        release();
+        if (held) release();
       }
     },
     [id, prepare, open, applyDetail],

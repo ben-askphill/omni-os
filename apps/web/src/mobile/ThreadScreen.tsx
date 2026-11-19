@@ -43,6 +43,7 @@ import type { PanelTab } from '../pages/useThreadSession.ts';
 import { statusLabel } from '@omni/shared/status-line.ts';
 import { asksForYou, markOf, turnPhase, type Glyph } from '@omni/shared/status.ts';
 import { threadPill } from '../components/thread/thread-state.ts';
+import { defers, LIVE_TURNS } from '../transcript/defer.ts';
 
 /** The thread: the outcome first, steps folded behind a row, one secondary surface at a time from the menu. */
 export function ThreadScreen() {
@@ -240,7 +241,8 @@ export function ThreadScreen() {
                 return (
                   <Fragment key={t.key}>
                     {edge && <HistoryEdgeRow edge={edge} history={history} touch />}
-                    <div data-key={t.key} ref={last ? newest : undefined} className="flex flex-col gap-4">
+                    {/* Older turns skip rendering while out of view (.tx-row); the newest never do. */}
+                    <div data-key={t.key} ref={last ? newest : undefined} className={defers(i, view.turns.length, LIVE_TURNS) ? 'tx-row tx-turn flex flex-col gap-4' : 'flex flex-col gap-4'}>
                       <Turn t={t} first={i === 0} last={last} c={ctx} />
                     </div>
                   </Fragment>

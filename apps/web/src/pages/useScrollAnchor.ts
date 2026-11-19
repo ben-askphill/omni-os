@@ -17,11 +17,23 @@ interface Anchor {
   offset: number;
 }
 
+/**
+ * The row of `n` stacked rows to hold in place in a view from `top` to `bottom`: the first that starts inside it,
+ * else the one across its top edge; `n` when none shows. Not the row across the edge when a later one starts in
+ * view: that row can still be an unrendered placeholder (.tx-row), and holding its top while it takes its real
+ * height would move everything below it.
+ */
+export function anchorRow(n: number, topOf: (i: number) => number, bottomOf: (i: number) => number, top: number, bottom: number): number {
+  const across = firstBelow(n, bottomOf, top);
+  if (across >= n || topOf(across) >= top - 0.5) return across;
+  return across + 1 < n && topOf(across + 1) < bottom ? across + 1 : across;
+}
+
 function measure(el: HTMLElement): Anchor | null {
   const rows = el.querySelectorAll<HTMLElement>('[data-key]');
-  const top = el.getBoundingClientRect().top;
-  const i = firstBelow(rows.length, (k) => rows[k].getBoundingClientRect().bottom, top);
-  return i < rows.length ? { key: rows[i].dataset.key ?? '', offset: rows[i].getBoundingClientRect().top - top } : null;
+  const box = el.getBoundingClientRect();
+  const i = anchorRow(rows.length, (k) => rows[k].getBoundingClientRect().top, (k) => rows[k].getBoundingClientRect().bottom, box.top, box.bottom);
+  return i < rows.length ? { key: rows[i].dataset.key ?? '', offset: rows[i].getBoundingClientRect().top - box.top } : null;
 }
 
 /**

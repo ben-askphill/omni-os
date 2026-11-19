@@ -26,6 +26,7 @@ import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { buildItems, buildTasks, keepSame, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
 import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
+import { defers, LIVE_ROWS } from '../transcript/defer.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
 import { clock, toDate } from '@omni/shared/format.ts';
 import type { ThreadHistory } from '../pages/useThreadHistory.ts';
@@ -109,8 +110,11 @@ function CopyMsg({ text, align = 'start' }: { text: string; align?: 'start' | 'e
   );
 }
 
-/** Ben's message, or the one an agent or automation sent. `fold` keeps it to its first lines (a delegated thread's brief). */
-function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean }) {
+/**
+ * Ben's message, or the one an agent or automation sent. `fold` keeps it to its first lines (a delegated thread's brief).
+ * `lazy`: its images wait until they near the screen, as older rows do; the newest rows load them at once.
+ */
+function UserBubble({ p, at, threadId, event, clipped, fold, lazy }: { p: UserP; at: string; threadId: string; event: number; clipped?: Clipped; fold?: boolean; lazy?: boolean }) {
   const [more, setMore] = useState(false);
   // Where the pill whose description is open starts.
   const [about, setAbout] = useState<number | null>(null);
@@ -155,7 +159,7 @@ function UserBubble({ p, at, threadId, event, clipped, fold }: { p: UserP; at: s
         )}
         <span className="font-num text-[11px] text-fg-3">{clock(toDate(at))}</span>
       </div>
-      {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} /> : null}
+      {p.attachments?.length ? <Attachments threadId={threadId} items={p.attachments} lazy={lazy} /> : null}
       <ContextChips records={p.context} align="end" className="mb-1.5 w-full max-w-[92%] sm:max-w-[80%]" />
       {(text || !hasContext(p.context)) && (
         <div
@@ -311,6 +315,8 @@ interface ItemRowProps {
   answers?: Record<string, ReportP>;
   /** A report row whose answer shows on its thread's delegation card instead. */
   onCard?: boolean;
+  /** Not one of the newest rows: it skips rendering while out of view (`.tx-row`). */
+  defer?: boolean;
 }
 
 /**
@@ -319,11 +325,11 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, code, answers, onCard, defer }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
-          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} />;
+          const bubble = <UserBubble key={it.key} p={it.p} at={it.at} threadId={threadId} event={it.key} clipped={it.clipped} fold={brief} lazy={defer} />;
           return team ? [bubble, <DelegationCard key="team" branches={team} team reports={reports} />] : bubble;
         }
         case 'text':
@@ -376,7 +382,7 @@ const ItemRow = memo(
     const shown = Array.isArray(body) ? body.length > 0 : !!body;
     // data-key: the row useScrollAnchor keeps in place and a search hit scrolls to.
     return shown ? (
-      <div data-key={it.key} className="space-y-4">
+      <div data-key={it.key} className={defer ? 'tx-row space-y-4' : 'space-y-4'}>
         {body}
       </div>
     ) : null;
@@ -501,6 +507,7 @@ export const Transcript = memo(function Transcript({
               code={it.type === 'result' ? code : undefined}
               answers={it.type === 'tools' ? answersFor(it.calls, answers) : undefined}
               onCard={it.type === 'report' && it.p.shown && answers.has(it.p.thread_id)}
+              defer={defers(idx, items.length, LIVE_ROWS)}
             />,
           ])}
           {edgeRow(-1)}
