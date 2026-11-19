@@ -8,7 +8,7 @@ import { agoPhrase, formatBytes } from '../artifacts/viewer-kind';
 import { ArtifactBody } from '../components/artifact/ArtifactBody';
 import { HeaderButton } from '../components/HeaderButton';
 import { shortAgo } from '../live/channel-model';
-import { useLibrary } from '../live/react';
+import { useLibrary, useLiveHub } from '../live/react';
 import type { RootScreenProps } from '../navigation/types';
 import { fontSize, space, useOmniTheme } from '../theme';
 
@@ -19,6 +19,7 @@ import { fontSize, space, useOmniTheme } from '../theme';
 export function ArtifactScreen({ navigation, route }: RootScreenProps<'Artifact'>) {
   const { colors } = useOmniTheme();
   const opened = route.params.artifact;
+  const hub = useLiveHub();
   const { artifacts } = useLibrary();
   const artifact = useMemo(() => {
     const latest = artifacts?.find((a) => a.id === opened.id);
@@ -30,12 +31,13 @@ export function ArtifactScreen({ navigation, route }: RootScreenProps<'Artifact'
   const share = useCallback(async () => {
     if (!file) return;
     try {
-      const copy = await shareableFile(file, artifact);
+      // Refused for a file an earlier server's session left on screen.
+      const copy = await shareableFile(hub, file, artifact);
       await Share.share({ url: copy.uri });
     } catch {
       // Closing the sheet is not an error, and nothing else here is worth interrupting Ben for.
     }
-  }, [file, artifact]);
+  }, [hub, file, artifact]);
 
   const published = artifact.url;
   useLayoutEffect(() => {

@@ -89,6 +89,11 @@ export interface ReportP {
   dropped?: boolean;
   /** Why the machine running the parent did not take it, when `dropped` is from there. */
   undelivered?: string;
+  /**
+   * It started no turn: the Conductor's report shown in place (apps/server/runner/queue.ts fileReport). Clients put it on
+   * the delegation card of the turn that delegated the thread (thread-view.ts `answers`).
+   */
+  shown?: boolean;
 }
 
 /** Where a Cursor cloud agent's run stands: the server's CloudAgentState (apps/server/stream.ts). */

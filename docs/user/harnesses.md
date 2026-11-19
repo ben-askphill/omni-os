@@ -94,7 +94,7 @@ Auto is the first entry in the model picker and the default for a new thread. Om
 | Anything else | Claude Code |
 
 - Image generation goes to Codex because it is the only harness here that makes images; the image shows in the thread's artifacts. If Codex is not signed in, the thread runs on Claude Code and the Auto note says there is no image generation.
-- Your claude.ai connectors (Gmail, Calendar, Notion, Slack, Productive, the Portal) exist only in Claude Code, so that work stays there even when the plan is busy.
+- Your claude.ai connectors (Gmail, Calendar, Slack, Productive, the Portal) exist only in Claude Code, so that work stays there even when the plan is busy. Notion briefs go there too, though threads reach Notion through `OMNI_NOTION_TOKEN` in any local harness ([Notion](notion.md)).
 - A review goes to Codex, always at high effort, so a different model family checks work Claude most likely wrote. The Conductor's PR reviews skip Auto and pick the family from the builder's model ([Crew](crew.md)).
 - "Quick", "fast", "asap" and the like lower the effort a step on any harness. For code, they also move the thread to Cursor's Composer, a fast and cheap coding model, as does a mechanical change across many files ("rename X across the repo"). This does not happen for the hardest tasks, or when the first message has images, which Cursor Agent cannot see.
 - Composer only runs while Cursor's Auto and Composer usage is under 90%. Auto never picks Grok, Gemini or Cursor's other named models, Hermes or Cursor Cloud. [Auto routing](../internals/auto-routing.md#lanes) explains why.

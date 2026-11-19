@@ -60,7 +60,7 @@ describe('codex tracer', () => {
     await H.untilResults(t.id, 1);
     const start = H.codexRequests().filter((r) => r.method === 'thread/start').at(-1);
     expect(start.params.sandbox).toBe('read-only');
-    expect(String(start.params.developerInstructions)).toContain('You route work; you never do it.');
+    expect(String(start.params.developerInstructions)).toContain('Answer quick asks yourself, in this thread');
   });
 
   it("keeps the usage card on the plan's rate limits, not a reserve model's", async () => {

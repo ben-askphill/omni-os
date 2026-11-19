@@ -10,13 +10,21 @@ const notAllowed = () =>
     headers: { 'content-type': 'application/json', allow: 'POST' },
   });
 
+// The largest body the transport reads: a long message or prompt fits many times over, and a body over it gets 413
+// before it is parsed. The SDK's own default is 4 MiB.
+const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
+
 /** Answers one MCP request over `call`. */
 export function mcpHttp(call: Call) {
   return async (req: Request): Promise<Response> => {
     // No session, so no stream to GET and nothing to DELETE.
     if (req.method !== 'POST') return notAllowed();
     const server = createExternalServer(call);
-    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+      maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
+    });
     await server.connect(transport);
     try {
       return await transport.handleRequest(req);
