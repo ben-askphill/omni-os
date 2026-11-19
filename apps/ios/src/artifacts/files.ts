@@ -131,12 +131,22 @@ export function artifactFile(hub: Session, artifact: Version): Promise<File> {
  * start deletes it.
  */
 export async function shareableFile(hub: Session, file: File, artifact: Pick<Artifact, 'id' | 'name'>): Promise<File> {
-  const sessionFolder = sessionDir(liveGeneration(hub));
+  const generation = liveGeneration(hub);
+  const sessionFolder = sessionDir(generation);
   // A server switch can leave the viewer holding the last session's file.
   if (!inside(file, sessionFolder)) throw new EndedSession();
   const dir = new Directory(sessionFolder, 'share', String(artifact.id));
   dir.create({ idempotent: true, intermediates: true });
   const copy = new File(dir, artifact.name.replace(/[/\\]/g, '_'));
   await file.copy(copy, { overwrite: true });
+  // A switch during the copy, with a folder that would not clear, leaves the copy in the last session's folder.
+  if (generation !== current) {
+    try {
+      if (copy.exists) copy.delete();
+    } catch {
+      // The next session's start deletes the folder.
+    }
+    throw new EndedSession();
+  }
   return copy;
 }

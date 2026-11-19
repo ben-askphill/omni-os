@@ -2,7 +2,18 @@ import type { RawResponse } from '@omni/client-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { artifactFile, shareableFile, startArtifactSession } from '../src/artifacts/files';
-import { failDeletes, holdWrites, leaveFile, resetDisk, writesSoFar, writtenTexts, type File } from './fake-file-system';
+import {
+  copiesSoFar,
+  failDeletes,
+  filesUnder,
+  holdCopies,
+  holdWrites,
+  leaveFile,
+  resetDisk,
+  writesSoFar,
+  writtenTexts,
+  type File,
+} from './fake-file-system';
 
 vi.mock('expo-file-system', () => import('./fake-file-system'));
 
@@ -143,6 +154,27 @@ describe('the artifact cache across a server switch', () => {
     startArtifactSession(clone);
     expect((macFile as unknown as File).exists).toBe(true);
     await expect(shareableFile(clone, macFile, report)).rejects.toThrow();
+    expect(writtenTexts().filter((t) => t === 'mac v1')).toHaveLength(1);
+  });
+
+  it('refuses a share copy still landing at the switch, and keeps none of it, even when the cache will not clear', async () => {
+    const mac = hubFor('mac v1');
+    startArtifactSession(mac);
+    const loading = artifactFile(mac, report);
+    await vi.waitFor(() => expect(mac.fetchArtifactFile).toHaveBeenCalled());
+    mac.answer();
+    const macFile = await loading;
+
+    const release = holdCopies();
+    const sharing = shareableFile(mac, macFile, report);
+    sharing.catch(() => {});
+    await vi.waitFor(() => expect(copiesSoFar()).toBe(1));
+
+    failDeletes(true);
+    startArtifactSession(hubFor('clone v1'));
+    release();
+    await expect(sharing).rejects.toThrow('The server changed while this file loaded.');
+    expect(filesUnder('file:///cache/omni-artifacts').filter((f) => f.includes('/share/'))).toEqual([]);
     expect(writtenTexts().filter((t) => t === 'mac v1')).toHaveLength(1);
   });
 

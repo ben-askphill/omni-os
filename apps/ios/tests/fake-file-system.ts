@@ -11,6 +11,9 @@ interface Disk {
   /** While set, a write waits for it before it lands. */
   writeGate: Promise<void> | null;
   writesStarted: number;
+  /** While set, a copy waits for it before it lands. */
+  copyGate: Promise<void> | null;
+  copiesStarted: number;
 }
 
 // On globalThis, so a test that loads the cache module again (a new launch of the app) still sees the same disk.
@@ -20,6 +23,8 @@ const disk: Disk = ((globalThis as { omniFakeDisk?: Disk }).omniFakeDisk ??= {
   deletesFail: false,
   writeGate: null,
   writesStarted: 0,
+  copyGate: null,
+  copiesStarted: 0,
 });
 const { files, folders } = disk;
 
@@ -86,7 +91,9 @@ export class File {
     if (!folders.has(parentOf(this.uri))) throw new Error(`no folder ${parentOf(this.uri)}`);
     files.set(this.uri, bytes);
   }
-  copy(to: File, _options: { overwrite?: boolean } = {}): void {
+  async copy(to: File, _options: { overwrite?: boolean } = {}): Promise<void> {
+    disk.copiesStarted += 1;
+    if (disk.copyGate) await disk.copyGate;
     const bytes = files.get(this.uri);
     if (!bytes) throw new Error(`no file ${this.uri}`);
     if (!folders.has(parentOf(to.uri))) throw new Error(`no folder ${parentOf(to.uri)}`);
@@ -110,6 +117,8 @@ export function resetDisk(): void {
   disk.deletesFail = false;
   disk.writeGate = null;
   disk.writesStarted = 0;
+  disk.copyGate = null;
+  disk.copiesStarted = 0;
 }
 
 /** Puts `text` at `uri`, as a file an earlier launch of the app left there. */
@@ -135,3 +144,20 @@ export function holdWrites(): () => void {
 }
 
 export const writesSoFar = () => disk.writesStarted;
+
+/** Holds every copy until the returned function runs. */
+export function holdCopies(): () => void {
+  let release = () => {};
+  disk.copyGate = new Promise<void>((resolve) => {
+    release = () => {
+      disk.copyGate = null;
+      resolve();
+    };
+  });
+  return release;
+}
+
+export const copiesSoFar = () => disk.copiesStarted;
+
+/** Every file under `uri`, to look for copies that should not be there. */
+export const filesUnder = (uri: string): string[] => [...files.keys()].filter((f) => f.startsWith(`${uri}/`));
