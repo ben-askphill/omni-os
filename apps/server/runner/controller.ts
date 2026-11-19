@@ -20,6 +20,8 @@ export interface ControllerThread {
   channel_id: string;
   session_id: string;
   harness: string;
+  model?: string | null;
+  effort?: string;
 }
 
 export class ThreadController {
@@ -28,8 +30,10 @@ export class ThreadController {
   /** The harness session. null while secrets and the MCP config are prepared; inflight is sent right after spawn. */
   session: HarnessSession | null = null;
   sessionId: string;
-  /** The harness it was spawned for. A switch synced from another machine changes the thread's, not this process's. */
+  /** The run it was spawned for. A switch synced from another machine changes the thread's, not this process's. */
   readonly harness: string;
+  readonly model: string;
+  readonly effort: string;
   /** A turn is in progress. Holds a concurrency slot. */
   turn = true;
   /** The CLI itself is inside a turn: between its init and its result. False in the gap between two queued turns. */
@@ -88,6 +92,8 @@ export class ThreadController {
     this.channelId = thread.channel_id;
     this.sessionId = thread.session_id;
     this.harness = thread.harness;
+    this.model = thread.model ?? '';
+    this.effort = thread.effort ?? '';
     this.inflight = [first];
     let done = () => {};
     this.exited = new Promise<void>((r) => (done = r));

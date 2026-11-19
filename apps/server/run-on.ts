@@ -24,7 +24,7 @@ import { reportCommandId } from './db/repos/remote-commands.ts';
 import { inFlight } from './handoff/records.ts';
 import { COMMAND_WINDOW_MS, expiryReason, recordOutcome } from './remote-outcomes.ts';
 import { holderOf, remoteHolder } from './ownership.ts';
-import { cancelLimitResume, fenceStale, interruptThread, resumeLimitNow, saveOwn, scheduleLimitResume, wakePrepared } from './runner.ts';
+import { applyQueued, cancelLimitResume, fenceStale, interruptThread, resumeLimitNow, saveOwn, scheduleLimitResume, wakePrepared } from './runner.ts';
 import { fileReport } from './runner/queue.ts';
 import { computerName, deviceName, deviceRecord } from './sync/devices.ts';
 import { livesOnRefusal } from './sync/guard.ts';
@@ -340,6 +340,20 @@ function legacyStops(self: string, now: number) {
   }
 }
 
+/**
+ * After each sync, on the machine that runs a thread: a run switch Ben queued on another machine while this one ran
+ * the turn (sync/guard.ts switchBlocked), which synced in after that turn ended, applies now, as a pick made here
+ * between turns does, and the warm process from the old run closes. One that landed during the turn applies when the
+ * turn ends (runner/switch.ts applyQueued).
+ */
+function applySyncedRuns(machineId: string) {
+  const rows = db.prepare('SELECT id, status FROM threads WHERE queued_harness IS NOT NULL').all() as { id: string; status: string }[];
+  for (const r of rows) {
+    if (r.status === 'running' || r.status === 'queued' || holderOf(r.id) !== machineId || inFlight(r.id)) continue;
+    applyQueued(r.id);
+  }
+}
+
 /** The sync workers claimOwnWorktrees has run for in this process. */
 const claimedFor = new WeakSet<SyncWorker>();
 
@@ -371,6 +385,11 @@ onSynced((worker) => {
     claimOwnWorktrees(worker);
   } catch (err) {
     console.error('[run-on] could not claim worktree threads:', (err as Error).message);
+  }
+  try {
+    applySyncedRuns(worker.machineId);
+  } catch (err) {
+    console.error('[run-on] could not apply a synced run switch:', (err as Error).message);
   }
   void reconcileRunOn(worker);
 });
