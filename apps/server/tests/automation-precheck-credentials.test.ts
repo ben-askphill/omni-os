@@ -171,6 +171,55 @@ describe("an automation moved by the config's channel override", () => {
   });
 });
 
+// The gate compares what the shell will be handed, as written: the raw command (before {{placeholders}} are filled,
+// since their values are open settings), its timeout, and the machine that runs it.
+describe('the rest of what decides how a saved precheck runs', () => {
+  for (const who of SIGNED_IN.filter((w) => !CREDENTIALS[w].shell))
+    it(`${who}: may not swap a placeholder in, raise its timeout or move it to another machine`, async () => {
+      const dir = join(r.tmp, `repos-${++n}`);
+      expect((await call(TOKEN, 'PUT', '/setup', { workspace: { reposDir: dir } })).status).toBe(200);
+      const command = `ls ${dir}`;
+      const id = await tokenAutomation(command);
+      const before = fileText(id);
+      // Fills to the same text today, but the placeholder's value is a setting any signed-in device may change.
+      expectRefused(who, await call(who, 'PUT', `/automations/${id}`, { yaml: yaml('precheck: ls {{reposDir}}\n') }));
+      expectRefused(who, await call(who, 'PUT', `/automations/${id}`, { yaml: yaml(`precheck:\n  command: ${command}\n  timeout: 600\n`) }));
+      expectRefused(who, await call(who, 'PUT', `/automations/${id}`, { yaml: yaml(`precheck: ${command}\nmachine: another-mac\n`) }));
+      expect(fileText(id)).toBe(before);
+    });
+
+  it('the install token may', async () => {
+    const id = await tokenAutomation('echo token-raw');
+    expect((await call(TOKEN, 'PUT', `/automations/${id}`, { yaml: yaml('precheck:\n  command: echo {{user}}\n  timeout: 600\n') })).status).toBe(200);
+    expect(loaded(id).precheck?.timeout).toBe(600);
+  });
+});
+
+// Reset drops the user's copy of a shipped automation, so the shipped file's precheck runs again.
+describe("resetting a shipped automation whose file carries a precheck the user's copy does not", () => {
+  // Shipped automations live in the checkout's automations/: point that at a folder of this test's own.
+  const SHIPPED = join(r.tmp, 'shipped-automations');
+  mkdirSync(SHIPPED, { recursive: true });
+  r.paths.automations = SHIPPED;
+  for (const who of SIGNED_IN)
+    it(`${who}: ${CREDENTIALS[who].shell ? 'may' : 'may not'} reset it`, async () => {
+      const id = `shipped-${++n}`;
+      const command = marker(who);
+      writeFileSync(join(SHIPPED, `${id}.yaml`), yaml(`precheck: ${command}\n`));
+      writeFileSync(personalFile(id), yaml());
+      expect(loaded(id).precheck).toBeUndefined();
+      const res = await call(who, 'POST', `/automations/${id}/reset`, {});
+      if (CREDENTIALS[who].shell) {
+        expect(res.status, JSON.stringify(res.body)).toBe(200);
+        expect(loaded(id).precheck?.command).toBe(command);
+        return;
+      }
+      expectRefused(who, res);
+      expect(existsSync(personalFile(id))).toBe(true);
+      expect(loaded(id).precheck).toBeUndefined();
+    });
+});
+
 describe('what stays open to every signed-in device', () => {
   for (const who of SIGNED_IN)
     it(`${who}: edits the rest of a file with a precheck, keeps or removes it, and the kept one still runs`, async () => {
@@ -217,7 +266,8 @@ describe('every route that writes an automation', () => {
       .filter((x) => x.method !== 'GET' && x.method !== 'ALL' && /^\/automations/.test(x.path))
       .map((x) => `${x.method} ${x.path}`)
       .sort();
-    // PUT writes YAML (gated above), POST /automations takes only fields, enabled and reset never write a precheck,
+    // PUT writes YAML and reset brings the shipped file back (both gated above), POST /automations takes only fields,
+    // enabled never writes a precheck,
     // run is manual (no precheck), DELETE removes, and the webhook secret is a secret, not a command.
     expect(writes).toEqual([
       'DELETE /automations/:id',

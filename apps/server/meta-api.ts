@@ -196,8 +196,9 @@ metaApi.post('/automations', async (c) => {
   const fields = caller && lineage(caller).scan ? { ...parsed.data.fields, enabled: false } : parsed.data.fields;
   return edit(c, () => createAutomation(fields, parsed.data.id), 201);
 });
-// Drop the user's copy of a shipped automation, so the shipped YAML loads again.
-metaApi.post('/automations/:id/reset', (c) => refusal(c, 'edit') ?? edit(c, () => resetAutomation(c.req.param('id'))));
+// Drop the user's copy of a shipped automation, so the shipped YAML loads again. Bringing back a shipped precheck that
+// the copy does not run needs the install token or a session paired with it, as a save does.
+metaApi.post('/automations/:id/reset', (c) => refusal(c, 'edit') ?? edit(c, () => resetAutomation(c.req.param('id'), { shell: shellAllowed(c) })));
 
 /** A 403 when the agent thread making this call may not (automation-guard.ts). Ben's own clients name no thread and pass. */
 function refusal(c: Context, write: AutomationWrite) {

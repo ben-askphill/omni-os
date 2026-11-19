@@ -773,7 +773,7 @@ server.registerTool(
       'fields.machine picks the synced machine that runs it: an id or name from list_devices, here, or empty to follow set_automations_machine. Set cron or on, not both. ' +
       'connectors: [slack, calendar] in the yaml names the accounts it reads (gmail, calendar, slack, notion, drive, granola): while one is signed out, the first run waits for a sign-in and later ones are skipped. ' +
       'A thread an automation started (or one below it) cannot create, change, turn on or run automations; Omni refuses it. ' +
-      `yaml that adds a precheck or changes its command is refused (403): it runs in a shell, so ${USER} writes it in the YAML tab.`,
+      `A save or reset that adds a precheck, or changes its command, timeout, channel or machine, is refused (403): it runs in a shell, so ${USER} makes that change in the YAML tab.`,
     inputSchema: {
       id: z.string().trim().min(1).max(64).optional(),
       create: z.boolean().optional().describe('Make a new one. Needs fields.'),
