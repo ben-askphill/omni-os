@@ -3,7 +3,8 @@ import type { Memory, MemoryStatus } from '@omni/shared/memory.ts';
 import { db, now, tx } from '../connection.ts';
 import { record } from '../sync.ts';
 
-// Omni's memory store (packages/shared/memory.ts): channel learnings now, crew role memory later (crew plan S6).
+// Omni's memory store (packages/shared/memory.ts): channel learnings (a channel, no role) and crew role memory (a role,
+// and a channel when the lesson holds only there; crew plan S6).
 // Every write records the row for sync (sync/handlers/memory.ts), where the newest write of the whole row wins.
 
 export type { Memory };
@@ -29,6 +30,22 @@ export const memories = {
       (db.prepare(`SELECT channel_id AS c, COUNT(*) AS n FROM memories WHERE status = 'proposed' AND channel_id IS NOT NULL GROUP BY channel_id`).all() as { c: string; n: number }[]).map(
         (r) => [r.c, r.n],
       ),
+    ),
+
+  /** A crew role's lessons, in every channel, waiting and approved. */
+  byRole: (role: string): Memory[] =>
+    db.prepare(`SELECT ${COLUMNS} FROM memories WHERE role = ? ORDER BY created_at DESC, id`).all(role) as unknown as Memory[],
+
+  /** The approved lessons a thread of this role runs with in this channel: the untagged ones and this channel's. */
+  approvedForRole: (role: string, channelId: string): Memory[] =>
+    db
+      .prepare(`SELECT ${COLUMNS} FROM memories WHERE role = ? AND status = 'approved' AND (channel_id IS NULL OR channel_id = ?) ORDER BY approved_at DESC, id`)
+      .all(role, channelId) as unknown as Memory[],
+
+  /** How many lessons wait for the user, by crew role. */
+  waitingByRole: (): Record<string, number> =>
+    Object.fromEntries(
+      (db.prepare(`SELECT role AS r, COUNT(*) AS n FROM memories WHERE status = 'proposed' AND role IS NOT NULL GROUP BY role`).all() as { r: string; n: number }[]).map((x) => [x.r, x.n]),
     ),
 
   create(fact: { channel_id: string | null; role?: string | null; text: string; status: MemoryStatus; proposed_by: 'user' | 'agent'; source_thread_id?: string | null }): Memory {

@@ -1,11 +1,13 @@
 //! The stdio MCP servers every local thread gets (`apps/server/sandbox.ts`), as one binary: `omni-mcp ask`,
-//! `omni-mcp render`, `omni-mcp steps` and `omni-mcp threads`. All but steps are ports of the Node script of that
-//! name in `apps/mcp`, held to the same recorded scenarios (`packages/test-fixtures/native/mcp`,
-//! docs/internals/rust-port.md); steps was written here and its scenarios by hand. `omni-mcp lazy`
+//! `omni-mcp render`, `omni-mcp steps`, `omni-mcp threads` and, for a crew role whose threads may propose lessons,
+//! `omni-mcp memory`. Ask, render and threads are ports of the Node script of that name in `apps/mcp`, held to the
+//! same recorded scenarios (`packages/test-fixtures/native/mcp`, docs/internals/rust-port.md); steps and memory were
+//! written here and their scenarios by hand. `omni-mcp lazy`
 //! is no server of its own: it starts another one when a thread first needs it (`lazy.rs`).
 
 mod ask;
 mod lazy;
+mod memory;
 mod protocol;
 mod render;
 mod server;
@@ -24,12 +26,13 @@ fn main() {
         Some("render") => Kind::Render,
         Some("steps") => Kind::Steps,
         Some("threads") => Kind::Threads,
+        Some("memory") => Kind::Memory,
         Some("--version") => {
             println!("omni-mcp {}", env!("CARGO_PKG_VERSION"));
             return;
         }
         _ => {
-            eprintln!("usage: omni-mcp <ask|render|steps|threads|lazy <answers.json> <command> [args...]>");
+            eprintln!("usage: omni-mcp <ask|render|steps|threads|memory|lazy <answers.json> <command> [args...]>");
             std::process::exit(2);
         }
     };

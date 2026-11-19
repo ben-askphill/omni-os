@@ -22,6 +22,12 @@ export interface CrewRole {
   delegatable: boolean;
   /** A review role: held at high effort on GPT, and a delegation with `review_of` runs on the other model family. */
   review: boolean;
+  /** Whether its threads read its lessons and propose new ones. A server from before role memory sends none: read-write. */
+  memory?: 'off' | 'read' | 'read-write';
+  /** Whether a lesson its threads propose waits for the user. A server from before role memory sends none: review. */
+  memoryWrites?: 'review' | 'auto';
+  /** How many lessons its threads proposed wait for the user, when any do. */
+  memoryWaiting?: number;
   charter: string;
   /** Shipped with Omni, a built-in with the user's edit, or the user's own. */
   kind: 'shipped' | 'edited' | 'own';

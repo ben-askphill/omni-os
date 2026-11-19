@@ -1,0 +1,623 @@
+{
+  "scenarios": [
+    {
+      "name": "protocol: initialize and list the tool",
+      "server": "memory",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1",
+        "OMNI_ROLE": "reviewer"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "ping"
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-memory",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "tools": [
+                {
+                  "name": "remember",
+                  "description": "Propose a lesson for this crew role's later threads: a correction Ben made to how this role works, or a step it missed that every later thread of it should take. One short sentence that still makes sense in a new thread, about how to work, never about this one task. Never put secrets, credentials or personal data in it. It holds in this channel only, unless you pass everywhere: true for a lesson about the role that holds in every channel. It waits for Ben's approval in Settings > Crew, unless Ben lets this role keep its lessons at once; the answer says which.",
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500,
+                        "description": "The lesson, in one short sentence."
+                      },
+                      "everywhere": {
+                        "description": "true: for this role in every channel. Leave it out for this channel only.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ]
+                  },
+                  "execution": {
+                    "taskSupport": "forbidden"
+                  }
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {},
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "a lesson for this channel waits for the user, and one for every channel the user lets the role keep",
+      "server": "memory",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1",
+        "OMNI_ROLE": "reviewer"
+      },
+      "api": [
+        {
+          "status": 201,
+          "json": {
+            "id": "m1",
+            "channel_id": "acme",
+            "role": "reviewer",
+            "text": "Run the repo's own check script before you report.",
+            "status": "proposed",
+            "proposed_by": "agent",
+            "source_thread_id": "thread-1"
+          }
+        },
+        {
+          "status": 201,
+          "json": {
+            "id": "m1",
+            "channel_id": null,
+            "role": "reviewer",
+            "text": "Run the repo's own check script before you report.",
+            "status": "approved",
+            "proposed_by": "agent",
+            "source_thread_id": "thread-1"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "remember",
+              "arguments": {
+                "text": "Run the repo's own check script before you report."
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "remember",
+              "arguments": {
+                "text": "Run the repo's own check script before you report.",
+                "everywhere": true
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-memory",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Proposed for this role's later threads in #acme only. It waits for Ben to approve it in Settings > Crew."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Kept for this role's later threads in every channel: Ben lets this role keep its lessons at once."
+                }
+              ]
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/crew/reviewer/memory",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "text": "Run the repo's own check script before you report."
+            }
+          },
+          {
+            "method": "POST",
+            "url": "/api/crew/reviewer/memory",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "text": "Run the repo's own check script before you report.",
+              "channel": null
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "the API refuses: its reason is the answer",
+      "server": "memory",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1",
+        "OMNI_ROLE": "reviewer"
+      },
+      "api": [
+        {
+          "status": 403,
+          "json": {
+            "error": "Reviewer's memory is read only: only Ben adds to it, in Settings > Crew."
+          }
+        }
+      ],
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "remember",
+              "arguments": {
+                "text": "Run the repo's own check script before you report.",
+                "everywhere": false
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-memory",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Reviewer's memory is read only: only Ben adds to it, in Settings > Crew."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          }
+        ],
+        "requests": [
+          {
+            "method": "POST",
+            "url": "/api/crew/reviewer/memory",
+            "headers": {
+              "authorization": "Bearer tok-1",
+              "content-type": "application/json",
+              "x-omni-thread": "thread-1"
+            },
+            "body": {
+              "text": "Run the repo's own check script before you report."
+            }
+          }
+        ],
+        "exit": 0
+      }
+    },
+    {
+      "name": "no role: refused without a request",
+      "server": "memory",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "remember",
+              "arguments": {
+                "text": "Run the repo's own check script before you report."
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-memory",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This thread runs as no crew role, so there is no role memory to add to."
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    },
+    {
+      "name": "arguments it refuses, without a request",
+      "server": "memory",
+      "env": {
+        "OMNI_USER": "Ben",
+        "OMNI_THREAD_ID": "thread-1",
+        "OMNI_TOKEN": "tok-1",
+        "OMNI_ROLE": "reviewer"
+      },
+      "steps": [
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {},
+              "clientInfo": {
+                "name": "scenario",
+                "version": "0"
+              }
+            }
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+          }
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+              "name": "remember",
+              "arguments": {
+                "text": ""
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 2
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+              "name": "remember",
+              "arguments": {
+                "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 3
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+              "name": "remember",
+              "arguments": {
+                "text": "Run the repo's own check script before you report.",
+                "everywhere": "yes"
+              }
+            }
+          }
+        },
+        {
+          "waitResponse": 4
+        },
+        {
+          "send": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+              "name": "remember",
+              "arguments": {}
+            }
+          }
+        }
+      ],
+      "expected": {
+        "responses": [
+          {
+            "result": {
+              "protocolVersion": "2025-06-18",
+              "capabilities": {
+                "tools": {
+                  "listChanged": true
+                }
+              },
+              "serverInfo": {
+                "name": "omni-memory",
+                "version": "0.1.0"
+              }
+            },
+            "jsonrpc": "2.0",
+            "id": 1
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool remember: Too small: expected string to have >=1 characters at text"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 2
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool remember: Too big: expected string to have <=500 characters at text"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 3
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool remember: Invalid input: expected boolean, received string at everywhere"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 4
+          },
+          {
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "MCP error -32602: Input validation error: Invalid arguments for tool remember: Invalid input: expected string, received undefined at text"
+                }
+              ],
+              "isError": true
+            },
+            "jsonrpc": "2.0",
+            "id": 5
+          }
+        ],
+        "requests": [],
+        "exit": 0
+      }
+    }
+  ]
+}

@@ -252,6 +252,8 @@ export async function prepareBrowserMcp(): Promise<void> {
 export const ASK_SERVER = 'omni-ask';
 /** The server with read_referenced_thread alone (crates/omni-mcp), for threads that do not get `omni`, which has it too. */
 export const THREADS_SERVER = 'omni-threads';
+/** The server with `remember` (crates/omni-mcp), for a crew role whose threads may propose lessons. The Conductor has it on `omni`. */
+export const MEMORY_SERVER = 'omni-memory';
 /** How long a harness lets an ask_user_question call wait for the user: a day. */
 export const ASK_TIMEOUT_SEC = 86_400;
 
@@ -268,7 +270,7 @@ export function buildMcpConfig(input: McpInput) {
   const servers: Record<string, McpServer> = {};
   const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: threadTokenPath(input.threadId), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
 
-  // ask, render, steps and threads run on omni-mcp (native-mcp.ts). An install without a binary that starts leaves them out.
+  // ask, render, steps, threads and memory run on omni-mcp (native-mcp.ts). An install without a binary that starts leaves them out.
   const helper = (key: string, name: NativeMcpServer): void => {
     const command = nativeMcpCommand(name);
     if (command) servers[key] = { ...command, env: api };
@@ -302,6 +304,12 @@ export function buildMcpConfig(input: McpInput) {
     servers['omni'] = { command: paths.mcpRunner, args: [paths.mcpOmni], env: api };
   } else {
     helper(THREADS_SERVER, 'threads');
+    // remember: a role whose threads may propose lessons for its later threads (memory-api.ts). A quick ask only reads.
+    const role = input.role;
+    if (role?.memory === 'read-write' && !input.quick) {
+      const command = nativeMcpCommand('memory');
+      if (command) servers[MEMORY_SERVER] = { ...command, env: { ...api, OMNI_ROLE: role.id } };
+    }
   }
   return { mcpServers: servers };
 }

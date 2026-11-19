@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blankCrewDraft, CHANGED_CHARTER_ACTIONS, crewChips, crewDraftOf, crewDraftProblem, crewIdFrom, crewMarkdownOf, crewRunLine, crewSaveBody, crewTools, lineDiff, type CrewDetailView, type CrewListed } from '../crew-settings.ts';
+import { blankCrewDraft, CHANGED_CHARTER_ACTIONS, crewChips, crewDraftOf, crewDraftProblem, crewIdFrom, crewMarkdownOf, crewRunLine, crewSaveBody, crewTools, lineDiff, memoryScope, type CrewDetailView, type CrewListed } from '../crew-settings.ts';
 
 const role = (over: Partial<CrewListed> = {}): CrewListed => ({ id: 'builder', name: 'Builder', description: 'Writes code.', model: 'auto', mcp: [], delegateOnly: false, delegatable: true, review: false, kind: 'shipped', hidden: false, ...over });
 
@@ -93,6 +93,25 @@ describe('the editor', () => {
     expect(crewTools(role({ delegateOnly: true }))).toBe('delegate-only');
   });
 
+  it('sends the memory settings like the others, and empty when back to the default', () => {
+    const own = role({ id: 'checker', kind: 'own' });
+    expect(crewDraftOf(detail(own, null))).toMatchObject({ memory: 'read-write', memoryWrites: 'review' });
+    expect(crewSaveBody({ ...crewDraftOf(detail(own, null)), memoryWrites: 'auto' }, detail(own, null)).fields).toEqual({ memory_writes: 'auto' });
+    expect(crewSaveBody({ ...crewDraftOf(detail(own, null)), memory: 'off' }, detail(own, null)).fields).toEqual({ memory: 'off' });
+    const auto = role({ ...own, memoryWrites: 'auto' });
+    expect(crewSaveBody({ ...crewDraftOf(detail(auto, null)), memoryWrites: 'review' }, detail(auto, null)).fields).toEqual({ memory_writes: '' });
+  });
+
+  it('says on the row how many lessons wait, and where a lesson applies', () => {
+    expect(crewChips(role({ memoryWaiting: 2 })).map((c) => [c.label, c.tone])).toEqual([
+      ['Built-in', 'outline'],
+      ['2 lessons wait', 'needs'],
+    ]);
+    expect(crewChips(role({ memoryWaiting: 1 })).at(-1)?.label).toBe('1 lesson waits');
+    expect(memoryScope({ channel_id: 'acme' })).toBe('#acme only');
+    expect(memoryScope({ channel_id: null })).toBe('Every channel');
+  });
+
   it('sends the review switch like the others: true when turned on, null when back to its default', () => {
     const own = role({ kind: 'own' });
     const on = { ...crewDraftOf(detail(own, null)), review: true };
@@ -107,7 +126,7 @@ describe('the editor', () => {
     const d = { ...blankCrewDraft(), name: 'Store ops', charter: 'Dry run first.' };
     const body = crewSaveBody(d, null);
     expect(body).toEqual({
-      fields: { name: 'Store ops', description: '', harness: '', model: 'auto', effort: '', channel: '', delegate_only: null, tools: '', delegatable: null, mcp: [], review: null, avatar: null },
+      fields: { name: 'Store ops', description: '', harness: '', model: 'auto', effort: '', channel: '', delegate_only: null, tools: '', delegatable: null, mcp: [], review: null, memory: '', memory_writes: '', avatar: null },
       charter: 'Dry run first.',
     });
   });

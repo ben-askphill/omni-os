@@ -41,7 +41,7 @@ describe('the learnings API', () => {
     const added = await call('POST', '/memory', { channel: 'acme', text: '  Quote prices   without VAT. ' });
     expect(added.status).toBe(201);
     expect(added.body).toMatchObject({ channel_id: 'acme', role: null, text: 'Quote prices without VAT.', status: 'approved', proposed_by: 'user', source_thread_id: null });
-    expect(feed).toContainEqual({ type: 'memory', channel_id: 'acme' });
+    expect(feed).toContainEqual({ type: 'memory', channel_id: 'acme', role: null });
 
     const builder = thread('acme', 'builder');
     const proposed = await call('POST', '/memory', { channel: 'acme', text: 'Run the theme check before pushing.' }, builder);
@@ -130,7 +130,7 @@ describe('learnings across machines', () => {
     expect((await worker.syncNow()).error).toBeUndefined();
     expect(memories.get('from-b')).toMatchObject({ text: 'From the other machine.', status: 'approved', channel_id: 'acme' });
     expect(memories.get('bad')).toBeNull();
-    expect(feed).toContainEqual({ type: 'memory', channel_id: 'acme' });
+    expect(feed).toContainEqual({ type: 'memory', channel_id: 'acme', role: null });
 
     await relay.push([signAs(change('from-b', null, 'delete'))]);
     expect((await worker.syncNow()).error).toBeUndefined();
