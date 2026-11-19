@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { TITLE_MAX } from '@omni/shared/slash.ts';
 import { readOpenItems, storeOpenItems } from '@omni/shared/open-items.ts';
+import { OWNER_MAX, ownerName } from '@omni/shared/thread-owner.ts';
+import { userConfig } from './user-config.ts';
 import { publishFeed } from './bus.ts';
 import { FolderError, folders, threads, type Thread } from './db.ts';
 
@@ -28,17 +30,19 @@ const patchSchema = z
     next_thread: z.null().optional(),
     /** Null dismisses every open item on the card under the transcript. */
     open_items: z.null().optional(),
+    /** The person accountable for it, by name. Null or empty gives it back to the user. */
+    owner: z.string().max(OWNER_MAX).nullable().optional(),
     /** Dismisses the one open item with this text, leaving the rest on the card. */
     dismiss_open_item: z.string().min(1).optional(),
   })
   .refine(
     (b) =>
       b.title !== undefined || b.archived !== undefined || b.folder_id !== undefined || b.pinned !== undefined || b.done !== undefined ||
-      b.next_thread !== undefined || b.open_items !== undefined || b.dismiss_open_item !== undefined,
+      b.next_thread !== undefined || b.open_items !== undefined || b.dismiss_open_item !== undefined || b.owner !== undefined,
     'a title is required',
   );
 
-/** Rename, archive, pin, mark done or file a thread, or dismiss its proposed follow-up or open items. It keeps its place in the lists, since nothing happened in it. */
+/** Rename, archive, pin, mark done, set the owner of or file a thread, or dismiss its proposed follow-up or open items. It keeps its place in the lists, since nothing happened in it. */
 threadsApi.patch('/:id', async (c) => {
   const id = c.req.param('id');
   const t = threads.get(id);
@@ -69,6 +73,7 @@ threadsApi.patch('/:id', async (c) => {
   // Archiving unpins: restoring it later brings it back to its channel, not to Pinned.
   if (body.data.pinned !== undefined || edit.archived) threads.setPinned(id, !!body.data.pinned && !edit.archived);
   if (body.data.done !== undefined) threads.setDone(id, body.data.done);
+  if (body.data.owner !== undefined) threads.setOwner(id, ownerName(body.data.owner, userConfig().user.name));
   // Archived: a usage limit's continuation no longer runs by itself (apps/server/runner/limits.ts).
   if (edit.archived) threads.setLimit(id, null);
   const renamed = Object.keys(edit).length ? threads.update(id, { ...edit, updated_at: t.updated_at })! : threads.get(id)!;

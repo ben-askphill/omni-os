@@ -72,6 +72,16 @@ describe('the thread quick card', () => {
     onOpenPR: () => {},
   };
 
+  it('gives who the thread is for and who does it separate rows: You until someone is named, and the crew role', () => {
+    const mine = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ owner: null, role: 'builder', harness: 'claude-code' }) }));
+    expect(mine).toContain('>Owner<');
+    expect(mine).toMatch(/data-owner="">.*?>You</);
+    expect(mine).toMatch(/>Agent<\/span><span class="min-w-0 truncate ">Builder</);
+    const theirs = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ owner: 'Maya Jansen', role: null }) }));
+    expect(theirs).toMatch(/data-owner="Maya Jansen">.*?>Maya Jansen</);
+    expect(theirs).toMatch(/>Agent<\/span><span class="min-w-0 truncate text-fg-3">No crew role</);
+  });
+
   it('lists machine, checkout, harness, branch and a door into the inspector', () => {
     const html = renderToStaticMarkup(
       createElement(ThreadQuickCard, { ...base, thread: thread(), init: { model: 'composer' }, artifactCount: 2, cwd: '/home/ben/omni-os/data/worktrees/t1' }),

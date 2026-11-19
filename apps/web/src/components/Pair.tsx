@@ -13,6 +13,18 @@ import { Button, ErrorNote, Label } from './ui.tsx';
 // this browser a session of its own, also in an HttpOnly cookie (GoogleSignIn.tsx). On this machine's Omni Connect
 // address, it offers Open with Omni Connect, and #/connect lands here from the relay (connect-key.ts).
 
+/**
+ * Why a pairing QR's link sent this browser here (auth-api.ts GET /pair-link answers `#/pair?link=expired|busy`), or
+ * null when it did not.
+ */
+export function pairLinkProblem(hash = window.location.hash): string | null {
+  const link = new URLSearchParams(hash.slice(hash.indexOf('?') + 1)).get('link');
+  if (!hash.includes('?') || !link) return null;
+  return link === 'busy'
+    ? 'Too many pairing attempts. Wait a minute, then scan a new code.'
+    : 'That pairing code expired or was already used. Show a new one on the computer that runs Omni and scan it again.';
+}
+
 /** `#/t/abc?pair=TOKEN` gives TOKEN and leaves `#/t/abc` in the address bar and in history. */
 function takePairParam(): string | null {
   const hash = window.location.hash;
@@ -122,7 +134,7 @@ function useMethods(offline: boolean): Methods {
 function PairScreen({ offline, connectError, onPaired }: { offline: boolean; connectError: string | null; onPaired: () => void }) {
   const { google, connect, checked } = useMethods(offline);
   const [token, setToken] = useState('');
-  const [error, setError] = useState<string | null>(offline ? 'Cannot reach the Omni server. Is it running?' : connectError);
+  const [error, setError] = useState<string | null>(offline ? 'Cannot reach the Omni server. Is it running?' : (connectError ?? pairLinkProblem()));
   const [opening, setOpening] = useState(false);
 
   const open = async (m: ConnectMethod) => {
@@ -184,6 +196,9 @@ function PairScreen({ offline, connectError, onPaired }: { offline: boolean; con
           </div>
         )}
         <div className="mt-5">
+          <p className="mb-4 text-[13px] text-fg-2" data-pair-qr>
+            On a phone: open the Omni desktop app on the computer that runs it, go to Settings {'>'} Sharing &amp; access, pick Phone browser under Pair a phone and scan the code with this phone’s camera.
+          </p>
           <Label htmlFor="pair-token" hint={<>On the machine that runs Omni: <code className="font-mono whitespace-nowrap">cat data/api-token</code>, or <code className="font-mono whitespace-nowrap">omni open --pair</code> for a link.</>}>
             Token
           </Label>

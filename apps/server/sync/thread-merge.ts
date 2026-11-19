@@ -20,7 +20,7 @@ export const EXEC = ['status', 'run_machine', 'has_run', 'last_text'] as const;
 /** Fields that move as a group by their `session` edit time, from whichever machine wrote them last. */
 export const SESSION = ['session_id', 'sessions', 'handover'] as const;
 /** Fields that merge by their own edit time. */
-export const META = ['title', 'archived', 'folder_id', 'pinned_at', 'done_at'] as const;
+export const META = ['title', 'archived', 'folder_id', 'pinned_at', 'done_at', 'owner'] as const;
 
 export type MetaField = (typeof META)[number];
 /** When each metadata field was last edited, and `exec` and `session` when those groups were last written, as ISO times. */

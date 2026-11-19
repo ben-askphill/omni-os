@@ -3,12 +3,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
-// Settings, Sharing & access, Omni for iOS: the card asks the server for a code only when you press the button, puts
+// Settings, Sharing & access, Pair a phone: the card asks the server for a code only when you press the button, puts
 // the address and that code, and only those, in the QR, and drops the code when it runs out.
 
 const CONNECTED = { enabled: true, relayReady: true, signedIn: true, hostname: 'bens-mac-a1b2c3.omni-os.app', url: 'https://bens-mac-a1b2c3.omni-os.app', connectPage: null, tunnel: { state: 'connected', error: null }, error: null };
 let connect: Omit<typeof CONNECTED, 'url'> & { url: string | null } = CONNECTED;
 let via = 'token';
+let sessionMethod: string | null = null;
 let push: unknown = { registration: true, delivery: true, problem: null };
 let reply: () => Promise<unknown> = async () => ({ code: 'AB12', expiresAt: new Date(Date.now() + 120_000).toISOString() });
 const posts: string[] = [];
@@ -16,7 +17,7 @@ const posts: string[] = [];
 vi.mock('../src/api.ts', async (importActual) => {
   const actual = await importActual<typeof import('../src/api.ts')>();
   actual.api.get = vi.fn(async (path: string) =>
-    path === '/auth/account' ? { available: true, issuer: null, owner: null, via } : path === '/capabilities' ? { api: 1, push } : connect,
+    path === '/auth/account' ? { available: true, issuer: null, owner: null, via, sessionMethod } : path === '/capabilities' ? { api: 1, push } : connect,
   ) as typeof actual.api.get;
   actual.api.post = vi.fn(async (path: string) => {
     posts.push(path);
@@ -42,6 +43,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   posts.length = 0;
   via = 'token';
+  sessionMethod = null;
   push = { registration: true, delivery: true, problem: null };
   reply = async () => ({ code: 'AB12', expiresAt: new Date(Date.now() + 120_000).toISOString() });
   connect = CONNECTED;
@@ -103,6 +105,19 @@ it('puts the Omni Connect address and the code in the QR', async () => {
   expect(qr()).toBe('{"version":1,"serverUrl":"https://bens-mac-a1b2c3.omni-os.app","code":"AB12"}');
   expect(host.textContent).toContain('in 2:00');
   expect(host.querySelector('[data-manual-code]')?.textContent).toBe('AB12');
+});
+
+it('Phone browser: the QR is the link a phone camera opens, with the same one-time code, no manual code and no iPhone alerts note', async () => {
+  push = { registration: true, delivery: false, problem: 'this server has no APNs key' };
+  await mount();
+  await act(async () => [...host.querySelectorAll('[role="radio"]')].find((b) => b.textContent === 'Phone browser')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  await act(async () => button('Show pairing code')!.click());
+  await flush();
+  expect(posts).toEqual(['/auth/app-pairings']);
+  expect(qr()).toBe('https://bens-mac-a1b2c3.omni-os.app/api/auth/pair-link?code=AB12');
+  expect(host.querySelector('[data-manual-code]')).toBeNull();
+  expect(host.querySelector('[data-browser-pairing]')).not.toBeNull();
+  expect(host.querySelector('[data-push-note]')).toBeNull();
 });
 
 it('drops the code when it expires', async () => {
@@ -189,15 +204,24 @@ it('drops a shown code when the address is switched', async () => {
   expect(qr()).toBeNull();
 });
 
-it('sends a browser that signed in with Google to the desktop app, with no way to ask for a code', async () => {
+it('sends a browser that signed in with Google or a code to the desktop app, with no way to ask for a code', async () => {
   via = 'session';
+  sessionMethod = 'google';
   await mount();
   expect(button('Show pairing code')).toBeUndefined();
   expect(host.querySelector('#ios-address')).toBeNull();
-  expect(host.textContent).toContain('signed in with Google');
+  expect(host.textContent).toContain('This browser signed in with Google or a pairing code.');
   expect(host.textContent).toContain('desktop app');
   expect(host.textContent).toContain('install token');
   expect(posts).toEqual([]);
+});
+
+it('offers the code to a session paired with the install token: the desktop window, or a browser that used the token', async () => {
+  via = 'session';
+  sessionMethod = 'token';
+  await mount();
+  expect(button('Show pairing code')).toBeDefined();
+  expect(host.textContent).not.toContain('signed in with Google');
 });
 
 it('tells a refused browser the same when the server says no', async () => {

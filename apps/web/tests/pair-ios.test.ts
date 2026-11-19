@@ -143,15 +143,16 @@ describe('pairingErrorText', () => {
   it('names a rate limit', () => {
     expect(pairingErrorText(new ApiError('slow down', 429))).toContain('Wait a minute');
   });
-  it('tells a refused session to use the desktop app or a browser paired with the install token', () => {
+  it('tells a refused session to make the code in the desktop app', () => {
     const text = pairingErrorText(new ApiError('Forbidden: a Google session cannot pair an app', 403));
     expect(text).toContain('Forbidden: a Google session cannot pair an app.');
     expect(text).toContain('desktop app');
     expect(text).toContain('install token');
   });
-  it('names the Google session in the instruction shown before any request', () => {
-    expect(NEEDS_INSTALL_TOKEN).toContain('signed in with Google');
-    expect(NEEDS_INSTALL_TOKEN).toContain('desktop app');
+  it('says before any request that a browser session cannot make a code, and where to make one', () => {
+    expect(NEEDS_INSTALL_TOKEN).toBe(
+      'This browser signed in with Google or a pairing code. Pairing a phone takes the install token. Make the code in the Omni desktop app, or in a browser paired with the token (omni open --pair prints its link).',
+    );
   });
   it('passes on what the server says about other failures', () => {
     expect(pairingErrorText(new ApiError('Cannot reach the Omni server. Is it running?', 0))).toBe('Cannot reach the Omni server. Is it running?');

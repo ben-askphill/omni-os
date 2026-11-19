@@ -426,11 +426,11 @@ describe('Routines step', () => {
 describe('Done screen: what to set up next', () => {
   const ids = (tips: { id: string }[]) => tips.map((t) => t.id);
 
-  it('every layout points at the iPhone app and a second machine', () => {
+  it('every layout points at pairing a phone, and none at a second machine: one computer is enough to start', () => {
     for (const where of ['rail', 'classic', 'phone'] as const) {
       const tips = doneTips('app', where);
-      expect(tips.find((t) => t.id === 'phone')!.text).toBe('Add your iPhone: make a pairing code in Settings > Sharing & access > Omni for iOS.');
-      expect(tips.find((t) => t.id === 'machine')!.text).toBe('Run threads on a second machine: turn on Settings > Sync on both, then pick one with Run on.');
+      expect(tips.find((t) => t.id === 'phone')!.text).toBe('Add your phone: scan the code in Settings > Sharing & access > Pair a phone.');
+      expect(tips.some((t) => /sync|machine/i.test(t.text))).toBe(false);
     }
   });
 
@@ -438,13 +438,13 @@ describe('Done screen: what to set up next', () => {
     expect(doneTips('app', 'rail').find((t) => t.id === 'cli')!.code).toBe('omni new "…"  ·  omni doctor');
     expect(doneTips('app', 'classic').find((t) => t.id === 'cli')!.code).toBe('omni new "…"  ·  omni doctor');
     expect(doneTips('checkout', 'rail').find((t) => t.id === 'cli')!.code).toBe('scripts/omni.sh new "…"  ·  scripts/omni.sh doctor');
-    expect(ids(doneTips('app', 'phone'))).toEqual(['phone', 'machine']);
-    expect(ids(doneTips('checkout', 'phone'))).toEqual(['phone', 'machine']);
+    expect(ids(doneTips('app', 'phone'))).toEqual(['phone']);
+    expect(ids(doneTips('checkout', 'phone'))).toEqual(['phone']);
   });
 
   it('renders each tip with its command as code', async () => {
     const el = await render(createElement(DoneTips, { tips: doneTips('app', 'rail') }));
-    expect([...el.querySelectorAll('[data-tip]')].map((t) => t.getAttribute('data-tip'))).toEqual(['phone', 'machine', 'cli']);
+    expect([...el.querySelectorAll('[data-tip]')].map((t) => t.getAttribute('data-tip'))).toEqual(['phone', 'cli']);
     expect(text(el.querySelector('[data-tip="cli"] code'))).toBe('omni new "…" · omni doctor');
   });
 });

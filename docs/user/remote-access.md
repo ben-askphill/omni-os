@@ -9,7 +9,7 @@ npm run build && npm start
 tailscale serve --bg 4747
 ```
 
-Then pair the phone once. On the Mac, print a pairing link with the `.ts.net` address:
+Then pair the phone once. The quickest way is the QR code under [Pair a phone's browser](#pair-a-phones-browser). From a terminal, print a pairing link with the `.ts.net` address instead:
 
 ```bash
 OMNI_URL=https://<your-mac>.<tailnet>.ts.net omni open --pair
@@ -19,17 +19,21 @@ Open that link on the phone (AirDrop it, or paste it). Or open the `.ts.net` add
 
 Every client names the Mac its Omni runs on: the desktop sidebar's footer (in a browser and in the desktop app) and the phone's Channels and Settings headers. A browser on another device gets a Remote chip, and its tab title starts with that Mac's name.
 
-On an iPhone, open the `.ts.net` address in Safari and use Share, then Add to Home Screen. Omni then opens full screen with the phone layout: Activity, Channels, Library and PRs tabs, and a + button for a new delegation. A home-screen app can keep its own cookies apart from Safari's, so if it opens on the pairing screen, paste the token there once.
+On an iPhone, open the `.ts.net` address in Safari and use Share, then Add to Home Screen. Omni then opens full screen with the phone layout: Activity, Channels, Library and PRs tabs, and a + button for a new delegation. A home-screen app can keep its own cookies apart from Safari's, so if it opens on the pairing screen, pair it once more with a new code.
+
+## Pair a phone's browser
+
+A phone's browser needs no token. In Settings in the desktop app, open Sharing & access, choose Pair a phone, then Phone browser, pick the address the phone will use and make a code. Scan the QR code with the phone's camera: it opens Omni on that address already signed in, with its own revocable browser session that shows under Signed-in devices. The code expires after five minutes and works once; an expired or used one opens the pairing screen with a line saying so.
 
 ## Pair the native iOS app
 
-In Settings, open Sharing & access and choose Omni for iOS. Pairing takes the install token, so use the desktop app or a browser paired with the install token. A browser that signed in with Google shows where to go instead of a code.
+In Settings, open Sharing & access, choose Pair a phone, then iPhone app. Pairing takes the install token: make the code in the desktop app, or in a browser you paired with the token (`omni open --pair` prints its link). A browser that signed in with Google or a pairing code sees where to go instead of a code.
 
 Pick the address the phone will use. The card offers this page's address when it is HTTPS, then the Omni Connect address while the tunnel is connected. For Tailscale, run `tailscale serve --bg 4747`, open "Use another address" and enter your `.ts.net` name. The card cannot check that the phone reaches an address you typed.
 
 Scan the QR code or type the manual code in the app. The code expires after five minutes and works once. The phone gets its own revocable app session, not the install token. Revoke a session under signed-in devices. A paired phone has the same access as a Google session: it can start agents, but not open the thread terminal or add, edit, run or retry a channel action. Revoking does not undo what its agents already ran.
 
-Once paired, the native app's tabs are Activity (phone web's Inbox list), Channels and Library, with New at the end of the tab bar. Settings uses the same shared catalog as the Web UI, including Channel Settings and About (native build, runtime and running update). Channel rows and headers show emoji, icon and SVG avatars. A push alert shows the thread's title, what happened (Finished, Failed, Needs your answer, a pull request that needs attention, or a crew report) and a plain-text preview of the reply, question or report. If alerts never arrive, Notifications and the Omni for iOS card name the missing APNs secrets (`APNS_AUTH_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`). Saving those secrets loads them without a server restart. Details are in [apps/ios/README.md](../../apps/ios/README.md) and [Native app pairing](../internals/app-pairing.md#push-delivery).
+Once paired, the native app's tabs are Activity (phone web's Inbox list), Channels and Library, with New at the end of the tab bar. Settings uses the same shared catalog as the Web UI, including Channel Settings and About (native build, runtime and running update). Channel rows and headers show emoji, icon and SVG avatars. A push alert shows the thread's title, what happened (Finished, Failed, Needs your answer, a pull request that needs attention, or a crew report) and a plain-text preview of the reply, question or report. If alerts never arrive, Notifications and the Pair a phone card name the missing APNs secrets (`APNS_AUTH_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`). Saving those secrets loads them without a server restart. Details are in [apps/ios/README.md](../../apps/ios/README.md) and [Native app pairing](../internals/app-pairing.md#push-delivery).
 
 ## Without Tailscale
 

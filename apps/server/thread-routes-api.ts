@@ -8,6 +8,7 @@ import { sessionSSE } from './sse.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { OWNER_MAX } from '@omni/shared/thread-owner.ts';
 import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { readOpenItems } from '@omni/shared/open-items.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
@@ -92,6 +93,8 @@ const createSchema = z.object({
   source: z.enum(['manual', 'conductor', 'capture']).default('manual'),
   /** A sidebar folder of the channel, by id or name. A name no folder has makes one. */
   folder: z.string().max(200).nullish(),
+  /** The person accountable for it, by name (thread-owner.ts). Left out: the parent's for a delegated thread, else the user. */
+  owner: z.string().max(OWNER_MAX).nullish(),
   /** Where a new worktree thread's branch starts (worktree-base.ts). Left out: the repo's HEAD, as before. */
   base: basePick.nullish(),
   device: z.string().max(100).nullish(),

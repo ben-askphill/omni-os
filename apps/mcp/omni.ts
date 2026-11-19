@@ -261,6 +261,11 @@ server.registerTool(
           `true when you will act on the report yourself: the next step of a chain ${USER} asked for, combining several reports, sending findings back. ` +
             `Then the report wakes you. Left off, ${USER} sees the report in your thread as it lands and you read it with ${USER}'s next message.`,
         ),
+      owner: z
+        .string()
+        .max(80)
+        .optional()
+        .describe(`The person accountable for the result, by name, when it is not ${USER}: someone ${USER} named as owning this work. The role you pick is the agent that does it. Leave it off otherwise; the thread then takes yours.`),
       base: z
         .string()
         .optional()
@@ -277,13 +282,13 @@ server.registerTool(
         ),
     },
   },
-  async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, follow_up, base, device }) => {
+  async ({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, create_folder, follow_up, base, device, owner }) => {
     if (folder?.trim()) await checkFolder(channel, folder, create_folder);
     const t = await call('/threads', {
       method: 'POST',
-      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, follow_up, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device) }),
+      body: JSON.stringify({ channel, role, prompt, task_id, title, harness, model, effort, review_of, folder, follow_up, base: basePick(base), parent_id: SELF, source: 'conductor', device: await deviceId(device), ...(owner?.trim() && { owner }) }),
     });
-    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch });
+    return text({ thread_id: t.id, task_id: t.task_id, channel: t.channel_id, folder_id: t.folder_id, role: t.role, harness: t.harness, model: t.model, effort: t.effort, auto_reason: t.auto_reason, status: t.status, branch: t.branch, owner: t.owner ?? null });
   },
 );
 

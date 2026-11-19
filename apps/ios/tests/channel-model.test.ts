@@ -73,6 +73,11 @@ describe('threadRow', () => {
     expect(threadRow(stub({ id: 'd', status: 'failed' }), NOW)).toMatchObject({ statusLabel: 'Failed' });
   });
 
+  it('carries someone else’s ownership, and nothing for the user’s own', () => {
+    expect(threadRow(stub({ id: 'e', status: 'done', owner: 'Sam' }), NOW).owner).toBe('Sam');
+    expect(threadRow(stub({ id: 'f', status: 'done' }), NOW)).not.toHaveProperty('owner');
+  });
+
   it('names a running or limited thread in plain words with Show technical details off', () => {
     expect(threadRow(stub({ id: 'a', status: 'running' }), NOW, false)).toMatchObject({ statusLabel: 'Working' });
     expect(threadRow(stub({ id: 'b', status: 'queued' }), NOW, false)).toMatchObject({ statusLabel: 'Working' });

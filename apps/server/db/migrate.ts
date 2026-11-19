@@ -648,6 +648,9 @@ export function migrate() {
   // their own times when set), which is what whole-row last-writer-wins compared before.
   const seedEdits = !(db.prepare('PRAGMA table_info(threads)').all() as unknown as { name: string }[]).some((c) => c.name === 'field_edits');
   ensureColumn('threads', 'field_edits', 'TEXT');
+  // M8: who is accountable for a thread, beside the agent (its role and harness) that does the work. A person's name,
+  // null for the install's own user. Synced, merged by its own edit time (sync/thread-merge.ts META).
+  ensureColumn('threads', 'owner', 'TEXT');
   if (seedEdits) {
     db.exec(`UPDATE threads SET field_edits = json_object('title', updated_at, 'archived', updated_at, 'folder_id', updated_at,
       'pinned_at', COALESCE(pinned_at, updated_at), 'done_at', COALESCE(done_at, updated_at))`);

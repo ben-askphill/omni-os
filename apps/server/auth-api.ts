@@ -254,12 +254,18 @@ const RedeemBody = z.object({
 });
 
 /**
- * A one-time code for pairing a native app: 5 minutes, single use. Only a device holding the install's token may mint
- * one. A session (an app's, or a Google sign-in's) could otherwise mint a replacement that outlives its own revoke
- * or the Google account being unlinked.
+ * A one-time code for pairing a phone (the native app, or a phone's browser through GET /pair-link): 5 minutes,
+ * single use. Only the install's token may mint one, or a session paired with it, as for /rotate-token: the desktop
+ * window and a browser that pasted the token or opened its link. A session from Google or from a pairing code could
+ * otherwise mint a replacement that outlives its own revoke or the Google account being unlinked. A token session can
+ * already rotate the token and start agents that read data/api-token, so a code gives it nothing new; the cleanup for
+ * a stolen one stays revoke, then rotate, which ends every session, the ones its codes made included.
  */
 authApi.post('/app-pairings', async (c) => {
-  if (c.get('omniAuth')?.via !== 'token') return c.json({ error: "Forbidden: only a device holding the install's token can pair an app" }, 403);
+  const auth = c.get('omniAuth');
+  if (auth?.via !== 'token' && !(auth?.via === 'session' && auth.method === 'token')) {
+    return c.json({ error: "Forbidden: only this Mac's desktop app or a device paired with the install's token can pair a phone" }, 403);
+  }
   if (!MintBody.safeParse(await c.req.json().catch(() => ({}))).success) return c.json({ error: 'Send {} or no body' }, 400);
   try {
     return c.json(mintPairing());
@@ -276,6 +282,24 @@ authApi.post('/app-pairings/redeem', async (c) => {
     return c.json(redeemPairing(body.data.code, body.data.name, clientKey(c)));
   } catch (err) {
     return pairingError(c, err);
+  }
+});
+
+/**
+ * Open: a phone's browser opened the pairing QR's link (Settings, Sharing & access). The same one-time code an app
+ * spends, spent here for a browser session in an HttpOnly cookie, then on to the Web UI. A spent, wrong or expired
+ * code goes to the pairing screen instead, which says so. The install's token is never in the link.
+ */
+authApi.get('/pair-link', (c) => {
+  const code = c.req.query('code') ?? '';
+  if (!code || code.length > 200) return c.redirect('/#/pair?link=expired', 303);
+  try {
+    const s = redeemPairing(code, browserName(c.req.header('user-agent')), clientKey(c), undefined, 'browser');
+    setSessionCookie(c, s.token);
+    return c.redirect('/', 303);
+  } catch (err) {
+    if (err instanceof PairingError) return c.redirect(`/#/pair?link=${err.status === 429 ? 'busy' : 'expired'}`, 303);
+    throw err;
   }
 });
 

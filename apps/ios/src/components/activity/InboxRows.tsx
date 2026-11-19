@@ -67,7 +67,7 @@ export interface RowTree {
 export function InboxRowView({ row, last, actions, onPress, tree }: { row: InboxRow; last: boolean; actions: RowAction[]; onPress: () => void; tree: RowTree }) {
   const { colors } = useOmniTheme();
   const home = useChannelLook(row.channelId);
-  const where = [`#${row.channel}`, row.branch].filter(Boolean).join(' · ');
+  const where = [`#${row.channel}`, row.owner && `for ${row.owner}`, row.branch].filter(Boolean).join(' · ');
   const right = row.status ? row.status.label : row.time;
   const reserve = actionsWidth(actions.length);
   const own = row.agents?.get(row.id) ?? 0;

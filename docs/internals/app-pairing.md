@@ -4,13 +4,17 @@ This contract describes version 1 of the native app pairing API. All routes are 
 
 ## Pair a device
 
-`POST /api/auth/app-pairings` requires the install token. It accepts an empty JSON object and returns `{ "code": "...", "expiresAt": "..." }`. The expiry is an ISO 8601 timestamp. Codes expire after 300 seconds and can be redeemed once. The server returns 429 with `Retry-After` when the creation limit is reached.
+`POST /api/auth/app-pairings` requires the install token or a `token` session (the desktop window, or a browser paired with the token), the same rule as `POST /api/auth/rotate-token`. A `google` or `pairing` session gets 403, so a phone paired with a code cannot mint the next one. It accepts an empty JSON object and returns `{ "code": "...", "expiresAt": "..." }`. The expiry is an ISO 8601 timestamp. Codes expire after 300 seconds and can be redeemed once. The server returns 429 with `Retry-After` when the creation limit is reached.
 
 The QR payload is a JSON object with `version` set to `1`, `serverUrl` set to the server's HTTPS origin, and `code` set to the one-time code. It contains neither the install token nor the resulting app session token. Treat the code as a secret until it expires or is redeemed.
 
 `serverUrl` is an HTTPS origin that the phone can reach from outside the computer. The settings card offers the origin of the page it is on, the Omni Connect address while its tunnel is connected, and an address the person types in, such as a Tailscale name. It never offers `localhost`, an IP address, a name without a dot, or a `.local` name. The server does not choose or check the address, so a client must show the person which address the QR names.
 
 `POST /api/auth/app-pairings/redeem` requires no session. Send `{ "code": "...", "name": "..." }`, where `name` has 1 to 100 characters. The response is `{ "token": "...", "sessionId": "..." }`. Store the token in the phone's secure storage for that server, and send it as `Authorization: Bearer <token>` on subsequent requests. Invalid input returns 400. A missing, used, or expired code returns 404. Rate limits return 429 with `Retry-After`.
+
+## Pair a phone's browser
+
+The same code pairs a phone's browser. The settings card's **Phone browser** QR names `<serverUrl>/api/auth/pair-link?code=<code>`, which the phone's camera opens. `GET /api/auth/pair-link` requires no session: it spends the code for a browser session (`kind` browser, `method` pairing), sets it as the HttpOnly session cookie and redirects to `/`. A missing, used or expired code redirects to `/#/pair?link=expired` (`busy` for a rate limit) and sets nothing. The link never holds the install token, and the code still expires after 300 seconds and works once.
 
 ## Capabilities
 
@@ -65,7 +69,7 @@ Set these in the secret store (Keychain, libsecret or `data/secrets.json`), or a
 - `APNS_TEAM_ID`: the Apple developer team id.
 - `APNS_BUNDLE_ID`: optional. Defaults to `app.omni-os.ios`.
 
-With any of the first three missing, or the key unreadable, nothing is sent, `push.delivery` is `false` and `push.problem` names the cause. The server logs which names are missing, never their values. Setting or deleting one of these secrets loads them again, so no restart is needed. A value in the environment needs a restart. The iPhone app's Notifications screen and the Omni for iOS card in Settings both show the problem.
+With any of the first three missing, or the key unreadable, nothing is sent, `push.delivery` is `false` and `push.problem` names the cause. The server logs which names are missing, never their values. Setting or deleting one of these secrets loads them again, so no restart is needed. A value in the environment needs a restart. The iPhone app's Notifications screen and the Pair a phone card in Settings both show the problem.
 
 Each registration names its environment, and each request goes to the matching APNs host (`sandbox` or `production`). Alerts expire after 15 minutes. APNs answers every request, so there are no receipts to poll.
 

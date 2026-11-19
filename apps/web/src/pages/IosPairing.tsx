@@ -3,7 +3,7 @@ import type { ServerCapabilities } from '@omni/shared/app-pairing.ts';
 import type { ConnectStatus } from '@omni/server/connect/service.ts';
 import { api, useApi } from '../api.ts';
 import { QrCode } from '../components/QrCode.tsx';
-import { Button, ErrorNote, Label, LinkButton, Loading, Picker } from '../components/ui.tsx';
+import { Button, ErrorNote, Label, LinkButton, Loading, Picker, Segmented } from '../components/ui.tsx';
 import {
   clock,
   NEEDS_INSTALL_TOKEN,
@@ -11,6 +11,7 @@ import {
   pairingErrorText,
   pairingOptions,
   pairingPayload,
+  pairLinkUrl,
   parseEnteredAddress,
   pushDeliveryNote,
   parsePairingCode,
@@ -23,10 +24,12 @@ import { href } from '../router.ts';
 import type { AuthAccount } from './GoogleAccount.tsx';
 import { Advanced, Card, InfoList, InfoRow } from './settings-parts.tsx';
 
-// Settings, Sharing & access, Omni for iOS: a QR the iPhone app scans to pair. The addresses come from pair-ios.ts, the
+// Settings, Sharing & access, Pair a phone: a QR the iPhone app scans to pair, or (Phone browser) one a phone's camera
+// opens as a link that signs its browser in (auth-api.ts GET /pair-link), the same one-time code either way. The addresses come from pair-ios.ts, the
 // code from POST /api/auth/app-pairings. The code lives in this component only: it is not stored, logged or sent
 // anywhere else, and it is dropped when it expires or the card closes. The server mints a code only for a client holding
-// the install token, so a browser that signed in with Google is told where to go instead of being offered the button.
+// the install token or a session paired with it (the desktop window, a browser that used the token), so a browser that
+// signed in with Google or a pairing code is told where to go instead of being offered the button.
 
 interface Issued {
   code: string;
@@ -52,6 +55,8 @@ export function IosPairingSection() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  /** What the QR pairs: the iPhone app, or a phone's browser. */
+  const [target, setTarget] = useState<'app' | 'browser'>('app');
 
   const options = pairingOptions({ pageOrigin: location.origin, connect: connect.data, entered });
   const address = options.addresses.find((a) => a.url === picked) ?? options.addresses[0] ?? null;
@@ -79,6 +84,8 @@ export function IosPairingSection() {
       setExpired(true);
     } else if (issued && issued.serverUrl !== url) setIssued(null);
   }, [issued, left, url]);
+  // A code shown for one target is not offered for the other.
+  useEffect(() => setIssued(null), [target]);
 
   const issue = async () => {
     if (!url) return;
@@ -89,7 +96,7 @@ export function IosPairingSection() {
       const code = parsePairingCode(await api.post('/auth/app-pairings'));
       if (!code) throw new Error(NO_CODE);
       setNow(Date.now());
-      setIssued({ code: code.code, payload: pairingPayload(url, code.code), serverUrl: url, expiresAt: code.expiresAt });
+      setIssued({ code: code.code, payload: target === 'app' ? pairingPayload(url, code.code) : pairLinkUrl(url, code.code), serverUrl: url, expiresAt: code.expiresAt });
     } catch (err) {
       setIssued(null);
       setError(pairingErrorText(err));
@@ -108,22 +115,33 @@ export function IosPairingSection() {
     setDraft('');
   };
 
-  const subtitle = 'Pair the iPhone app by scanning a code. The code is short-lived and holds this Omni’s address, never your token.';
-  if (account.data?.via === 'session') {
+  const subtitle = 'Pair the iPhone app, or a phone’s browser, by scanning a code. The code is short-lived and holds this Omni’s address, never your token.';
+  if (account.data?.via === 'session' && account.data.sessionMethod !== 'token') {
     return (
-      <Card entry="ios" title="Omni for iOS" subtitle={subtitle}>
+      <Card entry="ios" title="Pair a phone" subtitle={subtitle}>
         <p className="text-[13px] text-fg-3">{NEEDS_INSTALL_TOKEN}</p>
       </Card>
     );
   }
   const loading = (!onRemote && !connect.data && !connect.error) || (!account.data && !account.error);
   return (
-    <Card entry="ios" title="Omni for iOS" subtitle={subtitle}>
+    <Card entry="ios" title="Pair a phone" subtitle={subtitle}>
       {loading ? (
         <Loading />
       ) : (
         <>
-          {pushNote && (
+          <Segmented
+            radio
+            size="sm"
+            label="Pair"
+            value={target}
+            onChange={setTarget}
+            options={[
+              { id: 'app', label: 'iPhone app' },
+              { id: 'browser', label: 'Phone browser' },
+            ]}
+          />
+          {pushNote && target === 'app' && (
             <div data-push-note className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-fg-2">
               <p className="min-w-0 flex-1 basis-64">{pushNote}</p>
               <LinkButton size="sm" href={href.settingsSection('secrets')} icon="key">
@@ -183,15 +201,23 @@ export function IosPairingSection() {
           {address &&
             (issued ? (
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-                <QrCode text={issued.payload} label="QR code for pairing the Omni iOS app" className="w-full max-w-[220px] shrink-0" />
+                <QrCode text={issued.payload} label={target === 'app' ? 'QR code for pairing the Omni iOS app' : 'QR code for pairing a phone browser'} className="w-full max-w-[220px] shrink-0" />
                 <div className="min-w-0 flex-1 space-y-3 text-[13px]">
-                  <p className="text-fg-2">Open Omni on your iPhone and scan this code.</p>
-                  <div>
-                    <div className="text-[12.5px] text-fg-3">Or enter the address above and this code in the app</div>
-                    <div data-manual-code className="mt-1 font-mono text-[15px] tracking-[0.02em] break-all select-all">
-                      {issued.code}
-                    </div>
-                  </div>
+                  {target === 'app' ? (
+                    <>
+                      <p className="text-fg-2">Open Omni on your iPhone and scan this code.</p>
+                      <div>
+                        <div className="text-[12.5px] text-fg-3">Or enter the address above and this code in the app</div>
+                        <div data-manual-code className="mt-1 font-mono text-[15px] tracking-[0.02em] break-all select-all">
+                          {issued.code}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-fg-2" data-browser-pairing>
+                      Point the phone’s camera at this code and open the link. Its browser opens Omni, signed in, and keeps a cookie its pages cannot read. Remove it any time under Signed-in devices.
+                    </p>
+                  )}
                   <InfoRow label="Expires">
                     <span className="font-num">in {clock(left)}</span>
                   </InfoRow>

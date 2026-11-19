@@ -1,7 +1,7 @@
 import type { AppPairingCode, AppPairingQr, ServerCapabilities } from '@omni/shared/app-pairing.ts';
 import { ApiError, errorText } from './api.ts';
 
-// Settings, Sharing & access, Omni for iOS: which address the phone is told to use, what the QR holds, and what to say
+// Settings, Sharing & access, Pair a phone: which address the phone is told to use, what the QR holds, and what to say
 // when a code cannot be made.
 //
 // The QR holds {"version":1,"serverUrl":"https://<origin>","code":"<code>"} and nothing else: the code comes from
@@ -112,6 +112,9 @@ function noAddress(pageOrigin: string, connect: ConnectView | undefined): string
 /** The exact text of the QR. */
 export const pairingPayload = (serverUrl: string, code: string): string => JSON.stringify({ version: 1, serverUrl, code } satisfies AppPairingQr);
 
+/** The QR for a phone's browser: the link its camera opens, which spends the code for a browser session (auth-api.ts). */
+export const pairLinkUrl = (serverUrl: string, code: string): string => `${serverUrl}/api/auth/pair-link?code=${encodeURIComponent(code)}`;
+
 /** POST /api/auth/app-pairings answers `{code, expiresAt}`. Anything else is not a code. */
 export function parsePairingCode(raw: unknown): AppPairingCode | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -122,11 +125,11 @@ export function parsePairingCode(raw: unknown): AppPairingCode | null {
 
 /**
  * Only a client holding the install token may ask for a code, so a session cannot mint itself a way past its own
- * revoke. A browser that signed in with Google is told where to go: there is no button, and nothing in the page asks
- * for the token.
+ * revoke. A browser that signed in with Google or a pairing code is told where to go: there is no button, and nothing in
+ * the page asks for the token.
  */
-const INSTALL_TOKEN_ONLY = 'Pairing the iOS app takes the install token. Use the Omni desktop app, or a browser paired with the install token.';
-export const NEEDS_INSTALL_TOKEN = `This browser signed in with Google. ${INSTALL_TOKEN_ONLY}`;
+const INSTALL_TOKEN_ONLY = 'Pairing a phone takes the install token. Make the code in the Omni desktop app, or in a browser paired with the token (omni open --pair prints its link).';
+export const NEEDS_INSTALL_TOKEN = `This browser signed in with Google or a pairing code. ${INSTALL_TOKEN_ONLY}`;
 
 export const NO_CODE = 'The server did not send a pairing code. If you updated Omni, restart its server and try again.';
 

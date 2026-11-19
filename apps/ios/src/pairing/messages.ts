@@ -11,7 +11,7 @@ const INPUT_MESSAGES: Record<PairingInputReason, string> = {
 
 /** The Connect screen's first line: what pairing does, and where on the computer the code is made. */
 export const CONNECT_HINT =
-  'Pair this phone with your Omni server. On your computer, open Omni and go to Settings > Sharing & access > Omni for iOS to make a pairing code.';
+  'Pair this phone with your Omni server. On your computer, open Omni and go to Settings > Sharing & access > Pair a phone to make a pairing code.';
 
 export function describePairingError(error: unknown): string {
   if (error instanceof PairingInputError) return INPUT_MESSAGES[error.reason];

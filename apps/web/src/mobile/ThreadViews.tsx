@@ -1,4 +1,6 @@
 // The screens pushed from a thread: its steps, changes and PR, the channel browser, the shell, details and a file.
+import { NO_CREW_ROLE } from '@omni/shared/thread-owner.ts';
+import { OwnerField } from '../components/thread/OwnerField.tsx';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { turnCount } from '@omni/shared/history.ts';
 import { api, artifactUrl, errorText, useApi, type HarnessWithRunning, type PRDetail } from '../api.ts';
@@ -480,8 +482,9 @@ export function DetailsScreen() {
   const run = threadRunLabels(thread, harnesses);
   const rows: [string, ReactNode][] = [
     ['Channel', `#${channel(thread.channel_id)?.name ?? thread.channel_id}`],
-    // Only a thread started as a crew role has the row, as on desktop's Details.
-    ...(roleName ? ([['Role', roleName]] as [string, ReactNode][]) : []),
+    // Who it is for, beside the agent that does it: the crew role, as the quick card says (thread-owner.ts).
+    ['Owner', <OwnerField thread={thread} />],
+    ['Agent', roleName ?? <span className="text-fg-3">{NO_CREW_ROLE}</span>],
     [
       'Harness',
       <span className="inline-flex items-center gap-1.5">
@@ -495,12 +498,12 @@ export function DetailsScreen() {
     ['Started', fullDate(thread.created_at)],
     ['Turns', String(turns)],
   ];
-  if (thread.task_id) rows.splice(roleName ? 2 : 1, 0, ['Task', <span className="font-mono text-[13px]">{thread.task_id}</span>]);
+  if (thread.task_id) rows.splice(3, 0, ['Task', <span className="font-mono text-[13px]">{thread.task_id}</span>]);
   if (thread.branch) rows.push(['Branch', <span className="font-mono text-[13px]">{thread.branch}</span>]);
   const agentUrl = thread.harness === 'cursor-cloud' ? cloudAgentUrl(thread.session_id) : null;
   if (agentUrl)
     rows.push([
-      'Agent',
+      'Cloud agent',
       <a href={agentUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-fg">
         Open in Cursor
       </a>,

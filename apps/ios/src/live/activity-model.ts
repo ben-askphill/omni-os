@@ -28,6 +28,8 @@ export interface InboxRow {
   status: InboxStatus | null;
   time: string;
   branch: string | null;
+  /** Someone else accountable for it (thread-owner.ts), shown as "for <name>" after the channel; null for the user's own. */
+  owner: string | null;
   /** The step a running thread is on ("Step 2 of 3 · Read the reviews"), as phone web's row shows it. */
   step: string | null;
   pinned: boolean;
@@ -129,6 +131,7 @@ export function activityInbox({ recent, needsYou, pinned, channels, tasks, now }
       status,
       time: shortAgo(at(t), now),
       branch: t.branch ?? null,
+      owner: t.owner ?? null,
       step: t.step ?? null,
       pinned: !!t.pinned_at,
       receded: status?.glyph === 'running',

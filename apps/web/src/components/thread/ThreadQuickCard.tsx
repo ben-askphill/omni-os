@@ -11,12 +11,15 @@ import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
 import { threadPill } from './thread-state.ts';
 import { runningLabel } from '@omni/shared/goal.ts';
-import { useHereName, useNeedOf, useNow } from '../../store.tsx';
+import { useCrewRoles, useHereName, useNeedOf, useNow } from '../../store.tsx';
 import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import { shortPath } from '@omni/shared/short-path.ts';
 import type { ThreadPRs } from './panel/PRsTab.tsx';
 import type { InitP } from './panel/DetailsTab.tsx';
 import { CAPTION, CARD_PAD, DIVIDER, ROW } from './panel/inset.ts';
+import { NO_CREW_ROLE } from '@omni/shared/thread-owner.ts';
+import { crewRoleName } from '@omni/shared/crew-role.ts';
+import { OwnerField } from './OwnerField.tsx';
 import { markLabel, term } from '@omni/shared/display.ts';
 import { useTechnical } from '../../display.ts';
 
@@ -126,6 +129,9 @@ export function ThreadQuickCard({
   // The account its harness ran as when its process last started (apps/server/harness-accounts.ts), here or elsewhere.
   const ran = useThreadAccount(thread.id);
   const hereName = useHereName();
+  const crew = useCrewRoles();
+  // Who it is for and who does it, as separate rows (thread-owner.ts); the harness has its own row below.
+  const agent = crewRoleName(thread.role, crew);
 
   return (
     <section
@@ -152,6 +158,14 @@ export function ThreadQuickCard({
         </QuickRow>
       )}
       <div className="my-[var(--sp-2)] h-px bg-line" />
+      <QuickRow icon="target">
+        <span className="shrink-0 text-fg-3">Owner</span>
+        <OwnerField thread={thread} className="flex-1" />
+      </QuickRow>
+      <QuickRow icon="delegate">
+        <span className="shrink-0 text-fg-3">Agent</span>
+        <span className={`min-w-0 truncate ${agent ? '' : 'text-fg-3'}`}>{agent ?? NO_CREW_ROLE}</span>
+      </QuickRow>
       <QuickRow icon="info" label={term('harnessAndModel', technical)}>
         <span className="shrink-0 whitespace-nowrap">
           <HarnessMark harness={thread.harness} withLabel />

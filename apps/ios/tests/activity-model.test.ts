@@ -165,6 +165,11 @@ describe('the Activity inbox', () => {
     expect(a.working[0]?.branch).toBe('omni/t');
   });
 
+  it('names who a thread is for when that is someone else, and nobody for the user’s own', () => {
+    const a = inbox({ recent: [thread('theirs', { owner: 'Maya Jansen' }), thread('mine')] });
+    expect(Object.fromEntries(a.waiting.map((r) => [r.id, r.owner]))).toEqual({ theirs: 'Maya Jansen', mine: null });
+  });
+
   it('sorts done threads by when they were marked done, newest first, timed from then', () => {
     const a = inbox({ recent: [thread('earlier', { done_at: at(90) }), thread('latest', { done_at: at(2) })] });
     expect(a.done.map((r) => [r.id, r.time])).toEqual([

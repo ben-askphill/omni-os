@@ -75,7 +75,14 @@ export function mintPairing(deps: PairingDeps = defaultDeps): { code: string; ex
  * address behind Omni Connect or Tailscale, not the proxy's), so one noisy caller cannot lock the others out.
  * Past ten failures a source gets no redeem looked up until the minute clears, however good its code.
  */
-export function redeemPairing(code: string, name: string, source: string, deps: PairingDeps = defaultDeps): { token: string; sessionId: string } {
+export function redeemPairing(
+  code: string,
+  name: string,
+  source: string,
+  deps: PairingDeps = defaultDeps,
+  /** `browser`: a phone's browser that opened the pairing link (auth-api.ts GET /pair-link), held as a cookie. */
+  kind: 'app' | 'browser' = 'app',
+): { token: string; sessionId: string } {
   const at = deps.now();
   prune(at);
   const mine = failsBySource.get(source) ?? [];
@@ -90,7 +97,7 @@ export function redeemPairing(code: string, name: string, source: string, deps: 
   }
   if (pairedSessionCount() >= MAX_PAIRED_APPS) throw new PairingError('Too many paired apps. Remove one in Settings, Sharing & access', 429);
   open.delete(hash);
-  const session = createSession(name, 'app', '', 'pairing');
+  const session = createSession(name, kind, '', 'pairing');
   return { token: session.token, sessionId: session.id };
 }
 
