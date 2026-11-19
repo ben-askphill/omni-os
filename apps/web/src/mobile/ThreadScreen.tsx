@@ -186,13 +186,14 @@ export function ThreadScreen() {
         right={
           <>
             <StatusPill mark={pill.mark} label={pill.label} />
-            <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
+            {/* The quick card lists the branch, worktree and PRs: only in a code project, or with Show technical details. */}
+            {code && <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />}
             <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
           </>
         }
       />
       <div className="relative min-h-0 flex-1">
-        {quick && (
+        {quick && code && (
           <>
             <button type="button" aria-label="Close quick actions" tabIndex={-1} className="absolute inset-0 z-10 cursor-default" onClick={() => setQuick(false)} />
             <div className="pop-in absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)]">

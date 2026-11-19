@@ -14,6 +14,7 @@ import { channelBody, channelForm, channelFormProblem, CHANNEL_ID, CHANNEL_KINDS
 import { PR_STEPS, STEP_LABEL, STEP_PROMPTS } from '@omni/shared/thread-glance.ts';
 import { navigate } from '../router.ts';
 import { useApp } from '../store.tsx';
+import { useDisplay } from '../display.ts';
 import { pageColumn } from '../components/ui/feedback.tsx';
 import { Advanced, Card } from './settings-parts.tsx';
 import { AccessCard } from './ChannelAccess.tsx';
@@ -248,6 +249,7 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
   // The values Omni works out (#405). Each shows as a field only when detection failed or you asked to change it.
   const [editing, setEditing] = useState<{ id?: boolean; github?: boolean; base?: boolean }>({});
   const hasRepo = !!f.repo_path.trim();
+  const display = useDisplay();
   const repoChanged = (existing?.repo_path ?? '') !== f.repo_path.trim();
   /** A name with no letters or digits gives no usable id. */
   const idFailed = isNew && !!f.name.trim() && !idValid;
@@ -360,30 +362,36 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         </Field>
       </Card>
 
-      <Card title="Branch steps" subtitle="What the Open PR, Fix conflicts and Fix checks buttons ask the agent in this channel. Empty uses the built-in prompt, shown greyed out.">
-        {PR_STEPS.map((step) => (
-          <Field key={step} label={STEP_LABEL[step]} htmlFor={`ch-step-${step}`}>
-            <textarea
-              id={`ch-step-${step}`}
-              className="field min-h-[84px] resize-y"
-              value={f.prompts[step]}
-              placeholder={STEP_PROMPTS[step]}
-              onChange={(e) => set('prompts', { ...f.prompts, [step]: e.target.value })}
-            />
-          </Field>
-        ))}
-      </Card>
+      {/* Branch steps drive the Open PR buttons: only with a repo, or Show technical details on. */}
+      {(display.technical || hasRepo) && (
+        <Card title="Branch steps" subtitle="What the Open PR, Fix conflicts and Fix checks buttons ask the agent in this channel. Empty uses the built-in prompt, shown greyed out.">
+          {PR_STEPS.map((step) => (
+            <Field key={step} label={STEP_LABEL[step]} htmlFor={`ch-step-${step}`}>
+              <textarea
+                id={`ch-step-${step}`}
+                className="field min-h-[84px] resize-y"
+                value={f.prompts[step]}
+                placeholder={STEP_PROMPTS[step]}
+                onChange={(e) => set('prompts', { ...f.prompts, [step]: e.target.value })}
+              />
+            </Field>
+          ))}
+        </Card>
+      )}
 
-      <Card title="Store">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
-            <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" spellCheck={false} />
-          </Field>
-          <Field label="Client portal slug" htmlFor="ch-portal" hint="The company's slug in your client portal, for client context.">
-            <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" spellCheck={false} />
-          </Field>
-        </div>
-      </Card>
+      {/* The Shopify pack (Settings > Extras): the store and client portal fields. Off on a new install. */}
+      {display.shopify && (
+        <Card title="Store">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Store domain" htmlFor="ch-store" hint="The myshopify domain, e.g. acme.myshopify.com">
+              <input id="ch-store" className="field font-mono !text-[13px]" value={f.store_domain} onChange={(e) => set('store_domain', e.target.value)} placeholder="acme.myshopify.com" spellCheck={false} />
+            </Field>
+            <Field label="Client portal slug" htmlFor="ch-portal" hint="The company's slug in your client portal, for client context.">
+              <input id="ch-portal" className="field font-mono !text-[13px]" value={f.portal_slug} onChange={(e) => set('portal_slug', e.target.value)} placeholder="acme" spellCheck={false} />
+            </Field>
+          </div>
+        </Card>
+      )}
 
       {/* Id, GitHub repo and base directory fill themselves in; each shows as a field only when Omni could not work
           it out or you choose to change it, and a failure opens the fold (#405). */}

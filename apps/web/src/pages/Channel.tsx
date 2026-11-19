@@ -14,6 +14,8 @@ import { ChannelSettingsForm } from './ChannelSettings.tsx';
 import { Card } from './settings-parts.tsx';
 import { pageColumn } from '../components/ui/feedback.tsx';
 import { PRDetail, PRList } from './PRs.tsx';
+import { useDisplay } from '../display.ts';
+import { showsCode } from '@omni/shared/display.ts';
 
 function ThreadsTab({ id, isConductor }: { id: string; isConductor: boolean }) {
   const accept = useCallback((t: Thread) => t.channel_id === id, [id]);
@@ -99,6 +101,8 @@ function MissingChannel({ id }: { id: string }) {
 
 export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?: number }) {
   const { channel, channelsLoaded } = useApp();
+  const display = useDisplay();
+  const { shopify } = display;
   const ch = channel(id);
 
   if (!ch) {
@@ -109,7 +113,8 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
   const isConductor = ch.id === 'conductor';
   const tabs = [
     { id: 'threads' as const, label: 'Threads', href: href.channel(id) },
-    ...(isConductor ? [] : [{ id: 'prs' as const, label: 'PRs', href: href.prs(id) }]),
+    // A channel without a repo has no PRs to list, unless Show technical details is on.
+    ...(isConductor || !showsCode(display, ch) ? [] : [{ id: 'prs' as const, label: 'PRs', href: href.prs(id) }]),
     { id: 'settings' as const, label: 'Settings', href: href.settings(id) },
   ];
 
@@ -138,7 +143,7 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
         </div>
         {/* One fixed row, filled or not, so the tabs sit at the same height on every channel. */}
         <div className="mt-3 flex h-7 min-w-0 items-center gap-1.5 overflow-hidden">
-          {ch.store_domain && (
+          {shopify && ch.store_domain && (
             <a href={`https://${ch.store_domain}/admin`} target="_blank" rel="noopener noreferrer" className={linkCls}>
               <Icon name="globe" size={13} className="text-fg-3" /> <span className="truncate">{ch.store_domain}</span>
             </a>

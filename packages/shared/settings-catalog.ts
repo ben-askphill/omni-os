@@ -48,7 +48,7 @@ export const SETTINGS_SECTION_DEFS = [
   { id: 'desktop', group: 'devices', title: 'Desktop app', icon: 'monitor', blurb: 'Quick Prompt and how this app starts.', desktopApp: true },
   { id: 'worktrees', group: 'developer', title: 'Worktrees', icon: 'branch', blurb: 'The checkouts Omni makes for threads, and cleaning them up.' },
   { id: 'secrets', group: 'developer', title: 'Secrets', icon: 'key', blurb: 'API keys and tokens for threads, kept outside the database.' },
-  { id: 'extras', group: 'extras', title: 'Extras', icon: 'plug', blurb: 'Optional add-ons: Wispr Flow, Grok Bot, Hermes and the notes folder.' },
+  { id: 'extras', group: 'extras', title: 'Extras', icon: 'plug', blurb: 'Optional add-ons: Wispr Flow, Grok Bot, Shopify, Hermes and the notes folder.' },
   { id: 'about', group: 'app', title: 'About', icon: 'info', blurb: 'Version, server and where Omni keeps its files.' },
 ] as const satisfies readonly SettingsSectionDef[];
 
@@ -144,6 +144,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'network', section: 'access', title: 'Tailscale logins and public MCP URL', keywords: ['tailscale', 'tailnet', 'serve', 'mcp', 'claude.ai', 'chatgpt', 'clerk', 'remote access'] },
   { id: 'secrets', section: 'secrets', title: 'Secrets', keywords: ['api key', 'token', 'env', 'keychain', 'password', 'credentials'] },
   { id: 'wispr-flow', section: 'extras', title: 'Dictate with Wispr Flow', keywords: ['wispr flow', 'dictate', 'dictation', 'voice', 'speak', 'talk', 'quick prompt'] },
+  { id: 'shopify', section: 'extras', title: 'Shopify add-on', keywords: ['shopify', 'store', 'store domain', 'myshopify', 'portal', 'portal slug', 'ask phill', 'pack', 'add-on'] },
   { id: 'grok-bot', section: 'extras', title: 'Grok Bot', keywords: ['grok', 'grok bot', 'webhook', 'GROKBOT_WEBHOOK_URL', 'send to grok bot'] },
   { id: 'hermes', section: 'extras', title: 'Hermes URL', keywords: ['hermes', 'tailnet', 'HERMES_API_KEY', 'integrations'] },
   { id: 'brain', section: 'extras', title: 'Notes folder', keywords: ['notes', 'brain-export', 'export', 'digests', 'knowledge base'] },

@@ -19,6 +19,7 @@ import { readPref, useApp, useFeed, useNow, writePref } from '../store.tsx';
 import { useInbox } from '../app/useInbox.ts';
 import { usePresetSeq } from '../router.ts';
 import { runningListFilter } from '../running-list.ts';
+import { usePRsShown } from '../display.ts';
 
 const acceptAll = () => true;
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -178,7 +179,9 @@ function OpenList({ kind, insights, machine, machines, working }: { kind: ListKi
 }
 
 export function HomePage() {
-  const { needsYou, profile } = useApp();
+  const { needsYou, profile, channels } = useApp();
+  // The PR card only once there is code to review: Show technical details, or a channel with a repo.
+  const prs = usePRsShown(channels);
   const [range, setRangeState] = useState<InsightRange>(() => {
     const saved = readPref<string>('home.range', '30d');
     return isInsightRange(saved) ? saved : '30d';
@@ -262,7 +265,7 @@ export function HomePage() {
         <div className="mt-8 grid gap-4 @3xl:grid-cols-2">
           <NeedsYouCard needs={split?.needs ?? null} />
           <BusiestCard list={data?.channels} />
-          <PRsCard prs={data ? data.prs : undefined} loading={!insights.error} />
+          {prs && <PRsCard prs={data ? data.prs : undefined} loading={!insights.error} />}
           <AutomationsCard automations={data?.automations} />
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { DEFAULT_DISPLAY, parseDisplay, showsCode, type CodeChannel, type DisplayPrefs } from '@omni/shared/display.ts';
+import { anyRepo, DEFAULT_DISPLAY, parseDisplay, showsCode, type CodeChannel, type DisplayPrefs } from '@omni/shared/display.ts';
 import { api } from './api.ts';
 
 /**
@@ -58,5 +58,8 @@ export async function saveDisplay(patch: Partial<DisplayPrefs>): Promise<void> {
 export const useDisplay = (): DisplayPrefs => useSyncExternalStore(subscribe, readDisplay, readDisplay);
 /** Whether the status words and control names read technical. */
 export const useTechnical = (): boolean => useDisplay().technical;
+/** Whether the Pull requests page has a way in (rail, sidebar, palette, phone tab, Overview card): the switch, or a channel with a repo. */
+export const prsShown = (prefs: DisplayPrefs, channels: readonly { repo_path?: string | null }[]): boolean => prefs.technical || anyRepo(channels);
+export const usePRsShown = (channels: readonly { repo_path?: string | null }[]): boolean => prsShown(useDisplay(), channels);
 /** Whether a channel shows its code detail: the switch, or a repo (showsCode). */
 export const useShowsCode = (channel: CodeChannel): boolean => showsCode(useDisplay(), channel);

@@ -8,6 +8,7 @@ import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { userConfig } from '../user-config.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
+import { displayPrefs } from '../display.ts';
 import { accessSync, closeSync, constants, openSync, readSync, statSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
@@ -167,6 +168,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
   // A delegate-only role has no browser or file tools, so the sections on using them would only mislead it.
   // A quick ask only reads, and turns into a task for the rest (packages/shared/quick-ask.ts).
   const hands = !role?.delegateOnly && !readsOnly(thread);
+  const { shopify } = displayPrefs();
   const lines = [
     '# Omni OS context',
     TOOL_FAILURE_POLICY,
@@ -179,8 +181,9 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     ...profileLines(name),
     `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,
     `- Channel: #${channel.id} (${channel.name}, ${channel.kind})`,
-    channel.store_domain ? `- Store: ${channel.store_domain}` : '',
-    channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
+    // The Shopify pack (display.ts): its store and portal lines go out only while it is on.
+    shopify && channel.store_domain ? `- Shopify store: ${channel.store_domain}` : '',
+    shopify && channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
     channel.github_repo ? `- GitHub repo: ${channel.github_repo}` : '',
     remote
       ? '- This thread does not run in an Omni worktree or browser. Work on your own clone of the repo and open pull requests there.'

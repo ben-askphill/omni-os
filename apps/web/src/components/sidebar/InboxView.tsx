@@ -190,7 +190,8 @@ function InboxCard({
   const channelName = channel?.id === 'conductor' ? 'Conductor' : (channel?.name ?? t.channel_id);
   // The machine it runs on or last ran on, with the run's time while it runs; the branch only without a machine.
   const where = ranOnLine(t, now);
-  const label = where.machine ?? where.branch;
+  // A branch says nothing outside a code project: Show technical details, or a channel with a repo, brings it back.
+  const label = where.machine ?? (technical || channel?.repo_path ? where.branch : null);
   // A job's tree toggle sits on this line, laid over the link (a link can't hold a button), so a job always has it.
   const line = !!label || !!t.run_started_at || !!tree;
   const harness = t.harness && !tree && (

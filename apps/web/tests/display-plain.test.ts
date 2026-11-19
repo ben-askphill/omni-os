@@ -6,6 +6,9 @@ import { takeDisplay } from '../src/display.ts';
 import { StatusDot, StatusPill, statusLabel } from '../src/components/ui/status.tsx';
 import { ThreadQuickCard } from '../src/components/thread/ThreadQuickCard.tsx';
 import { rowOf } from '../src/mobile/rows.ts';
+import { prsShown } from '../src/display.ts';
+import { paletteItems } from '../src/components/command-palette/items.tsx';
+import type { ChannelWithRunning } from '../src/api.ts';
 
 // Show technical details off: the plain words a person reads, and the code detail left out outside a repo channel.
 
@@ -65,5 +68,19 @@ describe('the quick card outside a repo', () => {
     const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread(), code: true }));
     expect(html).toContain('T-BRIEF');
     expect(html).toContain('omni/t1');
+  });
+});
+
+describe('Pull requests outside a code project', () => {
+  const plain = [{ id: 'notes', name: 'Notes', repo_path: null }] as unknown as ChannelWithRunning[];
+  const code = [...plain, { id: 'shop', name: 'Shop', repo_path: '/code/shop' }] as unknown as ChannelWithRunning[];
+  const prs = (channels: ChannelWithRunning[]) => paletteItems('pull', channels, [], { name: 'home' }, null).some((i) => i.id === 'p:prs');
+
+  it('has no way in until a channel has a repo or the switch is on', () => {
+    expect(prsShown({ technical: false, shopify: false }, plain)).toBe(false);
+    expect(prsShown({ technical: false, shopify: false }, code)).toBe(true);
+    expect(prsShown({ technical: true, shopify: false }, plain)).toBe(true);
+    expect(prs(plain)).toBe(false);
+    expect(prs(code)).toBe(true);
   });
 });

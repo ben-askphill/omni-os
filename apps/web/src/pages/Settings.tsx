@@ -227,8 +227,30 @@ function ExtrasSection() {
         <Card entry="wispr-flow" title="Wispr Flow" subtitle="Say what you need instead of typing it: Wispr Flow dictates into the Quick Prompt. Its switch is here in Omni's Mac app." />
       )}
       <GrokBotCard />
+      <ShopifyCard />
       <ConfigSection part="extras" />
     </>
+  );
+}
+
+/** The Shopify pack: the Store card and Portal slug on a channel, its store link, and their lines in a thread's instructions. */
+function ShopifyCard() {
+  const { shopify } = useDisplay();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card entry="shopify" title="Shopify">
+      <SwitchRow
+        title="Shopify add-on"
+        origin={<Origin of="machine" label="Every machine" />}
+        detail="A store domain and client portal slug on each channel's settings, the store link on its page, and both in its threads' instructions. Off, Omni keeps any you set but shows and sends none."
+        checked={shopify}
+        onChange={(on) => {
+          setError(null);
+          saveDisplay({ shopify: on }).catch((e: unknown) => setError(errorText(e)));
+        }}
+      />
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Card>
   );
 }
 

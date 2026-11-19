@@ -155,6 +155,10 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   const prompts = useMemo(() => stepPrompts(ownChannel), [ownChannel]);
   // Show technical details, or a channel with a repo: branch, PRs, changes, terminal, tokens and the context ring.
   const code = useShowsCode(ownChannel);
+  // Outside a code project the quick card has little to say: the right side opens collapsed, and the header button
+  // opens the inspector. The saved choice stays as it was for the channels that show the card.
+  const surface = !code && panel.surface === 'card' ? 'collapsed' : panel.surface;
+  const onPanel = code ? panel.toggle : () => (surface === 'collapsed' ? panel.show() : panel.closeInspector());
   const underway = useMemo(() => stepUnderway(events, queued, slotBusy, prompts), [events, queued, slotBusy, prompts]);
   // A step prompt that never reached the agent (a restart, or a session download that failed): its button says why, and
   // pressing it again resumes that message rather than sending a second copy.
@@ -228,9 +232,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             onDone: () => void toggleDone(),
             onRestore: () => void restore(),
             restoring,
-            panelOpen: panel.open,
-            panelSurface: panel.surface,
-            onPanel: panel.toggle,
+            panelOpen: surface !== 'collapsed',
+            panelSurface: surface,
+            onPanel,
             artifactCount,
             asking,
             turn,
@@ -313,7 +317,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
               </button>
             )}
           </div>
-          {panel.surface === 'card' && (
+          {surface === 'card' && (
             <div className="absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)] md:static md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pl-1">
               <ThreadQuickCard
                 thread={thread}
@@ -337,7 +341,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
         </div>
 
         {/* composer, keeping clear of the quick card's column so it centres under the transcript */}
-        <div className={`relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4 ${panel.surface === 'card' ? 'md:pr-[19.5rem]' : ''}`}>
+        <div className={`relative shrink-0 bg-bg px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4 ${surface === 'card' ? 'md:pr-[19.5rem]' : ''}`}>
           <div className="mx-auto max-w-4xl">
             {actionError && <ErrorNote className="mb-2">{actionError}</ErrorNote>}
             {/* The setup card above says why while the worktree is not ready. */}
@@ -363,7 +367,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
       </div>
 
       {/* panel */}
-      {panel.surface === 'inspector' && (
+      {surface === 'inspector' && (
         <aside className="relative shrink-0 py-2 pr-2" style={{ width: panel.width }}>
           <PanelResizeHandle width={panel.width} max={panel.max} onChange={panel.resize} onReset={panel.reset} />
           <div className="panel-in h-full overflow-hidden rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))]">
