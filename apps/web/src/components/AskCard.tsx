@@ -59,7 +59,6 @@ function AskOptionsRow({ threadId, role, options, onOptions }: { threadId: strin
       )}
       <Segmented
         size="sm"
-        radio
         label="When it answers"
         value={options.wake ? 'wake' : 'show'}
         onChange={(v) => onOptions({ ...options, wake: v === 'wake' })}
