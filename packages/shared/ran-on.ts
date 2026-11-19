@@ -60,7 +60,7 @@ export function ranOnTitle(t: RanOnFields & { status?: string; branch?: string |
     const verb = t.run_started_at || t.status === 'running' ? 'Running on' : t.status === 'queued' ? 'Queued on' : 'Last ran on';
     parts.push(`${verb} ${machineName(r)}`);
     if (r.before.length) {
-      const stops = [...r.before].reverse().map((s) => (s.at ? `${machineName(s)} (${relTime(s.at, now)})` : machineName(s)));
+      const stops = r.before.toReversed().map((s) => (s.at ? `${machineName(s)} (${relTime(s.at, now)})` : machineName(s)));
       parts.push(`before: ${stops.join(', ')}`);
     }
   }

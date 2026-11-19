@@ -21,7 +21,7 @@ export function Screenshots({ shots, crew }: { shots: Artifact[]; crew: Artifact
       </Empty>
     );
   }
-  const own = [...shots].reverse();
+  const own = shots.toReversed();
   const list: Shot[] = [...own, ...crew];
   const idx = open ? list.findIndex((s) => s.id === open.id) : -1;
   const from = open && fromThread(open);

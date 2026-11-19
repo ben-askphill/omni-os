@@ -302,8 +302,8 @@ export function cardPRs(thread: Pick<Thread, 'channel_id'>, prs: NonNullable<Thr
     };
   });
   const seen = new Set(own.map((p) => p.url));
-  const crew: CardPR[] = [...prs.crew]
-    .reverse()
+  const crew: CardPR[] = prs.crew
+    .toReversed()
     .filter((p) => !seen.has(p.url))
     .map((p) => ({ key: p.url, channelId: p.channel_id, number: p.number, title: p.title, url: p.url, state: prBadge(p), open: p.state === 'OPEN' }));
   const all = [...own, ...crew];

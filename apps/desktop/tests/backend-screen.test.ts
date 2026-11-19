@@ -1,4 +1,5 @@
 // The server failure screen and the activity monitor's pure parts.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 // quick-prompt.ts sets Electron switches as it loads, which needs a running app.
@@ -42,6 +43,27 @@ describe('server screen', () => {
       expect(html).not.toContain('<script');
     }
     expect(screenHtml({ kind: 'failed', message: 'x', logTail: 'a\nb\n', logExists: true })).toContain('<pre><span>a\nb</span></pre>');
+  });
+
+  it('announces the start and slows its spinner under reduced motion', () => {
+    const html = screenHtml({ kind: 'starting', port: 4747 });
+    expect(html).toContain('<p class="progress" role="status">Starting the server on port 4747</p>');
+    expect(html).toContain('<div class="spinner" aria-hidden="true">');
+    expect(html).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.spinner \{ animation-duration: \d+s; \} \}/);
+  });
+
+  it("keeps the Web UI's tokens, one light-dark() value each", () => {
+    const web = readFileSync(new URL('../../web/src/index.css', import.meta.url), 'utf8');
+    const html = screenHtml({ kind: 'starting', port: 4747 });
+    const root = /:root \{([^}]+)\}/.exec(html)![1];
+    expect(html).not.toContain('prefers-color-scheme');
+    const tokens = [...root.matchAll(/(--[\w-]+): ([^;]+);/g)];
+    expect(tokens.length).toBe(11);
+    for (const [, name, value] of tokens) {
+      expect(value, name).toMatch(/^light-dark\(/);
+      // The screen's --ink is its primary button, which flips with the scheme. The Web UI's --ink is status ink.
+      if (name !== '--ink') expect(web, name).toContain(`  ${name}: ${value};`);
+    }
   });
 });
 

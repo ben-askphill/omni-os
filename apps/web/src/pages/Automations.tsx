@@ -28,7 +28,7 @@ const RUN_TONE: Record<string, string> = {
 /** Recent runs as a row of bars, oldest left: a glance at reliability. */
 function RunStrip({ runs }: { runs: Automation['runs'] }) {
   if (!runs.length) return null;
-  const bars = [...runs].reverse();
+  const bars = runs.toReversed();
   return (
     <span className="flex h-3.5 items-end gap-[3px]" role="img" aria-label={`${runs.filter((r) => r.status === 'done').length} of ${runs.length} recent runs finished`}>
       {bars.map((r, i) => (

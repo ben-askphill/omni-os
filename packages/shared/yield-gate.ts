@@ -20,14 +20,14 @@ export interface YieldGate {
 
 export function createYieldGate(): YieldGate {
   let holds = 0;
-  let opened: Promise<void> = Promise.resolve();
+  let opened = Promise.resolve();
   let open = () => {};
   const running = new Set<AbortController>();
 
   return {
     hold() {
       if (holds++ === 0) {
-        opened = new Promise((resolve) => (open = resolve));
+        ({ promise: opened, resolve: open } = Promise.withResolvers<void>());
         for (const read of running) read.abort();
       }
       let released = false;

@@ -23,7 +23,7 @@ Local agent workspace. See README.md for what it does.
 - Desktop app (Electron): any feature its Chromium ships. Code only the desktop app runs (QuickPrompt, the Activity Monitor, `server-screen.ts`, anything behind `window.omniDesktop`) needs no fallback.
 - Desktop web and phone web (`apps/web/`, server-rendered pages, the relay's Connect page): Baseline widely available features freely, and Baseline newly available features once iOS Safari 18.0 has them. iPhone Safari, mostly as a home-screen app, is the floor. It matches the iOS app's deployment target (`apps/ios/app.config.ts`), so raise both together.
 - Anything newer, or Chromium-only, goes in only as progressive enhancement: behind `@supports` or a feature check (`CSS.supports(...)`, `'x' in el`), and the page still works without it. The fallback is today's code, or at most ~20 new lines with no new dependency unless the task's brief names a bigger one. No polyfills unless the brief names one.
-- `packages/shared` also runs on the iOS app's Hermes engine: check a newer JS built-in (`Promise.withResolvers`, `Intl.DurationFormat`) there too.
+- `packages/shared` also runs on the iOS app's Hermes engine: check a newer JS built-in (`Promise.withResolvers`, `Intl.DurationFormat`) there too. Hermes V1 has no `Array.prototype.toSorted` (`packages/shared/tests/hermes-builtins.test.ts`).
 - Look support up on MDN or webstatus.dev, not from memory, and say in the PR which browsers get the fallback.
 - Why: nothing was written down, and Chromium-only APIs (`focusgroup`, `interestfor`, `closedby`) work in the desktop app but not on iPhone Safari. The modern web audit (#838) is the first work held to it.
 
