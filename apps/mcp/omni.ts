@@ -688,7 +688,7 @@ server.registerTool(
     description:
       `Continue an idle thread in a new one on a local harness, when ${USER} asks or when you have a follow-up for a thread whose session went cold ` +
       "(get_thread's session.warm is false; pass the thread's own harness then). The new thread is linked to it, in the same " +
-      'channel, with a session of its own and, for repo work, its own worktree on a new branch with the uncommitted changes carried. ' +
+      'channel, role and folder (a thread you delegated stays your delegation: same parent and task id, and its report comes back to you), with a session of its own and, for repo work, its own worktree on a new branch with the uncommitted changes carried. ' +
       'Its first session reads a carryover of the thread (goal, changed files, checks, recent history) ahead of `message`. ' +
       'Files attached in the thread go only when named in `attachments`: they are copied into the new thread, and any that are missing, too big or not plain files are listed back with why. ' +
       'The thread itself stays as it is. Refused while anything runs or waits in it, and to or from Hermes or Cursor Cloud. Ids come from list_harnesses.',
