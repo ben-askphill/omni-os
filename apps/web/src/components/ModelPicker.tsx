@@ -222,7 +222,7 @@ export function ModelPicker({
               aria-activedescendant={list.cursor >= 0 ? list.optionId(list.cursor) : undefined}
               placeholder={term('findModel', technical)}
               aria-label={term('findModel', technical)}
-              className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-4"
+              className="field-sm h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-4"
             />
           </label>
           <ModelList
