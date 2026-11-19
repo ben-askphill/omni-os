@@ -10,8 +10,8 @@ import { catalog } from '../thread/fixtures';
 describe('Settings sections on the phone', () => {
   it('lists the catalog in its order, without the desktop app', () => {
     const ids = settingsGroups().flatMap((g) => g.rows.map((r) => r.id));
-    expect(ids).toEqual(['general', 'appearance', 'notifications', 'models', 'accounts', 'threads', 'channels', 'workspace', 'worktrees', 'machines', 'sync', 'access', 'secrets', 'about']);
-    expect(settingsGroups()[0].title).toBe('Omni');
+    expect(ids).toEqual(['general', 'appearance', 'notifications', 'models', 'accounts', 'threads', 'channels', 'workspace', 'machines', 'sync', 'access', 'worktrees', 'secrets', 'extras', 'about']);
+    expect(settingsGroups().map((g) => g.title)).toEqual(['Omni', 'Assistant', 'Spaces', 'Devices', 'Developer', 'Extras', 'App']);
   });
 
   it('leaves Crew out until the app has its screen (crew plan slice S8), in the list and in search', () => {
@@ -27,7 +27,8 @@ describe('Settings sections on the phone', () => {
 
   it('finds a setting by its words, and never a desktop-app one', () => {
     expect(settingsHits('emoji')[0]).toMatchObject({ id: 'channel-basics', section: 'Channels' });
-    expect(settingsHits('quick prompt')).toEqual([]);
+    expect(settingsHits('quick prompt').map((h) => h.id)).toEqual(['wispr-flow']);
+    expect(settingsHits('grok')[0]).toMatchObject({ id: 'grok-bot', section: 'Extras' });
   });
 });
 

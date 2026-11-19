@@ -1,5 +1,5 @@
 import type { ChannelWithRunning, SearchHit, Thread } from '@omni/client-core';
-import { statusLabel } from '@omni/shared/status.ts';
+import { statusWord } from '@omni/shared/display.ts';
 
 import { shortAgo } from '../live/channel-model';
 
@@ -49,14 +49,14 @@ export interface HitRow {
   snippet: SnippetPart[];
 }
 
-export function hitRows(hits: readonly SearchHit[], channels: readonly ChannelWithRunning[] | null, now: number): HitRow[] {
+export function hitRows(hits: readonly SearchHit[], channels: readonly ChannelWithRunning[] | null, now: number, technical = true): HitRow[] {
   const names = new Map((channels ?? []).map((c) => [c.id, c.name]));
   return hits.map((h) => ({
     threadId: h.thread_id,
     title: h.title || 'Untitled',
     channel: names.get(h.channel_id) ?? h.channel_id,
     status: h.status,
-    statusLabel: h.status === 'done' || h.status === 'imported' ? null : statusLabel(h.status),
+    statusLabel: h.status === 'done' || h.status === 'imported' ? null : statusWord(h.status, technical),
     ago: shortAgo(h.updated_at, now),
     snippet: snippetParts(h.snippet),
   }));

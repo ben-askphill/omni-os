@@ -83,7 +83,7 @@ export function detailScreens({ backTitle }: { backTitle: string }) {
       <Stack.Screen name="ChannelSettings" component={ChannelSettingsScreen} options={{ title: 'Channel settings', headerBackTitle: 'Back' }} />
       <Stack.Screen name="ChannelAction" component={ChannelActionScreen} options={{ title: 'Action', presentation: 'modal' }} />
       <Stack.Screen name="Secrets" component={SecretsScreen} options={{ title: 'Secrets', headerBackTitle: 'Back' }} />
-      <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'Devices', headerBackTitle: 'Settings' }} />
+      <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'Signed-in devices', headerBackTitle: 'Settings' }} />
       <Stack.Screen name="Automations" component={AutomationsScreen} options={{ title: 'Automations', headerBackTitle: 'Settings' }} />
       <Stack.Screen name="Changes" component={ChangesScreen} options={{ title: 'Changes', headerBackTitle: 'Thread' }} />
       <Stack.Screen name="PullRequest" component={PullRequestScreen} options={{ title: 'Pull request', headerBackTitle: 'Thread', gestureEnabled: false }} />

@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { glyphLabel } from '@omni/shared/display.ts';
+import { technicalNow } from '../display.ts';
 import { api, type Thread } from '../api.ts';
 import { href, useRoute } from '../router.ts';
 import { useFeed } from '../store.tsx';
-import { Icon, IconButton, STATUS, StatusDot, glyphFor, threadGlyph, type IconName } from './ui.tsx';
+import { Icon, IconButton, StatusDot, glyphFor, threadGlyph, type IconName } from './ui.tsx';
 
 export interface ToastInput {
   title: ReactNode;
@@ -133,7 +135,7 @@ export function ThreadNotifier() {
     const glyph = threadGlyph(t);
     const r = routeRef.current;
     if (r.name === 'thread' && r.id === t.id && document.visibilityState === 'visible') return;
-    toast({ status: glyph, title: t.title || 'Untitled thread', body: `${STATUS[glyph].label} in #${t.channel_id}`, href: href.thread(t.id) });
+    toast({ status: glyph, title: t.title || 'Untitled thread', body: `${glyphLabel(glyph, technicalNow())} in #${t.channel_id}`, href: href.thread(t.id) });
   });
 
   return null;

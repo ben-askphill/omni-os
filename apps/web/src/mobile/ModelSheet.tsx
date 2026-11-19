@@ -1,4 +1,6 @@
 import type { HarnessWithRunning } from '../api.ts';
+import { effortWord, term } from '@omni/shared/display.ts';
+import { technicalNow, useTechnical } from '../display.ts';
 import type { PickerAccounts } from '../accounts.ts';
 import { accountLine } from '@omni/shared/harness-accounts.ts';
 import { Icon } from '../components/ui.tsx';
@@ -13,7 +15,8 @@ export function runLabel(harnesses: HarnessWithRunning[] | undefined, choice: Mo
   if (!harnesses) return 'Model';
   if (asksAuto(choice)) return 'Auto';
   const { harness, model } = modelOf(harnesses, choice);
-  return [model?.label ?? harness?.name ?? choice.harness, effort || model?.defaultEffort].filter(Boolean).join(' · ');
+  const level = effort || model?.defaultEffort;
+  return [model?.label ?? harness?.name ?? choice.harness, level && effortWord(level, technicalNow())].filter(Boolean).join(' · ');
 }
 
 /**
@@ -41,11 +44,13 @@ export function ModelSheet({
   accounts?: PickerAccounts | null;
 }) {
   const { model, efforts } = modelOf(harnesses, choice);
+  const technical = useTechnical();
+  const title = `Model and ${term('effort', technical).toLowerCase()}`;
   return (
-    <MoSheet full onClose={onClose} label="Model and effort">
+    <MoSheet full onClose={onClose} label={title}>
       <div className="flex shrink-0 items-center px-3 pt-1.5 pb-2">
         <span className="w-[60px]" />
-        <span className="flex-1 text-center text-[15px] font-medium">Model and effort</span>
+        <span className="flex-1 text-center text-[15px] font-medium">{title}</span>
         <button type="button" onClick={onClose} className="w-[60px] px-1.5 py-2 text-right text-[15px] font-medium">
           Done
         </button>
@@ -67,12 +72,12 @@ export function ModelSheet({
           </MoSection>
         )}
         {!asksAuto(choice) && efforts.length > 0 && (
-          <MoSection title={`Effort for ${model?.label ?? 'this model'}`}>
+          <MoSection title={`${term('effortFor', technical)} ${model?.label ?? 'this model'}`}>
             <MoGroup>
               {['', ...efforts].map((e, i, all) => (
                 <MoListRow
                   key={e || 'default'}
-                  label={e || (model?.defaultEffort ? `Default (${model.defaultEffort})` : 'Default')}
+                  label={e ? effortWord(e, technical) : model?.defaultEffort ? `Default (${effortWord(model.defaultEffort, technical)})` : 'Default'}
                   right={<MoRadio on={effort === e} />}
                   onClick={() => onChange(choice, e)}
                   chevron={false}

@@ -4,8 +4,12 @@ import type { ThreadStatus } from '@omni/client-core';
 import type { Takeover } from '@omni/shared/handoff.ts';
 import type { ThreadMachine } from '@omni/shared/thread-machine.ts';
 
-/** The status word beside the dot. Empty for a thread with no status yet. */
-export function threadStatusLabel(status: ThreadStatus | undefined): string {
+/**
+ * The status word beside the dot. Empty for a thread with no status yet. With Show technical details off, a running or
+ * queued thread reads Working.
+ */
+export function threadStatusLabel(status: ThreadStatus | undefined, technical = true): string {
+  if (!technical && (status === 'running' || status === 'queued')) return 'Working';
   switch (status) {
     case 'running':
       return 'Running';

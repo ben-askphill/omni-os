@@ -1,4 +1,5 @@
 import { turnPhase } from '@omni/shared/status.ts';
+import { useThreadAccount } from '../accounts.ts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, type HarnessWithRunning } from '../api.ts';
 import { ReplyComposer } from '../components/Composer.tsx';
@@ -21,6 +22,7 @@ import { useBranchChanges } from '../mobile/ThreadTurn.tsx';
 import { prNext, prOffered, stepOf, stepParked, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { ContextMeter } from '../components/thread/ContextMeter.tsx';
+import { useShowsCode } from '../display.ts';
 import { ThreadHeader } from '../components/thread/ThreadHeader.tsx';
 import { ThreadPanel } from '../components/thread/ThreadPanel.tsx';
 import { ThreadQuickCard } from '../components/thread/ThreadQuickCard.tsx';
@@ -151,6 +153,8 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   // The channel's own step prompts (Channel Settings), from the live channel list so an edit applies without a reload.
   const ownChannel = (thread && listedChannel(thread.channel_id)) ?? channel;
   const prompts = useMemo(() => stepPrompts(ownChannel), [ownChannel]);
+  // Show technical details, or a channel with a repo: branch, PRs, changes, terminal, tokens and the context ring.
+  const code = useShowsCode(ownChannel);
   const underway = useMemo(() => stepUnderway(events, queued, slotBusy, prompts), [events, queued, slotBusy, prompts]);
   // A step prompt that never reached the agent (a restart, or a session download that failed): its button says why, and
   // pressing it again resumes that message rather than sending a second copy.
@@ -165,6 +169,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   const offered = useMemo(() => prOffered(events, !slotBusy && !queued.length, prs?.pr), [events, slotBusy, queued, prs?.pr]);
 
   useThreadPresence(id, thread);
+  const account = useThreadAccount(id);
   useThreadInterruptKey({ slotBusy, interrupting, interrupt });
 
   if (notFound) {
@@ -205,11 +210,13 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
           modLines={modLines}
           delegated={known}
           roleName={roleName}
+          account={account}
           actions={{
             thread,
             meter: (
               <ContextMeter
                 thread={thread}
+                quiet={!code}
                 pushed={context}
                 onCompacted={(t) => {
                   applyThread(t, true);
@@ -239,7 +246,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 {/* Queued means waiting for a slot: nothing is working yet. */}
                 <LinkChannel.Provider value={thread.channel_id}>
                   <ThreadIdCtx.Provider value={id}>
-                    <Transcript threadId={id} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
+                    <Transcript threadId={id} code={code} events={events} running={turnInProgress} cwd={init?.cwd || thread.cwd} known={known} team={members} artifacts={files} reports={reports} history={history} delegated={!!thread.parent_id} limit={limitLabel(thread, now)} elsewhere={!!takeover} />
                   </ThreadIdCtx.Provider>
                 </LinkChannel.Provider>
                 <div className="mt-4 empty:hidden">
@@ -310,6 +317,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             <div className="absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)] md:static md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pl-1">
               <ThreadQuickCard
                 thread={thread}
+                code={code}
                 init={init}
                 warm={warm}
                 slotBusy={slotBusy}
@@ -361,6 +369,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
           <div className="panel-in h-full overflow-hidden rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_light-dark(transparent,var(--pane-edge))]">
             <ThreadPanel
               thread={thread}
+              code={code}
               files={files}
               shots={shots}
               crewArtifacts={crew}

@@ -19,7 +19,7 @@ import { ThreadMenuSheet } from '../components/thread/ThreadMenuSheet';
 import { StepChip } from '../components/thread/StepChip';
 import { ThreadTitle } from '../components/thread/ThreadTitle';
 import { useCrew } from '../newthread/hooks';
-import { useChannels, useThreadLive, useThreadView } from '../live/react';
+import { useChannels, useTechnical, useThreadLive, useThreadView } from '../live/react';
 import { useRemote } from '../live/use-remote';
 import { useThreadMachine } from '../machine/hooks';
 import type { RootScreenProps } from '../navigation/types';
@@ -30,6 +30,7 @@ import { useOmniTheme } from '../theme';
 import { useHarnessCatalog } from '../thread/hooks';
 import { targetOfThread } from '../thread/target';
 import { threadDeviceName, threadStatusLabel } from '../thread/title';
+import { threadAccountLabel } from '@omni/shared/harness-accounts.ts';
 
 const FLASH_MS = 3000;
 const FORK_FALLBACK_MS = 800;
@@ -67,10 +68,13 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
   const title = thread?.title || 'Thread';
   const hasThread = thread !== null;
   const status = thread?.status;
+  const technical = useTechnical();
   const channelName = listed?.name ?? view?.channel?.name ?? null;
   const crew = useCrew();
   const roleName = thread && headerShowsRole(thread) ? crewRoleName(thread.role, crew ?? []) : null;
   const device = view ? threadDeviceName({ takeover: takeoverShown(view.takeover, view.handoff), machine: machine.machine, hereName: server.data?.device?.name }) : null;
+  const ran = useRemote(useCallback((api: OmniApi) => api.threadAccount(id), [id]));
+  const account = ran.data?.account ? threadAccountLabel(ran.data.account) : null;
   const canPick = machine.machine !== null;
   const openMenu = useCallback((page: 'menu' | 'machine') => {
     setMenuPage(page);
@@ -83,16 +87,17 @@ export function ThreadScreen({ route, navigation }: RootScreenProps<'Thread'>) {
         <ThreadTitle
           title={title}
           status={status}
-          statusLabel={threadStatusLabel(status)}
+          statusLabel={threadStatusLabel(status, technical)}
           channel={channelName}
           role={roleName}
           device={device}
+          account={account}
           onOpenMachine={canPick ? () => openMenu('machine') : undefined}
         />
       ),
       headerRight: hasThread ? () => <HeaderButton label="Thread menu" icon="ellipsis" onPress={() => openMenu('menu')} /> : undefined,
     });
-  }, [navigation, title, status, channelName, roleName, device, canPick, hasThread, openMenu]);
+  }, [navigation, title, status, technical, channelName, roleName, device, account, canPick, hasThread, openMenu]);
 
   // A machine can fall asleep while the thread stays open: read the list again each time the menu opens.
   const { reload: reloadMachines } = machine;

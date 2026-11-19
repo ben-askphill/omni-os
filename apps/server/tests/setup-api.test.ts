@@ -114,22 +114,21 @@ describe('the welcome message', () => {
     }
   });
 
-  it('explains the Inbox, crew questions and #inbox, on every layout', async () => {
+  it('explains the Inbox, crew questions and the General channel, on every layout', async () => {
     const { welcomeText } = await import('../setup-api.ts');
     const text = welcomeText('', { install: 'app', crew: '~/c', personalCrew: '~/d' });
     expect(text).toContain('The Inbox lists what needs you, what is working and what finished.');
     expect(text).toContain('the Inbox disc on the channel rail or by pressing I, or from Activity on a phone');
     expect(text).toContain('Mark a thread done');
     expect(text).toContain('When a crew thread I started has a question for you, it shows up in the Conductor thread you asked me in.');
-    expect(text).toContain('#inbox is a channel for quick asks');
+    expect(text).toContain('For a quick question, start a thread in #General: it answers there');
   });
 
   it('gives an example with a finish line, and says the Conductor asks when there is none (#725 briefs)', async () => {
     const { welcomeText } = await import('../setup-api.ts');
     const text = welcomeText('', { install: 'checkout', crew: '~/c', personalCrew: '~/d' });
     expect(text).toContain('say what done looks like');
-    expect(text).toContain('"research how other stores do size guides and send me a table of 5 stores with links"');
-    expect(text).not.toContain('"research how other stores do size guides"');
+    expect(text).toContain('"find three venues for a team day in May under 2,000 euros and send me a table with links"');
     expect(text).toContain("If I can't tell what done looks like, I'll ask you a few questions first.");
   });
 });
@@ -383,5 +382,32 @@ describe('legacy migration', () => {
     } finally {
       process.env.OMNI_BRAIN_DIR = brain;
     }
+  });
+});
+
+describe('the first run for someone new', () => {
+  it('seeds General, not a second Inbox, for quick asks', () => {
+    expect(r.db.channels.get('inbox')).toMatchObject({ name: 'General', kind: 'internal', use_worktree: 0 });
+  });
+
+  it('keeps what you do and the tools you use, and tells every agent', async () => {
+    const s = await json(await send('PUT', '/api/setup', { user: { name: 'Ada', work: 'I run a small design studio', tools: 'Email, Calendar, Notion' } }));
+    expect(s.config.user).toMatchObject({ work: 'I run a small design studio', tools: 'Email, Calendar, Notion' });
+    expect((await send('PUT', '/api/setup', { user: { work: 'x'.repeat(301) } })).status).toBe(400);
+    const { buildSystemPrompt } = await import('../runner/prompts.ts');
+    const prompt = buildSystemPrompt(r.db.threads.list({})[0], r.db.channels.get('inbox')!);
+    expect(prompt).toContain('- What Ada does: I run a small design studio');
+    expect(prompt).toContain('- Tools Ada uses: Email, Calendar, Notion. Reach for these first when they are connected.');
+  });
+
+  it('runs the first question in General with no charter, and no question starts no thread', async () => {
+    const done = await json(await send('POST', '/api/setup/complete', { ask: 'What is a good name for a bakery?' }));
+    const t = r.db.threads.get(done.threadId)!;
+    expect(t).toMatchObject({ channel_id: 'inbox', role: null, branch: null, source: 'manual' });
+    await r.untilResults(t.id, 1);
+    expect(r.events(t.id).find((e) => e.kind === 'user')?.p.text).toBe('What is a good name for a bakery?');
+    const again = await json(await send('POST', '/api/setup/complete', {}));
+    expect(again.threadId).toBeNull();
+    expect((await send('POST', '/api/setup/complete', { ask: 7 })).status).toBe(400);
   });
 });

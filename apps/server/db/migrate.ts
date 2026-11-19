@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS sync_deferred (
 -- Messages accepted through the API (db/repos/requests.ts), saved before the client hears so. Local, not synced.
 CREATE TABLE IF NOT EXISTS message_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
-  -- Queue order, seq until Ben reorders.
+  -- Queue order, seq until the user reorders.
   pos INTEGER,
   id TEXT NOT NULL UNIQUE,
   thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS completions (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS completions_thread ON completions(thread_id, seq);
--- The newest result Ben has seen per thread, by its (n, uid): read state, kept apart from the thread row so reading
+-- The newest result the user has seen per thread, by its (n, uid): read state, kept apart from the thread row so reading
 -- never moves updated_at, status or its folder. Only ever moves forward, here and when the other Mac's arrives.
 CREATE TABLE IF NOT EXISTS result_reads (
   thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS thread_bases (
 
 -- A saved before/after snapshot of a worktree thread's checkout for each turn (server/turns.ts), so the turn's diff
 -- stays readable after later edits and restarts. The snapshots are commits under hidden refs named by the turn's id
--- (refs/omni/turns/<thread>/<id>/before and /after), never on Ben's branch or index. completion_uid is the Result the
+-- (refs/omni/turns/<thread>/<id>/before and /after), never on the user's branch or index. completion_uid is the Result the
 -- turn ended with, when it left one. Local, not synced: the refs live in this Mac's repo.
 CREATE TABLE IF NOT EXISTS turn_snapshots (
   id TEXT PRIMARY KEY,
@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS pr_watches (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS pr_watches_due ON pr_watches(next_poll_at) WHERE state = 'watching';
--- Ben's claude.ai Artifacts as the claude CLI lists them (claude-artifacts.ts): a cache of the last good listing, keyed
+-- The user's claude.ai Artifacts as the claude CLI lists them (claude-artifacts.ts): a cache of the last good listing, keyed
 -- by the page's uuid. Machine-local, not synced: each Mac lists the same account itself. gone_at hides a page a
 -- complete listing no longer had. The meta table holds the run state and the schedule.
 CREATE TABLE IF NOT EXISTS claude_artifacts (

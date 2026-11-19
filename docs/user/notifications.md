@@ -6,7 +6,7 @@ Omni can tell you when something needs you: in the desktop app as native notific
 
 | Kind | When |
 |---|---|
-| Questions | An agent asked you something (`ask_user_question`) and waits for the answer. A newer question card in the same thread notifies again. |
+| Questions | An agent asked you something (`ask_user_question`) and waits for the answer. A newer question card in the same thread notifies again. While the thread runs, the body names the step it stopped at ([Steps](threads.md#steps)). |
 | Failed threads | A turn failed, or Omni could not prepare a thread's worktree. |
 | Finished threads | A turn finished and its result waits in Needs you. A delegated thread's success goes to its parent as a crew report instead. |
 | Crew reports | A delegated thread reported back to a Conductor thread. |

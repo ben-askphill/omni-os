@@ -8,6 +8,7 @@ import { chromeBinary } from './browser-page.ts';
 import { userName } from './user-config.ts';
 import { fillWorktree, type WorktreeExtras } from './worktree-include.ts';
 import { RENDER_SERVER } from '@omni/shared/html-render.ts';
+import { STEPS_SERVER } from '@omni/shared/steps.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
@@ -263,7 +264,7 @@ export function buildMcpConfig(input: McpInput) {
   const servers: Record<string, McpServer> = {};
   const api = { OMNI_URL: input.omniUrl, OMNI_TOKEN_FILE: tokenPath(), OMNI_THREAD_ID: input.threadId, OMNI_USER: userName(), ...nodeChildEnv };
 
-  // ask, render and threads run on omni-mcp (native-mcp.ts). An install without a binary that starts leaves them out.
+  // ask, render, steps and threads run on omni-mcp (native-mcp.ts). An install without a binary that starts leaves them out.
   const helper = (key: string, name: NativeMcpServer): void => {
     const command = nativeMcpCommand(name);
     if (command) servers[key] = { ...command, env: api };
@@ -271,6 +272,8 @@ export function buildMcpConfig(input: McpInput) {
 
   helper(ASK_SERVER, 'ask');
   helper(RENDER_SERVER, 'render');
+  // set_steps: the plain step list the thread shows as its progress (@omni/shared/steps.ts).
+  helper(STEPS_SERVER, 'steps');
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
   if (config.browser && !input.role?.delegateOnly && !input.quick) {

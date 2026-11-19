@@ -1,4 +1,4 @@
-// Builds omni-mcp, the program a thread's ask, render and threads MCP servers run on (crates/omni-mcp), into this
+// Builds omni-mcp, the program a thread's ask, render, steps and threads MCP servers run on (crates/omni-mcp), into this
 // checkout's target/debug, where native-mcp.ts looks. npm run dev, npm start, scripts/qa-stack.sh and the server's
 // tests run it first. The desktop app ships its own build (apps/desktop/scripts/native.ts).
 //
@@ -40,7 +40,7 @@ export function buildCheckoutMcp(root = ROOT): CheckoutBuild {
 if (import.meta.main) {
   const built = buildCheckoutMcp();
   if (!built.ok && built.missing) {
-    console.warn(`[mcp] ${built.reason}. Threads from this checkout get no ask_user_question, html_render or read_referenced_thread until omni-mcp builds.`);
+    console.warn(`[mcp] ${built.reason}. Threads from this checkout get no ask_user_question, html_render, set_steps or read_referenced_thread until omni-mcp builds.`);
   } else if (!built.ok) {
     console.error(`[mcp] could not build omni-mcp: ${built.reason}`);
     process.exit(1);

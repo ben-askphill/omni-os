@@ -1,9 +1,11 @@
 import type { ServerOptionsState, SetupState, UserConfigPatch } from '@omni/shared/settings.ts';
 import type { CleanupState, RetentionPolicy } from '@omni/shared/worktree-cleanup.ts';
+import type { DisplayPrefs } from '@omni/shared/display.ts';
 import { apiPath, type HttpClient } from '../http.ts';
 
 export type { ServerOption, ServerOptionsState, SetupState, UserConfig, UserConfigPatch } from '@omni/shared/settings.ts';
 export type { CleanupState, RetentionPolicy } from '@omni/shared/worktree-cleanup.ts';
+export type { DisplayPrefs } from '@omni/shared/display.ts';
 
 /** A secret's name and where it applies. The value never leaves the server's secret store. */
 export interface SecretRow {
@@ -32,6 +34,10 @@ export function settingsApi(http: HttpClient) {
     /** Adds a secret, or replaces the value of one with the same scope and name. */
     setSecret: (scope: string, name: string, value: string) => http.request<{ ok: true }>('POST', apiPath`/secrets`, { body: { scope, name, value } }),
     deleteSecret: (scope: string, name: string) => http.request<{ ok: true }>('DELETE', apiPath`/secrets`, { body: { scope, name } }),
+    /** Show technical details and the Shopify add-on, shared by every client (apps/server/display.ts). */
+    display: () => http.request<DisplayPrefs>('GET', apiPath`/display`),
+    /** Sets either switch and answers with both. */
+    setDisplay: (patch: Partial<DisplayPrefs>) => http.request<DisplayPrefs>('PUT', apiPath`/display`, { body: patch }),
     worktrees: () => http.request<WorktreesView>('GET', apiPath`/worktrees/scan`),
     /** This machine's worktree retention. Saved on the server's machine only, never synced. */
     setRetention: (patch: Partial<RetentionPolicy>) => http.request<WorktreesView>('PUT', apiPath`/worktrees/retention`, { body: patch }),

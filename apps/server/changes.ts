@@ -50,6 +50,7 @@ export async function changesCheckout(t: Thread): Promise<{ dir: string } | { re
   if (isProviderHarness(t.harness)) return { reason: `This thread runs ${providerWhere(t.harness)}, so its files are not on this machine.` };
   if (t.setup === 'preparing') return { reason: "Omni is still preparing this thread's worktree." };
   if (t.setup === 'failed') return { reason: "This thread's worktree could not be prepared, so there are no changes to show." };
+  if (t.setup === 'signin') return { reason: 'This thread waits for a sign-in, so it has not started.' };
   const repo = channels.get(t.channel_id)?.repo_path;
   if (!repo) return { reason: "This thread's channel has no repository, so there are no branch changes to show." };
   if (!existsSync(repo)) return { reason: `The channel's repository is not on this machine: ${repo}` };

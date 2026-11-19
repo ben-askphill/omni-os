@@ -17,10 +17,12 @@ import { assignments, events, outbox, threads } from './db.ts';
 import { activeTasks, lives } from './runner/state.ts';
 import { isSubagent } from './stream.ts';
 import { machineNames, ranOnFields, type MachineNames } from './ran-on.ts';
+import type { StepField } from '@omni/shared/steps.ts';
+import { stepField } from './step-line.ts';
 import type { RanOnFields } from '@omni/shared/ran-on.ts';
 
-/** With `delegating`, and where it runs or ran and when its run started (ran-on.ts), for the Inbox rows. */
-export type WithDelegating<T> = T & { delegating: boolean } & Required<RanOnFields>;
+/** With `delegating`, where it runs or ran and when its run started (ran-on.ts), and the step it is on (step-line.ts), for the Inbox rows. */
+export type WithDelegating<T> = T & { delegating: boolean } & Required<RanOnFields> & StepField;
 
 /** How long a sub-agent on another machine counts without a new row: its progress is stored every 20 s while it works. */
 export const REMOTE_TASK_STALE_MS = 15 * 60_000;
@@ -43,7 +45,7 @@ export const delegatingIds = (): ReadonlySet<string> => new Set(threads.delegati
 /** The thread as the clients get it. Pass `ids` and `names` to read many with one query each. */
 export const withDelegating = <T extends { id: string; status?: string }>(t: T, ids = delegatingIds(), names: MachineNames = machineNames()): WithDelegating<T> => {
   const delegating = ids.has(t.id);
-  return { ...t, delegating, ...ranOnFields(t, delegating, names) };
+  return { ...t, delegating, ...ranOnFields(t, delegating, names), ...stepField(t) };
 };
 
 /** Every thread as the clients get it, with one query. */

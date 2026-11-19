@@ -7,7 +7,8 @@ import { assignments } from './assignments.ts';
 export type ThreadStatus = 'queued' | 'running' | 'done' | 'failed' | 'stopped' | 'imported';
 /** `team`: a member of a team, run under its lead thread and listed only there. */
 /** A worktree thread's preparation: `preparing` until its worktree is made and checked, `failed` (with why) until Ben retries. */
-export type ThreadSetup = 'preparing' | 'failed';
+/** `signin`: a connector the job needs is signed out (runner/setup.ts holdForSignIn); `setup_error` says which. */
+export type ThreadSetup = 'preparing' | 'failed' | 'signin';
 /** A turn stopped at the harness's usage limit: `limited` until Ben acts, `scheduled` to resume at the reset time. */
 export type ThreadLimit = 'limited' | 'scheduled';
 export type ThreadSource = 'manual' | 'automation' | 'conductor' | 'import' | 'capture' | 'team';
@@ -249,7 +250,7 @@ export const threads = {
         .all(id, id) as { id: string }[]
     ).map((r) => r.id),
   /**
-   * The top of this thread's delegation chain: the thread Ben delegated from, where its crew's questions wait on him.
+   * The top of this thread's delegation chain: the thread the user delegated from, where its crew's questions wait on them.
    * Itself when nothing delegated it, and the highest one here when an ancestor has not synced to this Mac.
    */
   root: (id: string) =>
@@ -263,8 +264,8 @@ export const threads = {
         .get(id) as { id: string } | undefined
     )?.id ?? id,
   /**
-   * Where Ben answers a delegated thread's questions: the top of its delegation chain (root), then the newest thread that
-   * continues it (continue.ts), and so on, since Ben works on in the newest and its crew cards show there. The walk goes
+   * Where the user answers a delegated thread's questions: the top of its delegation chain (root), then the newest thread that
+   * continues it (continue.ts), and so on, since the user works on in the newest and its crew cards show there. The walk goes
    * through archived threads (cleanup archives the middle of a chain), preferring a live continuation at each step, and
    * ends on the last live thread it passed, or the root when none is live. A thread nobody delegated is its own home: its
    * card shows only on itself.

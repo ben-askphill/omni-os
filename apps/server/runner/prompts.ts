@@ -6,6 +6,7 @@ import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
+import { userConfig } from '../user-config.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
 import { accessSync, closeSync, constants, openSync, readSync, statSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
@@ -146,6 +147,12 @@ function notionLines(thread: Thread, secretNames: readonly string[]) {
 const delegateOnlyRule = (name: string) =>
   `Answer quick asks yourself, in this thread, and start no thread for them: anything you can answer from the conversation, Omni's own state (the omni tools) or a light lookup with the tools you have (a fact you know, a page or doc read in a call or two, a connector read). Delegate with Omni's delegate tool, before anything else, when the work writes or edits files, runs commands, browses at length, changes code, a store, an inbox, a calendar or Notion, or will clearly grow past a few lookups. You have no shell, file editing, browser or subagent tools, by design: when a quick ask turns out to need them, delegate it instead of working around that. A plain question gets a plain answer: no brief, no folder question. Ask ${name} only for decisions that are theirs to make.`;
 
+/** What the user said about their work and tools in onboarding or Settings > General, when they said anything. */
+function profileLines(name: string) {
+  const { work, tools } = userConfig().user;
+  return [work ? `- What ${name} does: ${work}` : '', tools ? `- Tools ${name} uses: ${tools}. Reach for these first when they are connected.` : ''];
+}
+
 /** Every thread that can delegate follows up on its child threads with the prompt cache in mind (session-warmth.ts). */
 const SESSION_CACHE_RULE =
   "Before you message a thread you already have, check get_thread's session.warm. A warm thread (running, or its model active within the hour) gets message_thread. " +
@@ -169,10 +176,11 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       ? `You are Hermes, running on your own server and reached by Omni OS over HTTP. ${name} is on their own machine; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
       : `You are running headless inside Omni OS, ${userPossessive()} local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you. When a choice only ${name} can make blocks you, ask with the ask_user_question tool: it waits for the answer.`,
     getProfile().name ? `- You work for ${name}. Charters and automations that say "the user" mean them.` : '',
+    ...profileLines(name),
     `- Thread: ${thread.id}${thread.task_id ? ` (task ${thread.task_id})` : ''}`,
     `- Channel: #${channel.id} (${channel.name}, ${channel.kind})`,
-    channel.store_domain ? `- Shopify store: ${channel.store_domain}` : '',
-    channel.portal_slug ? `- Ask Phill Portal company slug: ${channel.portal_slug}` : '',
+    channel.store_domain ? `- Store: ${channel.store_domain}` : '',
+    channel.portal_slug ? `- Client portal slug: ${channel.portal_slug}` : '',
     channel.github_repo ? `- GitHub repo: ${channel.github_repo}` : '',
     remote
       ? '- This thread does not run in an Omni worktree or browser. Work on your own clone of the repo and open pull requests there.'
@@ -185,7 +193,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
       : '',
     channel.notes ? `- Channel notes: ${channel.notes}` : '',
     ...(readsOnly(thread) ? ['', ...quickAskRule(name)] : []),
-    // A usage scan's lead gets the omni tools to save what Ben picks, not to route work: it never delegates.
+    // A usage scan's lead gets the omni tools to save what the user picks, not to route work: it never delegates.
     ...(role?.mcp.includes('omni') && role.id !== SCAN_ROLE
       ? [
           '',
@@ -220,6 +228,14 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     remote
       ? ''
       : `When ${name} asks you to "show me", "list out" or "visualize" something, or a brief passes that ask on, show the result with html_render as cards, a table or a chart above your reply instead of a wall of text. A short answer stays plain text.`,
+    // The thread's step view (@omni/shared/steps.ts). set_steps is on omni-mcp, which Hermes and Cursor cloud do not get.
+    ...(remote
+      ? []
+      : [
+          '',
+          '## Progress',
+          `For a task with more than one stage, call set_steps before you start, with 3 to 6 steps in the plain words ${name} would use ("Find candidate apps", "Compare prices"), then again each time a step starts or finishes. Omni shows the list as the thread's progress. Skip it for a quick answer.`,
+        ]),
   ];
   if (thread.source === 'team') {
     lines.push(

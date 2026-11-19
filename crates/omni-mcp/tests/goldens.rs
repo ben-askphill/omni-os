@@ -398,6 +398,14 @@ fn render_matches_the_record_of_the_node_server() {
     check(&scenarios);
 }
 
+/// No Node server came before this one: its scenarios were written for it (`packages/test-fixtures/native/mcp/steps.json`).
+#[test]
+fn steps_matches_its_record() {
+    let scenarios = fixture("steps");
+    assert_eq!(scenarios.len(), 4);
+    check(&scenarios);
+}
+
 #[test]
 fn threads_matches_the_record_of_the_node_server() {
     let scenarios = fixture("threads");
@@ -415,7 +423,7 @@ fn every_server_behind_the_lazy_front_still_matches_the_record() {
         field(scenario, "steps").and_then(JsValue::as_array).unwrap_or_default().iter().any(|step| field(step, "writeTokenFile").is_some())
     };
     let mut left_out = 0;
-    for server in ["ask", "render", "threads"] {
+    for server in ["ask", "render", "steps", "threads"] {
         let all = fixture(server);
         let count = all.len();
         let behind: Vec<JsValue> = all
@@ -486,5 +494,8 @@ fn a_call_that_reuses_a_running_id_does_not_stop_the_first() {
 fn without_a_server_name_it_says_how_to_run_it() {
     let out = Command::new(BIN).output().unwrap();
     assert_eq!(out.status.code(), Some(2));
-    assert_eq!(String::from_utf8_lossy(&out.stderr), "usage: omni-mcp <ask|render|threads|lazy <answers.json> <command> [args...]>\n");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stderr),
+        "usage: omni-mcp <ask|render|steps|threads|lazy <answers.json> <command> [args...]>\n"
+    );
 }

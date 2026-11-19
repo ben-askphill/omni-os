@@ -24,7 +24,7 @@ import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
-import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST, type SetupRetryBy } from './setup.ts';
+import { bindResume, connectorsFor, declareConnectors, retrySetup, saveStart, setUpThread, START_REQUEST, type SetupRetryBy } from './setup.ts';
 import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
@@ -96,6 +96,8 @@ export interface CreateThreadInput {
   task_id?: string | null;
   source?: ThreadSource;
   automation?: string | null;
+  /** Connectors the job reads besides the ones its brief and role name: an automation's `connectors:` (setup.ts). */
+  connectors?: string[];
   /** A sidebar folder of the channel to file the thread in, by id or name. A name no folder has makes one. */
   folder?: string | null;
   /**
@@ -226,11 +228,13 @@ async function openThread(given: CreateThreadInput, status: Thread['status'] = '
     source: input.source ?? 'manual',
     automation: input.automation ?? null,
     folder_id: filedIn?.id ?? null,
-    // A thread for another machine has its worktree made there (handoff.ts take).
-    setup: !elsewhere && needsWorktree(channel, { remote, workspace }) ? 'preparing' : null,
+    // A thread for another machine has its worktree made there (handoff.ts take). A new thread whose brief or role
+    // needs a connector checks its sign-in first, as a worktree thread's preparation does (setup.ts).
+    setup: !elsewhere && (needsWorktree(channel, { remote, workspace }) || (status === 'queued' && connectorsFor({ id, harness, role: role?.id ?? null }, input.prompt, input.connectors).length > 0)) ? 'preparing' : null,
     quick: input.quick ? 1 : 0,
     workspace,
   });
+  if (input.connectors?.length) declareConnectors(id, input.connectors);
   if (base) threadBasePicks.set(id, base);
   if (input.follow_up && input.parent_id) reportFollowUps.set(id);
   return { thread, channel, harness, folder: commandsFolder(channel) ?? wd.cwd };
@@ -265,7 +269,8 @@ export async function createThread(input: CreateThreadInput): Promise<Thread> {
   const saved = await saveUploads(thread.id, input.files ?? []);
   const attachments = saved.length ? saved : undefined;
   if (thread.setup) {
-    // A worktree thread: its prompt and files are saved first, and sent once the worktree is made and checked.
+    // A worktree thread, or one whose connectors are checked first: its prompt and files are saved first, and sent
+    // once the sign-in check passes and the worktree is made and checked.
     saveStart(thread, input.prompt, attachments, context);
     if (!input.title) void generateTitle(thread.id, input.prompt);
     void setUpThread(thread.id);

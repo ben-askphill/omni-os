@@ -82,7 +82,7 @@ export function AccessSection() {
   return (
     <SettingsPage onRefresh={() => Promise.all([setup.reload(), mcp.reload()])}>
       <Group title="Signed-in devices">
-        <ListRow first icon="devices" title="Devices" detail="Where this server is signed in" chevron onPress={() => navigation.navigate('Devices')} />
+        <ListRow first icon="devices" title="Signed-in devices" detail="Where this server is signed in" chevron onPress={() => navigation.navigate('Devices')} />
       </Group>
       <RotateTokenGroup />
       <McpClientsGroup remote={mcp} />
