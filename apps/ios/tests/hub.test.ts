@@ -73,6 +73,7 @@ const threadDetail = (over: Record<string, unknown> = {}) => ({
 function session(over: Partial<OmniSession> = {}): OmniSession {
   return {
     serverUrl: BASE,
+    serverId: 'mac',
     token: async () => 'token',
     refreshAuth: async () => false,
     ...over,

@@ -1,7 +1,7 @@
 // The system prompt handed to a harness for one thread.
 import { quickAskRule, readsOnly } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
-import { config, artifactsDir, browserOutDir, designSystemFile } from '../config.ts';
+import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
 import { artifacts, type Channel, type Thread } from '../db.ts';
 import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
@@ -118,6 +118,27 @@ function workspaceLines(thread: Thread, channel: Channel) {
   ];
 }
 
+/** The secret holding the "Omni" Notion connection's integration token (docs/user/notion.md). */
+export const NOTION_TOKEN_SECRET = 'OMNI_NOTION_TOKEN';
+/** The REST helper shipped beside the charters, so it is there in a checkout and in the desktop app alike. */
+export const notionHelper = () => join(paths.crew, 'tools', 'notion.mjs');
+
+/**
+ * Notion through the integration token, for a thread whose environment has it. The Notion MCP plugin signs in with
+ * OAuth, which a headless thread cannot do, so threads use the REST API instead.
+ */
+function notionLines(thread: Thread, secretNames: readonly string[]) {
+  if (isProviderHarness(thread.harness) || !secretNames.includes(NOTION_TOKEN_SECRET)) return [];
+  const helper = notionHelper();
+  return [
+    '',
+    '## Notion',
+    `${NOTION_TOKEN_SECRET} is the token of ${userPossessive()} "Omni" Notion connection. Use it for every Notion read and write instead of the Notion MCP plugin and its Notion:* skills, which need an OAuth sign-in this thread cannot do.`,
+    `Helper: \`node ${helper} me | search [query] | read <id|url> | query <database> [filter] | api <METHOD> <path> [json]\`. \`read\` prints a page as Markdown; \`api\` reaches any endpoint (create pages, append blocks, update properties). Without it, call https://api.notion.com/v1 with the headers \`Authorization: Bearer $${NOTION_TOKEN_SECRET}\` and \`Notion-Version: 2022-06-28\`.`,
+    `The connection sees only pages and databases shared with it. A 404 object_not_found on a page that exists means it is not shared: ask ${userName()} to add the Omni connection to it in Notion (••• > Connections) rather than looking for another way in.`,
+  ];
+}
+
 /**
  * The Conductor's rule, in place of the usual "delegate when asked": a quick ask it answers itself, real work goes to a
  * crew role first.
@@ -131,7 +152,8 @@ const SESSION_CACHE_RULE =
   'A cold one you do not wake: open a new session with continue_thread on its own harness and a message that carries the follow-up, or delegate a fresh thread whose brief stands alone and links the old one, then say which thread replaced which. ' +
   'message_thread refuses a cold thread unless you pass wake_cold: true, which is only for when you were asked to resume that thread itself. Never wake a cold thread to ask how it went: read it with get_thread.';
 
-export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false) {
+/** `secretNames` are the names of the secrets in the thread's environment, never their values. */
+export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewRole, lead = false, secretNames: readonly string[] = []) {
   const remote = isProviderHarness(thread.harness);
   const cloud = thread.harness === 'cursor-cloud';
   const name = userName();
@@ -173,6 +195,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
         ]
       : []),
     ...(hands ? workspaceLines(thread, channel) : []),
+    ...(hands ? notionLines(thread, secretNames) : []),
     ...commandLineLines(thread, role),
     '',
     ...(cloud
