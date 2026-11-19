@@ -1,6 +1,7 @@
 import { paths } from '../config.ts';
 import { CREW_ID, crewFiles } from '../crew.ts';
 import { db, outbox, SEED_TS, tx, type SyncEntity } from '../db.ts';
+import { customHarnessSlugs } from '../harness/custom.ts';
 
 // Queue every existing row for the relay again: after moving to a new relay, or when the relay lost
 // history. The first sync on a machine already queues everything (outbox.arm); this is for later.
@@ -39,14 +40,18 @@ const SOURCES: [SyncEntity, string][] = [
 ];
 
 /**
- * The files sync carries from disk, as a source like the tables': the crew files in data/crew/ by role id. One this
- * machine never recorded (written by hand) goes at SEED_TS, as sync/handlers/crew-file.ts seeds it, so it only fills a
- * gap on the other machines.
+ * The files sync carries from disk, as a source like the tables': the crew files in data/crew/ by role id, and the
+ * custom harness files in data/harnesses/ by slug. One this machine never recorded (written by hand) goes at SEED_TS,
+ * as sync/handlers/crew-file.ts and harness-file.ts seed it, so it only fills a gap on the other machines.
  */
 function fileSources(): [SyncEntity, string, string][] {
   const ids = [...crewFiles(paths.personalCrew).keys()].filter((id) => CREW_ID.test(id));
-  // Plain ids (CREW_ID), so the list is safe to inline.
-  return [['crew_file', `SELECT value AS k, key AS o1, 0 AS o2 FROM json_each('${JSON.stringify(ids)}')`, SEED_TS]];
+  // Plain ids (CREW_ID, CUSTOM_HARNESS_SLUG), so the lists are safe to inline.
+  const list = (keys: string[]) => `SELECT value AS k, key AS o1, 0 AS o2 FROM json_each('${JSON.stringify(keys)}')`;
+  return [
+    ['crew_file', list(ids), SEED_TS],
+    ['harness_file', list(customHarnessSlugs()), SEED_TS],
+  ];
 }
 
 /**

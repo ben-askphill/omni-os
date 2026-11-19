@@ -1,16 +1,17 @@
-// Hermes behind the harness adapter interface. Hermes is an HTTP API on another machine,
-// not a CLI, so the session has no process: ending it stops the remote run. The runner keeps
-// its queue, steer, interrupt and keepalive.
+// A Runs API server behind the harness adapter interface: Hermes, and every custom harness
+// (custom.ts), which speak the same protocol (docs/internals/remote-harness-protocol.md).
+// It is an HTTP API on another machine, not a CLI, so the session has no process: ending it
+// stops the remote run. The runner keeps its queue, steer, interrupt and keepalive.
+// The server's key arrives as ctx.harnessKey and goes only on this client's requests.
 // Omni's system prompt goes as `instructions` on the first run of a session. The transcript
 // replay is only what Ben typed. A stable session id (`omni-<thread id>`) continues the
 // same remote conversation, which keeps its own context.
 import { randomUUID } from 'node:crypto';
-import { config } from '../../config.ts';
 import { TOOL_FAILURE_POLICY } from '../../tool-failure-policy.ts';
 import type { Record as StreamRecord } from '../../stream.ts';
-import { HERMES_FIX } from '../catalog.ts';
 import { detachedSession } from '../session.ts';
-import { CAPABILITIES, providerWhere } from '../types.ts';
+import { CAPABILITIES, type AnyHarnessId, type HarnessCapabilities } from '../types.ts';
+import { missingHarness, providerWhere, runsApiTarget, type RunsApiTarget } from '../registry.ts';
 import { remoteDelegateOnlyRefusal } from '../../crew.ts';
 import type { AdapterCallbacks, AdapterContext, HarnessAdapter, HarnessSession, OutgoingMessage } from '../adapter.ts';
 import { HermesClient, HermesHttpError, sleep } from './client.ts';
@@ -35,14 +36,15 @@ function composeInput(m: OutgoingMessage): string {
 const sessionIdOf = (thread: { id: string; session_id: string }) =>
   thread.session_id.startsWith('omni-') ? thread.session_id : `omni-${thread.id}`;
 
-function failText(e: unknown, baseUrl: string, apiKey: string): string {
-  if (e instanceof HermesHttpError && e.status === 429) return 'Hermes is at its concurrent run cap, so this turn was not started.';
-  if (e instanceof HermesHttpError && e.status === 401) return 'Hermes rejected the API key. Check the HERMES_API_KEY secret.';
-  if (e instanceof HermesHttpError) return `Hermes returned HTTP ${e.status}.`;
-  if (e instanceof Error && apiKey && e.message.includes(apiKey)) return `Could not reach Hermes at ${baseUrl}. ${HERMES_FIX}`;
-  return `Could not reach Hermes at ${baseUrl}. ${HERMES_FIX}`;
+/** What a failed turn says. Never the key, nor an error message that could carry it. */
+function failText(e: unknown, t: RunsApiTarget): string {
+  if (e instanceof HermesHttpError && e.status === 429) return `${t.name} is at its concurrent run cap, so this turn was not started.`;
+  if (e instanceof HermesHttpError && e.status === 401) return `${t.name} rejected the key. Check the ${t.keyName} secret.`;
+  if (e instanceof HermesHttpError) return `${t.name} returned HTTP ${e.status}.`;
+  return `Could not reach ${t.name} at ${t.url}. ${t.fix}`;
 }
 
+/** Hermes, from Settings and HERMES_API_KEY. Every custom harness runs on this adapter too (runsApiAdapter). */
 export const hermesAdapter: HarnessAdapter = {
   id: 'hermes',
   capabilities: CAPABILITIES.hermes,
@@ -50,8 +52,11 @@ export const hermesAdapter: HarnessAdapter = {
 
   spawn(ctx: AdapterContext, cb: AdapterCallbacks): HarnessSession {
     const thread = ctx.thread;
-    const baseUrl = config.hermesUrl;
-    const apiKey = ctx.secretEnv.HERMES_API_KEY ?? '';
+    // The thread's harness says which server: Hermes, or a custom harness's file, read as the session starts.
+    const harness = thread.harness as AnyHarnessId;
+    const target: RunsApiTarget = runsApiTarget(harness) ?? { id: harness, name: harness, url: '', keyName: '', capabilities: CAPABILITIES.hermes, fix: '', error: `No harness ${harness} on this machine.` };
+    const baseUrl = target.url;
+    const apiKey = ctx.harnessKey ?? '';
     const sessionId = sessionIdOf(thread);
     if (sessionId !== thread.session_id) cb.session(sessionId);
 
@@ -92,7 +97,7 @@ export const hermesAdapter: HarnessAdapter = {
     function ensureInit() {
       if (initSent) return;
       initSent = true;
-      cb.record({ kind: 'init', payload: { model: thread.model || 'hermes', cwd: '', tools: 0, mcp: [] } });
+      cb.record({ kind: 'init', payload: { model: thread.model || target.id, cwd: '', tools: 0, mcp: [] } });
     }
 
     function pump() {
@@ -152,7 +157,7 @@ export const hermesAdapter: HarnessAdapter = {
         await sleep(400, ac.signal);
       }
       // Give up locally, and stop the remote run so it does not keep a concurrency slot.
-      emit({ kind: 'error', payload: { text: `Hermes run ${id} is still running but the event stream ended.` } }, startedAt);
+      emit({ kind: 'error', payload: { text: `${target.name} run ${id} is still running but the event stream ended.` } }, startedAt);
       emit({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } }, startedAt);
       settled = true;
       void client!.stop(id).catch(() => {});
@@ -172,6 +177,14 @@ export const hermesAdapter: HarnessAdapter = {
       void (async () => {
         try {
           if (ended) return;
+          // A custom harness removed while its session was up (here, or by sync) takes no new turn: the brief would go
+          // to a server Ben no longer has set up.
+          const gone = missingHarness(harness);
+          if (gone) {
+            emit({ kind: 'error', payload: { text: gone } }, startedAt);
+            emit({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } }, startedAt);
+            return;
+          }
           let input = composeInput(m);
           if (sendPolicy) input = `${TOOL_FAILURE_POLICY}\n\n---\n\n${input}`;
           const key = m.uuid || randomUUID();
@@ -204,7 +217,7 @@ export const hermesAdapter: HarnessAdapter = {
           await follow(created.run_id, ac, startedAt, emptyHermesNorm());
         } catch (e) {
           if (ended || ac.signal.aborted) return;
-          emit({ kind: 'error', payload: { text: failText(e, baseUrl, apiKey) } }, startedAt);
+          emit({ kind: 'error', payload: { text: failText(e, target) } }, startedAt);
           emit({ kind: 'result', payload: { ok: false, subtype: 'error', turns: 1 } }, startedAt);
         } finally {
           if (runAbort === ac) runAbort = null;
@@ -246,9 +259,15 @@ export const hermesAdapter: HarnessAdapter = {
       stopActive();
     };
 
-    // Hermes gets no omni tools and takes no per-run tool limits, so a delegate-only role (the Conductor) could only
-    // do the work itself. Thread creation refuses it; this covers a thread that was already on Hermes.
-    const refused = !apiKey ? HERMES_FIX : ctx.role?.delegateOnly ? remoteDelegateOnlyRefusal(ctx.role.name, providerWhere('hermes')) : null;
+    // A Runs API server gets no omni tools and takes no per-run tool limits, so a delegate-only role (the Conductor)
+    // could only do the work itself. Thread creation refuses it; this covers a thread that was already on one.
+    const refused = target.error
+      ? `${target.name} cannot run: ${target.error}`
+      : !apiKey || !baseUrl
+        ? target.fix
+        : ctx.role?.delegateOnly
+          ? remoteDelegateOnlyRefusal(ctx.role.name, providerWhere(harness))
+          : null;
     if (refused) {
       const session = detachedSession(cb, {
         send(m) {
@@ -287,3 +306,6 @@ export const hermesAdapter: HarnessAdapter = {
     });
   },
 };
+
+/** The adapter a custom harness runs on: Hermes's, under its own id and with the capabilities its file leaves on. */
+export const runsApiAdapter = (id: AnyHarnessId, capabilities: HarnessCapabilities): HarnessAdapter => ({ ...hermesAdapter, id, capabilities });

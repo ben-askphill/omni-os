@@ -1,4 +1,4 @@
-// Pure translation of Hermes run events into Omni records, so a Hermes turn renders
+// Pure translation of Runs API events (Hermes and custom harnesses) into Omni records, so a Hermes turn renders
 // in the same transcript as a Claude turn. Deltas of one assistant message accumulate
 // and flush as a single bubble (one record per token would be one bubble each).
 // Reasoning is dropped, the way Cursor's thinking is. Tool names follow Claude Code's
@@ -205,7 +205,7 @@ export function applyHermesEvent(prev: HermesNormState, raw: unknown): HermesApp
       // Reasoning stays out of the transcript. Progress would be a status per tick.
       break;
     case 'run.queued':
-      records.push({ kind: 'status', payload: { text: 'Queued on Hermes' } });
+      records.push({ kind: 'status', payload: { text: 'Queued on its server' } });
       break;
     case 'run.stopping':
       records.push({ kind: 'status', payload: { text: 'Stopping' } });
@@ -276,7 +276,7 @@ export function applyHermesEvent(prev: HermesNormState, raw: unknown): HermesApp
     }
     case 'run.failed': {
       records.push(...flushText(state));
-      const error = str(evt.error) || 'Hermes run failed';
+      const error = str(evt.error) || 'The run failed';
       records.push({ kind: 'error', payload: { text: error } });
       records.push(resultRecord(false, 'error', '', evt));
       done = true;
@@ -304,7 +304,7 @@ export function eventFromRun(run: HermesRun): Raw | null {
     case 'completed':
       return { event: 'run.completed', output: run.output ?? '', usage: run.usage, runtime: run.runtime };
     case 'failed':
-      return { event: 'run.failed', error: run.error ?? (typeof run.last_event === 'string' ? run.last_event : 'Hermes run failed') };
+      return { event: 'run.failed', error: run.error ?? (typeof run.last_event === 'string' ? run.last_event : 'The run failed') };
     case 'cancelled':
       return { event: 'run.cancelled' };
     case 'interrupted':

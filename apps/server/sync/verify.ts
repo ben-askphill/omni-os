@@ -10,7 +10,7 @@ import type { Change, RemoteChange } from './transport.ts';
 
 // Whether a pulled change may apply, by its signature (PRD #667, S9, S3). sync/apply.ts asks before a handler runs.
 // - Action entities make a machine do something: run a message (remote_command), take a thread (assignment), update
-//   itself (update.ask.*), run the automations (automations.owner, automation_file), run a crew role's prompt (crew_file), run with a learned lesson (memory),
+//   itself (update.ask.*), run the automations (automations.owner, automation_file), run a crew role's prompt (crew_file), send briefs and a key to a custom harness (harness_file), run with a learned lesson (memory),
 //   store a secret (secretdrop.*, secretack.*), let an assistant into /mcp (mcp_client). They apply only with a valid signature from the machine they name, and only
 //   from the machine whose part they are.
 // - Everything else is logged when unsigned or invalid and still applied, so a Mac on an older build keeps syncing
@@ -44,8 +44,9 @@ const SECRET_ACK = 'secretack.';
 export function isActionChange(c: Pick<Change, 'entity' | 'entity_id'>): boolean {
   // An automation file is a prompt a machine runs on its schedule, on the machine it names. A crew file is a prompt
   // every later thread of that role runs with, with full permissions. An approved MCP client may start threads on every
-  // machine. A memory is a lesson every later thread in its channel runs with.
-  const actions = ['remote_command', 'assignment', 'automation_file', 'crew_file', 'mcp_client', 'memory'];
+  // machine. A memory is a lesson every later thread in its channel runs with. A harness file says where a role's
+  // briefs go and which secret travels there.
+  const actions = ['remote_command', 'assignment', 'automation_file', 'crew_file', 'harness_file', 'mcp_client', 'memory'];
   if (actions.includes(c.entity)) {
     return true;
   }

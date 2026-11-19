@@ -5,7 +5,8 @@
 // edits and restarts. It is a before/after snapshot: commits, pulls and other git operations made during
 // the turn are part of it.
 import { turnSnapshots, type SkippedFile, type Thread, type TurnSnapshot } from './db.ts';
-import { isProviderHarness, providerWhere } from './harness/types.ts';
+import { isProviderHarness } from './harness/types.ts';
+import { providerWhere } from './harness/registry.ts';
 import type { ChangedFile, TurnChanges, TurnView } from '@omni/shared/changes.ts';
 import { changesCheckout, commitsGroup, gitOr } from './changes.ts';
 import { captureTree, commitCheckpoint } from './checkpoint.ts';

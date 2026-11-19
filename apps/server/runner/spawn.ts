@@ -10,13 +10,14 @@ import { inWorkspace } from '../workspace.ts';
 import { followBranch } from '../branch-follow.ts';
 import { pathProblem } from '../sync/path-guard.ts';
 import { attachThread, detachThread } from '../browser.ts';
-import { globalSecret, hasSecret, secretsEnv } from '../secrets.ts';
+import { globalSecret, harnessKey, hasSecret, secretsEnv } from '../secrets.ts';
 import { recordUsage } from '../usage.ts';
 import { toolTails } from '../tool-tail.ts';
 import { recordContext, recordContextHint } from '../context.ts';
 import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
 import { beforeResume, type ResumeOutcome } from '../sync/files.ts';
 import { isProviderHarness, type HarnessId } from '../harness/types.ts';
+import { missingHarness, runsApiTarget } from '../harness/registry.ts';
 import type { AdapterContext, HarnessAdapter } from '../harness/adapter.ts';
 import { invalidateCommands } from '../commands.ts';
 import { runnableCommands } from '@omni/shared/slash.ts';
@@ -110,7 +111,23 @@ function refuseUnenforced(live: Live, reason: string) {
   if (t?.parent_id) reportToParent(t.id, 'failed', `This thread did not start: ${reason}`);
 }
 
+/**
+ * The thread's harness is not on this machine: a custom harness whose file was removed or has not synced, or an id no
+ * build knows. Nothing starts here, on that harness or any other. Ben's messages wait, as for a blocked resume, so they
+ * run once the harness is back, and the thread says why.
+ */
+function refuseMissing(live: Live, reason: string) {
+  live.removeMessages((m) => !(m.requestId && messageRequests.park(m.uuid)));
+  addEvent(live.threadId, 'error', { text: reason });
+  abortStart(live, 'failed');
+  const t = threads.get(live.threadId);
+  if (t?.parent_id) reportToParent(t.id, 'failed', `This thread did not start: ${reason}`);
+}
+
 async function spawnLive(live: Live, thread: Thread) {
+  // Before anything local: a missing harness must not take a worktree, the browser or a thread token either.
+  const missing = missingHarness(thread.harness);
+  if (missing) return refuseMissing(live, missing);
   const channel = channels.get(thread.channel_id)!;
   const role = getCrew(thread.role);
   // Checked here as well as at start and switch: a channel's level can change under a thread that already exists.
@@ -149,14 +166,18 @@ async function spawnLive(live: Live, thread: Thread) {
   const mcpFile = remote ? null : writeMcpConfig({ threadId: thread.id, channel, role, browserBusy, cdpEndpoint, omniUrl: omniUrl(), quick: readsOnly(thread) });
 
   let secretEnv: Record<string, string> = {};
+  // A Runs API server (Hermes, a custom harness) gets its own key and nothing else: no channel or global secret goes to
+  // a server Omni does not control (ADR 0017). The key is server-only, so secretsEnv never holds it.
+  const runsApi = runsApiTarget(thread.harness);
+  let key: string | undefined;
   try {
-    secretEnv = await secretsEnv(channel.id);
+    if (runsApi) key = (await harnessKey(channel.id, runsApi.keyName)) ?? undefined;
+    else secretEnv = await secretsEnv(channel.id);
     // The catalog probe reads the same global key. A channel secret of the same name already won above.
-    // A key in the secret store with no row in Secrets counts too. Each goes only to its own harness's HTTP client.
-    const keyName = thread.harness === 'hermes' ? 'HERMES_API_KEY' : thread.harness === 'cursor-cloud' ? 'CURSOR_API_KEY' : null;
-    if (keyName && !secretEnv[keyName]) {
-      const key = await globalSecret(keyName);
-      if (key) secretEnv = { ...secretEnv, [keyName]: key };
+    // A key in the secret store with no row in Secrets counts too. It goes only to Cursor Cloud's HTTP client.
+    if (thread.harness === 'cursor-cloud' && !secretEnv.CURSOR_API_KEY) {
+      const cursorKey = await globalSecret('CURSOR_API_KEY');
+      if (cursorKey) secretEnv = { ...secretEnv, CURSOR_API_KEY: cursorKey };
     }
   } catch (err) {
     addEvent(thread.id, 'error', { text: `Could not read secrets: ${(err as Error).message}` });
@@ -188,6 +209,7 @@ async function spawnLive(live: Live, thread: Thread) {
     resume: run.resume,
     handoverPending: !!threads.sessionState(thread.id).handover,
     permission,
+    ...(key && { harnessKey: key }),
   };
   // This spawn's own credential, in place of the install token (thread-tokens.ts). A harness that runs elsewhere gets none.
   const minted = remote ? null : mintThreadToken(thread.id);

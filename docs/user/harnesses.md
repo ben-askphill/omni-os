@@ -1,6 +1,6 @@
 # Harnesses
 
-A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to. Hermes and Cursor Cloud are the exceptions. They run off the Mac and Omni talks to them over HTTP. [Accounts](#accounts) shows which account each one is signed in to on each machine.
+A harness is the agent CLI a thread runs on. Pick one per channel (its default) or per thread in the model picker, or leave it to [Auto](#auto). Each runs through its official CLI and bills the plan it is signed in to. Hermes, Cursor Cloud and [custom harnesses](#custom-harnesses) are the exceptions. They run off the Mac and Omni talks to them over HTTP. [Accounts](#accounts) shows which account each one is signed in to on each machine.
 
 | Harness | Bills | Install and sign in | Runs as |
 | --- | --- | --- | --- |
@@ -9,12 +9,13 @@ A harness is the agent CLI a thread runs on. Pick one per channel (its default) 
 | Cursor Agent | Cursor plan | `curl https://cursor.com/install -fsS \| bash && cursor-agent login` | `cursor-agent` |
 | Hermes | Anthropic API | On your own Linux server, see [below](#hermes-remote) | HTTP over Tailscale ([ADR 0003](../adr/0003-hermes-remote-harness.md)) |
 | Cursor Cloud | Cursor plan | Secret `CURSOR_API_KEY`, see [below](#cursor-cloud) | A Cursor cloud agent, through the Cloud Agents API |
+| Custom harness | What its server bills | A file in `data/harnesses/`, see [below](#custom-harnesses) | HTTP, the [Runs API](../internals/remote-harness-protocol.md) ([ADR 0017](../adr/0017-custom-harnesses.md)) |
 
 - `OMNI_CLAUDE_BIN`, `OMNI_CODEX_BIN` and `OMNI_CURSOR_BIN` in `.env` point at a binary that is not on `PATH`. Without one, Codex also tries the copy inside the ChatGPT app.
 - A harness Omni can't use shows why in the model picker, Settings > Agents and the error `delegate` gets. Claude Code is asked with `claude auth status --json`: signed out reads as `claude auth login`, no `claude` on `PATH` as missing, and a CLI too old to answer stays available. For Codex that is one of: signed out (`codex login`), signed in with an API key, no `codex` on `PATH`, a binary that won't run, `codex app-server` exiting before it answers (with the last line it printed), or no answer to a request. A server busy with disk writes does not count as no answer.
 - The Usage card (desktop web and the desktop app; phone and iOS have none) has a row per signed-in account, and each limit says when it resets ("in 2h 10m"; hover or tap for the local time). Claude's rate-limit events drive the 5h and week windows, Codex reports its own, and Cursor's dashboard gives the monthly cycle. Hermes and Cursor Cloud have no plan limit to show. A window whose source sent no reset time shows no reset. An account with no reading of its own yet says **no reading yet** (and never borrows another account's numbers); a stale or missing reading on a lone account still says **no data**.
 - Each harness has its own concurrency cap (12 by default): `OMNI_MAX_CONCURRENT` (Claude Code), `OMNI_MAX_CONCURRENT_CODEX`, `OMNI_MAX_CONCURRENT_CURSOR`, `OMNI_MAX_CONCURRENT_HERMES`, `OMNI_MAX_CONCURRENT_CURSOR_CLOUD`. A full harness never holds up threads on another.
-- Each harness drops variables that would move it off the signed-in plan or away from the login Omni expects (`apps/server/harness/env-guard.ts`). Claude Code drops `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and `CLAUDE_CONFIG_DIR` (so traffic and transcripts stay on `~/.claude`). Codex drops `OPENAI_API_KEY`, `CODEX_API_KEY` and `OPENAI_BASE_URL`. Cursor and Cursor Cloud drop `CURSOR_API_KEY` and `CURSOR_AUTH_TOKEN`. Hermes drops `HERMES_API_KEY`. The guard wins over the server environment, a channel or global secret, and any extras, so a secret with one of those names never reaches that harness. A thread's terminal drops the union of every harness list. A login shell profile still runs, so a value exported there can come back.
+- Each harness drops variables that would move it off the signed-in plan or away from the login Omni expects (`apps/server/harness/env-guard.ts`). Claude Code drops `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` and `CLAUDE_CONFIG_DIR` (so traffic and transcripts stay on `~/.claude`). Codex drops `OPENAI_API_KEY`, `CODEX_API_KEY` and `OPENAI_BASE_URL`. Cursor and Cursor Cloud drop `CURSOR_API_KEY` and `CURSOR_AUTH_TOKEN`. Every harness drops `HERMES_API_KEY`, and no harness, terminal or channel action gets a custom harness's key (a secret its file names): those keys go only to their harness's HTTP client. The guard wins over the server environment, a channel or global secret, and any extras, so a secret with one of those names never reaches that harness. A thread's terminal drops the union of every harness list. A login shell profile still runs, so a value exported there can come back.
 - Cursor Agent streams partial reply text into one Markdown message as it writes, and tool rows show the call name and path, command or pattern when they start. It still cannot steer or interrupt a running turn. Messages sent mid-turn wait for the next one ([Sending while a thread is busy](threads.md#sending-while-a-thread-is-busy)).
 - Some features are Claude Code only: published artifact cards, [mods](mods.md) and [`/goal`](threads.md#goals).
 - Claude Code's model picker includes Fable 5.2 (`claude-fable-5-2`, between Sonnet 5 and Fable 5.1). The `fable` alias resolves to 5.2.
@@ -49,7 +50,7 @@ Settings > Accounts lists every synced machine, each harness on it, and the acco
 
 ## Switching mid-thread
 
-The model and effort pickers in a thread's reply box move it to another model, effort or harness. Switching does not work to or from Hermes or Cursor Cloud, which have no worktree on this Mac. A Cursor Cloud thread keeps the model its agent started with.
+The model and effort pickers in a thread's reply box move it to another model, effort or harness. Switching does not work to or from Hermes, Cursor Cloud or a custom harness, which have no worktree on this Mac. A Cursor Cloud thread keeps the model its agent started with.
 
 - Between turns the switch applies at once.
 - While a turn or its background tasks run, the switch waits. The pills show the pick with "Next turn" until the turn ends, however it ends (done, failed or stopped), and its background tasks finish. Then the switch applies. A later pick replaces it; picking the current model and effort again, or the pill's clear button, drops it. Anything you send meanwhile waits for the turn too and runs on the new pick, instead of steering the running turn.
@@ -72,7 +73,7 @@ A switch keeps one thread. To leave a thread as it is and carry on in a new one,
 - If the source changes between the preview and Start (a new message, a turn, an edit to its files), Omni refuses Start and the sheet shows the new preview.
 - **Attachments** from the source are listed with their name, type, size and whether Omni still has the bytes. None goes unless you tick it. Omni copies a ticked file into the new thread's own uploads folder, and it arrives with your first message the way any attachment does: images inline on Claude Code and Codex, and as a path to the file on Cursor Agent (the sheet says which). The new thread never points at the source's folder. A file that is missing on this Mac (for example attached on the other Mac), over the upload limit, past the 4-files'-worth total, a link instead of a file, or changed since it was attached stays on the list with its reason, and the carryover names it as not carried. Cancelling the sheet copies nothing, and a retried Start gives the same thread and the same files.
 - A message that starts with a command, like `/review`, runs first, and the carryover goes with your next message.
-- Hermes and Cursor Cloud can't take a continued thread, and a thread running on them can't be continued, since their files are not on this Mac.
+- Hermes, Cursor Cloud and custom harnesses can't take a continued thread, and a thread running on them can't be continued, since their files are not on this Mac.
 - The fork runs on the machine picked under **Run on** in the sheet. It opens on Settings > Threads, Run new threads on, and lists your synced machines only (no Grok Bot); with no other machine synced it is hidden and the fork follows that setting. Whenever the fork runs on another machine than the source ran on, picked or by the setting, the carryover says so in a `Machine:` constraint, so the preview changes with the machine. The Conductor's `continue_thread` takes the same choice as `device`. When the fork runs on another machine, Omni makes the fork here and sends it there with your message, its files and, for repo work, the source's snapshot, which that machine lays out as the fork's worktree before its setup action runs. The preview names that machine under Carryover. While it is offline, the preview says so and Start stays off. If the other machine cannot take it, the fork stays here, and Retry (repo work) or Resume runs it on this machine. See [Run a thread on another machine](sync.md#run-a-thread-on-another-machine).
 - A synced thread that works in a folder (no branch) can be forked on a Mac that doesn't have that folder: the new thread starts in the channel's folder, as any new thread does. A thread running on your other Mac can't be forked until it finishes there. A thread whose worktree is not on this Mac (made on the other one, or removed by a cleanup) forks from the last commit of its branch, here or on origin, and its uncommitted changes stay behind. When that branch is gone too, for example deleted after its PR merged, the fork starts in the channel's folder like any new thread. The sheet says which.
 - The Conductor can do the same with `continue_thread`, when you ask it to, and on its own when it has a follow-up for a thread whose session went cold ([Crew](crew.md)). It names the attachments to carry, and the answer says which went and why the others did not.
@@ -107,7 +108,7 @@ Auto is the first entry in the model picker and the default for a new thread. Om
 
 Hermes is an always-on agent on your own Linux server. Omni does not spawn it. The Hermes API server listens on the server's Tailscale address and is not public. A thread talks to it at `OMNI_HERMES_URL`, the server's Tailscale address and port (set it in Settings or `npm run setup`; empty means Hermes is off). The Mac must be on the tailnet.
 
-The bearer token is the global secret `HERMES_API_KEY`. It is not an env var or a database column, and Omni never writes it to logs.
+The bearer token is the global secret `HERMES_API_KEY` (or a channel secret of that name). It is not an env var or a database column, Omni never writes it to logs, and no local thread, terminal or channel action gets it.
 
 | Piece | What |
 | --- | --- |
@@ -118,6 +119,31 @@ The bearer token is the global secret `HERMES_API_KEY`. It is not an env var or 
 | Attachments | Described in the message. The files stay on the Mac; Hermes cannot read those paths |
 | Usage | Token counts on the run, not the plan meter. It bills the Anthropic API, not the Claude, ChatGPT or Cursor plan |
 | Availability | `GET /v1/capabilities` with the bearer token. A missing key or an unreachable URL shows the fix in the model picker |
+
+## Custom harnesses
+
+A custom harness is another agent on a server of your own, such as a second Hermes or an agent you built, that serves the [Runs API](../internals/remote-harness-protocol.md) Omni speaks to Hermes. Each is one file, `data/harnesses/<slug>.yaml`, and runs as harness `custom:<slug>`. Settings > Agents > Harnesses lists each one as "Custom harness on <host>" with the secret its key is in. An add form comes later; for now write the file, or `POST /api/harnesses/custom/<slug>` with `{ name, url, secret, bills?, family?, cap?, capabilities? }` (`PUT` to change it, `DELETE` to remove it).
+
+```yaml
+name: Hermes on Hetzner
+kind: runs-api
+url: https://hermes.tail1234.ts.net:8642
+auth:
+  scheme: bearer
+  secret: HERMES_HETZNER_KEY   # the key itself goes in Settings > Secrets
+bills: Anthropic API key on the VPS
+family: anthropic
+cap: 4
+capabilities:
+  steer: false                 # turn off what the server does not do; nothing turns on
+```
+
+- **The key** is the secret the file names, set in Settings > Secrets on each machine. The file syncs to your other machines; the key does not, and a machine without it shows the harness as not ready, naming the secret. The key goes only on that server's requests, never into a thread's environment. A file cannot name one of Omni's own credentials or any `OMNI_` name.
+- **The URL** is `https://`, or plain `http://` only to this machine or a Tailscale address. Omni never follows a redirect.
+- **A crew role binds to it by id**: `harness: custom:hermes-hetzner` with `model: default`. The Conductor sees it in `list_harnesses`. Auto never picks it.
+- **What it runs like**: a Hermes thread. No worktree, browser, Omni tools, channel secrets or plan meter; Omni's prompt goes as `instructions`; it cannot run the Conductor or any delegate-only role, or run below Full access. Its replies come from a server outside Omni.
+- **Only you** add, change or remove one: an agent thread, a Google or Omni Connect session and an app paired by code get a 403. It takes the install token or a browser paired with it.
+- **Removing one** keeps its threads readable. They do not run again, on it or on any other harness, until a harness with that id is back.
 
 ## Cursor Cloud
 

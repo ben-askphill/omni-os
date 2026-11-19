@@ -8,7 +8,8 @@ import { promisify } from 'node:util';
 import type { BranchChanges, ChangeGroup, ChangeKind, ChangedFile, ChangeStatus, DiffOmitted } from '@omni/shared/changes.ts';
 import { channels, threadBases, type Thread, type ThreadBase } from './db.ts';
 import { plannedWorktree, worktreeProblem } from './sandbox.ts';
-import { isProviderHarness, providerWhere } from './harness/types.ts';
+import { isProviderHarness } from './harness/types.ts';
+import { providerWhere } from './harness/registry.ts';
 
 const run = promisify(execFile);
 

@@ -18,7 +18,7 @@ import { record } from './db/sync.ts';
 import { validateRun, type Catalog } from './harness/catalog.ts';
 import { asksAuto } from './harness/auto.ts';
 import { validateDefaults } from './harness/resolve.ts';
-import { isProviderHarness, providerWhere } from './harness/types.ts';
+import { capabilitiesOf, providerWhere } from './harness/registry.ts';
 import { updateUserConfig } from './user-config.ts';
 
 const refused = (message: string, status: 400 | 404 | 409 = 400) => Object.assign(new Error(message), { status });
@@ -188,7 +188,7 @@ function check(id: string, role: CrewRole, builtIn: CrewRole | null, ctx: CrewSa
     throw refused(key === 'charter_mode' ? `${why} Save your text as an addition (charter_mode: append).` : `${why} Leave ${key} as the built-in has it.`, 409);
   }
   // It would never start: a remote runtime gets no delegate tools and keeps its own work tools (runner/api.ts).
-  if (role.delegateOnly && isProviderHarness(role.harness)) throw refused(remoteDelegateOnlyRefusal(role.name, providerWhere(role.harness!)), 409);
+  if (role.delegateOnly && role.harness && !asksAuto(role) && !capabilitiesOf(role.harness)?.toolLimits) throw refused(remoteDelegateOnlyRefusal(role.name, providerWhere(role.harness)), 409);
 }
 
 /**

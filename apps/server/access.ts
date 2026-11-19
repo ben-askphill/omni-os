@@ -17,6 +17,7 @@ import {
   type ConnectorLevel,
 } from '@omni/shared/access.ts';
 import type { Channel } from './db.ts';
+import { capabilitiesOf, harnessName } from './harness/registry.ts';
 import { installDefault } from './access-default.ts';
 
 /** The levels a thread runs at: its channel's (made no looser by its role's `access:`), and its connectors' own. */
@@ -268,14 +269,14 @@ export function codexPolicy(a: ChannelAccess): { approvalPolicy: 'never' | 'untr
   return { approvalPolicy: 'never', sandbox: 'danger-full-access' };
 }
 
-/** Harnesses that cannot be held to a level below full access: they run off this machine with tools Omni never sees. */
-export const UNENFORCEABLE = new Set(['hermes', 'cursor-cloud']);
-
-/** Why a harness cannot run in a channel at this level, or null when it can. */
+/**
+ * Why a harness cannot run in a channel at this level, or null when it can. A harness without `toolLimits` (Hermes,
+ * Cursor Cloud, a custom harness) runs off this machine with tools Omni never sees, so it cannot be held to a level
+ * below full access. An id that names no harness here is refused as well.
+ */
 export function harnessRefusal(harness: string, a: ChannelAccess): string | null {
-  if (unrestricted(a) || !UNENFORCEABLE.has(harness)) return null;
-  const name = harness === 'hermes' ? 'Hermes' : 'Cursor Cloud';
-  return `${name} runs off this machine, so Omni cannot hold it to this channel's access level. Pick Claude Code, Codex or Cursor Agent, or set the channel to Full access.`;
+  if (unrestricted(a) || capabilitiesOf(harness)?.toolLimits) return null;
+  return `${harnessName(harness)} runs off this machine, so Omni cannot hold it to this channel's access level. Pick Claude Code, Codex or Cursor Agent, or set the channel to Full access.`;
 }
 
 /** The key "Allow in this thread" and "Always allow for <role>" remember: the tool, so later calls of it run without asking. */

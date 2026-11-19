@@ -55,7 +55,7 @@ const harnessRows = (list: HarnessInfo[]) => {
 
 /** One row of GET /api/harnesses. */
 export function harnessRow(h: HarnessInfo, running: number) {
-  const install = !h.available && h.missing ? HARNESS_INSTALL[h.id] : undefined;
+  const install = !h.available && h.missing && isHarnessId(h.id) ? HARNESS_INSTALL[h.id] : undefined;
   return { ...h, running, ...(install && { install }) };
 }
 

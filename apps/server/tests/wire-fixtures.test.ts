@@ -302,6 +302,9 @@ let setUp: { bin: string; automationsDir: string } | undefined;
 async function boot(): Promise<number> {
   if (!setUp) {
     mkdirSync(join(tmp, 'brain'));
+    // A custom harness (harness/custom.ts) with no key on this machine, so GET /harnesses records its row.
+    mkdirSync(join(data, 'harnesses'), { recursive: true });
+    writeFileSync(join(data, 'harnesses', 'fixture-agent.yaml'), 'name: Fixture agent\nkind: runs-api\nurl: http://127.0.0.1:9\nauth:\n  scheme: bearer\n  secret: FIXTURE_AGENT_KEY\nbills: Bills the fixture server\n');
     setUp = { bin: fakeSecurity(), automationsDir: automations() };
     fakeGh(setUp.bin);
   }

@@ -6,6 +6,7 @@ import { artifacts, memories, type Channel, type Thread } from '../db.ts';
 import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
 import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
+import { harnessName } from '../harness/registry.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
 import { userConfig } from '../user-config.ts';
 import { TOOL_FAILURE_POLICY } from '../tool-failure-policy.ts';
@@ -220,7 +221,7 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     cloud
       ? `You are a Cursor cloud agent that Omni OS, ${userPossessive()} agent workspace on their own machine, started through the Cursor API. You run on a Linux machine of Cursor's, on your own clone of the repo; Omni, its tools, files and secrets are not here. Nobody watches live, so finish the task or clearly state what is blocking you.`
       : remote
-      ? `You are Hermes, running on your own server and reached by Omni OS over HTTP. ${name} is on their own machine; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
+      ? `You are ${harnessName(thread.harness)}, running on your own server and reached by Omni OS over HTTP. ${name} is on their own machine; you are not. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you.`
       : `You are running headless inside Omni OS, ${userPossessive()} local agent workspace. Nobody can answer permission prompts, so finish the task or clearly state what is blocking you. When a choice only ${name} can make blocks you, ask with the ask_user_question tool: it waits for the answer.`,
     getProfile().name ? `- You work for ${name}. Charters and automations that say "the user" mean them.` : '',
     ...profileLines(name),
@@ -277,11 +278,11 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     'Your final message is what gets shown and reported. Lead with the outcome, keep it short, bullets over prose.',
     'Omni renders standard GitHub-flavored Markdown, not Slack mrkdwn. Bold is **double asterisks**, italics are _underscores_, section titles are ## headings, tables are pipe tables, links are [label](url). Start every numbered item on its own line. This overrides any Slack or terminal formatting rule from a project CLAUDE.md or rules file.',
     'Keep table cells short. Put reasons and explanations in bullets under the table.',
-    // Hermes and Cursor cloud get no local MCP servers, so no html_render.
+    // Remote harnesses (Hermes, Cursor cloud, custom ones) get no local MCP servers, so no html_render.
     remote
       ? ''
       : `When ${name} asks you to "show me", "list out" or "visualize" something, or a brief passes that ask on, show the result with html_render as cards, a table or a chart above your reply instead of a wall of text. A short answer stays plain text.`,
-    // The thread's step view (@omni/shared/steps.ts). set_steps is on omni-mcp, which Hermes and Cursor cloud do not get.
+    // The thread's step view (@omni/shared/steps.ts). set_steps is on omni-mcp, which remote harnesses do not get.
     ...(remote
       ? []
       : [

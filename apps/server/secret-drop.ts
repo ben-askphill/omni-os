@@ -12,7 +12,7 @@
 // An unanswered drop is expired after DROP_WINDOW_MS: the target refuses it then, and the sender reports it so.
 import { createCipheriv, createDecipheriv, createPrivateKey, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, randomUUID, type KeyObject } from 'node:crypto';
 import { kv, outbox } from './db.ts';
-import { globalSecret, secretReachesThread, setSecret, NAME_RE, SCOPE_RE, SEAL_SECRET_NAME } from './secrets.ts';
+import { globalSecret, omniCredential, setSecret, NAME_RE, SCOPE_RE, SEAL_SECRET_NAME } from './secrets.ts';
 import { deviceRecord, machineFor } from './sync/devices.ts';
 import { keyring } from './sync/keyring.ts';
 import { syncProblem, type SyncNeed } from './sync/problem.ts';
@@ -193,7 +193,7 @@ export function checkSecret(scope: string, name: string, value: string) {
   if (!SCOPE_RE.test(scope)) throw refused('scope is global or channel:<channel id>', 400);
   if (!NAME_RE.test(name)) throw refused('name must be UPPER_SNAKE_CASE', 400);
   if (!value || /[\r\n]/.test(value)) throw refused('value must be a single non-empty line', 400);
-  if (!secretReachesThread(scope, name)) throw refused(`${name} is one of Omni's own credentials. Set it in Settings on that machine.`, 403);
+  if (omniCredential(scope, name)) throw refused(`${name} is one of Omni's own credentials. Set it in Settings on that machine.`, 403);
   if (changesHowProgramsStart(name)) throw refused(`${name} changes how every thread's programs start, so only Settings can set it.`, 403);
 }
 

@@ -8,7 +8,8 @@
 // The defaults' model and effort only apply when the thread runs on their harness, and their effort
 // only when their model is the one picked (or, when they name no model, the harness default is). Pure, so it is testable.
 // Whatever picked it, a review role on a GPT model then runs at high effort (reviewerEffort).
-import { isHarnessId, DEFAULT_HARNESS, HARNESS_META, type HarnessId } from './types.ts';
+import { isCustomHarnessId } from '@omni/shared/custom-harness.ts';
+import { isHarnessId, DEFAULT_HARNESS, type AnyHarnessId } from './types.ts';
 import { getHarness, resolveModel, unavailableError, validateRun, type Catalog, type Resolved, type ResolveError } from './catalog.ts';
 import { asksAuto, GPT_REVIEW_EFFORT, nearestEffort } from './auto.ts';
 
@@ -33,6 +34,9 @@ export interface AutoRun {
 }
 const AUTO_RUN: AutoRun = { ok: true, auto: true };
 
+/** A built-in id, or a custom one: the catalog then says whether this machine has it. */
+const harnessIdLike = (v: unknown): v is AnyHarnessId => isHarnessId(v) || (typeof v === 'string' && isCustomHarnessId(v));
+
 export function resolveRun(choice: RunChoice, roleDefaults: RoleDefaults | undefined, cat: Catalog, channel?: RoleDefaults): Resolved | AutoRun | ResolveError {
   // The role's defaults when it sets any, else the channel's. Below, "role" is whichever applies.
   const layer = setsRun(roleDefaults) ? roleDefaults : setsRun(channel) ? channel : undefined;
@@ -40,12 +44,12 @@ export function resolveRun(choice: RunChoice, roleDefaults: RoleDefaults | undef
   if (!(choice.harness || choice.model || choice.effort) && (!layer || asksAuto(layer))) return AUTO_RUN;
   // A choice that names a harness or model replaces an Auto default, which then sets nothing.
   const role = asksAuto(layer) ? undefined : (layer ?? roleDefaults);
-  if (choice.harness && !isHarnessId(choice.harness)) return { ok: false, error: `Unknown harness "${choice.harness}".` };
-  if (role?.harness && !isHarnessId(role.harness)) return { ok: false, error: `Unknown harness "${role.harness}".` };
+  if (choice.harness && !harnessIdLike(choice.harness)) return { ok: false, error: `Unknown harness "${choice.harness}".` };
+  if (role?.harness && !harnessIdLike(role.harness)) return { ok: false, error: `Unknown harness "${role.harness}".` };
 
   // A role that sets only a model stays on Claude Code.
   const roleHarness = role ? role.harness ?? DEFAULT_HARNESS : undefined;
-  const harness: HarnessId = isHarnessId(choice.harness) ? choice.harness : isHarnessId(roleHarness) ? roleHarness : DEFAULT_HARNESS;
+  const harness: AnyHarnessId = harnessIdLike(choice.harness) ? choice.harness : harnessIdLike(roleHarness) ? roleHarness : DEFAULT_HARNESS;
 
   const roleApplies = !!role && roleHarness === harness;
   const model = (choice.model ?? '') || (roleApplies ? role!.model ?? '' : '');
@@ -77,8 +81,8 @@ export const isGptRun = (run: { harness: string; model?: string | null }) => run
 export function reviewerEffort(run: { harness: string; model?: string | null; effort?: string | null }, role: { review?: boolean } | null | undefined, cat: Catalog): string {
   const asked = run.effort ?? '';
   if (!role?.review || !isGptRun(run)) return asked;
-  const h = isHarnessId(run.harness) ? getHarness(cat, run.harness) : undefined;
-  const m = run.model ? (isHarnessId(run.harness) ? resolveModel(cat, run.harness, run.model) : null) : (h?.models.find((x) => x.default) ?? h?.models[0]);
+  const h = getHarness(cat, run.harness);
+  const m = run.model ? resolveModel(cat, run.harness, run.model) : (h?.models.find((x) => x.default) ?? h?.models[0]);
   if (!m) return GPT_REVIEW_EFFORT;
   return m.efforts.length ? nearestEffort(m, GPT_REVIEW_EFFORT) : asked;
 }
@@ -86,15 +90,13 @@ export function reviewerEffort(run: { harness: string; model?: string | null; ef
 /** Validate a role, channel or automation's declared defaults against the catalog, for the settings pages. */
 export function validateDefaults(defaults: RoleDefaults, cat: Catalog): string | undefined {
   if (asksAuto(defaults)) return defaults.effort ? `Auto picks the effort, so leave it empty (got "${defaults.effort}")` : undefined;
-  if (defaults.harness && !isHarnessId(defaults.harness)) {
-    return `unknown harness "${defaults.harness}" (valid: ${Object.keys(HARNESS_META).join(', ')})`;
-  }
-  const harness = (isHarnessId(defaults.harness) ? defaults.harness : DEFAULT_HARNESS) as HarnessId;
+  const harness = defaults.harness || DEFAULT_HARNESS;
   const h = getHarness(cat, harness);
-  if (!h || h.models.length === 0) return undefined; // catalog not loaded for this harness: pass through
+  if (!h) return `unknown harness "${harness}" (this machine has: ${cat.harnesses.map((x) => x.id).join(', ')})`;
+  if (h.models.length === 0) return undefined; // catalog not loaded for this harness: pass through
   if (defaults.model || defaults.effort) {
     const modelForCheck = defaults.model || h.models.find((m) => m.default)?.id || h.models[0]?.id || '';
-    const check = validateRun(cat, harness, modelForCheck, defaults.effort ?? '');
+    const check = validateRun(cat, h.id, modelForCheck, defaults.effort ?? '');
     if (!check.ok) return check.error;
   }
   return undefined;

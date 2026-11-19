@@ -1,4 +1,5 @@
 import { MARK_TRANSFORM, HARNESS_LOGOS as LOGO, HARNESS, CREW } from '@omni/shared/brand.ts';
+import { customHarnessSlug } from '@omni/shared/custom-harness.ts';
 import { angDiff, c01, easeWeights, MARK_DROPLETS, MARK_R, MARK_START, MARK_TARGETS, MARK_W, markFrame, type MarkDrop, type MarkState } from '@omni/shared/mark.ts';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { HarnessId } from '../api.ts';
@@ -160,7 +161,8 @@ export { Loader } from './ui/status.tsx';
 
 /* The vendors' own logos, verbatim from Simple Icons (simpleicons.org). Monochrome, currentColor,
    24 grid. Never redraw them or recolor them into a pop. */
-export const harnessLabel = (harness: string) => HARNESS[harness]?.label ?? harness;
+/** A custom harness (custom:<slug>) without its catalog row at hand reads as its slug. */
+export const harnessLabel = (harness: string) => HARNESS[harness]?.label ?? customHarnessSlug(harness) ?? harness;
 
 /** Each harness with the short name usage rows give it, in the order they list. */
 export const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
@@ -173,14 +175,14 @@ export const HARNESS_ROWS: { id: HarnessId; name: string }[] = [
 /** The harnesses the running-slots line counts: the usage rows, plus Cursor Cloud, which reports no usage of its own. */
 export const SLOT_ROWS: { id: HarnessId; name: string }[] = [...HARNESS_ROWS, { id: 'cursor-cloud', name: 'Cursor Cloud' }];
 
-/** The bare logo. Harnesses without one (Hermes) get their two-letter label. */
+/** The bare logo. Harnesses without one (Hermes, a custom harness) get two letters of their id. */
 export function HarnessLogo({ harness, size = 14, title }: { harness: string; size?: number; title?: string }) {
   const h = HARNESS[harness];
-  const label = title ?? h?.label ?? harness;
+  const label = title ?? harnessLabel(harness);
   if (!h?.logo)
     return (
       <span role="img" aria-label={label} className="inline-grid shrink-0 place-items-center font-medium" style={{ width: size, height: size, fontSize: Math.max(7, size * 0.62), lineHeight: 1 }}>
-        {harness.slice(0, 2).toUpperCase()}
+        {(customHarnessSlug(harness) ?? harness).slice(0, 2).toUpperCase()}
       </span>
     );
   return (

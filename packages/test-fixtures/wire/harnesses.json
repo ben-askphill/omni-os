@@ -8,7 +8,10 @@
       "steer": true,
       "interrupt": true,
       "inlineImages": true,
-      "usage": "five-hour-week"
+      "usage": "five-hour-week",
+      "remote": false,
+      "toolLimits": true,
+      "switchable": true
     },
     "available": true,
     "models": [
@@ -100,7 +103,10 @@
       "steer": true,
       "interrupt": true,
       "inlineImages": true,
-      "usage": "five-hour-week"
+      "usage": "five-hour-week",
+      "remote": false,
+      "toolLimits": true,
+      "switchable": true
     },
     "cap": 4,
     "available": false,
@@ -117,7 +123,10 @@
       "steer": false,
       "interrupt": false,
       "inlineImages": false,
-      "usage": "monthly"
+      "usage": "monthly",
+      "remote": false,
+      "toolLimits": true,
+      "switchable": true
     },
     "cap": 4,
     "available": false,
@@ -136,9 +145,18 @@
       "steer": true,
       "interrupt": true,
       "inlineImages": false,
-      "usage": "none"
+      "usage": "none",
+      "remote": true,
+      "toolLimits": false,
+      "switchable": false
     },
     "cap": 4,
+    "remote": {
+      "custom": false,
+      "kind": "runs-api",
+      "host": "",
+      "secret": "HERMES_API_KEY"
+    },
     "available": false,
     "fix": "Set the Hermes URL in Settings (or OMNI_HERMES_URL) to its Tailscale address, set HERMES_API_KEY in Secrets, and connect this machine to Tailscale",
     "models": [],
@@ -153,11 +171,40 @@
       "steer": false,
       "interrupt": true,
       "inlineImages": false,
-      "usage": "none"
+      "usage": "none",
+      "remote": true,
+      "toolLimits": false,
+      "switchable": false
     },
     "cap": 4,
     "available": false,
     "fix": "Add CURSOR_API_KEY in Secrets, globally or on the channel. Make the key at cursor.com/dashboard under Integrations",
+    "models": [],
+    "running": 0
+  },
+  {
+    "id": "custom:fixture-agent",
+    "name": "Fixture agent",
+    "plan": "Bills the fixture server",
+    "capabilities": {
+      "warmProcess": false,
+      "steer": true,
+      "interrupt": true,
+      "inlineImages": false,
+      "usage": "none",
+      "remote": true,
+      "toolLimits": false,
+      "switchable": false
+    },
+    "cap": 4,
+    "remote": {
+      "custom": true,
+      "kind": "runs-api",
+      "host": "127.0.0.1:9",
+      "secret": "FIXTURE_AGENT_KEY"
+    },
+    "available": false,
+    "fix": "Key not on this machine: set FIXTURE_AGENT_KEY in Secrets to the server's key",
     "models": [],
     "running": 0
   }
