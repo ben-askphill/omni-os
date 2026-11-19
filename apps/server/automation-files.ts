@@ -256,10 +256,10 @@ export interface AutomationWriteBy {
  * same command in another channel's folder is another command (`./check.sh` is whatever that folder holds). A missing
  * Omni checkout is this machine's, not the file's (check below).
  */
-function scheduledPrecheck(id: string, text: string): string | null {
+function scheduledPrecheck(id: string, text: string, channel?: string): string | null {
   const a = parseAutomation(id, text);
   if ((a.error && !a.error.startsWith('needs an Omni checkout')) || a.on || !a.precheck) return null;
-  return JSON.stringify([a.channel, a.precheck.command]);
+  return JSON.stringify([channel || a.channel, a.precheck.command]);
 }
 
 /**
@@ -275,7 +275,8 @@ export function saveAutomation(id: string, change: { fields: AutomationFields } 
   const base = readFileSync(src.file, 'utf8');
   const text = 'yaml' in change ? keepChannelOverride(id, base, change.yaml) : render(base, change.fields);
   const precheck = scheduledPrecheck(id, text);
-  if (!by.shell && precheck !== null && precheck !== scheduledPrecheck(id, base)) throw refused(`Forbidden: ${SHELL_REFUSAL}`, 403);
+  // The file as it runs now: with the config's channel override (automations.ts loadAutomations), which a write drops.
+  if (!by.shell && precheck !== null && precheck !== scheduledPrecheck(id, base, userConfig().automations[id]?.channel)) throw refused(`Forbidden: ${SHELL_REFUSAL}`, 403);
   check(id, text, 'fields' in change ? change.fields.channel : undefined);
   write(id, text);
   return definitionOf(id)!;

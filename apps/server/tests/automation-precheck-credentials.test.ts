@@ -157,6 +157,20 @@ describe("moving a precheck to another channel's folder", () => {
     });
 });
 
+describe("an automation moved by the config's channel override", () => {
+  it('counts the override as where its precheck runs now, so an edit that keeps it there stays open', async () => {
+    const { updateUserConfig } = await import('../user-config.ts');
+    const id = await tokenAutomation(`echo overridden-${++n}`);
+    const command = loaded(id).precheck!.command;
+    updateUserConfig({ automations: { [id]: { channel: 'elsewhere' } } });
+    expect(loaded(id).channel).toBe('elsewhere');
+    // The YAML still names scratch: saving it keeps the override's channel, and the precheck runs where it ran.
+    const res = await call('Google app session', 'PUT', `/automations/${id}`, { yaml: yaml(`precheck: ${command}\n`, 'tidy up again') });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(loaded(id)).toMatchObject({ channel: 'elsewhere', prompt: 'tidy up again', precheck: { command } });
+  });
+});
+
 describe('what stays open to every signed-in device', () => {
   for (const who of SIGNED_IN)
     it(`${who}: edits the rest of a file with a precheck, keeps or removes it, and the kept one still runs`, async () => {
