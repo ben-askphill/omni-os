@@ -195,6 +195,8 @@ describe('Claude Code availability probe', () => {
   it('reads a signed-in, a signed-out and a missing claude from `claude auth status --json`', () => {
     expect(claudeProbeOf({ stdout: '{"loggedIn":true,"email":"a@b.c"}', missing: false })).toEqual({ available: true });
     expect(claudeProbeOf({ stdout: '{"loggedIn":false,"authMethod":"none"}', missing: false })).toEqual({ available: false, fix: CLAUDE_LOGIN });
+    // The same rule as Settings > Accounts: an answer that does not say loggedIn: true is signed out.
+    expect(claudeProbeOf({ stdout: '{"authMethod":"none"}', missing: false })).toEqual({ available: false, fix: CLAUDE_LOGIN });
     expect(claudeProbeOf({ stdout: null, missing: true })).toEqual({ available: false, missing: true, fix: CLAUDE_NOT_FOUND });
   });
 

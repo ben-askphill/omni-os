@@ -4,6 +4,7 @@
 import type { HarnessId, HarnessInfo, ModelEntry } from './types.ts';
 import { CAPABILITIES, HARNESS_META, HARNESS_IDS } from './types.ts';
 import { CLAUDE_ALIASES } from '@omni/shared/claude-aliases.ts';
+import { parseClaudeStatus } from './accounts-parse.ts';
 
 // ---------- Claude Code ----------
 // A bundled list, then whatever else Claude Code itself reports (its `initialize` answer, as T3 Code reads it), so a
@@ -121,17 +122,14 @@ export function claudeHarness(cap: number, defaultModelId?: string, reported: re
   return { ...base, available: true, models: claudeModels(defaultModelId, reported) };
 }
 
-/** `claude auth status --json`'s stdout as a probe; null stdout is a CLI that did not answer. */
+/**
+ * `claude auth status --json`'s stdout as a probe; null stdout is a CLI that did not answer. Signed out is the same
+ * reading Settings > Accounts makes (accounts-parse.ts parseClaudeStatus): JSON whose `loggedIn` is not true.
+ */
 export function claudeProbeOf(out: { stdout: string | null; missing: boolean }): ClaudeProbe {
   if (out.missing) return { available: false, missing: true, fix: CLAUDE_NOT_FOUND };
   if (!out.stdout) return { available: true };
-  let j: { loggedIn?: unknown } | null = null;
-  try {
-    j = JSON.parse(out.stdout) as { loggedIn?: unknown };
-  } catch {
-    return { available: true };
-  }
-  return j?.loggedIn === false ? { available: false, fix: CLAUDE_LOGIN } : { available: true };
+  return parseClaudeStatus(out.stdout).state === 'signed-out' ? { available: false, fix: CLAUDE_LOGIN } : { available: true };
 }
 
 // ---------- Codex ----------
