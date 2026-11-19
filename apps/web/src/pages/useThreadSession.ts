@@ -150,7 +150,7 @@ export function useThreadSession(id: string, artifactParam: number | undefined, 
           setReady(true);
           if (!artifactParamRef.current) {
             const visible = d.artifacts.filter((a) => a.kind !== 'screenshot');
-            const html = [...visible].reverse().find((a) => a.kind === 'html');
+            const html = visible.findLast((a) => a.kind === 'html');
             // A thread with no files of its own opens on the newest its crew made.
             const pick = html ?? visible[visible.length - 1] ?? crewShown(d.artifacts, d.crew_artifacts ?? []).files[0];
             if (pick) setSelected(pick.id);

@@ -15,7 +15,7 @@ export function ArtifactsTab({ artifacts, crew, selected, onSelect }: { artifact
       </Empty>
     );
   }
-  const list = [...artifacts].reverse();
+  const list = artifacts.toReversed();
   const from = selected && 'thread_title' in selected ? { id: selected.thread_id, title: selected.thread_title } : undefined;
   return (
     <div className="flex h-full min-h-0 flex-col">

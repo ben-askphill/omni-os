@@ -89,7 +89,7 @@ function BreakdownTable({ usage, view }: { usage: InsightsUsage; view: Breakdown
       ? usage.models.map((m) => ({ id: `${m.source}:${m.model}`, name: m.model, source: m.source as UsageSource | null, cost: m.cost, tokens: tokensOf(m), mono: true }))
       : view === 'harness'
         ? usage.sources.map((s) => ({ id: s.source, name: SOURCE_NAME[s.source], source: s.source as UsageSource | null, cost: s.cost, tokens: tokensOf(s), mono: false }))
-        : [...usage.days].reverse().map((d) => ({ id: d.day, name: dayLabel(d.day), source: null, cost: d.cost, tokens: Object.values(d.tokens).reduce((a, b) => a + (b ?? 0), 0), mono: false }));
+        : usage.days.toReversed().map((d) => ({ id: d.day, name: dayLabel(d.day), source: null, cost: d.cost, tokens: Object.values(d.tokens).reduce((a, b) => a + (b ?? 0), 0), mono: false }));
   if (!rows.length) return <p className="px-1 py-4 text-[12.5px] text-fg-3">No requests in this range.</p>;
   return (
     <div className="scroll-thin overflow-x-auto rounded-[14px] shadow-[inset_0_0_0_1px_var(--line)]" {...region}>

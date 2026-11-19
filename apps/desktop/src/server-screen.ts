@@ -33,10 +33,11 @@ export function escapeHtml(text: string): string {
 
 // The Web UI's tokens (apps/web/src/index.css), since this page loads before it and cannot read them.
 const STYLE = `
-:root { color-scheme: light dark; --bg: #ffffff; --surface: #f7f7f6; --surface-2: #f1f1f0; --surface-3: #ecebe7; --fg: #17181a;
-  --fg-2: #3c3b37; --fg-3: #62615c; --line: rgba(23,24,26,.08); --warn: #b45309; --ink: #17181a; --on-ink: #ffffff; }
-@media (prefers-color-scheme: dark) { :root { --bg: #121316; --surface: #191b1e; --surface-2: #222428; --surface-3: #2a2c31;
-  --fg: #eceae5; --fg-2: #b8b7b1; --fg-3: #a09f99; --line: rgba(236,235,231,.08); --warn: #f5b544; --ink: #eceae5; --on-ink: #101114; } }
+:root { color-scheme: light dark; --bg: light-dark(#ffffff, #121316); --surface: light-dark(#f7f7f6, #191b1e);
+  --surface-2: light-dark(#f1f1f0, #222428); --surface-3: light-dark(#ecebe7, #2a2c31); --fg: light-dark(#17181a, #eceae5);
+  --fg-2: light-dark(#3c3b37, #b8b7b1); --fg-3: light-dark(#62615c, #a09f99);
+  --line: light-dark(rgb(23 24 26 / 0.08), rgb(236 235 231 / 0.08)); --warn: light-dark(#b45309, #f5b544);
+  --ink: light-dark(#17181a, #eceae5); --on-ink: light-dark(#ffffff, #101114); }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 body { font: 400 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
@@ -68,6 +69,10 @@ a.ghost:hover { color: var(--fg); background: var(--surface-2); }
 a:focus-visible { outline: 1.5px solid var(--fg); outline-offset: 2px; }
 .spinner { width: 22px; height: 22px; border: 2px solid var(--line); border-top-color: var(--fg-3); border-radius: 50%;
   animation: spin .8s linear infinite; }
+/* Slower, not stopped, so the page still shows it is working. */
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 4s; } }
+/* Forced colors paint the whole ring one color, which hides the turn. */
+@media (forced-colors: active) { .spinner { border-color: GrayText; border-top-color: CanvasText; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 .progress { color: var(--fg-3); }
 `;
@@ -84,7 +89,7 @@ function button(action: ScreenAction, label: string, variant: 'primary' | 'secon
 export function screenHtml(view: ScreenView): string {
   let body: string;
   if (view.kind === 'starting') {
-    body = `<main><div class="spinner"></div><p class="progress">Starting the server on port ${view.port}</p></main>`;
+    body = `<main><div class="spinner" aria-hidden="true"></div><p class="progress" role="status">Starting the server on port ${view.port}</p></main>`;
   } else {
     const log = view.logTail.trim()
       ? `<section class="log"><div class="caption">Last lines of the server log</div><pre><span>${escapeHtml(view.logTail.trim())}</span></pre></section>`

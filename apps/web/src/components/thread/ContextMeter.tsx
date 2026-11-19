@@ -202,7 +202,7 @@ function ContextPanel({
   const approx = contextApprox(context) ? '~' : '';
   const used = (context?.categories ?? []).filter((c) => c.kind === 'used' && c.tokens > 0);
   const room = (context?.categories ?? []).filter((c) => c.kind !== 'used' && c.tokens > 0);
-  const tools = [...(context?.tools ?? [])].sort((a, b) => b.callTokens + b.resultTokens - (a.callTokens + a.resultTokens)).slice(0, 6);
+  const tools = (context?.tools ?? []).toSorted((a, b) => b.callTokens + b.resultTokens - (a.callTokens + a.resultTokens)).slice(0, 6);
   const largest = view?.largest ?? [];
   const scale = context?.max || context?.used || 1;
   // The panel fades at an edge while more of it sits past that edge.

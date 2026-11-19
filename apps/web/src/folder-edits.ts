@@ -9,7 +9,7 @@ export const draftKey = (channelId: string) => `new:${channelId}`;
 
 /** Manually placed folders first, in their order, then the rest by name. The server's order (db/repos/folders.ts). */
 export function sortFolders<T extends Pick<Folder, 'position' | 'name' | 'created_at'>>(list: T[]) {
-  return [...list].sort(
+  return list.toSorted(
     (a, b) =>
       (a.position === null ? 1 : 0) - (b.position === null ? 1 : 0) ||
       (a.position ?? 0) - (b.position ?? 0) ||

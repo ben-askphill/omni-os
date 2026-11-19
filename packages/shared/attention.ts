@@ -188,7 +188,7 @@ export function createTracker(): Tracker {
     observe(list, o) {
       const candidates: { key: string; at: string | null | undefined; make: () => AttentionAlert | null; item: AttentionItem; question?: boolean }[] = [];
       // Oldest first, so alerts stack in the order things happened.
-      for (const item of [...list.items].reverse()) {
+      for (const item of list.items.toReversed()) {
         const name = o.channelName?.(item.thread.channel_id);
         if (item.result) candidates.push({ key: item.result.uid, at: item.result.at, make: () => resultAlert(item, name), item });
         const setup = setupAlert(item, name);
