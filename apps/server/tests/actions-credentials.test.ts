@@ -217,6 +217,30 @@ describe('Retry setup, which runs the setup step again', () => {
       expect(res.status, `${who}: ${JSON.stringify(res.body)}`).toBe(200);
     }
   });
+
+  // The retry was let in because the channel had no setup step, but the step is looked up again once the checkout
+  // is made. One the token adds meanwhile must not run for the restricted caller's retry.
+  for (const who of WHO.filter((w) => w !== 'no credential'))
+    it(`${who}: ${CREDENTIALS[who].shell ? 'runs' : 'never runs'} a setup step added while its retry checks the branch out`, async () => {
+      const ch = worktreeChannel();
+      const t = await r.runner.createThread({ channel: ch, prompt: 'fix the cart' });
+      await r.untilResults(t.id, 1);
+      r.db.threads.update(t.id, { setup: 'failed', setup_error: 'checkout failed' });
+      const res = await call(who, 'POST', `/threads/${t.id}/setup/retry`, {});
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(r.thread(t.id).setup).toBe('preparing');
+      const command = marker(who);
+      expect((await call(TOKEN, 'POST', `/channels/${ch}/actions`, { name: 'Install', command, setup: 'blocking' })).status).toBe(201);
+      await r.until('the retry to finish', () => r.thread(t.id).setup !== 'preparing');
+      if (CREDENTIALS[who].shell) {
+        expect(launched()).toContain(command);
+        expect(r.thread(t.id).setup).toBeNull();
+        return;
+      }
+      expect(launched()).not.toContain(command);
+      expect(r.thread(t.id).setup).toBe('failed');
+      expect(r.thread(t.id).setup_error).toMatch(/install's token or a browser paired with it/);
+    });
 });
 
 describe('a setup step a restricted session tried to add', () => {

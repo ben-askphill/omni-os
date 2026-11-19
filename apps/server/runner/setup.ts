@@ -58,9 +58,10 @@ export const bindResume = (fn: (threadId: string) => Promise<unknown>) => {
 /**
  * Make the thread's worktree and check it, then send what waited for it. Marks the thread preparing before it
  * returns. On failure the thread shows why and its first prompt waits, recovered, for Retry; a child reports the
- * failure to its parent. Never runs twice at once for one thread.
+ * failure to its parent. Never runs twice at once for one thread. `retry` is Ben's Retry setup and who pressed it:
+ * the setup step is looked up again after the checkout, so a caller without a shell is held there too.
  */
-export function setUpThread(threadId: string): Promise<Thread | undefined> {
+export function setUpThread(threadId: string, retry?: SetupRetryBy): Promise<Thread | undefined> {
   const running = preparing.get(threadId);
   if (running) return running;
   const t = threads.get(threadId);
@@ -69,7 +70,7 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
   threads.update(threadId, { setup: 'preparing', setup_error: null, status, updated_at: t.updated_at });
   beginAttempt(threadId);
   emitThread(threadId);
-  const job = prepare(t)
+  const job = prepare(t, !retry || !!retry.shell)
     .catch((err) => {
       console.error(`[setup] ${threadId}:`, err);
       return threads.get(threadId);
@@ -82,7 +83,7 @@ export function setUpThread(threadId: string): Promise<Thread | undefined> {
   return job;
 }
 
-async function prepare(t: Thread): Promise<Thread | undefined> {
+async function prepare(t: Thread, shell: boolean): Promise<Thread | undefined> {
   // A worktree its agent moved to another branch keeps that branch: only a detached HEAD or the default branch is
   // switched back (sandbox.ts prepareWorktree).
   if (await followBranch(t.id).catch(() => false)) t = threads.get(t.id) ?? t;
@@ -109,7 +110,7 @@ async function prepare(t: Thread): Promise<Thread | undefined> {
     return threads.get(t.id);
   }
   // The channel's setup action, in the verified checkout: a blocking one holds the agent until it succeeds.
-  const held = await runSetupAction(t);
+  const held = await runSetupAction(t, shell);
   if (held) {
     failSetup(t.id, held.reason, held.stopped);
     return threads.get(t.id);
@@ -165,6 +166,6 @@ export function retrySetup(threadId: string, by: SetupRetryBy = {}): Thread {
   if (!t) throw refusal('thread not found', 404);
   if (t.setup !== 'failed') return t;
   if (!by.shell && !isProviderHarness(t.harness) && channelActions.setupFor(t.channel_id)) throw refusal(`Forbidden: ${SHELL_REFUSAL}`, 403);
-  void setUpThread(threadId);
+  void setUpThread(threadId, by);
   return threads.get(threadId)!;
 }
