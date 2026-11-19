@@ -8,9 +8,11 @@
 
 export const SETTINGS_GROUPS = [
   { id: 'omni', title: '' },
-  { id: 'agents', title: 'Agents' },
-  { id: 'code', title: 'Code' },
-  { id: 'connections', title: 'Connections' },
+  { id: 'assistant', title: 'Assistant' },
+  { id: 'spaces', title: 'Spaces' },
+  { id: 'devices', title: 'Devices' },
+  { id: 'developer', title: 'Developer' },
+  { id: 'extras', title: 'Extras' },
   { id: 'app', title: '' },
 ] as const;
 export type SettingsGroupId = (typeof SETTINGS_GROUPS)[number]['id'];
@@ -34,18 +36,19 @@ export const SETTINGS_SECTION_DEFS = [
   { id: 'general', group: 'omni', title: 'General', icon: 'sliders', blurb: 'Your name, pronouns, timezone and email, and the setup walkthrough.' },
   { id: 'appearance', group: 'omni', title: 'Appearance', icon: 'sun', blurb: 'How Omni looks and which keys it answers on this device.' },
   { id: 'notifications', group: 'omni', title: 'Notifications', icon: 'bell', blurb: 'What tells you a thread needs you.', scoped: true },
-  { id: 'models', group: 'agents', title: 'Harnesses & models', icon: 'layers', blurb: 'Which agents can run, their models, and the model a new thread starts on.', scoped: true },
-  { id: 'crew', group: 'agents', title: 'Crew', icon: 'delegate', blurb: 'The roles threads run as: their charters, run defaults and powers.' },
-  { id: 'accounts', group: 'agents', title: 'Accounts', icon: 'user', blurb: 'Which account each harness is signed in to, on each of your machines.' },
-  { id: 'threads', group: 'agents', title: 'Threads', icon: 'message', blurb: 'Where new threads run and how they recover from a usage limit.' },
-  { id: 'channels', group: 'code', title: 'Channels', icon: 'hash', blurb: 'Each channel’s name, default model, repo, notes and actions.', scoped: true },
-  { id: 'workspace', group: 'code', title: 'Workspace', icon: 'folder', blurb: 'Where your work lives on this machine.' },
-  { id: 'worktrees', group: 'code', title: 'Worktrees', icon: 'branch', blurb: 'The checkouts Omni makes for threads, and cleaning them up.' },
-  { id: 'machines', group: 'connections', title: 'Machines', icon: 'monitor', blurb: 'Your machines, their connections and their updates.' },
-  { id: 'sync', group: 'connections', title: 'Sync', icon: 'refresh', blurb: 'Your history across machines, through your own Cloudflare relay.' },
-  { id: 'access', group: 'connections', title: 'Sharing & access', icon: 'lock', blurb: 'Who and what can reach this Omni.' },
-  { id: 'secrets', group: 'connections', title: 'Secrets', icon: 'key', blurb: 'API keys and tokens for threads, kept outside the database.' },
-  { id: 'desktop', group: 'app', title: 'Desktop app', icon: 'monitor', blurb: 'Quick Prompt and how this app starts.', desktopApp: true },
+  { id: 'models', group: 'assistant', title: 'Models', icon: 'layers', blurb: 'Which agents can run, their models, and the model a new thread starts on.', scoped: true },
+  { id: 'crew', group: 'assistant', title: 'Crew', icon: 'delegate', blurb: 'The roles threads run as: their charters, run defaults and powers.' },
+  { id: 'accounts', group: 'assistant', title: 'Accounts', icon: 'user', blurb: 'Which account each agent is signed in to, on each of your machines.' },
+  { id: 'threads', group: 'assistant', title: 'Threads', icon: 'message', blurb: 'Where new threads run and how they recover from a usage limit.' },
+  { id: 'channels', group: 'spaces', title: 'Channels', icon: 'hash', blurb: 'Each channel’s name, default model, folder or repo, notes and actions.', scoped: true },
+  { id: 'workspace', group: 'spaces', title: 'Workspace', icon: 'folder', blurb: 'Where your work lives on this machine.' },
+  { id: 'machines', group: 'devices', title: 'Machines', icon: 'monitor', blurb: 'Your machines, their connections and their updates.' },
+  { id: 'sync', group: 'devices', title: 'Sync', icon: 'refresh', blurb: 'Your history across machines, through your own Cloudflare relay.' },
+  { id: 'access', group: 'devices', title: 'Sharing & access', icon: 'lock', blurb: 'Who and what can reach this Omni: your phone, signed-in devices and connected apps.' },
+  { id: 'desktop', group: 'devices', title: 'Desktop app', icon: 'monitor', blurb: 'Quick Prompt and how this app starts.', desktopApp: true },
+  { id: 'worktrees', group: 'developer', title: 'Worktrees', icon: 'branch', blurb: 'The checkouts Omni makes for threads, and cleaning them up.' },
+  { id: 'secrets', group: 'developer', title: 'Secrets', icon: 'key', blurb: 'API keys and tokens for threads, kept outside the database.' },
+  { id: 'extras', group: 'extras', title: 'Extras', icon: 'plug', blurb: 'Optional add-ons: Wispr Flow, Grok Bot, Hermes and the notes folder.' },
   { id: 'about', group: 'app', title: 'About', icon: 'info', blurb: 'Version, server and where Omni keeps its files.' },
 ] as const satisfies readonly SettingsSectionDef[];
 
@@ -61,8 +64,7 @@ export const sectionShows = (id: SettingsSectionId, desktopApp: boolean): boolea
 
 /**
  * Old names that still open a section: the pages Settings replaced (#/sync, #/storage, #/secrets) and section
- * names from before this layout. A section keeps its own name. Integrations folded into Harnesses & models (Hermes)
- * and Workspace (the notes folder) until it has third-party connections of its own.
+ * names from before this layout. A section keeps its own name. Integrations is Extras now (Hermes, the notes folder).
  */
 export const LEGACY_SETTINGS_SECTIONS: Record<string, SettingsSectionId> = {
   profile: 'general',
@@ -70,7 +72,7 @@ export const LEGACY_SETTINGS_SECTIONS: Record<string, SettingsSectionId> = {
   server: 'machines',
   connection: 'machines',
   storage: 'worktrees',
-  integrations: 'models',
+  integrations: 'extras',
 };
 
 /** The section a name opens: its own, or the one an old name moved to. */
@@ -111,7 +113,6 @@ export const SETTINGS_ENTRIES = [
   { id: 'model-visibility', section: 'models', title: 'Models in the picker', keywords: ['hide', 'hidden', 'show', 'visible', 'models', 'picker', 'new models', 'latest', 'family', 'clutter', 'check for new models', 'refresh'] },
   { id: 'channel-model', section: 'models', title: 'Default model for new threads', keywords: ['auto', 'model', 'effort', 'reasoning', 'override', 'channel default'] },
   { id: 'concurrency', section: 'models', title: 'Turns at once per harness', keywords: ['max concurrent', 'queue', 'cap', 'parallel', 'limit'] },
-  { id: 'hermes', section: 'models', title: 'Hermes URL', keywords: ['hermes', 'tailnet', 'HERMES_API_KEY', 'integrations'] },
   { id: 'model-options', section: 'models', title: 'Claude Code binary, fallback model and permission mode', keywords: ['OMNI_DEFAULT_MODEL', 'OMNI_PERMISSION_MODE', 'OMNI_CLAUDE_BIN', 'bypassPermissions', 'binary', 'path', '.env'] },
   { id: 'crew-roles', section: 'crew', title: 'Crew roles', keywords: ['role', 'roles', 'charter', 'conductor', 'builder', 'reviewer', 'researcher', 'inbox', 'agent', 'agents', 'persona', 'prompt', 'instructions', 'new role', 'duplicate', 'hide', 'reset'] },
   { id: 'harness-accounts', section: 'accounts', title: 'Harness accounts on each machine', keywords: ['account', 'email', 'login', 'signed in', 'sign in', 'subscription', 'plan', 'switch', 'org', 'who', 'claude code', 'codex', 'cursor', 'devices'] },
@@ -125,7 +126,6 @@ export const SETTINGS_ENTRIES = [
   { id: 'channel-code', section: 'channels', title: 'Channel repo, worktrees and browser', keywords: ['repo path', 'github repo', 'git', 'browser window', 'headless', 'store domain', 'shopify', 'worktreeinclude', '.env', 'copy into new worktrees', 'shared directories', 'node_modules', 'symlink'] },
   { id: 'channel-actions', section: 'channels', title: 'Channel actions', keywords: ['commands', 'scripts', 'setup', 'port', 'preview', 'dev server'] },
   { id: 'folders', section: 'workspace', title: 'Workspace folder, repos folder and GitHub owner', keywords: ['workspace', 'repos', 'folder', 'github owner', 'org', 'CLAUDE.md', 'skills', 'base directory'] },
-  { id: 'brain', section: 'workspace', title: 'Notes folder', keywords: ['notes', 'brain-export', 'export', 'digests'] },
   { id: 'worktree-retention', section: 'worktrees', title: 'Automatic cleanup', keywords: ['retention', 'idle days', 'delete', 'prune', 'cleanup'] },
   { id: 'worktree-storage', section: 'worktrees', title: 'Worktree storage', keywords: ['disk', 'size', 'scan', 'storage', 'eligible'] },
   { id: 'worktree-slim', section: 'worktrees', title: 'Strip caches', keywords: ['node_modules', 'build output', 'cache', 'free space', 'slim', 'disk'] },
@@ -141,8 +141,12 @@ export const SETTINGS_ENTRIES = [
   { id: 'mcp-clients', section: 'access', title: 'MCP clients', keywords: ['mcp', 'oauth', 'claude.ai', 'chatgpt', 'approve', 'remove', 'connected apps', 'assistants'] },
   { id: 'install-token', section: 'access', title: 'Rotate install token', keywords: ['token', 'rotate', 'leak', 'reset', 'sign out all', 'api token', 'credential'] },
   { id: 'network', section: 'access', title: 'Tailscale logins and public MCP URL', keywords: ['tailscale', 'tailnet', 'serve', 'mcp', 'claude.ai', 'chatgpt', 'clerk', 'remote access'] },
-  { id: 'secrets', section: 'secrets', title: 'Secrets', keywords: ['api key', 'token', 'env', 'keychain', 'password', 'credentials', 'grok bot'] },
-  { id: 'desktop-quick-prompt', section: 'desktop', title: 'Quick Prompt', keywords: ['hotkey', 'shortcut', 'keyboard', 'global', 'launcher', 'wispr flow', 'dictate'], surfaces: ['desktop'] },
+  { id: 'secrets', section: 'secrets', title: 'Secrets', keywords: ['api key', 'token', 'env', 'keychain', 'password', 'credentials'] },
+  { id: 'wispr-flow', section: 'extras', title: 'Dictate with Wispr Flow', keywords: ['wispr flow', 'dictate', 'dictation', 'voice', 'speak', 'talk', 'quick prompt'] },
+  { id: 'grok-bot', section: 'extras', title: 'Grok Bot', keywords: ['grok', 'grok bot', 'webhook', 'GROKBOT_WEBHOOK_URL', 'send to grok bot'] },
+  { id: 'hermes', section: 'extras', title: 'Hermes URL', keywords: ['hermes', 'tailnet', 'HERMES_API_KEY', 'integrations'] },
+  { id: 'brain', section: 'extras', title: 'Notes folder', keywords: ['notes', 'brain-export', 'export', 'digests', 'knowledge base'] },
+  { id: 'desktop-quick-prompt', section: 'desktop', title: 'Quick Prompt', keywords: ['hotkey', 'shortcut', 'keyboard', 'global', 'launcher'], surfaces: ['desktop'] },
   { id: 'desktop-login', section: 'desktop', title: 'Open Omni at login', keywords: ['startup', 'launch', 'login items', 'autostart'], surfaces: ['desktop'], needs: 'loginItem' },
   { id: 'desktop-updates', section: 'machines', title: 'App version and updates', keywords: ['version', 'update', 'upgrade', 'relaunch', 'restart', 'release notes', 'download', 'automatic', 'check for updates'], surfaces: ['desktop'] },
   { id: 'server', section: 'about', title: 'Server address, port and log', keywords: ['port', 'host', 'address', 'node', 'log', 'OMNI_PORT', 'data folder'] },

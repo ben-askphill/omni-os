@@ -164,7 +164,7 @@ export function welcomeText(name: string, place: CrewPlace = crewPlace()) {
       : `- Crew charters live in \`${place.crew}/\`. To change one just for you, copy it into \`${place.personalCrew}/\` and edit that copy.`;
   const general = channels.get(GENERAL)?.name ?? 'General';
   return [
-    `Welcome to Omni${name ? `, ${name}` : ''}. I'm the Conductor: tell me what you need and I hand it to the right crew role in the right channel, then report back here.`,
+    `Welcome to Omni${name ? `, ${name}` : ''}. I'm the Conductor: ask me anything. I answer quick questions here myself, and hand real work to the right crew role in the right channel, whose report then shows up here.`,
     '',
     'A few things to try:',
     '- Ask in plain words and say what done looks like, like "find three venues for a team day in May under 2,000 euros and send me a table with links" or "draft a reply to the last mail from my accountant". If I can\'t tell what done looks like, I\'ll ask you a few questions first.',

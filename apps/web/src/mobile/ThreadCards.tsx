@@ -18,6 +18,8 @@ import { useShell } from './shell.tsx';
 import { forwardedLabel, isForwarded, useSyncTrouble } from '../forwarded.ts';
 import type { NowDoing, PlanView, TurnView as TurnOf } from '@omni/shared/thread-view.ts';
 import { threadMark } from '@omni/shared/status.ts';
+import type { ReportP } from '@omni/shared/transcript-fold.ts';
+import { Folded } from '../components/Folded.tsx';
 
 /** The phone's turn, carrying the web's own artifact and thread rows. */
 export type TurnView = TurnOf<Artifact, Thread>;
@@ -155,7 +157,8 @@ function KidPill({ k }: { k: Thread }) {
 }
 
 /** The threads a Conductor turn delegated, each opening its thread, with Needs you's answer under one that waits. */
-export function Delegation({ kids }: { kids: Thread[] }) {
+/** `answers`: reports shown in place (ReportP `shown`), by the thread that sent them, each under its row. */
+export function Delegation({ kids, answers }: { kids: Thread[]; answers?: Record<string, ReportP> }) {
   const shell = useShell();
   const { needsYou, channel } = useApp();
   const now = useNow(60_000);
@@ -182,6 +185,13 @@ export function Delegation({ kids }: { kids: Thread[] }) {
             {card && (
               <div className="px-3 pb-3 pl-[54px]">
                 <NeedsActions card={card} size="md" />
+              </div>
+            )}
+            {answers?.[k.id] && k.status !== 'running' && k.status !== 'queued' && (
+              <div className="px-3 pb-3 text-[15px]">
+                <Folded>
+                  <MoProse text={answers[k.id].text || '(no reply)'} />
+                </Folded>
               </div>
             )}
           </div>

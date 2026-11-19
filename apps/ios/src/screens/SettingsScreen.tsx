@@ -26,7 +26,7 @@ const PHONE_DETAIL: Partial<Record<string, string>> = {
 
 /**
  * Settings: Servers first, then a search over every setting and the same groups of sections as the Web UI and phone
- * web (@omni/shared/settings-catalog.ts), then Devices and Automations, and Sign out.
+ * web (@omni/shared/settings-catalog.ts), then Signed-in devices and Automations, and Sign out.
  */
 export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
   const { colors } = useOmniTheme();
@@ -110,7 +110,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
           <View style={styles.section}>
             <ListHeading inset>Features</ListHeading>
             <GroupedList>
-              <ListRow first icon="devices" title="Devices" detail="Where this server is signed in" chevron onPress={() => navigation.navigate('Devices')} />
+              <ListRow first icon="devices" title="Signed-in devices" detail="Where this server is signed in" chevron onPress={() => navigation.navigate('Devices')} />
               <ListRow
                 icon="automation"
                 title="Automations"

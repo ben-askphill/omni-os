@@ -93,4 +93,15 @@ describe('parseCrewFile', () => {
     expect(crew.find((r) => r.id === 'usage-scan')).toMatchObject({ mcp: ['omni'], channel: 'inbox', harness: 'claude-code' });
     for (const r of crew) expect(r.charter.length).toBeGreaterThan(0);
   });
+
+  it("has the Conductor answer quick asks itself, keep the brief and folder pick for real work, and opt in to report wakes", async () => {
+    const { listCrew } = await import('../crew.ts');
+    const charter = listCrew().find((r) => r.id === 'conductor')!.charter;
+    expect(charter).toContain('Answer quick asks yourself, in this thread.');
+    expect(charter).not.toContain('a single lookup still goes to a crewmate');
+    expect(charter).not.toContain('No folder fits; want me to create');
+    expect(charter).toContain('When none fits, delegate without one and do not ask about it.');
+    expect(charter).toContain('A quick answer you give yourself needs none of this.');
+    expect(charter).toContain('pass `follow_up: true` on `delegate`');
+  });
 });

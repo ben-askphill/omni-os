@@ -158,8 +158,8 @@ const linear: Resolver = async (ref, _url, d) => {
 
 const notion: Resolver = async (ref, _url, d) => {
   if (!/^[0-9a-f]{32}$/.test(ref.params.id ?? '')) return;
-  const token = await anySecret(d, 'NOTION_TOKEN', 'NOTION_API_KEY');
-  if (!token) return ref.title ? undefined : { needs: 'NOTION_TOKEN' };
+  const token = await anySecret(d, 'OMNI_NOTION_TOKEN', 'NOTION_TOKEN', 'NOTION_API_KEY');
+  if (!token) return ref.title ? undefined : { needs: 'OMNI_NOTION_TOKEN' };
   const init = { headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2022-06-28' } };
   const page = await d.json(`https://api.notion.com/v1/pages/${ref.params.id}`, init).catch(() => d.json(`https://api.notion.com/v1/databases/${ref.params.id}`, init));
   const props = Object.values(page.properties ?? {}) as any[];
