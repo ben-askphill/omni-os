@@ -4,7 +4,8 @@ import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { type ContinueSource } from '@omni/shared/continue-flow.ts';
 import { useThreadSession } from '../pages/useThreadSession.ts';
 import { shownResult } from '../needs-you.ts';
-import { useApp, usePageVisible } from '../store.tsx';
+import { useApp } from '../store.tsx';
+import { usePageVisible } from '../visible.ts';
 import { useSeenUnlisted } from '../app/useSeenUnlisted.ts';
 
 export type ShellSheet = { name: 'new'; channel?: string; prompt?: string } | { name: 'search' } | { name: 'continue'; source: ContinueSource };
@@ -25,6 +26,11 @@ export function useShell() {
   if (!v) throw new Error('useShell outside MobileShell');
   return v;
 }
+
+/** Whether this root tab is the one on screen. Visited tabs stay mounted under the shown one, or under a pushed screen. */
+export const TabShownCtx = createContext(true);
+
+export const useTabShown = () => useContext(TabShownCtx);
 
 export type ThreadSession = ReturnType<typeof useThreadSession>;
 const ThreadCtx = createContext<ThreadSession | null>(null);

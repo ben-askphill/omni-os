@@ -37,7 +37,7 @@ vi.mock('../src/store.tsx', () => ({
 }));
 // The shared clock has no server snapshot.
 vi.mock('../src/clock.ts', () => ({ useTick: () => Date.parse('2026-01-05T12:00:00.000Z') }));
-vi.mock('../src/mobile/shell.tsx',() => ({ useShell: () => ({ open: vi.fn(), back: vi.fn(), sheet: vi.fn(), toast: vi.fn() }) }));
+vi.mock('../src/mobile/shell.tsx', () => ({ useShell: () => ({ open: vi.fn(), back: vi.fn(), sheet: vi.fn(), toast: vi.fn() }), useTabShown: () => true }));
 vi.mock('../src/app/useInbox.ts', () => ({
   useInbox: () => {
     const shelf = { count: 0, rows: [], open: false, toggle: () => {}, more: 0 };

@@ -13,7 +13,7 @@ import { Avatar } from '../components/ui.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
 import { MoDoneRow, MoInboxRow, MoShelf, MoShowMore } from './InboxRows.tsx';
 import { MoEmpty, MoHeader, MoScroll, MoTitle } from './parts.tsx';
-import { useShell } from './shell.tsx';
+import { useShell, useTabShown } from './shell.tsx';
 import { useTreesFold } from '../thread-tree.ts';
 
 /**
@@ -25,7 +25,8 @@ export function ActivityScreen() {
   const now = useNow(60_000);
   const { pinned, inbox, working, done, loaded, status } = useInbox();
   const fold = useTreesFold(working.threads, 'inbox');
-  const machines = useMachines().data;
+  // Its machine tiles stop asking while another tab, or a screen pushed over this one, is on screen.
+  const machines = useMachines(useTabShown()).data;
   const conductor = useApp().channel(CONDUCTOR_CHANNEL);
   const waiting = [...pinned, ...inbox];
   const mark = waiting.some((t) => asksForYou(status(t)?.glyph ?? 'idle')) ? 'attention' : 'idle';

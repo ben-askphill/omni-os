@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
 import { api, ApiError, errorText, openSSE } from '../api.ts';
 import { apiUrl } from '../api-base.ts';
+import { usePageVisible } from '../visible.ts';
 import { AnnotateButton, AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from './BrowserAnnotate.tsx';
 import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from './BrowserAnnotationOverlay.tsx';
 import { Button, Icon, IconButton, Loader } from './ui.tsx';
@@ -95,7 +96,11 @@ export function useChannelBrowser(channelId: string) {
     return { listeners, subscribe: (fn) => (listeners.add(fn), () => void listeners.delete(fn)) };
   })();
 
+  // The screencast stops while the page is hidden (a frame decode each time Chrome paints) and attaches again on return.
+  const visible = usePageVisible();
+  const started = useRef<{ key: string; start: Promise<{ st: BrowserState | null; error: string | null }>; applied: boolean } | null>(null);
   useEffect(() => {
+    if (!visible) return;
     setError(null);
     let pending: { data: string; width: number; height: number; scroll?: { x: number; y: number } } | null = null;
     let decoding = false;
@@ -153,23 +158,30 @@ export function useChannelBrowser(channelId: string) {
         },
       );
     };
-    void api
-      .post<BrowserState>(`${base}/start`, {})
-      .then((st) => {
-        if (alive) setState(st);
-      })
-      .catch((e) => {
-        if (alive && !(e instanceof ApiError && e.status === 404)) {
-          startError = errorText(e);
-          setError(startError);
-        }
-      })
-      .finally(attach);
+    // Once per view and Retry: coming back to the page only attaches, after the start already asked for.
+    const key = `${base}#${epoch}`;
+    if (started.current?.key !== key) {
+      const start = api.post<BrowserState>(`${base}/start`, {}).then(
+        (st) => ({ st, error: null }),
+        (e: unknown) => ({ st: null, error: e instanceof ApiError && e.status === 404 ? null : errorText(e) }),
+      );
+      started.current = { key, start, applied: false };
+    }
+    const run = started.current;
+    void run.start.then(({ st, error }) => {
+      if (!alive) return;
+      // The state the start answered lands once; the stream keeps it current after that.
+      if (st && !run.applied) setState(st);
+      run.applied = true;
+      startError = error;
+      if (error) setError(error);
+      attach();
+    });
     return () => {
       alive = false;
       h?.close();
     };
-  }, [base, epoch]);
+  }, [base, epoch, visible]);
 
   // Input goes out in order, a batch at a time: while one is on its way, the next queues and merges.
   const queue = useRef<Input[]>([]);

@@ -16,6 +16,7 @@ import { greeting } from '../greeting.ts';
 import { isFresh, keepInsights, keptInsights } from '../insights-cache.ts';
 import { splitNeeds } from '../needs-you.ts';
 import { readPref, useApp, useFeed, useNow, writePref } from '../store.tsx';
+import { useVisibleInterval } from '../visible.ts';
 import { useInbox } from '../app/useInbox.ts';
 import { usePresetSeq } from '../router.ts';
 import { runningListFilter } from '../running-list.ts';
@@ -67,11 +68,11 @@ function useInsights(range: InsightRange) {
   const [error, setError] = useState<string | null>(null);
   // Only the newest ask may set state, so a slow answer for a range left behind never lands on the one now picked.
   const asked = useRef(0);
-  const reload = useCallback(() => {
+  const load = useCallback((low: boolean) => {
     const n = ++asked.current;
     setRefreshing(true);
     api
-      .get<Insights>(path)
+      .get<Insights>(path, low ? { priority: 'low' } : undefined)
       .then(
         (d) => {
           const kept = keepInsights(path, d);
@@ -84,6 +85,8 @@ function useInsights(range: InsightRange) {
       )
       .finally(() => asked.current === n && setRefreshing(false));
   }, [path]);
+  const reload = useCallback(() => load(false), [load]);
+  const poll = useCallback(() => load(true), [load]);
   useEffect(() => {
     const kept = keptInsights(path);
     setEntry(kept);
@@ -98,19 +101,19 @@ function useInsights(range: InsightRange) {
   const partial = !!entry && (!entry.data.usage.complete || entry.data.prs === null);
   useEffect(() => {
     if (!partial) return;
-    const t = setTimeout(reload, 3000);
+    const t = setTimeout(poll, 3000);
     return () => clearTimeout(t);
-  }, [partial, entry, reload]);
-  useEffect(() => {
-    const t = setInterval(reload, 60_000);
-    return () => clearInterval(t);
-  }, [reload]);
+  }, [partial, entry, poll]);
+  // Every minute while the page is on screen, and once on coming back to it.
+  const live = useVisibleInterval(poll, 60_000);
+  const liveRef = useRef(live);
+  liveRef.current = live;
   // A thread started or marked done moves Done and Busiest channels: ask again once the burst settles.
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
   useFeed((e) => {
-    if (e.type !== 'thread') return;
+    if (e.type !== 'thread' || !liveRef.current) return;
     if (settle.current) clearTimeout(settle.current);
-    settle.current = setTimeout(reload, 11_000);
+    settle.current = setTimeout(() => liveRef.current && poll(), 11_000);
   });
   useEffect(() => () => void (settle.current && clearTimeout(settle.current)), []);
   return { data: entry?.data, at: entry?.at, refreshing, error, reload };

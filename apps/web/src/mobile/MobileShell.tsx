@@ -14,7 +14,7 @@ import { MoToast } from './parts.tsx';
 import { MoTabBar } from './MoTabBar.tsx';
 import { RENDER, SheetView } from './registry.tsx';
 import { placeEntry, rootTabOf, screenOf, specOf, stackOf, type NavDirection, type Tab } from './screens.ts';
-import { ShellCtx, ThreadScope, type MobileShellApi, type ShellSheet } from './shell.tsx';
+import { ShellCtx, TabShownCtx, ThreadScope, type MobileShellApi, type ShellSheet } from './shell.tsx';
 
 const TAB_PATH: Record<Tab, string> = { activity: '/', channels: '/channels', library: '/artifacts', prs: '/prs' };
 const PUSH_MS = 420;
@@ -163,7 +163,7 @@ export function MobileShell() {
               inert={!shown || covered || undefined}
               aria-hidden={!shown || covered || undefined}
             >
-              {RENDER[t](parseHash(`#${TAB_PATH[t]}`))}
+              <TabShownCtx.Provider value={shown && !covered}>{RENDER[t](parseHash(`#${TAB_PATH[t]}`))}</TabShownCtx.Provider>
             </div>
           );
         })}
