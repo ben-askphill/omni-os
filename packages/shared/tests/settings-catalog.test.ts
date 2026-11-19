@@ -34,7 +34,7 @@ describe('settings catalog', () => {
     expect(group('developer')).toEqual(['worktrees', 'secrets']);
   });
 
-  it('keeps Wispr Flow, Grok Bot, Hermes and the central brain under Extras', () => {
+  it('keeps Wispr Flow, Grok Bot, Hermes and the notes folder under Extras', () => {
     const where = (id: string) => SETTINGS_ENTRIES.find((e) => e.id === id)?.section;
     expect(['wispr-flow', 'grok-bot', 'hermes', 'brain'].map(where)).toEqual(['extras', 'extras', 'extras', 'extras']);
     expect(searchSettings('wispr', 'web')[0]?.id).toBe('wispr-flow');

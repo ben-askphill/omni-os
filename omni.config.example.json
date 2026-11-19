@@ -5,6 +5,8 @@
     "name": "Ada",
     "pronouns": "they/them",
     "email": "ada@example.com",
+    "work": "I run a small design studio",
+    "tools": "Email, Calendar, Notion",
     "timezone": "Europe/Amsterdam"
   },
   "workspace": {

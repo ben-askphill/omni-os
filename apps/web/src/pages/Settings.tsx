@@ -211,12 +211,12 @@ function ConfigSection({ part, children }: { part: SettingPage; children?: React
 function WorkspaceSection() {
   return (
     <ConfigSection part="workspace">
-      <LinkLine href={href.settingsSection('extras', 'brain')}>The central brain folder is in Extras</LinkLine>
+      <LinkLine href={href.settingsSection('extras', 'brain')}>The notes folder is in Extras</LinkLine>
     </ConfigSection>
   );
 }
 
-/** The optional add-ons, each off until set up: Wispr Flow, Grok Bot, then Hermes and the central brain's form. */
+/** The optional add-ons, each off until set up: Wispr Flow, Grok Bot, then Hermes and the notes folder's form. */
 function ExtrasSection() {
   return (
     <>

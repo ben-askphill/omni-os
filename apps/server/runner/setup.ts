@@ -10,6 +10,7 @@ import { withWorkspace } from '../workspace.ts';
 import { recordStartBase } from '../changes.ts';
 import { baseFor } from '../worktree-base.ts';
 import { channelExtras } from '../worktree-include.ts';
+import { userName } from '../user-config.ts';
 import { carryInto } from '../continue-carry.ts';
 import { notifyEnded } from '../push-sender.ts';
 import type { MessageContext } from '@omni/shared/message-context.ts';
@@ -146,7 +147,7 @@ export function failSetup(threadId: string, reason: string, stopped = false) {
   emitThread(threadId);
   const t = threads.get(threadId);
   if (!t?.parent_id) return;
-  if (stopped) reportToParent(threadId, 'stopped', `Ben stopped this thread while its worktree was being prepared, so it has not run.`);
+  if (stopped) reportToParent(threadId, 'stopped', `${userName().replace(/^the user/, 'The user')} stopped this thread while its worktree was being prepared, so it has not run.`);
   else reportToParent(threadId, 'failed', `Omni could not prepare this thread's worktree, so it has not run: ${reason}`);
 }
 
