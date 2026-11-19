@@ -155,7 +155,15 @@ const crewRoleView = (d: any) => {
     default_channel: r.channel ?? null,
     ...(r.charterMode && { charter_mode: r.charterMode }),
     ...(r.builtInChanged && { built_in_changed: true }),
-    powers: { mcp: r.mcp, delegate_only: r.delegateOnly, tools: r.tools ?? (r.delegateOnly ? 'delegate-only' : 'full'), delegatable: r.delegatable, review: r.review },
+    powers: {
+      mcp: r.mcp,
+      delegate_only: r.delegateOnly,
+      tools: r.tools ?? (r.delegateOnly ? 'delegate-only' : 'full'),
+      delegatable: r.delegatable,
+      review: r.review,
+      memory: r.memory ?? 'read-write',
+      memory_writes: r.memoryWrites ?? 'review',
+    },
     ...(r.locks && { locks: r.locks }),
     ...(r.error && { error: r.error }),
     charters: { built_in: d.charters.builtIn, own: d.charters.own, effective: d.charters.effective },
@@ -184,7 +192,7 @@ server.registerTool(
       `Without create it edits the role; on a built-in it writes ${USER}'s overlay. Only the fields you pass change, and an empty string removes one, so a built-in's value comes back. ` +
       `charter is the whole text of ${USER}'s file for the role: the charter of their own role, or what is added to a built-in's (charter_mode append, the default) or replaces it (replace). ` +
       'Start from get_crew_role\'s charters.own and send all of it. ' +
-      `Powers (mcp, delegate_only, tools, delegatable, review) are ${USER}'s to set in Settings > Crew, and Omni refuses a save that names one. The role syncs to ${USER}'s other machines.`,
+      `Powers (mcp, delegate_only, tools, delegatable, review, memory, memory_writes) are ${USER}'s to set in Settings > Crew, and Omni refuses a save that names one. The role syncs to ${USER}'s other machines.`,
     inputSchema: {
       id: crewId,
       create: z.boolean().optional().describe(`Make a new role of ${USER}'s own. Needs fields.name.`),
@@ -221,6 +229,46 @@ server.registerTool(
     inputSchema: { id: crewId },
   },
   async ({ id }) => text(crewRoleView(await call(`/crew/${encodeURIComponent(id)}/reset`, { method: 'POST' }))),
+);
+
+// A crew role's memory (plan slice S6, apps/server/memory-api.ts): lessons every later thread of the role runs with,
+// in every channel or one. The Conductor lists them and proposes; the user approves, edits and deletes in Settings >
+// Crew, unless they let a role keep its lessons at once (`memory_writes: auto`).
+server.registerTool(
+  'crew_memory',
+  {
+    description:
+      `List a crew role's memory: lessons every thread of that role gets in its prompt once ${USER} approved them (each in every channel, or only in the channel it names), and proposals still waiting for ${USER}. ` +
+      'Read them before proposing one with remember, so you do not repeat a lesson.',
+    inputSchema: { role: crewId },
+  },
+  async ({ role }) => {
+    const r = await call(`/crew/${encodeURIComponent(role)}/memory`);
+    return text({
+      waiting: r.waiting,
+      memories: r.memories.map((m: any) => ({ id: m.id, text: m.text, status: m.status, channel: m.channel_id, from: m.proposed_by, from_thread: m.source_thread_id })),
+    });
+  },
+);
+
+server.registerTool(
+  'remember',
+  {
+    description:
+      `Propose a lesson for one crew role's later threads, for ${USER} to approve in Settings > Crew: a correction ${USER} made to how that role works, or a step a crewmate of that role missed. ` +
+      'One short sentence that still makes sense in a new thread, about how the role should work, never about one task. ' +
+      'A lesson about a client or a channel, for every role there, goes to propose_learning instead. ' +
+      `It waits for ${USER} unless they let that role keep its lessons at once; the answer's status says which. Never put secrets, credentials or personal data in it.`,
+    inputSchema: {
+      role: crewId,
+      text: z.string().min(1).max(500),
+      channel: z.string().max(100).optional().describe('Only for threads in this channel. Leave it out for every channel. Use list_channels.'),
+    },
+  },
+  async ({ role, text: lesson, channel }) => {
+    const m = await call(`/crew/${encodeURIComponent(role)}/memory`, { method: 'POST', body: JSON.stringify({ text: lesson, channel: channel ?? null }) });
+    return text({ id: m.id, status: m.status, channel: m.channel_id, text: m.text });
+  },
 );
 
 server.registerTool(

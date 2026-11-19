@@ -5,7 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Channel, CrewRole } from '../src/api.ts';
 
 // Settings > Crew's editor: the Form and Markdown tabs are one draft, so an edit in either survives a switch to the
-// other and a save from it, and a key only the file has stays. Hide shows the role hidden at once.
+// other and a save from it, and a key only the file has stays. Hide shows the role hidden at once. The Memory tab counts
+// the lessons that wait for you and adds one of yours.
 
 const state = vi.hoisted(() => ({ channels: [] as Channel[], crew: [] as CrewRole[] }));
 vi.mock('../src/store.tsx', async (importOriginal) => ({
@@ -24,6 +25,8 @@ let detail: Detail;
 let calls: { method: string; url: string; body?: any }[];
 let root: Root;
 let host: HTMLDivElement;
+
+const lesson = { id: 'm1', role: 'builder', channel_id: 'acme', text: 'Run the check script before you report.', status: 'proposed', proposed_by: 'agent', created_at: 1, approved_at: null, source_thread_id: 't1' };
 
 const bodyOf = (text: string) => text.split('---\n').slice(2).join('---\n').trim();
 
@@ -60,7 +63,12 @@ beforeEach(async () => {
       const method = init?.method ?? 'GET';
       const body = init?.body ? JSON.parse(init.body as string) : undefined;
       calls.push({ method, url, body });
-      if (url === '/api/crew?all=1') return Response.json([detail.role]);
+      // Two lessons its threads proposed wait for you (GET /api/crew lists the count; the role's own GET does not).
+      if (url === '/api/crew?all=1') return Response.json([{ ...detail.role, memoryWaiting: 2 }]);
+      if (url === '/api/crew/builder/memory') {
+        if (method === 'POST') return Response.json({ id: 'm-new', role: 'builder', channel_id: null, text: body.text, status: 'approved', proposed_by: 'user' }, { status: 201 });
+        return Response.json({ memories: [lesson], waiting: 2 });
+      }
       if (url === '/api/crew/draft') return Response.json(draft(body));
       if (url === '/api/crew/builder/hidden') {
         detail = { ...detail, role: { ...detail.role, hidden: body.hidden } };
@@ -143,4 +151,23 @@ it('shows the role hidden once Hide is done, offering Show', async () => {
   expect(dialog.textContent).toContain('Hidden');
   // The title keeps the role's name, though the app's crew list no longer has it.
   expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)?.textContent).toBe('Edit Builder');
+});
+
+it("counts the lessons that wait on the Memory tab, and adds one of yours for every channel", async () => {
+  const tab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) => b.textContent?.startsWith('Memory'))!;
+  expect(tab.textContent).toBe('Memory2');
+  expect(tab.title).toBe('2 lessons wait for you');
+  await click(tab);
+  expect(host.textContent).toContain('Run the check script before you report.');
+  expect(host.textContent).toContain('#acme only');
+
+  await type(q<HTMLInputElement>('input[aria-label="New lesson"]'), 'Name the test command you ran.');
+  await click(button('Add lesson'));
+  expect(calls.filter((c) => c.method === 'POST' && c.url === '/api/crew/builder/memory').map((c) => c.body)).toEqual([{ text: 'Name the test command you ran.', channel: null }]);
+  // Enter in the field adds it too. The editor's own form, which the tab sits in, saves nothing either way.
+  await type(q<HTMLInputElement>('input[aria-label="New lesson"]'), 'Say which checks you could not run.');
+  await act(async () => q<HTMLInputElement>('input[aria-label="New lesson"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  await flush();
+  expect(calls.filter((c) => c.method === 'POST' && c.url === '/api/crew/builder/memory')).toHaveLength(2);
+  expect(saves()).toHaveLength(0);
 });

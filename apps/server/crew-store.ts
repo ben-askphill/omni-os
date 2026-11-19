@@ -13,6 +13,7 @@ import { publishFeed } from './bus.ts';
 import { parseChannelIcon } from '@omni/shared/channel-icon.ts';
 import { AVATAR_BG, charterHash, CREW_ID, CREW_LOCKS, CREW_TOOLS, crewTexts, getCrew, LOCKED_VALUE, lockedOverlay, mergeCrew, mergeSources, parseCrewFile, remoteDelegateOnlyRefusal, removeOwnCrew, splitCrewFile, writeOwnCrew, type CrewRole } from './crew.ts';
 import type { CrewLockedField } from '@omni/shared/crew-settings.ts';
+import { ROLE_MEMORY_MODES } from '@omni/shared/memory.ts';
 import { record } from './db/sync.ts';
 import { validateRun, type Catalog } from './harness/catalog.ts';
 import { asksAuto } from './harness/auto.ts';
@@ -65,6 +66,13 @@ export const crewFields = z
       .optional(),
     delegatable: z.boolean().nullable().optional(),
     review: z.boolean().nullable().optional(),
+    /** off, read or read-write: whether its threads read its lessons and propose new ones. Empty or null removes the key. */
+    memory: z
+      .union([z.enum(ROLE_MEMORY_MODES as [string, ...string[]]), z.literal('')])
+      .nullable()
+      .optional(),
+    /** review or auto: whether a lesson its threads propose waits for the user. Empty or null removes the key. */
+    memory_writes: z.union([z.enum(['review', 'auto']), z.literal('')]).nullable().optional(),
   })
   .strict();
 export type CrewFields = z.infer<typeof crewFields>;

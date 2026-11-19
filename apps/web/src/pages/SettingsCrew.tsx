@@ -11,12 +11,14 @@ import {
   crewSaveBody,
   lineDiff,
   NO_EDITS_NOTE,
+  ROLE_MEMORY_CHOICES,
   type CrewDetailView,
   type CrewDraft,
 } from '@omni/shared/crew-settings.ts';
 import { api, errorText, useApi, type CrewRole, type HarnessWithRunning } from '../api.ts';
 import { AvatarColorPicker } from '../components/AvatarColorPicker.tsx';
 import { CrewAvatar } from '../components/CrewAvatar.tsx';
+import { RoleMemory } from '../components/RoleMemory.tsx';
 import { Button, Chip, ErrorNote, Icon, InlineConfirm, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from '../components/ui.tsx';
 import { useApp } from '../store.tsx';
 import { IconPicker, RunDefaultsField } from './ChannelSettings.tsx';
@@ -24,7 +26,8 @@ import { Card, LockNote } from './settings-parts.tsx';
 
 // Settings > Crew: every crew role this machine has, hidden ones included, and an editor for each (plan slice S3,
 // docs/plans/2026-11-18-user-defined-crew.md). Saves go to /api/crew (apps/server/crew-api.ts): a role of your own is
-// its whole file in data/crew/, an edit of a built-in is an overlay that adds to its charter or replaces it. The same
+// its whole file in data/crew/, an edit of a built-in is an overlay that adds to its charter or replaces it. The
+// editor's Memory tab holds the role's lessons (slice S6, components/RoleMemory.tsx), which save one by one. The same
 // page is the phone's Settings section and the desktop app's.
 
 type CrewDetail = CrewDetailView<CrewRole>;
@@ -35,8 +38,8 @@ export function CrewSection() {
   const harnesses = useApi<HarnessWithRunning[]>('/harnesses');
   const [editing, setEditing] = useState<{ id: string | null } | null>(null);
   const reload = roles.reload;
-  // A save here, by the Conductor or on another machine.
-  useEffect(() => subscribe((e) => (e.type === 'crew' || e.type === 'reconnect') && reload()), [subscribe, reload]);
+  // A save here, by the Conductor or on another machine, or a lesson proposed or settled (the waiting counts).
+  useEffect(() => subscribe((e) => (e.type === 'crew' || e.type === 'reconnect' || (e.type === 'memory' && !!e.role)) && reload()), [subscribe, reload]);
 
   const names = {
     harness: (id: string) => harnesses.data?.find((h) => h.id === id)?.name,
@@ -94,7 +97,7 @@ export function CrewSection() {
   );
 }
 
-function RoleChips({ role }: { role: Pick<CrewRole, 'kind' | 'hidden' | 'builtInChanged' | 'error' | 'charterMode'> }) {
+function RoleChips({ role }: { role: Pick<CrewRole, 'kind' | 'hidden' | 'builtInChanged' | 'error' | 'charterMode' | 'memoryWaiting'> }) {
   return (
     <>
       {crewChips(role).map((c) => (
@@ -129,9 +132,11 @@ function CrewEditor({
   // Settings' list has hidden roles too; the app's crew list, which pickers use, leaves them out.
   const name = id ? ((roles ?? crew).find((r) => r.id === id)?.name ?? crew.find((r) => r.id === id)?.name ?? id) : null;
   const title = !id ? 'New role' : view === 'compare' ? `${name} and its built-in` : view === 'duplicate' ? `Duplicate ${name}` : `Edit ${name}`;
+  // From the list, which reloads when a lesson is proposed or decided anywhere.
+  const waiting = (id && roles?.find((r) => r.id === id)?.memoryWaiting) || 0;
   return (
     <Modal open={!!target} onClose={onClose} title={title} roomy>
-      {target && <EditorBody key={id ?? '+new'} id={id} view={view} setView={setView} onClose={onClose} onOpen={onOpen} onSaved={onSaved} />}
+      {target && <EditorBody key={id ?? '+new'} id={id} waiting={waiting} view={view} setView={setView} onClose={onClose} onOpen={onOpen} onSaved={onSaved} />}
     </Modal>
   );
 }
@@ -170,12 +175,31 @@ function Switch({ label, hint, checked, onChange, locked }: { label: string; hin
   );
 }
 
-function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: string | null; view: View; setView: (v: View) => void; onClose: () => void; onOpen: (id: string) => void; onSaved: () => void }) {
+function EditorBody({
+  id,
+  waiting,
+  view,
+  setView,
+  onClose,
+  onOpen,
+  onSaved,
+}: {
+  id: string | null;
+  /** Lessons its threads proposed that wait for the user: the Memory tab's count. */
+  waiting: number;
+  view: View;
+  setView: (v: View) => void;
+  onClose: () => void;
+  onOpen: (id: string) => void;
+  onSaved: () => void;
+}) {
   const { channels } = useApp();
   const detail = useApi<CrewDetail>(id ? `/crew/${encodeURIComponent(id)}` : null);
   const [draft, setDraft] = useState<CrewDraft | null>(id ? null : blankCrewDraft());
   const [newId, setNewId] = useState<string | null>(null);
   const [mode, setMode] = useState<'form' | 'markdown'>('form');
+  // The Memory tab: the role's lessons, saved one by one, beside the draft the Form and Markdown tabs share.
+  const [memoryTab, setMemoryTab] = useState(false);
   const [markdown, setMarkdown] = useState(id ? '' : crewMarkdownOf(null));
   // The Markdown tab's text as it last matched the form. An edit there is read into the form on the way back.
   const [synced, setSynced] = useState(markdown);
@@ -337,9 +361,32 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
           </div>
         )}
 
-        <Segmented label="Edit as" size="sm" value={mode} onChange={switchTo} options={[{ id: 'form', label: 'Form' }, { id: 'markdown', label: 'Markdown' }]} />
+        <Segmented
+          label="Edit as"
+          size="sm"
+          value={memoryTab ? 'memory' : mode}
+          onChange={(v) => {
+            setMemoryTab(v === 'memory');
+            if (v !== 'memory') switchTo(v);
+          }}
+          options={[
+            { id: 'form', label: 'Form' },
+            { id: 'markdown', label: 'Markdown' },
+            ...(role
+              ? [
+                  {
+                    id: 'memory' as const,
+                    label: 'Memory',
+                    ...(waiting > 0 && { badge: <span className="font-num text-[10.5px] text-fg-3 tabular-nums">{waiting}</span>, title: `${waiting} ${waiting === 1 ? 'lesson waits' : 'lessons wait'} for you` }),
+                  },
+                ]
+              : []),
+          ]}
+        />
 
-        {mode === 'markdown' ? (
+        {memoryTab && role ? (
+          <RoleMemory role={role} />
+        ) : mode === 'markdown' ? (
           <Field id="crew-md" label="Markdown" hint={builtIn ? 'Your overlay on the built-in: the fields it sets and your charter text. Saved as written.' : 'The whole role: frontmatter and charter. Saved as written.'}>
             <textarea id="crew-md" className="field min-h-[360px] resize-y font-mono !text-[12.5px] leading-relaxed" value={markdown} onChange={(e) => setMarkdown(e.target.value)} spellCheck={false} />
           </Field>
@@ -442,6 +489,34 @@ function EditorBody({ id, view, setView, onClose, onOpen, onSaved }: { id: strin
                 onChange={(v) => set('review', v)}
                 locked={locked.review}
               />
+            </Section>
+
+            <Section title="Memory">
+              <Field label="Lessons" hint={ROLE_MEMORY_CHOICES.find((c) => c.id === draft.memory)?.hint}>
+                <Segmented radio label="Lessons" size="sm" value={draft.memory} onChange={(v) => set('memory', v)} options={ROLE_MEMORY_CHOICES.map((c) => ({ id: c.id, label: c.label }))} />
+              </Field>
+              {draft.memory === 'read-write' && (
+                <Field
+                  label="What its threads propose"
+                  hint={
+                    draft.memoryWrites === 'auto'
+                      ? 'Applies at once, and each lesson names its thread. A thread under an automation, or a lesson for every channel, still waits for you.'
+                      : 'Waits for you in the Memory tab. Approve, edit or dismiss each one.'
+                  }
+                >
+                  <Segmented
+                    radio
+                    label="What its threads propose"
+                    size="sm"
+                    value={draft.memoryWrites}
+                    onChange={(v) => set('memoryWrites', v)}
+                    options={[
+                      { id: 'review', label: 'Waits for me' },
+                      { id: 'auto', label: 'Applies at once' },
+                    ]}
+                  />
+                </Field>
+              )}
             </Section>
           </>
         )}

@@ -3,7 +3,7 @@ import { quickAskRule, readsOnly } from '@omni/shared/quick-ask.ts';
 import { SCAN_ROLE } from '../usage-scan/asks.ts';
 import { config, artifactsDir, browserOutDir, designSystemFile, paths } from '../config.ts';
 import { artifacts, memories, type Channel, type Thread } from '../db.ts';
-import { learningsPrompt } from '@omni/shared/memory.ts';
+import { learningsPrompt, roleMemoryLines } from '@omni/shared/memory.ts';
 import type { CrewRole } from '../crew.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { getProfile, objectPronoun, userName, userPossessive } from '../profile.ts';
@@ -166,6 +166,33 @@ function noEditsLines(thread: Thread, role?: CrewRole) {
   ];
 }
 
+/**
+ * A crew role's memory (crew plan S6): the lessons the user approved for it, the untagged ones and this channel's, and
+ * how to propose one where the thread has a tool for it. A role with `memory: off` gets none. Remote harnesses get
+ * the lessons but no tool: they run no Omni MCP server.
+ */
+function roleMemorySection(thread: Thread, channel: Channel, role?: CrewRole) {
+  if (!role || role.memory === 'off' || readsOnly(thread)) return [];
+  const name = userName();
+  const facts = roleMemoryLines(memories.approvedForRole(role.id, channel.id));
+  const tool = role.memory === 'read-write' && !isProviderHarness(thread.harness);
+  const conductor = role.mcp.includes('omni');
+  const kept = role.memoryWrites === 'auto' ? 'It applies to later threads at once' : `It waits for ${name}'s approval`;
+  const how = !tool
+    ? ''
+    : conductor
+      ? `To keep a lesson about how a crew role works (a correction ${name} made, a step a crewmate missed), propose it with remember for that role. It waits for ${name}'s approval unless they let that role keep its lessons at once. A lesson about a client or channel goes to propose_learning instead.`
+      : `When ${name} corrects how you work, or you find a step every later ${role.name} thread should take, propose it with remember: one short sentence about how to work, never about this one task, and never a secret. ${kept}, and it holds in this channel only unless you pass everywhere: true.`;
+  if (!facts.length && !how) return [];
+  return [
+    '',
+    `## Your memory as ${role.name}`,
+    facts.length ? `Lessons ${name} approved for this role, from earlier threads. Follow them unless the task says otherwise.` : '',
+    ...facts,
+    how,
+  ];
+}
+
 /** What the user said about their work and tools in onboarding or Settings > General, when they said anything. */
 function profileLines(name: string) {
   const { work, tools } = userConfig().user;
@@ -215,6 +242,8 @@ export function buildSystemPrompt(thread: Thread, channel: Channel, role?: CrewR
     channel.notes ? `- Channel notes: ${channel.notes}` : '',
     // What the user approved as lessons for this channel (memory-api.ts). Only this channel's: one client's never reaches another's.
     ...learningsPrompt(memories.approvedIn(channel.id)),
+    // The role's own lessons (memory-api.ts): untagged ones and this channel's.
+    ...roleMemorySection(thread, channel, role),
     ...(readsOnly(thread) ? ['', ...quickAskRule(name)] : []),
     // A usage scan's lead gets the omni tools to save what the user picks, not to route work: it never delegates.
     ...(role?.mcp.includes('omni') && role.id !== SCAN_ROLE

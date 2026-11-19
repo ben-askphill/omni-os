@@ -1,4 +1,4 @@
-// The program a thread's ask, render, steps and threads MCP servers run on: omni-mcp, the Rust build in crates/omni-mcp
+// The program a thread's ask, render, steps, threads and memory MCP servers run on: omni-mcp, the Rust build in crates/omni-mcp
 // (docs/internals/rust-port.md). The desktop app carries it at bin/omni-mcp. A checkout builds it into
 // target/debug with scripts/native.ts, which npm run dev, npm start, scripts/qa-stack.sh and the server's tests run.
 import { spawnSync } from 'node:child_process';
@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 import { BUNDLED, ROOT } from './config.ts';
 
 /** The servers the binary has, by the name it takes as its one argument. */
-export type NativeMcpServer = 'ask' | 'render' | 'steps' | 'threads';
+export type NativeMcpServer = 'ask' | 'render' | 'steps' | 'threads' | 'memory';
 
 /** Where the desktop app's build puts the binary (apps/desktop/scripts/native.ts), under the app root. */
 export const NATIVE_MCP_PATH = join('bin', 'omni-mcp');
@@ -49,10 +49,10 @@ export function nativeMcp(candidate: string = nativeMcpCandidate()): string | nu
   let file: string | null = null;
   if (probe.ok) {
     file = candidate;
-    console.log(`[mcp] ask, render, steps and threads run on ${candidate} (${probe.version})`);
+    console.log(`[mcp] ask, render, steps, threads and memory run on ${candidate} (${probe.version})`);
   } else {
     const fix = BUNDLED ? 'This build of the app was made without it' : 'Build it with npm run dev, or cargo build -p omni-mcp';
-    console.warn(`[mcp] ${candidate} did not start (${probe.reason}). Threads get no ask_user_question, html_render, set_steps or read_referenced_thread. ${fix}`);
+    console.warn(`[mcp] ${candidate} did not start (${probe.reason}). Threads get no ask_user_question, html_render, set_steps, read_referenced_thread or remember. ${fix}`);
   }
   chosen = { candidate, file };
   return file;

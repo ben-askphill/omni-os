@@ -8,6 +8,7 @@ import { paths } from './config.ts';
 import { fillPlaceholders, userConfig } from './user-config.ts';
 import { parseConnectorList } from './connectors.ts';
 import { isAccessLevel, type AccessLevel } from '@omni/shared/access.ts';
+import { isRoleMemoryMode, type RoleMemoryMode, type RoleMemoryWrites } from '@omni/shared/memory.ts';
 
 // Crew roles: one markdown file each, frontmatter and a charter. The shipped ones live in crew/ and each release
 // replaces them. The user's own live in data/crew/: a file there with a new id is a whole role of theirs, and one with
@@ -74,6 +75,13 @@ export interface CrewRole {
    * `review_of` runs on the other model family from the thread it reviews (harness/review.ts). On for `reviewer`.
    */
   review: boolean;
+  /**
+   * `memory:`: whether its threads read its approved lessons (read), may also propose one with `remember`
+   * (read-write, the default), or neither (off). Lessons live in the memories table (memory-api.ts).
+   */
+  memory: RoleMemoryMode;
+  /** `memory_writes:`: a lesson its threads propose waits for the user (review, the default) or applies at once (auto). */
+  memoryWrites: RoleMemoryWrites;
   charter: string;
   kind: CrewKind;
   /** Hidden on this machine. Built-ins only: no new thread starts as it, and lists leave it out unless asked. */
@@ -209,6 +217,8 @@ function roleOf(id: string, meta: Record<string, unknown>, body: string, kind: C
     delegateOnly: tools === 'delegate-only',
     delegatable: meta.delegatable !== false,
     review: meta.review === true,
+    memory: isRoleMemoryMode(meta.memory) ? meta.memory : 'read-write',
+    memoryWrites: meta.memory_writes === 'auto' ? 'auto' : 'review',
     charter: fillPlaceholders(body),
     kind,
     hidden: false,

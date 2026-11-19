@@ -212,6 +212,12 @@ export interface CrewRole {
   delegatable: boolean;
   /** A review role: held at high effort on GPT, and a delegation with `review_of` runs on the other model family. */
   review: boolean;
+  /** Whether its threads read its lessons and propose new ones. A server from before role memory sends none: read-write. */
+  memory?: 'off' | 'read' | 'read-write';
+  /** Whether a lesson its threads propose waits for the user. A server from before role memory sends none: review. */
+  memoryWrites?: 'review' | 'auto';
+  /** How many lessons its threads proposed wait for the user, when any do. */
+  memoryWaiting?: number;
   charter: string;
   /** Shipped with Omni, a built-in with the user's edit, or the user's own. */
   kind: 'shipped' | 'edited' | 'own';
@@ -492,8 +498,11 @@ export type FeedEvent =
   | { type: 'automations' }
   /** A crew role was saved, reset, deleted, hidden or shown, here or on another machine: refetch GET /api/crew. */
   | { type: 'crew' }
-  /** A channel's Recent learnings changed, here or on another machine: refetch GET /api/memory?channel=<id>. */
-  | { type: 'memory'; channel_id: string | null }
+  /**
+   * A memory fact changed, here or on another machine: refetch a channel's Recent learnings (GET
+   * /api/memory?channel=<id>) when it has no role, else that role's memory (GET /api/crew/<role>/memory).
+   */
+  | { type: 'memory'; channel_id: string | null; role?: string | null }
   /** Show technical details or the Shopify add-on changed, here or on another machine: refetch GET /api/display. */
   | { type: 'display' }
   /** The update check or Update moved on: refetch GET /api/update. */
