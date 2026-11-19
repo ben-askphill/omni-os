@@ -147,6 +147,12 @@ export class RelayStore {
     });
   }
 
+  /** The sync machine a live token pushes as, or null before its first push. */
+  tokenMachine(id: string): string | null {
+    const [row] = this.sql.exec('SELECT machine_id FROM tokens WHERE id = ?', id).toArray() as { machine_id: string | null }[];
+    return row?.machine_id ?? null;
+  }
+
   revokeToken(id: string) {
     this.sql.exec('DELETE FROM tokens WHERE id = ?', id);
   }

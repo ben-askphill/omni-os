@@ -182,21 +182,21 @@ describe('a GPT reviewer runs at high effort', () => {
   };
 
   it('clamps xhigh, and anything else, to high on Codex', () => {
-    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'xhigh' }, 'reviewer', cat)).toBe('high');
-    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'medium' }, 'reviewer', cat)).toBe('high');
+    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'xhigh' }, { review: true }, cat)).toBe('high');
+    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'medium' }, { review: true }, cat)).toBe('high');
     // No model named: the harness default, at high rather than its own default effort.
-    expect(reviewerEffort({ harness: 'codex', model: '', effort: '' }, 'reviewer', cat)).toBe('high');
+    expect(reviewerEffort({ harness: 'codex', model: '', effort: '' }, { review: true }, cat)).toBe('high');
   });
 
   it('clamps a gpt-* model on another harness too', () => {
-    expect(reviewerEffort({ harness: 'cursor', model: 'gpt-5.6-sol', effort: 'xhigh' }, 'reviewer', withCursor)).toBe('high');
+    expect(reviewerEffort({ harness: 'cursor', model: 'gpt-5.6-sol', effort: 'xhigh' }, { review: true }, withCursor)).toBe('high');
     // Not GPT: Cursor's own models keep what they asked.
-    expect(reviewerEffort({ harness: 'cursor', model: 'composer-2.5', effort: '' }, 'reviewer', withCursor)).toBe('');
+    expect(reviewerEffort({ harness: 'cursor', model: 'composer-2.5', effort: '' }, { review: true }, withCursor)).toBe('');
   });
 
   it('leaves Claude reviewers and every other role alone', () => {
-    expect(reviewerEffort({ harness: 'claude-code', model: 'claude-opus-5-5', effort: 'xhigh' }, 'reviewer', cat)).toBe('xhigh');
-    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'xhigh' }, 'builder', cat)).toBe('xhigh');
+    expect(reviewerEffort({ harness: 'claude-code', model: 'claude-opus-5-5', effort: 'xhigh' }, { review: true }, cat)).toBe('xhigh');
+    expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'xhigh' }, { review: false }, cat)).toBe('xhigh');
     expect(reviewerEffort({ harness: 'codex', model: 'gpt-5.6-sol', effort: 'xhigh' }, null, cat)).toBe('xhigh');
   });
 });

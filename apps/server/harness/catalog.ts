@@ -3,20 +3,19 @@
 // and resolution live here; live probing of the CLIs is injected so this is testable.
 import type { HarnessId, HarnessInfo, ModelEntry } from './types.ts';
 import { CAPABILITIES, HARNESS_META, HARNESS_IDS } from './types.ts';
+import { CLAUDE_ALIASES } from '@omni/shared/claude-aliases.ts';
 
-// ---------- Claude Code (fixed) ----------
+// ---------- Claude Code ----------
+// A bundled list, then whatever else Claude Code itself reports (its `initialize` answer, as T3 Code reads it), so a
+// model that ships in a Claude Code release shows without an Omni release. The bundled list stays first and wins for
+// the ids it has: Auto, the aliases and crew roles name those ids, and some (claude-haiku-4-5) Claude Code reports
+// only with a release date.
 
 /** Claude Code's reasoning efforts, and the level "Default" resolves to. */
 export const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 export const CLAUDE_DEFAULT_EFFORT = 'high';
 
-/** The short aliases stay valid for roles and the conductor. */
-export const CLAUDE_ALIASES: Record<string, string> = {
-  opus: 'claude-opus-5-5',
-  sonnet: 'claude-sonnet-5-5',
-  haiku: 'claude-haiku-4-5',
-  fable: 'claude-fable-5-2',
-};
+export { CLAUDE_ALIASES };
 
 const claudeModel = (id: string, label: string, isDefault = false): ModelEntry => ({
   id,
@@ -26,8 +25,49 @@ const claudeModel = (id: string, label: string, isDefault = false): ModelEntry =
   ...(isDefault ? { default: true } : {}),
 });
 
-/** The fixed Claude Code list Omni has today. `defaultModelId` marks the harness default. */
-export function claudeModels(defaultModelId = 'claude-sonnet-5-5'): ModelEntry[] {
+/** One model as Claude Code's `initialize` answer lists it (claude 2.1.316). */
+export interface ClaudeReportedModel {
+  /** What `--model` takes: an id, or an alias such as `opus`. `default` is Claude Code's own default, not a model. */
+  value: string;
+  /** The model the value runs, e.g. `claude-opus-5-5` for `opus`. */
+  resolvedModel?: string;
+  displayName?: string;
+  supportsEffort?: boolean;
+  supportedEffortLevels?: string[];
+}
+
+/** The well-formed entries of an `initialize` answer's `models`. */
+export function parseClaudeReported(raw: unknown): ClaudeReportedModel[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r): ClaudeReportedModel[] => {
+    if (!r || typeof r !== 'object' || typeof (r as { value?: unknown }).value !== 'string') return [];
+    const o = r as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+    const levels = Array.isArray(o.supportedEffortLevels) ? o.supportedEffortLevels.filter((e): e is string => typeof e === 'string' && !!e) : undefined;
+    return [
+      {
+        value: o.value as string,
+        ...(str(o.resolvedModel) && { resolvedModel: str(o.resolvedModel) }),
+        ...(str(o.displayName) && { displayName: str(o.displayName) }),
+        ...(o.supportsEffort === true && { supportsEffort: true }),
+        ...(levels && { supportedEffortLevels: levels }),
+      },
+    ];
+  });
+}
+
+/** The id a reported model runs: its resolved model, without a context suffix (`[1m]`) or a release date. */
+export const claudeReportedId = (r: ClaudeReportedModel) =>
+  (r.resolvedModel || r.value)
+    .trim()
+    .replace(/\[[^\]]*\]$/, '')
+    .replace(/-\d{8}$/, '');
+
+/**
+ * The Claude Code models: the bundled list, then each model Claude Code reports that the list lacks, with its own
+ * effort levels. `defaultModelId` (an id or an alias) marks the harness default.
+ */
+export function claudeModels(defaultModelId = 'claude-sonnet-5-5', reported: readonly ClaudeReportedModel[] = []): ModelEntry[] {
   const models = [
     claudeModel('claude-sonnet-5-5', 'Sonnet 5.5'),
     claudeModel('claude-opus-5-5', 'Opus 5.5'),
@@ -36,19 +76,34 @@ export function claudeModels(defaultModelId = 'claude-sonnet-5-5'): ModelEntry[]
     claudeModel('claude-fable-5-1', 'Fable 5.1'),
     claudeModel('claude-haiku-4-5', 'Haiku 4.5'),
   ];
+  const known = new Set(models.map((m) => m.id));
+  for (const r of reported) {
+    if (r.value === 'default') continue;
+    const id = claudeReportedId(r);
+    if (!id || known.has(id)) continue;
+    known.add(id);
+    const efforts = r.supportsEffort ? (r.supportedEffortLevels ?? []) : [];
+    models.push({
+      id,
+      label: r.displayName?.trim() || id,
+      efforts,
+      defaultEffort: efforts.includes(CLAUDE_DEFAULT_EFFORT) ? CLAUDE_DEFAULT_EFFORT : (efforts[0] ?? ''),
+    });
+  }
   const resolved = CLAUDE_ALIASES[defaultModelId] ?? defaultModelId;
   const def = models.find((m) => m.id === resolved) ?? models[0];
   def.default = true;
   return models;
 }
 
-export function claudeHarness(cap: number, defaultModelId?: string): HarnessInfo {
+/** `reported`: what Claude Code listed when Omni last asked. Empty before the first answer: the bundled list alone. */
+export function claudeHarness(cap: number, defaultModelId?: string, reported: readonly ClaudeReportedModel[] = []): HarnessInfo {
   return {
     id: 'claude-code',
     ...HARNESS_META['claude-code'],
     capabilities: CAPABILITIES['claude-code'],
     available: true,
-    models: claudeModels(defaultModelId),
+    models: claudeModels(defaultModelId, reported),
     cap,
   };
 }

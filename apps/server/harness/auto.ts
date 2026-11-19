@@ -197,7 +197,7 @@ export const TIERS: Record<Tier, { claudeModel: string; effort: string }> = {
   max: { claudeModel: 'claude-opus-5-5', effort: 'xhigh' },
 };
 
-/** A review on a GPT model runs at this effort whatever its tier: high, never xhigh (Ben's rule; see reviewerEffort in resolve.ts). */
+/** A review on a GPT model runs at this effort whatever its tier: high, never xhigh (see reviewerEffort in resolve.ts). */
 export const GPT_REVIEW_EFFORT = 'high';
 
 /** At or above this share of a plan window, Auto moves work to another plan when it can. */

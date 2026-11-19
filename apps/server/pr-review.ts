@@ -1,6 +1,11 @@
+import { getCrew } from './crew.ts';
 import { threads, type Thread } from './db.ts';
 import { getPR } from './github.ts';
 import { createThread } from './runner.ts';
+import { refusal } from './runner/state.ts';
+
+/** The role the Review PR action runs as: it resolves conflicts and pushes fixes, so a review role (read only) would not do. */
+const REVIEW_PR_ROLE = 'builder';
 
 /** Prefer the nearest Conductor ancestor, even through a team lead. Otherwise keep the branch owner. */
 function reviewParent(origin: Thread): Thread {
@@ -17,6 +22,10 @@ function reviewParent(origin: Thread): Thread {
 }
 
 export async function requestPRReview(channel: string, repo: string, number: number) {
+  // Refused before GitHub is asked, with a way out, rather than the role check's list of other roles.
+  const builder = getCrew(REVIEW_PR_ROLE);
+  if (!builder) throw refusal(`Review PR runs as the ${REVIEW_PR_ROLE} role, and this machine has none.`, 409);
+  if (builder.hidden) throw refusal(`Review PR runs as ${builder.name}, which is hidden on this machine. Show it in Settings > Crew to use Review PR.`, 409);
   const pr = await getPR(repo, number);
   // A fork's branch with the same name does not belong to a thread in the base repo.
   const owners = pr.isCrossRepository ? [] : threads.byRepoBranch(repo, pr.headRefName);
@@ -35,7 +44,7 @@ export async function requestPRReview(channel: string, repo: string, number: num
   ].join('\n\n');
   const child = await createThread({
     channel: origin?.channel_id ?? channel,
-    role: 'builder',
+    role: REVIEW_PR_ROLE,
     title: `Review PR #${number}`,
     prompt,
     ...(parent ? { parent_id: parent.id, source: 'conductor' as const } : {}),

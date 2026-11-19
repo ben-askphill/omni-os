@@ -92,6 +92,20 @@ describe('/mcp: who gets in', () => {
   });
 });
 
+describe('/mcp: request limits', () => {
+  it('refuses a body over its size limit with 413 before reading it', async () => {
+    const res = await post(`/mcp/${MCP_TOKEN}`, 'tools/call', { name: 'list_channels', arguments: { pad: 'x'.repeat(2 * 1024 * 1024) } });
+    expect(res.status).toBe(413);
+  });
+
+  it('refuses tool arguments with more elements than any tool takes', async () => {
+    const wide = Object.fromEntries(Array.from({ length: 2_000 }, (_, i) => [`k${i}`, i]));
+    const { isError, raw } = await tool('list_channels', { wide });
+    expect(isError).toBe(true);
+    expect(raw).toMatch(/more than the maximum/);
+  });
+});
+
 describe('/mcp: the tools', () => {
   it('lists the external tools and none of the Conductor-only ones', async () => {
     const res = await post(`/mcp/${MCP_TOKEN}`, 'tools/list');

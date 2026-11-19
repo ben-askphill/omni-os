@@ -30,6 +30,7 @@ describe('parseCrewFile', () => {
       mcp: ['omni'],
       delegateOnly: false,
       delegatable: true,
+      review: false,
       charter: 'You write and ship code.\n\n- Keep changes scoped.',
       kind: 'own',
       hidden: false,
@@ -47,6 +48,7 @@ describe('parseCrewFile', () => {
       mcp: [],
       delegateOnly: false,
       delegatable: true,
+      review: false,
       charter: 'Just do quick asks.',
       kind: 'own',
       hidden: false,
@@ -61,6 +63,11 @@ describe('parseCrewFile', () => {
   it('reads delegate_only only when it is exactly true', () => {
     expect(parseCrewFile('e', '---\ndelegate_only: true\n---\nbody').delegateOnly).toBe(true);
     expect(parseCrewFile('f', '---\ndelegate_only: "yes"\n---\nbody').delegateOnly).toBe(false);
+  });
+
+  it('reads review the same way: a review role only when it says so exactly', () => {
+    expect(parseCrewFile('r', '---\nreview: true\n---\nbody').review).toBe(true);
+    expect(parseCrewFile('s', '---\nreview: "yes"\n---\nbody').review).toBe(false);
   });
 
   it('accepts frontmatter with no body', () => {

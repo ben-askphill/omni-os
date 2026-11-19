@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { MessageContext } from '@omni/shared/message-context.ts';
 import { channels, folders, messageRequests, outbox, threadBasePicks, requestFingerprint, threads, tx, type DeliveryState, type MessageRequest, type Thread, type ThreadSource } from '../db.ts';
-import { crewForNewThread, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
+import { crewForNewThread, listCrew, remoteDelegateOnlyRefusal, type CrewRole } from '../crew.ts';
 import { commandsFolder, needsWorktree, prepareWorkdir } from '../sandbox.ts';
 import { checkBase } from '../worktree-base.ts';
 import type { BasePick } from '@omni/shared/worktree-base.ts';
@@ -17,11 +17,12 @@ import { profileTask, routeTask } from '../harness/auto.ts';
 import { usageByHarness } from '../usage.ts';
 import { channelCatalog, freshCatalog, getCatalog } from '../harness/catalog-service.ts';
 import { resolveRun, reviewerEffort, setsRun } from '../harness/resolve.ts';
+import { reviewRun } from '../harness/review.ts';
 import type { CommandUse } from '../harness/adapter.ts';
 import { assembling, deliver, settleTeam } from './queue.ts';
 import { fallbackTitle, generateTitle } from './aux.ts';
 import { addEvent, emitThread, isShuttingDown, refusal, requestMsg, runsHere, threadCommands, type Msg, type SendMode } from './state.ts';
-import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST } from './setup.ts';
+import { bindResume, retrySetup, saveStart, setUpThread, START_REQUEST, type SetupRetryBy } from './setup.ts';
 import { dismissQuestions } from './question-waits.ts';
 import { runnerPorts } from './ports.ts';
 import { interruptThread } from './session.ts';
@@ -95,6 +96,11 @@ export interface CreateThreadInput {
   automation?: string | null;
   /** A sidebar folder of the channel to file the thread in, by id or name. A name no folder has makes one. */
   folder?: string | null;
+  /**
+   * The thread whose work this one reviews. Only with a review role: the run goes to the other model family from that
+   * thread's (harness/review.ts), and one on the same family is refused.
+   */
+  review_of?: string | null;
   /** The base a new worktree thread's branch is cut from (worktree-base.ts). None, or a thread with no worktree: the repo's HEAD. */
   base?: BasePick | null;
   /** Files Ben attached to the first message. Validate them with `checkUploads` before calling. */
@@ -125,8 +131,24 @@ function roleFor(id: string | null | undefined, source: ThreadSource | undefined
   return r.role ?? undefined;
 }
 
+/** The run a new thread asks for: its own, or for a review (`review_of`), one on the other model family. */
+function askedRun(input: CreateThreadInput, role: CrewRole | undefined) {
+  const own = { harness: input.harness, model: input.model, effort: input.effort };
+  if (!input.review_of) return own;
+  if (!role?.review) {
+    const reviewers = listCrew().filter((r) => r.review && !r.hidden).map((r) => r.id);
+    throw refusal(`review_of is for a review role. ${reviewers.length ? `Review roles: ${reviewers.join(', ')}.` : 'None here: turn review on for one in Settings > Crew.'}`, 400);
+  }
+  const reviewed = threads.get(input.review_of);
+  if (!reviewed) throw refusal(`No thread "${input.review_of}" to review.`, 404);
+  const r = reviewRun(own, reviewed, getCatalog());
+  if ('refused' in r) throw refusal(r.refused, 409);
+  return r.run;
+}
+
 async function openThread(input: CreateThreadInput, status: Thread['status'] = 'queued', elsewhere = false) {
   const role = roleFor(input.role, input.source);
+  const asked = askedRun(input, role);
   const channelId = input.channel || role?.channel || 'inbox';
   const channel = channels.get(channelId);
   if (!channel) throw refusal(`unknown channel "${channelId}"`, 404);
@@ -140,7 +162,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const roleDefaults = role?.id === 'conductor' && channel.id === 'conductor' && setsRun(channelDefaults) ? undefined : role;
   const resolve = (cat: Catalog, withChannel = true) =>
     resolveRun(
-      { harness: input.harness, model: input.model, effort: input.effort },
+      asked,
       roleDefaults,
       channelCatalog(cat, channel.id),
       withChannel ? channelDefaults : undefined,
@@ -154,7 +176,7 @@ async function openThread(input: CreateThreadInput, status: Thread['status'] = '
   const auto = 'auto' in run ? routeTask(profileTask(input.prompt), { catalog: getCatalog(), usage: usageByHarness(), images }) : null;
   const picked = auto ?? (run as Resolved);
   const { harness, model } = picked;
-  const effort = reviewerEffort(picked, role?.id, channelCatalog(getCatalog(), channel.id));
+  const effort = reviewerEffort(picked, role, channelCatalog(getCatalog(), channel.id));
   if (role?.delegateOnly && isProviderHarness(harness)) throw new Error(remoteDelegateOnlyRefusal(role.name, providerWhere(harness)));
 
   const filedIn = input.folder?.trim() ? (folders.find(channel.id, input.folder) ?? folders.create({ channel_id: channel.id, name: input.folder })) : null;
@@ -521,11 +543,11 @@ function goalSend(thread: Thread, prompt: string, files: number): { stops: boole
  * uncertain one may already have reached the harness, so it goes only when named. Each goes through the runner
  * like a new message, so the harness's concurrency cap holds. Only the Mac that accepted a request resumes it.
  */
-export async function resumeRequests(threadId: string, ids?: string[]): Promise<Thread> {
+export async function resumeRequests(threadId: string, ids?: string[], by: SetupRetryBy = {}): Promise<Thread> {
   const thread = threads.get(threadId);
   if (!thread) throw refusal('thread not found', 404);
   // What waits on a worktree goes once it is made: Resume there is Retry, and while it is made, nothing more.
-  if (thread.setup) return retrySetup(threadId);
+  if (thread.setup) return retrySetup(threadId, by);
   const parked = messageRequests.parked(threadId);
   const chosen = ids ? parked.filter((r) => ids.includes(r.id)) : parked.filter((r) => r.state === 'recovered');
   if (ids && chosen.length !== new Set(ids).size) throw refusal('Some of these messages are no longer waiting to be resumed.', 409);

@@ -10,9 +10,11 @@ import { isPrTrigger } from './automation-events.ts';
 import { recentDeliveries } from './automation-deliveries.ts';
 import { webhookInfo } from './github-webhook-api.ts';
 import { webhookSecretName } from './github-webhook.ts';
-import { channelCatalog, freshCatalog, getCatalog } from './harness/catalog-service.ts';
+import { channelCatalog, freshCatalog, getCatalog, loadCatalog, refreshStale } from './harness/catalog-service.ts';
+import { markHidden, modelVisibility, setHarnessModelPrefs } from './harness/model-visibility.ts';
+import { parseHarnessPrefs } from '@omni/shared/model-visibility.ts';
 import { validateDefaults } from './harness/resolve.ts';
-import { HARNESS_INSTALL, type HarnessInfo } from './harness/types.ts';
+import { HARNESS_INSTALL, isHarnessId, type HarnessInfo } from './harness/types.ts';
 import { runningByHarness } from './runner.ts';
 import { getProfile, profileInput, setProfile } from './profile.ts';
 import { deleteSecret, hasSecret, listSecrets, setSecret } from './secrets.ts';
@@ -23,19 +25,44 @@ export const metaApi = new Hono();
 
 // The harnesses with their availability, fix command, models, efforts, cap and running count, and the install
 // command for a CLI Omni found no binary for (a signed-out one gets only its sign-in `fix`).
-// A harness that is down is probed again first, so a login shows up when the picker opens.
+// A harness that is down is probed again first, so a login shows up when the picker opens, and a catalog older than
+// a few minutes is asked again in the background, so a newly released model shows up too (refreshStale).
+// A model Ben's picker settings leave out carries `hidden: true` (harness/model-visibility.ts). It is still listed:
+// the clients name and run it wherever it is already picked.
 // With ?channel=, as that channel sees them: Cursor Cloud needs its GitHub repo and can use its own key.
 metaApi.get('/harnesses', async (c) => {
   const cat = channelCatalog(await freshCatalog(), c.req.query('channel'));
-  const running = runningByHarness();
-  return c.json(cat.harnesses.map((h) => harnessRow(h, running[h.id] ?? 0)));
+  refreshStale();
+  return c.json(harnessRows(cat.harnesses));
 });
+
+/** Ask every harness for its models now, as Settings' Check for new models does, and answer with the result. */
+metaApi.post('/harnesses/refresh', async (c) => {
+  const cat = channelCatalog(await loadCatalog(), c.req.query('channel'));
+  return c.json(harnessRows(cat.harnesses));
+});
+
+const harnessRows = (list: HarnessInfo[]) => {
+  const running = runningByHarness();
+  const prefs = modelVisibility();
+  return list.map((h) => harnessRow(markHidden(h, prefs), running[h.id] ?? 0));
+};
 
 /** One row of GET /api/harnesses. */
 export function harnessRow(h: HarnessInfo, running: number) {
   const install = !h.available && h.missing ? HARNESS_INSTALL[h.id] : undefined;
   return { ...h, running, ...(install && { install }) };
 }
+
+// Which models the pickers list, per harness: the rule for untoggled models and the toggles (shared/model-visibility.ts).
+metaApi.get('/model-visibility', (c) => c.json(modelVisibility()));
+metaApi.put('/model-visibility/:harness', async (c) => {
+  const harness = c.req.param('harness');
+  if (!isHarnessId(harness)) return c.json({ error: `Unknown harness "${harness}".` }, 400);
+  const prefs = parseHarnessPrefs(await c.req.json().catch(() => null));
+  if (!prefs) return c.json({ error: 'Send { show, hide, newModels }.' }, 400);
+  return c.json(setHarnessModelPrefs(harness, prefs));
+});
 
 /** The other synced Macs a thread can be handed to, with whether Tailscale sees each up. Empty while sync is off. */
 metaApi.get('/devices', async (c) => c.json(await listDevices()));

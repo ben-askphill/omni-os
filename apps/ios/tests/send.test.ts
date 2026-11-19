@@ -7,6 +7,7 @@ import type { Staged } from '../src/attachments/model';
 import { addDraftContext, draftContext } from '../src/context/draft';
 import { createLiveHub } from '../src/live/hub';
 import type { OmniSession } from '../src/live/session';
+import { threadKey } from '../src/live/thread-key';
 import { composerPlaceholder, sendLabel, sendModeFor } from '../src/send/rules';
 
 const BASE = 'http://omni.test';
@@ -90,7 +91,7 @@ function open(replies: (req: Sent) => Reply | undefined | Promise<Reply | undefi
     if (req.method === 'GET') return { body: [] };
     return replies(req);
   });
-  const session: OmniSession = { serverUrl: BASE, token: async () => 'token', refreshAuth: async () => false, ...over };
+  const session: OmniSession = { serverUrl: BASE, serverId: 'mac', token: async () => 'token', refreshAuth: async () => false, ...over };
   const hub = createLiveHub({ session, transport: via, fetch: s.fetch });
   return { ...s, hub };
 }
@@ -102,6 +103,9 @@ async function opened(replies: (req: Sent) => Reply | undefined | Promise<Reply 
   await vi.waitFor(() => expect(live.catalog.get()).not.toBeNull());
   return { ...o, live };
 }
+
+/** Thread t1 on the server the tests' hubs talk to. */
+const T1 = threadKey('mac', 't1');
 
 const pickRecord = (id: string) =>
   newContext(
@@ -133,19 +137,30 @@ describe('sending to an idle thread', () => {
 
   it('sends picked context with no text, and drops it from the draft once the server has it', async () => {
     const { live, posts, hub } = await opened(() => ({ body: accepted('whatever') }));
-    addDraftContext('t1', pickRecord('ctx1'));
-    await live.send.submit(live.view.get().thread!, '  ', [], draftContext('t1'));
+    addDraftContext(T1, pickRecord('ctx1'));
+    await live.send.submit(live.view.get().thread!, '  ', [], draftContext(T1));
     expect(posts()[0].body).toMatchObject({ prompt: '', context: [{ id: 'ctx1', kind: 'diff_selection' }] });
-    expect(draftContext('t1')).toEqual([]);
+    expect(draftContext(T1)).toEqual([]);
+    hub.close();
+  });
+
+  it('drops what landed from its own server’s draft only, not from the same thread id on another server', async () => {
+    const { live, hub } = await opened(() => ({ body: accepted('whatever') }));
+    const onClone = threadKey('clone', 't1');
+    addDraftContext(T1, pickRecord('ctx-shared'));
+    addDraftContext(onClone, pickRecord('ctx-shared'));
+    await live.send.submit(live.view.get().thread!, 'look', [], draftContext(T1));
+    expect(draftContext(T1)).toEqual([]);
+    expect(draftContext(onClone).map((r) => r.id)).toEqual(['ctx-shared']);
     hub.close();
   });
 
   it('keeps picked context in the draft when the send fails, so Edit and Retry still have it', async () => {
     const { live, hub } = await opened(() => 'drop');
-    addDraftContext('t1', pickRecord('ctx2'));
-    await live.send.submit(live.view.get().thread!, 'look', [], draftContext('t1'));
+    addDraftContext(T1, pickRecord('ctx2'));
+    await live.send.submit(live.view.get().thread!, 'look', [], draftContext(T1));
     expect(live.send.state.get().outbox.item).toMatchObject({ phase: 'failed', context: [{ id: 'ctx2' }] });
-    expect(draftContext('t1').map((r) => r.id)).toEqual(['ctx2']);
+    expect(draftContext(T1).map((r) => r.id)).toEqual(['ctx2']);
     hub.close();
   });
 
@@ -460,7 +475,7 @@ async function withUpload(reply: (init: UploadInit, call: number) => UploadReply
     if (req.method === 'GET') return { body: [] };
     return undefined;
   });
-  const session: OmniSession = { serverUrl: BASE, token: async () => 'token', refreshAuth: async () => false };
+  const session: OmniSession = { serverUrl: BASE, serverId: 'mac', token: async () => 'token', refreshAuth: async () => false };
   const hub = createLiveHub({ session, transport, fetch: s.fetch, upload });
   const live = hub.openThread('t1');
   await vi.waitFor(() => expect(live.view.get().status).toBe('ready'));
@@ -488,14 +503,14 @@ describe('sending files', () => {
 
   it('carries picked diff context in the same multipart request as the files, and clears it from the draft once it lands', async () => {
     const { live, hub, uploads, posts } = await withUpload(() => ({ body: accepted('x') }));
-    addDraftContext('t1', pickRecord('ctx3'));
-    const out = await live.send.submit(live.view.get().thread!, 'both', [photo], draftContext('t1').filter((r) => r.id === 'ctx3'));
+    addDraftContext(T1, pickRecord('ctx3'));
+    const out = await live.send.submit(live.view.get().thread!, 'both', [photo], draftContext(T1).filter((r) => r.id === 'ctx3'));
     expect(out).not.toBeNull();
     expect(posts()).toHaveLength(0);
     expect(uploads).toHaveLength(1);
     expect(JSON.parse(uploads[0].init.payload)).toMatchObject({ prompt: 'both', context: [{ id: 'ctx3', kind: 'diff_selection' }] });
     expect(uploads[0].init.files).toHaveLength(1);
-    expect(draftContext('t1').map((r) => r.id)).not.toContain('ctx3');
+    expect(draftContext(T1).map((r) => r.id)).not.toContain('ctx3');
     hub.close();
   });
 

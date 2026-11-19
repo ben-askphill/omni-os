@@ -53,6 +53,13 @@
       "scoped": true
     },
     {
+      "id": "crew",
+      "group": "agents",
+      "title": "Crew",
+      "icon": "delegate",
+      "blurb": "The roles threads run as: their charters, run defaults and powers."
+    },
+    {
       "id": "accounts",
       "group": "agents",
       "title": "Accounts",
@@ -272,6 +279,25 @@
       ]
     },
     {
+      "id": "model-visibility",
+      "section": "models",
+      "title": "Models in the picker",
+      "keywords": [
+        "hide",
+        "hidden",
+        "show",
+        "visible",
+        "models",
+        "picker",
+        "new models",
+        "latest",
+        "family",
+        "clutter",
+        "check for new models",
+        "refresh"
+      ]
+    },
+    {
       "id": "channel-model",
       "section": "models",
       "title": "Default model for new threads",
@@ -319,6 +345,30 @@
         "binary",
         "path",
         ".env"
+      ]
+    },
+    {
+      "id": "crew-roles",
+      "section": "crew",
+      "title": "Crew roles",
+      "keywords": [
+        "role",
+        "roles",
+        "charter",
+        "conductor",
+        "builder",
+        "reviewer",
+        "researcher",
+        "inbox",
+        "agent",
+        "agents",
+        "persona",
+        "prompt",
+        "instructions",
+        "new role",
+        "duplicate",
+        "hide",
+        "reset"
       ]
     },
     {
@@ -831,6 +881,7 @@
       "query": "model",
       "surface": "web",
       "expected": [
+        "model-visibility",
         "channel-model",
         "model-options",
         "harnesses",

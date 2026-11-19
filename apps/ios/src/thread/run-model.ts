@@ -1,6 +1,7 @@
 import type { HarnessInfo, Thread } from '@omni/client-core';
 import type { Run } from '@omni/shared/run-switch.ts';
 import { pickedModelRun, runModel, shownRun, threadChoice, threadRunLabels } from '@omni/shared/thread-run.ts';
+import { pickerModels } from '@omni/shared/model-visibility.ts';
 
 /** What the run switch reads of a thread: its run, and the run queued to start after the current turn. */
 export type RunThread = Pick<
@@ -66,7 +67,8 @@ export function runSheetModel(thread: RunThread, harnesses: HarnessInfo[]): RunS
       plan: h.plan,
       available: h.available,
       fix: h.available ? null : (h.fix ?? null),
-      models: h.models.map((m) => ({
+      // Models hidden in Settings stay out, except the one the run is on.
+      models: pickerModels(h.models, h.id === choice.harness ? choice.model : null).map((m) => ({
         id: m.id,
         label: m.label,
         note: m.note || null,

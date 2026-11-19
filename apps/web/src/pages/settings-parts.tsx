@@ -136,29 +136,36 @@ export function ResetButton({ of, onReset, busy }: { of: Provenance; onReset: ()
   );
 }
 
-/** Under a field .env or the config file sets: where to change it, since the page cannot. */
-export function EnvNote({ env, file }: { env?: string; file?: string }) {
+/** Under a field the page cannot change: why, after a lock. */
+export function LockNote({ children }: { children: ReactNode }) {
   return (
     <p className="mt-1.5 flex items-start gap-1.5 text-[12.5px] text-fg-3">
       <Icon name="lock" size={13} className="mt-[3px] shrink-0" />
-      <span>
-        {env ? (
-          <>
-            Set in .env as <code className="font-mono text-[12px] text-fg-2">{env}</code>. Change it there and restart the server.
-          </>
-        ) : (
-          <>
-            Set in <code className="font-mono text-[12px] text-fg-2">data/omni.config.json</code>
-            {file && (
-              <>
-                {' '}as <code className="font-mono text-[12px] text-fg-2">{file}</code>
-              </>
-            )}
-            .
-          </>
-        )}
-      </span>
+      <span>{children}</span>
     </p>
+  );
+}
+
+/** Under a field .env or the config file sets: where to change it, since the page cannot. */
+export function EnvNote({ env, file }: { env?: string; file?: string }) {
+  return (
+    <LockNote>
+      {env ? (
+        <>
+          Set in .env as <code className="font-mono text-[12px] text-fg-2">{env}</code>. Change it there and restart the server.
+        </>
+      ) : (
+        <>
+          Set in <code className="font-mono text-[12px] text-fg-2">data/omni.config.json</code>
+          {file && (
+            <>
+              {' '}as <code className="font-mono text-[12px] text-fg-2">{file}</code>
+            </>
+          )}
+          .
+        </>
+      )}
+    </LockNote>
   );
 }
 

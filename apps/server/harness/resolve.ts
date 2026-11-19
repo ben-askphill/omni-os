@@ -7,7 +7,7 @@
 // A role that sets any of harness, model or effort replaces the channel's default whole; the two never mix.
 // The defaults' model and effort only apply when the thread runs on their harness, and their effort
 // only when their model is the one picked (or, when they name no model, the harness default is). Pure, so it is testable.
-// Whatever picked it, a reviewer on a GPT model then runs at high effort (reviewerEffort).
+// Whatever picked it, a review role on a GPT model then runs at high effort (reviewerEffort).
 import { isHarnessId, DEFAULT_HARNESS, HARNESS_META, type HarnessId } from './types.ts';
 import { getHarness, resolveModel, unavailableError, validateRun, type Catalog, type Resolved, type ResolveError } from './catalog.ts';
 import { asksAuto, GPT_REVIEW_EFFORT, nearestEffort } from './auto.ts';
@@ -66,20 +66,17 @@ export function resolveRun(choice: RunChoice, roleDefaults: RoleDefaults | undef
   return { ok: true, harness, model, effort };
 }
 
-/** The crew role whose threads review a PR (crew/reviewer.md). */
-export const REVIEWER_ROLE = 'reviewer';
-
 /** A run on a GPT model: anything on Codex, or a `gpt-*` model on another harness (Cursor). */
 export const isGptRun = (run: { harness: string; model?: string | null }) => run.harness === 'codex' || /^gpt-/i.test(run.model ?? '');
 
 /**
- * The effort a thread in this role runs at. A reviewer on a GPT model gets high whatever was asked, xhigh included:
- * Ben's rule for GPT reviews. Every other run, Claude reviewers included, keeps the effort it asked for. A model whose
- * catalog entry lists no efforts keeps its own (Cursor families without effort variants).
+ * The effort a thread in this role runs at. A review role (`review: true`, crew/reviewer.md) on a GPT model gets high
+ * whatever was asked, xhigh included: the rule for GPT reviews. Every other run, Claude reviewers included, keeps the
+ * effort it asked for. A model whose catalog entry lists no efforts keeps its own (Cursor families without effort variants).
  */
-export function reviewerEffort(run: { harness: string; model?: string | null; effort?: string | null }, role: string | null | undefined, cat: Catalog): string {
+export function reviewerEffort(run: { harness: string; model?: string | null; effort?: string | null }, role: { review?: boolean } | null | undefined, cat: Catalog): string {
   const asked = run.effort ?? '';
-  if (role !== REVIEWER_ROLE || !isGptRun(run)) return asked;
+  if (!role?.review || !isGptRun(run)) return asked;
   const h = isHarnessId(run.harness) ? getHarness(cat, run.harness) : undefined;
   const m = run.model ? (isHarnessId(run.harness) ? resolveModel(cat, run.harness, run.model) : null) : (h?.models.find((x) => x.default) ?? h?.models[0]);
   if (!m) return GPT_REVIEW_EFFORT;

@@ -15,6 +15,7 @@ export interface PairedSessionDeps {
 export function pairedSession(server: { id: string; origin: string }, deps: PairedSessionDeps): OmniSession {
   return {
     serverUrl: server.origin,
+    serverId: server.id,
     token: () => deps.getToken(server.id).catch(() => null),
     refreshAuth: () => deps.confirmSignedIn(server.id).catch(() => false),
   };

@@ -28,6 +28,7 @@ const ownPath = (id: string) => join(paths.personalCrew, `${id}.md`);
 ship('conductor', '---\nname: Conductor\nchannel: conductor\nmcp: [omni]\ndelegate_only: true\ndelegatable: false\n---\nRoute everything.\n');
 ship('usage-scan', '---\nname: Usage scan\nmcp: [omni]\ndelegate_only: true\ndelegatable: false\n---\nScan.\n');
 ship('builder', '---\nname: Builder\nmodel: auto\n---\nYou write and ship code.\n');
+ship('reviewer', '---\nname: Reviewer\nmodel: auto\nreview: true\n---\nReview the PR.\n');
 // Written by hand before this machine synced crew files: the first sync sends it once, as a seed.
 mkdirSync(paths.personalCrew, { recursive: true });
 writeFileSync(ownPath('by-hand'), '---\nname: By hand\n---\nMade in an editor.\n');
@@ -105,7 +106,7 @@ describe('agent writes to /api/crew', () => {
     ] as const) {
       const res = await call(method, path, body, conductor);
       expect(res.status).toBe(403);
-      expect(res.body.error).toMatch(/deletes, hides or shows crew roles, in Settings\.$/);
+      expect(res.body.error).toMatch(/(deletes|hides or shows) crew roles, in Settings\.$/);
     }
     expect(getCrew('scratch')).toBeDefined();
     expect(getCrew('builder')?.hidden).toBe(false);
@@ -134,6 +135,8 @@ describe('agent writes to /api/crew', () => {
     expect(powers.status).toBe(403);
     expect(powers.body.error).toMatch(/^mcp is .+'s to set, in Settings\. Leave it out of the save\.$/);
     expect((await call('PUT', '/crew/builder', { fields: { delegate_only: true, delegatable: false } }, conductor)).body.error).toMatch(/^delegate_only, delegatable are /);
+    // S4's review capability is a power too: it changes the run a role gets.
+    expect((await call('PUT', '/crew/builder', { fields: { review: true } }, conductor)).body.error).toMatch(/^review is .+'s to set, in Settings\./);
     expect((await call('POST', '/crew', { id: 'router', fields: { name: 'Router', mcp: ['omni'] } }, conductor)).status).toBe(403);
     const md = await call('PUT', '/crew/builder', { markdown: '---\nmcp: [omni]\n---\nRoute.\n' }, conductor);
     expect(md.status).toBe(403);
@@ -274,6 +277,27 @@ describe('crew files across machines', () => {
     await relay.push([signAs(file('by-hand', { markdown: '---\nname: Theirs\n---\nOther text.\n' }))]);
     expect((await worker.syncNow()).error).toBeUndefined();
     expect(getCrew('by-hand')?.name).toBe('Theirs');
+  });
+
+  it("refuses a file that breaks a built-in's lock, from whatever build sent it, and lands one that keeps them", async () => {
+    await relay.push([
+      signAs(file('reviewer', { markdown: '---\nreview: false\ncharter_mode: append\n---\nAlso check style.\n' })),
+      signAs(file('conductor', { markdown: '---\ndelegate_only: false\nmcp: []\n---\nDo the work yourself.\n' })),
+      signAs(file('usage-scan', { markdown: '---\ncharter_mode: replace\n---\nMy own scan.\n' })),
+    ]);
+    expect((await worker.syncNow()).error).toBeUndefined();
+    for (const id of ['reviewer', 'conductor', 'usage-scan']) expect(existsSync(ownPath(id))).toBe(false);
+    expect(getCrew('reviewer')?.review).toBe(true);
+    expect(getCrew('conductor')).toMatchObject({ delegateOnly: true, mcp: ['omni'] });
+    const refused = db.prepare(`SELECT entity_id, reason FROM sync_refused WHERE entity = 'crew_file' AND reason LIKE 'crew role %' ORDER BY entity_id`).all() as { entity_id: string; reason: string }[];
+    expect(refused.map((r) => r.entity_id)).toEqual(['conductor', 'reviewer', 'usage-scan']);
+    expect(refused.find((r) => r.entity_id === 'reviewer')?.reason).toBe("crew role reviewer: Omni's review rules come with this role. Duplicate it for a reviewer without them.");
+
+    await relay.push([signAs(file('reviewer', { markdown: '---\ncharter_mode: append\n---\nAlso check style.\n' }))]);
+    expect((await worker.syncNow()).error).toBeUndefined();
+    expect(getCrew('reviewer')).toMatchObject({ kind: 'edited', review: true, charter: 'Review the PR.\n\nAlso check style.' });
+    await relay.push([signAs(file('reviewer', null, 'delete'))]);
+    expect((await worker.syncNow()).error).toBeUndefined();
   });
 
   it('queues its crew files again when the relay lost them (Sync backfill), each at the time of its last write', async () => {

@@ -26,6 +26,8 @@ export interface ModelEntry {
   /** The effort used when none is picked. Empty when the model has no levels. */
   defaultEffort: string;
   default?: boolean;
+  /** Left out of the pickers by the Settings choice of models to show. Still runs where a thread already uses it. */
+  hidden?: boolean;
 }
 
 /** GET /harnesses: a harness with its availability, models and cap. */

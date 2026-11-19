@@ -153,13 +153,31 @@ describe('reading the feed', () => {
     }) as unknown as typeof fetch;
     let opened = 0;
     await N.followFeed(
-      { url: () => 'http://127.0.0.1:1/api/feed', token: () => 'tok', fetch: fetchFake, onOpen: () => opened++, onData: (d) => seen.push(d), sleep: async (ms) => void waits.push(ms) },
+      { url: () => 'http://127.0.0.1:1/api/feed', token: async () => 'tok', fetch: fetchFake, onOpen: () => opened++, onData: (d) => seen.push(d), sleep: async (ms) => void waits.push(ms) },
       controller.signal,
     );
     expect((calls[0].headers as Record<string, string>).authorization).toBe('Bearer tok');
     expect(opened).toBe(2);
     expect(seen).toEqual([{ type: 'needs_you' }, { type: 'needs_you' }]);
     expect(waits[0]).toBe(1000);
+  });
+
+  it('sends nothing while the server on the port does not prove it is this install, and backs off', async () => {
+    const calls: RequestInit[] = [];
+    const waits: number[] = [];
+    const controller = new AbortController();
+    const proven = [null, null, 'tok'];
+    const fetchFake = (async (_url: string, init: RequestInit) => {
+      calls.push(init);
+      controller.abort();
+      return { ok: false, status: 503, body: null };
+    }) as unknown as typeof fetch;
+    await N.followFeed(
+      { url: () => 'http://127.0.0.1:1/api/feed', token: async () => proven.shift() ?? null, fetch: fetchFake, onOpen: () => undefined, onData: () => undefined, sleep: async (ms) => void waits.push(ms) },
+      controller.signal,
+    );
+    expect(waits).toEqual([1000, 2000]);
+    expect(calls.map((c) => (c.headers as Record<string, string>).authorization)).toEqual(['Bearer tok']);
   });
 
   it('finds the thread a window shows', () => {

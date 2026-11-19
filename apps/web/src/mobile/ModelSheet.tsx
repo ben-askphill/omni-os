@@ -5,6 +5,7 @@ import { Icon } from '../components/ui.tsx';
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { modelOf, type ModelChoice } from '../components/ModelPicker.tsx';
 import { AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
+import { pickerModels } from '@omni/shared/model-visibility.ts';
 import { MoGroup, MoListRow, MoRadio, MoSection, MoSheet } from './parts.tsx';
 
 /** What a run's chip reads: "Sonnet 5.5 · high", the model's default effort when none is picked. */
@@ -16,9 +17,9 @@ export function runLabel(harnesses: HarnessWithRunning[] | undefined, choice: Mo
 }
 
 /**
- * A new thread's model and effort, or a thread's run to switch, as a sheet: the desktop ModelPicker's list (each harness's models, a missing
- * harness with the command that fixes it) and the EffortPicker's levels. Picking a model resets effort to its default,
- * as on the desktop.
+ * A new thread's model and effort, or a thread's run to switch, as a sheet: the desktop ModelPicker's list (each harness's
+ * models but the ones hidden in Settings, a missing harness with the command that fixes it) and the EffortPicker's
+ * levels. Picking a model resets effort to its default, as on the desktop.
  */
 export function ModelSheet({
   harnesses,
@@ -84,6 +85,8 @@ export function ModelSheet({
         {accounts && !accounts.current && <p className="m-0 px-5 text-[12.5px] text-fg-3">Accounts on {accounts.machine}</p>}
         {harnesses.map((h) => {
           const account = h.available ? accounts?.byHarness[h.id] : undefined;
+          // Models hidden in Settings stay out, except the one already picked.
+          const models = pickerModels(h.models, h.id === choice.harness ? choice.model : null);
           return (
             <MoSection
               key={h.id}
@@ -101,7 +104,7 @@ export function ModelSheet({
             >
               <MoGroup>
                 {h.available ? (
-                  h.models.map((m, i) => (
+                  models.map((m, i) => (
                     <MoListRow
                       key={m.id}
                       icon={
@@ -119,7 +122,7 @@ export function ModelSheet({
                       right={<MoRadio on={h.id === choice.harness && m.id === choice.model} />}
                       onClick={() => onChange({ harness: h.id, model: m.id }, '')}
                       chevron={false}
-                      last={i === h.models.length - 1}
+                      last={i === models.length - 1}
                     />
                   ))
                 ) : (
