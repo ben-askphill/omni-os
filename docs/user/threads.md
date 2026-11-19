@@ -161,6 +161,12 @@ The Details tab's agents card lists them under **Running**. That is every agent 
 
 Claude Code reports its agents itself. Omni maps Codex (multi-agent spawns), Cursor Agent (its task tool) and Hermes (`subagent.*` events) onto the same list. Cursor Cloud reports no sub-agents.
 
+## Context window
+
+The ring in the thread header shows how full the thread's context window is. Click it for what fills the window and **Compact**. On a phone, it is the **Context** row in Thread options. The ring moves on every model call while a turn runs. Once the turn ends, Omni keeps that last reading, so an idle thread still shows its level after Omni restarts, and on your other machines once it syncs.
+
+**Compact** works on an idle thread too, including one with no process running: Omni starts the session again to run the harness's own `/compact`, and the ring drops when it finishes. After a long idle the provider's prompt cache has expired, so that compaction reads the whole conversation at full price. Compact waits while a turn runs. Claude Code takes an optional line on what the summary should keep; Codex compacts without one. Cursor Agent shows its estimated level with Compact off, since it has no compact command. Hermes and Cursor Cloud report no context window, so they show no ring. Starting a thread over with fresh context or on another harness clears the level until the next turn. With Show technical details off in a channel without a repo, the header ring shows only from 70%; the phone's Context row always shows.
+
 ## Goals
 
 On Claude Code, `/goal <condition>` keeps the thread working until the condition holds. A line under the transcript shows the goal: **Pursuing goal** while a turn works on it, **Goal set** while it waits, and **Goal complete** once a turn ends with it met. It also counts how often Claude's check found the condition unmet. **Clear** sends `/goal clear`. A `/goal` message never steers into a running turn: it queues, and a new goal or a clear while one is active stops the turn first. A met goal leaves the line when your next message reaches the session, and any goal goes away when the thread starts a new session. While the thread works toward a goal, its status reads **Goal**, not Running. Claude Code has no pause or resume for goals. The goal stays on the machine that runs the thread and does not sync. Desktop web, phone web and the desktop app show the line; the iOS app does not. Codex, Cursor Agent, Cursor Cloud and Hermes get no goal line.

@@ -19,4 +19,11 @@ export const kv = {
       if (!localKey(key)) record('kv', key);
       return res;
     }),
+  /** Removes the key here and, through sync, on the other machines. */
+  delete: (key: string) =>
+    tx(() => {
+      const gone = db.prepare('DELETE FROM kv WHERE key = ?').run(key).changes > 0;
+      if (gone && !localKey(key)) record('kv', key, 'delete');
+      return gone;
+    }),
 };

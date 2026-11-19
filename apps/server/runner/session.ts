@@ -8,6 +8,7 @@ import { machineName } from '../sync/guard.ts';
 import { detachThread } from '../browser.ts';
 import { turnFinished } from '../sync/files.ts';
 import { followBranch } from '../branch-follow.ts';
+import { settleContext } from '../context.ts';
 import { notifyEnded } from '../push-sender.ts';
 import { suggestNextThread, suggestOpenItems, suggestReply } from './aux.ts';
 import { finishTurnSnapshot, settleSnapshots } from './snapshots.ts';
@@ -139,6 +140,8 @@ export function endTurn(live: Live, status: ThreadStatus, more = false) {
     has_run: 1,
     last_text: runText ? runText.slice(0, 600) : threads.get(id)?.last_text ?? null,
   });
+  // The meter's last reading from this turn, kept for while the thread sits idle (context.ts).
+  settleContext(id);
   // A quick ask is read where it was asked, so it alerts nobody. The task it turns into does. A quiet automation run
   // with nothing to report alerts nobody either (automation-quiet.ts).
   if (!more && !t?.quick) {

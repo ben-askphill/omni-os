@@ -2,6 +2,7 @@
 // starts with fresh context. Fresh context is a handover on the same run: the next turn gets a new native session that
 // reads the thread from Omni's own transcript, which syncs, so it holds the turns another machine ran.
 import { messageRequests, threads, type Thread } from '../db.ts';
+import { forgetContext } from '../context.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { turnBlocked } from '../sync/guard.ts';
 import { resumeRequests } from './api.ts';
@@ -48,5 +49,7 @@ export async function startFresh(threadId: string, by: SetupRetryBy = {}): Promi
   // A warm process holds the old session: the next turn starts a new one.
   const live = lives.get(threadId);
   if (live) closeLive(live);
+  // The new session starts empty: the meter waits for its first reading.
+  forgetContext(threadId);
   return sendParked(threadId, by);
 }

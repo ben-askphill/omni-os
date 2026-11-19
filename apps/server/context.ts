@@ -1,10 +1,11 @@
-// Each thread's context window, for the meter in the thread header. Held in memory: a running process
-// reports it on every call to the model and at the end of every turn, and a Claude thread with no process
-// reads its last call back from the session file. Published on the thread's stream so the ring moves live.
+// Each thread's context window, for the meter in the thread header. A running process reports it on every call
+// to the model and at the end of every turn; the last reading is kept in kv, so an idle thread shows its level
+// after a restart and on the other machine, and a Claude thread can also read its last call back from the
+// session file. Published on the thread's stream so the ring moves live.
 import { readFileSync, statSync } from 'node:fs';
 import { estimateTokens, usageTokens, type ContextResult, type ContextUsage, type ThreadSpend } from '@omni/shared/context-meter.ts';
 import { publishThread } from './bus.ts';
-import { kv, type Thread } from './db.ts';
+import { kv, threads, type Thread } from './db.ts';
 import { sessionFile } from './harness/claude/adapter.ts';
 import type { ContextHint } from './stream.ts';
 import { toolLabel } from './tool-label.ts';
@@ -31,24 +32,45 @@ function rememberWindow(c: ContextUsage) {
   if (prev?.max !== next.max || prev?.modelWindow !== next.modelWindow) kv.set(windowKey(c.model), next);
 }
 
-// Cursor has no session file to read back, so its last reading is kept, and so are its tokens and cost.
+// The last reading of every metered thread is kept (kv syncs it). Cursor's tokens and cost are kept beside it.
 const lastKey = (threadId: string) => `context-last:${threadId}`;
 const spendKey = (threadId: string) => `cursor-spend:${threadId}`;
-const kept = (c: ContextUsage) => c.source === 'cursor' || c.source === 'cursor-estimate';
+const cursorReading = (c: ContextUsage) => c.source === 'cursor' || c.source === 'cursor-estimate';
+
+/** Threads whose reading moved during a turn and is not kept yet: written once when the turn ends (settleContext). */
+const unsaved = new Set<string>();
+
+function keep(threadId: string, c: ContextUsage) {
+  const { spend: _, ...last } = c;
+  kv.set(lastKey(threadId), last);
+}
 
 function publish(threadId: string, c: ContextUsage) {
-  if (kept(c)) {
-    const { spend: _, ...last } = c;
-    kv.set(lastKey(threadId), last);
-    c = { ...last, spend: threadSpend(threadId) };
-  }
+  if (cursorReading(c)) c = { ...c, spend: threadSpend(threadId) };
   snapshots.set(threadId, c);
+  // A turn reports on every call to the model: one write when it ends, not one per call (kv rows sync).
+  const status = threads.get(threadId)?.status;
+  if (status === 'running' || status === 'queued') unsaved.add(threadId);
+  else {
+    unsaved.delete(threadId);
+    keep(threadId, c);
+  }
   publishThread(threadId, { kind: 'context', context: c });
 }
 
-/** The last reading: live, or kept from an earlier run (Cursor). */
+/** The turn ended: keep the last reading it took, so the thread shows it while idle and after a restart. */
+export function settleContext(threadId: string) {
+  if (!unsaved.delete(threadId)) return;
+  const c = snapshots.get(threadId);
+  if (c) keep(threadId, c);
+}
+
+/** The newer of two readings. */
+const newer = (a: ContextUsage | null | undefined, b: ContextUsage | null | undefined) => (!a ? b ?? null : !b ? a : b.updated_at > a.updated_at ? b : a);
+
+/** The last reading: live, or kept from an earlier run here or from the machine that ran the thread. */
 export function lastContext(threadId: string): ContextUsage | null {
-  return snapshots.get(threadId) ?? kv.get<ContextUsage>(lastKey(threadId)) ?? null;
+  return newer(snapshots.get(threadId), kv.get<ContextUsage>(lastKey(threadId)));
 }
 
 export function threadSpend(threadId: string): ThreadSpend | null {
@@ -67,7 +89,7 @@ export function recordSpend(threadId: string, s: ThreadSpend) {
 
 /** A full reading replaces the last one. */
 export function recordContext(threadId: string, c: ContextUsage) {
-  const prev = snapshots.get(threadId);
+  const prev = lastContext(threadId);
   // Codex may not name a window; keep the last one it did.
   const max = c.max ?? prev?.max ?? null;
   // An autocompact window env makes the CLI report it as the model's too; the stream still names the real one.
@@ -82,7 +104,7 @@ export function recordContext(threadId: string, c: ContextUsage) {
  * the last full reading until the turn ends and the CLI sends a new one.
  */
 export function recordContextHint(threadId: string, h: ContextHint, now = new Date()) {
-  const prev = snapshots.get(threadId);
+  const prev = lastContext(threadId);
   if (h.used !== undefined) {
     const model = h.model ?? prev?.model ?? null;
     publish(threadId, {
@@ -102,8 +124,11 @@ export function recordContextHint(threadId: string, h: ContextHint, now = new Da
   else if (prev?.max && window > prev.max && prev.modelWindow !== window) publish(threadId, { ...prev, modelWindow: window });
 }
 
+/** The thread starts over in a new session (another harness, fresh context): its last reading no longer applies. */
 export function forgetContext(threadId: string) {
   snapshots.delete(threadId);
+  unsaved.delete(threadId);
+  kv.delete(lastKey(threadId));
 }
 
 // ---------- the session file ----------
@@ -173,8 +198,8 @@ export function readTranscript(text: string, top = 8): Transcript {
   return { used, model, largest: results.slice(0, top).filter((r) => r.tokens > 0) };
 }
 
-/** The session file read, cached until it changes. Null when there is none. */
-function transcriptOf(t: Pick<Thread, 'cwd' | 'session_id'>): Transcript | null {
+/** The session file read, cached until it changes, and when it last changed. Null when there is none. */
+function transcriptOf(t: Pick<Thread, 'cwd' | 'session_id'>): (Transcript & { at: string }) | null {
   const file = sessionFile(t);
   let st;
   try {
@@ -183,7 +208,8 @@ function transcriptOf(t: Pick<Thread, 'cwd' | 'session_id'>): Transcript | null 
     return null;
   }
   const hit = cache.get(file);
-  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.data;
+  const at = st.mtime.toISOString();
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return { ...hit.data, at };
   let data: Transcript;
   try {
     data = readTranscript(readFileSync(file, 'utf8'));
@@ -191,7 +217,7 @@ function transcriptOf(t: Pick<Thread, 'cwd' | 'session_id'>): Transcript | null 
     return null;
   }
   cache.set(file, { mtimeMs: st.mtimeMs, size: st.size, data });
-  return data;
+  return { ...data, at };
 }
 
 // ---------- the API's view ----------
@@ -216,20 +242,17 @@ export function contextView(t: Thread): ContextView {
   const blocked = compactBlocked(t);
   const compact = { ok: !blocked, ...(blocked && { reason: blocked }), focus: t.harness === 'claude-code' };
   if (!METERED.has(t.harness)) return { context: null, largest: [], compact };
-  if (t.harness === 'cursor') {
-    const last = lastContext(t.id);
-    const spend = threadSpend(t.id);
-    return { context: last ? { ...last, spend } : null, largest: [], compact };
-  }
-  const live = snapshots.get(t.id) ?? null;
-  if (t.harness !== 'claude-code') return { context: live, largest: [], compact };
+  // Live, or kept from the last turn: an idle thread, after a restart too, shows where its window stood.
+  const last = lastContext(t.id);
+  if (t.harness === 'cursor') return { context: last ? { ...last, spend: threadSpend(t.id) } : null, largest: [], compact };
+  if (t.harness !== 'claude-code') return { context: last, largest: [], compact };
   const file = transcriptOf(t);
-  let context = live;
-  // No process has reported since Omni started: the session file has the last call's tokens.
+  let context = last;
+  // Nothing kept (a thread from before Omni kept readings): the session file has the last call's tokens.
   if (!context && file?.used) {
     const model = file.model ?? t.model;
     const known = knownWindow(model);
-    context = { used: file.used, max: known?.max ?? null, modelWindow: known?.modelWindow, model, source: 'claude-transcript', updated_at: new Date().toISOString() };
+    context = { used: file.used, max: known?.max ?? null, modelWindow: known?.modelWindow, model, source: 'claude-transcript', updated_at: file.at };
   }
   return { context, largest: file?.largest ?? [], compact };
 }
