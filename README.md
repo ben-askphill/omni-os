@@ -98,4 +98,4 @@ Start at [docs/](docs/README.md). The most used pages:
 - [Remote access and security](docs/user/remote-access.md)
 - [Known limits](docs/user/limits.md)
 
-Working on Omni itself? Read [CONTRIBUTING.md](CONTRIBUTING.md), then the [architecture overview](docs/internals/overview.md). Domain words (channel, thread, turn, crew role) are defined in [CONTEXT.md](CONTEXT.md).
+Working on Omni itself? Read [CONTRIBUTING.md](CONTRIBUTING.md), then the [architecture overview](docs/internals/overview.md). Domain words (channel, thread, turn, crew role) are defined in [GLOSSARY.md](GLOSSARY.md).

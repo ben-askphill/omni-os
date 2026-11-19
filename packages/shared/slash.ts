@@ -1,5 +1,5 @@
 // The slash grammar, shared by the server and the web app so both agree on what a message runs.
-// See CONTEXT.md: a Slash command is a Harness command or an Omni command.
+// See GLOSSARY.md: a Slash command is a Harness command or an Omni command.
 
 /**
  * Where a command comes from, as the menu groups it. `mcp`: an MCP server's prompt, which only a thread's running process

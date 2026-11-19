@@ -4,7 +4,7 @@
 
 ## Product context
 
-Vocabulary is from the repo's `CONTEXT.md`:
+Vocabulary is from the repo's `GLOSSARY.md`:
 - **Channel** — a client, project or area that groups threads and carries shared facts (repo, store, browser profile). Kinds: client, internal, personal.
 - **Thread** — one task's conversation with one agent, from the first prompt through every follow-up. Never "chat" or "session".
 - **Crew role** — a charter in `crew/*.md` (conductor, researcher, builder, store-ops, inbox).
@@ -15,7 +15,7 @@ Vocabulary is from the repo's `CONTEXT.md`:
 - **Artifacts** (HTML reports, files), **PRs** (GitHub), **usage** (5h / week windows per harness).
 
 ### Sources
-- **GitHub: `ben-askphill/omni-os` @ main** (see `github.md`). Read: `web/src/index.css` (tokens, Bencho blocks), `web/src/components/ui.tsx` (Button, IconButton, Status, Chip, Avatar, Segmented + sliding thumb, InlineConfirm, SlideToConfirm, Picker, Ticks, CheckItem, Toggle, Kbd, Modal), `Sidebar.tsx`, `ThreadList.tsx`, `Transcript.tsx`, `CommandPalette.tsx`, `Toaster.tsx`, `theme.tsx`, `App.tsx`, `pages/Channel.tsx`, `ModelPicker.tsx`, `CONTEXT.md`. Not yet read in full: `Composer.tsx`, `pages/Thread.tsx`, `pages/PRs.tsx`, `DiffViewer.tsx`, `ArtifactViewer.tsx`, `SlashMenu.tsx`.
+- **GitHub: `ben-askphill/omni-os` @ main** (see `github.md`). Read: `web/src/index.css` (tokens, Bencho blocks), `web/src/components/ui.tsx` (Button, IconButton, Status, Chip, Avatar, Segmented + sliding thumb, InlineConfirm, SlideToConfirm, Picker, Ticks, CheckItem, Toggle, Kbd, Modal), `Sidebar.tsx`, `ThreadList.tsx`, `Transcript.tsx`, `CommandPalette.tsx`, `Toaster.tsx`, `theme.tsx`, `App.tsx`, `pages/Channel.tsx`, `ModelPicker.tsx`, `GLOSSARY.md`. Not yet read in full: `Composer.tsx`, `pages/Thread.tsx`, `pages/PRs.tsx`, `DiffViewer.tsx`, `ArtifactViewer.tsx`, `SlashMenu.tsx`.
 - **bencho.dev** (https://bencho.dev) — the MIT block library the web app's interactions come from (pill thumb, say, sld, pik, chk, tick, bell, liquid toggle).
 - Original brief (pasted in chat, Sep 2026). Sample clients Volero, Pink Gellac, Acne Studios from the brief; others invented.
 
@@ -59,7 +59,7 @@ Intentional additions (not in web/src): `OmniMark`/`OmniLogo`/`Loader` (the flui
 
 - **Voice:** a calm operator. Plain, specific, short. The Conductor uses first person ("I'll bring the numbers back before anything ships"); the UI says **you** ("Needs you", "Waiting on you").
 - **Casing:** sentence case for buttons, titles, tabs ("New thread", "Open thread", "Search or jump to"). Section captions are sentence case too, 12px SF Pro medium ("Clients", "Recent threads", "Plan") — no all-caps labels. Channels are written `#Volero`.
-- **Words from CONTEXT.md:** thread (not chat), harness (not provider), crew role (not agent/persona), session only for the harness's own record.
+- **Words from GLOSSARY.md:** thread (not chat), harness (not provider), crew role (not agent/persona), session only for the harness's own record.
 - **Verbs on actions:** "Merge", "Pause WEEKEND15", "Open thread", "Ask the Conductor". Never "Submit", "OK", "Magic".
 - **Exact numbers:** "78.3% → 52.1%", "step 5/9", "Claude 4/6", "resets in 3h 12m".
 - **Mono is for code only:** `T-4F2A`, `omni/t-4f2b-shipping-rates`, `9e1c0af`, `snippets/shipping-rates.liquid`, `funnel-before-after.html`, inline code, tool args/output. Times, counts, model names and labels are SF Pro (tabular figures).

@@ -35,7 +35,7 @@ Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Agents also read [CLAUDE.md](.
 - [Delivery contract](internals/delivery.md): what an accepted message, wake or Stop is promised on any machine, and the known gaps with their expected-fail tests
 - [Transitions](internals/transitions.md): the one service behind a run switch, a handoff or Take over and a Continue, its four routes, the six older routes that answer through it, and what stays as synced kv for machines on an older build
 - [Rust port](internals/rust-port.md): the audit of every module, which move to Rust and in what order, which stay in TypeScript and why, and how parity is checked
-- [Glossary](../CONTEXT.md)
+- [Glossary](../GLOSSARY.md)
 - [Native app pairing contract](internals/app-pairing.md): session pairing, desktop pairing with a one-time nonce, install token rotation, capabilities, and push token registration
 - [iOS app](../apps/ios/README.md) · [iOS release](../apps/ios/RELEASE.md): Activity as Inbox (with machine tiles), Library with claude.ai Artifacts, thinking line, the Open items card, push alerts with a reply preview, Settings and Channel Settings (Accounts, Branch steps, worktree copy/shared directories), Changes review notes, PR steps (Open PR offer, working Fix conflicts / Fix checks, Auto-merge, Rerun failed checks) and forwarded-message rows, shared icons, first build, TestFlight, and the EAS workflow on `main` (native build or EAS Update)
 - [Desktop app](../apps/desktop/README.md): develop against a QA stack, the QA harness (`scripts/qa.ts`), packaging, where data and logs live, the bridge contract and the macOS Activity Monitor · [Desktop release](../apps/desktop/RELEASE.md): signing, notarization and the release workflow

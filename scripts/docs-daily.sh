@@ -50,7 +50,7 @@ init_paths() {
 is_doc_path() {
   local p="$1"
   case "$p" in
-    README.md|CLAUDE.md|AGENTS.md|CONTEXT.md|FORKING.md|CONTRIBUTING.md) return 0 ;;
+    README.md|CLAUDE.md|AGENTS.md|GLOSSARY.md|FORKING.md|CONTRIBUTING.md) return 0 ;;
     docs/*) return 0 ;;
     crew/*.md) return 0 ;;
     *) return 1 ;;

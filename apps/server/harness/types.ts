@@ -4,7 +4,7 @@
 // Cursor Cloud (a Cursor cloud agent on Cursor's own Linux machines, Cursor plan).
 // Beside these built-ins, the user can register custom harnesses: remote agents that speak the Runs API, one file each
 // in data/harnesses/ (custom.ts), with ids `custom:<slug>`.
-// See CONTEXT.md for the domain terms.
+// See GLOSSARY.md for the domain terms.
 import { isCustomHarnessId, type CustomHarnessId } from '@omni/shared/custom-harness.ts';
 
 /** The built-in harnesses. */

@@ -4,7 +4,7 @@ A plan for letting Omni users create and edit their own crew roles (Ben's "agent
 
 - Status: approved 2026-11-18. Ben took the recommendation for every decision, D1 to D11, as written (section 7). S0 to S4 and S7's first part are merged; S5 (no-edits) and S6 (role memory) are being built (T-CREW-S5S6). Task T-AGENTS.
 - Surveyed: `main` at `9e087e5a` (desktop 0.1.35). Every claim about current behavior cites `path:line` on that commit.
-- Wording: the glossary calls these **crew roles** and asks to avoid "agent" (`CONTEXT.md:24-26`). This plan follows it. What the UI calls them is open decision D1.
+- Wording: the glossary calls these **crew roles** and asks to avoid "agent" (`GLOSSARY.md`, Crew role). This plan follows it. What the UI calls them is open decision D1.
 
 ## Summary
 
@@ -365,7 +365,7 @@ Settled 2026-11-18: Ben took the recommendation for all eleven. For D11, the UI 
 
 Why:
 
-- **D1**: `CONTEXT.md:24-26` already settled "crew role" and Settings already has an Agents group with harnesses and accounts (`packages/shared/settings-catalog.ts:11`). Calling roles "Agents" would put two meanings on one word.
+- **D1**: `GLOSSARY.md` (Crew role) already settled "crew role" and Settings already has an Agents group with harnesses and accounts (`packages/shared/settings-catalog.ts:11`). Calling roles "Agents" would put two meanings on one word.
 - **D2**: files keep hand edits, agent-readable diffs and read-every-time behavior, and reuse the automation editor, store and sync handler. A table makes field-level sync easier but splits the source between shipped files and rows.
 - **D3**: replace-only is why a copied charter silently misses fixes like #785. Add-to keeps both.
 - **D4**: the same leak as the automations bug. A user who does Shopify work can duplicate a template from the docs or the Conductor can write one.
