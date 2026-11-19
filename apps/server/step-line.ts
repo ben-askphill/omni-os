@@ -4,15 +4,10 @@
 // as `step` on every thread the clients list, open or get from the feed, next to `delegating`, and only while the
 // thread runs and is on a step. When a call or an answer moves it, the thread goes out on the feed again (watchSteps).
 import { ANSWER_EVENT, QUESTION_EVENT } from '@omni/shared/question.ts';
-import { stepLine, turnSteps } from '@omni/shared/steps.ts';
+import { stepLine, turnSteps, type StepField } from '@omni/shared/steps.ts';
 import { buildItems, isAsking, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 import { bus, EVENT_ADDED, publishFeed, type FeedEvent } from './bus.ts';
 import { db, events, threads } from './db.ts';
-
-/** The field a client thread carries. Absent unless it runs and is on a step. */
-export interface StepField {
-  step?: string;
-}
 
 /** Calls whose input makes the list: every other call's input is left out of the read, since only its name counts. */
 const LIST_CALLS = ['TodoWrite', 'TaskCreate', 'TaskUpdate', 'mcp__omni-steps__set_steps', 'mcp__omni_steps__set_steps'];
