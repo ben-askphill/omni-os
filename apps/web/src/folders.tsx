@@ -5,7 +5,7 @@ import { api, errorText, type ChannelWithRunning, type Folder, type FolderWithTh
 import { useToast } from './components/Toaster.tsx';
 import { ConfirmDialog } from './components/ui.tsx';
 import { useApp } from './store.tsx';
-import { cleanName, DEFAULT_FOLDER_NAME, draftKey, duplicateStandIn, FOLDER_NAME_MAX, freeName, newFolderStandIn, patchFolder, reorderedIds, settledFolder, sortFolders, withCollapsed, withFolders, withoutFolder, withThreadMoved } from './folder-edits.ts';
+import { cleanName, DEFAULT_FOLDER_NAME, draftKey, duplicateStandIn, folderStep, FOLDER_NAME_MAX, freeName, newFolderStandIn, patchFolder, reorderedIds, settledFolder, sortFolders, withCollapsed, withFolders, withoutFolder, withThreadMoved } from './folder-edits.ts';
 
 export { cleanName, DEFAULT_FOLDER_NAME, draftKey, FOLDER_NAME_MAX, freeName, sortFolders };
 
@@ -39,6 +39,10 @@ interface FolderState {
   moveThread: (thread: ThreadStub, folderId: string | null) => Promise<void>;
   /** Put the dragged folder just before `beforeId`, or last for null. */
   reorder: (channelId: string, id: string, beforeId: string | null) => Promise<void>;
+  /** The folders of a channel, in the sidebar's order. */
+  inChannel: (channelId: string) => FolderWithThreads[];
+  /** The folder menu's Move up (-1) and Move down (1), the keyboard's way to reorder: says where it went. */
+  move: (id: string, dir: -1 | 1) => Promise<void>;
 }
 
 const Ctx = createContext<FolderState | null>(null);
@@ -187,6 +191,22 @@ export function FolderProvider({ children }: { children: ReactNode }) {
     [optimistic],
   );
 
+  const inChannel = useCallback((channelId: string) => sortFolders(latest.current.find((c) => c.id === channelId)?.folders ?? []), []);
+
+  // A polite live region that is always in the page, so a move's announcement is read (a region mounted with its
+  // text often is not).
+  const [said, setSaid] = useState('');
+  const move = useCallback(
+    async (id: string, dir: -1 | 1) => {
+      const f = find(id);
+      const step = f && folderStep(inChannel(f.channel_id), id, dir);
+      if (!f || !step) return;
+      setSaid(`Moved ${f.name} ${dir < 0 ? 'above' : 'below'} ${step.past.name}`);
+      await reorder(f.channel_id, id, step.beforeId);
+    },
+    [find, inChannel, reorder],
+  );
+
   const value = useMemo<FolderState>(
     () => ({
       editing,
@@ -203,11 +223,20 @@ export function FolderProvider({ children }: { children: ReactNode }) {
       remove,
       moveThread,
       reorder,
+      inChannel,
+      move,
     }),
     // channels: `deleting` reads the latest list.
-    [editing, deletingId, channels, find, create, rename, toggle, collapseAll, duplicate, remove, moveThread, reorder],
+    [editing, deletingId, channels, find, create, rename, toggle, collapseAll, duplicate, remove, moveThread, reorder, inChannel, move],
   );
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      <div aria-live="polite" className="sr-only" data-folder-announcer>
+        {said}
+      </div>
+    </Ctx.Provider>
+  );
 }
 
 export function useFolders() {

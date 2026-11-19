@@ -36,7 +36,7 @@ export function AccessCard({
     <div className="space-y-4">
       <div>
         <Label hint={set ? chosen.description : `Not set, so it runs at this computer’s default: ${fallback}. ${chosen.description}`}>What agents may do</Label>
-        <Segmented radio label="Access level" value={level} onChange={onLevel} options={ACCESS_LEVELS.map((l) => ({ id: l.id, label: l.label }))} />
+        <Segmented label="Access level" value={level} onChange={onLevel} options={ACCESS_LEVELS.map((l) => ({ id: l.id, label: l.label }))} />
       </div>
       <div>
         <Label hint="An account or the browser can have its own level. A crew role whose file sets a stricter one runs at that.">Connectors</Label>

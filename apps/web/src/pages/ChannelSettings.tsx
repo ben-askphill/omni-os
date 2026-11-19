@@ -318,7 +318,6 @@ export function ChannelSettingsForm({ existing }: { existing?: Channel }) {
         {!isSystem && (
           <Field label="Kind">
             <Segmented
-              radio
               label="Kind"
               value={f.kind}
               onChange={(k) => set('kind', k)}

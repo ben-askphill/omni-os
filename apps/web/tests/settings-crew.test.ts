@@ -154,7 +154,7 @@ it('shows the role hidden once Hide is done, offering Show', async () => {
 });
 
 it("counts the lessons that wait on the Memory tab, and adds one of yours for every channel", async () => {
-  const tab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) => b.textContent?.startsWith('Memory'))!;
+  const tab = [...host.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((b) => b.textContent?.startsWith('Memory'))!;
   expect(tab.textContent).toBe('Memory2');
   expect(tab.title).toBe('2 lessons wait for you');
   await click(tab);

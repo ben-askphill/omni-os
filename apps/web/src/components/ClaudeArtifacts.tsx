@@ -239,7 +239,7 @@ export function useLayoutPref(key: string, fallback: ClaudeArtifactsLayout): [Cl
 
 /** Rows or cards, for a toolbar's right slot. */
 export function LayoutSwitch({ value, onChange }: { value: ClaudeArtifactsLayout; onChange: (l: ClaudeArtifactsLayout) => void }) {
-  return <Segmented label="Layout" value={value} onChange={onChange} size="sm" radio options={CLAUDE_ARTIFACT_LAYOUTS.map((l) => ({ id: l.id, icon: LAYOUT_ICON[l.id], title: l.label }))} />;
+  return <Segmented label="Layout" value={value} onChange={onChange} size="sm" options={CLAUDE_ARTIFACT_LAYOUTS.map((l) => ({ id: l.id, icon: LAYOUT_ICON[l.id], title: l.label }))} />;
 }
 
 function ErrorState({ state, onRetry }: { state: ClaudeArtifactsState; onRetry: () => void }) {
@@ -358,6 +358,7 @@ export function ClaudeArtifactsView({ compact }: { compact?: boolean }) {
 export function ArtifactSourceSwitch({ source, className = '' }: { source: 'files' | 'claude'; className?: string }) {
   return (
     <Segmented
+      kind="nav"
       label="Artifact source"
       value={source}
       className={className}

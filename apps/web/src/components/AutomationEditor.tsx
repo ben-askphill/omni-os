@@ -187,7 +187,7 @@ function EditorBody({ id, onClose, onSaved }: { id: string | null; onClose: () =
             <SwitchRow label="On" hint={draft.enabled ? 'Runs on its schedule or events.' : 'Paused. Run now still works.'} checked={draft.enabled} onChange={(v) => set('enabled', v)} />
 
             <div className="space-y-3 rounded-[18px] p-4 shadow-[inset_0_0_0_1px_var(--line)]">
-              <Segmented radio label="Runs" size="sm" value={draft.trigger} onChange={(v) => set('trigger', v)} options={[{ id: 'schedule', label: 'On a schedule' }, { id: 'event', label: 'On an event' }]} />
+              <Segmented label="Runs" size="sm" value={draft.trigger} onChange={(v) => set('trigger', v)} options={[{ id: 'schedule', label: 'On a schedule' }, { id: 'event', label: 'On an event' }]} />
               {draft.trigger === 'schedule' ? (
                 <>
                   <Field id="auto-cron" label="Cron" hint={cronWords ? cronWords : 'Minute, hour, day of month, month, day of week.'}>

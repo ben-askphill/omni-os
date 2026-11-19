@@ -5,6 +5,7 @@ import { usePageVisible } from '../visible.ts';
 import { AnnotateButton, AnnotateLayer, canAnnotate, useAfterAdd, type AnnotateFrom } from './BrowserAnnotate.tsx';
 import { LiveAnnotateCard, LiveAnnotateOverlay, useLiveAnnotate } from './BrowserAnnotationOverlay.tsx';
 import { Button, Icon, IconButton, Loader } from './ui.tsx';
+import { ROVING_ITEM, rovingItems, useRovingFocus } from './ui/use-roving-focus.ts';
 
 export interface BrowserTabInfo {
   id: string;
@@ -274,53 +275,81 @@ function Favicon({ tab, loading }: { tab: BrowserTabInfo; loading?: boolean }) {
   return <img src={tab.favicon} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setFailed(tab.favicon!)} className="h-4 w-4 shrink-0 rounded-[3px] object-contain" />;
 }
 
-/** Chrome's tab strip: every tab, the active one joined to the toolbar under it, and new tab. */
-function TabStrip({ b }: { b: Browser }) {
+/**
+ * Chrome's tab strip: every tab, the active one joined to the toolbar under it, and new tab. One Tab stop: the arrow
+ * keys, Home and End move between the tabs, Enter or Space switches to one (a switch costs Chrome a new screencast, so
+ * moving alone does not), and Delete closes the focused one. New tab sits outside the tablist, its own Tab stop.
+ */
+export function TabStrip({ b }: { b: Pick<Browser, 'state' | 'action'> }) {
   const s = b.state;
   const tabs = s?.tabs.length ? s.tabs : [{ id: 'blank', url: '', title: s?.running ? 'New Tab' : 'Starting' }];
+  const roving = useRovingFocus({ stop: 'selected' });
+  const close = (id: string) => void b.action({ action: 'closeTab', id });
   return (
-    <div
-      className="scroll-thin flex min-w-0 items-center gap-1 overflow-x-auto px-2 py-1"
-      onDoubleClick={(e) => e.target === e.currentTarget && void b.action({ action: 'newTab' })}
-      role="tablist"
-      aria-label="Browser tabs"
-    >
-      {tabs.map((t) => {
-        const on = t.id === s?.active || tabs.length === 1;
-        return (
-          <div
-            key={t.id}
-            role="tab"
-            aria-selected={on}
-            data-on={on || undefined}
-            title={t.title || t.url}
-            onMouseDown={(e) => {
-              if (e.button === 1) {
-                e.preventDefault();
-                void b.action({ action: 'closeTab', id: t.id });
-              }
-            }}
-            onClick={() => !on && s?.running && void b.action({ action: 'tab', id: t.id })}
-            className="group relative flex h-8 min-w-12 max-w-52 flex-1 cursor-default items-center gap-2 rounded-[12px] pr-1 pl-3 text-[13px] text-fg-3 hover:bg-surface-2 data-[on=true]:bg-surface-3 data-[on=true]:text-fg"
-          >
-            <Favicon tab={t} loading={on && s?.loading} />
-            <span className="min-w-0 flex-1 truncate">{t.title || displayUrl(t.url) || 'New Tab'}</span>
-            {s?.running && t.id !== 'blank' && (
-              <button
-                type="button"
-                aria-label={`Close ${t.title || 'tab'}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void b.action({ action: 'closeTab', id: t.id });
-                }}
-                className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-fg-3 opacity-0 group-hover:opacity-100 group-data-[on=true]:opacity-100 hover:bg-surface-3 hover:text-fg"
-              >
-                <Icon name="x" size={11} />
-              </button>
-            )}
-          </div>
-        );
-      })}
+    <div className="flex min-w-0 items-center gap-1 px-2 py-1" onDoubleClick={(e) => e.target === e.currentTarget && void b.action({ action: 'newTab' })}>
+      <div
+        ref={roving.ref}
+        onKeyDown={roving.onKeyDown}
+        onFocus={roving.onFocus}
+        className="scroll-thin flex min-w-0 items-center gap-1 overflow-x-auto"
+        onDoubleClick={(e) => e.target === e.currentTarget && void b.action({ action: 'newTab' })}
+        role="tablist"
+        aria-label="Browser tabs"
+      >
+        {tabs.map((t) => {
+          const on = t.id === s?.active || tabs.length === 1;
+          const closable = !!s?.running && t.id !== 'blank';
+          const name = t.title || displayUrl(t.url) || 'New Tab';
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              {...ROVING_ITEM}
+              aria-selected={on}
+              aria-keyshortcuts={closable ? 'Delete' : undefined}
+              data-on={on || undefined}
+              title={t.title || t.url}
+              onMouseDown={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault();
+                  close(t.id);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (closable && (e.key === 'Delete' || e.key === 'Backspace')) {
+                  e.preventDefault();
+                  // The focus goes to the tab beside it first, or it would fall to the page with the removed button.
+                  const all = roving.ref.current ? rovingItems(roving.ref.current) : [];
+                  const at = all.indexOf(e.currentTarget);
+                  (all[at + 1] ?? all[at - 1])?.focus();
+                  close(t.id);
+                }
+              }}
+              onClick={() => !on && s?.running && void b.action({ action: 'tab', id: t.id })}
+              className="group relative flex h-8 min-w-12 flex-[0_1_13rem] cursor-default items-center gap-2 rounded-[12px] pr-1 pl-3 text-left text-[13px] text-fg-3 hover:bg-surface-2 data-[on=true]:bg-surface-3 data-[on=true]:text-fg"
+            >
+              <Favicon tab={t} loading={on && s?.loading} />
+              <span className="min-w-0 flex-1 truncate">{name}</span>
+              {closable && (
+                // The mouse's close. Keyboard and screen reader users close with Delete on the tab (aria-keyshortcuts):
+                // a tablist may only hold tabs, so this is no button of its own.
+                <span
+                  aria-hidden="true"
+                  title={`Close ${t.title || 'tab'}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    close(t.id);
+                  }}
+                  className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-fg-3 opacity-0 group-hover:opacity-100 group-data-[on=true]:opacity-100 hover:bg-surface-3 hover:text-fg"
+                >
+                  <Icon name="x" size={11} />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
       <IconButton icon="plus" label="New tab" size={14} className="h-7 w-7" disabled={!s?.running} onClick={() => void b.action({ action: 'newTab' })} />
     </div>
   );

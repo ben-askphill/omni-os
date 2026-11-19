@@ -12,7 +12,7 @@
 <script type="text/babel">
 omReady(({ Segmented }) => {
 
-function App(){const [t,setT]=React.useState('light');return <div className="cells"><div className="cell"><span className="om-caption">icon radio</span><Segmented size="sm" radio value={t} onChange={setT} options={[{id:"light",icon:"sun",title:"Light"},{id:"system",icon:"monitor",title:"System"},{id:"dark",icon:"moon",title:"Dark"}]}/></div><div className="cell"><span className="om-caption">soft tone</span><Segmented size="sm" tone="soft" bare value={t} onChange={setT} options={[{id:"light",label:"Light"},{id:"system",label:"System"},{id:"dark",label:"Dark"}]}/></div></div>}
+function App(){const [t,setT]=React.useState('light');return <div className="cells"><div className="cell"><span className="om-caption">icon radio</span><Segmented size="sm" value={t} onChange={setT} options={[{id:"light",icon:"sun",title:"Light"},{id:"system",icon:"monitor",title:"System"},{id:"dark",icon:"moon",title:"Dark"}]}/></div><div className="cell"><span className="om-caption">soft tone</span><Segmented size="sm" tone="soft" bare value={t} onChange={setT} options={[{id:"light",label:"Light"},{id:"system",label:"System"},{id:"dark",label:"Dark"}]}/></div></div>}
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 });
 </script>

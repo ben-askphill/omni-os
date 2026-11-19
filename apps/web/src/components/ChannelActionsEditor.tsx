@@ -151,7 +151,6 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
         <Label hint={ACTION_PORT_HINT[d.portMode]}>Port</Label>
         <div className="flex flex-wrap items-center gap-2">
           <Segmented
-            radio
             size="sm"
             label="Port"
             value={d.portMode}
@@ -177,7 +176,6 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
       <div>
         <Label hint={ACTION_SETUP_HINT[d.setup ?? 'off']}>Run in new worktrees</Label>
         <Segmented
-          radio
           size="sm"
           label="Run in new worktrees"
           value={d.setup ?? 'off'}
@@ -192,7 +190,6 @@ function ActionForm({ path, action, onSaved, onCancel }: { path: string; action?
       <div>
         <Label hint={ACTION_TEARDOWN_HINT[d.teardown ? 'on' : 'off']}>Run before a worktree is removed</Label>
         <Segmented
-          radio
           size="sm"
           label="Run before a worktree is removed"
           value={d.teardown ? 'on' : 'off'}

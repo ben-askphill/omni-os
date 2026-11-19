@@ -86,6 +86,18 @@ export const withThreadMoved = (thread: ThreadStub, folderId: string | null) => 
 export const withCollapsed = (set: ReadonlySet<string>) => (list: ChannelWithRunning[]) =>
   list.map((c) => (c.folders?.some((f) => set.has(f.id)) ? { ...c, folders: c.folders.map((f) => (set.has(f.id) ? { ...f, collapsed: 1 } : f)) } : c));
 
+/**
+ * Move up (-1) or Move down (1) by one place: the beforeId the reorder takes and the folder it passes, or null when the
+ * folder is already at that end or a stand-in is involved.
+ */
+export function folderStep(folders: FolderWithThreads[], id: string, dir: -1 | 1): { beforeId: string | null; past: FolderWithThreads } | null {
+  const list = sortFolders(folders);
+  const at = list.findIndex((f) => f.id === id);
+  const past = at < 0 ? undefined : list[at + dir];
+  if (!past || id.startsWith('tmp-') || past.id.startsWith('tmp-')) return null;
+  return { beforeId: dir < 0 ? past.id : (list[at + 2]?.id ?? null), past };
+}
+
 /** The channel's folder ids with `id` put just before `beforeId` (last for null); null when nothing would move or a stand-in is involved. */
 export function reorderedIds(folders: FolderWithThreads[], id: string, beforeId: string | null) {
   const ids = folders.map((f) => f.id).filter((x) => x !== id);

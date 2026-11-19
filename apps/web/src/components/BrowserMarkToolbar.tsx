@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import { MARK_COLORS, MARK_STROKES, type MarkShape, type MarkTool } from '@omni/shared/message-context-marks.ts';
 import { Icon, IconButton, type IconName } from './ui.tsx';
 import { useDismissable } from './ui/use-dismissable.ts';
+import { ROVING_ITEM, useRovingFocus } from './ui/use-roving-focus.ts';
 
 export type Tool = 'select' | MarkTool;
 
@@ -30,6 +31,7 @@ function Menu({ label, face, active, children }: { label: string; face: ReactNod
         aria-haspopup="menu"
         aria-expanded={open}
         data-on={active || undefined}
+        {...ROVING_ITEM}
         onClick={() => setOpen((o) => !o)}
         className="hov press inline-flex h-8 items-center gap-0.5 rounded-full pr-1.5 pl-2 text-fg-3 transition-colors hover:text-fg data-[on=true]:text-fg"
       >
@@ -73,11 +75,13 @@ export function MarkToolbar({
   onDelete: () => void;
 }) {
   const current = SHAPES.find((s) => s.shape === shape)!;
+  // One Tab stop: the arrow keys, Home and End move between the tools, and Tab comes back to the last one used.
+  const roving = useRovingFocus();
   return (
-    <div role="toolbar" aria-label="Annotation tools" className="flex shrink-0 flex-wrap items-center gap-0.5 px-2 pb-1">
-      <IconButton icon="pointer" label="Select" size={15} active={tool === 'select'} onClick={() => onTool('select')} />
-      <IconButton icon="pencil" label="Pen" size={15} active={tool === 'pen'} onClick={() => onTool('pen')} />
-      <Menu label="Shapes" active={isShape(tool)} face={<Icon name={current.icon} size={15} />}>
+    <div ref={roving.ref} onKeyDown={roving.onKeyDown} onFocus={roving.onFocus} role="toolbar" aria-label="Annotation tools" className="flex shrink-0 flex-wrap items-center gap-0.5 px-2 pb-1">
+      <IconButton {...ROVING_ITEM} icon="pointer" label="Select" size={15} pressed={tool === 'select'} onClick={() => onTool('select')} />
+      <IconButton {...ROVING_ITEM} icon="pencil" label="Pen" size={15} pressed={tool === 'pen'} onClick={() => onTool('pen')} />
+      <Menu label={isShape(tool) ? `Shapes, ${current.label} on` : 'Shapes'} active={isShape(tool)} face={<Icon name={current.icon} size={15} />}>
         {(close) =>
           SHAPES.map((s) => (
             <IconButton
@@ -85,6 +89,8 @@ export function MarkToolbar({
               icon={s.icon}
               label={s.label}
               size={15}
+              role="menuitemradio"
+              aria-checked={shape === s.shape}
               active={shape === s.shape}
               onClick={() => {
                 onShape(s.shape);
@@ -95,7 +101,7 @@ export function MarkToolbar({
           ))
         }
       </Menu>
-      <IconButton icon="type" label="Text" size={15} active={tool === 'text'} onClick={() => onTool('text')} />
+      <IconButton {...ROVING_ITEM} icon="type" label="Text" size={15} pressed={tool === 'text'} onClick={() => onTool('text')} />
       <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
       <Menu label="Color" face={<span className="h-4 w-4 rounded-full shadow-[0_0_0_1px_var(--line-strong)]" style={{ background: color }} />}>
         {(close) =>
@@ -141,8 +147,8 @@ export function MarkToolbar({
         }
       </Menu>
       <span className="flex-1" />
-      <IconButton icon="undo" label="Undo the last mark" size={15} disabled={!canUndo} onClick={onUndo} />
-      <IconButton icon="trash" label="Delete the selected mark" size={15} disabled={!canDelete} onClick={onDelete} />
+      <IconButton {...ROVING_ITEM} icon="undo" label="Undo the last mark" size={15} disabled={!canUndo} onClick={onUndo} />
+      <IconButton {...ROVING_ITEM} icon="trash" label="Delete the selected mark" size={15} disabled={!canDelete} onClick={onDelete} />
     </div>
   );
 }

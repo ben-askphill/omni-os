@@ -435,7 +435,6 @@ function EditorBody({
                     <LockNote>{locked.charter_mode}</LockNote>
                   ) : (
                     <Segmented
-                      radio
                       label="Your text"
                       size="sm"
                       value={draft.charterMode}
@@ -501,7 +500,7 @@ function EditorBody({
 
             <Section title="Memory">
               <Field label="Lessons" hint={ROLE_MEMORY_CHOICES.find((c) => c.id === draft.memory)?.hint}>
-                <Segmented radio label="Lessons" size="sm" value={draft.memory} onChange={(v) => set('memory', v)} options={ROLE_MEMORY_CHOICES.map((c) => ({ id: c.id, label: c.label }))} />
+                <Segmented label="Lessons" size="sm" value={draft.memory} onChange={(v) => set('memory', v)} options={ROLE_MEMORY_CHOICES.map((c) => ({ id: c.id, label: c.label }))} />
               </Field>
               {draft.memory === 'read-write' && (
                 <Field
@@ -513,7 +512,6 @@ function EditorBody({
                   }
                 >
                   <Segmented
-                    radio
                     label="What its threads propose"
                     size="sm"
                     value={draft.memoryWrites}
