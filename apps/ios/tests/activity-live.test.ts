@@ -46,7 +46,7 @@ function fakeTransport() {
 }
 
 const frame = (value: unknown) => ({ event: 'message', data: JSON.stringify(value) });
-const session = (): OmniSession => ({ serverUrl: BASE, token: async () => 'token', refreshAuth: async () => false });
+const session = (): OmniSession => ({ serverUrl: BASE, serverId: 'mac', token: async () => 'token', refreshAuth: async () => false });
 const thread = (id: string, updated_at: string, over: Record<string, unknown> = {}) => ({ id, channel_id: 'c', title: id, status: 'running', archived: 0, updated_at, ...over });
 const needs = (...ids: string[]) => ({ items: ids.map((id) => ({ thread: thread(id, ''), result: null, blockers: [], at: '' })), unread: 0, blocked: 0 });
 

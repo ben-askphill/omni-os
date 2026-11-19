@@ -3,29 +3,31 @@ import { parseContexts } from '@omni/shared/message-context-kinds.ts';
 import { useSyncExternalStore } from 'react';
 
 import { createStore } from '../live/store';
+import type { ThreadKey } from '../live/thread-key';
 
 /**
- * The context Ben added to each thread's next message and has not sent. It lives at module level like the text draft, so
- * it survives leaving the Changes screen for the thread. It is not saved across a restart.
+ * The context Ben added to each thread's next message and has not sent, per server and thread (live/thread-key.ts). It
+ * lives at module level like the text draft, so it survives leaving the Changes screen for the thread. It is not saved
+ * across a restart, and lines picked on one server never show on another server's thread with the same id.
  */
 const lists = createStore<Readonly<Record<string, readonly MessageContext[]>>>({});
 
 const NONE: readonly MessageContext[] = [];
 
-export const draftContext = (threadId: string): readonly MessageContext[] => lists.get()[threadId] ?? NONE;
+export const draftContext = (key: ThreadKey): readonly MessageContext[] => lists.get()[key] ?? NONE;
 
-export const useDraftContext = (threadId: string): readonly MessageContext[] => useSyncExternalStore(lists.subscribe, () => draftContext(threadId));
+export const useDraftContext = (key: ThreadKey): readonly MessageContext[] => useSyncExternalStore(lists.subscribe, () => draftContext(key));
 
-function put(threadId: string, list: readonly MessageContext[]): void {
+function put(key: ThreadKey, list: readonly MessageContext[]): void {
   lists.set((all) => {
-    const { [threadId]: _gone, ...rest } = all;
-    return list.length ? { ...rest, [threadId]: list } : rest;
+    const { [key]: _gone, ...rest } = all;
+    return list.length ? { ...rest, [key]: list } : rest;
   });
 }
 
 /** Adds `record` to the thread's next message. Null when it is on it, else why it cannot be, in the words the server's limits call for. */
-export function addDraftContext(threadId: string, record: MessageContext): string | null {
-  const list = draftContext(threadId);
+export function addDraftContext(key: ThreadKey, record: MessageContext): string | null {
+  const list = draftContext(key);
   if (list.some((r) => r.id === record.id)) return null;
   const next = [...list, record];
   const checked = parseContexts(next);
@@ -34,25 +36,25 @@ export function addDraftContext(threadId: string, record: MessageContext): strin
     if (JSON.stringify(next).length > CONTEXT_JSON_MAX) return 'Too much for one message. Pick fewer lines, or send what is attached first.';
     return checked.error;
   }
-  put(threadId, next);
+  put(key, next);
   return null;
 }
 
-export function removeDraftContext(threadId: string, id: string): void {
-  const list = draftContext(threadId);
+export function removeDraftContext(key: ThreadKey, id: string): void {
+  const list = draftContext(key);
   if (list.some((r) => r.id === id)) put(
-    threadId,
+    key,
     list.filter((r) => r.id !== id),
   );
 }
 
 /** Drops what a send carried. A record added while it was in flight stays for the next message. */
-export function settleDraftContext(threadId: string, sentIds: readonly string[]): void {
+export function settleDraftContext(key: ThreadKey, sentIds: readonly string[]): void {
   if (!sentIds.length) return;
-  const list = draftContext(threadId);
+  const list = draftContext(key);
   if (list.some((r) => sentIds.includes(r.id))) {
     put(
-      threadId,
+      key,
       list.filter((r) => !sentIds.includes(r.id)),
     );
   }

@@ -1,6 +1,7 @@
 // The Cloudflare API calls Omni Connect makes (docs/adr/0009-omni-connect.md): a remotely managed tunnel per machine,
-// its ingress, and a proxied CNAME under CONNECT_ZONE. Every step looks for what an earlier, interrupted try made
-// before it makes anything, so provisioning again repairs instead of duplicating.
+// its ingress, and a proxied CNAME under CONNECT_ZONE. One call per step: connect.ts records what each write made
+// before it makes the next, and decides what it may reuse, since the account and zone can be shared by every user of
+// a relay.
 import { RelayError } from './auth.ts';
 
 export interface CloudflareConfig {
@@ -9,13 +10,6 @@ export interface CloudflareConfig {
   zoneId: string;
   /** The zone's name, like omni-os.app: hostnames are one label under it. */
   zone: string;
-}
-
-export interface Tunnel {
-  tunnelId: string;
-  dnsRecordId: string;
-  /** What cloudflared runs with (TUNNEL_TOKEN). */
-  connectorToken: string;
 }
 
 const API = 'https://api.cloudflare.com/client/v4';
@@ -41,7 +35,8 @@ export class CloudflareApi {
     }
     const env = (await res.json().catch(() => null)) as Envelope<T> | null;
     if (!res.ok || !env?.success) {
-      const why = env?.errors?.map((e) => `${e.code}: ${e.message}`).join('; ') || `HTTP ${res.status}`;
+      // The status always: a 404 is how nullWhenGone knows a thing is gone, whatever the error says.
+      const why = [...(env?.errors?.map((e) => `${e.code}: ${e.message}`) ?? []), `HTTP ${res.status}`].join('; ');
       throw new RelayError(502, `Cloudflare refused ${method} ${path.split('?')[0]} (${why})`, 'cloudflare');
     }
     return env.result;
@@ -51,42 +46,72 @@ export class CloudflareApi {
     return `/accounts/${this.config.accountId}/cfd_tunnel`;
   }
 
-  /** Make or repair the tunnel, its ingress to 127.0.0.1:<port> and its DNS record. */
-  async provision(tunnelName: string, hostname: string, port: number, known: { tunnelId?: string | null } = {}): Promise<Tunnel> {
-    let tunnelId = known.tunnelId ?? null;
-    if (tunnelId) {
-      const t = await this.call<{ id: string; deleted_at: string | null } | null>('GET', `${this.acct}/${tunnelId}`).catch(() => null);
-      if (!t || t.deleted_at) tunnelId = null;
-    }
-    if (!tunnelId) {
-      const found = await this.call<{ id: string }[]>('GET', `${this.acct}?name=${encodeURIComponent(tunnelName)}&is_deleted=false`);
-      tunnelId = found[0]?.id ?? (await this.call<{ id: string }>('POST', this.acct, { name: tunnelName, config_src: 'cloudflare' })).id;
-    }
-    await this.call('PUT', `${this.acct}/${tunnelId}/configurations`, {
+  /** The tunnel with this id while it exists, or null once it is deleted or unknown. */
+  async tunnel(id: string): Promise<{ id: string; name: string } | null> {
+    const t = await this.call<{ id: string; name: string; deleted_at: string | null } | null>('GET', `${this.acct}/${id}`).catch(nullWhenGone);
+    return t && !t.deleted_at ? { id: t.id, name: t.name } : null;
+  }
+
+  /** The live tunnel with exactly this name, or null. */
+  async findTunnel(name: string): Promise<{ id: string } | null> {
+    const found = await this.call<{ id: string; name: string }[]>('GET', `${this.acct}?name=${encodeURIComponent(name)}&is_deleted=false`);
+    return found.find((t) => t.name === name) ?? null;
+  }
+
+  async createTunnel(name: string): Promise<string> {
+    return (await this.call<{ id: string }>('POST', this.acct, { name, config_src: 'cloudflare' })).id;
+  }
+
+  /** The hostnames the tunnel's ingress serves. */
+  async ingressHostnames(id: string): Promise<string[]> {
+    const r = await this.call<{ config?: { ingress?: { hostname?: unknown }[] } | null } | null>('GET', `${this.acct}/${id}/configurations`);
+    return (r?.config?.ingress ?? []).map((i) => i.hostname).filter((h): h is string => typeof h === 'string');
+  }
+
+  /** Point the tunnel's ingress at 127.0.0.1:<port> for this hostname only. */
+  async configure(id: string, hostname: string, port: number) {
+    await this.call('PUT', `${this.acct}/${id}/configurations`, {
       config: { ingress: [{ hostname, service: `http://127.0.0.1:${port}` }, { service: 'http_status:404' }] },
     });
-    const target = `${tunnelId}.cfargotunnel.com`;
-    const zone = `/zones/${this.config.zoneId}/dns_records`;
-    const [record] = await this.call<{ id: string; content: string }[]>('GET', `${zone}?type=CNAME&name=${encodeURIComponent(hostname)}`);
-    let dnsRecordId: string;
-    if (!record) dnsRecordId = (await this.call<{ id: string }>('POST', zone, { type: 'CNAME', name: hostname, content: target, proxied: true, comment: 'Omni Connect' })).id;
-    else {
-      dnsRecordId = record.id;
-      if (record.content !== target) await this.call('PATCH', `${zone}/${record.id}`, { content: target, proxied: true });
-    }
-    const connectorToken = await this.call<string>('GET', `${this.acct}/${tunnelId}/token`);
-    return { tunnelId, dnsRecordId, connectorToken };
+  }
+
+  private get zoneRecords() {
+    return `/zones/${this.config.zoneId}/dns_records`;
+  }
+
+  async findCname(hostname: string): Promise<{ id: string; content: string } | null> {
+    const [record] = await this.call<{ id: string; content: string }[]>('GET', `${this.zoneRecords}?type=CNAME&name=${encodeURIComponent(hostname)}`);
+    return record ?? null;
+  }
+
+  async createCname(hostname: string, target: string): Promise<string> {
+    return (await this.call<{ id: string }>('POST', this.zoneRecords, { type: 'CNAME', name: hostname, content: target, proxied: true, comment: 'Omni Connect' })).id;
+  }
+
+  async pointCname(recordId: string, target: string) {
+    await this.call('PATCH', `${this.zoneRecords}/${recordId}`, { content: target, proxied: true });
+  }
+
+  /** What cloudflared runs with (TUNNEL_TOKEN). */
+  connectorToken(id: string): Promise<string> {
+    return this.call<string>('GET', `${this.acct}/${id}/token`);
   }
 
   /** Delete the DNS record and the tunnel. Already gone counts as done. */
   async remove(tunnelId: string | null, dnsRecordId: string | null) {
-    const gone = (err: unknown) => {
-      if (!(err instanceof RelayError) || !/HTTP 404|1003|81044|not found/i.test(err.message)) throw err;
-    };
-    if (dnsRecordId) await this.call('DELETE', `/zones/${this.config.zoneId}/dns_records/${dnsRecordId}`).catch(gone);
-    if (tunnelId) await this.call('DELETE', `${this.acct}/${tunnelId}?cascade=true`).catch(gone);
+    if (dnsRecordId) await this.call('DELETE', `${this.zoneRecords}/${dnsRecordId}`).catch(nullWhenGone);
+    if (tunnelId) await this.call('DELETE', `${this.acct}/${tunnelId}?cascade=true`).catch(nullWhenGone);
   }
 }
+
+/** Cloudflare's "no such thing" is null. Anything else, a timeout or an outage, still throws. */
+function nullWhenGone(err: unknown): null {
+  if (!(err instanceof RelayError) || !/HTTP 404|1003|81044|not found/i.test(err.message)) throw err;
+  return null;
+}
+
+/** Where a machine's CNAME points: its tunnel. */
+export const tunnelTarget = (tunnelId: string) => `${tunnelId}.cfargotunnel.com`;
 
 /** The machine's hostname: its name as a DNS label, and 6 hex of a hash so two machines with one name differ. */
 export async function hostnameFor(zone: string, user: string, machineId: string, name: string): Promise<string> {
