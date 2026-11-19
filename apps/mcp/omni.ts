@@ -20,7 +20,7 @@ const USER = process.env.OMNI_USER || 'the user';
 
 /** How delegate and continue_thread describe `device`. */
 const DEVICE_ASK =
-  `"here" for this machine, or a synced machine by id or name from list_devices (this machine's own name means here). ` +
+  `"here" for this machine, or a synced machine by id, name or a part of a name one machine has, from list_devices (this machine's own name means here). ` +
   `When ${USER}'s message @mentions machines, it carries a "Machine mention" item for each with its device id: pass that id for the task ${USER} wrote next to the mention, one call per task. ` +
   `A machine that cannot take the thread (offline on Tailscale, or sync off) fails the call and nothing is made: tell ${USER}, and never run that task on another machine instead`;
 
