@@ -10,7 +10,7 @@ import { useApp, useNow } from '../store.tsx';
 import { useFolders } from '../folders.tsx';
 import { delegatesByParent } from '@omni/shared/delegate-count.ts';
 import { hasOwnLook } from '@omni/shared/channel-icon.ts';
-import { bottomInset, MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoScroll, MoSection, MoTitle } from './parts.tsx';
+import { MoEmpty, MoGroup, MoHeader, MoListRow, MoRound, MoScroll, MoSection, MoTitle } from './parts.tsx';
 import { MoDelegatedRow } from './DelegatedRow.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
 import { rowOf, type RowItem } from './rows.ts';
@@ -279,7 +279,7 @@ export function ChannelScreen({ id }: { id: string }) {
           )}
         </MoSection>
       </MoScroll>
-      <div className="shrink-0 px-4 pt-2" style={{ paddingBottom: bottomInset(0, 16) }}>
+      <div className="safe-b-4 shrink-0 px-4 pt-2">
         <button
           type="button"
           onClick={() => shell.sheet({ name: 'new', channel: id })}

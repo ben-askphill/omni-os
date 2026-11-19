@@ -51,7 +51,7 @@ const SOURCE: Record<string, string> = { manual: 'You', conductor: 'The Conducto
 
 function Body({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`mo-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-2 ${className}`} style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+    <div className={`mo-scroll safe-b-6 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-2 ${className}`}>
       {children}
     </div>
   );
@@ -98,7 +98,7 @@ function Step({ c, depth, running, cwd, tails }: { c: ToolCall; depth: number; r
         )}
         {open && (
           <div className="flex flex-col gap-2 px-3.5 pb-[11px]">
-            <ToolOutput call={c} running={running} touch box={(text) => <div className={`mo-scroll max-h-[60vh] overflow-auto ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{text || '(no output)'}</div>} />
+            <ToolOutput call={c} running={running} touch box={(text) => <div className={`mo-scroll max-h-[60dvh] overflow-auto ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{text || '(no output)'}</div>} />
           </div>
         )}
       </div>
@@ -152,7 +152,7 @@ export function ChangesScreen() {
   return (
     <>
       <MoHeader onBack={shell.back} title="Changes" sub={thread?.branch ?? thread?.title} />
-      <div className="min-h-0 flex-1 pt-1" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="safe-b min-h-0 flex-1 pt-1">
         {thread ? <ChangesTab thread={thread} /> : <MoEmpty>Loading</MoEmpty>}
       </div>
     </>
@@ -336,7 +336,7 @@ export function PRScreen() {
         {crew.length > 0 && <CrewPRList crew={crew} onOpen={(p) => setPicked(p.url)} />}
       </Body>
       {open && (
-        <div className="flex shrink-0 flex-col gap-2 px-4 pt-2" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+        <div className="safe-b-4 flex shrink-0 flex-col gap-2 px-4 pt-2">
           {note && <span className="text-center text-[12.5px] leading-[1.3] text-fg-3">{note}</span>}
           {error && <ErrorNote>{error}</ErrorNote>}
           <SlideToConfirm label="Slide to squash and merge" doneLabel={`Merged #${p.number}`} busyLabel="Merging" disabled={p.isDraft} onConfirm={merge} />
@@ -382,7 +382,7 @@ function BrowserBody({ channelId, threadId, onBack }: { channelId: string; threa
         sub={[url, 'watch only'].filter(Boolean).join(' · ')}
         right={<MoRound icon="annotate" label={annotating ? 'Stop annotating' : 'Annotate this page'} ink={annotating} disabled={!usable} onClick={() => (annotating ? stop() : setAnnotating(true))} />}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+      <div className="safe-b-6 flex min-h-0 flex-1 flex-col gap-2.5 px-3 pt-1">
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] bg-surface">
           <BrowserWatch b={b} box={box}>
             {on && <LiveAnnotateOverlay b={b} box={box} live={live} drive={false} />}
@@ -414,7 +414,7 @@ export function TerminalScreen() {
   return (
     <>
       <MoHeader onBack={shell.back} title="Terminal" sub="Read only · tap lines to add them to a message" />
-      <div className="flex min-h-0 flex-1 flex-col px-3 pt-1" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+      <div className="safe-b-6 flex min-h-0 flex-1 flex-col px-3 pt-1">
         {thread ? (
           <Suspense fallback={<MoEmpty>Loading</MoEmpty>}>
             <TerminalView threadId={thread.id} cwd={thread.cwd} readOnly />

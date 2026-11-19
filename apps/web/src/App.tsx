@@ -139,7 +139,8 @@ function Shell() {
   }, [layout]);
 
   return layout === 'rail' ? (
-    <div className="desktop-shell rail-shell flex h-full min-h-0 flex-row bg-bg">
+    // safe-x: a landscape iPhone gets this shell (844px and up), with the notch and the rounded corners at its sides.
+    <div className="desktop-shell rail-shell safe-x flex h-full min-h-0 flex-row bg-bg">
       <ChannelRail selection={selection} />
       <ListPanel mode={listMode(selection)} onSearch={openPalette} />
       <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-bg">
@@ -155,7 +156,7 @@ function Shell() {
       <FolderDeleteDialog />
     </div>
   ) : (
-    <div className="desktop-shell flex h-full min-h-0 flex-col md:flex-row md:bg-[var(--chrome)] md:py-2 md:pr-2">
+    <div className="desktop-shell safe-x flex h-full min-h-0 flex-col md:flex-row md:bg-[var(--chrome)] md:py-2 md:pr-[max(0.5rem,env(safe-area-inset-right))]">
       {/* Desktop sidebar */}
       <SidebarPane>
         <Sidebar onSearch={openPalette} />

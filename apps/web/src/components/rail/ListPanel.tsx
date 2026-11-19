@@ -53,7 +53,7 @@ function PanelHeader({ title, lead, right }: { title: ReactNode; lead?: ReactNod
   return (
     <div className="rail-panel-top flex h-[62px] shrink-0 items-end gap-1 px-3 pb-1.5">
       {lead}
-      <h2 className={`min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] text-fg ${lead ? '' : 'pl-2.5'}`}>{title}</h2>
+      <h2 className={`line-clamp-2 min-w-0 flex-1 text-[15px] leading-[1.25] font-semibold tracking-[-0.01em] text-balance text-fg ${lead ? '' : 'pl-2.5'}`}>{title}</h2>
       {right}
     </div>
   );
