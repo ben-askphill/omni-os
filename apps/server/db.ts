@@ -31,6 +31,7 @@ export { advanceRead, completions, needsYou, resultReads } from './db/repos/need
 export type { BaseHow, ThreadBase } from './db/repos/thread-bases.ts';
 export { threadBases } from './db/repos/thread-bases.ts';
 export { threadBasePicks } from './db/repos/thread-base-picks.ts';
+export { reportFollowUps } from './db/repos/report-follow-ups.ts';
 export { actionRuns, channelActions, threadSetupRuns } from './db/repos/channel-actions.ts';
 export type { SkippedFile, TurnSnapshot, TurnSnapshotState } from './db/repos/turn-snapshots.ts';
 export { turnSnapshots } from './db/repos/turn-snapshots.ts';

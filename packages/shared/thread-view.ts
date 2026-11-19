@@ -19,6 +19,7 @@ export interface TurnArtifact {
 
 /** What a turn reads of a thread this one delegated to: when it started, and whether it is a team member. */
 export interface TurnChild {
+  id?: string;
   created_at: string;
   source?: string | null;
 }
@@ -53,6 +54,8 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   artifacts: A[];
   /** Threads delegated during the turn. */
   children: C[];
+  /** Reports shown in place (ReportP `shown`) from this turn's children, by the child's id: each shows on its card. */
+  answers: Record<string, ReportP>;
   result: ResultP | null;
   error: string | null;
   /** The Cursor cloud agent run this turn launched or followed up, as it stands now. */
@@ -140,12 +143,18 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   // Until the first switch, the thread ran where that switch moved it from.
   let harness = items.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
   const start = (key: number, at: string): TurnView<A, C> => {
-    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
+    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
     turns.push(t);
     return t;
   };
   let cur: TurnView<A, C> | null = null;
+  const shown: ReportP[] = [];
   for (const it of items) {
+    // A report that started no turn belongs to the turn that delegated its thread, placed below.
+    if (it.type === 'report' && it.p.shown) {
+      shown.push(it.p);
+      continue;
+    }
     // A message or report after a turn ended starts the next one; one sent while it ran was steered into it.
     if (it.type === 'user' || it.type === 'report') {
       if (!cur || endOf(cur)) cur = start(it.key, it.at);
@@ -192,6 +201,12 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
     for (const a of artifacts) turnAt(a.updated_at).artifacts.push(a);
     // Team members show under their lead, not as delegations of their own.
     for (const c of children) if (c.source !== 'team') turnAt(c.created_at).children.push(c);
+    // On the card of its thread; one whose delegating turn is not loaded shows as a report on the newest turn.
+    for (const r of shown) {
+      const t = turns.find((t) => t.children.some((c) => c.id === r.thread_id)) ?? turns[turns.length - 1];
+      if (t.children.some((c) => c.id === r.thread_id)) t.answers[r.thread_id] = r;
+      else t.reports.push(r);
+    }
   }
 
   turns.forEach((t, i) => {

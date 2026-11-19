@@ -25,7 +25,7 @@ import { handoverNote, switchText } from '@omni/shared/run-switch.ts';
 import { ContextChips, hasContext } from '../message-context/ContextChips.tsx';
 import { buildItems, buildTasks, keepSame, same, type Item, toolLabel, toolSummary, type ReportP, type ResultP, type ModLine, type SwitchItem, type ToolCall, type UserP } from '@omni/shared/transcript-fold.ts';
 import { showsSteps, turnsOf, turnSteps, type StepsView } from '@omni/shared/steps.ts';
-import { delegations, mergeTasks, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
+import { answersFor, delegations, mergeTasks, shownAnswers, splitGroup, withLive, type Branch } from '../transcript/delegation.ts';
 import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
 import { clock, toDate } from '@omni/shared/format.ts';
 import type { ThreadHistory } from '../pages/useThreadHistory.ts';
@@ -304,6 +304,10 @@ interface ItemRowProps {
   steps?: StepsView;
   /** The thread's limit line, on the last result when the usage limit stopped that turn. */
   limit?: string | null;
+  /** Reports shown in place from the threads on this group's delegation cards, by thread (`shownAnswers`). */
+  answers?: Record<string, ReportP>;
+  /** A report row whose answer shows on its thread's delegation card instead. */
+  onCard?: boolean;
 }
 
 /**
@@ -312,7 +316,7 @@ interface ItemRowProps {
  * on every fold and compare by value.
  */
 const ItemRow = memo(
-  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit }: ItemRowProps) {
+  function ItemRow({ it, threadId, cwd, running, team, brief, reports, byId, artifacts, pages, steps, limit, answers, onCard }: ItemRowProps) {
     const body = ((): ReactNode => {
       switch (it.type) {
         case 'user': {
@@ -337,7 +341,7 @@ const ItemRow = memo(
               return a ? [<HtmlRender key={`r${c.id}`} a={a} title={r.title} />] : [];
             }),
             ...delegations(it.calls).map((d) => (
-              <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} />
+              <DelegationCard key={`d${d.key}`} lead={d.lead && withLive(d.lead, byId)} branches={d.branches.map((b) => withLive(b, byId))} reports={reports} answers={answers} />
             )),
             ...(pages ?? []).map((p) => <PublishedCard key={`p${p.url}`} p={p} threadId={threadId} artifact={artifacts.findLast((a) => a.url === p.url)} />),
           ];
@@ -353,7 +357,7 @@ const ItemRow = memo(
         case 'error':
           return <ErrorCallout key={it.key} text={it.p.text ?? ''} />;
         case 'report':
-          return <ReportCard key={it.key} p={it.p} />;
+          return onCard ? null : <ReportCard key={it.key} p={it.p} />;
         case 'mod':
           return <ModLog key={it.key} lines={it.lines} />;
         case 'cloud':
@@ -376,7 +380,7 @@ const ItemRow = memo(
   },
   (a, b) => {
     for (const k of Object.keys(b) as (keyof ItemRowProps)[]) {
-      if (k === 'pages' || k === 'steps' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
+      if (k === 'pages' || k === 'steps' || k === 'answers' ? !same(a[k], b[k]) : a[k] !== b[k]) return false;
     }
     return Object.keys(a).length === Object.keys(b).length;
   },
@@ -431,6 +435,7 @@ export const Transcript = memo(function Transcript({
   // The first item is the thread's first message only when the start is held.
   const fromStart = !spans || atStart({ spans });
   const pages = useMemo(() => publishedByGroup(items), [items]);
+  const answers = useMemo(() => shownAnswers(items), [items]);
   const { tasks: live, feedLive } = useApp();
   const stored = useMemo(() => buildTasks(events), [events]);
   const tasks = useMemo(() => mergeTasks(stored, live, threadId, { feedLive, here: !elsewhere }), [stored, live, feedLive, threadId, elsewhere]);
@@ -487,6 +492,8 @@ export const Transcript = memo(function Transcript({
               pages={pages.get(it.key)}
               steps={folded.get(it.key)}
               limit={idx === lastIdx && it.type === 'result' ? limit : undefined}
+              answers={it.type === 'tools' ? answersFor(it.calls, answers) : undefined}
+              onCard={it.type === 'report' && it.p.shown && answers.has(it.p.thread_id)}
             />,
           ])}
           {edgeRow(-1)}

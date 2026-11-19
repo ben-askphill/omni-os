@@ -7,7 +7,7 @@
 // Kept here: the switch, the hostname and the relay's public key in kv under sync.* (never synced), the machine's
 // private key and the tunnel's connector token in the secret store. Pending codes and seen request ids live in
 // memory: a restart only voids codes that were never used.
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { clerkConfig } from '../clerk.ts';
 import { config } from '../config.ts';
 import { kv, outbox } from '../db.ts';
@@ -15,7 +15,7 @@ import { createSession, linkOwner, owner } from '../google-auth.ts';
 import { CONNECT_SECRET_NAMES, deleteSecret, globalSecret, setSecret, SYNC_SECRETS } from '../secrets.ts';
 import { computerName } from '../sync/devices.ts';
 import type { JsonWebKeyInput } from "node:crypto";
-import { HEALTH_REQUEST, HEALTH_RESPONSE, MINT_REQUEST, MINT_RESPONSE, newKeyPair, publicJwk, RELAY_ISSUER, sign, verify, verifyProof, type EcJwk } from './jwt.ts';
+import { HEALTH_REQUEST, HEALTH_RESPONSE, MINT_REQUEST, MINT_RESPONSE, newKeyPair, publicJwk, REGISTER_PROOF, RELAY_ISSUER, sign, thumbprint, verify, verifyProof, type EcJwk } from './jwt.ts';
 import { TunnelSupervisor, type TunnelStatus } from './tunnel.ts';
 
 export const CONNECT_SECRETS = { key: CONNECT_SECRET_NAMES[0], tunnel: CONNECT_SECRET_NAMES[1] } as const;
@@ -63,7 +63,7 @@ export interface ConnectMachine {
 /** The relay calls a machine makes for Connect. Tests pass a fake. */
 export interface ConnectRelay {
   info(url: string): Promise<{ connect: boolean }>;
-  register(url: string, token: string, body: { machineId: string; name: string; publicKey: EcJwk; port: number }): Promise<{ hostname: string; connectorToken: string; relayKey: EcJwk }>;
+  register(url: string, token: string, body: { machineId: string; name: string; publicKey: EcJwk; port: number; proof: string }): Promise<{ hostname: string; connectorToken: string; relayKey: EcJwk }>;
   remove(url: string, token: string, machineId: string): Promise<void>;
   machines(url: string, token: string): Promise<{ id: string; name: string; hostname: string; online?: boolean; problem?: string | null }[]>;
 }
@@ -153,9 +153,22 @@ function machineId(): string {
 async function register(): Promise<{ hostname: string; connectorToken: string }> {
   const { url, token } = await credentials();
   const own = await machineKey();
+  const id = machineId();
+  // The relay keeps this id for the relay token that registered it. Signed in again (a new token), this proof of the
+  // key the machine enrolled is what gets it back; no other machine can make one.
+  const iat = Math.floor(Date.now() / 1000);
+  const proof = sign(own.privateJwk, REGISTER_PROOF, {
+    iss: id,
+    aud: RELAY_ISSUER,
+    sub: relayTokenUser(token),
+    tkh: createHash('sha256').update(token).digest('hex'),
+    jkt: thumbprint(own.publicJwk),
+    iat,
+    exp: iat + 60,
+  });
   let r: Awaited<ReturnType<ConnectRelay['register']>>;
   try {
-    r = await relay.register(url, token, { machineId: machineId(), name: await computerName(), publicKey: own.publicJwk, port: config.port });
+    r = await relay.register(url, token, { machineId: id, name: await computerName(), publicKey: own.publicJwk, port: config.port, proof });
   } catch (err) {
     if (err instanceof RelayRefused) throw new ConnectError(err.message, err.status === 503 ? 503 : err.status === 401 ? 401 : 502);
     throw err;

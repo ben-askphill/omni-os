@@ -120,10 +120,12 @@ async function main() {
   });
   const timezone = await ask('Timezone', cur.user.timezone || fb.timezone, { flag: 'timezone', check: (v) => (isTimezone(v) ? null : 'Unknown timezone, use an IANA name like Europe/Amsterdam.') });
   const pronouns = await ask('Pronouns', cur.user.pronouns || 'they/them', { flag: 'pronouns' });
+  const work = await ask('What you do, in a line (optional)', cur.user.work, { flag: 'work' });
+  const tools = await ask('Tools you use, comma separated (optional)', cur.user.tools, { flag: 'tools' });
   say('');
 
   say('2. Workspace');
-  say('   The workspace folder is where threads without a repo run; its CLAUDE.md and skills load in every Claude thread.');
+  say('   Where Omni keeps your files: threads without a repo run there, and its CLAUDE.md and skills load in every Claude thread.');
   const root = await ask('Workspace folder', cur.workspace.root || tildify(fb.workspaceRoot), { flag: 'workspace' });
   const reposDir = await ask('Folder with your git checkouts', cur.workspace.reposDir || tildify(fb.reposDir), { flag: 'repos' });
   const ghLogin = sh('gh', ['api', 'user', '--jq', '.login']);
@@ -134,7 +136,7 @@ async function main() {
   say('');
 
   const patch: UserConfigPatch = {
-    user: { name, email, timezone: timezone === fb.timezone && !cur.user.timezone ? '' : timezone, pronouns: pronouns || 'they/them' },
+    user: { name, email, timezone: timezone === fb.timezone && !cur.user.timezone ? '' : timezone, pronouns: pronouns || 'they/them', work, tools },
     workspace: { root: root === tildify(fb.workspaceRoot) && !cur.workspace.root ? '' : root, reposDir: reposDir === tildify(fb.reposDir) && !cur.workspace.reposDir ? '' : reposDir, githubOwner },
   };
 
@@ -212,7 +214,7 @@ async function harnesses(server: string | null) {
     if ((h.id === 'hermes' || h.id === 'cursor-cloud') && !h.available) continue;
     const check = harnessCheck(h);
     say(`   ${HARNESS_CHECK_LABEL[check.state].toLowerCase().padEnd(pad)}  ${h.name}`);
-    if (h.id === 'codex') say(`${indent}Reviews the pull requests Claude writes. Without it, the Conductor asks you each time.`);
+    if (h.id === 'codex') say(`${indent}Optional. Reviews a pull request Claude wrote when you ask the Conductor for a review.`);
     if (check.install) say(`${indent}install: ${check.install}`);
     if (check.command) say(`${indent}sign in: ${check.command}`);
     if (check.reason) say(`${indent}${check.reason}`);
@@ -227,7 +229,7 @@ async function harnesses(server: string | null) {
   if (gh.reason) say(`${indent}${gh.reason}`);
   const ghWho = githubLine(gh);
   if (ghWho) say(`${indent}${ghWho}`);
-  if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs. Codex reviews the pull requests Claude writes; Cursor Agent is optional.');
+  if (!list.find((h) => h.id === 'claude-code')?.available) say('   Claude Code is the one Omni needs. Codex and Cursor Agent are optional.');
 }
 
 async function createChannel(server: string | null, name: string, repo: string, store: string) {

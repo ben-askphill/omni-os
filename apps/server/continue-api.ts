@@ -12,9 +12,9 @@ const runSchema = z.object({
   harness: z.string().min(1).max(100),
   model: z.string().max(200).nullish().transform((v) => v ?? ''),
   effort: z.string().max(100).nullish().transform((v) => v ?? ''),
-  // The ids of the source's attachments Ben picked (`CarryoverAttachment.id`). None unless he picks.
+  // The ids of the source's attachments the user picked (`CarryoverAttachment.id`). None unless they pick.
   attachments: z.array(z.string().min(1).max(200)).max(200).optional(),
-  // The machine Ben picked: a synced machine's id, or "here". Left out, Settings > Threads' default.
+  // The machine the user picked: a synced machine's id, or "here". Left out, Settings > Threads' default.
   device: z.string().min(1).max(200).optional(),
 });
 
@@ -26,7 +26,7 @@ continueApi.post('/:id/continue/preview', async (c) => {
 });
 
 const startSchema = runSchema.extend({
-  // Ben's message goes as he wrote it, after the Carryover, never cut.
+  // The user's message goes as they wrote it, after the Carryover, never cut.
   text: z.string().refine((s) => s.trim().length > 0, 'Write the first message for the new thread.'),
   // The client's id for this start, kept across its retries: a retry gets the same thread back.
   request_id: z.string().min(1).max(200),

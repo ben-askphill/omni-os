@@ -27,7 +27,7 @@ const conductor = (over: Partial<Channel> = {}) => ({ id: 'conductor', name: 'Co
 
 const turn: TurnView = {
   key: 1, at: '2026-01-05T11:58:00.000Z', prompts: [], steps: 0, progress: null, failed: 0, texts: ['All three PRs are open.'], prose: 'All three PRs are open.',
-  proseClipped: null, reports: [], questions: [], artifacts: [], children: [], result: null, error: null, cloud: null, status: 'done',
+  proseClipped: null, reports: [], questions: [], artifacts: [], children: [], answers: {}, result: null, error: null, cloud: null, status: 'done',
   items: [], switches: [], harness: 'claude-code',
 };
 

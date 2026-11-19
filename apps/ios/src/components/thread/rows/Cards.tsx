@@ -184,8 +184,8 @@ export function DelegationRow({ row }: Of<'delegation'>) {
     <View style={[styles.card, { backgroundColor: colors.surface, paddingHorizontal: space.s4 }]}>
       <Text style={[styles.cardTitle, { color: colors.fg, paddingHorizontal: space.s4 }]}>{`Delegated ${plural(row.kids.length, 'task')}`}</Text>
       {row.kids.map((k) => (
+        <View key={k.id}>
         <Pressable
-          key={k.id}
           accessibilityRole="button"
           accessibilityLabel={`${k.title || 'Untitled'}, ${k.status}`}
           onPress={() => openThread(k.id)}
@@ -202,6 +202,12 @@ export function DelegationRow({ row }: Of<'delegation'>) {
             </Text>
           </View>
         </Pressable>
+        {row.answers[k.id] && k.status !== 'running' && k.status !== 'queued' ? (
+          <View style={styles.answer}>
+            <MarkdownIn text={row.answers[k.id].text || '(no reply)'} />
+          </View>
+        ) : null}
+        </View>
       ))}
     </View>
   );
@@ -333,6 +339,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   kidTitle: { fontSize: fontSize.body },
+  answer: { paddingHorizontal: space.s4, paddingTop: space.s3 },
   fileIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   pill: { minHeight: minTarget, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: space.s7 },
   pillText: { flex: 1, fontSize: 13.5 },

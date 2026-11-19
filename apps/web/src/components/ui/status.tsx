@@ -47,7 +47,7 @@ const SHAPE: Record<Mark | 'loading', ReactNode> = {
       <path d="M8 2.5H5A2.5 2.5 0 0 0 2.5 5v6A2.5 2.5 0 0 0 5 13.5h3Z" />
     </>
   ),
-  // Diamonds: Ben has it. Filled while the agent waits on him, hollow for a held message, half for a review.
+  // Diamonds: the user has it. Filled while the agent waits on them, hollow for a held message, half for a review.
   question: <path d="M8 1.2 14.8 8 8 14.8 1.2 8Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />,
   crew_question: (
     <>

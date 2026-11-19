@@ -12,7 +12,7 @@ type Row = Omit<ServerOption, 'source'>;
 
 function rows(): Row[] {
   return [
-    // Harnesses & models
+    // Models
     { env: 'OMNI_DEFAULT_MODEL', section: 'models', label: 'Claude Code model when nothing picks one', hint: 'Used when the thread, its crew role and its channel name no Claude model.', value: config.defaultModel, default: 'claude-sonnet-5-5' },
     { env: 'OMNI_PERMISSION_MODE', section: 'models', label: 'Claude Code permission mode', hint: 'Headless runs cannot answer prompts, so the default skips them.', value: config.permissionMode, default: 'bypassPermissions' },
     { env: 'OMNI_CLAUDE_BIN', section: 'models', label: 'Claude Code binary', hint: 'The claude CLI Omni starts.', value: config.claudeBin, default: 'claude' },

@@ -4,16 +4,20 @@
 //! Inside an Omni thread the server sets OMNI_URL, OMNI_TOKEN or OMNI_TOKEN_FILE, OMNI_DATA_DIR and OMNI_THREAD_ID.
 //! In a terminal the desktop app's shim sets the install's facts instead: OMNI_APP, OMNI_INSTALL_DATA_DIR,
 //! OMNI_INSTALL_LOG and OMNI_INSTALL_PORT. Nothing here guesses a path.
+//!
+//! A data folder's token (OMNI_DATA_DIR, or the install's from the shim) stays on this machine: it goes only to a
+//! server here that proves it holds it, never to another machine, which needs its own in OMNI_TOKEN or
+//! OMNI_TOKEN_FILE. Plain http leaves this machine only for a Tailscale address, where Tailscale encrypts the link.
 
 use std::cell::Cell;
-use std::net::Ipv6Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, Instant};
 
 use omni_core::js::{self, JsValue};
 
 use crate::error::{Error, Failure, Result};
 use crate::http::{self, Dropped};
-use crate::proof::{PROBE_MS, Probe, probe};
+use crate::proof::{PROBE_MS, Probe, probe, probe_install};
 use crate::sys;
 use crate::text::{path_join, slice16};
 
@@ -45,12 +49,21 @@ pub struct Connection {
     pub base_url: String,
     /// The port on this machine, when the server is local.
     pub port: u16,
-    /// OMNI_URL set the address, so it may be another machine.
+    /// OMNI_URL set the address, and it is not this machine's loopback.
     pub remote: bool,
-    /// The address is the install's port on this machine, not OMNI_URL: whatever holds that port proves it is this
-    /// install's Omni (GET /api/auth/proof) before it gets the token.
+    /// OMNI_URL is a Tailscale address: it leads to a machine on your own tailnet.
+    pub tailnet: bool,
+    /// OMNI_URL's host, as `normal_host` writes it.
+    pub host: Option<String>,
+    /// Whatever holds the address proves it holds the token (GET /api/auth/proof) before it gets it: the install's
+    /// port without OMNI_URL, and any address on this machine when the token is a data folder's.
     pub prove_first: bool,
+    /// The install's own port, which its server signs its proof with, also behind a tunnel or `tailscale serve`.
+    pub install_port: u16,
     pub token_source: TokenSource,
+    /// The token is a data folder's on this machine (OMNI_DATA_DIR or the install's), not one named for the address:
+    /// it never goes to another machine.
+    pub local_token: bool,
     env_token: Option<String>,
     pub data_dir: Option<String>,
     /// The thread an agent runs this in.
@@ -70,8 +83,25 @@ fn port_of(text: Option<String>) -> Option<u16> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct BaseUrl {
     pub url: String,
+    /// In lower case, an IPv6 address in brackets.
+    pub host: String,
     pub port: u16,
     pub loopback: bool,
+    pub https: bool,
+    /// A Tailscale address: Tailscale encrypts the link, so plain http to it is not in the clear.
+    pub tailnet: bool,
+}
+
+/// 100.64.0.0/10, fd7a:115c:a1e0::/48 or a MagicDNS name under .ts.net, the addresses Tailscale gives its machines.
+fn on_tailnet(host: &str) -> bool {
+    if let Some(inner) = host.strip_prefix('[').and_then(|h| h.strip_suffix(']')) {
+        return inner.parse::<Ipv6Addr>().is_ok_and(|ip| ip.segments()[..3] == [0xfd7a, 0x115c, 0xa1e0]);
+    }
+    if let Ok(ip) = host.parse::<Ipv4Addr>() {
+        let [a, b, ..] = ip.octets();
+        return a == 100 && (64..128).contains(&b);
+    }
+    host.strip_suffix('.').unwrap_or(host).ends_with(".ts.net")
 }
 
 /// The address in OMNI_URL, or `None` when it is not an http(s) server address: a scheme, a host with an optional
@@ -113,48 +143,111 @@ pub fn parse_base_url(input: &str) -> Option<BaseUrl> {
         }
     };
     let host = host.to_ascii_lowercase();
-    let loopback = host == "127.0.0.1"
-        || host == "localhost"
+    let loopback = host == "localhost"
+        || host.parse::<Ipv4Addr>().is_ok_and(|ip| ip.is_loopback())
         || host
             .strip_prefix('[')
             .and_then(|h| h.strip_suffix(']'))
             .and_then(|h| h.parse::<Ipv6Addr>().ok())
             .is_some_and(|ip| ip == Ipv6Addr::LOCALHOST);
-    Some(BaseUrl { url: format!("{}://{authority}{}", if https { "https" } else { "http" }, path.trim_end_matches('/')), port, loopback })
+    Some(BaseUrl {
+        url: format!("{}://{authority}{}", if https { "https" } else { "http" }, path.trim_end_matches('/')),
+        port,
+        loopback,
+        https,
+        tailnet: on_tailnet(&host),
+        host,
+    })
+}
+
+/// A host to compare: an address in its usual form without brackets, a name in lower case without a final dot.
+pub fn normal_host(host: &str) -> String {
+    let bare = host.strip_prefix('[').and_then(|h| h.strip_suffix(']')).unwrap_or(host);
+    match bare.parse::<IpAddr>() {
+        Ok(ip) => ip.to_string(),
+        Err(_) => bare.strip_suffix('.').unwrap_or(bare).to_ascii_lowercase(),
+    }
+}
+
+/// This machine's own Tailscale name and addresses in `tailscale status --json`, when Tailscale is running.
+pub fn own_tailnet_hosts_in(status: &str) -> Vec<String> {
+    let Ok(status) = js::parse(status) else { return Vec::new() };
+    let text = |v: Option<&JsValue>| v.and_then(JsValue::as_js_string).map(js::JsString::to_string_lossy).filter(|s| !s.is_empty());
+    if text(status.get("BackendState")).as_deref() != Some("Running") {
+        return Vec::new();
+    }
+    let Some(me) = status.get("Self") else { return Vec::new() };
+    let ips = me.get("TailscaleIPs").and_then(JsValue::as_array).unwrap_or_default();
+    text(me.get("DNSName")).into_iter().chain(ips.iter().filter_map(|ip| text(Some(ip)))).map(|h| normal_host(&h)).collect()
+}
+
+/// Asks the `tailscale` command, or the Mac app's copy of it. Empty when neither runs or Tailscale is not up.
+fn own_tailnet_hosts() -> Vec<String> {
+    const MAC_APP: &str = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
+    for bin in ["tailscale", MAC_APP] {
+        let ran = sys::run(bin, &["status", "--json"], Duration::from_secs(5));
+        if ran.code == Some(0) {
+            return own_tailnet_hosts_in(&ran.stdout);
+        }
+    }
+    Vec::new()
 }
 
 impl Connection {
     pub fn from_env() -> Result<Self> {
-        let port = port_of(sys::env("OMNI_INSTALL_PORT")).or_else(|| port_of(sys::env("OMNI_PORT"))).unwrap_or(DEFAULT_PORT);
-        let url = sys::env("OMNI_URL");
+        Self::from_vars(sys::env)
+    }
+
+    /// From the variables `var` reads, as `sys::env` does: trimmed, and `None` when empty.
+    pub fn from_vars(var: impl Fn(&str) -> Option<String>) -> Result<Self> {
+        let install_port = port_of(var("OMNI_INSTALL_PORT")).or_else(|| port_of(var("OMNI_PORT"))).unwrap_or(DEFAULT_PORT);
+        let url = var("OMNI_URL");
         let parsed = match &url {
             Some(url) => Some(parse_base_url(url).ok_or_else(|| Error::cli(format!("OMNI_URL is not an http(s) address: {url}")))?),
             None => None,
         };
-        let own_data = sys::env("OMNI_DATA_DIR");
-        let data_dir = own_data.clone().or_else(|| sys::env("OMNI_INSTALL_DATA_DIR"));
-        let env_token = sys::env("OMNI_TOKEN");
+        if let (Some(url), Some(p)) = (&url, &parsed)
+            && !(p.https || p.loopback || p.tailnet)
+        {
+            return Err(Error::cli(format!(
+                "OMNI_URL is plain http to another machine: {url}. Use https, or a Tailscale address (100.64.0.0/10, fd7a:115c:a1e0::/48 or a .ts.net name). Nothing was sent."
+            )));
+        }
+        let own_data = var("OMNI_DATA_DIR");
+        let data_dir = own_data.clone().or_else(|| var("OMNI_INSTALL_DATA_DIR"));
+        let env_token = var("OMNI_TOKEN");
+        let mut local_token = false;
         let token_source = if env_token.is_some() {
             TokenSource::Env
-        } else if let Some(path) = sys::env("OMNI_TOKEN_FILE") {
+        } else if let Some(path) = var("OMNI_TOKEN_FILE") {
             TokenSource::File { path, from: "OMNI_TOKEN_FILE" }
         } else if let Some(dir) = &data_dir {
+            local_token = true;
             TokenSource::File { path: path_join(dir, "api-token"), from: if own_data.is_some() { "OMNI_DATA_DIR" } else { "the install" } }
         } else {
             TokenSource::None
         };
         Ok(Self {
-            base_url: parsed.as_ref().map_or_else(|| format!("http://127.0.0.1:{port}"), |p| p.url.clone()),
-            port: parsed.as_ref().map_or(port, |p| p.port),
+            base_url: parsed.as_ref().map_or_else(|| format!("http://127.0.0.1:{install_port}"), |p| p.url.clone()),
+            port: parsed.as_ref().map_or(install_port, |p| p.port),
             remote: parsed.as_ref().is_some_and(|p| !p.loopback),
-            prove_first: parsed.is_none(),
+            tailnet: parsed.as_ref().is_some_and(|p| p.tailnet),
+            host: parsed.as_ref().map(|p| normal_host(&p.host)),
+            prove_first: parsed.is_none() || local_token,
+            install_port,
             token_source,
+            local_token,
             env_token,
             data_dir,
-            thread: sys::env("OMNI_THREAD_ID"),
-            app: sys::env("OMNI_APP"),
-            log_file: sys::env("OMNI_INSTALL_LOG"),
+            thread: var("OMNI_THREAD_ID"),
+            app: var("OMNI_APP"),
+            log_file: var("OMNI_INSTALL_LOG"),
         })
+    }
+
+    /// A data folder's token, and OMNI_URL leads to another machine: nothing goes there.
+    pub fn token_stays_here(&self) -> bool {
+        self.remote && self.local_token
     }
 
     /// Read again on every request, so a rotated token file is picked up.
@@ -205,9 +298,10 @@ fn error_message(body: &str, content_type: Option<&str>, status: u16) -> String 
 }
 
 /// Another program, or another install's Omni, can hold the install's port while this one is not running. On that
-/// address the token goes only to a server that proved it holds the same token: before a request, unless a proof
-/// passed within `PROOF_FRESH` and the connection has not dropped since. With no token there is nothing to prove
-/// with, so nothing is sent at all.
+/// address, and on any address here when the token is a data folder's, the token goes only to a server that proved
+/// it holds the same token: before a request, unless a proof passed within `PROOF_FRESH` and the connection has not
+/// dropped since. With no token there is nothing to prove with, so nothing is sent at all. A data folder's token
+/// never goes to another machine.
 pub struct Client {
     pub conn: Connection,
     proven_at: Cell<Option<Instant>>,
@@ -233,8 +327,19 @@ impl Client {
         self.proven_at.set(None);
     }
 
+    fn stays_here(&self) -> Error {
+        Error::cli(format!(
+            "{} is another machine. The only token here is this machine's own, {}, so nothing was sent. Put that machine's token in OMNI_TOKEN or OMNI_TOKEN_FILE.",
+            self.conn.base_url,
+            describe_source(&self.conn.token_source)
+        ))
+    }
+
     /// Makes sure the server may have the token, as before a request.
     pub fn prove(&self) -> Result<()> {
+        if self.conn.token_stays_here() {
+            return Err(self.stays_here());
+        }
         if !self.conn.prove_first {
             return Ok(());
         }
@@ -263,6 +368,39 @@ impl Client {
         };
         Err(Error::cli(format!(
             "{at} {who}: another install or another program holds the port. The token was not sent. omni doctor says more."
+        )))
+    }
+
+    /// Before a link that carries the token is printed (`open --pair`), which takes it wherever the link points. To
+    /// another address with a data folder's token, only when it is this Mac's own Tailscale name or address (as
+    /// `tailscale serve` gives it, and `tailscale status` says), and the server behind it proves it with the port it
+    /// listens on, the install's. The proof alone is not enough: any other server, on the tailnet or not, could hand on
+    /// this install's proof from one of its addresses.
+    pub fn prove_for_link(&self) -> Result<()> {
+        self.prove_for_link_with(own_tailnet_hosts)
+    }
+
+    /// `prove_for_link` with this machine's Tailscale hosts from `own`, asked only for a Tailscale address.
+    fn prove_for_link_with(&self, own: impl FnOnce() -> Vec<String>) -> Result<()> {
+        if !self.conn.token_stays_here() {
+            return self.prove();
+        }
+        let at = &self.conn.base_url;
+        let mine = self.conn.tailnet && self.conn.host.as_ref().is_some_and(|host| own().contains(host));
+        if !mine {
+            return Err(Error::cli(format!(
+                "{at} is not this Mac's own Tailscale address, and the link would take this machine's token there, so it was not printed. Use this Mac's .ts.net name or 100.x address with Tailscale running, or put that machine's token in OMNI_TOKEN."
+            )));
+        }
+        let who = match probe_install(&self.conn) {
+            Probe::Omni { mine: Some(true) } => return Ok(()),
+            Probe::Free => return Err(Error::unreachable("connection refused")),
+            Probe::Slow => return Err(Error::unreachable(&format!("no answer within {}s", PROBE_MS / 1000))),
+            Probe::Omni { .. } => "answers as Omni, but not as this install".to_string(),
+            Probe::NotOmni { detail } => format!("answers, but not as Omni ({detail})"),
+        };
+        Err(Error::cli(format!(
+            "{at} {who}. The link would take this machine's token there, so it was not printed. To pair with that machine, put its token in OMNI_TOKEN."
         )))
     }
 
@@ -365,6 +503,193 @@ mod tests {
         ] {
             assert_eq!(base(bad), None, "{bad}");
         }
+    }
+
+    /// The variables a test names, read as `sys::env` reads the environment.
+    fn vars(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let pairs: Vec<(String, String)> = pairs.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect();
+        move |name| pairs.iter().find(|(k, _)| k == name).map(|(_, v)| js::trim_str(v).to_string()).filter(|v| !v.is_empty())
+    }
+
+    fn connect(pairs: &[(&str, &str)]) -> Connection {
+        Connection::from_vars(vars(pairs)).unwrap_or_else(|e| panic!("{pairs:?}: {}", e.message()))
+    }
+
+    #[test]
+    fn knows_loopback_and_tailnet_addresses() {
+        let reach = |input: &str| parse_base_url(input).map(|b| (b.loopback, b.tailnet, b.https));
+        assert_eq!(reach("http://127.0.0.2:4747"), Some((true, false, false)));
+        assert_eq!(reach("http://LOCALHOST"), Some((true, false, false)));
+        assert_eq!(reach("http://[::1]"), Some((true, false, false)));
+        assert_eq!(reach("http://100.64.0.1:4747"), Some((false, true, false)));
+        assert_eq!(reach("http://100.127.255.255"), Some((false, true, false)));
+        assert_eq!(reach("http://[FD7A:115C:A1E0::42]:4747"), Some((false, true, false)));
+        assert_eq!(reach("http://omarchy.tail1234.ts.net:4747"), Some((false, true, false)));
+        assert_eq!(reach("http://omarchy.tail1234.TS.NET.:4747"), Some((false, true, false)));
+        assert_eq!(reach("https://omni.example.com"), Some((false, false, true)));
+        for outside in [
+            "http://100.63.255.255",
+            "http://100.128.0.1",
+            "http://[fd7a:115c:a1e1::1]",
+            "http://evilts.net",
+            "http://ts.net.example.com",
+            "http://100.64.0.1.example.com",
+            "http://192.168.1.20:4747",
+        ] {
+            assert_eq!(reach(outside), Some((false, false, false)), "{outside}");
+        }
+    }
+
+    #[test]
+    fn sends_plain_http_off_this_machine_only_over_a_tailnet() {
+        for refused in ["http://192.168.1.20:4747", "http://omni.example.com", "http://100.128.0.1:4747", "HTTP://mac.local:4747"] {
+            let Err(e) = Connection::from_vars(vars(&[("OMNI_URL", refused), ("OMNI_TOKEN", "test-token")])) else {
+                panic!("{refused} was taken");
+            };
+            assert!(
+                e.message().starts_with(&format!("OMNI_URL is plain http to another machine: {refused}. Use https")),
+                "{}",
+                e.message()
+            );
+        }
+        for taken in [
+            "https://omni.example.com",
+            "http://127.0.0.1:4747",
+            "http://localhost:4747",
+            "http://100.101.102.103:4747",
+            "http://[fd7a:115c:a1e0::1]:4747",
+            "http://mac.tail1234.ts.net:4747",
+        ] {
+            connect(&[("OMNI_URL", taken), ("OMNI_TOKEN", "test-token")]);
+        }
+    }
+
+    #[test]
+    fn keeps_a_data_folder_token_on_this_machine() {
+        let remote = "https://omni.example.test";
+        for data in [("OMNI_INSTALL_DATA_DIR", "/nowhere/install"), ("OMNI_DATA_DIR", "/nowhere/data")] {
+            let conn = connect(&[("OMNI_URL", remote), data]);
+            assert!(conn.remote && conn.local_token && conn.token_stays_here(), "{data:?}");
+            let refused = Client::new(conn, false).prove().expect_err("another machine with a data folder's token");
+            assert!(refused.message().contains("is another machine. The only token here is this machine's own"), "{}", refused.message());
+            assert!(refused.message().contains("OMNI_TOKEN or OMNI_TOKEN_FILE"), "{}", refused.message());
+        }
+        // A token named for the address goes there, as before: no proof, since a tunnel signs another port.
+        for named in [("OMNI_TOKEN", "that-machine"), ("OMNI_TOKEN_FILE", "/nowhere/tok")] {
+            let conn = connect(&[("OMNI_URL", remote), named, ("OMNI_INSTALL_DATA_DIR", "/nowhere/install")]);
+            assert!(conn.remote && !conn.local_token && !conn.prove_first, "{named:?}");
+            assert!(Client::new(conn, false).prove().is_ok(), "{named:?}");
+        }
+        // Inside a thread: OMNI_URL on loopback with the thread's token, which the server set for it.
+        assert!(connect(&[("OMNI_URL", "https://mac.tail1234.ts.net"), ("OMNI_INSTALL_DATA_DIR", "/i")]).tailnet);
+        assert!(!connect(&[("OMNI_URL", remote), ("OMNI_INSTALL_DATA_DIR", "/i")]).tailnet);
+        let thread = connect(&[("OMNI_URL", "http://127.0.0.1:4747"), ("OMNI_TOKEN", "thread-token"), ("OMNI_INSTALL_DATA_DIR", "/i")]);
+        assert!(!thread.remote && !thread.local_token && !thread.prove_first);
+        // A data folder's token on an address here goes only to a server that proves it holds it.
+        let here =
+            connect(&[("OMNI_URL", "http://localhost:4757"), ("OMNI_INSTALL_DATA_DIR", "/nowhere/install"), ("OMNI_INSTALL_PORT", "4800")]);
+        assert!(!here.remote && here.local_token && here.prove_first);
+        assert_eq!((here.port, here.install_port), (4757, 4800));
+        // Without OMNI_URL: the install's port, proved first, whatever the token.
+        let port = connect(&[("OMNI_TOKEN", "t"), ("OMNI_INSTALL_PORT", "4800")]);
+        assert_eq!((port.base_url.as_str(), port.prove_first, port.local_token), ("http://127.0.0.1:4800", true, false));
+    }
+
+    /// A stand-in Omni on a local port that answers every proof as `signs` says, and notes what it was asked.
+    struct Answerer {
+        port: u16,
+        seen: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    }
+
+    fn answerer(signs: impl Fn(&str) -> String + Send + 'static) -> Answerer {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a local port");
+        let port = listener.local_addr().expect("its address").port();
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let noted = seen.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { break };
+                let mut head = Vec::new();
+                let mut byte = [0u8; 1];
+                while !head.ends_with(b"\r\n\r\n") && stream.read(&mut byte).is_ok_and(|n| n == 1) {
+                    head.push(byte[0]);
+                }
+                let head = String::from_utf8_lossy(&head).to_string();
+                let line = head.lines().next().unwrap_or_default().to_string();
+                let authorized = head.lines().any(|l| l.to_ascii_lowercase().starts_with("authorization:"));
+                noted.lock().unwrap().push(format!("{line}{}", if authorized { " +token" } else { "" }));
+                let nonce = line.split("nonce=").nth(1).and_then(|r| r.split(' ').next()).unwrap_or_default();
+                let body = format!(r#"{{"proof":"{}"}}"#, signs(nonce));
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+            }
+        });
+        Answerer { port, seen }
+    }
+
+    #[test]
+    fn reads_this_machine_tailnet_hosts_from_tailscale_status() {
+        let status = r#"{"BackendState":"Running","Self":{"DNSName":"OmArchy.tail1234.ts.net.","TailscaleIPs":["100.101.102.103","fd7a:115c:a1e0:0:0:0:0:1234"]},"Peer":{"x":{"DNSName":"other.tail1234.ts.net."}}}"#;
+        assert_eq!(own_tailnet_hosts_in(status), ["omarchy.tail1234.ts.net", "100.101.102.103", "fd7a:115c:a1e0::1234"]);
+        assert!(own_tailnet_hosts_in(&status.replace("Running", "Stopped")).is_empty());
+        assert!(own_tailnet_hosts_in("not json").is_empty());
+        assert_eq!(normal_host("[FD7A:115C:A1E0::1234]"), "fd7a:115c:a1e0::1234");
+        let conn = connect(&[("OMNI_URL", "https://OmArchy.tail1234.ts.net./"), ("OMNI_INSTALL_DATA_DIR", "/i")]);
+        assert_eq!(conn.host.as_deref(), Some("omarchy.tail1234.ts.net"));
+    }
+
+    #[test]
+    fn prints_a_pairing_link_to_a_tailnet_address_only_when_it_leads_back_to_this_install() {
+        let dir = std::env::temp_dir().join(format!("omni-cli-pair-{}", sys::uuid()));
+        std::fs::create_dir_all(&dir).expect("a temp folder");
+        std::fs::write(dir.join("api-token"), "install-token\n").expect("the token file");
+        let dir_text = dir.to_string_lossy().to_string();
+        // `tailscale serve` or a tunnel in front of the install on 4999: another address, the install's server behind it.
+        let through = |a: &Answerer| {
+            let url = format!("http://127.0.0.1:{}", a.port);
+            let mut conn = connect(&[("OMNI_URL", &url), ("OMNI_INSTALL_DATA_DIR", &dir_text), ("OMNI_INSTALL_PORT", "4999")]);
+            (conn.remote, conn.tailnet) = (true, true);
+            Client::new(conn, false)
+        };
+
+        // This machine's own Tailscale hosts, as `tailscale status` would list them for the stand-in's address.
+        let here = || vec!["127.0.0.1".to_string()];
+        let install = answerer(|nonce| crate::proof::proof_for("install-token", 4999, nonce));
+        let c = through(&install);
+        assert!(c.prove_for_link_with(here).is_ok());
+        // An API request still never takes this machine's token there: only the printed link, for this install.
+        assert!(c.prove().is_err());
+        assert_eq!(install.seen.lock().unwrap().len(), 1);
+        assert!(install.seen.lock().unwrap().iter().all(|r| r.starts_with("GET /api/auth/proof?nonce=") && !r.ends_with("+token")));
+
+        let other_port = answerer(|nonce| crate::proof::proof_for("install-token", 4747, nonce));
+        let other_token = answerer(|nonce| crate::proof::proof_for("another-install", 4999, nonce));
+        for a in [&other_port, &other_token] {
+            let refused = through(a).prove_for_link_with(here).expect_err("not this install");
+            assert!(
+                refused.message().contains("answers as Omni, but not as this install. The link would take this machine's token there"),
+                "{}",
+                refused.message()
+            );
+            assert!(a.seen.lock().unwrap().iter().all(|r| !r.ends_with("+token")));
+        }
+
+        // Another machine that hands on this install's valid proof: a tailnet peer that is not this Mac, or a public
+        // address. Neither is asked, so neither can relay the proof.
+        let relay = answerer(|nonce| crate::proof::proof_for("install-token", 4999, nonce));
+        let peer = || vec!["omarchy.tail1234.ts.net".to_string(), "100.101.102.103".to_string()];
+        let refused = through(&relay).prove_for_link_with(peer).expect_err("another tailnet machine");
+        assert!(refused.message().contains("is not this Mac's own Tailscale address"), "{}", refused.message());
+        let mut public = through(&relay).conn.clone();
+        public.tailnet = false;
+        let refused = Client::new(public, false).prove_for_link_with(here).expect_err("a public address");
+        assert!(refused.message().contains("so it was not printed. Use this Mac's .ts.net name"), "{}", refused.message());
+        assert!(relay.seen.lock().unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

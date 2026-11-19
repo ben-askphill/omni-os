@@ -156,7 +156,7 @@ describe('a run', () => {
     expect(again.body.error).toContain('already running');
 
     const stopped = await call<ActionRun>('POST', `/threads/${t.id}/action-runs/${res.body.id}/stop`);
-    expect(stopped.body).toMatchObject({ state: 'stopped', error: 'Stopped by Ben.' });
+    expect(stopped.body).toMatchObject({ state: 'stopped', error: 'Stopped by you.' });
     await until('the sleep to die', async () => !alive(child));
     // Stopping again changes nothing.
     expect((await call<ActionRun>('POST', `/threads/${t.id}/action-runs/${res.body.id}/stop`)).body).toMatchObject({ state: 'stopped', ended_at: stopped.body.ended_at });
