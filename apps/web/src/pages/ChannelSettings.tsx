@@ -3,6 +3,7 @@ import { autoAvatarColor } from '@omni/shared/avatar-color.ts';
 import { claudeModelId } from '@omni/shared/claude-aliases.ts';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, errorText, harnessesPath, useApi, type Channel, type HarnessWithRunning } from '../api.ts';
+import { apiUrl } from '../api-base.ts';
 import { EffortPicker, ModelPicker } from '../components/ModelPicker.tsx';
 import { AUTO, AUTO_CHOICE, asksAuto } from '@omni/shared/thread-run.ts';
 import { Avatar, Button, ErrorNote, FolderInput, Icon, InlineConfirm, Label, PageHeader, Segmented, StatusDot, Toggle } from '../components/ui.tsx';
@@ -191,7 +192,7 @@ function DesignSystemPicker({ channel, onChange }: { channel: Channel; onChange:
         {channel.design_system_name && (
           <span className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1.5 text-[13px] text-fg">
             <Icon name="file" size={14} />
-            <a className="hov" href={`/api${url}`} target="_blank" rel="noreferrer" title="Open the file">
+            <a className="hov" href={apiUrl(url)} target="_blank" rel="noreferrer" title="Open the file">
               {channel.design_system_name}
             </a>
             <span className="text-fg-3">{bytes(channel.design_system_size)}</span>

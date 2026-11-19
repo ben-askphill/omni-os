@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, errorText } from '../api.ts';
+import { rememberApiBase } from '../api-base.ts';
 import { isTransientStatus, POLL_RETRIES } from '../poll-retry.ts';
 import { Button, CopyButton, ErrorNote, LinkButton, Loader, type IconName } from './ui.tsx';
 
@@ -114,7 +115,11 @@ export function DeviceCodeSignIn<R extends { state: string }>({
           const ended = r as Ended;
           if (ended.state === 'refused') setError(ended.error);
           else if (ended.state === 'denied' || ended.state === 'expired') setError(endedWords.current[ended.state]);
-          else done.current(r as R);
+          else {
+            // A browser's sign-in names where its requests go from now on (api-base.ts).
+            rememberApiBase((r as { api?: unknown }).api);
+            done.current(r as R);
+          }
         }
       } catch (err) {
         if (!alive) return;

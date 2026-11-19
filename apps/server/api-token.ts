@@ -77,6 +77,9 @@ export const cookieName = () => `omni_token_${config.port}`;
 /** The cookie a browser that signed in with Google holds instead (apps/server/google-auth.ts). Per port, like the token's. */
 export const sessionCookieName = () => `omni_session_${config.port}`;
 
+/** The id of the desktop window's session, for desktop-pair to find it again (browser-session.ts). An id, not a credential. */
+export const deviceCookieName = () => `omni_device_${config.port}`;
+
 /**
  * What the server answers to `nonce`, so the desktop app can tell it is this install's Omni without sending the token.
  * Bound to the port the server listens on: a program squatting on the app's port that relays the nonce to an Omni

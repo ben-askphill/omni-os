@@ -21,7 +21,7 @@ afterAll(() => rmSync(web, { recursive: true, force: true }));
 const r = await startRunner({ OMNI_WEB_DIST: web });
 const { app } = await import('../app.ts');
 const { gitHead } = await import('../about.ts');
-const { proofFor, sessionCookieName } = await import('../api-token.ts');
+const { deviceCookieName, proofFor, sessionCookieName } = await import('../api-token.ts');
 const { config } = await import('../config.ts');
 
 const call = async (path: string, init?: RequestInit) => {
@@ -143,7 +143,7 @@ describe('the Web UI', () => {
 describe('/api/auth', () => {
   const TOKEN = process.env.OMNI_TOKEN!;
 
-  it('pairs a browser: the token, sent as a bearer header, comes back as a session in an HttpOnly SameSite=Strict cookie on /api', async () => {
+  it('pairs a browser: the token, sent as a bearer header, comes back as a session in an HttpOnly SameSite=Strict cookie on a path of its own', async () => {
     const res = await app.request('/api/auth/pair', { method: 'POST' });
     expect(res.status).toBe(200);
     const cookie = res.headers.get('set-cookie') ?? '';
@@ -151,16 +151,23 @@ describe('/api/auth', () => {
     expect(cookie).not.toContain(TOKEN);
     const session = cookie.match(new RegExp(`${sessionCookieName()}=(omni_s_[0-9a-f]+)`))?.[1];
     expect(session).toBeTruthy();
-    expect(cookie).toMatch(/; Path=\/api(;|$)/);
+    // Over plain HTTP the cookie lives on /api/k/<key>, which the answer names (browser-session.ts).
+    const { api } = (await res.json()) as { api: string };
+    expect(api).toMatch(/^\/api\/k\/[0-9a-f]{32}$/);
+    expect(cookie).toContain(`; Path=${api};`);
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Strict');
     expect(cookie).not.toContain('Secure');
     const viaServe = await app.request('/api/auth/pair', { method: 'POST', headers: { 'x-forwarded-proto': 'https' } });
     expect(viaServe.headers.get('set-cookie')).toContain('Secure');
-    // The cookie alone is enough after that, for GET /api/auth and everything else.
-    const after = await app.request('/api/auth', { headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } });
-    expect(after.status).toBe(200);
-    expect(((await after.json()) as { ok: boolean }).ok).toBe(true);
+    expect(viaServe.headers.get('set-cookie')).toMatch(/; Path=\/api;/);
+    // The cookie alone is enough after that, on its own path, for GET /api/auth and everything else.
+    const after = await app.request(`${api}`, { headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } });
+    expect(after.status).toBe(404);
+    const check = await app.request(`${api}/auth`, { headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } });
+    expect(check.status).toBe(200);
+    expect(await check.json()).toEqual({ ok: true, api });
+    expect((await app.request('/api/auth', { headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } })).status).toBe(401);
   });
 
   it('pairs the desktop app window from this machine with a one-time nonce, never the token (S8)', async () => {
@@ -202,14 +209,22 @@ describe('/api/auth', () => {
     };
     const before = desktopRows();
     const first = await pair();
-    const held = /omni_s_[0-9a-f]+/.exec(first.headers.get('set-cookie') ?? '')?.[0];
+    const set = first.headers.get('set-cookie') ?? '';
+    const held = /omni_s_[0-9a-f]+/.exec(set)?.[0];
     expect(held).toBeTruthy();
+    // The keyed cookie never reaches desktop-pair; the session's id does, on that route alone.
+    const deviceCookie = first.headers.getSetCookie().find((c) => c.startsWith(`${deviceCookieName()}=`)) ?? '';
+    expect(deviceCookie).toContain('Path=/api/auth/desktop-pair;');
+    const device = /=([0-9a-f-]{36});/.exec(deviceCookie)?.[1];
+    expect(device).toBeTruthy();
+    const api = new URL(first.headers.get('location') ?? '', 'http://127.0.0.1').searchParams.get('api')!;
     for (let i = 0; i < 3; i++) {
-      const again = await pair(`${sessionCookieName()}=${held}`);
+      const again = await pair(`${deviceCookieName()}=${device}`);
       expect(again.status).toBe(302);
+      expect(new URL(again.headers.get('location') ?? '', 'http://127.0.0.1').searchParams.get('api')).toBe(api);
     }
     expect(desktopRows()).toBe(before + 1);
-    const after = await app.request('/api/auth', { headers: { authorization: '', cookie: `${sessionCookieName()}=${held}` } });
+    const after = await app.request(`${api}/auth`, { headers: { authorization: '', cookie: `${sessionCookieName()}=${held}` } });
     expect(after.status).toBe(200);
   });
 
@@ -234,10 +249,11 @@ describe('/api/auth', () => {
     // OMNI_TOKEN pins the token for the tests: rotating is refused with why, rather than half done.
     expect(pinned.status).toBe(409);
     expect(((await pinned.json()) as { error: string }).error).toMatch(/OMNI_TOKEN/);
-    const paired = (await app.request('/api/auth/pair', { method: 'POST' })).headers.get('set-cookie') ?? '';
-    const session = paired.match(new RegExp(`${sessionCookieName()}=(omni_s_[0-9a-f]+)`))![1];
+    const pairing = await app.request('/api/auth/pair', { method: 'POST' });
+    const session = (pairing.headers.get('set-cookie') ?? '').match(new RegExp(`${sessionCookieName()}=(omni_s_[0-9a-f]+)`))![1];
+    const { api } = (await pairing.json()) as { api: string };
     // A browser paired with the token may rotate it too (Settings); here the pin answers the same.
-    const bySession = await app.request('/api/auth/rotate-token', { method: 'POST', headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } });
+    const bySession = await app.request(`${api}/auth/rotate-token`, { method: 'POST', headers: { authorization: '', cookie: `${sessionCookieName()}=${session}` } });
     expect(bySession.status).toBe(409);
   });
 

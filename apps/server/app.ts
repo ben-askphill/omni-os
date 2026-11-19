@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { getPath } from 'hono/utils/url';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { existsSync, readFileSync } from 'node:fs';
 import { z } from 'zod';
@@ -48,15 +49,16 @@ import { connectApi } from './connect-api.ts';
 import { connectHostname } from './connect/service.ts';
 import { requestGuard, useConnectHost, useLegacyUpgrade, useSessionCheck, useThreadTokenCheck } from './request-guard.ts';
 import { threadOfToken } from './thread-tokens.ts';
-import { setSessionCookie } from './browser-session.ts';
-import { browserName, createSession, sessionFor } from './google-auth.ts';
+import { newCookiePath, setSessionCookie, withoutKey } from './browser-session.ts';
+import { browserName, createSession, sessionById, sessionFor, setCookiePath } from './google-auth.ts';
 import { toolFailuresApi } from './tool-failures-api.ts';
 import { worktreesApi } from './worktrees-api.ts';
 import { updateApi } from './update-api.ts';
 import { usageScanApi } from './usage-scan/api.ts';
 
-// Every /api route, and the Web UI. apps/server/index.ts boots it.
-export const app = new Hono();
+// Every /api route, and the Web UI. apps/server/index.ts boots it. A browser on plain HTTP sends its requests under
+// /api/k/<key>, its cookie's own path (browser-session.ts); the routes see them without the key.
+export const app = new Hono({ getPath: (req) => withoutKey(getPath(req)) });
 const api = new Hono();
 
 app.onError((err, c) => {
@@ -69,14 +71,16 @@ app.onError((err, c) => {
 
 // Ahead of every route: refuses requests without this install's token, and those other sites make through a browser
 // (apps/server/request-guard.ts). The Web UI below is served without either: it holds no secret, and pairs to get one.
-useSessionCheck(sessionFor);
+useSessionCheck(sessionFor, sessionById);
 // A thread's own token (thread-tokens.ts): the request is that thread's.
 useThreadTokenCheck(threadOfToken);
 // An older build's raw-token cookie, traded once for a session (browser-session.ts).
 useLegacyUpgrade((c) => {
   const s = createSession(browserName(c.req.header('user-agent')), 'browser', '', 'token');
-  setSessionCookie(c, s.token);
-  return s;
+  const cookiePath = newCookiePath(c);
+  setCookiePath(s.id, cookiePath);
+  setSessionCookie(c, s.token, cookiePath);
+  return { ...s, cookiePath };
 });
 useConnectHost(connectHostname);
 api.use('*', requestGuard);

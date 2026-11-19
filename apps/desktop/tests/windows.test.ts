@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   appPermissionAllowed,
+  carryApiParam,
   GESTURE_MS,
   isGesture,
   isWebUiDocument,
@@ -176,5 +177,22 @@ describe('pairing a window again', () => {
     expect(mayPairAgain(5000, 5000 + PAIR_AGAIN_MS)).toBe(true);
     // A clock that went back never locks the window out.
     expect(mayPairAgain(5000, 1000)).toBe(true);
+  });
+});
+
+describe("carrying desktop-pair's API path", () => {
+  const KEY = `/api/k/${'ab12'.repeat(8)}`;
+  const redirect = `http://127.0.0.1:4747/?api=${encodeURIComponent(KEY)}`;
+
+  it('puts the path the pairing redirect named on the load that follows, route kept', () => {
+    const next = new URL(carryApiParam('http://127.0.0.1:4786/#/t/abc', redirect));
+    expect(next.origin).toBe('http://127.0.0.1:4786');
+    expect(next.searchParams.get('api')).toBe(KEY);
+    expect(next.hash).toBe('#/t/abc');
+  });
+
+  it('changes nothing without one', () => {
+    expect(carryApiParam('http://127.0.0.1:4747/#/', null)).toBe('http://127.0.0.1:4747/#/');
+    expect(carryApiParam('http://127.0.0.1:4747/#/', 'http://127.0.0.1:4747/')).toBe('http://127.0.0.1:4747/#/');
   });
 });

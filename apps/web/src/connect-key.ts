@@ -3,6 +3,7 @@
 // thumbprint. The relay has this machine mint a one-time code bound to that thumbprint and sends the browser back to
 // #/connect?code=…. The page then redeems the code with a proof signed by the same key. A code that leaks (history, a
 // screenshot) is useless without the key, which never leaves this origin.
+import { rememberApiBase } from './api-base.ts';
 
 export interface ConnectMethod {
   relay: string;
@@ -80,5 +81,7 @@ export async function redeemConnectCode(code: string): Promise<void> {
     body: JSON.stringify({ code }),
   });
   await store('readwrite', (s) => s.delete(ID));
-  if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Omni answered HTTP ${res.status}`);
+  const body = (await res.json().catch(() => null)) as { error?: string; api?: unknown } | null;
+  if (!res.ok) throw new Error(body?.error ?? `Omni answered HTTP ${res.status}`);
+  rememberApiBase(body?.api);
 }

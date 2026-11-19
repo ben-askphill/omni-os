@@ -47,6 +47,24 @@ export function staysInWindow(url: string, origins: { app: string; server: strin
   }
 }
 
+/**
+ * The page's API path that desktop-pair's redirect named (`/?api=`), carried onto the load that follows it. With
+ * `--app-url` the Web UI is on another origin, whose storage never saw the first page, so it learns the path there.
+ */
+export function carryApiParam(target: string, redirect: string | null): string {
+  if (!redirect) return target;
+  let api: string | null;
+  try {
+    api = new URL(redirect).searchParams.get('api');
+  } catch {
+    return target;
+  }
+  if (!api) return target;
+  const url = new URL(target);
+  url.searchParams.set('api', api);
+  return url.href;
+}
+
 /** True for the Web UI's own document, not a file the server serves at another path (an artifact, an upload). */
 export function isWebUiDocument(url: string | undefined, appUrl: string): boolean {
   if (!url) return false;

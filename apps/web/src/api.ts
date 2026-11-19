@@ -4,6 +4,7 @@ import type { DiskLevel } from '@omni/shared/disk-space.ts';
 import type { AutoMergeRequest } from '@omni/shared/pr-auto-merge.ts';
 import type { MachineStats } from '@omni/shared/machines.ts';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { apiBase, apiUrl, movedSince, rememberApiBase } from './api-base.ts';
 import type { Thread as ThreadRow, Channel as ChannelRow, EventRow, Artifact, Folder, DeliveryState, NeedsYou, NeedsYouItem, NeedsYouBlocker, NeedsYouResult } from '@omni/server/db.ts';
 import type { Attachment } from '@omni/server/uploads.ts';
 import type { HarnessInfo, ModelEntry, HarnessId } from '@omni/server/harness/types.ts';
@@ -548,19 +549,31 @@ export class ApiError extends Error {
 /** Fired on window when the server says this browser holds no valid token. */
 export const UNPAIRED = 'omni:unpaired';
 
-/** Whether this browser holds the server's token, in its HttpOnly cookie. */
+/** Keep the path a pairing answer names for this browser's requests (api-base.ts). */
+const keepApiBase = async (res: Response) => rememberApiBase(((await res.json().catch(() => null)) as { api?: unknown } | null)?.api);
+
+/** Whether this browser holds a live session in its HttpOnly cookie. The answer names where its requests go. */
 export async function isPaired(): Promise<boolean> {
-  const res = await fetch('/api/auth');
+  const base = apiBase();
+  let res = await fetch(`${base}/auth`);
+  // Several tabs that reload at once after an update: the first moves the session onto a keyed path, which ends the
+  // others' copy of the old cookie. Once that tab has kept the new path, check again on it.
+  if (res.status === 401 && base === '/api') {
+    await new Promise((done) => setTimeout(done, 500));
+    if (movedSince(base)) res = await fetch(apiUrl('/auth'));
+  }
   if (res.status === 401) return false;
   if (!res.ok) throw new ApiError(`Request failed (${res.status})`, res.status);
+  await keepApiBase(res);
   return true;
 }
 
 /** Trades the token for the cookie (POST /api/auth/pair). The page never keeps the token itself. */
 export async function pairBrowser(token: string): Promise<boolean> {
-  const res = await fetch('/api/auth/pair', { method: 'POST', headers: { authorization: `Bearer ${token.trim()}` } });
+  const res = await fetch(apiUrl('/auth/pair'), { method: 'POST', headers: { authorization: `Bearer ${token.trim()}` } });
   if (res.status === 401) return false;
   if (!res.ok) throw new ApiError(`Request failed (${res.status})`, res.status);
+  await keepApiBase(res);
   return true;
 }
 
@@ -571,7 +584,7 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   const blob = body instanceof Blob;
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(apiUrl(path), {
       method,
       headers: blob ? { 'Content-Type': body.type } : body !== undefined && !form ? { 'Content-Type': 'application/json' } : undefined,
       body: body === undefined ? undefined : form || blob ? body : JSON.stringify(body),
@@ -641,10 +654,10 @@ export function refusedDelivery(e: unknown): DeliveryView | undefined {
 }
 
 export const artifactUrl = (a: Pick<Artifact, 'id' | 'updated_at'>, download = false) =>
-  `/api/artifacts/${a.id}/raw?v=${encodeURIComponent(a.updated_at)}${download ? '&download=1' : ''}`;
+  apiUrl(`/artifacts/${a.id}/raw?v=${encodeURIComponent(a.updated_at)}${download ? '&download=1' : ''}`);
 
 export const uploadUrl = (threadId: string, a: Pick<Attachment, 'name'>, download = false) =>
-  `/api/threads/${encodeURIComponent(threadId)}/uploads/${encodeURIComponent(a.name)}${download ? '?download=1' : ''}`;
+  apiUrl(`/threads/${encodeURIComponent(threadId)}/uploads/${encodeURIComponent(a.name)}${download ? '?download=1' : ''}`);
 
 /** GET /threads/:id/events/:eventId/output: the chunk of a tool_result's saved text that starts at `offset` (#225). */
 export const getToolOutput = (threadId: string, eventId: number, offset: number, signal: AbortSignal) =>
@@ -652,7 +665,7 @@ export const getToolOutput = (threadId: string, eventId: number, offset: number,
 
 /** GET /threads/:id/tools/:toolUseId/tail: a running call's output. The stream ends with an `end` message, and the caller closes on it. */
 export const openToolTail = (threadId: string, toolUseId: string, onData: (data: unknown) => void) =>
-  openSSE(() => `/api/threads/${encodeURIComponent(threadId)}/tools/${encodeURIComponent(toolUseId)}/tail`, onData);
+  openSSE(() => apiUrl(`/threads/${encodeURIComponent(threadId)}/tools/${encodeURIComponent(toolUseId)}/tail`), onData);
 
 // ---------- hooks ----------
 
@@ -852,7 +865,7 @@ export function useThreadStream(threadId: string, ready: boolean, lastId: RefObj
   useEffect(() => {
     if (!ready) return;
     const h = openSSE(
-      () => `/api/threads/${encodeURIComponent(threadId)}/stream?after=${lastId.current ?? 0}`,
+      () => apiUrl(`/threads/${encodeURIComponent(threadId)}/stream?after=${lastId.current ?? 0}`),
       (d) => {
         const m = classifyStream(d);
         if (m) handler.current(m);

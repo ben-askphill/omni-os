@@ -12,7 +12,8 @@ delete process.env.OMNI_TOKEN;
 const { app } = await import('../app.ts');
 const { apiToken, sessionCookieName, tokenPath } = await import('../api-token.ts');
 
-const call = (path: string, headers: Record<string, string>, method = 'GET') => app.request(`http://127.0.0.1:4747/api${path}`, { method, headers: { host: '127.0.0.1:4747', ...headers } });
+const call = (path: string, headers: Record<string, string>, method = 'GET', base = '/api') =>
+  app.request(`http://127.0.0.1:4747${base}${path}`, { method, headers: { host: '127.0.0.1:4747', ...headers } });
 
 describe('POST /api/auth/rotate-token', () => {
   it('refuses a session signed in with Google or an app, which could otherwise lock Ben out', async () => {
@@ -29,12 +30,14 @@ describe('POST /api/auth/rotate-token', () => {
 
   it('from a token-paired browser: writes a new token, refuses the old one and ends every session', async () => {
     const old = apiToken();
-    const paired = (await call('/auth/pair', { authorization: `Bearer ${old}` }, 'POST')).headers.get('set-cookie') ?? '';
-    const session = paired.match(new RegExp(`${sessionCookieName()}=(omni_s_[0-9a-f]+)`))![1];
+    const pairing = await call('/auth/pair', { authorization: `Bearer ${old}` }, 'POST');
+    const session = (pairing.headers.get('set-cookie') ?? '').match(new RegExp(`${sessionCookieName()}=(omni_s_[0-9a-f]+)`))![1];
+    // The browser's requests go under its cookie's own path (browser-session.ts).
+    const { api } = (await pairing.json()) as { api: string };
     const cookie = { authorization: '', cookie: `${sessionCookieName()}=${session}` };
-    expect((await call('/auth', cookie)).status).toBe(200);
+    expect((await call('/auth', cookie, 'GET', api)).status).toBe(200);
 
-    const res = await call('/auth/rotate-token', cookie, 'POST');
+    const res = await call('/auth/rotate-token', cookie, 'POST', api);
     expect(res.status).toBe(200);
     wireFixture('rotate-token.json', await res.clone().json());
     const fresh = readFileSync(tokenPath(), 'utf8').trim();
@@ -44,6 +47,6 @@ describe('POST /api/auth/rotate-token', () => {
     expect((await call('/auth', { authorization: `Bearer ${old}` })).status).toBe(401);
     expect((await call('/auth', { authorization: `Bearer ${fresh}` })).status).toBe(200);
     // The browser paired before it has to pair again.
-    expect((await call('/auth', cookie)).status).toBe(401);
+    expect((await call('/auth', cookie, 'GET', api)).status).toBe(401);
   });
 });

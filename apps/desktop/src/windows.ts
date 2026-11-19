@@ -14,6 +14,7 @@ import { openExternal } from './open-external.ts';
 import { safeRoute } from './options.ts';
 import {
   appPermissionAllowed,
+  carryApiParam,
   isGesture,
   linkTarget,
   mayPairAgain,
@@ -298,6 +299,7 @@ export function createOmniWindow(ctx: AppContext, input: { kind: WindowKind; rou
 
 async function load(ctx: AppContext, win: BrowserWindow, input: { kind: WindowKind; route?: string | null }): Promise<void> {
   failedLoads.delete(win);
+  let redirect: string | null = null;
   try {
     if (input.kind === 'main') {
       // Pairing sets the API cookie for this app's session; the server then sends the window to its UI. Each pairing
@@ -314,10 +316,19 @@ async function load(ctx: AppContext, win: BrowserWindow, input: { kind: WindowKi
         return;
       }
       if (win.isDestroyed()) return;
-      await win.loadURL(pairUrl);
+      // desktop-pair sends the window to /?api=<path>, where its requests go (apps/web/src/api-base.ts).
+      const onRedirect = (details: { url: string }) => {
+        redirect = details.url;
+      };
+      win.webContents.on('did-redirect-navigation', onRedirect);
+      try {
+        await win.loadURL(pairUrl);
+      } finally {
+        if (!win.isDestroyed()) win.webContents.off('did-redirect-navigation', onRedirect);
+      }
       if (ctx.appUrl() === ctx.backend.origin() && !input.route) return;
     }
-    await win.loadURL(routeUrl(ctx.appUrl(), input.route));
+    await win.loadURL(carryApiParam(routeUrl(ctx.appUrl(), input.route), redirect));
   } catch (err) {
     // A load the user replaced with another (a click while loading) rejects too. A failed one is marked by
     // did-fail-load, and showMain loads the window again once the server is up.
