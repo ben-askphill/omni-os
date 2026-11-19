@@ -2,10 +2,10 @@ import type { TurnPhase } from '@omni/shared/status.ts';
 import { useState, type ReactNode } from 'react';
 import type { Thread } from '../../api.ts';
 import type { PanelTab } from '../../pages/useThreadSession.ts';
-import { HarnessMark, harnessLabel } from '../brand.tsx';
+import { HarnessLogo, HarnessMark, harnessLabel } from '../brand.tsx';
 import { useThreadAccount } from '../../accounts.ts';
 import { threadAccountLine } from '@omni/shared/harness-accounts.ts';
-import { Chip, copyText, Icon, IconButton, IconLink, StatusDot, type ChipTone, type IconName } from '../ui.tsx';
+import { Chip, copyText, Icon, IconButton, IconLink, statusLabel, StatusDot, ThreadDot, type ChipTone, type IconName } from '../ui.tsx';
 import { plural } from '../../format.ts';
 import { machineLabel } from '@omni/shared/handoff.ts';
 import { prBadge, prLine, STEP_WORKING, type PRStep } from '@omni/shared/thread-glance.ts';
@@ -22,6 +22,8 @@ import { crewRoleName } from '@omni/shared/crew-role.ts';
 import { OwnerField } from './OwnerField.tsx';
 import { markLabel, term } from '@omni/shared/display.ts';
 import { useTechnical } from '../../display.ts';
+import { isWorking } from '@omni/shared/delegate-count.ts';
+import { runElapsed } from '@omni/shared/ran-on.ts';
 
 function QuickRow({
   icon,
@@ -68,8 +70,12 @@ function QuickRow({
 
 /**
  * A compact glance at the thread beside the transcript: machine, checkout, harness, run state, branch, a door into the
- * full inspector, and the PRs the thread and its crew opened. Desktop gives it a narrow column right of the transcript;
- * the phone opens it from the header.
+ * full inspector, the thread's lineage and the PRs the thread and its crew opened. Desktop gives it a narrow column right
+ * of the transcript; the phone opens it from the header.
+ *
+ * Show technical details only changes what the rows carry. Off, the card keeps the machine, owner, agent, the AI app,
+ * the run in plain words, the files, the lineage and any PRs, and leaves out the task id, the working directory, the
+ * model id, the account and plan, and whether the session is warm.
  */
 export function ThreadQuickCard({
   thread,
@@ -83,6 +89,9 @@ export function ThreadQuickCard({
   cwd,
   onOpen,
   onOpenPR,
+  parent = null,
+  delegated = [],
+  onOpenThread,
   asking = false,
   turn,
   reconnecting = false,
@@ -91,8 +100,8 @@ export function ThreadQuickCard({
 }: {
   thread: Thread;
   /**
-   * Show technical details is on, or the channel has a repo: the card lists the task id, working directory, session,
-   * branch and pull requests. Off outside a repo, it keeps the machine, the AI app, the run and the files.
+   * Show technical details is on, or the channel has a repo: the card lists the branch and its Pull requests section
+   * even while it has none. Outside a repo with the switch off, it lists PRs only when the thread's crew opened some.
    */
   code?: boolean;
   init: InitP | null;
@@ -108,6 +117,12 @@ export function ThreadQuickCard({
   onOpen: (tab: PanelTab) => void;
   /** Opens Omni's page for a PR. */
   onOpenPR: (channelId: string, n: number) => void;
+  /** The thread that delegated this one, for the lineage. */
+  parent?: Thread | null;
+  /** The threads this one delegated: the working ones lead the lineage, the rest fold under Previous agents. */
+  delegated?: Thread[];
+  /** Opens a thread from the lineage. */
+  onOpenThread: (id: string) => void;
   /** The agent waits on a question card: the turn is open, but on Ben. */
   asking?: boolean;
   /** What the running turn is doing, for the run row's dot. */
@@ -140,13 +155,13 @@ export function ThreadQuickCard({
     >
       <QuickRow icon="monitor">
         <span className="min-w-0 truncate">{machineLabel(machineName)}</span>
-        {code && thread.task_id && <span className="shrink-0 font-num text-[10px] text-fg-3">{thread.task_id}</span>}
+        {technical && thread.task_id && <span className="shrink-0 font-num text-[10px] text-fg-3">{thread.task_id}</span>}
       </QuickRow>
-      {!code && !cloud ? null : cloud && cloudUrl ? (
+      {cloud && cloudUrl ? (
         <QuickRow icon="external" label="Open in Cursor" onClick={() => window.open(cloudUrl, '_blank', 'noopener,noreferrer')}>
           <span className="truncate">Open in Cursor</span>
         </QuickRow>
-      ) : (
+      ) : !technical ? null : (
         <QuickRow
           icon="folder"
           disabled={remote}
@@ -170,9 +185,9 @@ export function ThreadQuickCard({
         <span className="shrink-0 whitespace-nowrap">
           <HarnessMark harness={thread.harness} withLabel />
         </span>
-        {model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
+        {!technical ? null : model ? <span className="min-w-0 truncate text-fg-3">{model}</span> : <span className="text-fg-3">default model</span>}
       </QuickRow>
-      {ran && (
+      {technical && ran && (
         <QuickRow icon="user">
           <span className="min-w-0 truncate" title={`${harnessLabel(ran.harness)} ran as ${ran.label}${ran.org ? ` (${ran.org})` : ''} on ${ran.machineName}`}>
             {threadAccountLine(ran, hereName)}
@@ -183,7 +198,7 @@ export function ThreadQuickCard({
         <StatusDot mark={run.mark} size={8} />
         <span className="truncate">
           {run.label}
-          {code && warm !== undefined && !remote && !reconnecting && (
+          {technical && warm !== undefined && !remote && !reconnecting && (
             <span className="text-fg-3"> · {warm ? 'Live session' : 'Cold start next message'}</span>
           )}
         </span>
@@ -207,7 +222,8 @@ export function ThreadQuickCard({
           <span className="font-medium">All details</span>
         </QuickRow>
       </div>
-      {code && <PullRequests thread={thread} prs={prs} step={step} onOpen={onOpen} onOpenPR={onOpenPR} />}
+      <Lineage parent={parent} delegated={delegated} onOpenThread={onOpenThread} />
+      {(code || (prs && cardPRs(thread, prs).length > 0)) && <PullRequests thread={thread} prs={prs} step={step} onOpen={onOpen} onOpenPR={onOpenPR} />}
     </section>
   );
 }
@@ -308,6 +324,88 @@ function PullRequests({ thread, prs, step, onOpen, onOpenPR }: { thread: Thread;
         <QuickRow icon="more" label="All pull requests" onClick={() => onOpen('prs')}>
           <span className="text-fg-3">{more} more</span>
         </QuickRow>
+      )}
+    </section>
+  );
+}
+
+/** The lineage's two lists: the delegated threads at work now, in the order they started, and the rest, newest first. */
+export function lineageOf(delegated: readonly Thread[]): { running: Thread[]; previous: Thread[] } {
+  const running = delegated.filter(isWorking);
+  const previous = delegated.filter((c) => !isWorking(c)).sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
+  return { running, previous };
+}
+
+/** A thread's harness logo with its status mark on the corner, as the inspector's agents card marks every agent. */
+function LineageMark({ t }: { t: Thread }) {
+  return (
+    <span className="relative grid size-5 shrink-0 place-items-center text-fg-3">
+      <HarnessLogo harness={t.harness ?? 'claude-code'} size={15} title={harnessLabel(t.harness ?? 'claude-code')} />
+      <span className="absolute -right-0.5 -bottom-0.5 grid place-items-center rounded-full bg-surface p-px">
+        <ThreadDot t={t} size={6} />
+      </span>
+    </span>
+  );
+}
+
+const lineageRow = `hov flex w-full min-w-0 items-center gap-[var(--sp-5)] ${ROW} text-left text-[12.5px] [--hov:var(--bg)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-line-strong`;
+
+/** One delegated thread: its mark, title and how long it has run (while it runs), opening the thread. */
+function LineageRow({ t, onOpenThread }: { t: Thread; onOpenThread: (id: string) => void }) {
+  const now = useNow(1000);
+  const side = isWorking(t) ? (runElapsed(t, now) ?? statusLabel(t.status)) : null;
+  return (
+    <button type="button" title={t.title || 'Untitled'} aria-label={`Open ${t.title || 'Untitled'}`} onClick={() => onOpenThread(t.id)} className={lineageRow}>
+      <LineageMark t={t} />
+      <span className="min-w-0 flex-1 truncate">{t.title || 'Untitled'}</span>
+      {side && <span className="shrink-0 font-num text-[11px] text-fg-3 tabular-nums">{side}</span>}
+    </button>
+  );
+}
+
+/**
+ * Where the thread sits among the threads it came from and handed work to: the thread that delegated it, then the
+ * threads it delegated that work now, each with a live mark and how long it has run, and the finished ones folded under
+ * Previous agents. Every row opens its thread. Shown with Show technical details on or off; nothing when the thread
+ * stands alone.
+ */
+function Lineage({ parent, delegated, onOpenThread }: { parent: Thread | null; delegated: Thread[]; onOpenThread: (id: string) => void }) {
+  const [showPrev, setShowPrev] = useState(false);
+  const { running, previous } = lineageOf(delegated);
+  if (!parent && !delegated.length) return null;
+  return (
+    <section aria-label="Lineage" className={DIVIDER}>
+      <div className={`flex items-center ${CAPTION} text-[11px] text-fg-3`}>
+        Lineage
+        {running.length > 0 && <span className="font-num tabular-nums">&nbsp;· {running.length} running</span>}
+      </div>
+      {parent && (
+        <button type="button" title={`Back to the thread that delegated this one: ${parent.title}`} onClick={() => onOpenThread(parent.id)} className={lineageRow}>
+          <span className="grid size-5 shrink-0 place-items-center text-fg-3">
+            <Icon name="arrowUpRight" size={14} />
+          </span>
+          <span className="min-w-0 flex-1 truncate">
+            <span className="text-fg-3">From </span>
+            {parent.title || 'Untitled'}
+          </span>
+          <span className="shrink-0 text-[11px] text-fg-3">{statusLabel(parent.status)}</span>
+        </button>
+      )}
+      {running.map((c) => (
+        <LineageRow key={c.id} t={c} onOpenThread={onOpenThread} />
+      ))}
+      {previous.length > 0 && (
+        <>
+          <button type="button" aria-expanded={showPrev} onClick={() => setShowPrev((v) => !v)} className={`${lineageRow} text-fg-2`}>
+            <span className="grid size-5 shrink-0 place-items-center text-fg-3">
+              <Icon name="delegate" size={15} />
+            </span>
+            <span className="flex-1">Previous agents</span>
+            <span className="font-num text-[11px] text-fg-3 tabular-nums">{previous.length}</span>
+            <Icon name="chevronRight" size={13} className={`shrink-0 text-fg-3 transition-transform ${showPrev ? 'rotate-90' : ''}`} />
+          </button>
+          {showPrev && previous.map((c) => <LineageRow key={c.id} t={c} onOpenThread={onOpenThread} />)}
+        </>
       )}
     </section>
   );

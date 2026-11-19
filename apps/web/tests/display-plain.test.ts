@@ -52,22 +52,54 @@ describe('plain status words', () => {
   });
 });
 
-describe('the quick card outside a repo', () => {
-  const base = { init: null, warm: true, slotBusy: false, prs: undefined, step: null, artifactCount: 0, machineName: 'Laptop', cwd: '/w', onOpen: () => {}, onOpenPR: () => {} };
+describe('the quick card with Show technical details off', () => {
+  const base = { init: { model: 'claude-opus-5-5' }, warm: true, slotBusy: false, prs: undefined, step: null, artifactCount: 2, machineName: 'Laptop', cwd: '/home/u/Omni/notes', onOpen: () => {}, onOpenPR: () => {}, onOpenThread: () => {} };
 
-  it('leaves out the task id, working directory, branch, session and pull requests', () => {
-    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread(), code: false }));
+  it('still opens, with the machine, owner, agent, AI app, run, files and the door to all details', () => {
+    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ role: 'conductor' }), code: false }));
+    expect(html).toContain('aria-label="Thread quick actions"');
+    expect(html).toContain('Laptop');
+    expect(html).toContain('>Owner<');
+    expect(html).toContain('>Agent<');
+    expect(html).toContain('Claude Code');
+    expect(html).toContain('2 artifacts');
+    expect(html).toContain('All details');
+  });
+
+  it('leaves out the task id, working directory, model id, session and branch, and PRs while there are none', () => {
+    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread(), code: false, prs: { pr: null, prs: [], crew: [] } }));
     expect(html).not.toContain('T-BRIEF');
+    expect(html).not.toContain('Omni/notes');
+    expect(html).not.toContain('Copy the working directory path');
+    expect(html).not.toContain('claude-opus-5-5');
+    expect(html).not.toContain('default model');
     expect(html).not.toContain('omni/t1');
     expect(html).not.toContain('Cold start');
     expect(html).not.toContain('Live session');
     expect(html).not.toContain('aria-label="Pull requests"');
   });
 
-  it('keeps them in a channel with a repo', () => {
+  it('lists the PRs its crew opened, though the channel has no repo', () => {
+    const crew = { number: 41, title: 'Crew work', state: 'OPEN', isDraft: false, url: 'https://github.com/u/r/pull/41', repo: 'u/r', thread_id: 'c1', thread_title: 'Builder', channel_id: 'shop', task_id: null };
+    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ branch: null }), code: false, prs: { pr: null, prs: [], crew: [crew] } }));
+    expect(html).toContain('aria-label="Pull requests"');
+    expect(html).toContain('#41');
+  });
+
+  it('shows the lineage, as it does with the switch on', () => {
+    const child = thread({ id: 'c1', title: 'Builder: fix the cart', status: 'running', run_started_at: new Date(Date.now() - 4000).toISOString() });
+    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread(), code: false, delegated: [child] }));
+    expect(html).toContain('aria-label="Lineage"');
+    expect(html).toContain('Builder: fix the cart');
+    expect(html).toMatch(/· 1 running/);
+  });
+
+  it('keeps the branch and the Pull requests section in a channel with a repo, but not the raw path or task id', () => {
     const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread(), code: true }));
-    expect(html).toContain('T-BRIEF');
     expect(html).toContain('omni/t1');
+    expect(html).toContain('aria-label="Pull requests"');
+    expect(html).not.toContain('T-BRIEF');
+    expect(html).not.toContain('Omni/notes');
   });
 });
 

@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { CrewPR, PRSummary, Thread } from '../src/api.ts';
-import { cardPRs, ThreadQuickCard } from '../src/components/thread/ThreadQuickCard.tsx';
+import { cardPRs, lineageOf, ThreadQuickCard } from '../src/components/thread/ThreadQuickCard.tsx';
 
 vi.mock('../src/store.tsx', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/store.tsx')>()),
@@ -70,6 +70,7 @@ describe('the thread quick card', () => {
     cwd: '/w',
     onOpen: () => {},
     onOpenPR: () => {},
+    onOpenThread: () => {},
   };
 
   it('gives who the thread is for and who does it separate rows: You until someone is named, and the crew role', () => {
@@ -98,11 +99,59 @@ describe('the thread quick card', () => {
     expect(html).toContain('No branch');
   });
 
-  it('leaves Actions, Changes and the thread lineage out', () => {
+  it('leaves Actions and Changes out, and the lineage on a thread that stands alone', () => {
     const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread() }));
     expect(html).not.toContain('Channel actions');
     expect(html).not.toContain('aria-label="Changes"');
     expect(html).not.toContain('Lineage');
+  });
+
+  it('lists the model id, the account and the task id with Show technical details on', () => {
+    const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ task_id: 'T-CART' }), init: { model: 'composer' } }));
+    expect(html).toContain('composer');
+    expect(html).toContain('T-CART');
+    expect(html).toContain('Copy the working directory path');
+    expect(html).toContain('Live session');
+  });
+
+  describe('lineage', () => {
+    const now = Date.now();
+    const child = (id: string, over: Partial<Thread> = {}) => thread({ id, title: `Lineage test: ${id}`, branch: null, parent_id: 't1', ...over });
+    const running = [
+      child('Sol', { harness: 'codex', status: 'running', run_started_at: new Date(now - 2000).toISOString() }),
+      child('Fable', { harness: 'claude-code', status: 'idle', delegating: true, run_started_at: new Date(now - 4000).toISOString() }),
+      child('Sonnet', { harness: 'claude-code', status: 'queued' }),
+    ];
+    const finished = [child('Old', { status: 'done', updated_at: '2026-10-28T08:00:00.000Z' }), child('Newer', { status: 'failed', updated_at: '2026-10-28T10:00:00.000Z' })];
+
+    it('splits the delegated threads into the ones at work and the rest, newest first', () => {
+      const { running: r, previous: p } = lineageOf([...running, ...finished]);
+      expect(r.map((t) => t.id)).toEqual(['Sol', 'Fable', 'Sonnet']);
+      expect(p.map((t) => t.id)).toEqual(['Newer', 'Old']);
+    });
+
+    it('lists the running ones with a live mark and how long each has run, and folds the finished ones under Previous agents', () => {
+      const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ branch: null, title: 'Conductor' }), delegated: [...running, ...finished] }));
+      expect(html).toContain('aria-label="Lineage"');
+      expect(html).toMatch(/Lineage<span[^>]*>\u00a0· 3 running</);
+      for (const id of ['Sol', 'Fable', 'Sonnet']) expect(html).toContain(`aria-label="Open Lineage test: ${id}"`);
+      expect(html).toMatch(/Lineage test: Sol<\/span><span[^>]*>[2-3]s</);
+      expect(html).toMatch(/data-mark="(working|delegating)"/);
+      expect(html).toContain('Previous agents');
+      expect(html).toContain('aria-expanded="false"');
+      expect(html).toMatch(/Previous agents<\/span><span[^>]*>2</);
+      // Folded until it is opened.
+      expect(html).not.toContain('Lineage test: Old');
+      expect(html.indexOf('Lineage')).toBeLessThan(html.indexOf('aria-label="Pull requests"'));
+    });
+
+    it('shows the thread that delegated this one, though nothing runs', () => {
+      const parent = thread({ id: 'p1', title: 'Conductor', status: 'idle' });
+      const html = renderToStaticMarkup(createElement(ThreadQuickCard, { ...base, thread: thread({ parent_id: 'p1' }), parent }));
+      expect(html).toContain('aria-label="Lineage"');
+      expect(html).toContain('Back to the thread that delegated this one: Conductor');
+      expect(html).not.toContain('running</span>');
+    });
   });
 
   it('says it is checking PRs until the first answer, then that there are none', () => {
