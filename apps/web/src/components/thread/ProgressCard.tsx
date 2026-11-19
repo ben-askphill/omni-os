@@ -1,8 +1,9 @@
-import { PROGRESS_MARK, progressCount, progressNow, progressPanel, progressTone, type ProgressPanel } from '@omni/shared/progress-panel.ts';
+import { progressCount, progressNow, progressPanel, progressTone, type ProgressPanel } from '@omni/shared/progress-panel.ts';
 import { buildItems, type TranscriptEvent } from '@omni/shared/transcript-fold.ts';
 import { useMemo, useState } from 'react';
 import { readPref, writePref } from '../../store.tsx';
-import { IconButton, StatusDot } from '../ui.tsx';
+import { IconButton } from '../ui.tsx';
+import { StepRail } from './StepRail.tsx';
 import { CARD_PAD, ROW_X } from './panel/inset.ts';
 import { NowWithConnector } from '../ConnectorMark.tsx';
 
@@ -21,8 +22,7 @@ function rememberClosed(threadId: string, key: string) {
 }
 
 /** A step title's first line's middle: its row's top padding (--sp-3) plus half of a 12.5px line at 1.45. */
-const MID = 'top-[15px]';
-const RAIL = { first: `${MID} bottom-0 rounded-t-full`, mid: 'top-0 bottom-0', last: 'top-0 h-[15px] rounded-b-full' } as const;
+const MID = 15;
 
 /** The thread's Progress card list from its events, folded again only when they or its run state change. */
 export function useProgressPanel(events: TranscriptEvent[], running: boolean, asking: boolean): ProgressPanel | null {
@@ -45,7 +45,6 @@ export function ProgressCard({ threadId, panel, className = '' }: { threadId: st
   }
   if (!panel || closed === panel.key) return null;
   const { view } = panel;
-  const last = view.steps.length - 1;
 
   return (
     <section
@@ -68,19 +67,10 @@ export function ProgressCard({ threadId, panel, className = '' }: { threadId: st
       <ol className={`${ROW_X} pb-[var(--sp-4)]`}>
         {view.steps.map((s, i) => {
           const tone = progressTone(s.state);
-          const mark = PROGRESS_MARK[s.state];
           const now = progressNow(s);
           return (
-            <li key={s.key} data-state={s.state} className="relative flex min-w-0 gap-[var(--sp-5)]" aria-current={tone === 'current' ? 'step' : undefined}>
-              {/* The rail: one segment per step, darker through the done ones, from the first step's middle to the last's. */}
-              <span aria-hidden className="relative w-[15px] shrink-0">
-                {last > 0 && <span className={`absolute left-1/2 w-[2px] -translate-x-1/2 ${tone === 'done' ? 'bg-fg-4' : 'bg-line'} ${RAIL[i === 0 ? 'first' : i === last ? 'last' : 'mid']}`} />}
-              </span>
-              {mark && (
-                <span className={`absolute ${MID} left-[7.5px] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-surface p-[var(--sp-1)]`}>
-                  <StatusDot mark={mark} size={8} />
-                </span>
-              )}
+            <li key={s.key} data-state={s.state} className="flex min-w-0 gap-[var(--sp-5)]" aria-current={tone === 'current' ? 'step' : undefined}>
+              <StepRail state={s.state} index={i} count={view.steps.length} mid={MID} />
               <span className="min-w-0 flex-1 py-[var(--sp-3)] text-[12.5px] leading-[1.45]">
                 <span className={`block ${TEXT[tone]}`}>{s.title}</span>
                 {now && (
