@@ -5,15 +5,15 @@ import { effortWord, glyphLabel, markLabel, parseDisplay, parseDisplayPatch, PLA
 const FIVE = ['Working', 'Needs you', 'Done', 'Failed', 'Stopped'];
 
 describe('the five status words', () => {
-  it('maps every one of the 18 marks onto five words', () => {
+  it('maps every one of the 19 marks onto five words', () => {
     const marks = Object.keys(MARK) as Mark[];
-    expect(marks).toHaveLength(18);
+    expect(marks).toHaveLength(19);
     expect(new Set(marks.map((m) => PLAIN_MARK[m]))).toEqual(new Set(FIVE));
     expect(new Set((Object.keys(STATUS) as Glyph[]).map((g) => PLAIN_GLYPH[g]))).toEqual(new Set(FIVE));
   });
 
   it('puts the state that waits on the user under Needs you', () => {
-    for (const m of ['question', 'crew_question', 'limited', 'held', 'review'] as Mark[]) expect(PLAIN_MARK[m]).toBe('Needs you');
+    for (const m of ['question', 'crew_question', 'limited', 'held', 'review', 'signin'] as Mark[]) expect(PLAIN_MARK[m]).toBe('Needs you');
     expect(PLAIN_GLYPH.limited).toBe('Needs you');
   });
 
