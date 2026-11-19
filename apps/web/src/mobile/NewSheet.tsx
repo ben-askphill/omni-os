@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { term } from '@omni/shared/display.ts';
+import { useTechnical } from '../display.ts';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type Thread } from '../api.ts';
 import { HarnessLogo, OmniMark } from '../components/brand.tsx';
 import { useBasePick, useBaseRows } from '../components/BasePicker.tsx';
@@ -13,7 +15,8 @@ import { clearDraftContext, removeDraftContext, useDraftContext } from '../messa
 import { referencesFor } from '../message-context/thread-picker.ts';
 import { keepLocalFiles } from '../sending.ts';
 import type { ModelChoice } from '../components/ModelPicker.tsx';
-import { Avatar, ErrorNote } from '../components/ui.tsx';
+import { Avatar, ErrorNote, Segmented } from '../components/ui.tsx';
+import { QuickAnswer } from '../components/QuickAnswer.tsx';
 import { draftRun, draftRunRequest } from '@omni/shared/draft-run.ts';
 import { baseRequest } from '../worktree-base.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
@@ -38,7 +41,9 @@ const pill = (on: boolean) =>
   `mo-press inline-flex h-9 shrink-0 items-center gap-[7px] rounded-full pr-3 pl-1.5 text-[13.5px] leading-none font-medium ${on ? 'bg-fg text-on-ink' : 'bg-surface-2 text-fg'}`;
 
 /**
- * A new delegation to the Conductor, or a new thread in one channel: the same POST /threads the desktop composer
+ * Ask: a quick ask answered right in the sheet, with a follow-up box, Copy, Keep as thread and Make it a task, as in the
+ * desktop app's Quick Prompt (components/QuickAnswer.tsx, packages/shared/quick-ask.ts). Task: a new delegation to the
+ * Conductor, or a new thread in one channel: the same POST /threads the desktop composer
  * makes, with the role's or the channel's run defaults until Ben picks another model. With Grok Bot on the machine
  * chip it posts the text to /api/grokbot instead, as the desktop composer does, and no thread starts. `prompt` fills the box to start.
  */
@@ -61,6 +66,7 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   };
   // As the target channel sees them: Cursor Cloud needs its GitHub repo.
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>(harnessesPath(target));
+  const technical = useTechnical();
   // A pick holds for the target it was made for; another target starts on its own defaults, as on the desktop.
   const [picked, setPicked] = useState<{ target: string; choice: ModelChoice; effort: string } | null>(null);
   const [picking, setPicking] = useState(false);
@@ -76,6 +82,9 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
   const runOn = useRunOn();
   const [base, setBase] = useBasePick(target);
   const [busy, setBusy] = useState(false);
+  // An open item's prompt is a task to start; anything typed fresh is asked first.
+  const [mode, setMode] = useState<'ask' | 'task'>(first ? 'task' : 'ask');
+  const [answering, setAnswering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const att = useAttachments();
   const file = useRef<HTMLInputElement>(null);
@@ -122,10 +131,31 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
     close();
   };
 
+  const asking = mode === 'ask' && !toGrok;
   const send = async () => {
     const prompt = text.trim();
     if (!prompt || busy) return;
     if (toGrok) return sendToGrok(prompt);
+    if (asking) {
+      setBusy(true);
+      setError(null);
+      try {
+        const t = await api.send<Thread>(
+          '/threads',
+          { channel: target, prompt, quick: true, ...draftRunRequest(picked?.target === target ? run : null), ...(refs.length && { context: referencesFor(refs, target) }) },
+          att.files,
+        );
+        clearDraftContext(NEW_SHEET_DRAFT);
+        keepLocalFiles(t.id, att.files);
+        setText('');
+        setAnswering(t.id);
+      } catch (e) {
+        setError(errorText(e));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -153,14 +183,36 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
 
   return (
     <>
-      <MoSheet onClose={close} label={conductor ? 'New delegation' : 'New thread'}>
+      <MoSheet onClose={close} label={asking ? 'Ask' : conductor ? term('newDelegation', technical) : 'New thread'}>
         <div className="flex shrink-0 items-center px-3 pt-1.5 pb-2">
           <button type="button" onClick={close} className="w-[60px] px-1.5 py-2 text-left text-[15px]">
             Cancel
           </button>
-          <span className="flex-1 text-center text-[15px] font-medium">{conductor ? 'New delegation' : 'New thread'}</span>
+          <span className="flex-1 text-center text-[15px] font-medium">{asking ? 'Ask' : conductor ? term('newDelegation', technical) : 'New thread'}</span>
           <span className="w-[60px]" />
         </div>
+        {!toGrok && !answering && (
+          <div className="flex shrink-0 justify-center px-4 pb-3">
+            <Segmented
+              label="Ask or start a task"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { id: 'ask', label: 'Ask' },
+                { id: 'task', label: 'Task' },
+              ]}
+            />
+          </div>
+        )}
+        {answering ? (
+          <div className="mx-3 rounded-[26px] bg-surface-2 px-3.5 py-3.5">
+            <QuickAnswer id={answering} touch onOpen={(id) => shell.open(href.thread(id))} />
+            <button type="button" onClick={() => setAnswering(null)} className="mo-press mt-3 text-[14px] font-medium text-fg-2">
+              New ask
+            </button>
+          </div>
+        ) : (
+        <>
         <div ref={strip} className="mo-scroll flex shrink-0 gap-2 overflow-x-auto px-4 pb-3">
           <button type="button" onClick={() => onTarget('conductor')} className={pill(conductor)} aria-pressed={conductor}>
             {conductorChannel && hasOwnLook(conductorChannel) ? (
@@ -189,10 +241,11 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
             onPaste={att.onPaste}
             rows={4}
             enterKeyHint="send"
-            placeholder={toGrok ? GROK_BOT_PLACEHOLDER : ch ? `Describe the task for #${ch.name}` : 'Ask the Conductor. It delegates to the crew.'}
+            placeholder={toGrok ? GROK_BOT_PLACEHOLDER : asking ? 'Ask anything. The answer shows here.' : ch ? `Describe the task for #${ch.name}` : 'Ask the Conductor. It delegates to the crew.'}
             className="resize-none bg-transparent px-2 text-[16px] leading-[1.45] text-fg outline-none placeholder:text-fg-3"
           />
-          {((baseRows && !toGrok) || runOn.rows) && (
+          {/* A quick ask runs here with no worktree, so neither the base nor the machine applies. */}
+          {!asking && ((baseRows && !toGrok) || runOn.rows) && (
             <div className="flex min-w-0 flex-wrap gap-1.5">
               {baseRows && !toGrok && (
                 <BaseChip
@@ -265,10 +318,16 @@ export function NewSheet({ channel: initial, prompt: first }: { channel?: string
         <p className="m-0 px-6 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">
           {toGrok
             ? GROK_BOT_NOTE
-            : ch
-              ? `Runs in #${ch.name} with its repo, store and browser profile.`
+            : asking
+              ? 'Answered here with read-only tools. Work that changes something needs a task. Recent asks keep it for 7 days.'
+              : ch
+                ? technical
+                  ? `Runs in #${ch.name} with its repo, store and browser profile.`
+                  : `In #${ch.name}.`
               : 'The Conductor picks the crew and reports back here. Activity shows you when something needs you.'}
         </p>
+        </>
+        )}
       </MoSheet>
       {pickingBase && baseRows && <BaseSheet rows={baseRows} value={base} onChange={setBase} onClose={() => setPickingBase(false)} />}
       {referencing && (

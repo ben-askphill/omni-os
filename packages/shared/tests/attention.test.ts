@@ -168,6 +168,12 @@ describe('questions', () => {
     expect(a).toMatchObject({ kind: 'question', body: 'Waiting on your answer in #acme: Which store should the digest cover first?' });
     expect(a!.id).toBe(`question:${byTitle('Daily digest · 5 Jan').thread.id}:2026-01-05T09:00:00.000Z`);
   });
+
+  it('names the step a running thread stopped at to ask', () => {
+    const item = byTitle('Daily digest · 5 Jan');
+    const a = questionAlert({ ...item, thread: { ...item.thread, status: 'running', step: 'Step 2 of 3 · Read the reviews' } });
+    expect(a?.body).toBe('Step 2 of 3 · Read the reviews · waiting on your answer in #acme: Which store should the digest cover first?');
+  });
 });
 
 describe('worktree setup', () => {
@@ -182,6 +188,12 @@ describe('worktree setup', () => {
     expect(out.post).toHaveLength(1);
     expect(out.post[0]).toMatchObject({ kind: 'failed' });
     expect(out.post[0].body.startsWith('Worktree could not be prepared in #widgets')).toBe(true);
+  });
+
+  it('alerts a thread held for a sign-in as a question, though it reads as stopped', () => {
+    const i = setupOnly('stopped');
+    const held: AttentionItem = { ...i, blockers: [{ kind: 'setup', signin: true, detail: 'Slack is signed out on omarchy.', count: 0 }] };
+    expect(setupAlert(held, 'widgets')).toMatchObject({ kind: 'question', body: 'Sign in needed in #widgets: Slack is signed out on omarchy.' });
   });
 
   it('stays quiet when Ben stopped it, or a failed result already says it', () => {

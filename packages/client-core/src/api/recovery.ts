@@ -18,8 +18,12 @@ export function recoveryApi(http: HttpClient) {
       http.request<Recovered>('POST', apiPath`/threads/${id}/requests/resume`, { body: ids ? { ids } : {} }),
     /** Drops parked messages. Each stays in the transcript, marked as never sent. At least one id. */
     discardRequests: (id: string, ids: readonly string[]) => http.request<Recovered>('POST', apiPath`/threads/${id}/requests/discard`, { body: { ids } }),
-    /** Retries a worktree that could not be prepared. Safe to send twice. */
-    retrySetup: (id: string) => http.request<Recovered>('POST', apiPath`/threads/${id}/setup/retry`),
+    /**
+     * Retries a worktree that could not be prepared, or a thread that waits for a sign-in. `skipSignIn` is Start anyway:
+     * it starts without the sign-in check this once. Safe to send twice.
+     */
+    retrySetup: (id: string, opts: { skipSignIn?: boolean } = {}) =>
+      http.request<Recovered>('POST', apiPath`/threads/${id}/setup/retry`, opts.skipSignIn ? { body: { skip_signin: true } } : {}),
     /** Schedules the one continuation of a turn stopped at its usage limit, for the reset time the harness gave. A 409 when it gave none. */
     scheduleLimit: (id: string) => http.request<Recovered>('POST', apiPath`/threads/${id}/limit/schedule`),
     cancelLimit: (id: string) => http.request<Recovered>('POST', apiPath`/threads/${id}/limit/cancel`),

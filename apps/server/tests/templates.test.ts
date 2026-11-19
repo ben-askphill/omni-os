@@ -18,7 +18,9 @@ file(shipped, 'Bad Name', '---\nname: Bad\n---\nbody\n');
 file(shipped, 'empty', '---\nname: Empty\n---\n');
 
 const r = await startRunner({ OMNI_TEMPLATES_DIR: shipped });
-const { allTemplates, listTemplates, parseTemplate, shopifyOn, templateList } = await import('../templates.ts');
+const { allTemplates, listTemplates, parseTemplate, templateList } = await import('../templates.ts');
+const { displayPrefs } = await import('../display.ts');
+const shopifyOn = () => displayPrefs().shopify;
 const { templatesApi } = await import('../templates-api.ts');
 const { commandsApi } = await import('../commands-api.ts');
 const { db, kv } = await import('../db.ts');
@@ -77,6 +79,8 @@ describe('the Shopify add-on', () => {
   });
 
   it('counts as on before it is set when a channel has a store domain, and follows the switch once it is', () => {
+    // displayPrefs keeps its first answer, so the row the test before read into place goes first.
+    unset();
     r.db.channels.create({ id: 'shop', name: 'Shop', kind: 'client', use_worktree: 0, store_domain: 'shop.example' } as never);
     try {
       expect(shopifyOn()).toBe(true);

@@ -4,6 +4,7 @@ import { api, type CommandList } from '../api.ts';
 import { SOURCE_TAG, type MenuSection } from '@omni/shared/slash-menu.ts';
 import { Loader } from './ui.tsx';
 import { KbdFooter, MENU_SURFACE, overlayRow } from './ui/overlay.tsx';
+import { useTechnical } from '../display.ts';
 
 /**
  * The command list for a `/` menu: a thread's (`thread=<id>`), or the one a new thread would get
@@ -65,6 +66,7 @@ export function SlashMenu({
   below?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const technical = useTechnical();
   useEffect(() => {
     ref.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
   }, [active, sections]);
@@ -117,7 +119,8 @@ export function SlashMenu({
                     </span>
                     {c.description && <span className="block truncate text-[12px] text-fg-3">{c.description}</span>}
                   </span>
-                  <span className="shrink-0 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">{SOURCE_TAG[c.source]}</span>
+                  {/* Where a command comes from (project, plugin, mcp) is for whoever writes them: Show technical details. */}
+                  {technical && <span className="shrink-0 rounded-full bg-surface-2 px-2 py-px text-[11px] text-fg-3">{SOURCE_TAG[c.source]}</span>}
                 </div>
               );
             })}

@@ -22,7 +22,8 @@ import { href } from '../router.ts';
 import { Card, InfoRow, LinkLine, Origin, SettingRow, SwitchRow } from './settings-parts.tsx';
 
 // Settings > Desktop app: what only the desktop app (apps/desktop) has: the Quick Prompt and opening at login. Its
-// other settings live where the rest of Omni keeps them, each with a line here that links there: zoom in Appearance
+// other settings live where the rest of Omni keeps them, each with a line here that links there: Wispr Flow
+// dictation in Extras (WisprFlowCard), zoom in Appearance
 // (ZoomRow), the app's updates in Machines (AppUpdatesCard) and its server, data folder and log in About
 // (AppServerRows). Shown only with the bridge (@omni/shared/settings-catalog.ts `desktopApp`).
 
@@ -124,19 +125,6 @@ export function DesktopSection({ bridge }: { bridge: DesktopBridge }) {
         {bridge.platform === 'linux' && (
           <p className="text-[12.5px] text-fg-3">On Wayland the desktop owns global shortcuts. Yours may ask you to allow it, or need it bound in its own settings.</p>
         )}
-        {mac && (
-          <SwitchRow
-            title="Dictate with Wispr Flow"
-            origin={thisApp}
-            detail={
-              status?.wispr
-                ? 'Opening the prompt starts Wispr Flow hands-free. Return stops it and sends once the words land.'
-                : 'Install Wispr Flow to talk to the Conductor. Until then the prompt opens for typing.'
-            }
-            checked={qp.dictate}
-            onChange={(on) => void save({ quickPrompt: { dictate: on } })}
-          />
-        )}
       </Card>
 
       {bridge.loginItemSupported && (
@@ -157,10 +145,45 @@ export function DesktopSection({ bridge }: { bridge: DesktopBridge }) {
         </Card>
       )}
 
+      {mac && <LinkLine href={href.settingsSection('extras', 'wispr-flow')}>Dictation with Wispr Flow is in Extras</LinkLine>}
       <LinkLine href={href.settingsSection('appearance', 'zoom')}>Zoom is in Appearance</LinkLine>
       <LinkLine href={href.settingsSection('machines', 'desktop-updates')}>Updates are in Machines</LinkLine>
       <LinkLine href={href.settingsSection('about', 'server')}>Server, data folder and log are in About</LinkLine>
     </>
+  );
+}
+
+/** Settings > Extras on a Mac: dictating into the Quick Prompt with Wispr Flow. */
+export function WisprFlowCard({ bridge }: { bridge: DesktopBridge }) {
+  const { settings, error, save } = useDesktopSettings(bridge);
+  const [wispr, setWispr] = useState<boolean | null>(null);
+  useEffect(() => {
+    bridge.quickPrompt
+      .status()
+      .then((s) => setWispr(s.wispr))
+      .catch(() => {});
+  }, [bridge]);
+  const qp = settings?.quickPrompt;
+  return (
+    <Card entry="wispr-flow" title="Wispr Flow" subtitle="Say what you need instead of typing it: Wispr Flow dictates into the Quick Prompt.">
+      {error && <ErrorNote>{error}</ErrorNote>}
+      {!qp ? (
+        !error && <Loader />
+      ) : (
+        <SwitchRow
+          title="Dictate with Wispr Flow"
+          origin={<Origin of="device" label="This app" />}
+          detail={
+            wispr
+              ? 'Opening the prompt starts Wispr Flow hands-free. Return stops it and sends once the words land.'
+              : 'Install Wispr Flow to talk to the Conductor. Until then the prompt opens for typing.'
+          }
+          checked={qp.dictate}
+          onChange={(on) => void save({ quickPrompt: { dictate: on } })}
+        />
+      )}
+      <LinkLine href={href.settingsSection('desktop', 'desktop-quick-prompt')}>The Quick Prompt and its shortcut are in Desktop app</LinkLine>
+    </Card>
   );
 }
 

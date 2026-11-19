@@ -1,13 +1,13 @@
 // Templates on this machine: the shipped files in templates/ and the user's own in data/templates/ (same name wins).
 // Read from disk at each call, so an edited file shows at once. The Shopify ones show only while the Shopify add-on is
-// on. See packages/shared/templates.ts.
+// on (display.ts displayPrefs, the same switch the Store card and the prompt read). See packages/shared/templates.ts.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { isCommandName } from '@omni/shared/slash.ts';
 import { isTemplatePack, offeredTemplates, type Template, type TemplateList } from '@omni/shared/templates.ts';
 import { paths } from './config.ts';
 import { splitCrewFile } from './crew.ts';
-import { db, kv } from './db.ts';
+import { displayPrefs } from './display.ts';
 
 /** A template file, or null when it is not one (a README, a bad name, no body). */
 export function parseTemplate(id: string, src: string): Template | null {
@@ -49,23 +49,12 @@ export function allTemplates(): Template[] {
   return [...merged.values()];
 }
 
-/**
- * Whether the Shopify add-on is on: the `shopify` field of the `display` kv row, which syncs. Until that row is
- * written, an install whose channels have a store domain or Portal slug counts as having it on, as the add-on's own
- * first read decides.
- */
-export function shopifyOn(): boolean {
-  const saved = kv.get<{ shopify?: unknown }>('display');
-  if (saved && typeof saved.shopify === 'boolean') return saved.shopify;
-  return !!db.prepare("SELECT 1 FROM channels WHERE COALESCE(store_domain, '') <> '' OR COALESCE(portal_slug, '') <> '' LIMIT 1").get();
-}
-
 /** The templates the menus offer. */
-export const listTemplates = (): Template[] => offeredTemplates(allTemplates(), shopifyOn());
+export const listTemplates = (): Template[] => offeredTemplates(allTemplates(), displayPrefs().shopify);
 
 export function templateList(): TemplateList {
   const all = allTemplates();
-  const shopify = shopifyOn();
+  const { shopify } = displayPrefs();
   const templates = offeredTemplates(all, shopify);
   return { templates, shopify, hidden: all.length - templates.length };
 }

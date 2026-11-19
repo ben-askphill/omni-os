@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTechnical } from '../display.ts';
 import { api, errorText, harnessesPath, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { dropNewThreadPreset, navigate, openNewThread, peekNewThreadPreset } from '../router.ts';
 import { useApp } from '../store.tsx';
@@ -29,6 +30,7 @@ import { ForkThreadButton } from './ContinueSheet.tsx';
 import { removeDraftContext, settleDraftContext, useDraftContext } from '../message-context/draft.ts';
 import { referencesFor } from '../message-context/thread-picker.ts';
 import { ReferenceThreadButton } from './ThreadReference.tsx';
+import { QuickAnswer } from './QuickAnswer.tsx';
 
 import { AttachButton, AttachmentStrip, useAttachments } from './composer/attachments.tsx';
 import { DropHint, enterKey, SendButton, shell, StopButton, useAutosize, useFocusRequests, withKeys } from './composer/controls.tsx';
@@ -80,6 +82,8 @@ export function NewThreadComposer({
   // As the channel sees them: Cursor Cloud needs its GitHub repo.
   const { data: harnesses, reload: reloadHarnesses } = useApi<HarnessWithRunning[]>(harnessesPath(channel));
   const [busy, setBusy] = useState(false);
+  // A quick ask from Ask: answered under the composer (components/QuickAnswer.tsx), no thread to open.
+  const [answering, setAnswering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const att = useAttachments();
@@ -193,6 +197,31 @@ export function NewThreadComposer({
     }
   };
 
+  /** Ask: a quick ask in this channel, on the picked run, answered right here with read-only tools. */
+  const ask = async () => {
+    const prompt = text.trim();
+    if (!prompt || busy || toGrok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const t = await api.send<Thread>(
+        '/threads',
+        { channel, prompt, quick: true, ...draftRunRequest(picked ? { choice, effort } : null), ...(refs.length && { context: referencesFor(refs, channel) }) },
+        att.files,
+      );
+      keepLocalFiles(t.id, att.files);
+      drafts.delete(key);
+      settleDraftContext(key, refs.map((r) => r.id));
+      setText('');
+      att.clear();
+      setAnswering(t.id);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const { channelOptions, roleOptions } = pickerOptions(visibleChannels, channel, crew);
   // A template chip puts `/<name> ` in the box, ready for what the job is about.
   const pickTemplate = (t: Template) => {
@@ -263,6 +292,11 @@ export function NewThreadComposer({
             </button>
           )}
           <div className="ml-auto flex items-center gap-2.5">
+            {!toGrok && (
+              <Button size="sm" variant="secondary" disabled={!text.trim() || busy} onClick={() => void ask()} title="Answer here with read-only tools, without starting a thread">
+                Ask
+              </Button>
+            )}
             <SendButton armed={!!text.trim() && !grokBlock} busy={busy} onClick={submit}>
               {toGrok ? 'Send' : 'Start'}
             </SendButton>
@@ -275,6 +309,14 @@ export function NewThreadComposer({
         {grokBlock && <ErrorNote className="mx-2 mb-2">{grokBlock}</ErrorNote>}
         {switched?.notice && target && <ComposerAccountNotice machine={{ id: target.id, name: target.machine }} account={switched} onSeen={accounts.setData} />}
         {(att.error || error) && <ErrorNote className="mx-2 mb-2">{att.error ?? error}</ErrorNote>}
+        {answering && (
+          <div className="mx-2 mb-2 rounded-[16px] bg-bg px-3.5 py-3 shadow-[var(--shadow-card)]">
+            <QuickAnswer key={answering} id={answering} onOpen={(id) => navigate(`/t/${id}`)} />
+            <button type="button" onClick={() => setAnswering(null)} className="press mt-2 text-[12.5px] font-medium text-fg-3 hover:text-fg">
+              Close
+            </button>
+          </div>
+        )}
       </div>
       {!text.trim() && !toGrok && templates.data && <TemplateChips templates={templates.data.templates} onPick={pickTemplate} className="mt-3 px-1" />}
     </>
@@ -354,6 +396,7 @@ export function ReplyComposer({
   const { id: threadId, status } = thread;
   // A switch queued behind the turn: what Ben sends waits for it too (apps/server/runner/queue.ts), so nothing steers.
   const steers = canSteer && !thread.queued_harness;
+  const technical = useTechnical();
   const key = `reply:${threadId}`;
   const [text, setText] = useState(() => drafts.get(key) ?? '');
   const [busy, setBusy] = useState(false);
@@ -508,7 +551,7 @@ export function ReplyComposer({
           void submit(busyThread ? busyMode : undefined);
         }}
         rows={1}
-        placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread || replying ? 'Reply' : steers ? 'Steer the agent. It reads this at its next step' : 'Queue a message. It runs after this turn')}
+        placeholder={suggestion ? `${suggestion} · ⇥ to use` : withKeys(!busyThread || replying ? 'Reply' : steers ? (technical ? 'Steer the agent. It reads this at its next step' : 'Add to this. It reads it at its next step') : technical ? 'Queue a message. It runs after this turn' : 'Send when it finishes')}
         className="block max-h-[220px] min-h-[60px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.8] outline-none placeholder:text-fg-3"
       />
       <div className="flex flex-wrap items-center gap-1.5 px-2 pt-1.5 pb-2">

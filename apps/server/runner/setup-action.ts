@@ -4,8 +4,9 @@
 import { startRun, stopRun } from '../actions.ts';
 import { channelActions, threadSetupRuns, threads, type Thread } from '../db.ts';
 import { isProviderHarness } from '../harness/types.ts';
+import { SHELL_REFUSAL } from '../request-trust.ts';
 
-export const STOPPED = 'Stopped by Ben before the agent started.';
+export const STOPPED = 'Stopped by you before the agent started.';
 
 /** Threads whose current preparation attempt Ben stopped. */
 const stops = new Set<string>();
@@ -53,9 +54,11 @@ export interface SetupHold {
  * After the checkout is made and verified: run the channel's setup action in it, if it has one. Resolves once a
  * blocking one has ended, or once a background one has started, with why the agent must not start, or null. A
  * thread that runs off this Mac never gets one, and nor does a thread without a worktree, which never comes here.
+ * `shell` is false for a Retry setup whose caller may not reach a shell: a step added since it was let in is held.
  */
-export async function runSetupAction(t: Thread): Promise<SetupHold | null> {
+export async function runSetupAction(t: Thread, shell = true): Promise<SetupHold | null> {
   const action = isProviderHarness(t.harness) ? undefined : channelActions.setupFor(t.channel_id);
+  if (action && !shell && !stops.has(t.id)) return { stopped: false, reason: `The setup action "${action.name}" did not run: ${SHELL_REFUSAL}.` };
   if (action && !stops.has(t.id)) {
     let started: Awaited<ReturnType<typeof startRun>>;
     try {

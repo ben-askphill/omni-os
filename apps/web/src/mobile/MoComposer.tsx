@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { term } from '@omni/shared/display.ts';
+import { useTechnical } from '../display.ts';
 import { api, errorText, useApi, type HarnessWithRunning, type SendMode, type Thread } from '../api.ts';
 import { AttachmentStrip, useAttachments, useReplySend } from '../components/Composer.tsx';
 import { ErrorNote, Icon, type IconName } from '../components/ui.tsx';
@@ -68,6 +70,7 @@ export function MoComposer({
   const accounts = useAccounts();
   const [switching, setSwitching] = useState(false);
   const { data: harnesses, reload } = useApi<HarnessWithRunning[]>('/harnesses');
+  const technical = useTechnical();
   const att = useAttachments();
   const context = useDraftContext(thread.id);
   const send = useReplySend(thread.id);
@@ -203,7 +206,7 @@ export function MoComposer({
         <ContextChips records={context} onRemove={(id) => removeDraftContext(thread.id, id)} className="px-3 pt-3 pb-0.5" />
         <AttachmentStrip files={att.files} onRemove={att.remove} />
         <div className="flex min-h-[52px] items-end gap-1.5 p-1.5">
-          <MoRound icon="plus" label="Attach, model and effort" onClick={() => setPlus(true)} disabled={busy} />
+          <MoRound icon="plus" label={term('plusSheet', technical)} onClick={() => setPlus(true)} disabled={busy} />
           <textarea
             ref={ref}
             rows={1}

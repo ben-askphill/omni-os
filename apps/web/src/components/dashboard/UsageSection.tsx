@@ -9,6 +9,8 @@ import { HarnessLogo } from '../brand.tsx';
 import { Chip, Loader, Segmented, Ticks } from '../ui.tsx';
 import { compact, dayLabel, grouped, pct, SOURCE_COLOR, SOURCE_NAME, SOURCE_ORDER, usd } from './numbers.ts';
 import { UsageChart } from './UsageChart.tsx';
+import { readDisplay, useTechnical } from '../../display.ts';
+import { term } from '@omni/shared/display.ts';
 
 const RANGE_LABEL: Record<InsightRange, string> = { today: 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days' };
 
@@ -92,7 +94,7 @@ function BreakdownTable({ usage, view }: { usage: InsightsUsage; view: Breakdown
         <thead>
           <tr className="text-left text-[11px] text-fg-3">
             <th className="w-10 px-3 py-2 font-medium">#</th>
-            <th className="px-3 py-2 font-medium">{view === 'model' ? 'Model' : view === 'harness' ? 'Harness' : 'Day'}</th>
+            <th className="px-3 py-2 font-medium">{view === 'model' ? 'Model' : view === 'harness' ? term('harness', readDisplay().technical) : 'Day'}</th>
             <th className="px-3 py-2 text-right font-medium">Cost</th>
             <th className="px-3 py-2 text-right font-medium">Share</th>
             <th className="px-3 py-2 text-right font-medium">Tokens</th>
@@ -133,6 +135,7 @@ function BreakdownTable({ usage, view }: { usage: InsightsUsage; view: Breakdown
  */
 export function UsageSection({ usage, range, from, to, loading }: { usage: InsightsUsage | undefined; range: InsightRange; from?: string; to?: string; loading: boolean }) {
   const [view, setView] = useState<Breakdown>('model');
+  const technical = useTechnical();
   const header = (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <h2 className="font-display text-[length:var(--fs-heading)]">
@@ -204,6 +207,9 @@ export function UsageSection({ usage, range, from, to, loading }: { usage: Insig
         </div>
       </div>
 
+      {/* Cache reads and writes, and tokens by type, are for tuning prompts: Show technical details. */}
+      {technical && (
+      <>
       <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-line pt-5 @3xl:grid-cols-5">
         <Stat label="Cached input" value={compact(t.cached)} sub={`${pct(t.cached, input)} cache hit`} />
         <Stat label="Uncached input" value={compact(t.uncached)} sub={`plus ${compact(t.cacheWrite)} written to cache`} />
@@ -229,6 +235,8 @@ export function UsageSection({ usage, range, from, to, loading }: { usage: Insig
           ))}
         </ul>
       </div>
+      </>
+      )}
 
       <div className="mt-6">
         <div className="mb-2 flex items-center justify-between gap-3">
@@ -240,7 +248,7 @@ export function UsageSection({ usage, range, from, to, loading }: { usage: Insig
             onChange={setView}
             options={[
               { id: 'model', label: 'Model' },
-              { id: 'harness', label: 'Harness' },
+              { id: 'harness', label: term('harness', technical) },
               { id: 'day', label: 'Day' },
             ]}
           />

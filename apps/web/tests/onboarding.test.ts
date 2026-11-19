@@ -32,7 +32,7 @@ afterEach(() => {
   postAnswers = {};
 });
 
-const { HarnessScreen, NotificationsScreen, STEPS } = await import('../src/components/onboarding-parts.tsx');
+const { FilesScreen, HarnessScreen, NotificationsScreen, STEPS, WorkScreen } = await import('../src/components/onboarding-parts.tsx');
 const { DoneTips, SavedNote, addChannelHint, doneTips, offersNpmSetup } = await import('../src/components/Onboarding.tsx');
 
 let root: Root | null = null;
@@ -89,16 +89,26 @@ describe('Harnesses step', () => {
     expect(text(codex)).toContain(`${exited}.`);
   });
 
-  it('says what Codex is for, and that the Conductor asks without it', async () => {
+  // The Conductor reviews only when asked (crew/conductor.md), so Codex is optional, not a reviewer of every PR.
+  it('says Codex is optional and reviews only on request', async () => {
     harnesses = [
       { id: 'claude-code', name: 'Claude Code', plan: 'Claude plan', available: true, models: [], running: 0, cap: 4 },
       { id: 'codex', name: 'Codex', plan: 'ChatGPT plan', available: false, fix: 'codex login', models: [], running: 0, cap: 2 },
     ];
     const el = await render(createElement(HarnessScreen));
-    expect(text(el)).not.toContain('Codex and Cursor Agent are optional');
-    expect(text(el)).toContain('Codex reviews the pull requests Claude writes.');
-    expect(text(row(el, 'codex'))).toContain('Reviews the pull requests Claude writes. Without it, the Conductor asks you what to do each time.');
-    expect(text(el)).toContain('Set up Codex for PR reviews, or the Conductor asks you each time.');
+    expect(text(el)).toContain('Omni needs Claude Code. Codex and Cursor Agent are optional.');
+    expect(text(row(el, 'codex'))).toContain('Optional. Reviews a pull request Claude wrote when you ask the Conductor for a review.');
+    expect(text(el)).not.toContain('each time');
+    expect(text(el)).toContain('You can add the others any time.');
+  });
+
+  it('leaves the GitHub CLI out for someone who does not work with code', async () => {
+    harnesses = [{ id: 'claude-code', name: 'Claude Code', plan: 'Claude plan', available: true, models: [], running: 0, cap: 4 }];
+    github = { state: 'signed-out' };
+    const heard: unknown[] = [];
+    const el = await render(createElement(HarnessScreen, { code: false, onGithub: (g) => heard.push(g) }));
+    expect(el.querySelector('[data-harness="github"]')).toBeNull();
+    expect(heard.at(-1)).toBeNull();
   });
 });
 
@@ -298,15 +308,15 @@ describe('copy for the install and the layout', () => {
   });
 
   it('names where to add a channel later on each layout', () => {
-    expect(addChannelHint('rail')).toBe('Skip it and add channels later with Add channel (+) at the foot of the rail.');
-    expect(addChannelHint('classic')).toBe('Skip it and add channels later with Add channel in the sidebar.');
-    expect(addChannelHint('phone')).toBe('Skip it and add channels later in Settings > Channels.');
+    expect(addChannelHint('rail')).toBe('Skip it and add projects later with Add channel (+) at the foot of the rail.');
+    expect(addChannelHint('classic')).toBe('Skip it and add projects later with Add channel in the sidebar.');
+    expect(addChannelHint('phone')).toBe('Skip it and add projects later in Settings > Channels.');
   });
 });
 
 describe('Notifications step', () => {
   it('sits before Done', () => {
-    expect(STEPS).toEqual(['You', 'Workspace', 'Harnesses', 'Channel', 'Notifications', 'Done']);
+    expect(STEPS).toEqual(['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Done']);
   });
 
   it('in the desktop app: a test notification so macOS asks now, and the switch saves the app setting', async () => {
@@ -361,5 +371,45 @@ describe('Notifications step', () => {
     } finally {
       if (keep) (globalThis as { Notification?: unknown }).Notification = keep;
     }
+  });
+});
+
+describe('Work step: what you do and which tools', () => {
+  const chips = (el: Element) => [...el.querySelectorAll('[aria-label="Tools you use"] button')];
+  const pressed = (el: Element) => chips(el).filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.textContent);
+
+  it('asks in plain words, with the tools as chips and an Others field', async () => {
+    const el = await render(createElement(WorkScreen, { work: '', tools: 'Email, Xero', onWork: () => {}, onTools: () => {} }));
+    expect(text(el.querySelector('h2'))).toBe('What do you do?');
+    expect(chips(el).map((b) => b.textContent)).toEqual(['Email', 'Calendar', 'Google Drive', 'Notion', 'Slack', 'Linear', 'Jira', 'Figma', 'GitHub and code', 'Shopify']);
+    expect(pressed(el)).toEqual(['Email']);
+    expect((el.querySelector('#ob-tools-other') as HTMLInputElement).value).toBe('Xero');
+  });
+
+  it('a chip adds its tool to the line and keeps what was typed under Others', async () => {
+    let tools = 'Email, Xero';
+    const el = await render(createElement(WorkScreen, { work: '', tools, onWork: () => {}, onTools: (v: string) => (tools = v) }));
+    await act(async () => (chips(el).find((b) => b.textContent === 'Notion') as HTMLButtonElement).click());
+    expect(tools).toBe('Email, Notion, Xero');
+  });
+});
+
+describe('Files step: where Omni keeps your files', () => {
+  const fallbacks = { workspaceRoot: '/home/ada/Omni', reposDir: '/home/ada/code' };
+  const value = { root: '', reposDir: '', githubOwner: '' };
+
+  it('asks for one folder, with code as an add-on that starts closed', async () => {
+    const el = await render(createElement(FilesScreen, { value, onChange: () => {}, code: false, onCode: () => {}, fallbacks }));
+    expect(text(el.querySelector('h2'))).toBe('Where should Omni keep your files?');
+    expect(el.querySelector('#ob-root')).not.toBeNull();
+    expect(el.querySelector('#ob-repos')).toBeNull();
+    expect(el.querySelector('#ob-gh')).toBeNull();
+    expect(text(el.querySelector('[data-addon="code"]'))).toContain('I work with code');
+  });
+
+  it('with the add-on on, shows the repos folder and GitHub owner', async () => {
+    const el = await render(createElement(FilesScreen, { value, onChange: () => {}, code: true, onCode: () => {}, fallbacks }));
+    expect(el.querySelector('#ob-repos')).not.toBeNull();
+    expect(el.querySelector('#ob-gh')).not.toBeNull();
   });
 });

@@ -3,6 +3,7 @@
 // same on the other.
 import { storedList, worktreeListProblem } from './worktree-lists.ts';
 import { STEP_PROMPT_FIELD, type PRStep, type StepPromptOverrides } from './thread-glance.ts';
+import { accessLevelOf, connectorAccessOf, isAccessLevel, type AccessLevel, type ConnectorAccess } from './access.ts';
 
 export type ChannelKind = 'client' | 'internal' | 'personal';
 
@@ -41,6 +42,12 @@ export interface ChannelRecord {
   prompt_fix_checks?: string | null;
   /** 1 leaves the channel out of usage scans. Missing from an older server. */
   scan_opt_out?: number;
+  /** What agents here may do without a yes (access.ts). Null or missing is full access. */
+  access_level?: string | null;
+  /** The connectors' own levels, as the stored JSON map. */
+  connector_access?: string | null;
+  /** What a channel with no access_level runs at on the machine that answered (apps/server/access-default.ts). */
+  access_default?: string;
 }
 
 /** A channel's default run as a picker choice: model '' is the harness default, model "auto" is Auto. All '' is no default, which runs Auto too. */
@@ -72,10 +79,22 @@ export interface ChannelForm {
   prompts: Record<PRStep, string>;
   /** Leave the channel's threads out of usage scans. */
   scanOptOut: boolean;
+  /** What agents here may do without a yes: the channel's own level, else the machine's default. */
+  access: AccessLevel;
+  /**
+   * The channel has a level of its own, or one was picked here. Otherwise a save leaves it unset, so the channel keeps
+   * running at each machine's default (apps/server/access-default.ts).
+   */
+  accessSet: boolean;
+  /** Connectors set apart from the channel's level, by MCP server name. */
+  connectors: ConnectorAccess;
 }
 
-/** A new channel's form when `c` is left out. */
-export function channelForm(c?: ChannelRecord): ChannelForm {
+/**
+ * A new channel's form when `c` is left out. `accessDefault`: the machine's default level, for a new channel's form
+ * (any channel record carries it as access_default).
+ */
+export function channelForm(c?: ChannelRecord, accessDefault?: string): ChannelForm {
   return {
     id: c?.id ?? '',
     name: c?.name ?? '',
@@ -96,6 +115,9 @@ export function channelForm(c?: ChannelRecord): ChannelForm {
     worktree_shared: c?.worktree_shared ?? '',
     prompts: { open: c?.prompt_open_pr ?? '', conflicts: c?.prompt_fix_conflicts ?? '', checks: c?.prompt_fix_checks ?? '' },
     scanOptOut: c?.scan_opt_out === 1,
+    access: accessLevelOf(c?.access_level ?? c?.access_default ?? accessDefault),
+    accessSet: isAccessLevel(c?.access_level),
+    connectors: connectorAccessOf(c?.connector_access),
   };
 }
 
@@ -163,6 +185,8 @@ export function channelBody(f: ChannelForm, opts: { system: boolean; github: boo
     worktree_shared: storedList(f.worktree_shared),
     ...promptsBody(f.prompts),
     scan_opt_out: f.scanOptOut ? 1 : 0,
+    ...(f.accessSet && { access_level: f.access }),
+    connector_access: f.connectors,
   };
   if (!opts.system) body.kind = f.kind;
   if (opts.github) body.github_repo = orNull(f.github_repo);

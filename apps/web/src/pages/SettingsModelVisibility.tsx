@@ -15,7 +15,7 @@ import {
 } from '@omni/shared/model-visibility.ts';
 import { Card, Origin, ResetButton, SettingRow } from './settings-parts.tsx';
 
-// Settings, Harnesses & models: which models each harness's picker lists (packages/shared/model-visibility.ts). Saved on
+// Settings, Models: which models each harness's picker lists (packages/shared/model-visibility.ts). Saved on
 // every switch, and synced to Ben's other machines. Hidden models still run wherever something already names them.
 
 /** Past this many models, the list gets a search field. */

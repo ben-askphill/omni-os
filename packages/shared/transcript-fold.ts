@@ -89,6 +89,11 @@ export interface ReportP {
   dropped?: boolean;
   /** Why the machine running the parent did not take it, when `dropped` is from there. */
   undelivered?: string;
+  /**
+   * It started no turn: the Conductor's report shown in place (apps/server/runner/queue.ts fileReport). Clients put it on
+   * the delegation card of the turn that delegated the thread (thread-view.ts `answers`).
+   */
+  shown?: boolean;
 }
 
 /** Where a Cursor cloud agent's run stands: the server's CloudAgentState (apps/server/stream.ts). */
@@ -245,15 +250,6 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
   }
   const questions = new Map(questionsIn(events).map((q) => [q.event_id, q]));
 
-  // Collect plan step updates
-  const planUpdates = new Map<number, string>();
-  for (const e of events) {
-    if (e.kind === 'plan_step_update') {
-      const p = payload<{ index: number; status: string }>(e);
-      if (typeof p.index === 'number') planUpdates.set(p.index, p.status);
-    }
-  }
-
   const items: Item[] = [];
   // Every call so far, not just this group's: a background agent's calls land after later text and turns.
   const byId = new Map<string, ToolCall>();
@@ -397,17 +393,6 @@ export function buildItems(events: TranscriptEvent[], spans?: readonly Span[]): 
       default:
         break;
     }
-  }
-
-  // Apply plan step updates to the plan
-  if (plan) {
-    plan = {
-      ...plan,
-      todos: plan.todos.map((todo, i) => {
-        const updatedStatus = planUpdates.get(i);
-        return updatedStatus ? { ...todo, status: updatedStatus } : todo;
-      }),
-    };
   }
 
   if (!spans) return { items, plan };

@@ -169,6 +169,9 @@ export function switchLine(machineName: string, harnessName: string, a: HarnessA
 export const threadAccountLine = (t: ThreadAccount, hereName?: string | null) =>
   `${t.plan ? `${t.label} · ${t.plan}` : t.label}${hereName && hereName === t.machineName ? '' : `, on ${t.machineName}`}`;
 
+/** The account alone, for a thread header that names the machine already: "dev@example.com · Max". */
+export const threadAccountLabel = (t: Pick<ThreadAccount, 'label' | 'plan'>) => (t.plan ? `${t.label} · ${t.plan}` : t.label);
+
 /** The accounts of one machine by harness, for the pickers. */
 export const accountsByHarness = (m: MachineAccounts | null | undefined): Record<string, HarnessAccountView> =>
   Object.fromEntries((m?.accounts ?? []).map((a) => [a.harness, a]));

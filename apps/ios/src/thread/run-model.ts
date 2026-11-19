@@ -2,6 +2,7 @@ import type { HarnessInfo, Thread } from '@omni/client-core';
 import type { Run } from '@omni/shared/run-switch.ts';
 import { pickedModelRun, runModel, shownRun, threadChoice, threadRunLabels } from '@omni/shared/thread-run.ts';
 import { pickerModels } from '@omni/shared/model-visibility.ts';
+import { effortWord, term } from '@omni/shared/display.ts';
 
 /** What the run switch reads of a thread: its run, and the run queued to start after the current turn. */
 export type RunThread = Pick<
@@ -46,18 +47,18 @@ export interface RunSheetModel {
  * The model sheet as rows, from `/harnesses` alone: every harness the server reports is listed, so a new one needs no
  * code here. The checked rows are the run the thread shows: the one queued for its next turn, else the one it runs on.
  */
-export function runSheetModel(thread: RunThread, harnesses: HarnessInfo[]): RunSheetModel {
+export function runSheetModel(thread: RunThread, harnesses: HarnessInfo[], technical = true): RunSheetModel {
   const shown = shownRun(thread);
   const choice = threadChoice(shown, harnesses);
   const { model } = runModel(shown, harnesses);
   const levels = model?.efforts ?? [];
   return {
-    effortTitle: levels.length > 0 ? `Effort for ${model?.label ?? 'this model'}` : null,
+    effortTitle: levels.length > 0 ? `${term('effortFor', technical)} ${model?.label ?? 'this model'}` : null,
     efforts:
       levels.length > 0
         ? ['', ...levels].map((value) => ({
             value,
-            label: value || (model?.defaultEffort ? `Default (${model.defaultEffort})` : 'Default'),
+            label: value ? effortWord(value, technical) : model?.defaultEffort ? `Default (${effortWord(model.defaultEffort, technical)})` : 'Default',
             selected: shown.effort === value,
           }))
         : [],
@@ -94,12 +95,12 @@ export function runForPick(
  * "Sonnet 5.5 · high": the chip's text for the run the thread is on now. A switch queued mid-turn is not here, the next
  * turn chip names it. Null until the catalog loads.
  */
-export function runChipLabel(thread: RunThread, harnesses: HarnessInfo[] | null): string | null {
+export function runChipLabel(thread: RunThread, harnesses: HarnessInfo[] | null, technical = true): string | null {
   if (!harnesses) return null;
   const labels = threadRunLabels(thread, harnesses);
   const { model } = runModel(thread, harnesses);
   const effort = model && model.efforts.length > 0 ? thread.effort || model.defaultEffort : '';
-  return [labels.model, effort].filter(Boolean).join(' · ');
+  return [labels.model, effort && effortWord(effort, technical)].filter(Boolean).join(' · ');
 }
 
 /**

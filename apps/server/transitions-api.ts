@@ -21,7 +21,7 @@ const relocate = z.object({ kind: z.literal('relocate'), to: z.string().min(1).m
 /** A fork's machine: a synced machine's id, or "here". Left out, Settings > Threads' default. */
 const forkPreview = z.object({ kind: z.literal('fork'), run: runSchema, attachments, device: z.string().min(1).max(200).optional() });
 const fork = forkPreview.extend({
-  // Ben's message goes as he wrote it, after the Carryover, never cut.
+  // The user's message goes as they wrote it, after the Carryover, never cut.
   text: z.string().refine((s) => s.trim().length > 0, 'Write the first message for the new thread.'),
   // The client's id for this start, kept across its retries: a retry gets the same thread back.
   request_id: z.string().min(1).max(200),

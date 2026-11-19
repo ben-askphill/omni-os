@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { builderArgs } from '../scripts/dist.ts';
+import { personalTermProblems, SHIPPED_SOURCES } from '../scripts/personal-terms.ts';
 import { NATIVE_BINARIES, NATIVE_DIR, rustTriple, stagedNativeProblems, stageNative } from '../scripts/native.ts';
 import { NATIVE_CLI } from '../src/cli-shim.ts';
 import {
@@ -140,10 +141,34 @@ describe('stage.ts and the server bundle', () => {
     expect(personalCrewProblems(join(import.meta.dirname, '../../../crew'))).toEqual([]);
   });
 
-  // Templates ship the same way: the Shopify pack is generic, and anything about one person's company lives in data/templates/.
-  it('ships templates that name no one in particular', () => {
+  // Templates ship the same way: the whole-build guard reads templates/ too, so anything about one person's company
+  // lives in data/templates/.
+  it('ships templates under the same guard as the rest of the build', () => {
     expect(SHIPPED_DIRS).toContain('templates');
-    expect(personalCrewProblems(join(import.meta.dirname, '../../../templates'), 'templates')).toEqual([]);
+    expect(SHIPPED_SOURCES).toContain('templates');
+  });
+
+  // The rest of the default build too: the server, Conductor MCP, Web UI, desktop and shared text, mods included.
+  // What esbuild drops (types and the comments on them) does not count; an optional pack under packs/ may name a company.
+  // It transforms every shipped source file, which takes seconds when the whole suite runs at once.
+  it('ships a default build that names no one in particular', { timeout: 60_000 }, () => {
+    expect(personalTermProblems(join(import.meta.dirname, '../../..'))).toEqual([]);
+  });
+
+  it('flags shipped text, not what the build drops, and skips packs/', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omni-stage-src-'));
+    try {
+      mkdirSync(join(dir, 'apps/server/packs'), { recursive: true });
+      writeFileSync(join(dir, 'apps/server/a.ts'), "interface T {\n  /** Ben picks it. */\n  a: string;\n}\nexport const a = 'Stopped by Ben.';\nexport const b = 'benchmark';\n");
+      writeFileSync(join(dir, 'apps/server/packs/shop.ts'), "export const p = 'Ask Phill Portal';\n");
+      writeFileSync(join(dir, 'apps/server/b.tsx'), 'export const C = () => <p>Hi from Volero</p>;\n');
+      expect(personalTermProblems(dir, ['apps/server']).map((p) => p.split(': ').slice(0, 2).join(': ').replace(/:\d+:/, ':'))).toEqual([
+        'apps/server/a.ts: Ben',
+        'apps/server/b.tsx: Volero',
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("flags a charter that names a person's own setup, and passes the same words in plain prose", () => {

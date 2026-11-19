@@ -59,6 +59,25 @@ describe('cursor tools, secrets, attachments and crew reports', () => {
     const t = await H.start('CMD hi', { ...cursor, role: 'builder' });
     await H.untilResults(t.id, 1);
     expect(turnFor(t.id).cursor_config_dir).toBe(userCursor);
+    // At full access it keeps the browser an Ask first channel loses.
+    expect(Object.keys(JSON.parse(readFileSync(join(turnFor(t.id).plugin_dir as string, '.mcp.json'), 'utf8')).mcpServers)).toContain('omni-browser');
+  });
+
+  it('runs an Ask first channel as read only under the same deny rules, with no browser', async () => {
+    // Print mode cannot stop to ask, so below full access Cursor gets the delegate-only deny rules (ADR 0015).
+    H.db.channels.update('scratch', { access_level: 'ask' });
+    try {
+      const t = await H.start('CMD hi', { ...cursor, role: 'builder' });
+      await H.untilResults(t.id, 1);
+      const dir = turnFor(t.id).cursor_config_dir as string;
+      expect(dir).not.toBe(userCursor);
+      expect(JSON.parse(readFileSync(join(dir, 'cli-config.json'), 'utf8')).permissions.deny).toEqual(['Read(.env)', 'Shell(*)', 'Write(**)']);
+      const mcp = JSON.parse(readFileSync(join(turnFor(t.id).plugin_dir as string, '.mcp.json'), 'utf8'));
+      expect(Object.keys(mcp.mcpServers)).toContain('omni-ask');
+      expect(Object.keys(mcp.mcpServers)).not.toContain('omni-browser');
+    } finally {
+      H.db.channels.update('scratch', { access_level: null });
+    }
   });
 
   it('carries secrets in the shell but never leaks a value or the Cursor api key', () => {

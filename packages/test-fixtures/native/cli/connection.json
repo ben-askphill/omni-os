@@ -359,6 +359,7 @@
           "text": "install-token\n"
         }
       },
+      "proof": "data-token",
       "routes": [
         {
           "method": "GET",
@@ -377,6 +378,14 @@
         "requests": [
           {
             "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
             "url": "/api/threads?limit=20",
             "headers": {
               "accept": "application/json",
@@ -385,6 +394,170 @@
             "body": null
           }
         ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a loopback OMNI_URL proves itself before it gets the install's token",
+      "args": [
+        "threads"
+      ],
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "proof": "install-token",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer install-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "a loopback OMNI_URL that cannot prove itself gets neither the install's token nor the prompt",
+      "args": [
+        "new",
+        "a secret prompt"
+      ],
+      "env": {
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/auth/proof",
+          "prefix": true,
+          "replies": [
+            {
+              "status": 404,
+              "text": "Not Found"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni new: {url} answers, but not as Omni (it answered 404, not an Omni proof): another install or another program holds the port. The token was not sent. omni doctor says more.\n",
+        "exit": 3,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_URL on another machine never gets the install's token",
+      "args": [
+        "new",
+        "a secret prompt"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_URL": "https://omni.example.test",
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni new: https://omni.example.test is another machine. The only token here is this machine's own, {dir}/data/api-token (the install), so nothing was sent. Put that machine's token in OMNI_TOKEN or OMNI_TOKEN_FILE.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "OMNI_URL on another machine never gets the OMNI_DATA_DIR token",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_URL": "https://omni.example.test/prefix/",
+        "OMNI_DATA_DIR": "{dir}/data"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: https://omni.example.test/prefix is another machine. The only token here is this machine's own, {dir}/data/api-token (OMNI_DATA_DIR), so nothing was sent. Put that machine's token in OMNI_TOKEN or OMNI_TOKEN_FILE.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      }
+    },
+    {
+      "name": "plain http to another machine is refused, token and all",
+      "args": [
+        "threads"
+      ],
+      "address": "none",
+      "env": {
+        "OMNI_URL": "http://omni.example.test:4747",
+        "OMNI_TOKEN": "test-token"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: OMNI_URL is plain http to another machine: http://omni.example.test:4747. Use https, or a Tailscale address (100.64.0.0/10, fd7a:115c:a1e0::/48 or a .ts.net name). Nothing was sent.\n",
+        "exit": 3,
+        "requests": [],
         "launched": {}
       }
     },

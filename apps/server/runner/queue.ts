@@ -1,6 +1,7 @@
 // Who runs next: deliver a message, take a free slot, start the turn.
 import { resolveDelivery } from '../delivery.ts';
-import { events, messageRequests, outbox, requestFingerprint, threads, tx, type MessageRequest } from '../db.ts';
+import { events, messageRequests, outbox, reportFollowUps, requestFingerprint, threads, tx, type MessageRequest } from '../db.ts';
+import { getCrew } from '../crew.ts';
 import { publishThread } from '../bus.ts';
 import { clearSuggestion } from './aux.ts';
 import { closeLive, hardKill, requestInterrupt, stopStartup } from './session.ts';
@@ -34,6 +35,7 @@ import {
 
 export function deliver(threadId: string, m: Msg) {
   if (isShuttingDown()) throw new Error('Omni is shutting down');
+  withShownReports(threadId, m);
   let live = lives.get(threadId);
   // Generation fencing: a process here whose thread another machine took meanwhile is not the one to run this. A turn
   // still running was stopped at the last sync (fenceStale); a warm idle process is closed, and the turn starts fresh.
@@ -210,16 +212,44 @@ export function reportToParent(childId: string, status: string, text: string, co
   // A lead that has not run yet waits for its whole team, then runs once with every report.
   const waitingLead = child.source === 'team' && !parent.has_run && !lives.has(parent.id) && !waiting.includes(parent.id);
   if (!waitingLead && status === 'stopped') return;
-  const prompt =
-    `[crew report] task ${child.task_id ?? '(none)'} from ${child.role ?? 'crew'} in #${child.channel_id} ` +
-    `(thread ${child.id}), status: ${status}\n\n${report.text}\n\n` +
-    `Relay what matters to ${userName()} in one short update. Delegate follow-ups if needed. Do not redo the work.`;
+  const prompt = `${reportText(report)}\n\nRelay what matters to ${userName()} in one short update. Delegate follow-ups if needed. Do not redo the work.`;
   const key = `crew-report:${child.id}:${completion}`;
   if (waitingLead) return teamReported(parent.id, key, prompt, report);
   // The parent is on another machine (a delegation sent elsewhere, run-on.ts), or on its way to one: the report goes
   // to it there, and whichever machine holds the parent at its next sync files it.
   if (heldElsewhere(parent.id)) return runnerPorts().routing.forwardReport(parent.id, key, prompt, report);
   fileReport(parent.id, key, prompt, report);
+}
+
+/** A report as its parent's harness reads it. */
+const reportText = (r: Record<string, unknown>) =>
+  `[crew report] task ${r.task_id ?? '(none)'} from ${r.role ?? 'crew'} in #${r.channel} (thread ${r.thread_id}), status: ${r.status}\n\n${r.text}`;
+
+/**
+ * A report a delegate-only parent (the Conductor) would only relay: Ben sees it in that thread as it lands, so it
+ * starts no turn there, and the harness reads it with the next message (withShownReports). It still wakes the parent
+ * when the delegation asked for that (follow_up on delegate: the parent acts on it), and is steered in as before while
+ * the parent is busy, which costs no extra turn.
+ */
+function showsInPlace(parentId: string, report: Record<string, unknown>) {
+  const parent = threads.get(parentId);
+  if (!parent?.role || !getCrew(parent.role)?.delegateOnly) return false;
+  if (reportFollowUps.has(String(report.thread_id))) return false;
+  if (parent.setup || lives.get(parentId)?.turn || waiting.includes(parentId)) return false;
+  return true;
+}
+
+/**
+ * Reports shown in a thread that its harness has not read yet go in front of the next message it gets, and are
+ * delivered with it. A slash command keeps them for the message after, since a harness reads it only at the start.
+ */
+function withShownReports(threadId: string, m: Msg) {
+  if (m.text.trimStart().startsWith('/')) return;
+  const shown = messageRequests.shown(threadId).filter((r) => r.id !== m.uuid);
+  if (!shown.length) return;
+  const said = shown.map((r) => reportText(r.payload ?? {})).join('\n\n');
+  m.text = `Crew reports ${userName()} has seen in this thread since your last turn:\n\n${said}\n\n---\n\n${m.text}`;
+  for (const r of shown) messageRequests.mark(r.id, 'delivered');
 }
 
 /**
@@ -233,6 +263,16 @@ export function fileReport(parentId: string, key: string, prompt: string, report
   const row = saveOwn(parent.id, key, { prompt, kind: 'crew_report', payload: report, source: 'crew' });
   if (!row) return;
   notifyCrewReport(parent.id, report);
+  if (showsInPlace(parent.id, report)) {
+    const ev = tx(() => {
+      // shown: the clients put it on the delegation card of the turn that delegated it, since no turn of its own follows.
+      const added = events.add(parent.id, 'crew_report', { ...report, shown: true });
+      messageRequests.mark(row.id, 'shown', added.id);
+      return added;
+    });
+    publishThread(parent.id, ev);
+    return emitThread(parent.id);
+  }
   // Ben stopped the parent: the report waits for him rather than starting it again. A parent whose worktree is not
   // ready keeps it too, and Retry sends it once the worktree is made.
   if (parent.setup || (parent.status === 'stopped' && !lives.get(parent.id)?.turn && !waiting.includes(parent.id))) {

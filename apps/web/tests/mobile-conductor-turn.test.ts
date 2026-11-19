@@ -26,14 +26,14 @@ const thread = { ...base, id: 'lead', channel_id: 'conductor', role: 'conductor'
 const conductor = (over: Partial<Channel> = {}) => ({ id: 'conductor', name: 'Conductor', kind: 'system', icon: null, avatar_bg: null, ...over }) as Channel;
 
 const turn: TurnView = {
-  key: 1, at: '2026-01-05T11:58:00.000Z', prompts: [], steps: 0, failed: 0, texts: ['All three PRs are open.'], prose: 'All three PRs are open.',
-  proseClipped: null, reports: [], questions: [], artifacts: [], children: [], result: null, error: null, cloud: null, status: 'done',
+  key: 1, at: '2026-01-05T11:58:00.000Z', prompts: [], steps: 0, progress: null, failed: 0, texts: ['All three PRs are open.'], prose: 'All three PRs are open.',
+  proseClipped: null, reports: [], questions: [], artifacts: [], children: [], answers: {}, result: null, error: null, cloud: null, status: 'done',
   items: [], switches: [], harness: 'claude-code',
 };
 
 const ctx = (over: Partial<TurnCtx> = {}): TurnCtx =>
   ({
-    thread, view: { plan: null }, history: { history: {} }, conductor: true, conductorChannel: conductor(), crew: [], ch: conductor(),
+    thread, view: { turns: [] }, history: { history: {} }, conductor: true, conductorChannel: conductor(), crew: [], ch: conductor(),
     changes: null, pr: null, now: Date.parse('2026-01-05T12:00:00.000Z'), shell: { open: vi.fn() }, status: null, ...over,
   }) as unknown as TurnCtx;
 
