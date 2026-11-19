@@ -155,10 +155,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
   const prompts = useMemo(() => stepPrompts(ownChannel), [ownChannel]);
   // Show technical details, or a channel with a repo: branch, PRs, changes, terminal, tokens and the context ring.
   const code = useShowsCode(ownChannel);
-  // Outside a code project the quick card has little to say: the right side opens collapsed, and the header button
-  // opens the inspector. The saved choice stays as it was for the channels that show the card.
-  const surface = !code && panel.surface === 'card' ? 'collapsed' : panel.surface;
-  const onPanel = code ? panel.toggle : () => (surface === 'collapsed' ? panel.show() : panel.closeInspector());
+  // The quick card shows in every channel: Show technical details only changes which rows it lists.
+  const surface = panel.surface;
+  const onPanel = panel.toggle;
   const underway = useMemo(() => stepUnderway(events, queued, slotBusy, prompts), [events, queued, slotBusy, prompts]);
   // A step prompt that never reached the agent (a restart, or a session download that failed): its button says why, and
   // pressing it again resumes that message rather than sending a second copy.
@@ -318,7 +317,7 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
             )}
           </div>
           {surface === 'card' && (
-            <div className="absolute top-2 right-2 z-20 w-[17rem] max-w-[calc(100%-1rem)] md:static md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pl-1">
+            <div className="absolute top-2 right-2 z-20 max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] overflow-y-auto md:static md:max-h-none md:w-72 md:max-w-none md:shrink-0 md:pt-2 md:pr-3 md:pl-1">
               <ThreadQuickCard
                 thread={thread}
                 code={code}
@@ -332,6 +331,9 @@ export function ThreadPage({ id, artifact: artifactParam, at, view }: { id: stri
                 cwd={workCwd}
                 onOpen={openFromCard}
                 onOpenPR={(c, n) => navigate(href.pr(c, n))}
+                parent={parent}
+                delegated={children}
+                onOpenThread={(t) => navigate(href.thread(t))}
                 asking={asking}
                 turn={turn}
                 reconnecting={reconnecting}
