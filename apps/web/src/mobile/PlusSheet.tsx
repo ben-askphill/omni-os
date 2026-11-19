@@ -1,6 +1,4 @@
 import { type HarnessWithRunning, type Thread } from '../api.ts';
-import { term } from '@omni/shared/display.ts';
-import { useTechnical } from '../display.ts';
 import { HarnessLogo } from '../components/brand.tsx';
 import { Icon, type IconName } from '../components/ui.tsx';
 import { shownRun, threadRunLabels } from '@omni/shared/thread-run.ts';
@@ -37,7 +35,6 @@ export function PlusSheet({
   const labels = threadRunLabels(shown, harnesses);
   const now = threadRunLabels(thread, harnesses);
   const busy = thread.status === 'running' || thread.status === 'queued';
-  const technical = useTechnical();
   const tiles: [Pick, IconName, string][] = [
     ['photo', 'image', 'Photo'],
     ['camera', 'maximize', 'Camera'],
@@ -67,7 +64,7 @@ export function PlusSheet({
             right={labels.model}
             onClick={onRun}
           />
-          <MoListRow icon="gauge" label={term('effort', technical)} right={labels.effort} onClick={onRun} last={!queued} />
+          <MoListRow icon="gauge" label="Effort" right={labels.effort} onClick={onRun} last={!queued} />
           {queued && <MoListRow icon="x" label={`Keep ${now.model}`} sub={`${now.harnessName ? `${now.harnessName}, ` : ''}${now.effort}`} onClick={onKeep} chevron={false} last />}
         </MoGroup>
         <p className="m-0 px-2 pt-2.5 text-[12.5px] leading-[1.45] text-fg-3">

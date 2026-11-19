@@ -9,7 +9,6 @@ import { Button } from '../../ui/Button';
 import { Callout } from '../../ui/Callout';
 import { Sheet } from '../../ui/Sheet';
 import { RunOptions } from './RunOptions';
-import { useTechnical } from '../../live/react';
 
 interface RunSheetProps {
   visible: boolean;
@@ -29,8 +28,7 @@ interface RunSheetProps {
 export function RunSheet({ visible, onClose, threadId, thread, busy, catalog }: RunSheetProps) {
   const { colors } = useOmniTheme();
   const { state, pick, dismiss } = useRunSwitch(threadId, thread, catalog.harnesses);
-  const technical = useTechnical();
-  const model = useMemo(() => (thread && catalog.harnesses ? runSheetModel(thread, catalog.harnesses, technical) : null), [thread, catalog.harnesses, technical]);
+  const model = useMemo(() => (thread && catalog.harnesses ? runSheetModel(thread, catalog.harnesses) : null), [thread, catalog.harnesses]);
   const switching = state.status === 'switching';
 
   useEffect(() => {
