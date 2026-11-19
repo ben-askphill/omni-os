@@ -36,7 +36,7 @@ export type ProgressTone = 'done' | 'current' | 'pending';
 export const progressTone = (s: StepState): ProgressTone => (s === 'done' ? 'done' : s === 'pending' ? 'pending' : 'current');
 
 /** The status mark beside the step it is on (status.ts marks). Done and pending steps carry none, only the rail. */
-export const PROGRESS_MARK: Record<StepState, 'working' | 'question' | 'failed' | 'stopped' | null> = {
+export const PROGRESS_MARK: Record<StepState, 'working' | 'question' | 'failed' | 'stopped' | 'done' | null> = {
   done: null,
   pending: null,
   active: 'working',
@@ -44,6 +44,15 @@ export const PROGRESS_MARK: Record<StepState, 'working' | 'question' | 'failed' 
   failed: 'failed',
   stopped: 'stopped',
 };
+
+/** Every step is done: the list is finished, and its last step carries the done check the rail runs into. */
+export const progressFinished = (v: Pick<StepsView, 'steps'>) => v.steps.length > 0 && v.steps.every((s) => s.state === 'done');
+
+/**
+ * A step's mark on the rail: the step it is on carries its status, and the last step of a finished list the done check,
+ * so a list that is all done ends on a check, like Claude's Progress card, instead of a rail with nothing at its end.
+ */
+export const progressMark = (state: StepState, { last, finished }: { last: boolean; finished: boolean }) => (finished && last ? 'done' : PROGRESS_MARK[state]);
 
 /** The line under the step it is on: what it does now while the turn runs. */
 export const progressNow = (s: Step): string | null => (s.state === 'active' || s.state === 'needs' ? s.now : null);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROGRESS_MARK, progressCount, progressNow, progressPanel, progressTone } from '../progress-panel.ts';
+import { PROGRESS_MARK, progressCount, progressFinished, progressMark, progressNow, progressPanel, progressTone } from '../progress-panel.ts';
 import { buildItems, type TranscriptEvent } from '../transcript-fold.ts';
 
 // The Progress card under the quick card: the newest turn's list the agent or its harness made, never Omni's phases.
@@ -80,5 +80,14 @@ describe('a step row', () => {
     const p = panel([user('Fix it'), ...todo('t', ['completed', 'in_progress']), ev('tool_use', { id: 'r', name: 'Read', input: { file_path: '/r/cart.js' }, parent: null })]);
     expect(p && p.view.steps.map(progressNow)).toEqual([null, 'Reading "cart.js"']);
     expect(p && progressCount(p.view)).toBe('1 of 2 done');
+  });
+
+  it('ends a finished list on the done check, on its last step only', () => {
+    const p = panel([user('Fix it'), ...todo('t', ['completed', 'completed'])]);
+    expect(p && progressFinished(p.view)).toBe(true);
+    expect(progressMark('done', { last: true, finished: true })).toBe('done');
+    expect(progressMark('done', { last: false, finished: true })).toBeNull();
+    expect(progressMark('done', { last: true, finished: false })).toBeNull();
+    expect(progressFinished({ steps: [] })).toBe(false);
   });
 });

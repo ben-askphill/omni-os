@@ -9,6 +9,7 @@ import { actionsLabel, stepsHeader, type Step, type StepsView } from '@omni/shar
 import { Icon, StatusDot, StatusPill, Ticks } from '../ui.tsx';
 import { ToolRow } from './ToolRows.tsx';
 import { StepRail } from './StepRail.tsx';
+import { progressFinished } from '@omni/shared/progress-panel.ts';
 import { NowWithConnector } from '../ConnectorMark.tsx';
 import { callsHold, useFindOpens } from '../../transcript/find-target.ts';
 
@@ -29,14 +30,30 @@ function StepThread({ id, byId }: { id: string; byId: Map<string, Thread> }) {
 /** A step title's first line's middle: the row's top padding (5px) plus half of a 13.5px line at 1.4. */
 const MID = 14.5;
 
-function StepRow({ s, index, count, cwd, running, byId }: { s: Step; index: number; count: number; cwd?: string | null; running: boolean; byId: Map<string, Thread> }) {
+function StepRow({
+  s,
+  index,
+  count,
+  finished,
+  cwd,
+  running,
+  byId,
+}: {
+  s: Step;
+  index: number;
+  count: number;
+  finished: boolean;
+  cwd?: string | null;
+  running: boolean;
+  byId: Map<string, Thread>;
+}) {
   const [opened, setOpen] = useState(false);
   // The find bar's match is in one of this step's calls: its actions open.
   const open = useFindOpens((t) => callsHold(s.calls, t), () => setOpen(true)) || opened;
   const on = s.state === 'active' || s.state === 'needs';
   return (
     <li data-state={s.state} className="flex min-w-0 gap-2.5">
-      <StepRail state={s.state} index={index} count={count} mid={MID} className="w-3" />
+      <StepRail state={s.state} index={index} count={count} mid={MID} finished={finished} className="w-3" />
       <div className="min-w-0 flex-1 py-[5px]">
         <div className="flex min-w-0 items-start gap-2.5">
           <span className="min-w-0 flex-1">
@@ -106,7 +123,7 @@ export function StepsCard({ v, cwd, byId }: { v: StepsView; cwd?: string | null;
       {open && (
         <ol className={v.live ? '' : 'fade-in mt-1'}>
           {v.steps.map((s, i) => (
-            <StepRow key={s.key} s={s} index={i} count={n} cwd={cwd} running={v.live} byId={byId} />
+            <StepRow key={s.key} s={s} index={i} count={n} finished={progressFinished(v)} cwd={cwd} running={v.live} byId={byId} />
           ))}
         </ol>
       )}
