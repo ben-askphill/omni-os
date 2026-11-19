@@ -21,7 +21,7 @@ vi.mock('../src/api.ts', async (importActual) => {
   return { ...actual, api: { ...actual.api, get: async () => ({ thread }) } };
 });
 
-import { layerCount, layerOpen, pushLayer } from '../src/components/ui/dismiss-stack.ts';
+import { layerCount, layerOpen, pushLayer, subscribeLayers, topDialog } from '../src/components/ui/dismiss-stack.ts';
 import { closeMenu, ContextMenuHost, openMenu, useMenuOpenFor } from '../src/components/ContextMenu.tsx';
 import { PRToolbar } from '../src/pages/PRToolbar.tsx';
 import { DEFAULT_PR_QUERY, type ListedPR, type PRQuery } from '@omni/shared/pr-query.ts';
@@ -83,6 +83,31 @@ describe('the dismiss stack', () => {
     expect(layerCount()).toBe(0);
     lower.remove();
     upper.remove();
+  });
+
+  it('keeps the modals in its own order, for the toasts: the top dialog, not a menu over it', () => {
+    const first = document.createElement('dialog');
+    const second = document.createElement('dialog');
+    const menu = box('menu');
+    document.body.append(first, second);
+    let heard = 0;
+    const unsubscribe = subscribeLayers(() => heard++);
+    expect(topDialog()).toBeNull();
+    const offFirst = pushLayer({ roots: () => [first], dialog: () => first, escape: 'native' });
+    const offSecond = pushLayer({ roots: () => [second], dialog: () => second, escape: 'native' });
+    const offMenu = pushLayer({ roots: () => [menu] });
+    expect(topDialog()).toBe(second);
+    // A dialog on its way out leaves the stack, and the one under it is the top again.
+    offSecond();
+    expect(topDialog()).toBe(first);
+    offMenu();
+    offFirst();
+    expect(topDialog()).toBeNull();
+    expect(heard).toBe(6);
+    unsubscribe();
+    first.remove();
+    second.remove();
+    menu.remove();
   });
 
   it('leaves an Escape a control already took, and one the top layer declines', () => {

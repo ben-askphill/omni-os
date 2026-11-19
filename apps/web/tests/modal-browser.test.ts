@@ -160,7 +160,7 @@ describe.skipIf(!executablePath)('a modal in Chromium', () => {
 
   it('holds a toast while the focus is in it, and hands the focus back when it is dismissed', async () => {
     page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
-    await page.goto(server.resolvedUrls!.local[0]! + 'overlays.html');
+    await page.goto(fixture.url + 'overlays.html');
     await page.focus('#toast-now');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.toast');
@@ -206,7 +206,7 @@ describe.skipIf(!executablePath)('a modal in Chromium', () => {
 
   it('shows a toast fired from a phone sheet over it, and takes a click', async () => {
     page = await browser.newPage({ viewport: { width: 390, height: 700 } });
-    await page.goto(server.resolvedUrls!.local[0]! + 'overlays.html');
+    await page.goto(fixture.url + 'overlays.html');
     await page.click('#open-sheet');
     await page.click('#sheet-toast');
     await page.waitForSelector('.toast');
