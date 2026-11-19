@@ -33,6 +33,21 @@ describe('access levels on Claude Code', () => {
     expect(existsSync(join(folder(), file))).toBe(true);
   });
 
+  // The quick-ask lock (packages/shared/quick-ask.ts readsOnly) holds under every level: a level never hands an ask
+  // the write tools or the browser back.
+  it('keeps a quick ask on its read-only tools in an Ask first and a Full access channel', async () => {
+    const { startQuickAsk } = await import('../quick-ask.ts');
+    for (const level of ['ask', 'full']) {
+      setLevel(level);
+      const t = await startQuickAsk({ channel: 'scratch', prompt: 'what is here?' });
+      await r.untilResults(t.id, 1);
+      const a = args(t.id);
+      const denied = a[a.indexOf('--disallowedTools') + 1].split(',');
+      for (const tool of ['Bash', 'Edit', 'Write', 'mcp__omni-browser']) expect(denied, `${level}: ${tool}`).toContain(tool);
+    }
+    setLevel(null);
+  });
+
   it('refuses a write tool in a read-only channel, without a card, and the agent hears why', async () => {
     setLevel('read');
     const file = `read-${randomUUID()}.txt`;

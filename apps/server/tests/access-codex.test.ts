@@ -35,6 +35,21 @@ describe('access levels on Codex', () => {
     rmSync(file, { force: true });
   });
 
+  // A quick ask's lock (packages/shared/quick-ask.ts readsOnly) and the channel's level are two layers: neither may
+  // lift the other, so an ask in an Ask first or Full access channel still only reads, never asks and has no browser.
+  it('keeps a quick ask read only, never asking and without a browser, whatever the level', async () => {
+    const { startQuickAsk } = await import('../quick-ask.ts');
+    for (const level of ['ask', 'full']) {
+      setLevel(level);
+      const t = await startQuickAsk({ channel: 'scratch', prompt: 'hi', harness: 'codex' });
+      await r.untilResults(t.id, 1);
+      const params = started(t.id);
+      expect(params, level).toMatchObject({ approvalPolicy: 'never', sandbox: 'read-only' });
+      expect(Object.keys(params.config).some((k) => k.startsWith('mcp_servers.omni-browser')), level).toBe(false);
+    }
+    setLevel(null);
+  });
+
   it('keeps full access as before levels', async () => {
     setLevel('full');
     const t = await r.start('hi', { harness: 'codex' });
