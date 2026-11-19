@@ -120,3 +120,44 @@ describe('fillShellPlaceholders', () => {
     expect(readFileSync(LAUNCHES, 'utf8')).not.toContain('Someone else');
   });
 });
+
+// A thread's own token (thread-tokens.ts, #832) is the agent the precheck gate keeps out of a shell. The values a
+// precheck reads reach it as data, but a thread still may not choose them: it cannot write the profile or setup fields
+// behind a placeholder. Every other setting it may change stays open.
+describe("a thread's own token", async () => {
+  const { mintThreadToken } = await import('../thread-tokens.ts');
+  r.db.db.prepare('INSERT INTO threads (id, channel_id, title, status, session_id, cwd, source) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    'placeholder-thread', 'scratch', 'Thread', 'done', 'placeholder-thread', r.tmp, 'manual',
+  );
+  const thread = bearer(mintThreadToken('placeholder-thread').token);
+  const put = async (path: string, body: unknown) => {
+    const res = await app.request(`/api${path}`, { method: 'PUT', headers: { 'content-type': 'application/json', ...thread }, body: JSON.stringify(body) });
+    return { status: res.status, body: (await res.json()) as { error?: string } };
+  };
+  const { shellPlaceholderEnv: env, fillShellPlaceholders: fill } = await import('../user-config.ts');
+  const values = () => env(fill('{{user}} {{timezone}} {{workspace}} {{reposDir}} {{githubOwner}} {{centralBrain}}'));
+
+  it('cannot change a profile or setup value a placeholder reads', async () => {
+    const before = values();
+    for (const [path, body] of [
+      ['/profile', { name: 'x; touch pwned' }],
+      ['/profile', { timezone: 'Asia/Tokyo' }],
+      ['/setup', { user: { name: 'x; touch pwned' } }],
+      ['/setup', { user: { timezone: 'Asia/Tokyo' } }],
+      ['/setup', { workspace: { githubOwner: 'someone-else' } }],
+      ['/setup', { workspace: { root: '/tmp/elsewhere' } }],
+      ['/setup', { workspace: { reposDir: '/tmp/elsewhere' } }],
+      ['/setup', { integrations: { centralBrainDir: '/tmp/elsewhere' } }],
+    ] as const) {
+      const res = await put(path, body);
+      expect(res.status, `${path} ${JSON.stringify(body)}: ${JSON.stringify(res.body)}`).toBe(403);
+      expect(res.body.error).toMatch(/placeholder/);
+    }
+    expect(values()).toEqual(before);
+  });
+
+  it('still changes what no placeholder reads', async () => {
+    expect((await put('/profile', { pronouns: 'she/her' })).status).toBe(200);
+    expect((await put('/setup', { user: { pronouns: 'they/them' } })).status).toBe(200);
+  });
+});

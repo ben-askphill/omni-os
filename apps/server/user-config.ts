@@ -336,6 +336,25 @@ function placeholderValues(forShell: boolean): Record<string, () => string> {
   };
 }
 
+/**
+ * The profile and setup fields a placeholder above reads ({{user}} is user.name). A thread's own token may not change
+ * them (setup-api.ts, meta-api.ts): a precheck takes their values as data, but the agent the precheck gate keeps out
+ * of a shell should not pick what a precheck it cannot write reads.
+ */
+const PLACEHOLDER_SOURCES = { user: ['name', 'timezone'], workspace: ['root', 'reposDir', 'githubOwner'], integrations: ['centralBrainDir'] } as const;
+
+/** The placeholder-backed fields a profile or setup patch sets, as `section.field`. */
+export function placeholderFieldsIn(patch: { [K in keyof typeof PLACEHOLDER_SOURCES]?: object }): string[] {
+  return Object.entries(PLACEHOLDER_SOURCES).flatMap(([section, fields]) => {
+    const set = patch[section as keyof typeof PLACEHOLDER_SOURCES] as Record<string, unknown> | undefined;
+    return set ? fields.filter((f) => set[f] !== undefined).map((f) => `${section}.${f}`) : [];
+  });
+}
+
+/** Why a thread's own token was refused a placeholder-backed field. */
+export const placeholderRefusal = (fields: string[]) =>
+  `A thread may not change ${fields.join(', ')}: a {{placeholder}} in an automation's precheck reads it. Change it in Settings.`;
+
 const PLACEHOLDER = /\{\{\s*(\w+)\s*\}\}/g;
 const PLACEHOLDER_KEYS = Object.keys(placeholderValues(false));
 const isPlaceholder = (key: string) => PLACEHOLDER_KEYS.includes(key);

@@ -47,7 +47,7 @@ Crew charters, automation prompts and automation prechecks can use these, filled
 
 `{{omniRoot}}` and `{{omniRepo}}` name an Omni git checkout, for automations you write that work on Omni itself. A server run from a checkout uses that one. The packaged desktop app is not a checkout. It uses `OMNI_CHECKOUT` from its data dir's `.env`, or else the checkout whose `data/` it kept using. With neither, those automations show the error "needs an Omni checkout" and do not run.
 
-A precheck is a shell command, and any signed-in device can change your name and folders, so a precheck never gets the values pasted in: each placeholder becomes a variable reference such as `$OMNI_PLACEHOLDER_USER`, set when the precheck runs ([Automations](automations.md)).
+A precheck is a shell command, and any signed-in device can change your name and folders (a thread's own token cannot change the ones a placeholder reads), so a precheck never gets the values pasted in: each placeholder becomes a variable reference such as `$OMNI_PLACEHOLDER_USER`, set when the precheck runs ([Automations](automations.md)).
 
 ## Server options
 
