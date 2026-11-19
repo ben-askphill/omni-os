@@ -49,6 +49,7 @@ const { startWorktreeRetention } = await import('./worktree-cleanup.ts');
 const { startDiskWatch } = await import('./disk-space.ts');
 const { startPush } = await import('./push-sender.ts');
 const { migrateLegacyConfig } = await import('./config-migrate.ts');
+const { revokeAllThreadTokens } = await import('./thread-tokens.ts');
 const { computerName } = await import('./sync/devices.ts');
 const { onRestart, RESTART_EXIT_CODE, startUpdateCheck } = await import('./update.ts');
 
@@ -72,6 +73,8 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
   // A worktree the last server was still preparing never got checked, so nothing runs in it until Ben retries.
   const unprepared = threads.failPreparing("Omni stopped before this thread's worktree was ready.");
   if (unprepared) console.log(`[omni] ${unprepared} thread(s) were mid-setup: kept for Retry`);
+  // No harness process outlives the server that spawned it, so no thread token from before is held by anything live.
+  revokeAllThreadTokens();
   const interrupted = threads.failInterrupted();
   if (interrupted) console.log(`[omni] marked ${interrupted} interrupted thread(s) as failed`);
   // A handoff to another Mac the last server was still preparing never went out: its thread stays here.

@@ -6,14 +6,13 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { apiToken } from '../../api-token.ts';
 import { config, paths, artifactsDir, threadDir } from '../../config.ts';
 import type { Thread } from '../../db.ts';
 import { DELEGATE_ONLY_DENIED, type CrewRole } from '../../crew.ts';
 import { ASK_TIMEOUT_SEC } from '../../sandbox.ts';
 import { parseEvent, LineSplitter } from '../../stream.ts';
 import { describeAttachments, inlinable, messageContent, type Attachment } from '../../uploads.ts';
-import { harnessEnv } from '../env-guard.ts';
+import { harnessEnv, threadTokenEnv } from '../env-guard.ts';
 import { processSession } from '../session.ts';
 import { normalizeClaudeCommands } from './commands.ts';
 import { syncClaudeLoginBeforeSpawn } from './login-sync.ts';
@@ -185,7 +184,7 @@ export const claudeAdapter: HarnessAdapter = {
         CLAUDE_CODE_ENTRYPOINT: 'omni-os',
         CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
         OMNI_URL: ctx.omniUrl,
-        OMNI_TOKEN: apiToken(),
+        ...threadTokenEnv(ctx),
         OMNI_THREAD_ID: thread.id,
         OMNI_THREAD_DIR: threadDir(thread.id),
         OMNI_ARTIFACTS_DIR: artifactsDir(thread.id),

@@ -1502,6 +1502,235 @@
         "requests": [],
         "launched": {}
       }
+    },
+    {
+      "name": "in an agent's thread the data folder's token is not used",
+      "args": [
+        "threads"
+      ],
+      "address": "url",
+      "env": {
+        "OMNI_THREAD_ID": "22222222-2222-4222-8222-222222222222",
+        "OMNI_DATA_DIR": "{dir}/data",
+        "OMNI_THREAD_DIR": "{dir}/data/threads/22222222-2222-4222-8222-222222222222"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for {url}: nowhere: inside an agent's thread only the thread's own token counts, from OMNI_TOKEN, OMNI_TOKEN_FILE or its thread folder, never the install's api-token. Nothing was sent.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      },
+      "dirs": [
+        "data/threads/22222222-2222-4222-8222-222222222222"
+      ]
+    },
+    {
+      "name": "in an agent's thread the install's token from the shim is not used",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_THREAD_ID": "22222222-2222-4222-8222-222222222222",
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data",
+        "OMNI_THREAD_DIR": "{dir}/data/threads/22222222-2222-4222-8222-222222222222"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "",
+        "stderr": "omni threads: No API token for {url}: nowhere: inside an agent's thread only the thread's own token counts, from OMNI_TOKEN, OMNI_TOKEN_FILE or its thread folder, never the install's api-token. Nothing was sent.\n",
+        "exit": 3,
+        "requests": [],
+        "launched": {}
+      },
+      "dirs": [
+        "data/threads/22222222-2222-4222-8222-222222222222"
+      ]
+    },
+    {
+      "name": "in an agent's thread its own OMNI_TOKEN goes, not the data folder's",
+      "args": [
+        "threads"
+      ],
+      "address": "url",
+      "env": {
+        "OMNI_THREAD_ID": "22222222-2222-4222-8222-222222222222",
+        "OMNI_DATA_DIR": "{dir}/data",
+        "OMNI_TOKEN": "omt_thread-token",
+        "OMNI_THREAD_DIR": "{dir}/data/threads/22222222-2222-4222-8222-222222222222"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer omt_thread-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "in an agent's thread without the token variables, the thread folder's token goes",
+      "args": [
+        "threads"
+      ],
+      "address": "url",
+      "env": {
+        "OMNI_THREAD_ID": "22222222-2222-4222-8222-222222222222",
+        "OMNI_DATA_DIR": "{dir}/data",
+        "OMNI_THREAD_DIR": "{dir}/data/threads/22222222-2222-4222-8222-222222222222"
+      },
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        },
+        "data/threads/22222222-2222-4222-8222-222222222222/token": {
+          "text": "omt_from-the-folder\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer omt_from-the-folder"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
+      "name": "Ben's terminal in a thread still uses the install's token",
+      "args": [
+        "threads"
+      ],
+      "address": "port",
+      "env": {
+        "OMNI_THREAD_ID": "22222222-2222-4222-8222-222222222222",
+        "OMNI_INSTALL_DATA_DIR": "{dir}/data"
+      },
+      "proof": "install-token",
+      "files": {
+        "data/api-token": {
+          "text": "install-token\n",
+          "mode": "600"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/threads?limit=20",
+          "replies": [
+            {
+              "json": []
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "No threads.\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/threads?limit=20",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer install-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
     }
   ]
 }

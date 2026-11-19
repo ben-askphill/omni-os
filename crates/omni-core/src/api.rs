@@ -49,9 +49,9 @@ pub enum Method {
 
 pub struct Api {
     base: String,
-    /// The API token: `OMNI_TOKEN` from the thread's env, else the file Omni named in `OMNI_TOKEN_FILE`
-    /// (`data/api-token`). Rotating the install token rewrites that file but not the env of a running thread, so a
-    /// 401 reads the file again and retries once with what it holds now.
+    /// The API token: `OMNI_TOKEN` from the thread's env, else the file Omni named in `OMNI_TOKEN_FILE`, both the
+    /// thread's own token (apps/server/thread-tokens.ts). The file can be rewritten under a running server, so a 401
+    /// reads it again and retries once with what it holds now.
     token: Mutex<String>,
     token_file: Option<PathBuf>,
     thread: Option<String>,

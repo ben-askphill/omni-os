@@ -4,9 +4,10 @@ import { readFileSync } from 'node:fs';
 
 const BASE = process.env.OMNI_URL ?? 'http://127.0.0.1:4747';
 /**
- * The API token: OMNI_TOKEN from the thread's env, else the file Omni named in OMNI_TOKEN_FILE (data/api-token).
- * Rotating the install token (POST /api/auth/rotate-token) rewrites that file but not the env of a running thread,
- * so a 401 reads the file again and retries once with what it holds now.
+ * The API token: OMNI_TOKEN from the thread's env, else the file Omni named in OMNI_TOKEN_FILE. In a thread both hold
+ * the thread's own token (apps/server/thread-tokens.ts); the stdio server another client starts may name the install's
+ * data/api-token. A token file can be rewritten under a running server (a rotation, a respawn), so a 401 reads the
+ * file again and retries once with what it holds now.
  */
 let token = process.env.OMNI_TOKEN || readToken(process.env.OMNI_TOKEN_FILE);
 

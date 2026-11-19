@@ -1165,6 +1165,8 @@ async function main() {
         session_id: sessionId, resume: resumed, model, effort: opts['--effort'] ?? null, unknown, thread_id: process.env.OMNI_THREAD_ID ?? null,
         api_auth: ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'].filter((k) => k in process.env),
         entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT ?? null, mcp_tool_timeout: process.env.MCP_TOOL_TIMEOUT ?? null,
+        // The credential Omni handed this process (thread-tokens.ts), for the tests that check it is never the install's.
+        omni_token: process.env.OMNI_TOKEN ?? null, omni_token_file: process.env.OMNI_TOKEN_FILE ?? null,
       }) + '\n',
     );
   }

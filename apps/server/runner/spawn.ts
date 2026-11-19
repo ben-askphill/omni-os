@@ -17,7 +17,7 @@ import { recordContext, recordContextHint } from '../context.ts';
 import { addCursorTurn, afterCursorTurn } from '../cursor-usage.ts';
 import { beforeResume, type ResumeOutcome } from '../sync/files.ts';
 import { isProviderHarness, type HarnessId } from '../harness/types.ts';
-import type { AdapterContext } from '../harness/adapter.ts';
+import type { AdapterContext, HarnessAdapter } from '../harness/adapter.ts';
 import { invalidateCommands } from '../commands.ts';
 import { runnableCommands } from '@omni/shared/slash.ts';
 import { buildSystemPrompt } from './prompts.ts';
@@ -31,6 +31,7 @@ import { reportToParent } from './queue.ts';
 import { resumesSession, sessionStarted, takeHandover } from './switch.ts';
 import { startTurnSnapshot } from './snapshots.ts';
 import { stampThread } from '../harness-accounts.ts';
+import { mintThreadToken, revokeThreadToken } from '../thread-tokens.ts';
 
 /** A thread's process starts: its controller is built here, with the deps the composition root bound, and registered. */
 export function launch(threadId: string, first: Msg): Live | undefined {
@@ -188,8 +189,12 @@ async function spawnLive(live: Live, thread: Thread) {
     handoverPending: !!threads.sessionState(thread.id).handover,
     permission,
   };
-  live.attach(
-    adapterFor(thread.harness).spawn(ctx, {
+  // This spawn's own credential, in place of the install token (thread-tokens.ts). A harness that runs elsewhere gets none.
+  const minted = remote ? null : mintThreadToken(thread.id);
+  if (minted) ctx.threadToken = minted.token;
+  let session: ReturnType<HarnessAdapter['spawn']>;
+  try {
+    session = adapterFor(thread.harness).spawn(ctx, {
       record: (rec) => {
         // Claude chooses its id before spawning. Its user replay confirms that the session accepted input.
         if (thread.harness === 'claude-code' && rec.kind === 'replay') sessionStarted(live);
@@ -213,15 +218,22 @@ async function spawnLive(live: Live, thread: Thread) {
       },
       stderr: (d) => live.sawStderr(d),
       spawnError: (err) => {
+        if (minted) revokeThreadToken(minted.spawn);
         live.failedToSpawn();
         addEvent(thread.id, 'error', { text: `Could not start ${cliLabel(thread.harness)}: ${err.message}` });
       },
       exit: (code, signal) => {
         permission?.end();
+        if (minted) revokeThreadToken(minted.spawn);
         onExit(live, code, signal);
       },
-    }),
-  );
+    });
+  } catch (err) {
+    // No process holds the token, so it goes now rather than at the next spawn.
+    if (minted) revokeThreadToken(minted.spawn);
+    throw err;
+  }
+  live.attach(session);
 
   // Messages go in through the session, never as CLI args, so leading dashes or huge pastes never get parsed as flags.
   // A copy: a harness that replays synchronously (Hermes) takes each message out of live.inflight while this loops.

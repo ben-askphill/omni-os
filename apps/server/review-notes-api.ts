@@ -6,7 +6,7 @@ import { openNotes, parseNoteBody, parseNoteInput, sendRecords, THREAD_NOTES_MAX
 import { publishFeed } from './bus.ts';
 import { reviewNotes, threads, type Thread } from './db.ts';
 import { contextBlock, placeFor } from './message-context/project.ts';
-import { senderOf } from './automation-guard.ts';
+import { lineageRefusal, senderOf } from './automation-guard.ts';
 import { createThread, postMessage } from './runner.ts';
 
 export const reviewNotesApi = new Hono();
@@ -97,6 +97,10 @@ reviewNotesApi.post('/:id/review-notes/send', async (c) => {
   if (target && new_delegate) return c.json({ error: 'Pick a delegate or a new one, not both.' }, 400);
   const to = target && target !== id ? delegatesOf(id).find((t) => t.id === target) : from;
   if (!to) return c.json({ error: 'Notes go to this thread or a thread it delegated to.' }, 400);
+  // Under an automation or a usage scan, a thread sends notes only to a thread under the same one, as for /messages,
+  // and a new delegate files under this thread.
+  const outside = lineageRefusal(c, to.id, false);
+  if (outside) return c.json({ error: outside }, 403);
   // A retry of a new-delegate send whose answer was lost: the thread it made, with the notes it already carried.
   const made = new_delegate && request_id ? threads.get(request_id) : null;
   if (made) return made.parent_id === id ? c.json({ target: made.id, sent: [], created: true } satisfies ReviewNotesSent) : c.json({ error: `Thread id ${made.id} was already used.` }, 409);

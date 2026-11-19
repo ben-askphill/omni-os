@@ -74,6 +74,81 @@
       }
     },
     {
+      "name": "in an agent's thread, its own token",
+      "args": [
+        "doctor"
+      ],
+      "env": {
+        "OMNI_TOKEN": "omt_thread-token",
+        "OMNI_THREAD_ID": "22222222-2222-4222-8222-222222222222",
+        "OMNI_DATA_DIR": "{dir}/data",
+        "OMNI_INSTALL_LOG": "{dir}/logs/server.log",
+        "OMNI_APP": "{dir}/bin/omni-app",
+        "TZ": "UTC",
+        "OMNI_THREAD_DIR": "{dir}/data/threads/22222222-2222-4222-8222-222222222222"
+      },
+      "proof": "install-token",
+      "files": {
+        "data/omni.db": {
+          "text": ""
+        },
+        "logs/server.log": {
+          "text": "[server] listening on :4747\n\n[sync] pulled 3 changes\n",
+          "agoMs": 130000
+        }
+      },
+      "programs": {
+        "claude": {
+          "stdout": "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"subscriptionType\":\"max\"}\n"
+        },
+        "codex": {
+          "stdout": "Logged in using ChatGPT\n"
+        },
+        "gh": {
+          "stdout": "github.com\n  ✓ Logged in to github.com account ben-askphill (keyring)\n"
+        },
+        "omni-app": {}
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "replies": [
+            {
+              "json": {
+                "server": {}
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "stdout": "ok    omni    dev, runs on {dir}/bin/omni-app\nok    server  Omni answers on {url}\nok    token   OMNI_TOKEN, this thread's own token, and the server takes it\nok    data    {dir}/data\nok    claude  signed in (claude.ai, max)\nok    codex   signed in (ChatGPT)\nok    gh      signed in to github.com as ben-askphill\nok    log     {dir}/logs/server.log, last written 2m ago\n",
+        "stderr": "",
+        "exit": 0,
+        "requests": [
+          {
+            "method": "GET",
+            "url": "/api/auth/proof?nonce={nonce}",
+            "headers": {
+              "accept": "*/*"
+            },
+            "body": null
+          },
+          {
+            "method": "GET",
+            "url": "/api/status",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer omt_thread-token"
+            },
+            "body": null
+          }
+        ],
+        "launched": {}
+      }
+    },
+    {
       "name": "everything is well, as JSON",
       "args": [
         "doctor",

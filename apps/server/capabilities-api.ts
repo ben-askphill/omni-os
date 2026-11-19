@@ -11,7 +11,7 @@ capabilitiesApi.get('/', (c) => {
   const session = auth?.via === 'session' ? auth : null;
   return c.json({
     api: 1,
-    auth: { via: auth?.via === 'session' ? 'session' : 'token', method: session?.method ?? null, sessionId: session?.session ?? null },
+    auth: { via: auth?.via === 'session' || auth?.via === 'thread' ? auth.via : 'token', method: session?.method ?? null, sessionId: session?.session ?? null },
     pairing: { app: true, codeTtlSeconds: PAIRING_TTL_MS / 1000 },
     push: { registration: true, ...pushStatus() },
     streams: { sse: true, closeOnRevoke: true },

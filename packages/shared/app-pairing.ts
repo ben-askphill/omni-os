@@ -80,7 +80,8 @@ export interface AppPushSettled {
 export interface ServerCapabilities {
   api: number;
   auth: {
-    via: 'token' | 'session';
+    /** `thread`: a thread's own token (apps/server/thread-tokens.ts), which no client holds. */
+    via: 'token' | 'session' | 'thread';
     method: 'google' | 'pairing' | null;
     sessionId: string | null;
   };

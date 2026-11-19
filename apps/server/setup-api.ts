@@ -12,6 +12,7 @@ import { channels, threads } from './db.ts';
 import { createAutomation } from './automation-files.ts';
 import { cancelLogin, claudeSetup, installStep, startInstall, startLogin, submitCode } from './claude-setup.ts';
 import { createThread } from './runner.ts';
+import { threadCredential } from './automation-guard.ts';
 import { STARTER_AUTOMATIONS, STARTER_ROLE, starterAutomation } from '@omni/shared/starter-automations.ts';
 import { prepareWorkdir } from './sandbox.ts';
 import { addEvent, emitThread } from './runner/state.ts';
@@ -160,6 +161,8 @@ setupApi.put('/', async (c) => {
  * Running setup again from Settings ends here too, without a second welcome.
  */
 setupApi.post('/complete', async (c) => {
+  // It saves automations and starts a thread with no parent: Ben's first run, never an agent thread's (ADR 0016).
+  if (threadCredential(c)) return c.json({ error: 'Only the user finishes setup.' }, 403);
   const body = (await c.req.json().catch(() => ({}))) ?? {};
   const extras = completeExtras.safeParse(body);
   if (!extras.success) return c.json({ error: extras.error.issues[0]?.message ?? 'Invalid setup' }, 400);

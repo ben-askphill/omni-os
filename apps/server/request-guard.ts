@@ -10,6 +10,7 @@ import { networkInterfaces } from 'node:os';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { cookieName, sessionCookieName, tokenMatches } from './api-token.ts';
+import { CALLER_HEADER as THREAD_HEADER } from './caller-header.ts';
 import { nonceLive } from './desktop-pairing.ts';
 import { decideRequest, mayUseShell, type Credential, type RouteClass } from './request-trust.ts';
 import { config } from './config.ts';
@@ -117,9 +118,14 @@ const isConnectRoute = (c: Context) => CONNECT_OPEN_ROUTES.some(([m, p]) => c.re
 
 /**
  * How a request proved itself: the install's token, a device's session (`method`: signed in with Google, or an app
- * that redeemed a pairing code), or neither (the open routes).
+ * that redeemed a pairing code), a thread's own token (thread-tokens.ts: `thread` is the thread it was minted for), or
+ * neither (the open routes).
  */
-export type OmniAuth = { via: 'token' } | { via: 'session'; session: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token' } | { via: 'none' };
+export type OmniAuth =
+  | { via: 'token' }
+  | { via: 'session'; session: string; kind: 'browser' | 'app'; method: 'google' | 'pairing' | 'token' }
+  | { via: 'thread'; thread: string }
+  | { via: 'none' };
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -132,6 +138,13 @@ let sessionCheck: (token: string) => { id: string; kind: 'browser' | 'app'; meth
 export const useSessionCheck = (fn: typeof sessionCheck) => {
   sessionCheck = fn;
 };
+
+/** Looks a thread's token up (thread-tokens.ts threadOfToken). app.ts sets it, so this module and its tests never open the db. */
+let threadTokenCheck: (token: string) => string | null = () => null;
+export const useThreadTokenCheck = (fn: typeof threadTokenCheck) => {
+  threadTokenCheck = fn;
+};
+
 
 const bearer = (c: Context) => c.req.header('authorization')?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];
 
@@ -236,7 +249,7 @@ const routeClass = (c: Context): RouteClass => {
 };
 
 const credentialOf = (auth: OmniAuth): Credential =>
-  auth.via === 'token' ? 'token' : auth.via === 'session' ? (auth.method === 'token' ? 'session-token' : 'session') : 'none';
+  auth.via === 'token' ? 'token' : auth.via === 'session' ? (auth.method === 'token' ? 'session-token' : 'session') : auth.via === 'thread' ? 'thread' : 'none';
 
 /**
  * Whether the request requestGuard let through may reach a shell (request-trust.ts mayUseShell), for a route whose
@@ -261,6 +274,8 @@ export const shellAllowed = (c: Context) => {
  *   Connect's signed routes (CONNECT_OPEN_ROUTES);
  * - a shell (the terminal, or adding, changing, running or retrying a channel action), for anything but the token or
  *   a session paired with it;
+ * - a thread's token from anywhere but this machine straight to the server, or one sent with an x-omni-thread header
+ *   that names another thread (a wiring bug, which should surface);
  * - through tailscale serve (a tailnet Host, or any proxy header), a Tailscale-User-Login that is not in
  *   `integrations.tailscaleLogin`, when that is set.
  * A raw-token cookie an older build set still works once, and is swapped for a session cookie once the request is let through.
@@ -275,8 +290,16 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   const given = bearer(c);
   let auth: OmniAuth = { via: 'none' };
   let legacy = false;
-  if (tokenMatches(given)) auth = { via: 'token' };
-  else {
+  const install = tokenMatches(given);
+  const thread = install ? null : threadTokenCheck(given ?? '');
+  if (install) auth = { via: 'token' };
+  else if (thread) {
+    // Threads reach the server on loopback (runner/state.ts omniUrl): a copy that left the machine counts for nothing.
+    if (!directFromThisMac(c)) return refuse("a thread's token works only from this machine", 401);
+    const named = c.req.header(THREAD_HEADER);
+    if (named && named !== thread) return refuse(`this token is thread ${thread}'s, and the ${THREAD_HEADER} header names another`);
+    auth = { via: 'thread', thread };
+  } else {
     const session = sessionCheck(given ?? getCookie(c, sessionCookieName()) ?? '');
     if (session) auth = { via: 'session', session: session.id, kind: session.kind, method: session.method };
     // An older build's cookie held the token itself. It counts as a token-paired session, and is traded for one below.

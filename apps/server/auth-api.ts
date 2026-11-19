@@ -33,6 +33,7 @@ import { PushPreferencesBody, readPushPreferences, updatePushPreferences } from 
 import { PushSettledBody, settledAlerts } from './push-settled.ts';
 import { deletePushToken, pushRegistration, PushTokenBody, setPushToken } from './push-tokens.ts';
 import { clientKey, viaConnect } from './request-guard.ts';
+import { unattended } from './automation-guard.ts';
 
 export const authApi = new Hono();
 
@@ -89,11 +90,15 @@ authApi.get('/desktop-pair', (c) => {
  * A new install token (PRD #667, story 10): data/api-token is rewritten and every device session ends, so every
  * browser, app and the desktop window pairs again. The token or a session paired with it (Settings in a paired
  * browser or the desktop app): a Google or app session cannot, so a stolen one cannot lock Ben out of everything.
- * Running threads keep the old one until their next turn.
+ * A thread's own token may too (the Conductor's rotate_install_token), unless an automation or a usage scan sits above
+ * the thread: nobody watches that one end every device session. Running threads hold their own tokens, so none of
+ * them stops working.
  */
 authApi.post('/rotate-token', (c) => {
   const auth = c.get('omniAuth');
-  if (auth?.via !== 'token' && !(auth?.via === 'session' && auth.method === 'token')) {
+  if (auth?.via === 'thread') {
+    if (unattended(auth.thread)) return c.json({ error: 'Forbidden: a thread under an automation or a usage scan cannot rotate the install token' }, 403);
+  } else if (auth?.via !== 'token' && !(auth?.via === 'session' && auth.method === 'token')) {
     return c.json({ error: 'Forbidden: rotate from this Mac or a device paired with the install token' }, 403);
   }
   try {

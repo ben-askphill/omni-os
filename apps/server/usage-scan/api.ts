@@ -2,7 +2,7 @@
 // and what went into it. 409 when another scan is starting, the channel opted out, or nothing repeats enough.
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { automationRefusal, CALLER_HEADER } from '../automation-guard.ts';
+import { automationRefusal, callerOf } from '../automation-guard.ts';
 import { startUsageScan } from './scan.ts';
 
 export const usageScanApi = new Hono();
@@ -13,7 +13,7 @@ usageScanApi.post('/', async (c) => {
     .strict()
     .safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'invalid scan' }, 400);
-  const no = automationRefusal(c.req.header(CALLER_HEADER), 'scan');
+  const no = automationRefusal(callerOf(c), 'scan');
   if (no) return c.json({ error: no }, 403);
   try {
     return c.json(await startUsageScan({ channel: parsed.data.channel }), 201);

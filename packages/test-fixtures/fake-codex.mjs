@@ -66,6 +66,8 @@ const log = (method, params) => {
       params: params ?? null,
       cwd: process.cwd(),
       thread_id: process.env.OMNI_THREAD_ID ?? null,
+      omni_token: process.env.OMNI_TOKEN ?? null,
+      omni_token_file: process.env.OMNI_TOKEN_FILE ?? null,
       api_auth: API_VARS.filter((k) => k in process.env),
       // Names only (never values) of the probe env vars the process can see, for the secrets test.
       env_probe: Object.keys(process.env).filter((k) => k.startsWith('PROBE_')),

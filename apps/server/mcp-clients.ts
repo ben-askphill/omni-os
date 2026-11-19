@@ -13,6 +13,8 @@ import { db, now, tx } from './db/connection.ts';
 import { record } from './db/sync.ts';
 import type { ClientStatus } from './mcp-token.ts';
 import { resolved } from './user-config.ts';
+// For the omniAuth context variable it declares.
+import type {} from './request-guard.ts';
 
 export interface McpClient {
   id: string;
@@ -167,6 +169,9 @@ export const mcpClientsApi = new Hono();
 mcpClientsApi.get('/', (c) => c.json(mcpClients.list()));
 
 mcpClientsApi.post('/:id/approve', (c) => {
+  // An approved client calls the API as the install token, past every thread guard: only Ben lets one in. Removing
+  // one only narrows, so a thread may still do that (remove_mcp_client).
+  if (c.get('omniAuth')?.via === 'thread') return c.json({ error: 'Only the user approves an MCP client, in Settings.' }, 403);
   const id = c.req.param('id');
   if (!MCP_CLIENT_ID.test(id)) return c.json({ error: 'bad client id' }, 400);
   return c.json(mcpClients.approve(id));

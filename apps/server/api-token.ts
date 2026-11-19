@@ -1,6 +1,7 @@
 // The per-install secret every /api request carries (apps/server/request-guard.ts). It lives in the data dir as
-// `api-token`, mode 0600, so only Ben's account can read it: the desktop app, the omni command (crates/omni-cli) and
-// apps/mcp/omni.ts read the file, threads get it as OMNI_TOKEN, and a browser pairs with it once and then holds a device session (browser-session.ts).
+// `api-token`, mode 0600, so only Ben's account can read it: the desktop app and the omni command (crates/omni-cli) read
+// the file, and a browser pairs with it once and then holds a device session (browser-session.ts). Threads never get it:
+// each spawn holds a token of its own (thread-tokens.ts).
 // A file rather than the Keychain: shell scripts and the desktop app read it without a Keychain prompt, and the
 // Keychain would guard it from the same account the file's mode already admits, and from no one else.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -43,7 +44,7 @@ export class TokenPinned extends Error {}
 
 /**
  * A new token in data/api-token, 0600, which replaces the old one at once (PRD #667, story 10). The caller ends every
- * device session. Running threads keep the old one in OMNI_TOKEN until their next turn.
+ * device session. Running threads hold their own tokens (thread-tokens.ts), so none of them stops working.
  */
 export function rotateToken(env: NodeJS.ProcessEnv = process.env): void {
   if (env.OMNI_TOKEN?.trim()) throw new TokenPinned('OMNI_TOKEN sets this server\'s token: change it there and restart');

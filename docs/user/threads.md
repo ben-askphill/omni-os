@@ -297,7 +297,7 @@ A thread with an open PR can watch its checks and its reviews. Start it with **W
 
 An open PR can merge by itself once its required checks and reviews pass (`gh pr merge --auto`), so you can turn it on from the phone and walk away. The **Auto-merge** row shows whether it is on, with which method and who turned it on, and turns it on or off. It is on the desktop PR page's merge card, beside the merge method it uses, and the card's note says what it does and who turned it on while it is on. It is also on the phone web PR screen and in the iOS app, where a tap shows the same confirm slide as a merge.
 
-- Only a paired device can turn it on. The server refuses a request from the install token, which agents hold, so the Conductor's `set_auto_merge` tool can only read it or turn it off.
+- Only a paired device can turn it on. The server refuses a request from the install token or a thread's own token, which agents hold, so the Conductor's `set_auto_merge` tool can only read it or turn it off. A thread's token cannot pair a device either, so an agent cannot get a session of its own.
 - It uses the repo's merge method: the one asked for when the repo allows it, otherwise the first of squash, merge and rebase that the repo allows.
 - A repo with auto-merge turned off in its GitHub settings refuses, and gh's message shows in place.
 - A PR that can already merge may merge at once.

@@ -7,7 +7,7 @@ use std::time::Duration;
 use omni_core::js::{self, JsValue};
 use ring::hmac;
 
-use crate::connection::Connection;
+use crate::connection::{Connection, THREAD_TOKEN_PREFIX};
 use crate::http::{self, Dropped};
 use crate::sys;
 
@@ -21,7 +21,7 @@ pub enum Probe {
     NotOmni {
         detail: String,
     },
-    /// `mine` is `None` when there is no token to check the proof with, or the server is remote.
+    /// `mine` is `None` when there is no token to check the proof with (none, or a thread's own), or the server is remote.
     Omni {
         mine: Option<bool>,
     },
@@ -60,8 +60,11 @@ fn ask(conn: &Connection, port: Option<u16>) -> Probe {
     let Some(proof) = proof.filter(|_| answer.status == 200) else {
         return Probe::NotOmni { detail: format!("it answered {}, not an Omni proof", answer.status) };
     };
+    // A thread's own token is not the one the server signs with, so it cannot check the proof.
     match (conn.token(), port) {
-        (Some(token), Some(port)) => Probe::Omni { mine: Some(proof == proof_for(&token, port, &nonce)) },
+        (Some(token), Some(port)) if !token.starts_with(THREAD_TOKEN_PREFIX) => {
+            Probe::Omni { mine: Some(proof == proof_for(&token, port, &nonce)) }
+        }
         _ => Probe::Omni { mine: None },
     }
 }

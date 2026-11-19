@@ -8,6 +8,12 @@
 //! A data folder's token (OMNI_DATA_DIR, or the install's from the shim) stays on this machine: it goes only to a
 //! server here that proves it holds it, never to another machine, which needs its own in OMNI_TOKEN or
 //! OMNI_TOKEN_FILE. Plain http leaves this machine only for a Tailscale address, where Tailscale encrypts the link.
+//!
+//! In an agent's thread (OMNI_THREAD_DIR, which only a harness process gets) the token is the thread's own (`omt_`,
+//! minted per spawn by apps/server/thread-tokens.ts): OMNI_TOKEN, OMNI_TOKEN_FILE, else the thread folder's `token`,
+//! for a shell whose harness drops variables named like a token. There the command never falls back to a data
+//! folder's api-token, the install's. Ben's own terminal and channel actions in a thread name the thread but get no
+//! thread folder, so they keep the install's token.
 
 use std::cell::Cell;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -23,6 +29,9 @@ use crate::text::{path_join, slice16};
 
 pub const DEFAULT_PORT: u16 = 4747;
 
+/// What a thread's own token starts with (apps/server/thread-tokens.ts).
+pub const THREAD_TOKEN_PREFIX: &str = "omt_";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenSource {
     /// OMNI_TOKEN.
@@ -32,6 +41,8 @@ pub enum TokenSource {
         from: &'static str,
     },
     None,
+    /// In an agent's thread with no token of its own anywhere: the install's token does not count.
+    NoThreadToken,
 }
 
 /// Where the token comes from, in words, for errors and doctor.
@@ -40,6 +51,10 @@ pub fn describe_source(source: &TokenSource) -> String {
         TokenSource::Env => "OMNI_TOKEN".to_string(),
         TokenSource::File { path, from } => format!("{path} ({from})"),
         TokenSource::None => "nowhere: set OMNI_TOKEN, OMNI_TOKEN_FILE or OMNI_DATA_DIR".to_string(),
+        TokenSource::NoThreadToken => {
+            "nowhere: inside an agent's thread only the thread's own token counts, from OMNI_TOKEN, OMNI_TOKEN_FILE or its thread folder, never the install's api-token"
+                .to_string()
+        }
     }
 }
 
@@ -216,11 +231,16 @@ impl Connection {
         let own_data = var("OMNI_DATA_DIR");
         let data_dir = own_data.clone().or_else(|| var("OMNI_INSTALL_DATA_DIR"));
         let env_token = var("OMNI_TOKEN");
+        let thread = var("OMNI_THREAD_ID");
+        let thread_dir = var("OMNI_THREAD_DIR").filter(|_| thread.is_some());
         let mut local_token = false;
         let token_source = if env_token.is_some() {
             TokenSource::Env
         } else if let Some(path) = var("OMNI_TOKEN_FILE") {
             TokenSource::File { path, from: "OMNI_TOKEN_FILE" }
+        } else if let Some(dir) = &thread_dir {
+            let path = path_join(dir, "token");
+            if sys::stat(&path).is_some() { TokenSource::File { path, from: "the thread's own" } } else { TokenSource::NoThreadToken }
         } else if let Some(dir) = &data_dir {
             local_token = true;
             TokenSource::File { path: path_join(dir, "api-token"), from: if own_data.is_some() { "OMNI_DATA_DIR" } else { "the install" } }
@@ -239,7 +259,7 @@ impl Connection {
             local_token,
             env_token,
             data_dir,
-            thread: var("OMNI_THREAD_ID"),
+            thread,
             app: var("OMNI_APP"),
             log_file: var("OMNI_INSTALL_LOG"),
         })
@@ -259,7 +279,7 @@ impl Connection {
                 let trimmed = js::trim_str(&text);
                 (!trimmed.is_empty()).then(|| trimmed.to_string())
             }
-            TokenSource::None => None,
+            TokenSource::None | TokenSource::NoThreadToken => None,
         }
     }
 }
@@ -337,6 +357,13 @@ impl Client {
 
     /// Makes sure the server may have the token, as before a request.
     pub fn prove(&self) -> Result<()> {
+        if self.conn.token_source == TokenSource::NoThreadToken {
+            return Err(Error::cli(format!(
+                "No API token for {}: {}. Nothing was sent.",
+                self.conn.base_url,
+                describe_source(&self.conn.token_source)
+            )));
+        }
         if self.conn.token_stays_here() {
             return Err(self.stays_here());
         }

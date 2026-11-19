@@ -15,7 +15,8 @@
 //   refuse its answer. The guard cannot read whether he agreed. It holds the rule that the Conductor proposes an edit
 //   and waits for him (decision D10 in docs/plans/2026-11-18-user-defined-crew.md), so a brief, a web page or a crew
 //   report alone never rewrites a role.
-// Like the automation guard, it holds the path agents are told to use, not a determined one.
+// Like the automation guard, it holds every path Omni gives a thread (its own token), not one that reads the install
+// token from disk, which only the OS sandbox closes.
 import { benAnswered, lineage } from './automation-guard.ts';
 import { crewTexts, getCrew, parseCrewFile, type CrewRole } from './crew.ts';
 import type { CrewSave } from './crew-store.ts';

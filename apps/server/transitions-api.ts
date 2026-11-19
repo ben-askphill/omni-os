@@ -4,6 +4,7 @@
 // an older build keep working; a new client can use these alone.
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { lineageRefusal } from './automation-guard.ts';
 import { ContinueRefused } from './continue.ts';
 import { cancelTransition, createTransition, previewTransition, readTransition } from './transition.ts';
 
@@ -43,6 +44,9 @@ transitionsApi.post('/:id/transitions/preview', async (c) => {
  */
 transitionsApi.post('/:id/transitions', async (c) => {
   const body = createSchema.parse(await c.req.json().catch(() => ({})));
+  // A fork is Continue: the new thread comes from this one (automation-guard.ts lineageRefusal).
+  const no = body.kind === 'fork' ? lineageRefusal(c, c.req.param('id'), false) : null;
+  if (no) return c.json({ error: no }, 403);
   try {
     return c.json(await createTransition(c.req.param('id'), body));
   } catch (err) {

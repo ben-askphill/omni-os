@@ -8,7 +8,8 @@
 // - A shell on this machine: only the install's token, or a session paired with the token (a browser or the desktop
 //   app's window), may open, type into or watch a thread's terminal, or add, change, run or retry a channel action,
 //   whose command a login shell runs. A Google, Omni Connect or app session cannot, so a stolen session cannot read
-//   data/api-token through a shell. Reading actions and runs, stopping a run and removing an action stay open to it.
+//   data/api-token through a shell. A thread's own token cannot either: a thread runs its own shells. Reading actions
+//   and runs, stopping a run and removing an action stay open to all of them.
 //   Retry setup reruns the channel's setup step, so it is a shell too, but only while the thread has one to rerun:
 //   that depends on the thread, not the path, so runner/setup.ts checks it with request-guard.ts shellAllowed.
 // - No GET opens a shell or starts Chrome: the terminal and channel browser start on POST, and their streams only
@@ -17,8 +18,12 @@
 // - The desktop pairing link takes a one-time nonce and only a top-level navigation the app's main process made
 //   (Sec-Fetch-Site absent or none).
 
-/** How a request proved itself. `session-token`: a device session paired with the install's token. */
-export type Credential = 'token' | 'session-token' | 'session' | 'nonce' | 'none';
+/**
+ * How a request proved itself. `session-token`: a device session paired with the install's token. `thread`: the token
+ * one spawn of a thread's harness holds (thread-tokens.ts), which is never the install's: it opens no terminal and
+ * pairs nothing.
+ */
+export type Credential = 'token' | 'session-token' | 'session' | 'thread' | 'nonce' | 'none';
 
 /** What the route does. A shell (a thread's terminal, a channel action's command) and pairing have stricter rules. */
 export type RouteClass = 'read' | 'act' | 'shell' | 'pairing';

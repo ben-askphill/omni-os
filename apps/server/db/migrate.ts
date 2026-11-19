@@ -597,6 +597,17 @@ export function migrate() {
     last_seen_at TEXT NOT NULL,
     revoked_at TEXT
   );`);
+  // The credential each spawn of a thread's harness holds instead of the install token (thread-tokens.ts). Local,
+  // never synced: a token belongs to one process on this machine. Only its SHA-256 is kept.
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_tokens (
+    hash TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    spawn TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    revoked_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS thread_tokens_thread ON thread_tokens(thread_id) WHERE revoked_at IS NULL;
+  CREATE INDEX IF NOT EXISTS thread_tokens_spawn ON thread_tokens(spawn);`);
   // How a session was granted: 'google' (the owner signed in; ends when the owner changes) or 'pairing' (an app
   // redeemed a one-time code from an authenticated device; needs no Google owner). Older rows are all Google's.
   ensureColumn('device_sessions', 'method', `TEXT NOT NULL DEFAULT 'google'`);

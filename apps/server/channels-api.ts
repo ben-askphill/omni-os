@@ -1,5 +1,5 @@
 // /api/channels: channel CRUD, and the threads listed under one channel.
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { revokeRoleGrant, roleGrants } from './runner/approvals.ts';
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
@@ -16,7 +16,7 @@ import { publishFeed } from './bus.ts';
 import { baseOptions } from './worktree-base.ts';
 import { storedList, worktreeListProblem } from '@omni/shared/worktree-lists.ts';
 import { ACCESS_CONNECTORS } from '@omni/shared/access.ts';
-import { CALLER_HEADER } from './automation-guard.ts';
+import { callerOf } from './automation-guard.ts';
 
 export const channelsApi = new Hono();
 
@@ -93,11 +93,11 @@ const connectorAccess = z
   .transform((m) => (m === undefined ? undefined : m && Object.keys(m).length ? JSON.stringify(m) : null));
 
 /**
- * An agent thread never changes what agents may do: a call that names its thread (the Conductor's tools, or a
- * thread's own curl) is refused when it sets a level. Ben sets them in Channel settings.
+ * An agent thread never changes what agents may do: a call from a thread (its own token, or an install-token call that
+ * names one, automation-guard.ts callerOf) is refused when it sets a level. Ben sets them in Channel settings.
  */
-const agentSetsAccess = (c: { req: { header: (h: string) => string | undefined } }, body: { access_level?: unknown; connector_access?: unknown }) =>
-  !!c.req.header(CALLER_HEADER) && (body.access_level !== undefined || body.connector_access !== undefined);
+const agentSetsAccess = (c: Context, body: { access_level?: unknown; connector_access?: unknown }) =>
+  !!callerOf(c) && (body.access_level !== undefined || body.connector_access !== undefined);
 const AGENT_ACCESS_REFUSAL = 'Agents cannot change access levels. Ask the user to set them in Channel settings.';
 
 const channelSchema = z.object({
@@ -294,7 +294,7 @@ channelsApi.get('/:id/access-grants', (c) => {
 channelsApi.delete('/:id/access-grants/:role', (c) => {
   const id = c.req.param('id');
   if (!channels.get(id)) return c.json({ error: 'not found' }, 404);
-  if (c.req.header(CALLER_HEADER)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
+  if (callerOf(c)) return c.json({ error: AGENT_ACCESS_REFUSAL }, 403);
   revokeRoleGrant(id, c.req.param('role'), c.req.query('tool') || undefined);
   publishFeed({ type: 'channel', id });
   return c.json({ grants: roleGrants(id) });

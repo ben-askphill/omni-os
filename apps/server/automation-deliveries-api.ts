@@ -7,7 +7,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { DeliveryPage } from '@omni/shared/automation-triggers.ts';
-import { automationRefusal, CALLER_HEADER } from './automation-guard.ts';
+import { automationRefusal, callerOf } from './automation-guard.ts';
 import { admitPending } from './automation-triggers.ts';
 import { retryDelivery, skipDelivery, viewById, viewsOf, type DeliveryAction } from './automation-deliveries.ts';
 import { triggerDeliveries } from './db/repos/trigger-deliveries.ts';
@@ -35,7 +35,7 @@ const reply = (c: { json: (body: unknown, status?: 404 | 409) => Response }, r: 
 automationDeliveriesApi.post('/deliveries/:id/retry', async (c) => {
   const { attempt } = z.object({ attempt: z.number().int().positive() }).parse(await c.req.json().catch(() => ({})));
   // A retry starts the automation's run: not from a thread an automation started (automation-guard.ts).
-  const no = automationRefusal(c.req.header(CALLER_HEADER), 'run');
+  const no = automationRefusal(callerOf(c), 'run');
   if (no) return c.json({ error: no }, 403);
   const r = retryDelivery(c.req.param('id'), attempt);
   // Started here when this Mac runs automations. Another Mac holds it for the one that does.

@@ -107,4 +107,14 @@ describe('harness env guard', () => {
       expect(env.PATH).toBe('/usr/bin');
     }
   });
+
+  it("never passes on the server's own credentials, only the thread's token the runner sets", () => {
+    // A server started with its token in the environment (a QA stack, a script) would otherwise hand it to every thread.
+    const server = { ...base, OMNI_TOKEN: 'install-token', OMNI_TOKEN_FILE: '/data/api-token', OMNI_MCP_TOKEN: 'mcp-token' } as NodeJS.ProcessEnv;
+    for (const h of HARNESS_IDS) {
+      const bare = harnessEnv(h, {}, {}, server);
+      expect([bare.OMNI_TOKEN, bare.OMNI_TOKEN_FILE, bare.OMNI_MCP_TOKEN]).toEqual([undefined, undefined, undefined]);
+      expect(harnessEnv(h, { OMNI_TOKEN: 'omt_thread' }, { OMNI_TOKEN: 'from-a-secret' }, server).OMNI_TOKEN).toBe('omt_thread');
+    }
+  });
 });

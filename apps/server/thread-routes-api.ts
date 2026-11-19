@@ -14,7 +14,8 @@ import { readOpenItems } from '@omni/shared/open-items.ts';
 import { checkAnnotations } from './message-context/browser-annotation.ts';
 import { stampNewThreadReferences, stampThreadReferences } from './message-context/thread-reference.ts';
 import { getCrew } from './crew.ts';
-import { senderOf as sender } from './automation-guard.ts';
+import { lineageRefusal, senderOf as sender, threadCredential } from './automation-guard.ts';
+import { userName } from './profile.ts';
 import { commentsPrompt, isArtifactUrl } from '@omni/shared/published.ts';
 import { CREW_ARTIFACTS_MAX } from '@omni/shared/crew-artifacts.ts';
 import { bus } from './bus.ts';
@@ -69,6 +70,9 @@ import { fixChecksPrompt } from './fix-checks.ts';
 import { shellAllowed } from './request-guard.ts';
 
 /** List, create, detail, and summary. Registered before PATCH and the terminal routes. */
+/** A thread under an automation or a usage scan acts only on threads under the same one (automation-guard.ts lineageRefusal). */
+const OUTSIDE_LINEAGE = 'A thread under an automation or a usage scan acts only on threads under the same one.';
+
 export const threadRoutesApi = new Hono();
 
 /** Messages, uploads, stop, and the event stream. Registered after PATCH and the terminal routes. */
@@ -116,6 +120,8 @@ threadRoutesApi.get('/asks', (c) => c.json(allWithDelegating(threads.recentAsks(
  */
 threadRoutesApi.post('/:id/promote', async (c) => {
   const body = z.object({ to: z.enum(['task', 'keep']), request: z.string().max(20_000).optional() }).parse(await c.req.json().catch(() => ({})));
+  // The task starts with no parent, so a thread could shed its lineage through it: Ben turns an ask into a task.
+  if (body.to === 'task' && threadCredential(c)) return c.json({ error: `Only ${userName()} turns a quick ask into a task.` }, 403);
   try {
     if (body.to === 'keep') return c.json({ ask: keepQuickAsk(c.req.param('id')) });
     return c.json(await taskFromQuickAsk(c.req.param('id'), { request: body.request }));
@@ -144,6 +150,8 @@ threadRoutesApi.post('/', async (c) => {
   const { data, files } = await readBody(c);
   // run-on.ts: a synced machine's id, "here", or left out for Settings' default.
   const { context: raw, ...body } = createSchema.parse(data);
+  const filed = fileUnderCaller(c, body);
+  if (filed) return filed;
   checkUploads(files);
   const parsed = parseContexts(raw);
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
@@ -192,10 +200,24 @@ const teamSchema = z.object({
     .min(1),
 });
 
+/**
+ * A thread's own token starts threads under itself: no parent means the caller, and a parent outside its lineage is a
+ * 403 (automation-guard.ts lineageRefusal). Sets `parent_id` on `body`; the 403 when refused.
+ */
+function fileUnderCaller(c: Context, body: { parent_id?: string | null }) {
+  const caller = threadCredential(c);
+  if (!caller) return null;
+  body.parent_id ||= caller;
+  const no = lineageRefusal(c, body.parent_id, true);
+  return no ? c.json({ error: no }, 403) : null;
+}
+
 /** A lead thread in the channel and one member thread per task under it. */
 threadRoutesApi.post('/team', async (c) => {
   const body = teamSchema.safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? 'invalid team' }, 400);
+  const filed = fileUnderCaller(c, body.data);
+  if (filed) return filed;
   return c.json(await createTeam(body.data));
 });
 
@@ -314,6 +336,8 @@ threadActionsApi.post('/:id/messages', async (c) => {
   const from = sender(c, asked);
   const target = threads.get(id);
   if (!target) return c.json({ error: 'not found' }, 404);
+  // Under an automation or a usage scan, a thread steers only threads in its own lineage, as with review notes.
+  if (lineageRefusal(c, id, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
   if (from === 'conductor' && !wake_cold) {
     const warmth = sessionWarmth(target);
     if (!warmth.warm) return c.json({ error: coldRefusal(target, warmth), session: warmth }, 409);
@@ -346,6 +370,15 @@ const afterRecovery = (id: string) => ({ thread: threads.get(id), pending: pendi
  * Resume messages a restart parked, in the order they came. No ids: every recovered one. An uncertain one (it may
  * have reached the harness before the restart) is only sent again when named.
  */
+/**
+ * A thread's queue of unsent messages is Ben's to manage: a message he queued is his answer once it is delivered, so a
+ * thread's own token never edits, cancels, reorders, steers, resumes or drops one (automation-guard.ts senderOf).
+ */
+threadActionsApi.use('/:id/requests/*', async (c, next) => {
+  if (c.req.method !== 'GET' && threadCredential(c)) return c.json({ error: `Only ${userName()} changes a thread's queued messages.` }, 403);
+  await next();
+});
+
 threadActionsApi.post('/:id/requests/resume', async (c) => {
   const id = c.req.param('id');
   const { ids } = z.object({ ids: z.array(z.string().min(1)).max(200).optional() }).parse(await c.req.json().catch(() => ({})));
@@ -359,6 +392,19 @@ threadActionsApi.post('/:id/requests/resume', async (c) => {
  * session, and its first prompt once it is ready. `skip_signin` is Start anyway: the thread starts without the sign-in
  * check this once. Safe to send twice; a thread that is ready or already being prepared is left as it is.
  */
+/**
+ * Recovery that sends a thread's parked messages or restarts its run: Retry setup, Retry or Start fresh (the
+ * Conductor's recover_thread_session), and the usage-limit continuation. Under an automation or a usage scan, a thread
+ * does these only for threads under the same one (automation-guard.ts lineageRefusal).
+ */
+const recovery = async (c: Context, next: () => Promise<void>) => {
+  if (lineageRefusal(c, c.req.param('id')!, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
+  await next();
+};
+threadActionsApi.use('/:id/setup/*', recovery);
+threadActionsApi.use('/:id/session/*', recovery);
+threadActionsApi.use('/:id/limit/*', recovery);
+
 threadActionsApi.post('/:id/setup/retry', async (c) => {
   const id = c.req.param('id');
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
@@ -498,6 +544,7 @@ threadActionsApi.post('/:id/published/comments', async (c) => {
   const id = c.req.param('id');
   const { url } = z.object({ url: z.string().refine(isArtifactUrl, 'not a claude.ai artifact url') }).parse(await c.req.json());
   if (!threads.get(id)) return c.json({ error: 'not found' }, 404);
+  if (lineageRefusal(c, id, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
   return c.json(await postMessage(id, commentsPrompt(url), { mode: 'queue', from: sender(c) }));
 });
 
@@ -532,6 +579,7 @@ threadActionsApi.post('/:id/compact', async (c) => {
   const { focus } = z.object({ focus: z.string().max(2000).optional() }).parse(await c.req.json().catch(() => ({})));
   const t = threads.get(id);
   if (!t) return c.json({ error: 'not found' }, 404);
+  if (lineageRefusal(c, id, false)) return c.json({ error: OUTSIDE_LINEAGE }, 403);
   const blocked = compactBlocked(t);
   if (blocked) return c.json({ error: blocked }, 409);
   const extra = t.harness === 'claude-code' ? focus?.replace(/\s+/g, ' ').trim() : '';

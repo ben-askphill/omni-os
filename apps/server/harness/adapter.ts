@@ -27,6 +27,11 @@ export interface AdapterContext {
   /** The channel browser Omni runs, for the browser MCP to attach to. */
   cdpEndpoint?: string | null;
   omniUrl: string;
+  /**
+   * This spawn's own token (thread-tokens.ts), which the process gets as OMNI_TOKEN in place of the install's. Its MCP
+   * servers read the same token from the file OMNI_TOKEN_FILE names. Unset for a harness that runs elsewhere.
+   */
+  threadToken?: string;
   /** Whether the CLI should resume its stored session rather than start fresh. */
   resume: boolean;
   /** A switched session still needs its history, including a retry into an empty native session. */
