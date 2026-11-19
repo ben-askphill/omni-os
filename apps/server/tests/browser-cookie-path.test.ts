@@ -11,7 +11,7 @@ import { startRunner } from './runner-boot.ts';
 // The browser is a cookie jar with the RFC 6265 rules a browser applies: host-only cookies match the host whatever
 // the port, and a cookie goes with every request whose path is under its Path.
 
-await startRunner();
+const h = await startRunner();
 const { app } = await import('../app.ts');
 const { serve } = await import('@hono/node-server');
 const { sessionCookieName } = await import('../api-token.ts');
@@ -213,6 +213,35 @@ describe("a paired browser's session cookie, with another service on a sibling p
     const authLoad = await jar.fetch(`${OMNI}${api}/auth`, { headers: frame });
     expect(authLoad.status).toBe(303);
     expect((await fetch(`${OMNI}${authLoad.headers.get('location')}`, { headers: frame })).status).toBe(401);
+  });
+
+  // A thread's own token (thread-tokens.ts, #832) is a bearer for loopback calls. It never stands in for a browser: it
+  // gets no session cookie, no keyed path and no signed document address, and put in a cookie it counts for nothing.
+  it("gives a thread's token no cookie, no keyed path and no signed address, and refuses it as a cookie", async () => {
+    const { mintThreadToken } = await import('../thread-tokens.ts');
+    h.db.db.prepare('INSERT INTO threads (id, channel_id, title, status, session_id, cwd, source) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      'cookie-path-thread', 'scratch', 'Thread', 'done', 'cookie-path-thread', h.tmp, 'manual',
+    );
+    const { token } = mintThreadToken('cookie-path-thread');
+    const bearer = { authorization: `Bearer ${token}` };
+
+    const check = await fetch(`${OMNI}/api/auth`, { headers: bearer });
+    expect(check.status).toBe(200);
+    expect(((await check.json()) as { api: string }).api).toBe('/api');
+    expect(check.headers.getSetCookie()).toEqual([]);
+    const pair = await fetch(`${OMNI}/api/auth/pair`, { method: 'POST', headers: bearer });
+    expect(pair.status).toBe(403);
+    expect(pair.headers.getSetCookie()).toEqual([]);
+
+    // A document load with it on a keyed path is not sent to a signed address: that is only for a browser's session.
+    const { api } = await pairedBrowser();
+    const load = await fetch(`${OMNI}${api}/channels`, { redirect: 'manual', headers: { ...bearer, 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate' } });
+    expect(load.status).not.toBe(303);
+    expect(load.headers.get('location')).toBeNull();
+
+    for (const path of ['/api/channels', `${api}/channels`]) {
+      expect((await replay(`${sessionCookieName()}=${token}`, path)).status).toBe(401);
+    }
   });
 
   it('keeps a Secure cookie on /api behind HTTPS, where plain-HTTP services never get it', async () => {
