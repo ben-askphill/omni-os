@@ -35,13 +35,14 @@ function lastLine(text: string) {
 
 /**
  * Run the command in cwd through a login shell (so PATH has gh and friends, as for channel actions). Resolves null
- * when it exits 0, else the reason to record. Its own process group, so a timeout ends what it started too.
+ * when it exits 0, else the reason to record. Its own process group, so a timeout ends what it started too. `vars`
+ * are the placeholder values the command refers to (fillShellPlaceholders in user-config.ts).
  */
-export function runPrecheck(p: Precheck, cwd: string): Promise<string | null> {
+export function runPrecheck(p: Precheck, cwd: string, vars: Record<string, string> = {}): Promise<string | null> {
   return new Promise((resolve) => {
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(process.env.SHELL || '/bin/sh', ['-lc', p.command], { cwd, detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
+      child = spawn(process.env.SHELL || '/bin/sh', ['-lc', p.command], { cwd, env: { ...process.env, ...vars }, detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
     } catch (err) {
       return resolve(`precheck could not start: ${(err as Error).message}`);
     }

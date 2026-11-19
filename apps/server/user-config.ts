@@ -315,25 +315,66 @@ export function omniRepo(): string | null {
 }
 
 /**
- * Fill `{{placeholders}}` in a crew charter or an automation prompt, so the shared files in the repo name nobody:
- * {{user}}, {{workspace}}, {{reposDir}}, {{githubOwner}}, {{omniRoot}}, {{omniRepo}}, {{centralBrain}}, {{timezone}}.
- * An unknown placeholder stays as written.
+ * The `{{placeholders}}` a crew charter, an automation prompt or a precheck can use, so the shared files in the repo
+ * name nobody: {{user}}, {{workspace}}, {{reposDir}}, {{githubOwner}}, {{omniRoot}}, {{omniRepo}}, {{centralBrain}},
+ * {{timezone}}. A folder is shown with ~ for a reader, absolute for a shell.
  */
-export function fillPlaceholders(text: string) {
-  const values: Record<string, () => string> = {
+function placeholderValues(forShell: boolean): Record<string, () => string> {
+  const path = (p: string) => (forShell ? p : tildify(p));
+  return {
     user: userName,
-    workspace: () => tildify(resolved.workspaceRoot()),
-    reposDir: () => tildify(resolved.reposDir()),
+    workspace: () => path(resolved.workspaceRoot()),
+    reposDir: () => path(resolved.reposDir()),
     githubOwner: () => resolved.githubOwner() || '<your GitHub owner>',
     omniRoot: () => {
       const checkout = omniCheckout();
-      return checkout ? tildify(checkout) : '<your Omni checkout>';
+      return checkout ? path(checkout) : '<your Omni checkout>';
     },
     omniRepo: () => omniRepo() ?? '<your Omni repo>',
-    centralBrain: () => tildify(resolved.centralBrainDir()) || '<your notes folder>',
+    centralBrain: () => path(resolved.centralBrainDir()) || '<your notes folder>',
     timezone: resolved.timezone,
   };
-  return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (all, key: string) => (values[key] ? values[key]() : all));
+}
+
+const PLACEHOLDER = /\{\{\s*(\w+)\s*\}\}/g;
+const PLACEHOLDER_KEYS = Object.keys(placeholderValues(false));
+const isPlaceholder = (key: string) => PLACEHOLDER_KEYS.includes(key);
+
+/** Fill `{{placeholders}}` in a crew charter or an automation prompt. An unknown placeholder stays as written. */
+export function fillPlaceholders(text: string) {
+  const values = placeholderValues(false);
+  return text.replace(PLACEHOLDER, (all, key: string) => (isPlaceholder(key) ? values[key]() : all));
+}
+
+/** The variable a shell command reads a placeholder's value from: {{githubOwner}} is OMNI_PLACEHOLDER_GITHUBOWNER. */
+const placeholderVar = (key: string) => `OMNI_PLACEHOLDER_${key.toUpperCase()}`;
+const PLACEHOLDER_VAR = /\bOMNI_PLACEHOLDER_([A-Z]+)\b/g;
+
+/**
+ * Fill `{{placeholders}}` in a shell command (an automation's precheck). The values come from the profile and setup,
+ * which any signed-in device may change, so none is pasted into the command: each placeholder becomes a plain
+ * reference to a variable that shellPlaceholderEnv() sets, the same text wherever it sits. The shell expands it as
+ * data, in double quotes as one word, outside quotes split on spaces as a pasted value was. In single quotes it stays
+ * a reference, so text handed to another shell (`sh -c '…'`, `ssh host '…'`) carries the name and that shell reads
+ * the value from the environment, never as code. `${VAR}` only where a letter follows; `$VAR` also works in fish.
+ */
+export function fillShellPlaceholders(command: string) {
+  return command.replace(PLACEHOLDER, (all, key: string, at: number) => {
+    if (!isPlaceholder(key)) return all;
+    const name = placeholderVar(key);
+    return /\w/.test(command[at + all.length] ?? '') ? `\${${name}}` : `$${name}`;
+  });
+}
+
+/** The variables a command filled by fillShellPlaceholders() refers to, with this install's values now. */
+export function shellPlaceholderEnv(command: string): Record<string, string> {
+  const values = placeholderValues(true);
+  const env: Record<string, string> = {};
+  for (const [, upper] of command.matchAll(PLACEHOLDER_VAR)) {
+    const key = PLACEHOLDER_KEYS.find((k) => k.toUpperCase() === upper);
+    if (key) env[placeholderVar(key)] = values[key]();
+  }
+  return env;
 }
 
 /** Make the workspace folder when onboarding picked one that does not exist yet. */
