@@ -190,6 +190,12 @@ describe('worktree setup', () => {
     expect(out.post[0].body.startsWith('Worktree could not be prepared in #widgets')).toBe(true);
   });
 
+  it('alerts a thread held for a sign-in as a question, though it reads as stopped', () => {
+    const i = setupOnly('stopped');
+    const held: AttentionItem = { ...i, blockers: [{ kind: 'setup', signin: true, detail: 'Slack is signed out on omarchy.', count: 0 }] };
+    expect(setupAlert(held, 'widgets')).toMatchObject({ kind: 'question', body: 'Sign in needed in #widgets: Slack is signed out on omarchy.' });
+  });
+
   it('stays quiet when Ben stopped it, or a failed result already says it', () => {
     expect(setupAlert(setupOnly('stopped'))).toBeNull();
     expect(setupAlert(byTitle('Fix the widget'))).toBeNull();

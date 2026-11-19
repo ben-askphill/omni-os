@@ -39,7 +39,8 @@ export interface Thread {
   folder_id: string | null;
   pinned_at: string | null;
   done_at: string | null;
-  setup: 'preparing' | 'failed' | null;
+  /** `signin`: a connector the job needs is signed out; `setup_error` says which and how to sign in. */
+  setup: 'preparing' | 'failed' | 'signin' | null;
   setup_error: string | null;
   resume_blocked: string | null;
   limit_state: 'limited' | 'scheduled' | null;
