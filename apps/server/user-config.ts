@@ -343,11 +343,14 @@ function placeholderValues(forShell: boolean): Record<string, () => string> {
  */
 const PLACEHOLDER_SOURCES = { user: ['name', 'timezone'], workspace: ['root', 'reposDir', 'githubOwner'], integrations: ['centralBrainDir'] } as const;
 
-/** The placeholder-backed fields a profile or setup patch sets, as `section.field`. */
+/** The placeholder-backed fields a profile or setup patch changes, as `section.field`. One sent as it is saved is not. */
 export function placeholderFieldsIn(patch: { [K in keyof typeof PLACEHOLDER_SOURCES]?: object }): string[] {
+  const saved = userConfig();
   return Object.entries(PLACEHOLDER_SOURCES).flatMap(([section, fields]) => {
-    const set = patch[section as keyof typeof PLACEHOLDER_SOURCES] as Record<string, unknown> | undefined;
-    return set ? fields.filter((f) => set[f] !== undefined).map((f) => `${section}.${f}`) : [];
+    const key = section as keyof typeof PLACEHOLDER_SOURCES;
+    const set = patch[key] as Record<string, unknown> | undefined;
+    const now = saved[key] as Record<string, unknown>;
+    return set ? fields.filter((f) => set[f] !== undefined && set[f] !== now[f]).map((f) => `${section}.${f}`) : [];
   });
 }
 
@@ -373,17 +376,19 @@ const PLACEHOLDER_VAR = /\bOMNI_PLACEHOLDER_([A-Z]+)\b/g;
  * Fill `{{placeholders}}` in a shell command (an automation's precheck). The values come from the profile and setup,
  * which any signed-in device may change, so none is pasted into the command: each placeholder becomes a plain
  * reference to a variable that shellPlaceholderEnv() sets, the same text wherever it sits. The shell expands it as
- * data, in double quotes as one word, outside quotes split on spaces as a pasted value was. In single quotes it stays
- * a reference, so text handed to another shell (`sh -c '…'`, `ssh host '…'`) carries the name and that shell reads
- * the value from the environment, never as code. A double-quoted `sh -c "…"`, `eval` or `$(( ))` expands it first and
+ * data, in double quotes as one word, outside quotes split on spaces in sh and bash (zsh does not split it). In single
+ * quotes it stays a reference, so text handed to another shell on this machine (`sh -c '…'`) carries the name and that
+ * shell reads the value from the environment, never as code. ssh, `sudo`, `su -c` and `env -i` do not pass the
+ * variable on, so there it reads as empty. A double-quoted `sh -c "…"`, `eval` or `$(( ))` expands it first and
  * then runs it, as a pasted value did: the precheck's author (the install token) has to avoid those, and the docs say so.
- * `${VAR}` only where a letter follows; `$VAR` also works in fish.
+ * `${VAR}` where a letter, `:` or `[` follows (zsh reads `$VAR:h` as a modifier and `$VAR[1]` as a subscript), else
+ * `$VAR`, which fish also reads.
  */
 export function fillShellPlaceholders(command: string) {
   return command.replace(PLACEHOLDER, (all, key: string, at: number) => {
     if (!isPlaceholder(key)) return all;
     const name = placeholderVar(key);
-    return /\w/.test(command[at + all.length] ?? '') ? `\${${name}}` : `$${name}`;
+    return /[\w:[]/.test(command[at + all.length] ?? '') ? `\${${name}}` : `$${name}`;
   });
 }
 

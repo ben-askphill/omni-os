@@ -109,6 +109,8 @@ describe('fillShellPlaceholders', () => {
     expect(env.OMNI_PLACEHOLDER_REPOSDIR).not.toMatch(/^~/);
     expect(env.OMNI_PLACEHOLDER_WORKSPACE).toMatch(/^\//);
     expect(fillShellPlaceholders('cd {{workspace}} && test -d "{{reposDir}}/x" && echo {{user}}s')).toBe('cd $OMNI_PLACEHOLDER_WORKSPACE && test -d "$OMNI_PLACEHOLDER_REPOSDIR/x" && echo ${OMNI_PLACEHOLDER_USER}s');
+    // zsh, the login shell on a Mac, reads `$NAME:h` as a modifier and `$NAME[1]` as a subscript: braces end the name.
+    expect(fillShellPlaceholders('echo {{user}}:hello {{reposDir}}[1] {{user}}.')).toBe('echo ${OMNI_PLACEHOLDER_USER}:hello ${OMNI_PLACEHOLDER_REPOSDIR}[1] $OMNI_PLACEHOLDER_USER.');
     // Only the variables the command refers to.
     expect(Object.keys(shellPlaceholderEnv(fillShellPlaceholders('echo {{user}} {{timezone}}')))).toEqual(['OMNI_PLACEHOLDER_USER', 'OMNI_PLACEHOLDER_TIMEZONE']);
   });
@@ -117,7 +119,7 @@ describe('fillShellPlaceholders', () => {
     const before = fillShellPlaceholders('echo {{user}}');
     expect((await call('Google app session', 'PUT', '/profile', { name: 'Someone else' })).status).toBe(200);
     expect(fillShellPlaceholders('echo {{user}}')).toBe(before);
-    expect(readFileSync(LAUNCHES, 'utf8')).not.toContain('Someone else');
+    expect(existsSync(LAUNCHES) ? readFileSync(LAUNCHES, 'utf8') : '').not.toContain('Someone else');
   });
 });
 
@@ -154,6 +156,14 @@ describe("a thread's own token", async () => {
       expect(res.body.error).toMatch(/placeholder/);
     }
     expect(values()).toEqual(before);
+  });
+
+  it('may send a placeholder field back unchanged with the rest of its section', async () => {
+    const { userConfig } = await import('../user-config.ts');
+    const { user, workspace } = userConfig();
+    expect((await put('/setup', { user: { ...user, pronouns: 'she/her' } })).status).toBe(200);
+    expect((await put('/setup', { workspace })).status).toBe(200);
+    expect((await put('/profile', { name: user.name, pronouns: 'they/them' })).status).toBe(200);
   });
 
   it('still changes what no placeholder reads', async () => {
