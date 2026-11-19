@@ -17,7 +17,8 @@ import { assignments, events, outbox, threads } from './db.ts';
 import { activeTasks, lives } from './runner/state.ts';
 import { isSubagent } from './stream.ts';
 import { machineNames, ranOnFields, type MachineNames } from './ran-on.ts';
-import { stepField, type StepField } from './step-line.ts';
+import type { StepField } from '@omni/shared/steps.ts';
+import { stepField } from './step-line.ts';
 import type { RanOnFields } from '@omni/shared/ran-on.ts';
 
 /** With `delegating`, where it runs or ran and when its run started (ran-on.ts), and the step it is on (step-line.ts), for the Inbox rows. */

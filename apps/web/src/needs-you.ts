@@ -1,7 +1,9 @@
 // Needs you (apps/server/db/repos/needs-you.ts) from the Web UI's side: why each thread is there, and which result an
 // open thread has shown.
 import type { NeedsYou, NeedsYouItem, Thread } from './api.ts';
-import { STATUS, blockerGlyph, asksForYou, blockerMark, markOf, resultGlyph, type Glyph, type Mark } from '@omni/shared/status.ts';
+import { glyphLabel } from '@omni/shared/display.ts';
+import { technicalNow } from './display.ts';
+import { asksForYou, blockerGlyph, blockerMark, markOf, resultGlyph, type Glyph, type Mark } from '@omni/shared/status.ts';
 import { resetLabel } from './limits.ts';
 import { unreadResultOf, withoutRead } from '@omni/shared/needs-read.ts';
 
@@ -41,7 +43,7 @@ function sayOf(item: NeedsYouItem): Omit<Reason, 'mark'> {
     return { glyph, label: plural(b.count, 'A message waits for Resume', '# messages wait for Resume'), detail: preview };
   }
   const glyph = resultGlyph(item.result?.status ?? 'done');
-  return { glyph, label: glyph === 'done' ? 'Finished' : STATUS[glyph].label, detail: preview };
+  return { glyph, label: glyph === 'done' ? 'Finished' : glyphLabel(glyph, technicalNow()), detail: preview };
 }
 
 /**

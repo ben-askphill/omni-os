@@ -43,7 +43,8 @@ export interface AttentionAlert {
 
 /** A Needs you item, narrowed. */
 export interface AttentionItem {
-  thread: { id: string; channel_id: string; title: string | null; status?: string; last_text?: string | null };
+  /** `step`: the step a running thread is on (steps.ts `stepLine`), which the server adds while it runs. */
+  thread: { id: string; channel_id: string; title: string | null; status?: string; last_text?: string | null; step?: string };
   result: { uid: string; status: string; at: string } | null;
   blockers: { kind: string; detail: string | null; count: number; at?: string | null; signin?: boolean }[];
   at?: string;
@@ -130,7 +131,9 @@ export function questionAlert(item: AttentionItem, channelName?: string): Attent
   const q = item.blockers.find((b) => b.kind === 'question');
   const id = questionKey(item);
   if (!q || !id) return null;
-  const head = q.count > 1 ? `${q.count} questions wait in ${where(item.thread.channel_id, channelName)}` : `Waiting on your answer in ${where(item.thread.channel_id, channelName)}`;
+  const wait = q.count > 1 ? `${q.count} questions wait in ${where(item.thread.channel_id, channelName)}` : `Waiting on your answer in ${where(item.thread.channel_id, channelName)}`;
+  // Where it stopped to ask: "Step 2 of 3 · Read the reviews · waiting on your answer in #volero".
+  const head = item.thread.step ? `${item.thread.step} · ${wait[0].toLowerCase()}${wait.slice(1)}` : wait;
   return { id, kind: 'question', threadId: item.thread.id, channelId: item.thread.channel_id, title: titleOf(item.thread.title), body: withDetail(head, q.detail) };
 }
 

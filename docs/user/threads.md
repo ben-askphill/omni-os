@@ -14,6 +14,8 @@ A thread shows as running everywhere while a thread it delegated (a team lead an
 
 Every thread carries one mark, on desktop web, phone web and the desktop app. The native iOS app keeps its own glyphs.
 
+With **Show technical details** off (Settings > Appearance), each mark keeps its shape and color but is named with one of five words: **Working**, **Needs you**, **Done**, **Failed** or **Stopped**. A mark that says more than its word keeps its own name as the detail, in its tooltip and screen reader label ("Needs you: Usage limit"). The table below gives each mark's own name, which is what it reads with the switch on. The iOS app names its statuses the same way.
+
 - **Shape says who has the ball.** A circle is the agent, a square is a system outside Omni (checks, a usage limit), a diamond is you, a cross or triangle is broken.
 - **Color repeats it**: blue, amber, vermilion and red, with volt for done and grey for quiet states. No state depends on color alone.
 - **Fill says how far along**: hollow, half, filled.
@@ -75,6 +77,16 @@ Needs you holds unread results and threads waiting for you to act. A delegated t
 
 On desktop web and in the desktop app, use the check on a Needs you row or an Inbox card, the check in the thread header, or the thread's menu. The thread header keeps only the crew role the thread runs as (beside the channel crumb, left out on the Conductor's own threads), the channels its delegated threads work in, the context meter, Mark as done, the status, the thread menu (⋯) and the quick-card and panel toggle. Pin, Reference and Send to Grok Bot are in the menu. Hand off and Take over are on the reply box's Machine chip. On a phone, use the check on an Activity row or Thread options. The Conductor can use `mark_thread_done` when you ask it to.
 
+## Quick asks
+
+A quick ask is a question answered where you asked it, not a thread to manage. Ask from the desktop app's Quick Prompt (Return), or the phone web's and the iOS app's New screen with Ask picked (Task starts a thread as before).
+
+- It runs on Auto unless you pick a model, with read-only tools: it reads files in the channel's folder, searches and fetches the web and reads connectors, but cannot edit files, run commands, use a browser or delegate. Hermes and Cursor Cloud cannot run one (409), since Omni takes those tools away on this machine.
+- It gets no charter, worktree, folder or task id (its `workspace` is `read`, or `none` in a channel with no folder), and stays out of the sidebar, channel lists, the Inbox and notifications. Recent asks lists the last 7 days (`GET /api/threads/asks`).
+- Keep as thread lists it as an ordinary thread where it is, still with read-only tools. Make it a task starts a task thread in the same channel, with its own worktree and full tools, whose first message carries the questions and answers so far (`POST /api/threads/:id/promote` with `to: keep` or `task`).
+- When the agent finds the ask needs real work, it answers `TASK: <title>`. Omni shows "This needs a task" under the answer and highlights Make it a task, which then takes that title. Only you start the task: text the agent read (a page, a file) cannot start one by writing a TASK line.
+- Other code starts one through `startQuickAsk` (`apps/server/quick-ask.ts`), or `POST /api/threads` with `quick: true`.
+
 ## The composer
 
 - A new thread follows the channel and crew defaults until you pick a model or effort for that draft. When no default is set, Auto picks from the first prompt. The Conductor role's charter is Auto, and a saved #conductor channel default still wins. See [Harnesses](harnesses.md#auto).
@@ -92,7 +104,7 @@ On desktop web and in the desktop app, use the check on a Needs you row or an In
 | Queue for after this turn | Omni holds it and runs it as a new turn once the current one ends |
 | Interrupt and send (Cmd/Ctrl+Shift+Enter) | Stops the current step, then runs the message |
 
-Cmd/Ctrl+Enter adds a newline. Pending messages show under the live output and enter the transcript at the point the agent read them. A queued message has **Steer now**, which sends it into the running turn instead of waiting for the turn to end. Cursor Agent and Cursor Cloud cannot steer, so they lack it. While a turn runs and the reply box is empty, the send button turns into **Stop**. Stop (or Esc) stops the turn but keeps the process and its context. Steers already sent still run, and Omni records queued ones as "Not sent". Omni kills a CLI that does not stop within `OMNI_INTERRUPT_GRACE_MS`. Only turns in progress count toward `OMNI_MAX_CONCURRENT`; warm idle processes do not.
+With Show technical details off the three modes read **Add to this**, **Send when it finishes** and **Stop and send**. Cmd/Ctrl+Enter adds a newline. Pending messages show under the live output and enter the transcript at the point the agent read them. A queued message has **Steer now**, which sends it into the running turn instead of waiting for the turn to end. Cursor Agent and Cursor Cloud cannot steer, so they lack it. While a turn runs and the reply box is empty, the send button turns into **Stop**. Stop (or Esc) stops the turn but keeps the process and its context. Steers already sent still run, and Omni records queued ones as "Not sent". Omni kills a CLI that does not stop within `OMNI_INTERRUPT_GRACE_MS`. Only turns in progress count toward `OMNI_MAX_CONCURRENT`; warm idle processes do not.
 
 On Cursor Agent and Cursor Cloud, messages sent during a turn wait for the next turn. A model, effort or harness switch picked during a turn also makes messages wait for that switch, even on a harness that can steer. See [Switching mid-thread](harnesses.md#switching-mid-thread).
 
@@ -143,10 +155,6 @@ Claude Code reports its agents itself. Omni maps Codex (multi-agent spawns), Cur
 ## Goals
 
 On Claude Code, `/goal <condition>` keeps the thread working until the condition holds. A line under the transcript shows the goal: **Pursuing goal** while a turn works on it, **Goal set** while it waits, and **Goal complete** once a turn ends with it met. It also counts how often Claude's check found the condition unmet. **Clear** sends `/goal clear`. A `/goal` message never steers into a running turn: it queues, and a new goal or a clear while one is active stops the turn first. A met goal leaves the line when your next message reaches the session, and any goal goes away when the thread starts a new session. While the thread works toward a goal, its status reads **Goal**, not Running. Claude Code has no pause or resume for goals. The goal stays on the machine that runs the thread and does not sync. Desktop web, phone web and the desktop app show the line; the iOS app does not. Codex, Cursor Agent, Cursor Cloud and Hermes get no goal line.
-
-## Plan steps
-
-When the agent posts a plan, click a step's checkbox to cycle it through pending, in progress and completed. Omni saves the change as a `plan_step_update` event, so it survives reloads. This works on desktop web, phone web and the desktop app.
 
 ## Point the agent at lines of a diff
 
@@ -215,13 +223,15 @@ While a turn runs, a thinking line stays up for the whole turn, tool calls inclu
 
 Replies render as Markdown on desktop web, phone web and the desktop app. A `mermaid` code fence draws as a diagram in light and dark. A fence that fails to parse keeps its source visible. Wide diagrams scroll sideways on a phone.
 
-Open a tool row to read its output. Long output starts with a preview, then loads in chunks with Load more. A running Codex command can show its live tail. The other harnesses show output when the call ends. If the harness cut the output before saving it, loading more cannot recover it. The budgets and client rules are in [Thread history](../internals/thread-history.md).
+Open a call under a step's **N actions** to read its output. Long output starts with a preview, then loads in chunks with Load more. A running Codex command can show its live tail. The other harnesses show output when the call ends. If the harness cut the output before saving it, loading more cannot recover it. The budgets and client rules are in [Thread history](../internals/thread-history.md).
 
 ## Steps
 
 An agent on a task with more than one stage posts its plan as 3 to 6 steps in plain words with Omni's `set_steps` tool, then moves the marker as each step starts or finishes. Claude Code, Codex and Cursor threads have it through the `omni-steps` MCP server, and their system prompt asks for it. When the agent posts no list, Omni uses the plan the harness keeps (Claude Code's todo list or its tasks, a Codex plan, Cursor's todos). With neither, Omni groups the turn's calls into plain phases such as "Searching the web" or "Looking through the files", ending in "Writing the answer". Hermes and Cursor Cloud threads have no Omni MCP servers, so they show phases. No step names a tool, a path or a command.
 
-While a thread runs, the step it is on goes out with the thread as one line: "Step 2 of 3 · Read the reviews" for a list, or the phase ("Searching the web"). Every machine reads it from the thread's own events, so a thread that runs on another machine shows the same line. How it is built: `packages/shared/steps.ts` and `apps/server/step-line.ts`.
+The steps take the place of the tool rows. A running turn shows its list under the transcript, above the thinking line: a status mark per step, "Now:" under the step it is on, and the threads a step handed work to. Each step's **N actions** opens the calls it made, with their output as before. A finished turn folds to one line ("3 steps · 12 actions") with **Show steps**. A turn that made no call shows no list, only the thinking line. On a phone the list sits in the turn the same way, and **N actions** opens the turn's Actions screen. The iOS app shows the running turn's list, and its actions under the turn. Steps are the agent's to move: you cannot tick one.
+
+While a thread runs, the step it is on goes out with the thread as one line: "Step 2 of 3 · Read the reviews" for a list, or the phase ("Searching the web"). The Inbox card shows it under the title on desktop web, the desktop app, phone web and the iOS app's Activity, and a question's notification on the desktop app names it ("Step 2 of 3 · Read the reviews · waiting on your answer in #volero"). Every machine reads it from the thread's own events, so a thread that runs on another machine shows the same line. How it is built: `packages/shared/steps.ts` and `apps/server/step-line.ts`.
 
 ## When the agent asks you
 

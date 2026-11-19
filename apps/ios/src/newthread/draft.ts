@@ -79,6 +79,14 @@ export function createRequest(inputs: DraftInputs): Omit<CreateThreadRequest, 'i
   };
 }
 
+/** A quick ask from the New screen (@omni/shared/quick-ask.ts): no role or machine, on Auto unless a model was picked. */
+export function quickRequest(inputs: DraftInputs): Omit<CreateThreadRequest, 'id'> | null {
+  const prompt = inputs.text.trim();
+  if (!prompt) return null;
+  const shown = shownDraftRun(inputs);
+  return { channel: inputs.target, prompt, quick: true, ...draftRunRequest(inputs.picked ? (shown ?? inputs.picked) : null) };
+}
+
 export type DraftPick = 'auto' | { harness: string; model: string } | { effort: string };
 
 /** Another model starts at its default effort, as in the thread's own switch. */

@@ -209,13 +209,14 @@ function foldersByChannel(list: Folder[], filed: Thread[], delegating: ReadonlyS
  * lead, the thread the sidebar lists.
  */
 function busyThreads(delegating: ReadonlySet<string>) {
-  const busy = threads.running();
-  const seen = new Set(busy.map((t) => t.id));
+  // A quick ask runs where it was asked, not in the lists (packages/shared/quick-ask.ts).
+  const busy = threads.running().filter((t) => !t.quick);
+  const seen = new Set(threads.running().map((t) => t.id));
   for (const id of [...activeTasks().map((task) => task.lead_id ?? task.thread_id), ...delegating]) {
     if (seen.has(id)) continue;
     seen.add(id);
     const t = threads.get(id);
-    if (t && !t.archived) busy.push(t);
+    if (t && !t.archived && !t.quick) busy.push(t);
   }
   return busy;
 }

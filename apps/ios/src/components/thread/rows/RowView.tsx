@@ -11,7 +11,7 @@ import {
   ErrorRow,
   NowRow,
   OutcomeRow,
-  PlanRow,
+  ProgressRow,
   ProseRow,
   PromptRow,
   QuestionRow,
@@ -42,7 +42,7 @@ const VIEWS: Views = {
   switch: SwitchRow,
   now: NowRow,
   thinking: ThinkingRow,
-  plan: PlanRow,
+  progress: ProgressRow,
 };
 
 const GAP: Partial<Record<RowKind, number>> = { call: space.s2, note: space.s4, mod: space.s2, switch: space.s4, prompt: space.s9 };

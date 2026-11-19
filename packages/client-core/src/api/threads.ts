@@ -47,8 +47,16 @@ export interface Thread {
   limit_resets_at: string | null;
   limit_elsewhere: number;
   continued_from: string | null;
+  /** 1 while it is a quick ask (packages/shared/quick-ask.ts), answered in place and out of the lists but Recent asks. */
+  quick?: number;
+  /** What its agent may touch: `none`, `read` (a quick ask) or `worktree`. Null for a thread from before quick asks. */
+  workspace?: 'none' | 'read' | 'worktree' | null;
+  /** The task thread a quick ask turned into. */
+  promoted_to?: string | null;
   created_at: string;
   updated_at: string;
+  /** The step a running thread is on ("Step 2 of 3 · Read the reviews"), from @omni/shared/steps.ts. Absent otherwise. */
+  step?: string;
 }
 
 /** The part of a thread the channel list sends for each of its threads. */
@@ -86,6 +94,11 @@ export interface CreateThreadRequest {
   base?: BasePick;
   /** A synced machine's id, or `here`. Left out: Settings' default. */
   device?: string;
+  /**
+   * A quick ask (@omni/shared/quick-ask.ts): answered in place with read-only tools, on Auto unless a run is given, out of
+   * every list but Recent asks. Role, folder, base and device are ignored. A 409 on Hermes or Cursor Cloud.
+   */
+  quick?: boolean;
 }
 
 /** PATCH /threads/:id takes any of these at once. The thread's run (model, effort, harness) goes through `switchRun`. */
@@ -124,5 +137,13 @@ export function threadsApi(http: HttpClient) {
     moveToFolder: (id: string, folderId: string | null) => patch(id, { folder_id: folderId }),
     /** The model, effort and harness. Between turns it applies at once; during one it waits. A 409 while another machine runs the thread. */
     switchRun: (id: string, run: Run) => http.request<Thread>('POST', apiPath`/threads/${id}/run`, { body: run }),
+    /** Quick asks of the last week, newest first, kept or turned into a task ones included. */
+    recentAsks: () => http.request<Thread[]>('GET', apiPath`/threads/asks`),
+    /**
+     * A quick ask becomes a thread: `keep` where it is, or `task`, a new task thread that starts from its answer
+     * (`request`: what the task should do; left out, the last question). A second `task` returns the first one's.
+     */
+    promoteQuickAsk: (id: string, to: 'keep' | 'task', request?: string) =>
+      http.request<{ ask: Thread; task?: Thread }>('POST', apiPath`/threads/${id}/promote`, { body: { to, ...(request && { request }) } }),
   };
 }

@@ -10,6 +10,8 @@ import { cloudAgentUrl } from '@omni/shared/cloud-agent.ts';
 import type { PanelTab } from '../../../pages/useThreadSession.ts';
 import type { PRNext, PRStep } from '@omni/shared/thread-glance.ts';
 import { AgentsSection } from './AgentsSection.tsx';
+import { effortWord, term } from '@omni/shared/display.ts';
+import { useShowsCode, useTechnical } from '../../../display.ts';
 import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
 import { CAPTION, CARD_PAD, ROW_X, ROW_X_BLEED } from './inset.ts';
@@ -126,6 +128,9 @@ export function DetailsTab({
   onTab?: (tab: PanelTab) => void;
 }) {
   const { data: harnesses } = useApi<HarnessWithRunning[]>('/harnesses');
+  // Off outside a repo channel: no branch card, working directory, session, task id, MCP list, tokens or resume command.
+  const code = useShowsCode(channel);
+  const technical = useTechnical();
   const cwd = init?.cwd || thread.cwd;
   const cloud = thread.harness === 'cursor-cloud';
   const remote = thread.harness === 'hermes' || cloud;
@@ -141,8 +146,8 @@ export function DetailsTab({
   const resume = remote ? '' : `cd ${shellQuote(cwd)} && ${resumeCmd[thread.harness] ?? resumeCmd['claude-code']}`;
   return (
     <div className="scroll-thin flex h-full flex-col gap-[var(--sp-6)] overflow-y-auto px-[var(--sp-5)] pb-[var(--sp-6)] [&>*]:shrink-0">
-      <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} parked={parked} onAsk={onAsk} onMerged={onMerged} onTab={onTab} />
-      {prs && <CrewGlance crew={prs.crew} onMerged={onMerged} onTab={onTab} />}
+      {code && <GlanceCard thread={thread} prs={prs} changes={changes ?? null} next={next ?? null} step={step} parked={parked} onAsk={onAsk} onMerged={onMerged} onTab={onTab} />}
+      {code && prs && <CrewGlance crew={prs.crew} onMerged={onMerged} onTab={onTab} />}
       <AgentsSection parent={parent} links={links} children={children} agents={agents} onJump={onJump} />
       <dl className="divide-y divide-line rounded-[var(--r-xl)] bg-bg py-[var(--sp-2)]">
         <Row k="Channel">
@@ -158,7 +163,7 @@ export function DetailsTab({
             </span>
           </Row>
         )}
-        <Row k="Harness">
+        <Row k={term('harness', technical)}>
           <HarnessMark harness={thread.harness} withLabel />
         </Row>
         <Row k="Model">
@@ -166,20 +171,20 @@ export function DetailsTab({
           {slug && slug !== run.model && <span className="ml-1.5 font-mono text-[11.5px] text-fg-3">{slug}</span>}
           {thread.model && init?.model && init.model !== thread.model && <span className="ml-1.5 font-mono text-[11.5px] text-fg-3">({init.model})</span>}
         </Row>
-        <Row k="Effort">{run.effort}</Row>
+        <Row k={term('effort', technical)}>{effortWord(run.effort, technical)}</Row>
         {thread.auto_reason && <Row k="Auto">{thread.auto_reason}</Row>}
-        <Row k="Source">
+        {code && <Row k="Source">
           {thread.source}
           {thread.automation && <span className="text-fg-3"> · {thread.automation}</span>}
-        </Row>
-        <Row k="Working dir">
+        </Row>}
+        {code && <Row k="Working dir">
           {remote ? (
             <span className="text-fg-3">{cloud ? 'Cursor cloud agent, not an Omni worktree' : 'Hermes server, not an Omni worktree'}</span>
           ) : (
             <span className="font-mono text-[12px]">{cwd}</span>
           )}
-        </Row>
-        <Row k="Session">
+        </Row>}
+        {code && <Row k="Session">
           <span className="font-mono text-[12px]">{thread.session_id}</span>
           {warm !== undefined && (
             <div className="mt-[var(--sp-1)] flex items-center gap-[var(--sp-3)] text-fg-3">
@@ -187,13 +192,13 @@ export function DetailsTab({
               {warm ? 'Live, the next message starts instantly' : 'Not running, the next message starts a new process'}
             </div>
           )}
-        </Row>
-        {thread.task_id && (
+        </Row>}
+        {code && thread.task_id && (
           <Row k="Task">
             <span className="font-mono text-[12px]">{thread.task_id}</span>
           </Row>
         )}
-        {init?.mcp && init.mcp.length > 0 && (
+        {code && init?.mcp && init.mcp.length > 0 && (
           <Row k="MCP">
             <McpList servers={init.mcp} />
           </Row>
@@ -203,9 +208,9 @@ export function DetailsTab({
         {lastResult?.duration_ms != null && (
           <Row k="Last run">
             {duration(lastResult.duration_ms)}
-            {lastResult.turns ? <span className="text-fg-3"> · {plural(lastResult.turns, 'turn')}</span> : null}
-            {lastResult.model ? <span className="text-fg-3"> · {lastResult.model}</span> : null}
-            {lastResult.input_tokens != null ? (
+            {code && lastResult.turns ? <span className="text-fg-3"> · {plural(lastResult.turns, 'turn')}</span> : null}
+            {code && lastResult.model ? <span className="text-fg-3"> · {lastResult.model}</span> : null}
+            {code && lastResult.input_tokens != null ? (
               <span className="text-fg-3">
                 {' '}
                 · {lastResult.input_tokens} in / {lastResult.output_tokens ?? 0} out
@@ -215,7 +220,7 @@ export function DetailsTab({
         )}
       </dl>
 
-      {remote ? (
+      {!code ? null : remote ? (
         <div className={`rounded-[var(--r-xl)] bg-bg ${CARD_PAD}`}>
           <div className={`caption ${CAPTION}`}>{cloud ? 'Cursor cloud agent' : 'Remote session'}</div>
           {cloud ? (

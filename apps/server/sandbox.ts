@@ -12,7 +12,7 @@ import { STEPS_SERVER } from '@omni/shared/steps.ts';
 import { config, paths, threadDir, artifactsDir, browserOutDir, designSystemFile, nodeChildEnv } from './config.ts';
 import { nativeMcpCommand, type NativeMcpServer } from './native-mcp.ts';
 import { lazyCommand, prepareLazy } from './lazy-mcp.ts';
-import type { Channel } from './db.ts';
+import type { Channel, ThreadWorkspace } from './db.ts';
 import type { CrewRole } from './crew.ts';
 
 const run = promisify(execFile);
@@ -31,8 +31,12 @@ async function isGitRepo(dir: string) {
   }
 }
 
-/** A thread that must run in a worktree of its own: a repo channel with worktrees on, for a harness on this Mac. */
-export function needsWorktree(channel: Channel, opts?: { remote?: boolean }) {
+/**
+ * A thread that must run in a worktree of its own: a repo channel with worktrees on, for a harness on this Mac. A
+ * quick ask's `none` or `read` workspace never needs one (apps/server/quick-ask.ts).
+ */
+export function needsWorktree(channel: Channel, opts?: { remote?: boolean; workspace?: ThreadWorkspace | null }) {
+  if (opts?.workspace === 'none' || opts?.workspace === 'read') return false;
   return !opts?.remote && !!channel.repo_path && !!channel.use_worktree;
 }
 
@@ -48,13 +52,14 @@ export function plannedWorktree(threadId: string): { cwd: string; branch: string
  * - otherwise: the channel's base dir, falling back to the brain (phillbert) so skills and context load
  * A worktree thread gets plannedWorktree's folder, which prepareWorktree makes before anything runs there.
  */
-export async function prepareWorkdir(channel: Channel, threadId: string, opts?: { remote?: boolean }): Promise<Workdir> {
+export async function prepareWorkdir(channel: Channel, threadId: string, opts?: { remote?: boolean; quick?: boolean }): Promise<Workdir> {
   mkdirSync(artifactsDir(threadId), { recursive: true });
   mkdirSync(browserOutDir(threadId), { recursive: true });
 
   // Hermes and Cursor Cloud run off this Mac. A worktree here would pin a branch nothing on this Mac commits to.
   if (opts?.remote) return { cwd: threadDir(threadId), branch: null };
-  if (needsWorktree(channel)) return plannedWorktree(threadId);
+  // A quick ask only reads, so it reads the channel's own folder and never gets a worktree.
+  if (needsWorktree(channel, { workspace: opts?.quick ? 'read' : null })) return plannedWorktree(threadId);
 
   if (channel.repo_path && existsSync(channel.repo_path)) return { cwd: channel.repo_path, branch: null };
   if (channel.base_dir && existsSync(channel.base_dir)) return { cwd: channel.base_dir, branch: null };
@@ -207,6 +212,8 @@ export interface McpInput {
    * access here, so nothing would stop a click or a form (access.ts browserHeld). Claude Code asks per call, so it keeps it.
    */
   noBrowser?: boolean;
+  /** A quick ask: no browser. Browsing is what turns it into a task. */
+  quick?: boolean;
 }
 
 let playwrightMcp: { bin: string; version: string } | undefined;
@@ -274,7 +281,7 @@ export function buildMcpConfig(input: McpInput) {
   helper(STEPS_SERVER, 'steps');
 
   // A delegate-only role hands browser work to a crewmate, so it gets no browser to be tempted by.
-  if (config.browser && !input.role?.delegateOnly && !input.noBrowser) {
+  if (config.browser && !input.role?.delegateOnly && !input.noBrowser && !input.quick) {
     const args = [playwrightMcpBin(), '--output-dir', browserOutDir(input.threadId)];
     // Chrome locks a profile dir, so only one live thread per channel gets the persistent logins.
     if (input.cdpEndpoint && !input.browserBusy) args.push('--cdp-endpoint', input.cdpEndpoint);

@@ -36,6 +36,13 @@ describe('model sheet rows', () => {
     ]);
   });
 
+  it('names effort in plain words with Show technical details off', () => {
+    const model = runSheetModel(thread({ model: 'sonnet', effort: 'high' }), harnesses, false);
+    expect(model.effortTitle).toBe('Thinking for Sonnet 5.5');
+    expect(model.efforts.map((e) => e.label)).toEqual(['Default (Fast)', 'Fast', 'Thorough']);
+    expect(runChipLabel(thread({ model: 'sonnet', effort: 'high' }), harnesses, false)).toBe('Sonnet 5.5 · Thorough');
+  });
+
   it('checks the default effort row when no effort is set', () => {
     expect(runSheetModel(thread({ effort: '' }), harnesses).efforts.find((e) => e.selected)?.value).toBe('');
   });

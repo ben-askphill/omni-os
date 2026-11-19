@@ -134,7 +134,7 @@ function TaskBadge({ t }: { t: TaskView }) {
   );
 }
 
-function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | null; running: boolean; depth?: number }) {
+export function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: string | null; running: boolean; depth?: number }) {
   const [open, setOpen] = useState(false);
   const task = useContext(TaskCtx).get(c.id);
   // A background agent's result comes back at launch, so its task says whether it still runs.
@@ -238,71 +238,6 @@ export function AgentRow({ c, cwd, running }: { c: ToolCall; cwd?: string | null
   );
 }
 
-function countNames(calls: ToolCall[]) {
-  const m = new Map<string, number>();
-  const walk = (cs: ToolCall[]) =>
-    cs.forEach((c) => {
-      const n = toolLabel(c.name).split(' · ')[0];
-      m.set(n, (m.get(n) ?? 0) + 1);
-      walk(c.children);
-    });
-  walk(calls);
-  return [...m.entries()].sort((a, b) => b[1] - a[1]);
-}
-
 export function flatten(calls: ToolCall[]): ToolCall[] {
   return calls.flatMap((c) => [c, ...flatten(c.children)]);
-}
-
-export function ToolGroup({ calls, total, cwd, running, isLast }: { calls: ToolCall[]; total: number; cwd?: string | null; running: boolean; isLast: boolean }) {
-  const [open, setOpen] = useState(false);
-  if (total === 1 && calls.length === 1) {
-    return <ToolRow c={calls[0]} cwd={cwd} running={running} />;
-  }
-  const all = flatten(calls);
-  const errors = all.filter((c) => c.result?.is_error && !interruptedTool(c)).length;
-  const live = running && isLast && all.some((c) => !c.result);
-  const latest = all[all.length - 1];
-  const names = countNames(calls);
-  return (
-    <div className="rounded-[20px] bg-surface">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="hov flex h-10 w-full min-w-0 items-center gap-2 rounded-[20px] px-3.5 text-left text-[12.5px]"
-      >
-        <Icon name="chevronRight" size={12} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
-        <Icon name="tool" size={13} className="text-fg-3" />
-        <span className="shrink-0 font-medium text-fg-2">
-          <span className="font-num">{total}</span> tool calls
-        </span>
-        <span className="min-w-0 flex-1 truncate text-fg-3">
-          {live && latest ? (
-            <span className="font-mono text-[11.5px]">
-              {toolLabel(latest.name)} {toolSummary(latest, cwd)}
-            </span>
-          ) : (
-            names
-              .slice(0, 4)
-              .map(([n, k]) => (k > 1 ? `${n} ${k}` : n))
-              .join(', ')
-          )}
-        </span>
-        {errors > 0 && (
-          <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg">
-            <StatusDot status="needs" size={7} /> {errors} failed
-          </span>
-        )}
-        {live && <Loader size={11} className="text-fg-3" />}
-      </button>
-      {open && (
-        <div className="fade-in px-1.5 pb-1.5">
-          {calls.map((c) => (
-            <ToolRow key={c.id} c={c} cwd={cwd} running={running} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
