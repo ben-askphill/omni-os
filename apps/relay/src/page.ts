@@ -78,13 +78,22 @@ function shell(body: string, script = '') {
 <meta name="referrer" content="no-referrer"><title>Omni Connect</title><style>${STYLE}</style></head><body><main>${body}</main>${script ? `<script>${script}</script>` : ''}</body></html>`;
 }
 
-/** Inline script only, no other origin, no framing. */
-export const PAGE_HEADERS = {
-  'content-type': 'text/html; charset=utf-8',
-  'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
-  'cache-control': 'no-store',
-  'referrer-policy': 'no-referrer',
-};
+let scriptHash: Promise<string> | undefined;
+/** SCRIPT's `'sha256-…'` source, worked out on the first page rather than kept by hand next to the script. */
+const hashOfScript = () =>
+  (scriptHash ??= crypto.subtle
+    .digest('SHA-256', new TextEncoder().encode(SCRIPT))
+    .then((d) => `'sha256-${btoa(String.fromCharCode(...new Uint8Array(d)))}'`));
+
+/** The one inline script, by its hash, so no other script on the page could run. No other origin, no framing. */
+export async function pageHeaders(): Promise<Record<string, string>> {
+  return {
+    'content-type': 'text/html; charset=utf-8',
+    'content-security-policy': `default-src 'none'; script-src ${await hashOfScript()}; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`,
+    'cache-control': 'no-store',
+    'referrer-policy': 'no-referrer',
+  };
+}
 
 export function connectPage(): string {
   return shell(

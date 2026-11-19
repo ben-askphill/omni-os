@@ -699,6 +699,21 @@ describe('pairing a phone browser from the QR link', () => {
     expect((await req('GET', '/threads', undefined, { ...NONE, cookie })).status).toBe(401);
   });
 
+  it("runs the page's one script by a nonce fresh on each answer, never 'unsafe-inline'", async () => {
+    const nonces: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const res = await open((await mint()).code);
+      const csp = res.headers.get('content-security-policy') ?? '';
+      const nonce = /script-src 'nonce-([A-Za-z0-9+/=]{24})'/.exec(csp)?.[1];
+      expect(nonce, csp).toBeTruthy();
+      expect(csp).toBe(`default-src 'none'; script-src 'nonce-${nonce}'; base-uri 'none'; frame-ancestors 'none'`);
+      const scripts = [...(await res.text()).matchAll(/<script\b([^>]*)>/g)].map((m) => m[1]);
+      expect(scripts).toEqual([` nonce="${nonce}"`]);
+      nonces.push(nonce!);
+    }
+    expect(nonces[0]).not.toBe(nonces[1]);
+  });
+
   it('a spent, wrong or missing code goes to the pairing screen and sets nothing', async () => {
     const { code } = await mint();
     await open(code);

@@ -460,6 +460,8 @@ interface Report {
     folderDialogs: string[];
   };
   pageErrors: string[];
+  /** The console's Content-Security-Policy messages, report-only ones included, so a policy change shows what it trips. */
+  cspViolations: string[];
 }
 
 const DESKTOP = resolve(import.meta.dirname, '..');
@@ -481,7 +483,7 @@ function bail(out: string | null, report: Report, message: string, code: number)
 }
 
 async function main(argv: readonly string[]): Promise<number> {
-  const report: Report = { ok: true, error: null, app: { executable: null, packaged: false }, port: null, dataDir: null, steps: [], facts: { route: null, windows: [], external: [], folderDialogs: [] }, pageErrors: [] };
+  const report: Report = { ok: true, error: null, app: { executable: null, packaged: false }, port: null, dataDir: null, steps: [], facts: { route: null, windows: [], external: [], folderDialogs: [] }, pageErrors: [], cspViolations: [] };
   const args = parseArgs(argv);
   if (isError(args)) bail(null, report, args.error, 2);
   const out = resolve(args.out);
@@ -545,6 +547,9 @@ async function main(argv: readonly string[]): Promise<number> {
     if (watched.has(page)) return;
     watched.add(page);
     page.on('pageerror', (err) => report.pageErrors.length < 50 && report.pageErrors.push(`${page.url()}: ${err.message}`));
+    page.on('console', (m) => {
+      if (/Content Security Policy/.test(m.text()) && report.cspViolations.length < 50) report.cspViolations.push(`${page.url()}: ${m.text()}`);
+    });
   };
   app.on('window', watch);
 

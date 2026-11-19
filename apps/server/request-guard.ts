@@ -15,6 +15,7 @@ import { docSession, docUrl, requestBase, sessionCookies } from './browser-sessi
 import { nonceLive } from './desktop-pairing.ts';
 import { decideRequest, mayUseShell, type Credential, type RouteClass } from './request-trust.ts';
 import { config } from './config.ts';
+import { CSP_REPORT_PATH } from './web-headers.ts';
 import { resolved } from './user-config.ts';
 
 /** This machine's Omni Connect hostname while Connect is on (connect/service.ts). app.ts sets it, so the tests never open the db. */
@@ -116,6 +117,14 @@ export const CONNECT_OPEN_ROUTES: readonly (readonly [string, string])[] = [
   ['POST', '/api/connect/redeem'],
 ];
 const isConnectRoute = (c: Context) => CONNECT_OPEN_ROUTES.some(([m, p]) => c.req.method === m && c.req.path === p);
+
+/**
+ * The Web UI shell's CSP violation reports (csp-report-api.ts), open only straight from this machine: a browser here
+ * talks plain HTTP, so its cookie sits on the keyed path and the report to /api/csp-report goes without it. Through a
+ * proxy or the Connect tunnel the cookie is on /api and goes along, so a report there needs a session like any request,
+ * and nobody else can fill the counts with junk.
+ */
+const isCspReport = (c: Context) => c.req.method === 'POST' && c.req.path === CSP_REPORT_PATH && directFromThisMac(c);
 
 /**
  * How a request proved itself: the install's token, a device's session (`method`: signed in with Google, or an app
@@ -299,8 +308,8 @@ export const shellAllowed = (c: Context) => {
  * - a text/plain or form-urlencoded body, the content types that skip the preflight;
  * - no token, or the wrong one (401), in the Authorization header, and no live device session in it or the paired
  *   browser's cookie, except on the proof route, a GitHub webhook post (its own signature), the desktop app's nonce
- *   and pairing routes from this machine, the Google sign-in routes, redeeming an app pairing code, and Omni
- *   Connect's signed routes (CONNECT_OPEN_ROUTES);
+ *   and pairing routes from this machine, the Google sign-in routes, redeeming an app pairing code, Omni
+ *   Connect's signed routes (CONNECT_OPEN_ROUTES) and the shell's CSP reports from this machine (isCspReport);
  * - a shell (the terminal, or adding, changing, running or retrying a channel action), for anything but the token or
  *   a session paired with it;
  * - a thread's token from anywhere but this machine straight to the server, or one sent with an x-omni-thread header
@@ -317,7 +326,8 @@ export const requestGuard: MiddlewareHandler = async (c, next) => {
   const route = routeClass(c);
   const desktop = route === 'pairing' || (c.req.method === 'POST' && c.req.path === DESKTOP_NONCE_PATH);
   if (desktop && hostAllowed(hostnameOf(host)) && !directFromThisMac(c)) return refuse('desktop pairing is only from this machine');
-  const open = desktop || (c.req.method === 'GET' && c.req.path === PROOF_PATH) || isWebhookPost(c) || isSignInRoute(c) || isAppPairingRoute(c) || isConnectRoute(c);
+  const open =
+    desktop || (c.req.method === 'GET' && c.req.path === PROOF_PATH) || isWebhookPost(c) || isSignInRoute(c) || isAppPairingRoute(c) || isConnectRoute(c) || isCspReport(c);
   const given = bearer(c);
   const base = requestBase(c);
   let auth: OmniAuth = { via: 'none' };

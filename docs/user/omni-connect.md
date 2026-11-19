@@ -22,6 +22,7 @@ Either way the machine signs that browser in. The browser gets an ordinary signe
 ## What to know
 
 - The machine must be awake with Omni running. The Connect page shows a machine as offline when it does not answer within 5 seconds.
+- The Connect page's CSP lets only its own script run, by hash. A relay deployed before that change still allows any inline script there; run `npx wrangler deploy` from `apps/relay` to update it ([Sync](sync.md)).
 - The Connect hostname needs the token or a session on every route, as a `.ts.net` name does. The Tailscale login check (`integrations.tailscaleLogin`) does not apply there, because that request did not come through Tailscale.
 - Turning Connect off deletes the machine's tunnel and DNS record on Cloudflare. Sessions it already made stay until you revoke them.
 - Signing out of sync (Sign Out in Settings, Sync) also deletes the machine's tunnel on the relay.
