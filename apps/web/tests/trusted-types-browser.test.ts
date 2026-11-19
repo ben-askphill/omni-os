@@ -22,8 +22,9 @@ describe.skipIf(!executablePath)('Trusted Types in Chromium', () => {
     page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
     await page.goto(fixture.url);
     // Every diagram drawn, or the first violation: enforced, a write without a policy throws and its diagram stays source.
+    // Under load the first poll can come before the page's module has run, so `violations` may not be there yet.
     await page.waitForFunction(
-      () => window.violations.length > 0 || (document.querySelectorAll('.mermaid-diagram [role="img"] svg').length === 7 && !!document.querySelector('#terminal .xterm')),
+      () => (window.violations?.length ?? 0) > 0 || (document.querySelectorAll('.mermaid-diagram [role="img"] svg').length === 7 && !!document.querySelector('#terminal .xterm')),
       undefined,
       { timeout: 60_000 },
     );
