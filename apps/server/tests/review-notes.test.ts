@@ -82,6 +82,17 @@ describe('review notes', () => {
     expect((await list()).map((n) => n.id)).not.toContain(note.id);
   });
 
+  it('keeps notes added in the same millisecond in the order they were added', T, async () => {
+    const t = await H.runner.createThread({ channel: 'notes', prompt: 'hello' });
+    await H.untilResults(t.id, 1);
+    const notes: ReviewNote[] = [];
+    for (let i = 0; i < 8; i++) notes.push(await add(`note ${i}`, t.id));
+    // Random ids would put same-time notes in any order: the list and Send open notes follow insertion.
+    const { db } = await import('../db/connection.ts');
+    db.prepare('UPDATE review_notes SET created_at = ? WHERE thread_id = ?').run(notes[0].created_at, t.id);
+    expect((await list(t.id)).map((n) => n.id)).toEqual(notes.map((n) => n.id));
+  });
+
   it('sends every open note as one message, marks them sent, and leaves resolved ones out', T, async () => {
     const t = await H.runner.createThread({ channel: 'notes', prompt: 'hello' });
     await H.untilResults(t.id, 1);

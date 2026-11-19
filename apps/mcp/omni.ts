@@ -12,6 +12,7 @@ import type { MachinePick } from '@omni/shared/machine-pick.ts';
 import { ApiError, call, SELF, text } from './api.ts';
 import { autoMergeStep, prList, prListInput, PR_LIST_DESCRIPTION } from './pull-requests.ts';
 import { registerReferencedThread } from './referenced-thread.ts';
+import { resolveDevice } from './device-pick.ts';
 import { threadId } from './thread-id.ts';
 
 /** Who the conductor works for, from the user config (apps/server/user-config.ts). */
@@ -804,15 +805,7 @@ server.registerTool(
 
 /** A machine named by id or name (from list_devices), "here", or nothing for the default, as POST /threads takes it. */
 async function deviceId(device: string | undefined): Promise<string | undefined> {
-  const want = device?.trim();
-  if (!want) return undefined;
-  if (want.toLowerCase() === 'here') return 'here';
-  const devices: any[] = await call('/devices');
-  const named = devices.filter((d) => d.name.toLowerCase() === want.toLowerCase());
-  const hit = devices.find((d) => d.id === want) ?? (named.length === 1 ? named[0] : null);
-  if (named.length > 1 && !hit) throw new Error(`${named.length} machines are called "${want}". Pass the id instead: ${named.map((d) => d.id).join(', ')}.`);
-  if (!hit) throw new Error(`No synced machine is called "${want}". Machines: ${devices.map((d) => `${d.name} (${d.id})`).join(', ') || 'none, sync is off'}.`);
-  return hit.id;
+  return device?.trim() ? (await resolveDevice(device)).id : undefined;
 }
 
 /** The machine a delegated or continued thread runs on, as GET /devices/pick names it. Undefined leaves the default. */
@@ -848,14 +841,14 @@ server.registerTool(
   {
     description:
       `Create or change an automation, only when ${USER} asks. Writes its YAML in data/automations/ (a shipped one becomes ${USER}'s own copy, comments kept) and syncs it to the other machines. ` +
-      'Pass fields (all of them: start from get_automation) or yaml (the whole file). Without id it creates one, its id made from the name. ' +
+      'Pass fields (all of them: start from get_automation) or yaml (the whole file, comments kept). Without id, or with create, it makes a new one, its id made from the name. ' +
       'fields.machine picks the synced machine that runs it: an id or name from list_devices, here, or empty to follow set_automations_machine. Set cron or on, not both. ' +
       'connectors: [slack, calendar] in the yaml names the accounts it reads (gmail, calendar, slack, notion, drive, granola): while one is signed out, the first run waits for a sign-in and later ones are skipped. ' +
       'A thread an automation started (or one below it) cannot create, change, turn on or run automations; Omni refuses it. ' +
       `A save or reset that adds a precheck, or changes its command, timeout, channel or machine, is refused (403): it runs in a shell, so ${USER} makes that change in the YAML tab.`,
     inputSchema: {
       id: z.string().trim().min(1).max(64).optional(),
-      create: z.boolean().optional().describe('Make a new one. Needs fields.'),
+      create: z.boolean().optional().describe('Make a new one, from fields or yaml.'),
       yaml: z.string().min(1).max(200_000).optional(),
       fields: z
         .object({
@@ -881,10 +874,7 @@ server.registerTool(
   },
   async ({ id, create, yaml, fields }) => {
     if (!!yaml === !!fields) throw new Error('Pass fields or yaml, one of them.');
-    if (create || !id) {
-      if (!fields) throw new Error('A new automation needs fields.');
-      return text(await call('/automations', { method: 'POST', body: JSON.stringify({ ...(id && { id }), fields }) }));
-    }
+    if (create || !id) return text(await call('/automations', { method: 'POST', body: JSON.stringify({ ...(id && { id }), ...(fields ? { fields } : { yaml }) }) }));
     return text(await call(`/automations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(fields ? { fields } : { yaml }) }));
   },
 );
@@ -997,16 +987,11 @@ server.registerTool(
   },
   async ({ thread_id, to }) => {
     thread_id = await threadId(thread_id);
-    if (to.trim().toLowerCase() === 'here') {
+    const hit = await resolveDevice(to);
+    if (hit.id === 'here') {
       const res = await call(`/threads/${thread_id}/takeover`, { method: 'POST', body: '{}' });
       return text({ thread_id, to: 'here', handoff: res.handoff?.state ?? null });
     }
-    const devices: any[] = await call('/devices');
-    const want = to.trim().toLowerCase();
-    const named = devices.filter((d) => d.name.toLowerCase() === want);
-    const hit = devices.find((d) => d.id === to) ?? (named.length === 1 ? named[0] : null);
-    if (named.length > 1 && !hit) throw new Error(`${named.length} machines are called "${to}". Pass the id instead: ${named.map((d) => d.id).join(', ')}.`);
-    if (!hit) throw new Error(`No synced machine is called "${to}". Machines: ${devices.map((d) => `${d.name} (${d.id})`).join(', ') || 'none, sync is off or no other machine has synced'}.`);
     const res = await call(`/threads/${thread_id}/handoff`, { method: 'POST', body: JSON.stringify({ to: hit.id }) });
     return text({ thread_id, to: { id: hit.id, name: hit.name }, handoff: res.handoff?.state ?? null });
   },

@@ -27,6 +27,17 @@ describe('pickMachine', () => {
     });
   });
 
+  it('takes a part of a name one machine has, and refuses one two machines share', () => {
+    const air = machine({ id: 'air-1', name: "Ben's MacBook Air" });
+    expect(pickMachine('macbook pro', [mac, box, air])).toMatchObject({ ok: true, pick: { device: 'here', here: true } });
+    expect(pickMachine('Air', [mac, box, air])).toMatchObject({ ok: true, pick: { device: 'air-1', via: 'name' } });
+    expect(pickMachine('MacBook', [mac, box, air])).toEqual({
+      ok: false,
+      status: 400,
+      error: `2 machines match "MacBook": Ben's MacBook Pro (mac-1, this machine), Ben's MacBook Air (air-1). Pass the id instead.`,
+    });
+  });
+
   it('knows only this machine while sync is off', () => {
     const alone = machine({ id: null, name: 'omarchy', here: true });
     expect(pickMachine('', [alone])).toMatchObject({ ok: true, pick: { device: 'here' } });

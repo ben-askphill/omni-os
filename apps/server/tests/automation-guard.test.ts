@@ -147,6 +147,10 @@ describe("a usage scan's lead", () => {
     expect(status).toBe(201);
     expect(body.fields.enabled).toBe(false);
     expect(find('weekly-copy-check')?.enabled).toBe(false);
+    const yaml = '# from the scan\nname: Daily copy check\nenabled: true\ncron: "0 9 * * 1-5"\nchannel: scratch\nprompt: Check the shop.\n';
+    const fromYaml = await call('POST', '/automations', { yaml }, scan);
+    expect(fromYaml.status).toBe(201);
+    expect(find('daily-copy-check')?.enabled).toBe(false);
   });
 
   it('counts an answer to a question it asked', async () => {

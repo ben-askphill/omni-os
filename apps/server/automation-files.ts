@@ -235,11 +235,17 @@ function write(id: string, text: string) {
   schedule();
 }
 
-/** A new automation from the editor's fields. The id is the file's name: given, or made from the name. */
-export function createAutomation(f: AutomationFields, id?: string): AutomationDefinition {
-  const want = (id?.trim() || f.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')).slice(0, 64);
+/** A free id for a new automation: given, or made from its name. */
+function newId(name: string, id?: string): string {
+  const want = (id?.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')).slice(0, 64);
   if (!AUTOMATION_ID.test(want)) throw refused('The id takes lowercase letters, digits and dashes.');
   if (loadAutomations().some((a) => a.id === want) || existsSync(personalFile(want))) throw refused(`An automation called ${want} exists already.`, 409);
+  return want;
+}
+
+/** A new automation from the editor's fields. The id is the file's name: given, or made from the name. */
+export function createAutomation(f: AutomationFields, id?: string): AutomationDefinition {
+  const want = newId(f.name, id);
   const text = `# Made in Omni's Automations page. Edits there rewrite this file; comments stay.\n${render(null, f)}`;
   check(want, text, f.channel);
   write(want, text);
@@ -272,6 +278,22 @@ function holdPrecheck(id: string, base: string, text: string, by: AutomationWrit
   const next = scheduledPrecheck(id, text);
   // The file as it runs now: with the config's channel override (automations.ts loadAutomations), which a write drops.
   if (!by.shell && next !== null && next !== scheduledPrecheck(id, base, userConfig().automations[id]?.channel)) throw refused(`Forbidden: ${SHELL_REFUSAL}`, 403);
+}
+
+/**
+ * A new automation from a whole YAML file, written as given (comments kept). `off` writes it turned off. A precheck in
+ * it is a shell command none ran before, so it needs a caller that may reach a shell (holdPrecheck), as a save does.
+ */
+export function createAutomationYaml(yaml: string, id?: string, off = false, by: AutomationWriteBy = {}): AutomationDefinition {
+  const doc = YAML.parseDocument(yaml);
+  if (doc.errors.length || !isMap(doc.contents)) throw refused('The file is not valid YAML.');
+  const want = newId(str(doc.get('name')), id);
+  if (off) setKey(doc, 'enabled', false);
+  const text = off ? doc.toString({ lineWidth: 0 }) : yaml;
+  check(want, text, undefined);
+  holdPrecheck(want, '', text, by);
+  write(want, text);
+  return definitionOf(want)!;
 }
 
 /**
