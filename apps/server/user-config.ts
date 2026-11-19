@@ -356,7 +356,9 @@ const PLACEHOLDER_VAR = /\bOMNI_PLACEHOLDER_([A-Z]+)\b/g;
  * reference to a variable that shellPlaceholderEnv() sets, the same text wherever it sits. The shell expands it as
  * data, in double quotes as one word, outside quotes split on spaces as a pasted value was. In single quotes it stays
  * a reference, so text handed to another shell (`sh -c '…'`, `ssh host '…'`) carries the name and that shell reads
- * the value from the environment, never as code. `${VAR}` only where a letter follows; `$VAR` also works in fish.
+ * the value from the environment, never as code. A double-quoted `sh -c "…"`, `eval` or `$(( ))` expands it first and
+ * then runs it, as a pasted value did: the precheck's author (the install token) has to avoid those, and the docs say so.
+ * `${VAR}` only where a letter follows; `$VAR` also works in fish.
  */
 export function fillShellPlaceholders(command: string) {
   return command.replace(PLACEHOLDER, (all, key: string, at: number) => {
