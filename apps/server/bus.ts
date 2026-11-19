@@ -22,6 +22,8 @@ export type FeedEvent =
   | { type: 'automations' }
   /** A crew role was saved, reset, deleted, hidden or shown, here or on another machine (crew-store.ts, sync). Clients refetch GET /api/crew. */
   | { type: 'crew' }
+  /** A memory fact (a channel's Recent learnings) was proposed, approved, edited or deleted, here or on another machine (memory.ts, sync). Clients refetch that channel's list. */
+  | { type: 'memory'; channel_id: string | null }
   /** Show technical details or the Shopify add-on changed, here or on another machine (display.ts). Clients refetch GET /api/display. */
   | { type: 'display' }
   /** The update check or Update moved on (update.ts). Clients refetch GET /api/update. */

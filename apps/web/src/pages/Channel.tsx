@@ -10,6 +10,7 @@ import { Avatar, Button, Empty, StatusDot, Icon, LinkButton, Loading, Tabs } fro
 import { href, usePresetSeq, type ChannelTab } from '../router.ts';
 import { useApp } from '../store.tsx';
 import { ChannelActionsEditor } from '../components/ChannelActionsEditor.tsx';
+import { ChannelLearnings } from '../components/ChannelLearnings.tsx';
 import { ChannelSettingsForm } from './ChannelSettings.tsx';
 import { Card } from './settings-parts.tsx';
 import { pageColumn } from '../components/ui/feedback.tsx';
@@ -168,6 +169,13 @@ export function ChannelPage({ id, tab, pr }: { id: string; tab: ChannelTab; pr?:
       {tab === 'settings' && (
         <div className={`${pageColumn('measure')} space-y-4 pt-6 pb-16`}>
           <ChannelSettingsForm existing={ch} />
+          <Card
+            entry="learnings"
+            title="Recent learnings"
+            subtitle="Lessons every thread in this channel gets, and no other channel's. Agents propose them; nothing applies until you approve it."
+          >
+            <ChannelLearnings channel={ch.id} />
+          </Card>
           <Card title="Actions">
             <ChannelActionsEditor channelId={ch.id} />
           </Card>

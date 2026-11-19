@@ -93,6 +93,40 @@ server.registerTool(
     text((await call('/templates')).templates.map((t: any) => ({ id: t.id, name: t.name, description: t.description, input: t.argumentHint ?? null, kind: t.kind, ...(t.skill && { skill: t.skill }) }))),
 );
 
+// A channel's Recent learnings (apps/server/memory-api.ts): lessons every later thread in that channel runs with.
+// The Conductor only lists and proposes; the user approves, edits and deletes in the channel's settings.
+server.registerTool(
+  'list_learnings',
+  {
+    description:
+      `List a channel's Recent learnings: lessons every thread in that channel gets in its prompt once ${USER} approved them, and proposals still waiting for ${USER}. ` +
+      'Read them before proposing one, so you do not repeat a lesson.',
+    inputSchema: { channel: z.string().max(100).describe('Channel id. Use list_channels.') },
+  },
+  async ({ channel }) => {
+    const r = await call(`/memory?channel=${encodeURIComponent(channel)}`);
+    return text({ waiting: r.waiting, learnings: r.learnings.map((m: any) => ({ id: m.id, text: m.text, status: m.status, from_thread: m.source_thread_id })) });
+  },
+);
+
+server.registerTool(
+  'propose_learning',
+  {
+    description:
+      `Propose a lesson for one channel's threads, for ${USER} to approve in that channel's settings: a correction ${USER} made, a preference for this client, a step a crew thread missed. ` +
+      'One short sentence that still makes sense in a new thread, about how to work in that channel, never about one task. It applies only in that channel, so a lesson about one client never reaches another. ' +
+      `Nothing changes until ${USER} approves it. Never put secrets, credentials or personal data in it.`,
+    inputSchema: {
+      channel: z.string().max(100).describe('The channel the lesson is for. Use list_channels.'),
+      text: z.string().min(1).max(500),
+    },
+  },
+  async ({ channel, text: lesson }) => {
+    const m = await call('/memory', { method: 'POST', body: JSON.stringify({ channel, text: lesson }) });
+    return text({ id: m.id, status: m.status, text: m.text });
+  },
+);
+
 // The crew roles the Conductor reads and writes (plan slice S7, docs/plans/2026-11-18-user-defined-crew.md). The API's
 // crew guard (apps/server/crew-guard.ts) decides every write: only a thread running as the Conductor, never under an
 // automation, only after Ben answered in it, and never a role's powers.
