@@ -15,6 +15,8 @@ import { useShowsCode, useTechnical } from '../../../display.ts';
 import { CrewGlance, GlanceCard, type BranchChanges } from './GlanceCard.tsx';
 import type { ThreadPRs } from './PRsTab.tsx';
 import { CAPTION, CARD_PAD, ROW_X, ROW_X_BLEED } from './inset.ts';
+import { connectorFor } from '@omni/shared/connectors.ts';
+import { ConnectorMark } from '../../ConnectorMark.tsx';
 
 export interface InitP {
   model?: string;
@@ -60,11 +62,15 @@ function McpList({ servers }: { servers: string[] }) {
               {p.label}
             </Chip>
           ))}
-          {good.map((p) => (
-            <Chip key={p.key} title={p.name}>
-              {p.label}
-            </Chip>
-          ))}
+          {good.map((p) => {
+            const app = connectorFor(p.name);
+            return (
+              <Chip key={p.key} title={p.name}>
+                {app && <ConnectorMark connector={app} size={14} className="mr-1 -ml-0.5" />}
+                {p.label}
+              </Chip>
+            );
+          })}
         </div>
       )}
     </div>

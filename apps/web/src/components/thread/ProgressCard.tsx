@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { readPref, writePref } from '../../store.tsx';
 import { IconButton, StatusDot } from '../ui.tsx';
 import { CARD_PAD, ROW_X } from './panel/inset.ts';
+import { NowWithConnector } from '../ConnectorMark.tsx';
 
 /** Where a closed card is remembered: thread id to the list it closed (ProgressPanel.key). */
 const PREF = 'progress.closed';
@@ -82,7 +83,11 @@ export function ProgressCard({ threadId, panel, className = '' }: { threadId: st
               )}
               <span className="min-w-0 flex-1 py-[var(--sp-3)] text-[12.5px] leading-[1.45]">
                 <span className={`block ${TEXT[tone]}`}>{s.title}</span>
-                {now && <span className="block truncate text-[11.5px] text-fg-3">{now}</span>}
+                {now && (
+                  <span className="block truncate text-[11.5px] text-fg-3">
+                    <NowWithConnector now={now} connector={s.connector} />
+                  </span>
+                )}
               </span>
             </li>
           );

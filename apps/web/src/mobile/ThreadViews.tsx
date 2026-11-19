@@ -31,6 +31,8 @@ import { mergeNote } from '@omni/shared/pr-merge.ts';
 import { checkTone, STEP_WORKING, stepPrompts, stepUnderway } from '@omni/shared/thread-glance.ts';
 import { useApp } from '../store.tsx';
 import { toolLabel, toolSummary, type Item, type ToolCall } from '@omni/shared/transcript-fold.ts';
+import { connectorAction, connectorOf } from '@omni/shared/connectors.ts';
+import { ConnectorMark } from '../components/ConnectorMark.tsx';
 import { CrewFileList } from './CrewFiles.tsx';
 import { CrewPRList } from './CrewPRs.tsx';
 import { MoAutoMerge } from './MoAutoMerge.tsx';
@@ -70,12 +72,15 @@ function Step({ c, depth, running, cwd, tails }: { c: ToolCall; depth: number; r
   const target = outputTarget(c, running);
   // A step Ben opened stays openable when its call settles, so the card does not fold away under his thumb.
   const tappable = open || target?.kind === 'saved' || (target?.kind === 'live' && tails);
+  // A connector call wears its app's tile and name, and says what it does in words.
+  const app = connectorOf(c.name);
   const head = (
     <>
       <span className="flex items-center gap-2.5">
         <StatusDot status={state} size={8} />
-        <span className="shrink-0 text-[13px] font-medium">{toolLabel(c.name)}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-[1.3] text-fg-2">{toolSummary(c, cwd)}</span>
+        {app && <ConnectorMark connector={app} size={18} />}
+        <span className="shrink-0 text-[13px] font-medium">{app ? app.name : toolLabel(c.name)}</span>
+        <span className={`min-w-0 flex-1 truncate text-[12.5px] leading-[1.3] text-fg-2 ${app ? '' : 'font-mono'}`}>{app ? [connectorAction(c.name), toolSummary(c, cwd)].filter(Boolean).join(' · ') : toolSummary(c, cwd)}</span>
         {tappable && <Icon name="chevronRight" size={14} className={`shrink-0 text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />}
       </span>
       {out && !open && <span className={`ml-[18px] block ${OUTPUT_BOX} ${state === 'failed' ? 'text-fg' : 'text-fg-3'}`}>{out}</span>}

@@ -31,7 +31,8 @@ import { atStart, historyEdges, type Clipped } from '@omni/shared/history.ts';
 import { clock, toDate } from '@omni/shared/format.ts';
 import type { ThreadHistory } from '../pages/useThreadHistory.ts';
 
-import { AgentRow, flatten, TaskCtx } from './thread/ToolRows.tsx';
+import { AgentRow, ConnectorRow, flatten, TaskCtx } from './thread/ToolRows.tsx';
+import { connectorGroups } from '@omni/shared/connectors.ts';
 import { StepsCard } from './thread/StepsCard.tsx';
 import { Attachments } from './thread/Attachments.tsx';
 import { QueuedMessages, SendingMessages } from './thread/PendingMessages.tsx';
@@ -358,7 +359,16 @@ const ItemRow = memo(
           const subagents = agents.length ? (
             <DelegationCard key={`a${it.key}`} agents={agents.map((c) => <AgentRow key={c.id} c={c} cwd={cwd} running={running} />)} />
           ) : null;
-          const out = [subagents, ...cards].filter(Boolean);
+          // Outside connectors stay in sight in the transcript, as Claude's apps show them: one row per app per group.
+          const apps = connectorGroups(it.calls);
+          const connectors = apps.length ? (
+            <div key={`k${it.key}`} className="space-y-0.5">
+              {apps.map((g) => (
+                <ConnectorRow key={g.connector.id} g={g} cwd={cwd} running={running} />
+              ))}
+            </div>
+          ) : null;
+          const out = [connectors, subagents, ...cards].filter(Boolean);
           return steps ? [<StepsCard key="steps" v={steps} cwd={cwd} byId={byId} />, ...out] : out;
         }
         case 'result':

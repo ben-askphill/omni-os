@@ -17,7 +17,7 @@ import { atStart } from '@omni/shared/history.ts';
 import { href } from '../router.ts';
 import { isRenderPath } from '@omni/shared/html-render.ts';
 import { HtmlRender } from '../components/HtmlRender.tsx';
-import { ArtifactCard, ChangesCard, Clamped, Delegation, MoProse, MoSteps, NowLine, Outcome, Report, type TurnView } from './ThreadCards.tsx';
+import { ArtifactCard, ChangesCard, Clamped, Delegation, MoConnectors, MoProse, MoSteps, NowLine, Outcome, Report, type TurnView } from './ThreadCards.tsx';
 import { MoBubble } from './parts.tsx';
 import { showsSteps } from '@omni/shared/steps.ts';
 import { shortTime } from './rows.ts';
@@ -74,6 +74,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
           ) : (
             <ThinkingLine label={c.status ?? (c.turn === 'starting' ? PHASE.starting.label : 'Thinking')} phase={c.turn ?? 'working'} since={t.at || thread.created_at} className="rounded-2xl bg-surface px-3.5 py-3 text-[14px]" />
           )}
+          <MoConnectors t={t} onOpen={() => steps(t)} />
           {showsSteps(t.progress) && <MoSteps v={t.progress} failed={t.failed} onActions={() => steps(t)} />}
           {t.cloud && <CloudAgentCard p={t.cloud} />}
           {delegated}
@@ -103,6 +104,7 @@ function TurnBody({ t, last, c }: { t: TurnView; last: boolean; c: TurnCtx }) {
         {t.artifacts.filter((a) => isRenderPath(a.path)).map((a) => (
           <HtmlRender key={a.id} a={a} title={a.name} onOpen={() => viewer(a)} />
         ))}
+        <MoConnectors t={t} onOpen={() => steps(t)} />
         {t.prose && <MoProse text={t.prose} />}
         {t.prose && t.proseClipped && <ClippedNote event={t.proseClipped.key} clipped={t.proseClipped.clipped} />}
         {delegated}

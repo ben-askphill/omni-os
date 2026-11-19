@@ -453,3 +453,22 @@ button.om-tid{background:none;border:0;padding:0;cursor:pointer}
 /* ---------- Narrow containers ---------- */
 .om-thread{container-type:inline-size;container-name:om-thread}
 @container om-thread (max-width:560px){.om-bubble{max-width:92%}.om-branch{grid-template-columns:28px minmax(0,1fr)}.om-branch__side{grid-column:2;grid-row:2;padding-top:0}.om-tool__args{display:none}.om-report__end{margin-left:0;width:100%}}
+
+/* ---------- Connectors (apps/web/src/components/ConnectorMark.tsx, ToolRows.tsx ConnectorRow, ThreadQuickCard Connectors) ---------- */
+.om-connector{display:inline-grid;flex:none;place-items:center;width:var(--om-connector-size,20px);height:var(--om-connector-size,20px);border-radius:var(--r-xs);background:var(--surface);box-shadow:inset 0 0 0 1px var(--line-strong);color:var(--fg)}
+.om-connector svg{display:block;width:62%;height:62%}
+.om-connector__letter{font:600 calc(var(--om-connector-size,20px) * .59)/1 var(--font-sans);color:var(--fg)}
+.om-connector__plug{color:var(--fg-2)}
+.om-connector-row{display:inline-flex;align-items:center;gap:10px;max-width:100%;min-width:0;height:36px;padding:0 12px 0 4px;margin-left:-4px;border-radius:999px;font:400 13px/1 var(--font-sans);color:var(--fg-3);background:none;border:0;cursor:pointer}
+.om-connector-row:hover{background:var(--surface-2)}
+.om-connector-row__label{flex:none;font-weight:500;color:var(--fg-2)}
+.om-connector-row__detail{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.om-connector-row__chev{flex:none;width:12px;height:12px;color:var(--fg-3);transition:transform .3s var(--ease-settle)}
+.om-connector-row[aria-expanded="true"] .om-connector-row__chev{transform:rotate(90deg)}
+.om-connector-row__body{margin:4px 0 8px 34px}
+.om-connector-now{display:inline-flex;align-items:center;gap:5px;max-width:100%;min-width:0;vertical-align:top;color:var(--fg-3)}
+.om-connector-now > :last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.om-connectors__cap{padding:8px 12px 4px;font:400 11px/1.2 var(--font-sans);color:var(--fg-3)}
+.om-connectors__row{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:var(--r-sm);font:400 12.5px/1 var(--font-sans);color:var(--fg)}
+.om-connectors__name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.om-connectors__kind{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--fg-3)}

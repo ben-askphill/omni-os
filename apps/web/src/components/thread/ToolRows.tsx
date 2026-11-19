@@ -9,6 +9,8 @@ import { str, toolLabel, toolSummary, type TaskView, type Todo, type ToolCall } 
 import { agentStatus, TASK_END } from '../../transcript/delegation.ts';
 import { exitCodeOf, outputMeta } from '@omni/shared/tool-output.ts';
 import { toDate } from '@omni/shared/format.ts';
+import { connectorAction, connectorOf, type ConnectorGroup } from '@omni/shared/connectors.ts';
+import { ConnectorMark } from '../ConnectorMark.tsx';
 
 export const TaskCtx = createContext<Map<string, TaskView>>(new Map());
 
@@ -142,8 +144,10 @@ export function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: str
   const stopped = interruptedTool(c);
   const err = c.result?.is_error && !stopped;
   const exit = c.result && (c.result.output?.exit_code ?? exitCodeOf(c.result.text));
-  const summary = toolSummary(c, cwd);
-  const mono = ['Bash', 'Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep'].includes(c.name);
+  // A connector call wears its app's mark and name, and says what it does in words ("Search meetings").
+  const app = connectorOf(c.name);
+  const summary = app ? [connectorAction(c.name), toolSummary(c, cwd)].filter(Boolean).join(' · ') : toolSummary(c, cwd);
+  const mono = !app && ['Bash', 'Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep'].includes(c.name);
   const indent = depth > 0 || c.orphan;
   return (
     <div className={indent ? 'ml-3.5 border-l border-line pl-2.5' : ''}>
@@ -154,8 +158,8 @@ export function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: str
         className="hov group flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-2.5 text-left text-[12.5px]"
       >
         <Icon name="chevronRight" size={12} className={`text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
-        <Icon name={toolIcon(c.name)} size={13} className="text-fg-3" />
-        <span className={`shrink-0 font-medium text-fg-2`}>{toolLabel(c.name)}</span>
+        {app ? <ConnectorMark connector={app} size={16} /> : <Icon name={toolIcon(c.name)} size={13} className="text-fg-3" />}
+        <span className={`shrink-0 font-medium text-fg-2`}>{app ? app.name : toolLabel(c.name)}</span>
         <span className={`min-w-0 flex-1 truncate text-fg-3 ${mono ? 'font-mono text-[11.5px]' : ''}`}>{summary}</span>
         {c.children.length > 0 && !task?.running && <span className="shrink-0 font-num text-[11px] text-fg-3">{c.children.length} sub-calls</span>}
         {task ? (
@@ -182,6 +186,60 @@ export function ToolRow({ c, cwd, running, depth = 0 }: { c: ToolCall; cwd?: str
           {(open ? c.children : c.children.slice(-3)).map((ch) => (
             <ToolRow key={ch.id} c={ch} cwd={cwd} running={running} depth={depth + 1} />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One outside connector's calls in a tool group, inline in the transcript the way Claude's apps show them: the app's
+ * tile, "Working on it" while a call runs and "Used Granola" after, and the chevron opening the calls themselves. One
+ * call opens straight to what it sent and got back; more open as their own rows.
+ */
+export function ConnectorRow({ g, cwd, running }: { g: ConnectorGroup; cwd?: string | null; running: boolean }) {
+  const [open, setOpen] = useState(false);
+  const { connector, calls } = g;
+  const busy = running && calls.some((c) => !c.result);
+  const failed = calls.filter((c) => c.result?.is_error && !interruptedTool(c)).length;
+  const last = calls[calls.length - 1];
+  const detail = calls.length > 1 ? plural(calls.length, 'call') : connectorAction(last.name);
+  const only = calls.length === 1 ? last : null;
+  return (
+    <div data-connector-row={connector.id}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="hov group -ml-1 flex h-9 max-w-full min-w-0 items-center gap-2.5 rounded-full pr-3 pl-1 text-left text-[13px]"
+      >
+        <ConnectorMark connector={connector} size={24} />
+        <span className="shrink-0 font-medium text-fg-2">{busy ? 'Working on it' : `Used ${connector.name}`}</span>
+        <span className="min-w-0 truncate text-fg-3">{detail}</span>
+        <Icon name="chevronRight" size={12} className={`shrink-0 text-fg-3 transition-transform duration-300 [transition-timing-function:var(--ease-settle)] ${open ? 'rotate-90' : ''}`} />
+        {busy ? (
+          <Loader size={11} className="shrink-0 text-fg-3" />
+        ) : failed > 0 ? (
+          <span className="inline-flex shrink-0 items-center gap-1 font-num text-[11px] text-fg">
+            <StatusDot status="needs" size={7} /> {calls.length > 1 ? `${failed} failed` : 'error'}
+          </span>
+        ) : null}
+      </button>
+      {open && (
+        <div className="fade-in mt-1 mb-2 ml-[34px] space-y-1.5">
+          {only ? (
+            <>
+              <ToolInput c={only} />
+              <ClippedNote event={only.event} clipped={only.clipped} />
+              <ToolOutput call={only} running={running} box={outputBox(only.result?.is_error && !interruptedTool(only))} />
+            </>
+          ) : (
+            <div className="rounded-[16px] bg-surface p-1">
+              {calls.map((c) => (
+                <ToolRow key={c.id} c={c} cwd={cwd} running={running} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

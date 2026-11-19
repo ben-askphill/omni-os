@@ -61,6 +61,7 @@
 //   STEPS:<ms>        before the answer, post a three-step plan with Omni's set_steps as the real CLI calls an MCP tool:
 //                     start the omni-steps server from --mcp-config, then run one call per step, each taking <ms>, and
 //                     move the marker on as each step starts and once all are done. Interruptible like TOOL
+//   CONNECTORS        with STEPS: the steps call claude.ai connectors (Granola, Google Calendar, an unknown CRM) instead
 // Env:
 //   FAKE_CLAUDE_CRASH_ON=<text>   exit 1 with a stderr message when a message containing <text> starts
 //   FAKE_CLAUDE_LOG=<file>        append one JSON line per invocation (pid, args, mode, session, thread, api auth vars seen,
@@ -527,11 +528,21 @@ const STEP_CALLS = [
   ['Read', { file_path: 'prices.csv' }],
 ];
 
+/** STEPS with CONNECTORS: each step calls a claude.ai connector, the last one a server Omni has no brand for. */
+const CONNECTOR_PLAN = ['Read the meeting notes', 'Check the calendar', 'Update the CRM'];
+const CONNECTOR_CALLS = [
+  ['mcp__claude_ai_Granola__search_meetings', { query: 'kickoff' }],
+  ['mcp__claude_ai_Google_Calendar__list_events', { timeMin: '2026-11-19' }],
+  ['mcp__acme_crm__update_contact', { name: 'Volero' }],
+];
+
 /**
  * STEPS: set_steps through the omni-steps server Omni configured, like html_render above, with one call per step
  * between the moves. Resolves to the calls made, set_steps included; stops early once interrupted.
  */
-async function postSteps(t, ms) {
+async function postSteps(t, ms, connectors = false) {
+  const STEP_PLAN_USED = connectors ? CONNECTOR_PLAN : STEP_PLAN;
+  const STEP_CALLS_USED = connectors ? CONNECTOR_CALLS : STEP_CALLS;
   const server = mcpEntry('omni-steps');
   let client = null;
   let made = 0;
@@ -542,17 +553,17 @@ async function postSteps(t, ms) {
       client = new Client({ name: 'claude-code', version: VERSION });
       await client.connect(new StdioClientTransport({ command: server.command, args: server.args ?? [], env: { ...process.env, ...server.env }, stderr: 'ignore' }));
     }
-    for (let k = 0; k <= STEP_PLAN.length; k++) {
+    for (let k = 0; k <= STEP_PLAN_USED.length; k++) {
       const id = `toolu_fake_${++seq}`;
-      const input = { steps: STEP_PLAN, current: k };
+      const input = { steps: STEP_PLAN_USED, current: k };
       assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id, name: 'mcp__omni-steps__set_steps', input }]);
       made++;
       if (client) {
         const res = await client.callTool({ name: 'set_steps', arguments: input });
         toolResult(id, res.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n'), !!res.isError);
       } else toolResult(id, 'No such tool available: mcp__omni-steps__set_steps', true);
-      if (k === STEP_PLAN.length) break;
-      const [name, args] = STEP_CALLS[k];
+      if (k === STEP_PLAN_USED.length) break;
+      const [name, args] = STEP_CALLS_USED[k];
       const call = `toolu_fake_${++seq}`;
       assistant(`msg_fake_${seq}`, [{ type: 'tool_use', id: call, name, input: args }]);
       made++;
@@ -612,6 +623,7 @@ async function runTurn() {
   /** WRITE and CMD: tool calls that change something, each asked for first under --permission-prompt-tool. */
   const actions = [];
   let stepMs = null;
+  let stepConnectors = false;
   let steps = 0;
 
   emit({
@@ -656,6 +668,7 @@ async function runTurn() {
       for (const x of m.text.matchAll(/NEEDS_TASK:(\S+)/g)) needsTask = x[1].replace(/-/g, ' ');
       const plan = m.text.match(/STEPS:(\d+)/);
       if (plan) stepMs = Number(plan[1]);
+      if (/\bCONNECTORS\b/.test(m.text)) stepConnectors = true;
     }
     return true;
   };
@@ -747,7 +760,7 @@ async function runTurn() {
     await renderPage(title);
   }
   if (stepMs !== null) {
-    steps += await postSteps(t, stepMs);
+    steps += await postSteps(t, stepMs, stepConnectors);
     stepMs = null;
     if (dead) return;
   }
