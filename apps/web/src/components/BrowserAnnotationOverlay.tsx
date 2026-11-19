@@ -28,6 +28,7 @@ import type { Browser } from './LiveBrowser.tsx';
 import { dragRect, elementName, initialLiveAnnotate, liveAnnotateReducer, resolveSelection, styleRows, type Selection } from './browser-live-annotate.ts';
 import { Button, ErrorNote, Icon, IconButton, Kbd } from './ui.tsx';
 import { isImeEnter } from '../ime.ts';
+import { useDismissLayer } from './ui/dismiss-stack.ts';
 
 /** A press that moves less than this many screen pixels is a click. */
 const DRAG_START = 3;
@@ -447,20 +448,16 @@ export function LiveAnnotateCard({ live, threadId, onDraw, onDone, onSent, phone
     if (ready && !phone) noteRef.current?.focus();
   }, [ready, phone]);
 
-  // Escape clears the pick, then turns Annotate off. It never reaches the page while Annotate is on.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      // The address bar's Escape is its own.
-      if (e.key !== 'Escape' || t?.tagName === 'INPUT') return;
-      e.preventDefault();
-      e.stopPropagation();
+  // Escape clears the pick, then turns Annotate off, while this is the top layer (dismiss-stack.ts). The address bar's
+  // Escape is its own. A press outside leaves it on.
+  useDismissLayer(true, {
+    roots: () => [],
+    escape: (e) => {
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return false;
       if (live.state.selection) live.clear();
       else onDone();
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [live, onDone]);
+    },
+  });
 
   const send = async () => {
     if (await live.send(note)) onSent?.();

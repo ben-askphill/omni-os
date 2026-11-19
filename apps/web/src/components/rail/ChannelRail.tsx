@@ -11,7 +11,9 @@ import { monogram } from '@omni/shared/monogram.ts';
 import { needsByChannel, railBadge, railGroups, type RailBadge, type RailSelection } from '../../rail-model.ts';
 import { StaticMark } from '../brand.tsx';
 import { ChannelMark, Icon, Monograms, StatusDot, type IconName } from '../ui.tsx';
-import { focusFirstItem, MenuGroups, moveFocus, useMenuDismiss, useMenuPlacement, type MenuItem } from '../ContextMenuParts.tsx';
+import { focusFirstItem, isMenuMoveKey, MenuGroups, moveFocus, useMenuDismiss, useMenuPlacement, useMenuPopover, type MenuItem } from '../ContextMenuParts.tsx';
+import { supportsPopover } from '../ui/use-anchored-popover.ts';
+import { useExit } from '../ui/use-exit.ts';
 import { MENU_SURFACE } from '../ui/overlay.tsx';
 import { useScrollFade } from './useScrollFade.ts';
 import { usePRsShown } from '../../display.ts';
@@ -113,7 +115,11 @@ function MoreMenu({ selection }: { selection: RailSelection }) {
   const { channels } = useApp();
   const pages = useMorePages(channels);
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  const [last, setLast] = useState(at);
+  if (at && at !== last) setLast(at);
   const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const exit = useExit(!!at, menu);
   const current = pages.find((p) => p.kind === selection.kind);
   const open = () => {
     const r = button.current?.getBoundingClientRect();
@@ -144,7 +150,7 @@ function MoreMenu({ selection }: { selection: RailSelection }) {
       >
         <Disc selected={!!current} icon="more" quiet />
       </button>
-      {at && createPortal(<MorePopup pages={pages} at={at} anchor={button} onClose={close} />, document.body)}
+      {exit.shown && last && <MorePopupHost popup={<MorePopup el={menu} pages={pages} at={last} anchor={button} onClose={close} closing={!at} />} />}
     </>
   );
 }
@@ -155,29 +161,40 @@ function useMorePages(channels: readonly { repo_path?: string | null }[]) {
   return prs ? MORE_PAGES : MORE_PAGES.filter((p) => p.kind !== 'prs');
 }
 
+/** In the top layer as a popover, so the rail's scroll box never clips it. Without popovers, at the end of the page. */
+function MorePopupHost({ popup }: { popup: ReactNode }) {
+  const [popover] = useState(supportsPopover);
+  return popover ? popup : createPortal(popup, document.body);
+}
+
 function MorePopup({
+  el: ref,
   pages,
   at,
   anchor,
   onClose,
+  closing,
 }: {
+  el: RefObject<HTMLDivElement | null>;
   pages: readonly (typeof MORE_PAGES)[number][];
   at: { x: number; y: number };
   anchor: RefObject<HTMLButtonElement | null>;
   onClose: (refocus: boolean) => void;
+  closing: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
   const pos = useMenuPlacement(ref, at.x, at.y);
-  const dismiss = useCallback(() => onClose(ref.current?.contains(document.activeElement) ?? false), [onClose]);
-  useMenuDismiss(ref, dismiss, anchor);
-  useEffect(() => focusFirstItem(ref), []);
+  const top = useMenuPopover(ref);
+  // Escape, and a press or Tab that leaves the focus in the menu, put it back on the disc.
+  const dismiss = useCallback((refocus: boolean) => onClose(refocus || (ref.current?.contains(document.activeElement) ?? false)), [onClose, ref]);
+  useMenuDismiss(ref, dismiss, anchor, !closing);
+  useEffect(() => focusFirstItem(ref), [ref]);
   const items: MenuItem[] = pages.map((p) => ({
     label: p.label,
     icon: p.icon,
     run: () => (onClose(false), navigate(p.to)),
   }));
   const onKey = (e: ReactKeyboardEvent) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (isMenuMoveKey(e.key)) {
       e.preventDefault();
       moveFocus(ref, e.key);
     } else if (e.key === 'Tab') {
@@ -186,7 +203,16 @@ function MorePopup({
     }
   };
   return (
-    <div ref={ref} role="menu" aria-label="More" style={{ left: pos.x, top: pos.y }} onKeyDown={onKey} className={`pop-in fixed z-[60] min-w-[200px] p-1.5 ${MENU_SURFACE}`}>
+    <div
+      ref={ref}
+      {...top}
+      role="menu"
+      aria-label="More"
+      data-closing={closing || undefined}
+      style={{ left: pos.x, top: pos.y }}
+      onKeyDown={onKey}
+      className={`menu-pop pop-in fixed z-[60] min-w-[200px] p-1.5 ${MENU_SURFACE}`}
+    >
       <MenuGroups groups={[{ items }]} />
     </div>
   );

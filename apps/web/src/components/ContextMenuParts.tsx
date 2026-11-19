@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { api, type Thread, type ThreadDetail } from '../api.ts';
 import { draftKey, type useFolders } from '../folders.tsx';
 import { folderStep } from '../folder-edits.ts';
 import { navigate, href, openNewThread } from '../router.ts';
 import { Icon, type IconName } from './ui.tsx';
 import { overlayRow, RowKeys } from './ui/overlay.tsx';
+import { useDismissLayer } from './ui/dismiss-stack.ts';
+import { supportsPopover } from './ui/use-anchored-popover.ts';
 
 /** A thread's row and the state that decides its menu, asked for once the menu opens so "Unarchive" reads right. */
 export function useThreadRow(kind: string, id: string) {
@@ -53,43 +55,85 @@ export function useMenuPlacement(ref: RefObject<HTMLDivElement | null>, x: numbe
 }
 
 /**
- * Close on a press or right-click outside, Escape, and anything that moves the page under the menu. `anchor`: the
- * button that opened it, whose own click toggles it, so a press there is not "outside".
+ * Close on a press or right-click outside, Escape, the focus leaving it, and anything that moves the page under the
+ * menu, while it is the top layer (dismiss-stack.ts). `refocus` is true for Escape only. `anchor`: the button that opened it, whose own click toggles it,
+ * so a press there is not "outside".
  */
-export function useMenuDismiss(ref: RefObject<HTMLDivElement | null>, onClose: () => void, anchor?: RefObject<HTMLElement | null>) {
+export function useMenuDismiss(ref: RefObject<HTMLDivElement | null>, onClose: (refocus: boolean) => void, anchor?: RefObject<HTMLElement | null>, active = true) {
+  const close = useRef(onClose);
+  close.current = onClose;
+  // Escape hands the focus back to the opener; a press, a Tab or a page change leaves it where it went.
+  useDismissLayer(active, {
+    roots: () => [ref.current, anchor?.current],
+    escape: () => close.current(true),
+    outside: () => close.current(false),
+    focusOut: () => close.current(false),
+  });
   useEffect(() => {
-    const away = (e: Event) => !ref.current?.contains(e.target as Node) && !anchor?.current?.contains(e.target as Node) && onClose();
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('pointerdown', away, true);
-    document.addEventListener('contextmenu', away, true);
-    document.addEventListener('keydown', key);
-    window.addEventListener('blur', onClose);
-    window.addEventListener('resize', onClose);
-    window.addEventListener('hashchange', onClose);
+    if (!active) return;
+    const away = () => close.current(false);
+    window.addEventListener('blur', away);
+    window.addEventListener('resize', away);
+    window.addEventListener('hashchange', away);
     return () => {
-      document.removeEventListener('pointerdown', away, true);
-      document.removeEventListener('contextmenu', away, true);
-      document.removeEventListener('keydown', key);
-      window.removeEventListener('blur', onClose);
-      window.removeEventListener('resize', onClose);
-      window.removeEventListener('hashchange', onClose);
+      window.removeEventListener('blur', away);
+      window.removeEventListener('resize', away);
+      window.removeEventListener('hashchange', away);
     };
-  }, [ref, onClose, anchor]);
+  }, [active]);
 }
 
-const ITEMS = '[role="menuitem"], [role="menuitemradio"]';
+/**
+ * Show a menu in the top layer as a manual popover, so no modal, transform or overflow clips it and no z-index has to
+ * win. The dismiss stack closes it, not the browser. Spread the result on the menu, with `.menu-pop`. Without
+ * popovers it stays a fixed box over the page.
+ */
+export function useMenuPopover(ref: RefObject<HTMLElement | null>) {
+  const [popover] = useState(supportsPopover);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!popover || !el) return;
+    try {
+      el.showPopover();
+    } catch {
+      // Already showing.
+    }
+  }, [popover, ref]);
+  return { popover: popover ? ('manual' as const) : undefined };
+}
+
+/** The element that had the focus as a menu opened, to hand it back when the menu closes from inside. */
+export function useOpener() {
+  const opener = useRef<Element | null>(null);
+  opener.current ??= document.activeElement;
+  return opener;
+}
+
+/** Put the focus back on `opener` if it is still on the page and the focus is in `menu` or nowhere. */
+export function refocus(opener: Element | null, menu: HTMLElement | null) {
+  const at = document.activeElement;
+  if (!(opener instanceof HTMLElement) || !opener.isConnected || opener === document.body) return;
+  if (at && at !== document.body && !menu?.contains(at)) return;
+  opener.focus();
+}
+
+const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
 
 /** Focus the first item whenever the menu swaps what it shows. */
-export function focusFirstItem(ref: RefObject<HTMLDivElement | null>) {
+export function focusFirstItem(ref: RefObject<HTMLElement | null>) {
   ref.current?.querySelector<HTMLElement>(ITEMS)?.focus();
 }
 
-/** Arrow keys walk the items, wrapping at the ends. */
-export function moveFocus(ref: RefObject<HTMLDivElement | null>, key: 'ArrowDown' | 'ArrowUp') {
+/** Arrow keys walk the items, wrapping at the ends; Home and End go to the first and last. */
+export function moveFocus(ref: RefObject<HTMLElement | null>, key: 'ArrowDown' | 'ArrowUp' | 'Home' | 'End') {
   const items = [...(ref.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [])];
   const i = items.indexOf(document.activeElement as HTMLElement);
-  items[(i + (key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
+  const to = key === 'Home' ? 0 : key === 'End' ? items.length - 1 : (i + (key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+  items[to]?.focus();
 }
+
+/** The menu keys a handler takes: the arrows, Home and End. */
+export const isMenuMoveKey = (key: string): key is 'ArrowDown' | 'ArrowUp' | 'Home' | 'End' => key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
 
 const CAPTION = 'caption truncate px-2.5 pt-1.5 pb-1 text-fg-3';
 

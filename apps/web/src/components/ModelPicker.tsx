@@ -8,6 +8,7 @@ import { HarnessLogo } from './brand.tsx';
 import { ModelList, listedChoices } from './model-picker/ModelList.tsx';
 import { useAnchoredPopover } from './ui/use-anchored-popover.ts';
 import { useListbox } from './ui/use-listbox.ts';
+import { useExit } from './ui/use-exit.ts';
 import { asksAuto } from '@omni/shared/thread-run.ts';
 import { pickerModels } from '@omni/shared/model-visibility.ts';
 
@@ -95,6 +96,7 @@ export function ModelPicker({
   const showAuto = offerAuto && 'auto'.includes(q.trim().toLowerCase());
   const choices = listedChoices(groups, showAuto);
   const list = useListbox(choices.length, open);
+  const exit = useExit(open, card);
   const pop = useAnchoredPopover({ open, onDismiss: () => setOpen(false), wrap, trigger: btn, panel: card, initialFocus: () => search.current });
 
   // On the picked model as the list opens. The search is empty by then, so the choices are the whole list.
@@ -181,10 +183,11 @@ export function ModelPicker({
         )}
         <Icon name="chevronDown" size={13} className="text-fg-3" />
       </button>
-      {open && (
+      {exit.shown && (
         <div
           ref={card}
           {...pop.panelProps}
+          data-closing={exit.closing || undefined}
           className={`pik-card w-[min(340px,calc(100vw-32px))] ${pop.inlineClass}`}
           data-keys={list.keyed || undefined}
           // Escape from anywhere in the list, the effort levels too; the search field's own keys run first.

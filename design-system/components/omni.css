@@ -155,6 +155,10 @@ button.om-tid{background:none;border:0;padding:0;cursor:pointer}
 .om-pik-card{position:absolute;z-index:30;width:min(300px,calc(100vw - 32px));padding:6px;border-radius:var(--r-2xl);background:var(--elev);box-shadow:var(--shadow-menu);animation:om-pik .34s var(--ease-settle)}
 .om-pik-card[data-up]{bottom:calc(100% + 8px);transform-origin:0 100%}
 .om-pik-card:not([data-up]){top:calc(100% + 8px)}
+/* Exits (apps/web ui/use-exit.ts): a list, a menu or a modal on its way out plays one short exit, then goes. None with Reduce motion on. Closing, it takes no presses. */
+[data-closing]{pointer-events:none}
+@media (prefers-reduced-motion:no-preference){.om-pik-card[data-closing],.om-stack__menu[data-closing]{animation:om-exit-pop .14s var(--ease-out) forwards}}
+@keyframes om-exit-pop{to{opacity:0;transform:translateY(-2px) scale(.97)}}
 .om-pik-row{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;padding:6px 8px;border:0;border-radius:16px;background:transparent;text-align:left;cursor:pointer;transition:background-color .14s}
 .om-pik-row[data-cursor="true"]{background:var(--wash)}
 .om-pik-row .t{display:flex;flex-direction:column;min-width:0;flex:1}

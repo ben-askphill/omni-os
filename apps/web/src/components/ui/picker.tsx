@@ -3,6 +3,7 @@ import { Icon, type IconName } from './icons.tsx';
 import { Avatar } from './primitives.tsx';
 import { useAnchoredPopover } from './use-anchored-popover.ts';
 import { useListbox } from './use-listbox.ts';
+import { useExit } from './use-exit.ts';
 
 // ---------- picker (Bencho "pik") ----------
 
@@ -72,6 +73,7 @@ export function Picker<T extends string>({
   }, [options, q]);
   const canSearch = searchable ?? options.length > 7;
   const list = useListbox(shown.length, open);
+  const exit = useExit(open, card);
   const pop = useAnchoredPopover({
     open,
     onDismiss: () => setOpen(false),
@@ -140,10 +142,11 @@ export function Picker<T extends string>({
         <span className={`min-w-0 truncate ${size === 'field' ? 'flex-1' : ''}`}>{current?.label ?? 'Choose'}</span>
         <Icon name="chevronDown" size={13} className="pik-chev text-fg-3" />
       </button>
-      {open && (
+      {exit.shown && (
         <div
           ref={card}
           {...pop.panelProps}
+          data-closing={exit.closing || undefined}
           className={`pik-card w-[min(300px,calc(100vw-32px))] ${pop.inlineClass}`}
           data-keys={list.keyed || undefined}
           onKeyDown={(e) =>

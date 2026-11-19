@@ -6,7 +6,7 @@ import { api, type Thread } from '../api.ts';
 import { href, useRoute } from '../router.ts';
 import { useFeed } from '../store.tsx';
 import { Icon, IconButton, StatusDot, glyphFor, threadGlyph, type IconName } from './ui.tsx';
-import { subscribeModals, topModal } from './ui/use-modal-dialog.ts';
+import { subscribeLayers, topDialog } from './ui/dismiss-stack.ts';
 
 export interface ToastInput {
   title: ReactNode;
@@ -108,7 +108,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // A manual popover in the top layer, so the toasts stay over a modal's backdrop. The page behind a modal is inert
   // however high it sits, so while one is open the toasts render inside the top modal: still in the top layer, and
   // still clickable. A change of modal moves them, which remounts them in their new place.
-  const modal = useSyncExternalStore(subscribeModals, topModal, () => null);
+  const modal = useSyncExternalStore(subscribeLayers, topDialog, () => null);
   useLayoutEffect(() => {
     const el = region.current;
     if (el && !el.matches(':popover-open')) el.showPopover();

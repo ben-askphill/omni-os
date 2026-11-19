@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useDismissLayer } from './dismiss-stack.ts';
 
 /** The Popover API, its methods too: some engines reflect the attribute alone. Read as a panel opens, so a test can stub it. */
-function supportsPopover(): boolean {
+export function supportsPopover(): boolean {
   return typeof HTMLElement !== 'undefined' && Object.hasOwn(HTMLElement.prototype, 'popover') && typeof HTMLElement.prototype.showPopover === 'function';
 }
 
@@ -27,11 +28,12 @@ type Mode = 'anchored' | 'placed' | 'inline';
  *   - Without it (iOS Safari 18) script places it from the trigger's box and follows the trigger as the page scrolls.
  * - Without popovers it stays where it always was: absolute under the trigger, or above when there is no room below.
  *
- * A press outside closes it. Popover light dismiss covers a mouse. A tap is also caught by hand, as before: iOS Safari
- * before 18.3 does not light dismiss a popover on a tap. Without popovers every press is caught by hand.
+ * It is a layer on the dismiss stack (dismiss-stack.ts): Escape and a press outside close it while it is the top layer,
+ * and a press that closes it is not also a press on a modal's backdrop. The stack catches a tap too: iOS Safari before
+ * 18.3 does not light dismiss a popover on a tap. Escape with the focus in the panel puts it back on the trigger.
  *
- * `onDismiss` runs for a press outside or the browser closing the popover (Escape it saw first). The panel must render
- * only while `open`.
+ * `onDismiss` runs for Escape, a press outside, or the browser closing the popover (light dismiss, another popover
+ * opening). The panel must render only while `open`, or while its exit plays (`useExit`).
  */
 export function useAnchoredPopover({
   open,
@@ -130,25 +132,15 @@ export function useAnchoredPopover({
     return () => el.removeEventListener('toggle', onToggle);
   }, [open, mode, panel]);
 
-  useEffect(() => {
-    if (!open) return;
-    let mouse = false;
-    const onPointer = (e: PointerEvent) => {
-      mouse = e.pointerType === 'mouse';
-    };
-    // `mousedown`, as before: iOS sends it for a tap but not for a scroll.
-    const onDown = (e: MouseEvent) => {
-      if (mode !== 'inline' && mouse) return;
-      if (wrap.current?.contains(e.target as Node)) return;
+  useDismissLayer(open, {
+    roots: () => [wrap.current, panel.current],
+    escape: () => {
+      const refocus = !!panel.current?.contains(document.activeElement);
       dismiss.current();
-    };
-    document.addEventListener('pointerdown', onPointer, true);
-    document.addEventListener('mousedown', onDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      document.removeEventListener('mousedown', onDown);
-    };
-  }, [open, mode, wrap]);
+      if (refocus) trigger.current?.focus();
+    },
+    outside: () => dismiss.current(),
+  });
 
   const popover = mode !== 'inline';
   return {

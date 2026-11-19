@@ -1,81 +1,26 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { ViteDevServer } from 'vite';
+import { executablePath, startFixture, type Browser, type Page } from './chromium.ts';
 
 // The Modal in a real Chromium, for what happy-dom does not model: showModal() keeps Tab inside, makes the page
-// behind inert, and sends Escape to the top dialog only. The page is tests/fixtures/modal-page, served by Vite.
-// Skips where no Chromium or Chrome is installed; OMNI_TEST_CHROMIUM names one.
-
-// Loaded by a name TypeScript does not follow: playwright's types bring Electron's globals, which clash with the
-// web app's own WebviewTag (NativeBrowser.tsx). The handful of calls here need no more than this.
-type Locator = { boundingBox(): Promise<{ x: number; y: number; width: number; height: number } | null>; count(): Promise<number>; click(): Promise<void> };
-type Page = {
-  goto(url: string): Promise<unknown>;
-  click(selector: string): Promise<void>;
-  waitForSelector(selector: string): Promise<unknown>;
-  waitForFunction(fn: () => boolean, arg?: undefined, options?: { timeout: number }): Promise<unknown>;
-  evaluate<T, A = void>(fn: (arg: A) => T, arg?: A): Promise<T>;
-  locator(selector: string): Locator;
-  getByRole(role: string, options: { name: string }): Locator;
-  focus(selector: string): Promise<void>;
-  waitForTimeout(ms: number): Promise<void>;
-  inputValue(selector: string): Promise<string>;
-  keyboard: { press(key: string): Promise<void>; type(text: string): Promise<void> };
-  mouse: { click(x: number, y: number): Promise<void>; move(x: number, y: number): Promise<void>; down(): Promise<void>; up(): Promise<void> };
-  close(): Promise<void>;
-};
-type Browser = { newPage(options: { viewport: { width: number; height: number } }): Promise<Page>; close(): Promise<void> };
-type Chromium = { executablePath(): string; launch(options: { executablePath: string }): Promise<Browser> };
-const PLAYWRIGHT: string = 'playwright';
-const loadChromium = async (): Promise<Chromium> => ((await import(PLAYWRIGHT)) as { chromium: Chromium }).chromium;
-
-async function findChromium(): Promise<string | null> {
-  const chromium = await loadChromium();
-  const candidates = [
-    process.env.OMNI_TEST_CHROMIUM,
-    chromium.executablePath(),
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/google-chrome',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-  ];
-  return candidates.find((p): p is string => !!p && existsSync(p)) ?? null;
-}
-
-const executablePath = await findChromium();
+// behind inert, and sends Escape to the top dialog only. The page is tests/fixtures/modal-page.
 
 describe.skipIf(!executablePath)('a modal in Chromium', () => {
-  let server: ViteDevServer;
+  let fixture: Awaited<ReturnType<typeof startFixture>>;
   let browser: Browser;
   let page: Page;
 
   beforeAll(async () => {
-    const { createServer } = await import('vite');
-    const { default: react } = await import('@vitejs/plugin-react');
-    const { default: tailwindcss } = await import('@tailwindcss/vite');
-    server = await createServer({
-      configFile: false,
-      root: join(import.meta.dirname, 'fixtures/modal-page'),
-      plugins: [react(), tailwindcss()],
-      server: { host: '127.0.0.1', port: 0 },
-      logLevel: 'error',
-    });
-    await server.listen();
-    const chromium = await loadChromium();
-    browser = await chromium.launch({ executablePath: executablePath! });
+    fixture = await startFixture('modal-page');
+    browser = fixture.browser;
   }, 60_000);
 
   afterAll(async () => {
-    await browser?.close();
-    await server?.close();
+    await fixture?.stop();
   });
 
   const open = async (button: string, path = '', opens = 'dialog[open]') => {
     page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
-    await page.goto(server.resolvedUrls!.local[0]! + path);
+    await page.goto(fixture.url + path);
     await page.click(button);
     await page.waitForSelector(opens);
   };
@@ -124,11 +69,12 @@ describe.skipIf(!executablePath)('a modal in Chromium', () => {
     expect(await focusedId()).toBe('Cancel');
     await page.keyboard.press('Escape');
     expect(await events()).toEqual(['confirm cancelled']);
-    expect(await page.locator('dialog[open]').count()).toBe(1);
+    // Once its exit has played.
+    await page.waitForFunction(() => document.querySelectorAll('dialog[open]').length === 1);
     expect(await focusedId()).toBe('open-confirm');
     await page.keyboard.press('Escape');
     expect(await events()).toEqual(['confirm cancelled', 'plain closed']);
-    expect(await page.locator('dialog[open]').count()).toBe(0);
+    await page.waitForFunction(() => document.querySelectorAll('dialog[open]').length === 0);
     expect(await focusedId()).toBe('open-plain');
     await page.close();
   }, 30_000);

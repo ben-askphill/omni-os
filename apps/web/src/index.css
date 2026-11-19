@@ -953,6 +953,17 @@
     overflow: visible;
     color: inherit;
   }
+  /* A menu in the top layer as a manual popover (ContextMenuParts useMenuPopover): the ContextMenu and the rail's More
+     menu. Script places it, so this only undoes the browser's popover box; the menu's own utilities set the rest. */
+  .menu-pop[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: visible;
+    color: inherit;
+  }
   @supports (position-area: block-end) {
     .pik-card[popover] {
       min-width: anchor-size(width);
@@ -1627,6 +1638,47 @@
 @position-try --pik-above-centred {
   position-area: block-start span-all;
   justify-self: center;
+}
+/* ---- exits (ui/use-exit.ts) ----
+   An overlay on its way out keeps its place for one short animation, then goes: a modal and its dim, a picker's list,
+   a menu, the phone quick card. use-exit.ts waits only for animations named exit-*. With Reduce motion on none of these
+   apply, so it goes at once. Closing, it takes no presses: the layer under it has them. */
+[data-closing] {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pik-card[data-closing],
+  .menu-pop[data-closing] {
+    animation: exit-pop 0.14s var(--ease-out) forwards;
+  }
+  dialog.modal[data-closing] {
+    animation: exit-sheet 0.18s var(--ease-out) forwards;
+  }
+  dialog.modal[data-closing]::backdrop {
+    animation: exit-fade 0.18s var(--ease-out) forwards;
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 640px) {
+  dialog.modal[data-closing] {
+    animation-name: exit-pop;
+  }
+}
+@keyframes exit-pop {
+  to {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.97);
+  }
+}
+@keyframes exit-sheet {
+  to {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes exit-fade {
+  to {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

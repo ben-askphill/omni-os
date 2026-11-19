@@ -1,4 +1,6 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useId, useMemo, useRef, useState } from 'react';
+import { useDismissLayer } from '../components/ui/dismiss-stack.ts';
+import { useExit } from '../components/ui/use-exit.ts';
 import { glyphLabel, showsCode } from '@omni/shared/display.ts';
 import { useDisplay } from '../display.ts';
 import { api, errorText, type Artifact, type Thread } from '../api.ts';
@@ -56,6 +58,19 @@ export function ThreadScreen() {
   const ran = useThreadAccount(thread?.id);
   // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
   const [quick, setQuick] = useState(false);
+  // The quick card: a popup its header button toggles, light dismissed by the dismiss stack (a tap outside it or
+  // Escape). It stays in the pane, not the top layer: the top layer follows the layout viewport, which iOS keeps under
+  // the keyboard, while MobileShell sizes the pane from the visual viewport.
+  const quickId = useId();
+  const quickButton = useRef<HTMLButtonElement>(null);
+  const quickCard = useRef<HTMLDivElement>(null);
+  const quickExit = useExit(quick, quickCard);
+  useDismissLayer(quick, {
+    roots: () => [quickCard.current, quickButton.current],
+    // A phone sheet over it keeps Escape (the sheets keep their own stack, mobile/parts.tsx).
+    escape: () => (document.querySelector('[role="dialog"][aria-modal="true"]') ? false : setQuick(false)),
+    outside: () => setQuick(false),
+  });
   const display = useDisplay();
   const now = useNow(30_000);
   const [menu, setMenu] = useState(false);
@@ -191,16 +206,30 @@ export function ThreadScreen() {
           <>
             <StatusPill mark={pill.mark} label={pill.label} />
             {/* The quick card shows in every channel: Show technical details only changes which rows it lists. */}
-            <MoRound icon="panel" label={quick ? 'Hide quick actions' : 'Show quick actions'} ink={quick} onClick={() => setQuick((v) => !v)} />
-            <MoRound icon="more" label="Thread options" onClick={() => setMenu(true)} />
+            <MoRound
+              icon="panel"
+              label="Quick actions"
+              ink={quick}
+              expanded={quick}
+              controls={quickId}
+              buttonRef={quickButton}
+              onClick={() => setQuick((v) => !v)}
+            />
+            <MoRound icon="more" label="Thread options" onClick={() => (setQuick(false), setMenu(true))} />
           </>
         }
       />
       <div className="relative min-h-0 flex-1">
-        {quick && (
+        {quickExit.shown && (
           <>
-            <button type="button" aria-label="Close quick actions" tabIndex={-1} className="absolute inset-0 z-10 cursor-default" onClick={() => setQuick(false)} />
-            <div className="pop-in absolute top-2 right-2 z-20 flex max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] flex-col gap-[var(--sp-4)] overflow-y-auto">
+            <div
+              ref={quickCard}
+              id={quickId}
+              role="group"
+              aria-label="Quick actions"
+              data-closing={quickExit.closing || undefined}
+              className="menu-pop pop-in absolute top-2 right-2 z-20 flex max-h-[calc(100%-1rem)] w-[17rem] max-w-[calc(100%-1rem)] flex-col gap-[var(--sp-4)] overflow-y-auto"
+            >
               <ThreadQuickCard
                 thread={thread}
                 code={code}

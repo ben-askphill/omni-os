@@ -1,9 +1,10 @@
 // The tool row over the screenshot an annotation is drawn on: select, pen, shapes, text, color and line width. It holds
 // no state of its own; BrowserAnnotate's Draw owns the tool and the style.
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { MARK_COLORS, MARK_STROKES, type MarkShape, type MarkTool } from '@omni/shared/message-context-marks.ts';
 import { Icon, IconButton, type IconName } from './ui.tsx';
-import { useDismissable } from './ui/use-dismissable.ts';
+import { useDismissLayer } from './ui/dismiss-stack.ts';
+import { useExit } from './ui/use-exit.ts';
 import { ROVING_ITEM, useRovingFocus } from './ui/use-roving-focus.ts';
 
 export type Tool = 'select' | MarkTool;
@@ -17,14 +18,51 @@ export const SHAPES: { shape: MarkShape; label: string; icon: IconName }[] = [
 const SHAPE_NAMES: string[] = SHAPES.map((s) => s.shape);
 export const isShape = (t: Tool): t is MarkShape => SHAPE_NAMES.includes(t);
 
-/** A button with a small menu under it. */
+/** The keys that walk a popup's items: it is a row, so Left and Right, and Up and Down too. */
+const STEP: Record<string, 1 | -1 | 'first' | 'last'> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: 'first', End: 'last' };
+
+/**
+ * A button with a small menu under it. It opens on the checked item, the arrow keys, Home and End walk its items, Enter
+ * or Space picks, and Escape closes only it (the annotation view stays) and puts the focus back on the button. Tab
+ * closes it and moves on.
+ */
 function Menu({ label, face, active, children }: { label: string; face: ReactNode; active?: boolean; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  useDismissable(open, () => setOpen(false), { root });
+  const button = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const exit = useExit(open, list);
+  const items = () => [...(list.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])];
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) button.current?.focus();
+  };
+  useDismissLayer(open, {
+    roots: () => [root.current],
+    escape: () => close(!!list.current?.contains(document.activeElement)),
+    outside: () => close(false),
+  });
+  useEffect(() => {
+    if (!open) return;
+    const all = items();
+    (all.find((el) => el.getAttribute('aria-checked') === 'true') ?? all[0])?.focus();
+  }, [open]);
+  const onKey = (e: ReactKeyboardEvent) => {
+    if (e.key === 'Tab') return close(false);
+    const step = STEP[e.key];
+    if (!step) return;
+    e.preventDefault();
+    // The toolbar's own arrow keys stay out of it.
+    e.stopPropagation();
+    const all = items();
+    const at = all.indexOf(document.activeElement as HTMLElement);
+    const to = step === 'first' ? 0 : step === 'last' ? all.length - 1 : (at + step + all.length) % all.length;
+    all[to]?.focus();
+  };
   return (
     <div ref={root} className="relative">
       <button
+        ref={button}
         type="button"
         aria-label={label}
         title={label}
@@ -33,14 +71,28 @@ function Menu({ label, face, active, children }: { label: string; face: ReactNod
         data-on={active || undefined}
         {...ROVING_ITEM}
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (open || e.key !== 'ArrowDown') return;
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
         className="hov press inline-flex h-8 items-center gap-0.5 rounded-full pr-1.5 pl-2 text-fg-3 transition-colors hover:text-fg data-[on=true]:text-fg"
       >
         {face}
         <Icon name="chevronDown" size={11} />
       </button>
-      {open && (
-        <div role="menu" className="absolute top-full left-0 z-30 mt-1 flex gap-1 rounded-xl bg-surface-2 p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.35),0_0_0_1px_var(--line)]">
-          {children(() => setOpen(false))}
+      {exit.shown && (
+        <div
+          ref={list}
+          role="menu"
+          aria-label={label}
+          aria-orientation="horizontal"
+          data-closing={exit.closing || undefined}
+          onKeyDown={onKey}
+          className="menu-pop pop-in absolute top-full left-0 z-30 mt-1 flex gap-1 rounded-xl bg-surface-2 p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.35),0_0_0_1px_var(--line)]"
+        >
+          {children(() => close(true))}
         </div>
       )}
     </div>
