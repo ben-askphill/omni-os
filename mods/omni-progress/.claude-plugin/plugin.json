@@ -2,7 +2,7 @@
   "name": "omni-progress",
   "version": "0.1.0",
   "description": "Live turn progress in the status line, and a warning when a tool call runs long or keeps failing the same way.",
-  "author": { "name": "Ben Rosenberg" },
+  "author": { "name": "Omni OS" },
   "userConfig": {
     "slowCallMinutes": {
       "type": "number",

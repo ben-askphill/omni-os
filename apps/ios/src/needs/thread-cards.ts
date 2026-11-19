@@ -3,6 +3,7 @@ import type { PendingMsg, Thread } from '@omni/client-core';
 import type { NeedsAction } from './actions';
 import { harnessLabel, LIMIT_LABEL, limitView } from './limit';
 import { isOmnis, isParked, parkedHeading, parkedLabel } from './parked';
+import { setupWait } from '@omni/shared/setup-wait.ts';
 
 export interface CardButton {
   /** Names the button while its call runs, so only that one shows busy. */
@@ -25,15 +26,14 @@ export type ThreadCard =
   | { kind: 'limit'; title: string; body: string; scheduled: boolean; buttons: CardButton[] }
   | { kind: 'parked'; heading: string; rows: ParkedRow[]; buttons: CardButton[] };
 
-const SETUP_WAIT = 'Sends once the worktree is ready';
 
 function setupCard(thread: Thread): ThreadCard | null {
   if (thread.setup === 'preparing') {
     return {
       kind: 'setup',
       failed: false,
-      title: 'Preparing worktree',
-      body: 'Nothing runs before the agent starts. Your message and files wait below.',
+      title: thread.branch ? 'Preparing worktree' : 'Checking sign-ins',
+      body: thread.branch ? 'Nothing runs before the agent starts. Your message and files wait below.' : 'Omni checks the accounts this job needs before it starts. Your message waits below.',
       detail: null,
       branch: thread.branch,
       buttons: [],
@@ -48,6 +48,20 @@ function setupCard(thread: Thread): ThreadCard | null {
       detail: thread.setup_error,
       branch: thread.branch,
       buttons: [{ key: 'retry', label: 'Retry setup', action: { kind: 'retry-setup' }, primary: true }],
+    };
+  }
+  if (thread.setup === 'signin') {
+    return {
+      kind: 'setup',
+      failed: true,
+      title: 'Sign in needed',
+      body: 'This job has not started. Your message is kept and sends once you sign in.',
+      detail: thread.setup_error,
+      branch: thread.branch,
+      buttons: [
+        { key: 'retry', label: 'Try again', action: { kind: 'retry-setup' }, primary: true },
+        { key: 'anyway', label: 'Start anyway', action: { kind: 'retry-setup', skipSignIn: true }, primary: false },
+      ],
     };
   }
   return null;
@@ -69,6 +83,7 @@ function parkedCard(thread: Thread, pending: readonly PendingMsg[], blocked: boo
   const parked = pending.filter(isParked);
   if (parked.length === 0) return null;
   const waitingOnWorktree = thread.setup !== null;
+  const wait = setupWait(thread.setup);
   const recovered = parked.filter((m) => m.delivery === 'recovered').length;
   const rows = parked.map((m): ParkedRow => {
     const buttons: CardButton[] = [];
@@ -79,13 +94,13 @@ function parkedCard(thread: Thread, pending: readonly PendingMsg[], blocked: boo
     return {
       uuid: m.uuid,
       text: m.text,
-      label: waitingOnWorktree ? 'Waits for the worktree' : (parkedLabel(m, blocked) ?? 'Held for Resume'),
+      label: wait ? wait.label : (parkedLabel(m, blocked) ?? 'Held for Resume'),
       buttons,
     };
   });
   return {
     kind: 'parked',
-    heading: waitingOnWorktree ? SETUP_WAIT : parkedHeading(parked, blocked),
+    heading: wait ? wait.heading : parkedHeading(parked, blocked),
     rows,
     buttons:
       recovered > 0 && !waitingOnWorktree

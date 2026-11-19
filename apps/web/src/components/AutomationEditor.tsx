@@ -6,7 +6,7 @@ import { api, errorText, useApi, type AutomationDefinition, type HarnessWithRunn
 import { blankDraft, CRON_PRESETS, draftOf, draftProblem, EVENTS, fieldsOf, isPrEvent, WEBHOOK_EVENTS, type Draft, type EventName } from '../automation-draft.ts';
 import { describeEvent } from '../format.ts';
 import { useApp, useHereName } from '../store.tsx';
-import { Button, ErrorNote, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from './ui.tsx';
+import { Button, ChipSet, ErrorNote, Label, Loading, Modal, ModalFooter, Picker, Segmented, Toggle, type PickerOption } from './ui.tsx';
 
 // The Automations page's editor: every field of an automation's YAML, and the YAML itself. Saving writes the file
 // (apps/server/automation-files.ts); a shipped automation becomes your own copy in data/automations/ and Reset drops it.
@@ -32,28 +32,6 @@ function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: s
         {hint && <span className="mt-0.5 block text-[13px] leading-[18px] text-fg-3">{hint}</span>}
       </span>
       <Toggle checked={checked} onChange={onChange} label={label} />
-    </div>
-  );
-}
-
-/** Small toggle chips for picking several of a few things: channels, webhook events. */
-function ChipSet({ label, options, value, onChange }: { label: string; options: { id: string; label: string }[]; value: string[]; onChange: (v: string[]) => void }) {
-  return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
-      {options.map((o) => {
-        const on = value.includes(o.id);
-        return (
-          <button
-            key={o.id}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onChange(on ? value.filter((x) => x !== o.id) : [...value, o.id])}
-            className={`hov inline-flex h-7 max-w-full items-center rounded-full px-3 text-[12.5px] [--hov:var(--surface-2)] ${on ? 'bg-fg text-bg [--hov:var(--fg-2)]' : 'bg-bg text-fg-2 shadow-[inset_0_0_0_1px_var(--line)]'}`}
-          >
-            <span className="truncate">{o.label}</span>
-          </button>
-        );
-      })}
     </div>
   );
 }

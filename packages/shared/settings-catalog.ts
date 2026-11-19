@@ -48,7 +48,7 @@ export const SETTINGS_SECTION_DEFS = [
   { id: 'desktop', group: 'devices', title: 'Desktop app', icon: 'monitor', blurb: 'Quick Prompt and how this app starts.', desktopApp: true },
   { id: 'worktrees', group: 'developer', title: 'Worktrees', icon: 'branch', blurb: 'The checkouts Omni makes for threads, and cleaning them up.' },
   { id: 'secrets', group: 'developer', title: 'Secrets', icon: 'key', blurb: 'API keys and tokens for threads, kept outside the database.' },
-  { id: 'extras', group: 'extras', title: 'Extras', icon: 'plug', blurb: 'Optional add-ons: Wispr Flow, Grok Bot, Hermes and the central brain.' },
+  { id: 'extras', group: 'extras', title: 'Extras', icon: 'plug', blurb: 'Optional add-ons: Wispr Flow, Grok Bot, Hermes and the notes folder.' },
   { id: 'about', group: 'app', title: 'About', icon: 'info', blurb: 'Version, server and where Omni keeps its files.' },
 ] as const satisfies readonly SettingsSectionDef[];
 
@@ -64,7 +64,7 @@ export const sectionShows = (id: SettingsSectionId, desktopApp: boolean): boolea
 
 /**
  * Old names that still open a section: the pages Settings replaced (#/sync, #/storage, #/secrets) and section
- * names from before this layout. A section keeps its own name. Integrations is Extras now (Hermes, the central brain).
+ * names from before this layout. A section keeps its own name. Integrations is Extras now (Hermes, the notes folder).
  */
 export const LEGACY_SETTINGS_SECTIONS: Record<string, SettingsSectionId> = {
   profile: 'general',
@@ -146,7 +146,7 @@ export const SETTINGS_ENTRIES = [
   { id: 'wispr-flow', section: 'extras', title: 'Dictate with Wispr Flow', keywords: ['wispr flow', 'dictate', 'dictation', 'voice', 'speak', 'talk', 'quick prompt'] },
   { id: 'grok-bot', section: 'extras', title: 'Grok Bot', keywords: ['grok', 'grok bot', 'webhook', 'GROKBOT_WEBHOOK_URL', 'send to grok bot'] },
   { id: 'hermes', section: 'extras', title: 'Hermes URL', keywords: ['hermes', 'tailnet', 'HERMES_API_KEY', 'integrations'] },
-  { id: 'brain', section: 'extras', title: 'Central brain folder', keywords: ['notes', 'brain-export', 'export', 'digests', 'knowledge base'] },
+  { id: 'brain', section: 'extras', title: 'Notes folder', keywords: ['notes', 'brain-export', 'export', 'digests', 'knowledge base'] },
   { id: 'desktop-quick-prompt', section: 'desktop', title: 'Quick Prompt', keywords: ['hotkey', 'shortcut', 'keyboard', 'global', 'launcher'], surfaces: ['desktop'] },
   { id: 'desktop-login', section: 'desktop', title: 'Open Omni at login', keywords: ['startup', 'launch', 'login items', 'autostart'], surfaces: ['desktop'], needs: 'loginItem' },
   { id: 'desktop-updates', section: 'machines', title: 'App version and updates', keywords: ['version', 'update', 'upgrade', 'relaunch', 'restart', 'release notes', 'download', 'automatic', 'check for updates'], surfaces: ['desktop'] },

@@ -24,6 +24,7 @@ import { plural } from '../format.ts';
 import { reasonOf } from '../needs-you.ts';
 import { href, type ThreadView } from '../router.ts';
 import { useApp, useHereName, useNow } from '../store.tsx';
+import { useThreadAccount } from '../accounts.ts';
 import { needsCard } from './activity.ts';
 import { MoComposer, type ComposerChip } from './MoComposer.tsx';
 import { NeedsCardView } from './NeedsCard.tsx';
@@ -49,6 +50,8 @@ export function ThreadScreen() {
   const { thread, parent, children, events, history, revealTarget, clearReveal, files, shots, queued, listed, setQueued, applyThread, slotBusy, interrupt, interrupting, notFound, error, actionError, load, ready, handoff, setHandoff, takeover, init, warm, crew: crewArtifacts } = s;
   const { needsYou, channel, crew: roles } = useApp();
   const hereName = useHereName();
+  // The account its harness runs as, after the harness in the header's line.
+  const ran = useThreadAccount(thread?.id);
   // The phone has no room beside the transcript, so the quick card is a popover off the header, closed on open.
   const [quick, setQuick] = useState(false);
   const display = useDisplay();
@@ -132,7 +135,9 @@ export function ThreadScreen() {
   if (!slotBusy && !conductor) chips.push({ label: 'Ask the Conductor', icon: 'delegate', onClick: () => shell.sheet({ name: 'new' }) });
   if (!conductor) chips.push({ label: 'New thread', icon: 'plus', onClick: () => shell.sheet({ name: 'new', channel: thread.channel_id }) });
 
-  const sub = conductor ? `Conductor · ${plural(crew.length, 'crew thread')}` : [`#${ch?.name ?? thread.channel_id}`, crewRoleName(thread.role, roles), harnessLabel(thread.harness)].filter(Boolean).join(' · ');
+  const sub = conductor
+    ? `Conductor · ${plural(crew.length, 'crew thread')}`
+    : [`#${ch?.name ?? thread.channel_id}`, crewRoleName(thread.role, roles), ran ? `${harnessLabel(thread.harness)} as ${ran.label}` : harnessLabel(thread.harness)].filter(Boolean).join(' · ');
   // A Conductor thread needs Ben while any thread it delegated does.
   const kidIds = new Set(crew.map((c) => c.id));
   const needs: Glyph | null = card && asksForYou(card.glyph) ? card.glyph : conductor && needsYou?.items.some((i) => kidIds.has(i.thread.id) && asksForYou(reasonOf(i).glyph)) ? 'needs' : null;
@@ -253,7 +258,7 @@ export function ThreadScreen() {
                   setQueued(pending);
                 }}
               />
-              {/* A question's card above is where Ben answers it, and the setup card is where he retries setup. */}
+              {/* A question's card above is where the user answers it, and the setup card is where they retry setup. */}
               {card && card.kind !== 'question' && card.kind !== 'setup' && <NeedsCardView card={card} onRecovered={(r) => {
                     applyThread(r.thread, true);
                     setQueued(r.pending);

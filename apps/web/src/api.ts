@@ -13,6 +13,7 @@ import type { ContextUsage } from '@omni/shared/context-meter.ts';
 import type { AccountUsage } from '@omni/shared/account-usage.ts';
 import type { HandoffView, Takeover } from '@omni/shared/handoff.ts';
 import type { RanOnFields } from '@omni/shared/ran-on.ts';
+import type { StepField } from '@omni/shared/steps.ts';
 import type { Opening } from '@omni/shared/opening.ts';
 import type { DeliveryPage, DeliveryView } from '@omni/shared/automation-triggers.ts';
 import type { ArtifactTrigger, PrTrigger, WebhookTrigger } from '@omni/server/automation-events.ts';
@@ -39,11 +40,11 @@ export type Channel = Omit<ChannelRow, 'design_system'> & { design_system_size: 
  * A thread as the API sends it. `delegating`: a thread it delegated, at any depth, still runs or queues
  * (apps/server/delegating.ts). Read running state through @omni/shared/delegate-count.ts, not `status` alone.
  */
-export type Thread = ThreadRow & { delegating?: boolean } & RanOnFields;
+export type Thread = ThreadRow & { delegating?: boolean } & RanOnFields & StepField;
 
 /** Just enough of a thread to list it under its channel in the sidebar. */
 export type ThreadStub = Pick<Thread, 'id' | 'channel_id' | 'title' | 'status' | 'created_at'> &
-  Partial<Pick<Thread, 'parent_id' | 'source' | 'delegating' | 'limit_state' | 'setup' | 'model' | 'branch' | 'goal_objective' | 'goal_status' | 'ran_on' | 'run_started_at'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
+  Partial<Pick<Thread, 'parent_id' | 'source' | 'delegating' | 'limit_state' | 'setup' | 'model' | 'branch' | 'goal_objective' | 'goal_status' | 'ran_on' | 'run_started_at' | 'step'>> & { updated_at?: string; folder_id?: string | null; harness?: string; done_at?: string | null };
 /** A Conductor job and its cross-channel delegated threads, as the channel API sends them. */
 export interface ConductorHandoffGroup {
   parent: ThreadStub;

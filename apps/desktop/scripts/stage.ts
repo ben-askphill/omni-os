@@ -6,7 +6,7 @@
 //
 //   --host-glibc  ship this machine's node-pty build on Linux even when it needs a newer glibc than the floor
 //   --native      the Rust binaries (native.ts). required, the default, fails when one does not build. off leaves
-//                 them out, for an app whose threads go without ask, render and threads and that has no omni command
+//                 them out, for an app whose threads go without ask, render, steps and threads and that has no omni command
 //
 // Packages come from the repo's node_modules along package-lock.json's graph, at their locked versions.
 import { spawnSync } from 'node:child_process';
@@ -14,6 +14,9 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rm
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
 import { NATIVE_MODES, type NativeMode, stageNative } from './native.ts';
+import { PERSONAL_TERMS, personalTermProblems } from './personal-terms.ts';
+
+export { PERSONAL_TERMS };
 
 const DESKTOP = resolve(import.meta.dirname, '..');
 const REPO = resolve(DESKTOP, '../..');
@@ -28,16 +31,6 @@ export const EXTERNALS = ['node-pty', '@playwright/mcp'] as const;
  * in their data dir. tests/stage.test.ts keeps it that way.
  */
 export const SHIPPED_DIRS = ['crew', 'mods', 'prototypes/activity-monitor'] as const;
-
-/**
- * Words that mark a crew charter as one person's own: their name, company, clients and tools. Shipped charters reach
- * every install, so they stay generic and the user's own roles live in their data dir (docs/user/crew.md). Matched as
- * whole words, case and all, so "productive" or "portal" in plain prose still pass.
- */
-export const PERSONAL_TERMS = [
-  'Ben', 'Rosenberg', 'brosenb', 'Ask Phill', 'askphill', 'APA', 'Phillbert', 'Productive', 'Portal',
-  'Volero', 'Pink Gellac', 'Kamera Express', 'Acne Studios', 'North Sails', 'Patta',
-] as const;
 
 /** Each shipped charter line that names one of PERSONAL_TERMS, as `crew/<file>:<line>: <term>`. */
 export function personalCrewProblems(crewDir: string): string[] {
@@ -435,8 +428,8 @@ export async function stage(args: StageArgs, out = STAGE_DIR): Promise<void> {
   if (!existsSync(join(webDist, 'index.html'))) throw new Error('apps/web/dist has no index.html. Run without --skip-web.');
   cpSync(webDist, join(out, 'apps/web/dist'), { recursive: true });
 
-  const personal = personalCrewProblems(join(REPO, 'crew'));
-  if (personal.length) throw new Error(`crew/ names one person's own setup, and it ships to every install: ${personal.join('; ')}`);
+  const personal = personalTermProblems(REPO);
+  if (personal.length) throw new Error(`The default build names one person's own setup, and it ships to every install: ${personal.join('; ')}`);
   for (const dir of SHIPPED_DIRS) cpSync(join(REPO, dir), join(out, dir), { recursive: true });
   const version = stampPackageJson(out);
 

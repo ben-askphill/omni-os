@@ -117,11 +117,16 @@ describe('threadRows', () => {
     expect(notes.some((n) => n.startsWith('## Checkout funnel'))).toBe(false);
   });
 
-  it('shows the live turn with its thinking line, plan and steps so far', () => {
+  it('shows the live turn with its thinking line, its plain steps and its actions so far', () => {
     const live = local.find((c) => c.name === 'rich-running')!;
     const rows = threadRows(input(live)).rows;
     expect(of(rows, 'thinking')).toHaveLength(1);
     expect(of(rows, 'now')).toHaveLength(0);
+    const [progress] = of(rows, 'progress');
+    expect(progress).toBeTruthy();
+    expect(progress.kind === 'progress' && progress.steps.some((s) => s.state === 'active')).toBe(true);
+    // Plain words only: no tool names in the step list.
+    expect(JSON.stringify(progress)).not.toMatch(/Bash|Read|Edit|TodoWrite|mcp__/);
     expect(of(rows, 'steps')[0]).toMatchObject({ live: true, steps: 2 });
     expect(of(rows, 'outcome')).toHaveLength(0);
   });

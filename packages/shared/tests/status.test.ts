@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BLOCKER_GLYPH, MARK, PHASE, STATUS, blockerMark, glyphFor, inboxStatus, markOf, resultGlyph, statusLabel, threadGlyph, threadMark, threadPhase, turnPhase, type Mark } from '../status.ts';
+import { BLOCKER_GLYPH, MARK, PHASE, STATUS, blockerGlyph, blockerMark, glyphFor, inboxStatus, markOf, resultGlyph, statusLabel, threadGlyph, threadMark, threadPhase, turnPhase, type Mark } from '../status.ts';
 
 describe('status', () => {
   it('has one label for each state a person reads', () => {
@@ -124,6 +124,15 @@ describe('the mark a thread shows', () => {
     expect(blockerMark({ kind: 'recovered' })).toBe('held');
     expect(blockerMark({ kind: 'uncertain' })).toBe('held');
     for (const kind of Object.keys(BLOCKER_GLYPH) as (keyof typeof BLOCKER_GLYPH)[]) expect(MARK[blockerMark({ kind })].glyph).toBe(BLOCKER_GLYPH[kind]);
+  });
+
+  it('reads a thread that waits for a sign-in as waiting on Ben, not as a failed setup', () => {
+    expect(blockerMark({ kind: 'setup', signin: true })).toBe('signin');
+    expect(blockerGlyph({ kind: 'setup', signin: true })).toBe('needs');
+    expect(blockerGlyph({ kind: 'setup' })).toBe('failed');
+    expect(MARK.signin).toMatchObject({ label: 'Sign in needed', glyph: 'needs', family: 'you' });
+    expect(threadMark({ status: 'stopped', setup: 'signin' })).toBe('signin');
+    expect(inboxStatus({ status: 'stopped' }, { blockers: [{ kind: 'setup', signin: true }], result: null })).toEqual({ glyph: 'needs', label: STATUS.needs.label });
   });
 
   it('puts what holds it up first, then its phase, then how it ended', () => {

@@ -3,7 +3,7 @@ import { removeOwnFileOnDisk, yamlFiles } from './automation-store.ts';
 import { Cron } from 'croner';
 import YAML from 'yaml';
 import { config, paths } from './config.ts';
-import { automationRuns, channels, db } from './db.ts';
+import { automationRuns, channels, db, kv } from './db.ts';
 import { record } from './db/sync.ts';
 import { publishFeed } from './bus.ts';
 import { createThread } from './runner.ts';
@@ -12,6 +12,10 @@ import { parseTrigger, type EventTrigger } from './automation-events.ts';
 import { fillPlaceholders, NEEDS_CHECKOUT, omniCheckout, updateUserConfig, userConfig } from './user-config.ts';
 import { parsePrecheck, runPrecheck, type Precheck } from './automation-precheck.ts';
 import { commandsFolder } from './sandbox.ts';
+import { neededConnectors, parseConnectorList } from './connectors.ts';
+import { checkSignIn } from './sign-in-check.ts';
+import { getCrew } from './crew.ts';
+import { about } from './about.ts';
 
 export interface Automation {
   id: string;
@@ -34,6 +38,8 @@ export interface Automation {
   catchupMaxAge?: number;
   /** Run before a scheduled run (cron or catch-up) starts anything; a failure skips the run. */
   precheck?: Precheck;
+  /** `connectors:`, the accounts every run reads (connectors.ts ids). A signed-out one holds the first run and skips the rest. */
+  connectors?: string[];
   /** The synced machine that runs it, by name or sync id. Unset, the one picked in "Run automations on" (sync/owner.ts). */
   machine?: string;
   file: string;
@@ -76,6 +82,11 @@ export function parseAutomation(id: string, src: string, file = ''): Automation 
     const p = parsePrecheck(y.precheck);
     if (typeof p === 'string') a.error = p;
     else (rawPrecheck = p.command), (a.precheck = { ...p, command: fillPlaceholders(p.command) });
+  }
+  if (!yamlError && !a.error && y.connectors !== undefined && y.connectors !== null) {
+    const ids = parseConnectorList(y.connectors);
+    if (typeof ids === 'string') a.error = ids;
+    else if (ids.length) a.connectors = ids;
   }
   if (!yamlError && !a.error && y.catchup_max_age !== undefined) {
     const age = parseAge(y.catchup_max_age);
@@ -155,6 +166,7 @@ export async function runAutomation(a: Automation, trigger: 'cron' | 'manual' | 
     title: event?.title ?? `${a.name} · ${date}`,
     source: 'automation',
     automation: a.id,
+    connectors: a.connectors,
   });
   automationRuns.add(a.id, thread.id, trigger);
   return thread;
@@ -168,6 +180,36 @@ function recordSkip(a: Automation, trigger: 'cron' | 'catchup', reason: string) 
   console.log(`[automations] ${a.id} skipped (${trigger}): ${reason}`);
   automationRuns.skip(a.id, trigger, reason);
   return null;
+}
+
+// ---------- the sign-in check (connectors.ts) ----------
+
+/**
+ * Where this machine last reported a run of the automation held for a sign-in, as the signed-out connectors' ids. Per
+ * machine (a sync.* key), as sign-ins are. The first held run makes its thread, which waits at its sign-in check and
+ * alerts (runner/setup.ts holdForSignIn); later runs with the same connectors signed out record a skip and stay quiet.
+ * A run that finds them signed in clears it, so the next sign-out reports again.
+ */
+const reportedKey = (id: string) => `sync.signin-reported.${id}`;
+const reportedSignIn = (id: string) => kv.get<string | null>(reportedKey(id)) ?? null;
+function setReportedSignIn(id: string, key: string | null) {
+  if (reportedSignIn(id) !== key) kv.set(reportedKey(id), key);
+}
+
+/**
+ * The connectors a scheduled run needs that are signed out here, or null. Only Claude Code reports sign-ins, so an
+ * automation pinned to another harness is never held.
+ */
+async function signInGap(a: Automation): Promise<{ key: string; message: string } | null> {
+  const role = getCrew(a.role);
+  const harness = a.harness ?? role?.harness;
+  if (harness && harness !== 'claude-code' && harness !== 'auto') return null;
+  const needs = neededConnectors(a.prompt, a.connectors, role?.connectors);
+  if (!needs.length) return null;
+  const check = await checkSignIn(needs, precheckDir(a));
+  if (!check.signedOut.length) return null;
+  const labels = check.signedOut.map((c) => c.label).join(', ');
+  return { key: check.signedOut.map((c) => c.id).join(','), message: `${labels} still signed out on ${about.name}; the first held run already said so` };
 }
 
 /** Where a precheck runs: the channel's folder (its repo, else its base dir, else the brain), as for its threads. */
@@ -191,6 +233,9 @@ async function runScheduled(a: Automation, trigger: 'cron' | 'catchup') {
       const reason = await runPrecheck(a.precheck, precheckDir(a));
       if (reason) return recordSkip(a, trigger, reason);
     }
+    const signedOut = await signInGap(a);
+    if (signedOut && reportedSignIn(a.id) === signedOut.key) return recordSkip(a, trigger, signedOut.message);
+    setReportedSignIn(a.id, signedOut?.key ?? null);
     return await runAutomation(a, trigger);
   } finally {
     starting.delete(a.id);

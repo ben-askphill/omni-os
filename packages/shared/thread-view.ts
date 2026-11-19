@@ -4,7 +4,8 @@
 import type { ThreadQuestion } from './question.ts';
 import type { Clipped, Span } from './history.ts';
 import { cloudStatus } from './cloud-agent.ts';
-import { buildItems, isAsking, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type Todo, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
+import { turnSteps, type StepsView } from './steps.ts';
+import { buildItems, isAsking, toolLabel, toolSummary, type CloudAgentP, type Item, type ReportP, type ResultP, type SwitchItem, type ToolCall, type TranscriptEvent, type UserP } from './transcript-fold.ts';
 
 export type TurnStatus = 'running' | 'queued' | 'done' | 'failed' | 'stopped';
 
@@ -35,8 +36,10 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   at: string;
   /** Ben's message that started it, then any he steered in while it ran. Empty when a crew report started it. */
   prompts: Prompt[];
-  /** Tool calls, sub-agents' own calls included. */
+  /** Tool calls, sub-agents' own calls included: the turn's actions. */
   steps: number;
+  /** The turn's plain steps (steps.ts): the agent's list, the harness's plan or the phases of its calls. Null for a plain answer. */
+  progress: StepsView | null;
   failed: number;
   /** Every assistant text in order. */
   texts: string[];
@@ -66,11 +69,6 @@ export interface TurnView<A extends TurnArtifact = TurnArtifact, C extends TurnC
   harness: string;
 }
 
-export interface PlanView {
-  todos: Todo[];
-  done: number;
-}
-
 /** What a running thread is doing now: "Editing" `snippets/shipping-rates.liquid`. */
 export interface NowDoing {
   verb: string;
@@ -79,8 +77,6 @@ export interface NowDoing {
 
 export interface ThreadView<A extends TurnArtifact = TurnArtifact, C extends TurnChild = TurnChild> {
   turns: TurnView<A, C>[];
-  /** The latest TodoWrite of the latest turn, while it runs. */
-  plan: PlanView | null;
   /** Null while it waits on Ben's answer to a question: it is not doing anything. */
   now: NowDoing | null;
   /** A question waits on Ben's answer. */
@@ -142,12 +138,12 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   artifacts: A[];
   children: C[];
 }): ThreadView<A, C> {
-  const { items, plan } = buildItems(events, spans);
+  const { items } = buildItems(events, spans);
   const turns: TurnView<A, C>[] = [];
   // Until the first switch, the thread ran where that switch moved it from.
   let harness = items.find((it): it is SwitchItem => it.type === 'switch')?.p.from.harness ?? thread.harness;
   const start = (key: number, at: string): TurnView<A, C> => {
-    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
+    const t: TurnView<A, C> = { key, at, prompts: [], steps: 0, progress: null, failed: 0, texts: [], prose: null, proseClipped: null, reports: [], questions: [], artifacts: [], children: [], answers: {}, result: null, error: null, cloud: null, status: 'done', items: [], switches: [], harness };
     turns.push(t);
     return t;
   };
@@ -222,7 +218,11 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
   const asking = isAsking(events);
   const latest = turns[turns.length - 1];
   const running = thread.status === 'running' && !!latest && latest.status === 'running';
-  if (!running) return { turns, plan: null, now: null, asking };
+  turns.forEach((t) => {
+    const live = running && t === latest;
+    t.progress = turnSteps(t.items, { live, asking: live && asking });
+  });
+  if (!running) return { turns, now: null, asking };
   // The newest call still waiting on its result is what it is doing; with none, it is between calls.
   let open: ToolCall | undefined;
   for (const it of latest.items) {
@@ -231,10 +231,8 @@ export function threadView<A extends TurnArtifact, C extends TurnChild>({
       if (!c.result) open = c;
     });
   }
-  const planned = plan && latest.items.some((it) => it.type === 'tools' && it.key === plan.after) ? plan.todos : null;
   return {
     turns,
-    plan: planned && { todos: planned, done: planned.filter((x) => x.status === 'completed').length },
     // A cloud agent works on Cursor's machines: its run's status is all there is to say.
     now: asking ? null : open ? nowDoing(open, thread.cwd) : latest.cloud ? { verb: `Cursor cloud agent: ${cloudStatus(latest.cloud.status).label.toLowerCase()}`, target: '' } : { verb: 'Thinking', target: '' },
     asking,

@@ -243,6 +243,32 @@ describe('Retry setup, which runs the setup step again', () => {
     });
 });
 
+// Start anyway on a thread held for a sign-in (setup.ts holdForSignIn) prepares its worktree again, and with it the
+// channel's setup step: the same shell route as Retry setup, so `skip_signin` never lets a restricted session past it.
+describe('Start anyway on a sign-in hold', () => {
+  for (const who of WHO.filter((w) => w !== 'no credential'))
+    it(`${who}: ${CREDENTIALS[who].shell ? 'reruns' : 'never reruns'} the setup step of a worktree thread`, async () => {
+      const ch = worktreeChannel();
+      const install = await call<ChannelAction>(TOKEN, 'POST', `/channels/${ch}/actions`, { name: 'Install', command: marker(who), setup: 'blocking' });
+      expect(install.status, JSON.stringify(install.body)).toBe(201);
+      const t = await r.runner.createThread({ channel: ch, prompt: 'fix the cart' });
+      await r.untilResults(t.id, 1);
+      const runs = () => launched().filter((x) => x === install.body.command).length;
+      expect(runs()).toBe(1);
+      r.db.threads.update(t.id, { setup: 'signin', setup_error: 'Sign in to Gmail first.', status: 'stopped' });
+      const res = await call(who, 'POST', `/threads/${t.id}/setup/retry`, { skip_signin: true });
+      if (!CREDENTIALS[who].shell) {
+        expectRefused(who, res);
+        await new Promise((done) => setTimeout(done, 300));
+        expect(runs()).toBe(1);
+        expect(r.thread(t.id).setup).toBe('signin');
+        return;
+      }
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      await r.until('the setup step to run again', () => runs() === 2 && r.thread(t.id).setup === null);
+    });
+});
+
 describe('a setup step a restricted session tried to add', () => {
   for (const who of WHO.filter((w) => !CREDENTIALS[w].shell && w !== 'no credential'))
     it(`${who}: never runs when a new worktree is prepared`, async () => {

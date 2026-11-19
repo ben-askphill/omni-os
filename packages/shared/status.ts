@@ -126,6 +126,9 @@ export const BLOCKER_GLYPH: Record<'question' | 'setup' | 'recovered' | 'uncerta
   recovered: 'needs',
 };
 
+/** A blocker's glyph. A thread that waits for a sign-in needs Ben, where a worktree that could not be made failed. */
+export const blockerGlyph = (b: { kind: keyof typeof BLOCKER_GLYPH; signin?: boolean }): Glyph => (b.kind === 'setup' && b.signin ? 'needs' : BLOCKER_GLYPH[b.kind]);
+
 /**
  * The one vocabulary a status mark draws, for every state a thread can be in (StatusDot, apps/web/src/index.css
  * .glyph). The shape says who has the ball: a circle while the agent has it, a square while a system outside Omni
@@ -146,6 +149,7 @@ export type Mark =
   | 'failed'
   | 'crew_failed'
   | 'setup_failed'
+  | 'signin'
   | 'done'
   | 'stopped'
   | 'idle';
@@ -175,6 +179,7 @@ export const MARK: Record<Mark, { label: string; hint: string; family: MarkFamil
   failed: { label: 'Failed', hint: 'Its turn ended in an error', family: 'broken', glyph: 'failed', motion: 'still' },
   crew_failed: { label: 'Crew failed', hint: 'A thread under this one failed and you have not opened it', family: 'broken', glyph: 'failed', motion: 'still' },
   setup_failed: { label: 'Setup failed', hint: 'Its folder could not be prepared, so it never started', family: 'broken', glyph: 'failed', motion: 'still' },
+  signin: { label: 'Sign in needed', hint: 'An account it needs is signed out, so it has not started', family: 'you', glyph: 'needs', motion: 'still' },
   done: { label: 'Done', hint: 'Its turn finished', family: 'settled', glyph: 'done', motion: 'still' },
   stopped: { label: 'Stopped', hint: 'Its turn was stopped', family: 'quiet', glyph: 'settled', motion: 'still' },
   idle: { label: 'Idle', hint: 'It has not run', family: 'quiet', glyph: 'idle', motion: 'still' },
@@ -186,14 +191,14 @@ const GLYPH_MARK: Record<Glyph, Mark> = { running: 'working', needs: 'question',
 export const markOf = (glyph: Glyph, phase?: Phase | null): Mark => (phase && (glyph === 'running' || glyph === 'queued') ? phase : GLYPH_MARK[glyph]);
 
 /** What holds a thread up (a Needs you blocker), to its mark. `from`: the threads under it that asked. */
-export function blockerMark(b: { kind: keyof typeof BLOCKER_GLYPH; from?: readonly string[]; scheduled?: boolean }): Mark {
+export function blockerMark(b: { kind: keyof typeof BLOCKER_GLYPH; from?: readonly string[]; scheduled?: boolean; signin?: boolean }): Mark {
   switch (b.kind) {
     case 'question':
       return b.from?.length ? 'crew_question' : 'question';
     case 'child_failed':
       return 'crew_failed';
     case 'setup':
-      return 'setup_failed';
+      return b.signin ? 'signin' : 'setup_failed';
     case 'limited':
       return b.scheduled ? 'resuming' : 'limited';
     default:
@@ -222,6 +227,7 @@ export function threadMark(t: Parameters<typeof threadGlyph>[0] & { setup?: stri
   const phase = threadPhase(t, ctx.turn);
   if (phase) return phase;
   if (t.setup === 'failed') return 'setup_failed';
+  if (t.setup === 'signin') return 'signin';
   const glyph = threadGlyph(t);
   if (glyph === 'done' && ctx.pr?.state === 'OPEN' && !ctx.pr.isDraft) return 'review';
   return markOf(glyph);
@@ -245,10 +251,10 @@ export interface RowStatus {
  */
 export function inboxStatus(
   t: Parameters<typeof threadGlyph>[0],
-  need?: { blockers: readonly { kind: keyof typeof BLOCKER_GLYPH }[]; result: { status: string } | null } | null,
+  need?: { blockers: readonly { kind: keyof typeof BLOCKER_GLYPH; signin?: boolean }[]; result: { status: string } | null } | null,
 ): RowStatus | null {
   const b = need?.blockers[0];
   const own = threadGlyph(t);
-  const glyph = b ? BLOCKER_GLYPH[b.kind] : own === 'running' || own === 'queued' ? own : need?.result ? resultGlyph(need.result.status) : null;
+  const glyph = b ? blockerGlyph(b) : own === 'running' || own === 'queued' ? own : need?.result ? resultGlyph(need.result.status) : null;
   return glyph ? { glyph, label: STATUS[glyph].label } : null;
 }
