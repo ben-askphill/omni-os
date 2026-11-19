@@ -1,6 +1,6 @@
 # Automations
 
-Omni ships no automations, so a fresh install lists none. Yours are YAML files in `data/automations/`, one per automation: make one with New on the Automations page, ask the Conductor, or add a file there by hand.
+Omni ships no automations, so a fresh install lists none. Yours are YAML files in `data/automations/`, one per automation: make one with New on the Automations page, ask the Conductor, or add a file there by hand. The first-run screens offer three starter routines (Morning plan, Mail follow-ups, Weekly review), each off; one you turn on there becomes your own file in `data/automations/`, run as the Admin role in General.
 
 A server also loads shared automations from `automations/` beside it (`OMNI_AUTOMATIONS_DIR` names another folder), under yours: the same id in `data/automations/` wins. Omni's own builds leave it empty, and the desktop app does not ship it.
 
@@ -8,7 +8,7 @@ A server also loads shared automations from `automations/` beside it (`OMNI_AUTO
 
 The Automations page edits every field of an automation and writes the result into its YAML. New makes one, Edit on a card opens it, and the toggle turns it on or off. Desktop web, phone web and the desktop app share the editor.
 
-- The Form tab covers name, on or off, a schedule (cron, timezone, catch-up) or an event with its options, channel, machine, role, harness, model, effort and prompt. The YAML tab edits the file as text.
+- The Form tab covers name, on or off, a schedule (cron, timezone, catch-up) or an event with its options, channel, machine, role, harness, model, effort, prompt and the run rules below it ([Quiet runs, approval and dry runs](#quiet-runs-approval-and-dry-runs)). The YAML tab edits the file as text.
 - Every save, the toggle included, writes `data/automations/<id>.yaml`. Editing a shared one writes your own copy there first, with the file's comments and any keys the form does not know kept. Its card then says Edited, and updates to the shared file stop reaching it until Reset to shipped in the editor drops your copy.
 - Omni refuses a save it would load as invalid (a bad cron, both `cron` and `on`, an unknown channel, harness or model), and writes nothing.
 - With sync on, a file saved in Omni reaches your other machines too, and so does a Delete of it. A file you edit by hand, or saved in Omni before sync was set up, stays on its machine until its next save in Omni with sync on.
@@ -72,6 +72,23 @@ catchup_max_age: 6h     # seconds, or 45s, 90m, 6h, 2d
 - It runs for scheduled runs only: cron ticks and catch-ups. Run now and event runs ignore it.
 - `catchup_max_age` caps a catch-up: when the missed slot is older than this, Omni skips it instead of starting a stale run after the Mac wakes. A missed slot within the age still runs once.
 - A skipped run makes no thread and nothing in the Inbox. It shows in the automation's run history as Skipped with its reason (the precheck's exit code and last line of stderr, the timeout, or the missed slot's time) on desktop web, phone web, the desktop app and iOS, and it counts as that slot's run, so a catch-up does not try it again.
+
+## Quiet runs, approval and dry runs
+
+Three optional fields, on the Form tab under the prompt as Quiet when empty, Ask before acting and Draft expires after:
+
+```yaml
+quiet: true     # post nothing when there is nothing to report
+approve: true   # draft first, then ask on a card before acting outside Omni
+expires: 8h     # an unanswered draft is skipped after this; needs approve
+```
+
+- Omni adds what each one means to the end of the prompt it sends, so they hold on every harness.
+- `quiet`: a run with nothing to report replies with the one word `NOTHING_TO_REPORT`. Omni then marks its thread done, so it raises no alert or push and stays out of Needs you. The run history still lists it. A run that found something posts as usual, and so does any turn after you reply in the thread or once the run has asked a question, so text a run reads cannot talk it into hiding what it did.
+- `approve`: the run drafts what it would send, post or change, then asks on the question card, Approve or Skip, and acts only on Approve.
+- `expires`: seconds, or a duration like 90m, 8h or 2d. A card nobody answered in that time is answered as expired, so the run does nothing, and its thread is marked done. The machine that runs the automation checks every minute. Without `expires` the card waits for you; `expires` without `approve` is invalid.
+- **Dry run** on a card runs it now and has the agent list what it would do, each item with what it would send or change, without acting or asking for approval. It always reports, quiet or not. Its thread is titled `Dry run · <name>`. The Conductor's `run_automation` takes `dry_run: true` for the same.
+- A card shows Quiet when empty and Asks first, with the expiry, as chips. Desktop web, phone web and the desktop app have the fields, the chips and Dry run; the native iOS screen only toggles.
 
 ## Sign-in check
 

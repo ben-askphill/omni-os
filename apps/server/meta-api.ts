@@ -141,7 +141,9 @@ metaApi.post('/automations/:id/run', async (c) => {
   const a = loadAutomations().find((x) => x.id === c.req.param('id'));
   if (!a) return c.json({ error: 'not found' }, 404);
   if (a.error) return c.json({ error: a.error }, 400);
-  return c.json(await runAutomation(a, 'manual'));
+  // `{"dry": true}`: a dry run, which says what it would do and does none of it (automation-rules.ts).
+  const body = (await c.req.json().catch(() => ({}))) as { dry?: unknown } | null;
+  return c.json(await runAutomation(a, 'manual', undefined, { dry: body?.dry === true }));
 });
 // Delete one: the user's own YAML is removed, a shipped one is hidden on this machine (automations.ts deleteAutomation).
 // The id is matched against the listed automations, never joined into a path; one that looks like a path is refused first.

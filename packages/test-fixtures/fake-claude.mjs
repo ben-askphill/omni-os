@@ -51,6 +51,8 @@
 //                     its tool_result once it returns), and wait as long as MCP_TOOL_TIMEOUT allows (else the SDK's 60s).
 //                     Interruptible like TOOL. Messages sent meanwhile join after its result; the answer quotes the result
 //   ASK_ONE           ASK with only the first of those questions
+//   SAY:<text>        answer with exactly <text> (the rest of that line) instead of "ack: ...", as a quiet automation
+//                     run that has nothing to report does
 //   WRITE:<path>      a Write tool call that writes "written by fake-claude" to that path (relative to the cwd)
 //   CMD:<command>     a Bash tool call that runs that command in the cwd; underscores in it are spaces
 //                     With --permission-prompt-tool stdio, each WRITE, CMD and TOOL call first sends a can_use_tool
@@ -219,6 +221,26 @@ if (process.argv[2] === 'auth' && process.argv[3] === 'status') {
     : JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', email: 'dev@example.com', orgName: 'Example Org', subscriptionType: 'max' }, null, 2);
   process.stdout.write(status + '\n');
   process.exit(JSON.parse(status).loggedIn ? 0 : 1);
+}
+
+// `claude auth login`, as the real CLI runs without a terminal: it prints the page to open, waits for the code that page
+// shows on stdin, and signs in. The code `bad` fails the way a wrong code does. Signing in writes FAKE_CLAUDE_AUTH (only
+// when it is set, so a QA stack never writes the real home folder) as signed in, so `auth status` reads it next.
+if (process.argv[2] === 'auth' && process.argv[3] === 'login') {
+  process.stdout.write('Opening browser to sign in\u2026\nIf the browser didn\'t open, visit: https://claude.com/cai/oauth/authorize?code=true&client_id=fake&response_type=code&state=fake\nPaste code here if prompted > ');
+  let code = '';
+  process.stdin.on('data', (b) => {
+    code += b;
+    if (!code.includes('\n')) return;
+    if (code.trim() === 'bad') {
+      process.stdout.write("Login failed: That code wasn't accepted. It may be incomplete, expired, already used, or from an earlier sign-in attempt.\n");
+      process.exit(1);
+    }
+    if (process.env.FAKE_CLAUDE_AUTH) writeFileSync(process.env.FAKE_CLAUDE_AUTH, JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', email: 'new@example.com', subscriptionType: 'pro' }));
+    process.stdout.write('Login successful.\n');
+    process.exit(0);
+  });
+  await new Promise(() => {});
 }
 
 // `claude mcp list`: each MCP server and whether it is connected, for the sign-in check (apps/server/sign-in-check.ts).
@@ -815,7 +837,8 @@ async function runTurn() {
     }
     if (think && !(await pause(t, think))) break;
     steps++;
-    finalText = needsTask ? `TASK: ${needsTask}\nIt has to change files, which a quick ask cannot do.` : `ack: ${[...seen, ...answers].join(' | ')}`;
+    const said = /\bSAY:([^\n]+)/.exec(seen.join('\n'))?.[1]?.trim();
+    finalText = said || (needsTask ? `TASK: ${needsTask}\nIt has to change files, which a quick ask cannot do.` : `ack: ${[...seen, ...answers].join(' | ')}`);
     assistant(`msg_fake_${++seq}`, [{ type: 'text', text: finalText }]);
     if (goal && goalMisses > 0) {
       // The goal hook blocks the stop: its reason goes in as a synthetic message and the model goes on.

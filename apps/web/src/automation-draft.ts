@@ -43,6 +43,12 @@ export interface Draft {
   harness: string;
   model: string;
   effort: string;
+  /** Post nothing when there is nothing to report. */
+  quiet: boolean;
+  /** Ask on a card before acting outside Omni. */
+  approve: boolean;
+  /** How long a draft waiting for approval lasts, like 8h. Empty: until answered. */
+  expires: string;
   prompt: string;
 }
 
@@ -68,6 +74,9 @@ export const blankDraft = (channel = 'inbox'): Draft => ({
   harness: '',
   model: '',
   effort: '',
+  quiet: false,
+  approve: false,
+  expires: '',
   prompt: '',
 });
 
@@ -103,6 +112,9 @@ export function draftOf(f: AutomationFields, machineId: string | null, self: str
     harness: f.harness ?? '',
     model: f.model ?? '',
     effort: f.effort ?? '',
+    quiet: !!f.quiet,
+    approve: !!f.approve,
+    expires: f.expires ?? '',
     prompt: f.prompt,
   };
 }
@@ -146,6 +158,9 @@ export function fieldsOf(d: Draft): AutomationFields {
     harness: d.harness,
     model: d.harness ? d.model : '',
     effort: d.harness && d.model ? d.effort : '',
+    quiet: d.quiet,
+    approve: d.approve,
+    expires: d.approve ? d.expires.trim() : '',
     prompt: d.prompt,
   };
 }
@@ -157,5 +172,6 @@ export function draftProblem(d: Draft): string | null {
   if (d.trigger === 'schedule' && d.cron.trim().split(/\s+/).length !== 5) return 'A schedule takes five cron fields, like 0 8 * * 1-5.';
   if (d.trigger === 'event' && d.event === 'github_webhook' && !/^[\w.-]+\/[\w.-]+$/.test(d.repo.trim())) return 'A GitHub webhook needs its repo as owner/name.';
   if (d.trigger === 'event' && d.event === 'github_webhook' && !d.webhookEvents.length) return 'Pick at least one GitHub event.';
+  if (d.approve && d.expires.trim() && !/^\d+(\.\d+)?\s*[smhd]?$/i.test(d.expires.trim())) return 'An expiry takes a duration like 90m, 8h or 2d.';
   return null;
 }

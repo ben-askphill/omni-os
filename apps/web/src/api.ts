@@ -343,6 +343,12 @@ export interface AutomationFields {
   harness?: string;
   model?: string;
   effort?: string;
+  /** Post nothing when there is nothing to report. */
+  quiet?: boolean;
+  /** Ask on the question card before acting outside Omni. */
+  approve?: boolean;
+  /** How long an unanswered draft waits, like 8h. Only with `approve`. */
+  expires?: string;
   prompt: string;
 }
 
@@ -388,6 +394,12 @@ export interface Automation {
   prompt: string;
   enabled: boolean;
   catchup?: boolean;
+  /** Posts nothing when there is nothing to report: such a run is filed as done. */
+  quiet?: boolean;
+  /** Asks on a card before it acts outside Omni. */
+  approve?: boolean;
+  /** Seconds an unanswered draft waits before it expires. */
+  expiresAfter?: number;
   /** The synced machine its YAML names, by name or id. Unset, it follows "Run automations on". */
   machine?: string;
   /** Where it runs: a machine's sync id (null before any machine claimed automations), and whether that is this one. */

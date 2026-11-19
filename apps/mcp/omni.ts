@@ -786,6 +786,9 @@ server.registerTool(
           harness: z.string().optional(),
           model: z.string().optional(),
           effort: z.string().optional(),
+          quiet: z.boolean().optional().describe('Post nothing when a run has nothing to report: it ends marked done, with no alert.'),
+          approve: z.boolean().optional().describe('Draft first and ask on the question card before sending, posting or changing anything outside Omni.'),
+          expires: z.string().optional().describe('With approve: how long an unanswered draft waits before it expires, like 8h or 2d.'),
           prompt: z.string(),
         })
         .optional(),
@@ -1119,11 +1122,15 @@ server.registerTool(
   {
     description:
       `Run an automation now, once, only when ${USER} asks. It starts a new thread on this machine with the automation's prompt and defaults, ` +
-      'even when the automation is disabled or another machine runs the schedule. An automation with an error is refused with the reason. Returns the new thread id.',
-    inputSchema: { automation: z.string().min(1).max(200).describe('Automation id from list_automations.') },
+      'even when the automation is disabled or another machine runs the schedule. An automation with an error is refused with the reason. Returns the new thread id. ' +
+      'dry_run: true runs it as a dry run, which goes as far as acting, then lists what it would send, post or change and does none of it.',
+    inputSchema: {
+      automation: z.string().min(1).max(200).describe('Automation id from list_automations.'),
+      dry_run: z.boolean().optional().describe('Say what the run would do without doing any of it.'),
+    },
   },
-  async ({ automation }) => {
-    const t = await call(`/automations/${encodeURIComponent(automation)}/run`, { method: 'POST' });
+  async ({ automation, dry_run }) => {
+    const t = await call(`/automations/${encodeURIComponent(automation)}/run`, { method: 'POST', ...(dry_run && { body: JSON.stringify({ dry: true }) }) });
     return text({ automation, thread_id: t.id, title: t.title, channel: t.channel_id, status: t.status });
   },
 );

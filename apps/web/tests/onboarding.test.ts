@@ -12,9 +12,26 @@ let harnesses: unknown[] = [];
 let accounts: unknown = { machines: [], synced: false };
 /** GET /api/setup/github. Unset stands for an older server without it, which answers 404. */
 let github: unknown;
+/** GET /api/setup/claude, the same way. */
+let claudeSetup: unknown;
+/** GET /api/setup/claude/install/:flow, one answer per poll; the last one repeats. */
+let installSteps: unknown[] = [];
+/** GET /api/automations: the ids already saved. */
+let automations: { id: string }[] = [];
 const routes = async (path: string) => {
-  if (path === '/setup/github' && github === undefined) throw new Error('Not found');
-  return path === '/harnesses' ? harnesses : path === '/accounts' ? accounts : path === '/setup/github' ? github : {};
+  if ((path === '/setup/github' && github === undefined) || (path === '/setup/claude' && claudeSetup === undefined)) throw new Error('Not found');
+  if (path.startsWith('/setup/claude/install/')) return installSteps.length > 1 ? installSteps.shift() : installSteps[0];
+  return path === '/harnesses'
+    ? harnesses
+    : path === '/accounts'
+      ? accounts
+      : path === '/setup/github'
+        ? github
+        : path === '/setup/claude'
+          ? claudeSetup
+          : path === '/automations'
+            ? automations
+            : {};
 };
 /** POSTs the page sent, and what each answers: Connect GitHub's start and poll, by path. */
 let posts: { path: string; body: unknown }[] = [];
@@ -28,11 +45,14 @@ vi.mock('../src/api.ts', () => ({ api: { get: routes, post, put: async () => ({}
 afterEach(() => {
   accounts = { machines: [], synced: false };
   github = undefined;
+  claudeSetup = undefined;
+  installSteps = [];
+  automations = [];
   posts = [];
   postAnswers = {};
 });
 
-const { FilesScreen, HarnessScreen, NotificationsScreen, STEPS, WorkScreen } = await import('../src/components/onboarding-parts.tsx');
+const { FilesScreen, HarnessScreen, NotificationsScreen, RoutinesScreen, STEPS, WorkScreen } = await import('../src/components/onboarding-parts.tsx');
 const { DoneTips, SavedNote, addChannelHint, doneTips, offersNpmSetup } = await import('../src/components/Onboarding.tsx');
 
 let root: Root | null = null;
@@ -264,6 +284,145 @@ describe('Harnesses step: accounts and the GitHub CLI', () => {
   });
 });
 
+describe('Harnesses step: Claude Code without a terminal', () => {
+  const claude = { id: 'claude-code', name: 'Claude Code', plan: 'Claude plan', available: true, models: [], running: 0, cap: 4 };
+  const wait = (ms = 30) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
+  const button = (el: Element, label: string) => [...el.querySelectorAll('button')].find((b) => text(b) === label);
+  const click = (el: Element, label: string) =>
+    act(async () => {
+      button(el, label)!.click();
+      await new Promise((r) => setTimeout(r, 5));
+    });
+  const type = (input: HTMLInputElement, value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  const start = { flow: 'c1', url: 'https://claude.com/cai/oauth/authorize?code=true&state=x' };
+
+  it('a signed-out CLI is not Ready, whatever the catalog or the accounts list says, and offers Sign in to Claude', async () => {
+    harnesses = [claude];
+    claudeSetup = { state: 'signed-out' };
+    // The accounts list can still hold the login from before a sign-out.
+    accounts = { synced: false, machines: [{ id: 'm1', name: 'studio', current: true, checkedAt: null, accounts: [{ harness: 'claude-code', state: 'signed-in', label: 'old@example.com', plan: 'Max', org: null, note: null, switched: null, notice: false }] }] };
+    const el = await render(createElement(HarnessScreen));
+    const r = row(el, 'claude-code');
+    expect(r.getAttribute('data-state')).toBe('signed-out');
+    expect(r.querySelector('[data-account]')).toBeNull();
+    expect(button(r, 'Sign in to Claude')).toBeDefined();
+    expect([...r.querySelectorAll('code')].map((c) => c.textContent)).toEqual(['claude auth login']);
+    expect(text(el)).toContain('Set up Claude Code before your first thread.');
+  });
+
+  it('Sign in: a link to the page the CLI printed, the pasted code goes back, then the row reads again as signed in', async () => {
+    harnesses = [claude];
+    claudeSetup = { state: 'signed-out' };
+    postAnswers = { '/setup/claude/login': [start], '/setup/claude/login/code': [{ state: 'done', setup: { state: 'ready', email: 'ada@example.com', plan: 'pro' } }] };
+    const el = await render(createElement(HarnessScreen));
+    await click(row(el, 'claude-code'), 'Sign in to Claude');
+    const card = row(el, 'claude-code').querySelector('[data-claude="code"]')!;
+    const open = card.querySelector('a')!;
+    expect([text(open), open.getAttribute('href'), open.getAttribute('target')]).toEqual(['Open Claude sign-in', start.url, '_blank']);
+    expect((button(card, 'Finish') as HTMLButtonElement).disabled).toBe(true);
+    await type(card.querySelector('input')!, 'abc#state');
+    claudeSetup = { state: 'ready', email: 'ada@example.com', plan: 'pro' };
+    await click(card, 'Finish');
+    await wait();
+    expect(posts.find((p) => p.path === '/setup/claude/login/code')?.body).toEqual({ flow: 'c1', code: 'abc#state' });
+    const r = row(el, 'claude-code');
+    expect(r.getAttribute('data-state')).toBe('ready');
+    expect(text(r.querySelector('[data-account]'))).toBe('Signed in as ada@example.com · Pro');
+    expect(r.querySelector('[data-claude]')).toBeNull();
+  });
+
+  it("Enter in the code field finishes the sign-in, not the wizard's step around it", async () => {
+    harnesses = [claude];
+    claudeSetup = { state: 'signed-out' };
+    postAnswers = { '/setup/claude/login': [start], '/setup/claude/login/code': [{ state: 'done' }] };
+    const submitted: unknown[] = [];
+    const el = await render(createElement('form', { onSubmit: (e: Event) => (e.preventDefault(), submitted.push(e)) }, createElement(HarnessScreen)));
+    await click(row(el, 'claude-code'), 'Sign in to Claude');
+    const input = row(el, 'claude-code').querySelector('input')!;
+    await type(input, 'abc');
+    await act(async () => void input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await wait();
+    expect(posts.find((p) => p.path === '/setup/claude/login/code')?.body).toEqual({ flow: 'c1', code: 'abc' });
+    expect(row(el, 'claude-code').querySelector('form')).toBeNull();
+    expect(submitted).toEqual([]);
+  });
+
+  it("a refused code says why in the CLI's words and offers Sign in again; Cancel stops the CLI", async () => {
+    harnesses = [claude];
+    claudeSetup = { state: 'signed-out' };
+    postAnswers = { '/setup/claude/login': [start], '/setup/claude/login/code': [{ state: 'failed', error: "Login failed: That code wasn't accepted." }] };
+    const el = await render(createElement(HarnessScreen));
+    await click(row(el, 'claude-code'), 'Sign in to Claude');
+    await type(row(el, 'claude-code').querySelector('input')!, 'bad');
+    await click(row(el, 'claude-code'), 'Finish');
+    expect(text(row(el, 'claude-code'))).toContain("Login failed: That code wasn't accepted.");
+    expect(button(row(el, 'claude-code'), 'Sign in to Claude')).toBeDefined();
+    await click(row(el, 'claude-code'), 'Sign in to Claude');
+    await click(row(el, 'claude-code'), 'Cancel');
+    expect(posts.find((p) => p.path === '/setup/claude/login/cancel')?.body).toEqual({ flow: 'c1' });
+    expect(row(el, 'claude-code').querySelector('[data-claude="code"]')).toBeNull();
+  });
+
+  it('a missing CLI gets Install, which runs the installer and reads the row again when it is done', async () => {
+    harnesses = [{ ...claude, available: false, missing: true, fix: 'Omni found no claude on its PATH' }];
+    claudeSetup = { state: 'missing', install: 'curl -fsSL https://claude.ai/install.sh | bash' };
+    postAnswers = { '/setup/claude/install': [{ flow: 'i1' }] };
+    installSteps = [{ state: 'running' }, { state: 'done' }];
+    const el = await render(createElement(HarnessScreen));
+    const r = row(el, 'claude-code');
+    expect(r.getAttribute('data-state')).toBe('missing');
+    expect([...r.querySelectorAll('code')].map((c) => c.textContent)).toEqual(['curl -fsSL https://claude.ai/install.sh | bash']);
+    await click(r, 'Install Claude Code');
+    claudeSetup = { state: 'signed-out' };
+    await wait(3300);
+    expect(row(el, 'claude-code').getAttribute('data-state')).toBe('signed-out');
+    expect(button(row(el, 'claude-code'), 'Sign in to Claude')).toBeDefined();
+  });
+
+  it('an older server, or a CLI that cannot say, keeps the catalog row with no buttons', async () => {
+    harnesses = [claude];
+    let el = await render(createElement(HarnessScreen));
+    expect(row(el, 'claude-code').getAttribute('data-state')).toBe('ready');
+    expect(row(el, 'claude-code').querySelector('[data-claude]')).toBeNull();
+    act(() => root?.unmount());
+    host.remove();
+    claudeSetup = { state: 'unknown' };
+    el = await render(createElement(HarnessScreen));
+    expect(row(el, 'claude-code').getAttribute('data-state')).toBe('ready');
+    expect(row(el, 'claude-code').querySelector('[data-claude]')).toBeNull();
+  });
+});
+
+describe('Routines step', () => {
+  it('sits after Notifications, before Done', () => {
+    expect(STEPS.slice(-3)).toEqual(['Notifications', 'Routines', 'Done']);
+  });
+
+  it('lists the three starters, each off, and a switch adds or drops its id', async () => {
+    const picked: string[][] = [];
+    const el = await render(createElement(RoutinesScreen, { value: ['weekly-review'], onChange: (ids: string[]) => picked.push(ids) }));
+    const rows = [...el.querySelectorAll('[data-starter]')];
+    expect(rows.map((r) => r.getAttribute('data-starter'))).toEqual(['morning-plan', 'follow-ups', 'weekly-review']);
+    expect(rows.map((r) => r.querySelector('[role="switch"]')!.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true']);
+    expect(text(rows[1])).toContain('Weekdays at 10:00');
+    expect(text(el)).toContain('a draft nobody approves expires after 8 hours');
+    await act(async () => (rows[0].querySelector('[role="switch"]') as HTMLElement).click());
+    await act(async () => (rows[2].querySelector('[role="switch"]') as HTMLElement).click());
+    expect(picked).toEqual([['weekly-review', 'morning-plan'], []]);
+  });
+
+  it('one already saved as an automation shows as on and stays as it is', async () => {
+    automations = [{ id: 'follow-ups' }];
+    const el = await render(createElement(RoutinesScreen, { value: [], onChange: () => {} }));
+    const sw = el.querySelector('[data-starter="follow-ups"] [role="switch"]') as HTMLButtonElement;
+    expect([sw.getAttribute('aria-checked'), sw.disabled]).toEqual(['true', true]);
+  });
+});
+
 describe('Done screen: what to set up next', () => {
   const ids = (tips: { id: string }[]) => tips.map((t) => t.id);
 
@@ -315,8 +474,8 @@ describe('copy for the install and the layout', () => {
 });
 
 describe('Notifications step', () => {
-  it('sits before Done', () => {
-    expect(STEPS).toEqual(['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Done']);
+  it('sits before Routines and Done', () => {
+    expect(STEPS).toEqual(['You', 'Work', 'Files', 'Harnesses', 'Project', 'Notifications', 'Routines', 'Done']);
   });
 
   it('in the desktop app: a test notification so macOS asks now, and the switch saves the app setting', async () => {

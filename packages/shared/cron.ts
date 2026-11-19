@@ -39,3 +39,9 @@ export function describeCron(cron: string): string {
   if (num.test(dom) && dow === '*') return `Day ${dom} of every month at ${at}`;
   return cron;
 }
+
+/** "8 hours", "90 minutes", "2 days": a span of seconds in words, as an automation's expiry is said. */
+export function spanWords(sec: number): string {
+  const [n, unit] = sec % 86_400 === 0 ? [sec / 86_400, 'day'] : sec % 3600 === 0 ? [sec / 3600, 'hour'] : [Math.max(1, Math.round(sec / 60)), 'minute'];
+  return `${n} ${unit}${n === 1 ? '' : 's'}`;
+}
