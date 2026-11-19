@@ -133,7 +133,7 @@ pub fn open_command(argv: &[String]) -> Result<i32> {
             return Err(Error::cli("No API token to pair with. Set OMNI_TOKEN, or run this on the machine Omni runs on."));
         };
         // The link carries the token: it names only a server that proved it holds it.
-        c.prove()?;
+        c.prove_for_link()?;
         sys::out(&format!("{}?pair={}\n", c.link(&route), encode(&token)));
         return Ok(exit::OK);
     }

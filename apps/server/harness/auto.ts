@@ -26,6 +26,8 @@ export const TIERS_ORDER: Tier[] = ['light', 'standard', 'heavy', 'max'];
  * What a brief asks of the run beyond its kind and difficulty. Each one can decide the harness (see LANES).
  * - `image-generation`: make an image. Only Codex generates images here.
  * - `connectors`: Ben's mail, calendar, Notion, Slack, Productive or Portal, which are claude.ai connectors in Claude Code.
+ *   Notion also works in any local harness through OMNI_NOTION_TOKEN (runner/prompts.ts); it stays here because a
+ *   brief that names it usually names another connector too.
  * - `review`: a second look at code or a PR, best from another model family than the one that wrote it.
  * - `bulk`: one mechanical change applied everywhere, which a fast cheap coding model does as well as a big one.
  * - `speed`: Ben asked for it fast. Lowers the effort a step and prefers the fastest model that can do the kind.

@@ -50,4 +50,4 @@ Crew reports and pull requests come from the server's live feed:
 
 - only the machine where the report landed or the PR watch runs notifies for them;
 - one sent while the app or tab was not connected to the server (the app starting, the server restarting) is not shown later;
-- a crew report usually wakes its Conductor thread, so a Finished notification for that thread follows the report, as on the iPhone.
+- a crew report shows in its Conductor thread without waking it, unless the delegation asked for a follow-up; then a Finished notification for that thread follows the report, as on the iPhone.

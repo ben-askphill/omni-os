@@ -7,6 +7,7 @@ import { Text, TextInput } from '../ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { addDraftContext } from '../context/draft';
+import { useThreadKey } from '../live/react';
 import { describeFailure } from '../review/failure';
 import { Button } from '../ui/Button';
 import { fontSize, lineHeight, mono, radius, space, useOmniTheme } from '../theme';
@@ -34,6 +35,7 @@ interface SelectionDockProps {
 export function SelectionDock({ threadId, picked, source, onClear, onAdded, onPin }: SelectionDockProps) {
   const { colors } = useOmniTheme();
   const insets = useSafeAreaInsets();
+  const key = useThreadKey(threadId);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pinning, setPinning] = useState(false);
@@ -42,7 +44,7 @@ export function SelectionDock({ threadId, picked, source, onClear, onAdded, onPi
 
   const add = () => {
     if (!body.ok) return;
-    const why = addDraftContext(threadId, newContext(diffSelection, body.value, note));
+    const why = addDraftContext(key, newContext(diffSelection, body.value, note));
     if (why) return setError(why);
     onAdded();
   };

@@ -65,19 +65,20 @@ The Simulator has no camera, so use Enter code there.
 
 Search lists the latest threads until you type. After 200 ms of quiet it asks the server's `/search`, which matches every word as a prefix in thread titles and messages, and shows matching channels above the thread hits. A hit opens its thread. It does not scroll to the matching message yet, because the Thread screen takes only an id.
 
-Settings opens with Servers, then a search over every setting and the same groups and sections as the Web UI and phone web, drawn from `@omni/shared/settings-catalog.ts`, then Devices, Automations and Sign out. A search hit opens its section. Each section edits what the Web UI's section edits, through the same calls, so a value saved on the phone shows on the computer and the other way round:
+Settings opens with Servers, then a search over every setting and the same groups and sections as the Web UI and phone web, drawn from `@omni/shared/settings-catalog.ts`, then Signed-in devices, Automations and Sign out. A search hit opens its section. Each section edits what the Web UI's section edits, through the same calls, so a value saved on the phone shows on the computer and the other way round:
 
 - General: name, pronouns, timezone and email (`PUT /setup`). The fields come from `@omni/shared/settings.ts`, as on the web.
 - Appearance: Match system, Light or Dark, kept on this phone only.
 - Notifications: the per-server alert choices (`NotificationSettings`).
-- Harnesses & models: each harness with whether it can run and how to fix it, each channel's default model, and the server's `.env` options.
+- Models: each harness with whether it can run and how to fix it, each channel's default model, and the server's `.env` options.
 - Threads: the machine new threads run on, the session and usage-limit options from `.env`, and Automations.
 - Channels: every channel, New channel, and the archived ones with Unarchive.
-- Workspace: the GitHub owner. Folders, the central brain folder included, show their value, since they are paths on the server's machine. The Hermes URL is under Harnesses & models.
+- Workspace: the GitHub owner. Folders show their value, since they are paths on the server's machine.
 - Worktrees: automatic cleanup and its idle days (`PUT /worktrees/retention`).
 - Machines: the server's machine, read-only, and Update all machines, which checks, downloads and updates every synced machine through `/update/fleet` as the Web UI's card does.
 - Sync: what the server reports, plus each machine's signing key (paired machines are trusted with their first key; Confirm new key when a machine's key changed, with how many of its actions wait, and Trust this machine only for one still not trusted) and the changes this server refused.
-- Sharing & access: Devices, Rotate install token and the MCP clients that reached `/mcp` (Approve, Remove).
+- Sharing & access: Signed-in devices, Rotate install token and the MCP clients that reached `/mcp` (Approve, Remove).
+- Extras: Wispr Flow (a switch in the Mac app only), whether Grok Bot is on, and the Hermes URL and notes folder (`PUT /setup`; the folder shows its value).
 - About: what the server reports, read-only.
 - Secrets: names by scope, add or replace a value, delete one. A value is never shown again.
 

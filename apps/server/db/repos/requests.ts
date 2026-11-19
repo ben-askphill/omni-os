@@ -15,6 +15,8 @@ import type { Attachment } from '../../uploads.ts';
  * read), `discarded` (Ben chose not to send a recovered one), `cancelled` (Ben removed it from the queue before it
  * was sent; the row stays as the record, and the transcript never shows it). After a restart: `recovered` (it never reached a
  * harness, so it waits for Resume) and `uncertain` (it may have reached one, so it is never sent again on its own).
+ * `shown`: a crew report in its delegate-only parent's transcript that started no turn; the harness reads it with the
+ * parent's next message, which makes it `delivered` (apps/server/runner/queue.ts).
  */
 export type DeliveryState =
   | 'accepted'
@@ -26,7 +28,8 @@ export type DeliveryState =
   | 'discarded'
   | 'cancelled'
   | 'recovered'
-  | 'uncertain';
+  | 'uncertain'
+  | 'shown';
 
 /** Waiting on Ben after a restart. */
 export const PARKED: readonly DeliveryState[] = ['recovered', 'uncertain'];
@@ -119,6 +122,8 @@ export const messageRequests = {
   /** A thread's requests waiting on the user after a restart, in the order they arrived. */
   parked: (threadId: string) =>
     list(`SELECT * FROM message_requests WHERE thread_id = ? AND state IN (${marks(PARKED)}) ORDER BY pos, seq`, threadId),
+  /** A thread's crew reports shown in its transcript that its harness has not read yet, oldest first. */
+  shown: (threadId: string) => list(`SELECT * FROM message_requests WHERE thread_id = ? AND state = 'shown' ORDER BY pos, seq`, threadId),
   /** A thread's requests saved but not handed to the runner yet: a worktree thread's first prompt while it is prepared. */
   unstarted: (threadId: string) => list(`SELECT * FROM message_requests WHERE thread_id = ? AND state = 'accepted' ORDER BY pos, seq`, threadId),
   /** A thread's requests, newest first: the record of what was sent, dropped, discarded or cancelled. */

@@ -47,7 +47,7 @@ const detail = () => ({
   live: false,
 });
 
-const session = (over: Partial<OmniSession> = {}): OmniSession => ({ serverUrl: BASE, token: async () => 'token', refreshAuth: async () => false, ...over });
+const session = (over: Partial<OmniSession> = {}): OmniSession => ({ serverUrl: BASE, serverId: 'mac', token: async () => 'token', refreshAuth: async () => false, ...over });
 
 beforeEach(() => {
   vi.useFakeTimers();

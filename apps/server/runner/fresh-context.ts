@@ -5,6 +5,7 @@ import { messageRequests, threads, type Thread } from '../db.ts';
 import { isProviderHarness } from '../harness/types.ts';
 import { turnBlocked } from '../sync/guard.ts';
 import { resumeRequests } from './api.ts';
+import type { SetupRetryBy } from './setup.ts';
 import { closeLive } from './session.ts';
 import { runName } from './switch.ts';
 import { emitThread, lives, refusal, runsHere } from './state.ts';
@@ -20,24 +21,24 @@ function quiet(threadId: string): Thread {
 }
 
 /** Send what waits for Resume, if anything does: the next spawn downloads the session again first. */
-async function sendParked(threadId: string): Promise<Thread> {
-  if (messageRequests.parked(threadId).some((r) => r.state === 'recovered')) await resumeRequests(threadId);
+async function sendParked(threadId: string, by: SetupRetryBy): Promise<Thread> {
+  if (messageRequests.parked(threadId).some((r) => r.state === 'recovered')) await resumeRequests(threadId, undefined, by);
   emitThread(threadId);
   return threads.get(threadId)!;
 }
 
 /** Try the session download again with the messages that wait. Nothing waiting: the next message tries it. */
-export async function retryResume(threadId: string): Promise<Thread> {
+export async function retryResume(threadId: string, by: SetupRetryBy = {}): Promise<Thread> {
   const t = quiet(threadId);
   if (t.resume_blocked) threads.update(threadId, { resume_blocked: null, updated_at: t.updated_at });
-  return sendParked(threadId);
+  return sendParked(threadId, by);
 }
 
 /**
  * Start the thread's next turn in a new session that reads the thread so far, instead of resuming the session here.
  * Sends what waits for Resume; with nothing waiting, Ben's next message starts it. Twice is the same as once.
  */
-export async function startFresh(threadId: string): Promise<Thread> {
+export async function startFresh(threadId: string, by: SetupRetryBy = {}): Promise<Thread> {
   const t = quiet(threadId);
   if (isProviderHarness(t.harness)) throw refusal('This harness keeps its session with its provider, so there is no copy here to start over from.', 400);
   if (!t.has_run) throw refusal('This thread has not run yet, so its first turn already starts with fresh context.', 400);
@@ -47,5 +48,5 @@ export async function startFresh(threadId: string): Promise<Thread> {
   // A warm process holds the old session: the next turn starts a new one.
   const live = lives.get(threadId);
   if (live) closeLive(live);
-  return sendParked(threadId);
+  return sendParked(threadId, by);
 }
